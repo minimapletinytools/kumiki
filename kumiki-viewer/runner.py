@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Persistent stdio runner for the Horsey Viewer VS Code extension.
+Persistent stdio runner for the Kumiki Viewer VS Code extension.
 
 Protocol:
 - stdin: newline-delimited JSON requests
@@ -30,9 +30,9 @@ def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
         return None, False
     candidate = Path(sys.argv[1]).resolve().parent
     while True:
-        if (candidate / "giraffecad").is_dir():
+        if (candidate / "kumiki").is_dir():
             return candidate, True
-        if (candidate / ".giraffe.yaml").is_file():
+        if (candidate / ".kumiki.yaml").is_file():
             return candidate, False
         parent = candidate.parent
         if parent == candidate:
@@ -62,9 +62,9 @@ if _project_root is not None:
 
 
 # Enable milestone emission so pattern scripts can report progress to the viewer.
-os.environ["HORSEY_VIEWER_MILESTONES"] = "1"
+os.environ["KUMIKI_VIEWER_MILESTONES"] = "1"
 
-TARGET_MODULE_NAME = "_horsey_viewer_target"
+TARGET_MODULE_NAME = "_kumiki_viewer_target"
 
 
 @dataclass
@@ -155,7 +155,7 @@ def get_timber_display_name(timber: Any) -> str:
 
 
 def _compute_csg_depth(csg: Any) -> int:
-    from giraffecad.cutcsg import SolidUnion, Difference
+    from kumiki.cutcsg import SolidUnion, Difference
 
     if isinstance(csg, SolidUnion):
         if not csg.children:
@@ -172,7 +172,7 @@ def _compute_csg_depth(csg: Any) -> int:
 
 def _count_csg_nodes_and_features(csg: Any) -> Tuple[int, int]:
     """Return (node_count, named_feature_count) for the CSG tree."""
-    from giraffecad.cutcsg import SolidUnion, Difference, HalfSpace, RectangularPrism
+    from kumiki.cutcsg import SolidUnion, Difference, HalfSpace, RectangularPrism
 
     nodes = 1
     features = 0
@@ -275,9 +275,9 @@ def _cut_timber_to_triangle_mesh_payload(
     local_csg: Any,
     timber_key: str,
 ) -> Dict[str, Any]:
-    from giraffecad.cutcsg import adopt_csg
-    from giraffecad.rule import Transform
-    from giraffecad.triangles import triangulate_cutcsg
+    from kumiki.cutcsg import adopt_csg
+    from kumiki.rule import Transform
+    from kumiki.triangles import triangulate_cutcsg
 
     global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
     triangle_mesh = triangulate_cutcsg(global_csg).mesh
@@ -312,9 +312,9 @@ def _accessory_to_triangle_mesh_payload(
     accessory_key: str,
     accessory_name: str,
 ) -> Dict[str, Any]:
-    from giraffecad.cutcsg import adopt_csg
-    from giraffecad.rule import Transform
-    from giraffecad.triangles import triangulate_cutcsg
+    from kumiki.cutcsg import adopt_csg
+    from kumiki.rule import Transform
+    from kumiki.triangles import triangulate_cutcsg
 
     if hasattr(accessory, "transform"):
         global_csg = adopt_csg(accessory.transform, Transform.identity(), local_csg)
@@ -585,7 +585,7 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> Any:
         if verbose:
             log_stderr("[reload] WARNING: _project_root is None — project module purge skipped!")
             log_stderr(f"[reload]   sys.argv = {sys.argv}")
-            log_stderr("[reload]   Module changes to giraffecad/ will NOT be picked up until runner restarts.")
+            log_stderr("[reload]   Module changes to kumiki/ will NOT be picked up until runner restarts.")
 
     # Step 3: Ensure target module doesn't exist in sys.modules
     module_name = _module_name_for_path(file_path)
@@ -624,9 +624,9 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
     if _looks_like_frame(value):
         return value
 
-    from giraffecad.cutcsg import CutCSG
-    from giraffecad.rule import Transform
-    from giraffecad.timber import CSGAccessory, Frame
+    from kumiki.cutcsg import CutCSG
+    from kumiki.rule import Transform
+    from kumiki.timber import CSGAccessory, Frame
 
     frame_name = name or type(value).__name__
 
@@ -803,7 +803,7 @@ def _inv_transform_point(rot: List[List[float]], pos: List[float], pt: List[floa
 
 def _is_point_inside_csg_float(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
     """True if *pt* (timber-local floats) is inside *csg* (±eps tolerance)."""
-    from giraffecad.cutcsg import (
+    from kumiki.cutcsg import (
         HalfSpace, RectangularPrism, Cylinder, SolidUnion, Difference,
         ConvexPolygonExtrusion,
     )
@@ -852,7 +852,7 @@ def _is_point_inside_csg_float(csg: Any, pt: List[float], eps: float = 1e-4) -> 
 
 def _is_point_on_csg_boundary_float(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
     """True if *pt* (timber-local floats) lies on the boundary of *csg*."""
-    from giraffecad.cutcsg import (
+    from kumiki.cutcsg import (
         HalfSpace, RectangularPrism, Cylinder, SolidUnion, Difference,
         ConvexPolygonExtrusion,
     )
@@ -920,7 +920,7 @@ def _is_point_on_csg_boundary_float(csg: Any, pt: List[float], eps: float = 1e-4
 
 def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
     """Determine which face of a primitive CSG node *pt* lies on."""
-    from giraffecad.cutcsg import HalfSpace, RectangularPrism, Cylinder
+    from kumiki.cutcsg import HalfSpace, RectangularPrism, Cylinder
 
     if isinstance(csg, HalfSpace):
         return getattr(csg, "named_feature", None) or "cut_plane"
@@ -963,7 +963,7 @@ def _resolve_csg_at_path(csg: Any, path: List[str], pt: Optional[List[float]] = 
     transparently.  When *pt* is given and multiple children share the
     same tag, prefer the one whose boundary contains *pt*.
     """
-    from giraffecad.cutcsg import SolidUnion, Difference
+    from kumiki.cutcsg import SolidUnion, Difference
 
     def _find_tagged(node: Any, tag_name: str) -> List[Any]:
         """Return all descendants of *node* with the given *tag*, searching
@@ -1018,7 +1018,7 @@ def _navigate_csg_one_level(
 
     Returns (new_path, target_csg_to_highlight, feature_label_or_None).
     """
-    from giraffecad.cutcsg import SolidUnion, Difference
+    from kumiki.cutcsg import SolidUnion, Difference
 
     if isinstance(node, Difference):
         # Check which subtract child the point lies on
@@ -1062,7 +1062,7 @@ def _navigate_csg_to_leaf(
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
     """Ctrl+click: traverse from root to deepest named node, then report face."""
-    from giraffecad.cutcsg import SolidUnion, Difference
+    from kumiki.cutcsg import SolidUnion, Difference
 
     path: List[str] = []
     node = csg
@@ -1160,7 +1160,7 @@ def _debug_prism_distances(prism: Any, pt: List[float], eps: float, indent: int 
 
 def _debug_difference_distances(diff: Any, pt: List[float], eps: float, indent: int = 4) -> None:
     """Log detailed distances for a Difference CSG."""
-    from giraffecad.cutcsg import HalfSpace as _HS, RectangularPrism as _RP
+    from kumiki.cutcsg import HalfSpace as _HS, RectangularPrism as _RP
     pad = " " * indent
     base = diff.base
     if isinstance(base, _HS):
@@ -1225,7 +1225,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         return label
 
     def _csg_tree_debug(c: Any, depth: int = 0) -> List[str]:
-        from giraffecad.cutcsg import SolidUnion, Difference
+        from kumiki.cutcsg import SolidUnion, Difference
         indent = "  " * depth
         lines = [f"{indent}{_csg_debug_label(c)}"]
         if isinstance(c, Difference):
@@ -1264,7 +1264,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         log_stderr(f"[csg-nav] navigating from: {_csg_debug_label(node)}")
 
         # Debug: test each subtract child boundary for Difference nodes
-        from giraffecad.cutcsg import Difference as _Diff, SolidUnion as _SU, HalfSpace as _HS, RectangularPrism as _RP
+        from kumiki.cutcsg import Difference as _Diff, SolidUnion as _SU, HalfSpace as _HS, RectangularPrism as _RP
         if isinstance(node, _Diff):
             for i, sub in enumerate(node.subtract):
                 on_b = _is_point_on_csg_boundary_float(sub, pt_local, eps)
@@ -1376,20 +1376,20 @@ def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
         return _patterns_cache
 
     t0 = time.monotonic()
-    from giraffecad.librarian import scan_library_folder
+    from kumiki.librarian import scan_library_folder
 
     sources: List[Dict[str, Any]] = []
 
-    # Shipped patterns — bundled inside the giraffecad package as giraffecad/patterns/
+    # Shipped patterns — bundled inside the kumiki package as kumiki/patterns/
     # (pip-installed) or at the sibling patterns/ folder in a dev checkout.
     try:
-        import giraffecad
-        giraffecad_dir = Path(giraffecad.__file__).resolve().parent
+        import kumiki
+        kumiki_dir = Path(kumiki.__file__).resolve().parent
         # Installed wheel: patterns are inside the package directory.
-        # Dev checkout fallback: patterns/ sits next to the giraffecad/ folder.
-        shipped_patterns_dir = giraffecad_dir / "patterns"
+        # Dev checkout fallback: patterns/ sits next to the kumiki/ folder.
+        shipped_patterns_dir = kumiki_dir / "patterns"
         if not shipped_patterns_dir.is_dir():
-            shipped_patterns_dir = giraffecad_dir.parent / "patterns"
+            shipped_patterns_dir = kumiki_dir.parent / "patterns"
         if shipped_patterns_dir.is_dir():
             with contextlib.redirect_stdout(sys.stderr):
                 scan = scan_library_folder(str(shipped_patterns_dir))

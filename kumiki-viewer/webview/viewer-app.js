@@ -21,7 +21,7 @@ function createInitialViewState() {
     };
 }
 
-const INITIAL_PAYLOAD = window.__HORSEY_INITIAL_PAYLOAD__ || {
+const INITIAL_PAYLOAD = window.__KUMIKI_INITIAL_PAYLOAD__ || {
     frame: {},
     geometry: { meshes: [] },
     uiState: {
@@ -274,7 +274,7 @@ class ViewerSettingsPanel {
     }
 }
 
-class HorseyViewerApp extends LitElement {
+class KumikiViewerApp extends LitElement {
     constructor() {
         super();
         this.meshObjectsByKey = new Map();
@@ -661,7 +661,7 @@ class HorseyViewerApp extends LitElement {
             vscode.postMessage(payload);
             return;
         }
-        console.info('[HorseyViewer]', payload);
+        console.info('[KumikiViewer]', payload);
     }
 
     appendLogLine(text) {
@@ -2646,4 +2646,4 @@ class HorseyViewerApp extends LitElement {
     }
 }
 
-customElements.define('horsey-viewer-app', HorseyViewerApp);
+customElements.define('kumiki-viewer-app', KumikiViewerApp);

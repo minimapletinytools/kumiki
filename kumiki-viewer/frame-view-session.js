@@ -75,7 +75,7 @@ class FrameViewSession {
         const projectRoot = this.runnerSession && this.runnerSession.projectRoot
             ? this.runnerSession.projectRoot
             : path.dirname(this.filePath);
-        return path.join(projectRoot, '.horsey', 'refresh-stats.json');
+        return path.join(projectRoot, '.kumiki', 'refresh-stats.json');
     }
 
     postLoadingStatus(stage, details = {}) {
@@ -633,17 +633,17 @@ class FrameViewSession {
 
         this.channel.show(true);
         const location = this.parseTracebackLocation(details.traceback);
-        const actions = ['Open Horsey Output'];
+        const actions = ['Open Kumiki Output'];
         if (location) {
             actions.push('Go to Error');
         }
 
         const choice = await vscode.window.showErrorMessage(
-            `Horsey Viewer Python error: ${details.message}`,
+            `Kumiki Viewer Python error: ${details.message}`,
             ...actions
         );
 
-        if (choice === 'Open Horsey Output') {
+        if (choice === 'Open Kumiki Output') {
             this.channel.show(true);
         }
         if (choice === 'Go to Error' && location) {
@@ -651,7 +651,7 @@ class FrameViewSession {
         }
 
         if (error && typeof error === 'object') {
-            error.horseyErrorNotified = true;
+            error.kumikiErrorNotified = true;
         }
     }
 

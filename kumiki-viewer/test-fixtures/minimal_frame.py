@@ -4,9 +4,9 @@ from pathlib import Path
 project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
-from giraffecad.construction import create_timber
-from giraffecad.rule import create_v2, create_v3, mm
-from giraffecad.timber import Frame
+from kumiki.construction import create_timber
+from kumiki.rule import create_v2, create_v3, mm
+from kumiki.timber import Frame
 
 
 def build_frame():

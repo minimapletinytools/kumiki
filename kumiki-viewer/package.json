@@ -1,12 +1,12 @@
 {
-  "name": "horsey-viewer",
-  "displayName": "Horsey Viewer",
-  "description": "Timber frame viewer for GiraffeCAD",
+  "name": "kumiki-viewer",
+  "displayName": "Kumiki Viewer",
+  "description": "Timber frame viewer for Kumiki",
   "version": "0.0.1",
-  "publisher": "giraffeCAD",
+  "publisher": "kumiki",
   "repository": {
     "type": "git",
-    "url": "https://github.com/minimapletinytools/giraffeCAD-proto"
+    "url": "https://github.com/minimapletinytools/kumiki-proto"
   },
   "engines": {
     "vscode": "^1.60.0"
@@ -22,23 +22,23 @@
     "Visualization"
   ],
   "activationEvents": [
-    "onCommand:horsey-viewer.renderHorsey",
-    "onCommand:horsey-viewer.browsePatterns",
-    "onCommand:horsey-viewer.unloadPattern"
+    "onCommand:kumiki-viewer.renderKumiki",
+    "onCommand:kumiki-viewer.browsePatterns",
+    "onCommand:kumiki-viewer.unloadPattern"
   ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "horsey-viewer.renderHorsey",
-        "title": "Render Horsey"
+        "command": "kumiki-viewer.renderKumiki",
+        "title": "Render Kumiki"
       },
       {
-        "command": "horsey-viewer.browsePatterns",
+        "command": "kumiki-viewer.browsePatterns",
         "title": "Browse Patterns"
       },
       {
-        "command": "horsey-viewer.unloadPattern",
+        "command": "kumiki-viewer.unloadPattern",
         "title": "Unload Pattern Viewer"
       }
     ]

@@ -1,6 +1,6 @@
 /**
  * RefreshProfiler — Centralises timing, milestone tracking, and stats I/O
- * for Horsey Viewer refresh cycles.
+ * for Kumiki Viewer refresh cycles.
  */
 
 const fs = require('fs');

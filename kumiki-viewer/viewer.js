@@ -39,7 +39,7 @@ function escapeScriptJson(value) {
 
 function createFrameViewer(filePath, frameName = null, isLocalDev = false) {
     return vscode.window.createWebviewPanel(
-        'horseyViewer',
+        'kumikiViewer',
         getViewerTitle(filePath, frameName, isLocalDev),
         vscode.ViewColumn.Two,
         {
@@ -122,9 +122,9 @@ function getViewerTitle(filePath, frameName = null, isLocalDev = false) {
     const fileName = path.basename(filePath);
     const devTag = isLocalDev ? ' [Local Dev]' : '';
     if (frameName) {
-        return `Horsey: ${frameName}${devTag} · v${VIEWER_APP_VERSION}`;
+        return `Kumiki: ${frameName}${devTag} · v${VIEWER_APP_VERSION}`;
     }
-    return `Horsey: ${fileName}${devTag} · v${VIEWER_APP_VERSION}`;
+    return `Kumiki: ${fileName}${devTag} · v${VIEWER_APP_VERSION}`;
 }
 
 function getWebviewContent(webview, frameData, geometryData, profiling, uiState = null, viewerOptions = null) {

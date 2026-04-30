@@ -104,7 +104,7 @@ describe('FileWatcher', () => {
       expect(mockVscodeWorkspace.createFileSystemWatcher).not.toHaveBeenCalled();
     });
 
-    test('should create library watcher when project root exists with giraffecad', () => {
+    test('should create library watcher when project root exists with kumiki', () => {
       const fs = require('fs');
       jest.spyOn(fs, 'existsSync').mockReturnValue(true);
 
@@ -114,10 +114,10 @@ describe('FileWatcher', () => {
 
       expect(mockVscodeWorkspace.createFileSystemWatcher).toHaveBeenCalledTimes(2);
       const libraryWatcherCall = mockVscodeWorkspace.createFileSystemWatcher.mock.calls[1];
-      expect(libraryWatcherCall[0].pattern).toContain('giraffecad/**/*.py');
+      expect(libraryWatcherCall[0].pattern).toContain('kumiki/**/*.py');
     });
 
-    test('should not create library watcher when giraffecad does not exist', () => {
+    test('should not create library watcher when kumiki does not exist', () => {
       const fs = require('fs');
       jest.spyOn(fs, 'existsSync').mockReturnValue(false);
 
@@ -321,7 +321,7 @@ describe('FileWatcher', () => {
   });
 
   describe('hasLocalCodeGoesHere()', () => {
-    test('should return true when giraffecad exists under projectRoot', () => {
+    test('should return true when kumiki exists under projectRoot', () => {
       const fs = require('fs');
       jest.spyOn(fs, 'existsSync').mockReturnValue(true);
 
@@ -329,7 +329,7 @@ describe('FileWatcher', () => {
       expect(watcher.hasLocalCodeGoesHere()).toBe(true);
     });
 
-    test('should return false when giraffecad does not exist', () => {
+    test('should return false when kumiki does not exist', () => {
       const fs = require('fs');
       jest.spyOn(fs, 'existsSync').mockReturnValue(false);
 

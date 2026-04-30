@@ -1,22 +1,22 @@
 """
-Test file for Horsey Viewer extension.
-Run 'Render Horsey' command with this file open to test the viewer.
+Test file for Kumiki Viewer extension.
+Run 'Render Kumiki' command with this file open to test the viewer.
 """
 
 import sys
 from pathlib import Path
 
-# Add the project root to the path so we can import giraffecadcad
+# Add the project root to the path so we can import kumikicad
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from giraffecad.timber import Frame, CutTimber
-from giraffecad.construction import create_timber
-from giraffecad.rule import create_v2, create_v3, mm
+from kumiki.timber import Frame, CutTimber
+from kumiki.construction import create_timber
+from kumiki.rule import create_v2, create_v3, mm
 
 def build_frame():
     """
-    This function is called by the Horsey Viewer extension.
+    This function is called by the Kumiki Viewer extension.
     It should return a Frame object.
 
     Note: Originally wanted to call this 'raise' (as in 'raising a frame'),

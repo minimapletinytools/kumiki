@@ -3,7 +3,7 @@
  *
  * Watches:
  * 1. The example file itself (always)
- * 2. The giraffecad library tree (optional, local dev only)
+ * 2. The kumiki library tree (optional, local dev only)
  *
  * Debounces rapid file changes and notifies via callback.
  */
@@ -25,7 +25,7 @@ class FileWatcher {
     }
 
     /**
-     * Start watching the example file and optionally the giraffecad library.
+     * Start watching the example file and optionally the kumiki library.
      */
     start() {
         if (this.isDisposed) {
@@ -37,24 +37,24 @@ class FileWatcher {
         // Watch the example file itself
         this.watchExampleFile();
 
-        // Watch giraffecad library (local dev only)
+        // Watch kumiki library (local dev only)
         if (this.projectRoot && this.hasLocalCodeGoesHere()) {
-            this.logChange(`Library watcher enabled for: ${path.join(this.projectRoot, 'giraffecad')}`);
+            this.logChange(`Library watcher enabled for: ${path.join(this.projectRoot, 'kumiki')}`);
             this.watchLibrary();
             return;
         }
 
-        this.logChange('Library watcher disabled: no local giraffecad checkout detected');
+        this.logChange('Library watcher disabled: no local kumiki checkout detected');
     }
 
     /**
-     * Check if giraffecad exists under the project root (local checkout detection).
+     * Check if kumiki exists under the project root (local checkout detection).
      */
     hasLocalCodeGoesHere() {
         if (!this.projectRoot) {
             return false;
         }
-        return fs.existsSync(path.join(this.projectRoot, 'giraffecad'));
+        return fs.existsSync(path.join(this.projectRoot, 'kumiki'));
     }
 
     /**
@@ -86,10 +86,10 @@ class FileWatcher {
     }
 
     /**
-     * Create a watcher for the giraffecad library tree.
+     * Create a watcher for the kumiki library tree.
      */
     watchLibrary() {
-        const pattern = new vscode.RelativePattern(this.projectRoot, 'giraffecad/**/*.py');
+        const pattern = new vscode.RelativePattern(this.projectRoot, 'kumiki/**/*.py');
         const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
         watcher.onDidChange((uri) => {

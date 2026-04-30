@@ -1,12 +1,12 @@
 #!/bin/bash
-# Installation script for Horsey Viewer extension
+# Installation script for Kumiki Viewer extension
 
-echo "🐴 Installing Horsey Viewer extension..."
+echo "🐴 Installing Kumiki Viewer extension..."
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-VSCODE_EXT_DIR="$HOME/.vscode/extensions/horsey-viewer"
-CURSOR_EXT_DIR="$HOME/.cursor/extensions/horsey-viewer"
+VSCODE_EXT_DIR="$HOME/.vscode/extensions/kumiki-viewer"
+CURSOR_EXT_DIR="$HOME/.cursor/extensions/kumiki-viewer"
 
 TARGETS=("$VSCODE_EXT_DIR" "$CURSOR_EXT_DIR")
 EDITORS=("VSCode" "Cursor")
@@ -45,11 +45,11 @@ for i in "${!TARGETS[@]}"; do
         "$SCRIPT_DIR/" "$EXT_DIR/"
 done
 
-echo "✅ Horsey Viewer installed successfully in VSCode and Cursor!"
+echo "✅ Kumiki Viewer installed successfully in VSCode and Cursor!"
 echo ""
 echo "Next steps:"
 echo "1. Reload VSCode and Cursor: Cmd+Shift+P → 'Developer: Reload Window'"
 echo "2. Open a Python file with a build_frame() function"
-echo "3. Run command: 'Render Horsey'"
+echo "3. Run command: 'Render Kumiki'"
 echo ""
 echo "Test file available at: $SCRIPT_DIR/test-frame.py"

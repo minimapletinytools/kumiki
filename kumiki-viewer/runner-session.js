@@ -34,12 +34,12 @@ class PythonRunnerSession {
         let isLocalDev = false;
 
         while (true) {
-            if (fs.existsSync(path.join(candidate, 'giraffecad'))) {
+            if (fs.existsSync(path.join(candidate, 'kumiki'))) {
                 projectRoot = candidate;
                 isLocalDev = true;
                 break;
             }
-            if (fs.existsSync(path.join(candidate, '.giraffe.yaml'))) {
+            if (fs.existsSync(path.join(candidate, '.kumiki.yaml'))) {
                 projectRoot = candidate;
                 isLocalDev = false;
                 break;
@@ -52,11 +52,11 @@ class PythonRunnerSession {
         }
 
         if (!projectRoot) {
-            // Not found, default to folder of the filePath and create .giraffe.yaml
+            // Not found, default to folder of the filePath and create .kumiki.yaml
             projectRoot = path.dirname(path.resolve(filePath));
-            const envYamlPath = path.join(projectRoot, '.giraffe.yaml');
+            const envYamlPath = path.join(projectRoot, '.kumiki.yaml');
             if (!fs.existsSync(envYamlPath)) {
-                fs.writeFileSync(envYamlPath, 'giraffecad_version: latest\n', 'utf8');
+                fs.writeFileSync(envYamlPath, 'kumiki_version: latest\n', 'utf8');
             }
             isLocalDev = false;
         }
@@ -88,7 +88,7 @@ class PythonRunnerSession {
         if (!this.projectRoot) {
             return null;
         }
-        const yamlPath = path.join(this.projectRoot, '.horsey', 'project.yaml');
+        const yamlPath = path.join(this.projectRoot, '.kumiki', 'project.yaml');
         if (!fs.existsSync(yamlPath)) {
             return null;
         }
@@ -103,7 +103,7 @@ class PythonRunnerSession {
                 return pythonPath;
             }
         } catch (error) {
-            this.channel.appendLine(`[env] Failed reading .horsey/project.yaml: ${error.message}`);
+            this.channel.appendLine(`[env] Failed reading .kumiki/project.yaml: ${error.message}`);
         }
         return null;
     }
@@ -218,8 +218,8 @@ class PythonRunnerSession {
 
     getPythonInstallHelpMessage() {
         return [
-            'Python was not found on this machine, so Horsey cannot create a project virtual environment.',
-            'Install Python 3.10+ and then run Render Horsey again.',
+            'Python was not found on this machine, so Kumiki cannot create a project virtual environment.',
+            'Install Python 3.10+ and then run Render Kumiki again.',
             'Download: https://www.python.org/downloads/',
             process.platform === 'darwin' ? 'macOS (Homebrew): brew install python' : null,
             process.platform === 'win32' ? 'Windows: install Python from python.org and enable "Add python.exe to PATH".' : null,
@@ -249,8 +249,8 @@ class PythonRunnerSession {
         if (!this.projectRoot) {
             return;
         }
-        const horseyDir = path.join(this.projectRoot, '.horsey');
-        fs.mkdirSync(horseyDir, { recursive: true });
+        const kumikiDir = path.join(this.projectRoot, '.kumiki');
+        fs.mkdirSync(kumikiDir, { recursive: true });
 
         const lines = [
             'schema_version: 1',
@@ -269,7 +269,7 @@ class PythonRunnerSession {
             }
         }
 
-        fs.writeFileSync(path.join(horseyDir, 'project.yaml'), `${lines.join('\n')}\n`, 'utf8');
+        fs.writeFileSync(path.join(kumikiDir, 'project.yaml'), `${lines.join('\n')}\n`, 'utf8');
     }
 
     async ensurePythonEnvironment() {
@@ -296,7 +296,7 @@ class PythonRunnerSession {
         const expectedVenvPython = this.getPythonCandidates(this.projectRoot)[0];
         let createdVenv = false;
 
-        fs.mkdirSync(path.join(this.projectRoot, '.horsey'), { recursive: true });
+        fs.mkdirSync(path.join(this.projectRoot, '.kumiki'), { recursive: true });
 
         if (!fs.existsSync(expectedVenvPython)) {
             this.channel.appendLine(`[env] Creating virtual environment at ${venvDir}`);
@@ -331,7 +331,7 @@ class PythonRunnerSession {
             if (this.isLocalDev && fs.existsSync(path.join(this.projectRoot, 'pyproject.toml'))) {
                 await this.runCommand(pythonCmd, ['-m', 'pip', 'install', '-e', this.projectRoot]);
             } else {
-                await this.runCommand(pythonCmd, ['-m', 'pip', 'install', 'giraffecad']);
+                await this.runCommand(pythonCmd, ['-m', 'pip', 'install', 'kumiki']);
             }
             installedViewerDeps = true;
         }

@@ -1,4 +1,4 @@
-Tag-Based Search Module Plan (Horsey Viewer)
+Tag-Based Search Module Plan (Kumiki Viewer)
 
 Goal
 Create a reusable, client-side tag+name search module for the viewer to filter patterns, joints, and timbers.
@@ -62,20 +62,20 @@ Architecture
 - Keep filtering client-side in webview (no runner or extension protocol changes needed initially).
 
 Files To Add
-- horsey-viewer/webview/tag-search-store.js
-- horsey-viewer/__tests__/tag-search-store.test.js
+- kumiki-viewer/webview/tag-search-store.js
+- kumiki-viewer/__tests__/tag-search-store.test.js
 
 Files To Update
-- horsey-viewer/webview/viewer-app.js
+- kumiki-viewer/webview/viewer-app.js
   - add TagSearchPanel
   - initialize TagSearchStore
   - wire setItems(...) when availablePatterns updates
   - render patterns from store.getResults()
-- horsey-viewer/webview/viewer.css
+- kumiki-viewer/webview/viewer.css
   - add styles for search input, autocomplete list, tag rail, chips, active state
-- horsey-viewer/viewer.js
+- kumiki-viewer/viewer.js
   - add URI injection for tag-search-store.js into template replacements
-- horsey-viewer/webview/viewer.html
+- kumiki-viewer/webview/viewer.html
   - include tag-search-store.js script before viewer-app module
 
 Implementation Phases
@@ -94,10 +94,10 @@ Phase 4: Webview Script Wiring
 
 Validation
 1) Unit tests
-- cd horsey-viewer && npx jest
+- cd kumiki-viewer && npx jest
 
 2) Extension smoke tests
-- cd horsey-viewer && node ./test/run-extension-tests.js
+- cd kumiki-viewer && node ./test/run-extension-tests.js
 
 3) Manual checks
 - Load patterns and verify:

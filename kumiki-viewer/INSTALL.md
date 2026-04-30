@@ -1,8 +1,8 @@
-# Installing Horsey Viewer
+# Installing Kumiki Viewer
 
 ## Quick Install (Development Mode)
 
-1. Open the `giraffeCAD-proto` project in VSCode
+1. Open the `kumiki-proto` project in VSCode
 
 2. Press `F5` or go to **Run > Start Debugging**
 
@@ -10,11 +10,11 @@
    - Open a new VSCode window with the extension loaded
    - The extension will be active in this development window
 
-3. In the new window, open `horsey-viewer/test-frame.py`
+3. In the new window, open `kumiki-viewer/test-frame.py`
 
 4. Open the Command Palette (`Cmd+Shift+P` on Mac, `Ctrl+Shift+P` on Windows/Linux)
 
-5. Type "Render Horsey" and select the command
+5. Type "Render Kumiki" and select the command
 
 6. A new panel should open showing the frame data!
 
@@ -25,17 +25,17 @@ To install the extension permanently in your VSCode:
 ### macOS / Linux
 
 ```bash
-cd horsey-viewer
-mkdir -p ~/.vscode/extensions/horsey-viewer
-cp -r . ~/.vscode/extensions/horsey-viewer/
+cd kumiki-viewer
+mkdir -p ~/.vscode/extensions/kumiki-viewer
+cp -r . ~/.vscode/extensions/kumiki-viewer/
 ```
 
 ### Windows
 
 ```powershell
-cd horsey-viewer
-mkdir $env:USERPROFILE\.vscode\extensions\horsey-viewer
-Copy-Item -Recurse -Force . $env:USERPROFILE\.vscode\extensions\horsey-viewer\
+cd kumiki-viewer
+mkdir $env:USERPROFILE\.vscode\extensions\kumiki-viewer
+Copy-Item -Recurse -Force . $env:USERPROFILE\.vscode\extensions\kumiki-viewer\
 ```
 
 Then reload VSCode.
@@ -46,7 +46,7 @@ Then reload VSCode.
 
 2. Open the file in VSCode
 
-3. Run the **Render Horsey** command
+3. Run the **Render Kumiki** command
 
 4. The extension will:
    - Save your file
@@ -57,7 +57,7 @@ Then reload VSCode.
 
 - VSCode 1.60.0 or higher
 - Python 3.6+
-- GiraffeCAD project structure (with `giraffecad` directory)
+- Kumiki project structure (with `kumiki` directory)
 - Virtual environment with required dependencies (`venv/bin/python`)
 
 ## Troubleshooting

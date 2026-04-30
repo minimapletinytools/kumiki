@@ -17,7 +17,7 @@ function getAllTabs() {
   return vscode.window.tabGroups.all.flatMap((group) => group.tabs);
 }
 
-describe('Horsey Viewer extension flow', () => {
+describe('Kumiki Viewer extension flow', () => {
   it('renders milestone fixture and keeps panel healthy across rerender', async function () {
     this.timeout(40000);
 
@@ -28,9 +28,9 @@ describe('Horsey Viewer extension flow', () => {
     const document = await vscode.workspace.openTextDocument(fixtureUri);
     await vscode.window.showTextDocument(document, { preview: false });
 
-    const expectedTabPrefix = 'Horsey: Runner Milestone Joint Frame';
+    const expectedTabPrefix = 'Kumiki: Runner Milestone Joint Frame';
 
-    await vscode.commands.executeCommand('horsey-viewer.renderHorsey');
+    await vscode.commands.executeCommand('kumiki-viewer.renderKumiki');
 
     await waitFor(() => {
       const tabs = getAllTabs();
@@ -38,13 +38,13 @@ describe('Horsey Viewer extension flow', () => {
     }, 25000, 150);
 
     await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('horsey-viewer.renderHorsey');
+      await vscode.commands.executeCommand('kumiki-viewer.renderKumiki');
     });
 
     const tabs = getAllTabs();
     assert.ok(
       tabs.some((tab) => tab.label.startsWith(expectedTabPrefix)),
-      'Expected Horsey webview tab for milestone_joint_frame.py with the current frame-name title format'
+      'Expected Kumiki webview tab for milestone_joint_frame.py with the current frame-name title format'
     );
   });
 });

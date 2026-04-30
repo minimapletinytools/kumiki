@@ -7,14 +7,14 @@ const patternSessions = new Map();     // slotName → FrameViewSession (pattern
 let patternSlotCounter = 0;
 
 /**
- * Main activation function for the Horsey Viewer extension.
+ * Main activation function for the Kumiki Viewer extension.
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-    outputChannel = vscode.window.createOutputChannel('Horsey Viewer');
+    outputChannel = vscode.window.createOutputChannel('Kumiki Viewer');
     context.subscriptions.push(outputChannel);
 
-    const disposable = vscode.commands.registerCommand('horsey-viewer.renderHorsey', async function () {
+    const disposable = vscode.commands.registerCommand('kumiki-viewer.renderKumiki', async function () {
         const editor = vscode.window.activeTextEditor;
         if (!editor) {
             vscode.window.showErrorMessage('No active editor!');
@@ -39,8 +39,8 @@ function activate(context) {
             await session.refresh();
         } catch (error) {
             outputChannel.show(true);
-            if (!error || !error.horseyErrorNotified) {
-                vscode.window.showErrorMessage(`Horsey Viewer error: ${error.message}`);
+            if (!error || !error.kumikiErrorNotified) {
+                vscode.window.showErrorMessage(`Kumiki Viewer error: ${error.message}`);
             }
         }
     });
@@ -48,7 +48,7 @@ function activate(context) {
     context.subscriptions.push(disposable);
 
     // --- Browse Patterns command ---
-    const browsePatterns = vscode.commands.registerCommand('horsey-viewer.browsePatterns', async function () {
+    const browsePatterns = vscode.commands.registerCommand('kumiki-viewer.browsePatterns', async function () {
         try {
             // We need a running main session to query patterns via its runner process.
             // If none exists, try to create one from the active editor.
@@ -56,7 +56,7 @@ function activate(context) {
             if (!mainSession) {
                 const editor = vscode.window.activeTextEditor;
                 if (!editor || editor.document.languageId !== 'python') {
-                    vscode.window.showErrorMessage('Open a Python file first, then run Render Horsey before browsing patterns.');
+                    vscode.window.showErrorMessage('Open a Python file first, then run Render Kumiki before browsing patterns.');
                     return;
                 }
                 if (editor.document.isDirty) {
@@ -67,7 +67,7 @@ function activate(context) {
 
             const runner = mainSession.runnerSession;
             if (!runner || !runner.isAlive()) {
-                vscode.window.showErrorMessage('Horsey runner is not running. Run Render Horsey first.');
+                vscode.window.showErrorMessage('Kumiki runner is not running. Run Render Kumiki first.');
                 return;
             }
 
@@ -138,7 +138,7 @@ function activate(context) {
             await patternSession.refresh('pattern open');
         } catch (error) {
             outputChannel.show(true);
-            if (!error || !error.horseyErrorNotified) {
+            if (!error || !error.kumikiErrorNotified) {
                 vscode.window.showErrorMessage(`Browse Patterns error: ${error.message}`);
             }
         }
@@ -147,7 +147,7 @@ function activate(context) {
     context.subscriptions.push(browsePatterns);
 
     // --- Unload Pattern command ---
-    const unloadPattern = vscode.commands.registerCommand('horsey-viewer.unloadPattern', async function () {
+    const unloadPattern = vscode.commands.registerCommand('kumiki-viewer.unloadPattern', async function () {
         if (patternSessions.size === 0) {
             vscode.window.showInformationMessage('No pattern viewers are open.');
             return;
@@ -175,7 +175,7 @@ function activate(context) {
     context.subscriptions.push(unloadPattern);
 
     const screenshotDisposable = vscode.commands.registerCommand(
-        'horsey-viewer.captureRenderedScreenshot',
+        'kumiki-viewer.captureRenderedScreenshot',
         async (options = {}) => {
             const targetFilePath =
                 typeof options.filePath === 'string' && options.filePath
@@ -190,7 +190,7 @@ function activate(context) {
 
             const session = frameSessions.get(targetFilePath);
             if (!session || session.isDisposed) {
-                throw new Error(`No active Horsey viewer session for ${targetFilePath}`);
+                throw new Error(`No active Kumiki viewer session for ${targetFilePath}`);
             }
 
             const timeoutMs =
@@ -234,7 +234,7 @@ function _findAnyAliveMainSession() {
 async function _openPatternFromWebview(mainSession, patternName, sourceFile, context) {
     const runner = mainSession.runnerSession;
     if (!runner || !runner.isAlive()) {
-        vscode.window.showErrorMessage('Horsey runner is not running.');
+        vscode.window.showErrorMessage('Kumiki runner is not running.');
         return;
     }
 
@@ -275,7 +275,7 @@ async function _openPatternFromWebview(mainSession, patternName, sourceFile, con
 async function _openBookFromWebview(mainSession, sourceFile, context) {
     const runner = mainSession.runnerSession;
     if (!runner || !runner.isAlive()) {
-        vscode.window.showErrorMessage('Horsey runner is not running.');
+        vscode.window.showErrorMessage('Kumiki runner is not running.');
         return;
     }
 
