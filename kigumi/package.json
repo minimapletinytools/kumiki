@@ -1,12 +1,12 @@
 {
   "name": "kigumi",
   "displayName": "Kigumi",
-  "description": "Timber frame viewer for Kumiki",
+  "description": "Kiguim is a viewer tool for Kumiki designs",
   "version": "0.0.1",
-  "publisher": "kumiki",
+  "publisher": "minimapletinytools",
   "repository": {
     "type": "git",
-    "url": "https://github.com/minimapletinytools/kumiki-proto"
+    "url": "https://github.com/minimapletinytools/kumiki/kigumi"
   },
   "engines": {
     "vscode": "^1.60.0"
@@ -27,6 +27,7 @@
     "onCommand:kigumi.unloadPattern"
   ],
   "main": "./extension.js",
+  "icon": "templogo.png",
   "contributes": {
     "commands": [
       {

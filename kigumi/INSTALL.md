@@ -2,7 +2,7 @@
 
 ## Quick Install (Development Mode)
 
-1. Open the `kumiki-proto` project in VSCode
+1. Open the `kumiki` project in VSCode
 
 2. Press `F5` or go to **Run > Start Debugging**
 

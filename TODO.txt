@@ -98,14 +98,14 @@ A couple other things, we may show patterns in the layers view using a similar l
 
 
 :: V0 release
--features
-  -do patternbook viewer (where to put python env in this case?)
-  -list view
+-finalize kigumi functions
+  -add menu, menu should populate list of patterns and projects in the open folder (maybe ditch the in-viewer thing)
 -come up with sensible instalation strat
   -do pip package for release
   DONE-do proper python env on installing extension, maybe add installation loading screen
-  -do girrafe.yaml configuration stuff (I think it just needs python and girrafe verison in it?)
   -do vscode extension release
+-do the layers view for timbers and joints, don't do projects/patterns since you can put that in the menu, or maybe youshould still just do it? idk
+-add generic miter joint
 -finish docs
   -finish README
   -finish agents doc
@@ -113,9 +113,6 @@ A couple other things, we may show patterns in the layers view using a similar l
 -marketing
   -make simple website
   -make some content drip
-
-
-
 
 
 
@@ -140,25 +137,6 @@ A couple other things, we may show patterns in the layers view using a similar l
 
 :: TODO
 
-DONE-review TestHousedDovetailButtJoint and see if it deserves a camel
-DONE-fix feature issues
-  DONE-come up with a better term for "named CSG"
-    -how about tagged CSG
-  DONE-when generating named CSG meshes, it's selecting way too much, maybe you can fix with broad phase? or explicitly test each point against the CSG rather than just using geometry + normal which I assume is what's it's donig right now... or maybe it's using the CSG name which is the same rather than using CSG hierarchy
-    -I think it general you should just rewrite named CSG mesh/feature generation. 
-  DONE-selecting feature still doesn't highlight properly. I suspect its related to geo generation
-DONE-refactor patterns to not actually load the entire pattern
-DONE-BUG basic_gooseneck pattern is broken, it's not rendering teh housing tiimber. It works fine when I opne the xample in freecad. in the viewer it shows only 1 timber when there should be 2 so it's not rendering one of the timbers for some reason ,prheaps due to a name duplication? Can you figuer out why.
-DONE-fix 0 length prism rendering triangulation
-DONE-BUG hrosey viewer seems to run in teh background after closing all tabs... need better cleanup routine, 
-DONE-BUG sharde runners that have been stopped stil have their auto relod watcher thingy running, make suer to stop it when you close it or whatever when yo cuose the tab
-DONE-BUG pattern viewer thingy does not support CSG stuff
-  [tinyhouse120.py] [patterns] loadPattern error: Runner command 'raise_specific_pattern' failed: Pattern 'halfspace_cut' returned Difference, expected Frame can you lok into 
-DONE-BUG doubel dildo joint on oscar shed still having z fighting issues.
-DONE-get rid of the old step file generatinon thing and then figure out which dependencies are mandatory and just amke them all mandatory, ono optional deps!!
-
--rename to kumiki/kigumi
-
 -rethink hierarchical feature selection, as you'll want to be able to select 2 features to measure them in the future.
 -do new selection hierarchy here are the states
   -nothing selected (show everything)
@@ -169,8 +147,6 @@ DONE-get rid of the old step file generatinon thing and then figure out which de
   -tagged CSG selected (with sub selection)
   -feature selected
   -I guess just use transparency for outer stuff when focusing in on selection? But you should make distinct states for each of them... but maybe combine the options for changing their look 
-
-
 
 
 -pattern viewer
@@ -427,6 +403,24 @@ M3.5
 
 
 :: TODONE 
+DONE-review TestHousedDovetailButtJoint and see if it deserves a camel
+DONE-fix feature issues
+  DONE-come up with a better term for "named CSG"
+    -how about tagged CSG
+  DONE-when generating named CSG meshes, it's selecting way too much, maybe you can fix with broad phase? or explicitly test each point against the CSG rather than just using geometry + normal which I assume is what's it's donig right now... or maybe it's using the CSG name which is the same rather than using CSG hierarchy
+    -I think it general you should just rewrite named CSG mesh/feature generation. 
+  DONE-selecting feature still doesn't highlight properly. I suspect its related to geo generation
+DONE-refactor patterns to not actually load the entire pattern
+DONE-BUG basic_gooseneck pattern is broken, it's not rendering teh housing tiimber. It works fine when I opne the xample in freecad. in the viewer it shows only 1 timber when there should be 2 so it's not rendering one of the timbers for some reason ,prheaps due to a name duplication? Can you figuer out why.
+DONE-fix 0 length prism rendering triangulation
+DONE-BUG hrosey viewer seems to run in teh background after closing all tabs... need better cleanup routine, 
+DONE-BUG sharde runners that have been stopped stil have their auto relod watcher thingy running, make suer to stop it when you close it or whatever when yo cuose the tab
+DONE-BUG pattern viewer thingy does not support CSG stuff
+  [tinyhouse120.py] [patterns] loadPattern error: Runner command 'raise_specific_pattern' failed: Pattern 'halfspace_cut' returned Difference, expected Frame can you lok into 
+DONE-BUG doubel dildo joint on oscar shed still having z fighting issues.
+DONE-get rid of the old step file generatinon thing and then figure out which dependencies are mandatory and just amke them all mandatory, ono optional deps!!
+DONE-rename to kumiki/kigumi
+
 DONE-TICKET TODO
   DONE-add reference faces to PTW ticket
     -add a post init step to PTW that does the following
