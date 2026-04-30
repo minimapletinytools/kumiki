@@ -2,9 +2,9 @@
 applyTo: "patterns/**, experiments/**"
 ---
 
-# GiraffeCAD Agent Instructions
+# Kumiki Agent Instructions
 
-Copy this file into your project's `.github/copilot-instructions.md` (or `.cursorrules`) to give your AI coding agent context for designing timber frames with GiraffeCAD. Do not copy the applyTo field above.
+Copy this file into your project's `.github/copilot-instructions.md` (or `.cursorrules`) to give your AI coding agent context for designing timber frames with Kumiki. Do not copy the applyTo field above.
 
 ---
 

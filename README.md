@@ -16,13 +16,13 @@ You've setup your tools and you're almost ready to make your first sawhorse.
 But first, lets admire the one in the patterns folder
 
 ```python
-from patterns.structures.horsey_example import *
+from patterns.structures.kumiki_example import *
 ...
 ```
 
 TODO finish
 
-## your first horsey
+## your first kumiki
 
 TODO finish
 
@@ -51,7 +51,7 @@ To render structures in FreeCAD (open source, free):
    - Open FreeCAD
    - Go to **Edit** → **Preferences** → **Python** → **Macro**
    - Click **Add** under "Macro path"
-   - Navigate to and select: `/path/to/giraffeCAD-proto/freecad`
+   - Navigate to and select: `/path/to/kumiki-proto/freecad`
    - Click **OK**
 
 3. **Run the renderer**:

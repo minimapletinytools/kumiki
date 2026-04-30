@@ -1,6 +1,6 @@
 # FreeCAD Example Scripts
 
-This directory contains example scripts for rendering GiraffeCAD models in FreeCAD.
+This directory contains example scripts for rendering Kumiki models in FreeCAD.
 
 ## Quick Start
 
@@ -23,7 +23,7 @@ You can also run CSG tests standalone, but it's easier to use `run_examples.py` 
 Both scripts provide automatic module reloading:
 
 ✅ **No FreeCAD restart needed** - Make code changes and re-run the macro  
-✅ **Reloads all modules** - GiraffeCAD modules, renderers, and examples  
+✅ **Reloads all modules** - Kumiki modules, renderers, and examples  
 ✅ **Saves development time** - Instant feedback on code changes
 
 ### Without Module Reloading
@@ -42,7 +42,7 @@ Both scripts provide automatic module reloading:
 - **`test_csg.py`** - Standalone CSG tests (optional, can also run via `run_examples.py`)
 
 ### Renderer
-- **`giraffe_render_freecad.py`** - FreeCAD rendering engine for GiraffeCAD
+- **`giraffe_render_freecad.py`** - FreeCAD rendering engine for Kumiki
 
 ## Usage
 
@@ -63,7 +63,7 @@ Both scripts provide automatic module reloading:
   - `'csg'` - CSG operation tests (also edit `CSG_EXAMPLE_TO_RENDER` for specific test)
 
 **Making Changes:**
-- Edit your code in any GiraffeCAD module
+- Edit your code in any Kumiki module
 - Re-run the same macro in FreeCAD
 - Changes are automatically reloaded!
 
@@ -123,13 +123,13 @@ Edit `CSG_EXAMPLE_TO_RENDER` in `run_examples.py` to choose which test to run.
 
 The scripts reload modules in dependency order:
 
-1. `giraffecad.rule` - Core math/orientation
-2. `giraffecad.footprint` - 2D footprints
-3. `giraffecad.cutcsg` - CSG operations
-4. `giraffecad.timber` - Timber data structures
-5. `giraffecad.construction` - Construction functions
-6. `giraffecad.joints.plain_joints` - Plain joint functions
-7. `giraffecad.joints.mortise_and_tenon_joint` - Mortise & tenon functions
+1. `kumiki.rule` - Core math/orientation
+2. `kumiki.footprint` - 2D footprints
+3. `kumiki.cutcsg` - CSG operations
+4. `kumiki.timber` - Timber data structures
+5. `kumiki.construction` - Construction functions
+6. `kumiki.joints.plain_joints` - Plain joint functions
+7. `kumiki.joints.mortise_and_tenon_joint` - Mortise & tenon functions
 8. `giraffe` - Main API module
 9. `giraffe_render_freecad` - FreeCAD renderer
 10. `patterns.*` - All pattern modules
@@ -138,7 +138,7 @@ The scripts reload modules in dependency order:
 
 **Import Errors:**
 - Make sure you're running from the `freecad/` directory
-- Check that the parent directory contains `giraffecad/` and `patterns/`
+- Check that the parent directory contains `kumiki/` and `patterns/`
 
 **Module Not Reloading:**
 - Check the console output to see which modules were reloaded
@@ -156,14 +156,14 @@ The scripts reload modules in dependency order:
 
 ```
 ======================================================================
-GiraffeCAD FreeCAD - Examples Runner
+Kumiki FreeCAD - Examples Runner
 ======================================================================
 
-Reloading all GiraffeCAD modules...
-  ✓ Reloaded giraffecad.rule
-  ✓ Reloaded giraffecad.timber
-  ✓ Reloaded giraffecad.construction
-  ✓ Reloaded giraffecad.joints.mortise_and_tenon_joint
+Reloading all Kumiki modules...
+  ✓ Reloaded kumiki.rule
+  ✓ Reloaded kumiki.timber
+  ✓ Reloaded kumiki.construction
+  ✓ Reloaded kumiki.joints.mortise_and_tenon_joint
   ✓ Reloaded giraffe_render_freecad
   ✓ Reloaded patterns.structures.oscarshed
 
@@ -172,7 +172,7 @@ Module reload complete.
 Running example: oscar_shed
 
 ============================================================
-GiraffeCAD FreeCAD - Oscar's Shed
+Kumiki FreeCAD - Oscar's Shed
 ============================================================
 
 Creating Oscar's Shed structure...

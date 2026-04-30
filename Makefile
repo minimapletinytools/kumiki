@@ -1,7 +1,7 @@
 .PHONY: help setup test test-verbose test-cov typecheck typecheck-watch clean profile stepout
 
 help:
-	@echo "🦒 GiraffeCAD Development Commands"
+	@echo "🦒 Kumiki Development Commands"
 	@echo "=================================="
 	@echo ""
 	@echo "  make setup           - Setup development environment (create venv and install deps with uv)"
@@ -11,8 +11,8 @@ help:
 	@echo "  make typecheck       - Run type checking with ty"
 	@echo "  make typecheck-watch - Run type checking in watch mode"
 	@echo "  make clean           - Remove build artifacts and cache files"
-	@echo "  make profile         - Profile all patterns (or PATTERNS='oscarshed horsey')"
-	@echo "  make stepout         - Export STEP files (or PATTERN=horsey)"
+	@echo "  make profile         - Profile all patterns (or PATTERNS='oscarshed kumiki')"
+	@echo "  make stepout         - Export STEP files (or PATTERN=kumiki)"
 	@echo ""
 
 setup:
@@ -25,7 +25,7 @@ test-verbose:
 	uv run pytest tests/ -v
 
 test-cov:
-	uv run pytest tests/ --cov=giraffecad --cov-report=html --cov-report=term-missing
+	uv run pytest tests/ --cov=kumiki --cov-report=html --cov-report=term-missing
 	@echo ""
 	@echo "✅ Coverage report generated in htmlcov/index.html"
 

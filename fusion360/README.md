@@ -1,6 +1,6 @@
-# GiraffeCAD Fusion 360 Integration
+# Kumiki Fusion 360 Integration
 
-This directory contains a complete, self-contained Fusion 360 script for rendering timber frame structures created with GiraffeCAD.
+This directory contains a complete, self-contained Fusion 360 script for rendering timber frame structures created with Kumiki.
 
 ## 🏗️ What's Included
 
@@ -10,9 +10,9 @@ This directory contains a complete, self-contained Fusion 360 script for renderi
 - **`giraffe_render_fusion360_OLD.py`** - Previous version (backup)
 
 ### Imported from Parent Directory
-- **`../giraffe.py`** - Core GiraffeCAD timber framing library
-- **`../giraffecad/`** - Core modules (rule, footprint, etc.)
-- **`../patterns/structures/horsey_example.py`** - Sawhorse structure
+- **`../giraffe.py`** - Core Kumiki timber framing library
+- **`../kumiki/`** - Core modules (rule, footprint, etc.)
+- **`../patterns/structures/kumiki_example.py`** - Sawhorse structure
 - **`../patterns/structures/oscarshed.py`** - Oscar's Shed structure
 - **`../patterns/basic_joints_examples.py`** - Basic joint type demonstrations and patternbook
 
@@ -95,7 +95,7 @@ python3 test_local.py
 
 This will test:
 - ✅ All dependencies import correctly
-- ✅ GiraffeCAD modules load properly  
+- ✅ Kumiki modules load properly  
 - ✅ Example structures can be created
 - ✅ All timbers with joints are generated
 
@@ -126,10 +126,10 @@ pip install --target ./libs sympy
 This ensures Fusion 360's isolated Python environment can access them.
 
 ### Path Import Benefits
-- **No file duplication** - GiraffeCAD modules are imported from the parent directory
+- **No file duplication** - Kumiki modules are imported from the parent directory
 - **Always up-to-date** - Changes to the main modules are immediately available
 - **Cleaner structure** - Only dependencies and the main script are in the giraffetest folder
-- **Easier maintenance** - Single source of truth for all GiraffeCAD code
+- **Easier maintenance** - Single source of truth for all Kumiki code
 
 ### Architecture
 ```
@@ -139,7 +139,7 @@ fusion360/
 ├── libs/ (local dependencies: sympy, mpmath)
 └── imports from parent directory:
     ├── ../giraffe.py (timber framing API)
-    ├── ../giraffecad/ (core modules)
+    ├── ../kumiki/ (core modules)
     │   ├── rule.py (3D rotations)
     │   ├── footprint.py (2D layouts)
     │   ├── cutcsg.py (CSG operations)
@@ -147,7 +147,7 @@ fusion360/
     │   ├── construction.py (timber helpers)
     │   └── plain_joints.py (joint functions)
     └── ../patterns/
-      ├── structures/horsey_example.py
+      ├── structures/kumiki_example.py
       ├── structures/oscarshed.py
       └── reference/plain_joints_example.py
 ```
@@ -171,9 +171,9 @@ If some timbers don't render:
 - Check the script output - it reports how many timbers were successfully created
 - Each timber should become a separate component in the browser
 
-## 🦒 About GiraffeCAD
+## 🦒 About Kumiki
 
-GiraffeCAD is a Python library for programmatic timber frame design, featuring:
+Kumiki is a Python library for programmatic timber frame design, featuring:
 - **Precise joint definitions** (mortise & tenon, etc.)
 - **3D timber positioning** and orientation
 - **Symbolic math** for exact calculations

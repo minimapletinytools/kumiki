@@ -37,7 +37,7 @@ uv run pytest tests/ -v
 uv run pytest tests/test_rule.py -v
 
 # Run with coverage (or use make test-cov)
-uv run pytest tests/ --cov=giraffecad --cov-report=html
+uv run pytest tests/ --cov=kumiki --cov-report=html
 ```
 
 Tests flagged with # 🐪 have been hand reviewed, the rest are AI slop
@@ -64,8 +64,8 @@ or manually via `uv`:
 uv run ty check
 
 # Check specific files or directories
-uv run ty check giraffecad/timber.py
-uv run ty check giraffecad/
+uv run ty check kumiki/timber.py
+uv run ty check kumiki/
 
 # Watch mode - automatically re-checks when files change
 uv run ty check --watch

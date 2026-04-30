@@ -2,7 +2,7 @@
 applyTo: "girrafecad/**,tests/**"
 ---
 
-# GiraffeCAD Library Authoring Rules
+# Kumiki Library Authoring Rules
 
 ## Running Tests
 
@@ -19,7 +19,7 @@ uv run ty check
 
 If making changes to the viewer, run viewer tests:
 ```bash
-cd horsey-viewer && npx jest && node ./test/run-extension-tests.js
+cd kumiki-viewer && npx jest && node ./test/run-extension-tests.js
 ```
 
 ## Key Files

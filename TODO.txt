@@ -89,10 +89,10 @@ A couple other things, we may show patterns in the layers view using a similar l
 
 
 
-:: 3/30/2026 horsey viewer environment
+:: 3/30/2026 kumiki viewer environment
 
 - when you open a my_structure.py file with the extension
-- check the parent folder for an existing .horsey/project.yaml file which will contain info on the python environment and the girrafecad version, otheriwse create it using the latest version available
+- check the parent folder for an existing .kumiki/project.yaml file which will contain info on the python environment and the girrafecad version, otheriwse create it using the latest version available
 - cerate teh python virtual environment to run runner.py in
 
 
@@ -228,7 +228,7 @@ DONE-get rid of the old step file generatinon thing and then figure out which de
 
 -UI whatever
   -output proper error if you try and open a non-frame file
-  -render horsey should not open in new tab
+  -render kumiki should not open in new tab
   -move focus button, make it more cute
   -add # joints table view at bottom (shouldh include joint type, but you need metadat for this)
   -maybe add "assume upright structure" to limit camera movement with mouse?
@@ -316,7 +316,7 @@ RENAMEIFY
     -add from_joints -> raise function to Frame
       -have an on class member version of it to cuz its cutre that way
     -oscar shed -> tiny snack house
-    -horsey viewer -> horse watcher or barn raising? or 建前 or tatemae
+    -kumiki viewer -> horse watcher or barn raising? or 建前 or tatemae
   -consider doing a rename pass on validitiy checkers  
     -assert
     -check
@@ -771,7 +771,7 @@ DONE-gooseneck lap joint
 DONE-change gooseneck to return 2 Convex CSGs or support non convex polygon extrusion CSG (errors on some functions or returns None or whatever)
 DONE-rafters get added twice in oscar shed
 DONE-add extrude polygon csg rendering to fusino 360
-DONE-fix the 13:43:54  /Users/peter.lu/kitchen/faucet/giraffeCAD-proto/code_goes_here/japanese_joints.py:221: UserWarning: Gooseneck joint configuration may not be sensible: Joint ends are pointing in the same direction (dot product = 1.000). For a splice joint, the ends should point in opposite directions (dot product should be -1) warning
+DONE-fix the 13:43:54  /Users/peter.lu/kitchen/faucet/kumiki-proto/code_goes_here/japanese_joints.py:221: UserWarning: Gooseneck joint configuration may not be sensible: Joint ends are pointing in the same direction (dot product = 1.000). For a splice joint, the ends should point in opposite directions (dot product should be -1) warning
 DONE-do irrational joint test for rendering
 DONE/IGNORE-static method in orientation class
 DONE-fix or delete goosenecksplice example in japanese joints examples

@@ -1,8 +1,8 @@
 ---
-applyTo: "horsey-viewer/**"
+applyTo: "kumiki-viewer/**"
 ---
 
-# Horsey Viewer Frontend Agent Rules
+# Kumiki Viewer Frontend Agent Rules
 
 ## Goal
 Keep frontend implementation migration-safe so Lit can be swapped to React later with minimal churn.
@@ -36,7 +36,7 @@ Keep frontend implementation migration-safe so Lit can be swapped to React later
 
 Always run viewer tests after making changes:
 ```bash
-cd horsey-viewer && npx jest && node ./test/run-extension-tests.js
+cd kumiki-viewer && npx jest && node ./test/run-extension-tests.js
 ```
 
 - `npx jest` — unit tests (file-watcher, runner-protocol, selection-store)

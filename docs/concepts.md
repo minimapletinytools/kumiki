@@ -1,6 +1,6 @@
 
 # Coordinate System
-GiraffeCAD uses a right-hand coordinate system.
+Kumiki uses a right-hand coordinate system.
 
 - XY is the "ground" and Z is "up" 
 
@@ -22,7 +22,7 @@ Since faces live on solid objects, they are "sided" objects:
 
 # Timber
 
-A *Timber* is one of the fundamental building blocks of your structure and the majority of GiraffeCAD is designed around this class.
+A *Timber* is one of the fundamental building blocks of your structure and the majority of Kumiki is designed around this class.
 
 ```
 class Timber:
@@ -78,7 +78,7 @@ Joint functions take measurents for its features relative to one of the features
 
 ## member names
 
-When timbers are part of a structure, they may be referred to as members. Members have no logical distinction from each other as far as GiraffeCAD is concerned, but the concepts are useful for explaining the intended use of various functions and you may also want to use these names to organize your projects. It is also useful to describe them as such as the AI will understand things like "beams" being horizontal members. The remainder of this doc will assume knowledge of various member names to elaborate certain concepts.
+When timbers are part of a structure, they may be referred to as members. Members have no logical distinction from each other as far as Kumiki is concerned, but the concepts are useful for explaining the intended use of various functions and you may also want to use these names to organize your projects. It is also useful to describe them as such as the AI will understand things like "beams" being horizontal members. The remainder of this doc will assume knowledge of various member names to elaborate certain concepts.
 
 
 # Footprint
