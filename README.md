@@ -6,6 +6,9 @@ As Kumiki is a CoAD library, it is well suited for usage with AI agents.
 
 Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki designs!
 
+
+INSTRUCTIONS BELOW DO NOT WORK YET DO NOT TRY!!!
+
 ## setup
 
 Kumiki is best used with Kigumi. To install Kigumi, download [VSCode](https://code.visualstudio.com/) and install Kigumi (TODO link)
@@ -16,17 +19,19 @@ You can of course use Kumiki withou Kigumi. You will still want to use Kigumi to
 
 ## viewing the built in patterns and examples
 
-Kigumi ships with a patternbook and several examples. To 
+Kigumi ships with a patternbook and several examples. Open the Kumiki menu by clicking on the Kumiki horse icon in the bar on the left side and click "Open Kigumi".
+
+You may also open Kigumi by opening the command palette in VScode (cmd/ctrl+shift+p). Start typing "kigumi" and choose the "kigumi: open" command.
 
 ## your first kumiki project
 
-Create a folder for your Kumiki project and open that folder in VSCode. Then hit cmd/ctrl+shift+p to open the command pallete, start typing "kigumi" and choose the "kigumi: initialize project" command. This command will setup 
+Create a folder for your Kumiki project and open that folder in VSCode. Then click "Initialize Project" from the Kumiki menu. You may also run "kigumi: initialize project" command from the command pallete.
+
+TODO finish
 
 ## for advanced students
 
 TODO finish
-
-#
 
 
 # APPENDIX
