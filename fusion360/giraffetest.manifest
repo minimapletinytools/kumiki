@@ -2,9 +2,9 @@
     "autodeskProduct": "Fusion360",
     "type": "script",
     "id": "giraffetest",
-    "author": "GiraffeCAD",
+    "author": "Kumiki",
     "description": {
-        "": "GiraffeCAD test script - Renders timber frame structures in Fusion 360. Currently configured to render Oscar's Shed."
+        "": "Kumiki test script - Renders timber frame structures in Fusion 360. Currently configured to render Oscar's Shed."
     },
     "version": "1.0",
     "runOnStartup": false,

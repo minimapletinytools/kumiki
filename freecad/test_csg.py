@@ -14,7 +14,7 @@ import sys
 import os
 import importlib
 
-# Add GiraffeCAD to path
+# Add Kumiki to path
 script_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(script_dir)
 if parent_dir not in sys.path:
@@ -25,17 +25,17 @@ if script_dir not in sys.path:
     sys.path.insert(0, script_dir)
 
 print("="*70)
-print("GiraffeCAD FreeCAD - CSG Test")
+print("Kumiki FreeCAD - CSG Test")
 print("="*70)
-print("\nReloading all GiraffeCAD modules...")
+print("\nReloading all Kumiki modules...")
 
 # List of modules to reload in dependency order
 modules_to_reload = [
-    'giraffecad.rule',
-    'giraffecad.footprint',
-    'giraffecad.cutcsg',
-    'giraffecad.timber',
-    'giraffecad.construction',
+    'kumiki.rule',
+    'kumiki.footprint',
+    'kumiki.cutcsg',
+    'kumiki.timber',
+    'kumiki.construction',
     'giraffe',
     'giraffe_render_freecad',
     'patterns.CSG_debug_examples',

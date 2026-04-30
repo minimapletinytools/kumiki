@@ -341,7 +341,7 @@ def do_xy_cross_section_on_parallel_timbers_overlap(timberA: PerfectTimberWithin
     timberB_height_dir_global = timberB.get_height_direction_global()
     
     # Convert to timberA's local space (just rotate, don't translate)
-    from giraffecad.rule import safe_transform_vector
+    from kumiki.rule import safe_transform_vector
     timberB_width_dir_local = safe_transform_vector(timberA.orientation.matrix.T, timberB_width_dir_global)
     timberB_height_dir_local = safe_transform_vector(timberA.orientation.matrix.T, timberB_height_dir_global)
     

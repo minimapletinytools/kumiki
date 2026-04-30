@@ -4,13 +4,13 @@ Tests for build-a-butt-joint shoulder helpers
 
 import pytest
 from sympy import Rational, cos, sin, pi
-from giraffecad.rule import create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector, safe_compare, Comparison
-from giraffecad.timber import (
+from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector, safe_compare, Comparison
+from kumiki.timber import (
     TimberReferenceEnd,
     timber_from_directions, create_v3
 )
-from giraffecad.construction import ButtJointTimberArrangement
-from giraffecad.joints.build_a_butt_joint_shavings import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
+from kumiki.construction import ButtJointTimberArrangement
+from kumiki.joints.build_a_butt_joint_shavings import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
 
 
 class TestMeasureMortiseShoulderPlane:
@@ -26,7 +26,7 @@ class TestMeasureMortiseShoulderPlane:
         With distance_from_centerline = 0, the plane passes through the
         mortise centerline. With distance = 1, the plane is 1" toward the tenon.
         """
-        from giraffecad.example_shavings import create_canonical_example_butt_joint_timbers
+        from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
         arrangement = create_canonical_example_butt_joint_timbers()
 
         plane_at_center = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(

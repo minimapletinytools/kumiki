@@ -1,5 +1,5 @@
 """
-GiraffeCAD - Basic joint construction functions
+Kumiki - Basic joint construction functions
 
 Convenience wrappers (cut_basic_*) that call the underlying joint functions with
 sensible default sizing. Use these for quick prototyping; for full control over
@@ -9,8 +9,8 @@ or cut_lapped_* functions directly.
 
 from dataclasses import replace
 from typing import Optional, List, Tuple, cast
-from giraffecad.timber import *
-from giraffecad.rule import *
+from kumiki.timber import *
+from kumiki.rule import *
 from .plain_joints import (
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
@@ -22,7 +22,7 @@ from .plain_joints import (
     cut_plain_house_joint,
     cut_plain_splice_lap_joint_on_aligned_timbers,
 )
-from giraffecad.construction import (
+from kumiki.construction import (
     ButtJointTimberArrangement,
     SpliceJointTimberArrangement,
     CornerJointTimberArrangement,

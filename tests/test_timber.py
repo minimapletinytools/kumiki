@@ -1,11 +1,11 @@
 """
-Tests for GiraffeCAD timber framing system
+Tests for Kumiki timber framing system
 """
 
 import pytest
 from sympy import Matrix, sqrt, simplify, Abs, Float, Rational
-from giraffecad.rule import Orientation
-from giraffecad import *
+from kumiki.rule import Orientation
+from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
     create_standard_horizontal_timber,
@@ -696,7 +696,7 @@ class TestCutTimber:
         csg = cut_timber._extended_timber_without_cuts_csg_local()
         
         # Should be a finite prism
-        from giraffecad.cutcsg import RectangularPrism
+        from kumiki.cutcsg import RectangularPrism
         assert isinstance(csg, RectangularPrism)
         
         # In LOCAL coordinates (relative to bottom_position):
@@ -710,7 +710,7 @@ class TestCutTimber:
         assert csg.size == size
         # In LOCAL coordinates, the prism is always axis-aligned (identity orientation)
         # The timber's orientation transforms from local to global coordinates
-        from giraffecad.rule import Orientation
+        from kumiki.rule import Orientation
         assert simplify(csg.transform.orientation.matrix - Orientation.identity().matrix).norm() == 0
     
     def test_extended_timber_without_cuts_positioned(self):
@@ -757,7 +757,7 @@ class TestCutTimber:
         assert csg.end_distance == 80
         
         # the csg is in local coordinates, so it should have identity orientation
-        from giraffecad.rule import Orientation
+        from kumiki.rule import Orientation
         assert csg.transform.orientation.matrix.equals(Orientation.identity().matrix)
     
     def test_render_timber_with_cuts_no_cuts(self):
@@ -775,7 +775,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a RectangularPrism (since no cuts means no Difference operation)
-        from giraffecad.cutcsg import RectangularPrism
+        from kumiki.cutcsg import RectangularPrism
         assert isinstance(csg, RectangularPrism)
         assert csg.size == size
         assert csg.start_distance == 0
@@ -792,7 +792,7 @@ class TestCutTimber:
         timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
         
         # Add a cut (a simple half-plane cut at z=50 in local coordinates)
-        from giraffecad.cutcsg import HalfSpace
+        from kumiki.cutcsg import HalfSpace
         # Create a half plane that cuts perpendicular to the timber length
         # Normal pointing in +Z direction, offset at 50
         half_plane = HalfSpace(
@@ -812,7 +812,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a Difference operation
-        from giraffecad.cutcsg import Difference
+        from kumiki.cutcsg import Difference
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         assert len(csg.subtract) == 1
@@ -829,7 +829,7 @@ class TestCutTimber:
         timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
         
         # Add two cuts
-        from giraffecad.cutcsg import HalfSpace
+        from kumiki.cutcsg import HalfSpace
         half_plane1 = HalfSpace(
             normal=Matrix([Rational(0), Rational(0), Rational(1)]),
             offset=Rational(25)
@@ -858,7 +858,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a Difference operation
-        from giraffecad.cutcsg import Difference
+        from kumiki.cutcsg import Difference
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         assert len(csg.subtract) == 2
@@ -875,7 +875,7 @@ class TestCutTimber:
         timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
         
         # Add an end cut at the top
-        from giraffecad.cutcsg import HalfSpace
+        from kumiki.cutcsg import HalfSpace
         half_plane = HalfSpace(
             normal=Matrix([Rational(0), Rational(0), Rational(-1)]),
             offset=Rational(-50)
@@ -893,7 +893,7 @@ class TestCutTimber:
         csg = cut_timber.render_timber_with_cuts_csg_local()
         
         # Should be a Difference operation
-        from giraffecad.cutcsg import Difference, RectangularPrism
+        from kumiki.cutcsg import Difference, RectangularPrism
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         
@@ -1250,7 +1250,7 @@ class TestFrameBoundingBox:
     
     def test_x_shaped_timbers_with_butt_joint(self):
         """Test bounding box for two timbers in a crossing configuration with a butt joint cut."""
-        from giraffecad.joints.plain_joints import cut_plain_butt_joint_on_face_aligned_timbers
+        from kumiki.joints.plain_joints import cut_plain_butt_joint_on_face_aligned_timbers
         
         # Create two timbers in a crossing configuration that meet near the origin
         # Timber A: receiving timber (uncut), runs perpendicular to timberB

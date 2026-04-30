@@ -1,14 +1,14 @@
 """
-GiraffeCAD - Timber construction functions
+Kumiki - Timber construction functions
 Contains functions for creating and manipulating timbers
 """
 
 import warnings
-from giraffecad.timber import *
-from giraffecad.rule import *
-from giraffecad.measuring import *
-from giraffecad.timber_shavings import *
-from giraffecad.ticket import TimberTicket
+from kumiki.timber import *
+from kumiki.rule import *
+from kumiki.measuring import *
+from kumiki.timber_shavings import *
+from kumiki.ticket import TimberTicket
 from typing import Dict, Any
 
 
@@ -864,7 +864,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
         
         # Check dot products to determine which direction the normal points
         # dot product ≈ +1 means same direction, ≈ -1 means opposite direction
-        from giraffecad.rule import safe_compare, Comparison, safe_dot_product
+        from kumiki.rule import safe_compare, Comparison, safe_dot_product
         width_dot = safe_dot_product(plane_normal, width_direction)
         height_dot = safe_dot_product(plane_normal, height_direction)
         

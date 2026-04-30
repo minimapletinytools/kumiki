@@ -8,9 +8,9 @@ import sys
 from sympy import Rational, Integer, sqrt
 from typing import Optional
 
-from giraffecad import *
-from giraffecad.timber import Frame, add_milestone
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki import *
+from kumiki.timber import Frame, add_milestone
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 # ============================================================================
 # PARAMETERS

@@ -4,7 +4,7 @@ Manual test script for STEP output.
 
 Usage:
     python test_step_output.py                    # exports oscarshed (default)
-    python test_step_output.py horsey             # exports horsey sawhorse
+    python test_step_output.py kumiki             # exports kumiki sawhorse
     python test_step_output.py oscarshed          # exports oscarshed
 
 Output goes to step_test_output/ in the current directory.
@@ -18,7 +18,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from giraffecad.blueprint import export_frame_step, export_cut_timber_step, _OCP_AVAILABLE
+from kumiki.blueprint import export_frame_step, export_cut_timber_step, _OCP_AVAILABLE
 
 
 def _load_structure_factory(module_name: str, factory_name: str):
@@ -46,15 +46,15 @@ def main():
     print(f"Building frame: {pattern}")
     t0 = time.time()
 
-    if pattern == "horsey":
-        create_sawhorse = _load_structure_factory("horsey_example", "create_sawhorse")
+    if pattern == "kumiki":
+        create_sawhorse = _load_structure_factory("kumiki_example", "create_sawhorse")
         frame = create_sawhorse()
     elif pattern == "oscarshed":
         create_oscarshed = _load_structure_factory("oscarshed", "create_oscarshed")
         frame = create_oscarshed()
     else:
         print(f"Unknown pattern: {pattern}")
-        print("Available: oscarshed, horsey")
+        print("Available: oscarshed, kumiki")
         sys.exit(1)
 
     t_build = time.time() - t0

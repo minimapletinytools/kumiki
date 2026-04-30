@@ -4,16 +4,16 @@ Tests for Japanese joint construction functions.
 
 import pytest
 from sympy import Matrix, Rational, Integer, simplify, pi, Abs
-from giraffecad import *
-from giraffecad.rule import inches, degrees, are_vectors_parallel, safe_dot_product, normalize_vector
-from giraffecad.ticket import TimberTicket
-from giraffecad.cutcsg import Difference, SolidUnion, ConvexPolygonExtrusion
-from giraffecad.example_shavings import (
+from kumiki import *
+from kumiki.rule import inches, degrees, are_vectors_parallel, safe_dot_product, normalize_vector
+from kumiki.ticket import TimberTicket
+from kumiki.cutcsg import Difference, SolidUnion, ConvexPolygonExtrusion
+from kumiki.example_shavings import (
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_corner_joint_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
 )
-from giraffecad.joints.japanese_joints import cut_mitered_and_keyed_lap_joint, cut_housed_dovetail_butt_joint
+from kumiki.joints.japanese_joints import cut_mitered_and_keyed_lap_joint, cut_housed_dovetail_butt_joint
 from tests.testing_shavings import (
     create_standard_horizontal_timber,
 )

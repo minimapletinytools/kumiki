@@ -1,5 +1,5 @@
 """
-Fusion 360 rendering module for GiraffeCAD timber framing system using CSG.
+Fusion 360 rendering module for Kumiki timber framing system using CSG.
 
 This module provides functions to render timber structures in Autodesk Fusion 360
 using the CutCSG system for constructive solid geometry operations.
@@ -20,12 +20,12 @@ import traceback
 import time
 from typing import Optional, List, Tuple
 from sympy import Matrix, Float
-from giraffecad import CutTimber, Timber, JointAccessory, Peg, PegShape, Wedge, Frame
-from giraffecad.rule import Orientation
-from giraffecad.cutcsg import (
+from kumiki import CutTimber, Timber, JointAccessory, Peg, PegShape, Wedge, Frame
+from kumiki.rule import Orientation
+from kumiki.cutcsg import (
     CutCSG, HalfSpace, RectangularPrism, Cylinder, SolidUnion, Difference, ConvexPolygonExtrusion
 )
-from giraffecad.rendering_utils import (
+from kumiki.rendering_utils import (
     calculate_structure_extents,
     transform_halfspace_to_timber_local,
     sympy_to_float
@@ -1237,7 +1237,7 @@ def log_structure_extents(extent: float, cut_timbers: List[CutTimber]):
     app = get_fusion_app()
     if app:
         # Calculate detailed extents for logging
-        from giraffecad.rendering_utils import calculate_timber_corners
+        from kumiki.rendering_utils import calculate_timber_corners
         
     min_x = min_y = min_z = float('inf')
     max_x = max_y = max_z = float('-inf')
@@ -1436,7 +1436,7 @@ def render_multiple_timbers(cut_timbers: List[CutTimber], base_name: str = "Timb
         import json
         import datetime
         try:
-            with open('/Users/peter.lu/kitchen/faucet/giraffeCAD-proto/.cursor/debug.log', 'a') as f:
+            with open('/Users/peter.lu/kitchen/faucet/kumiki-proto/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps({
                     'location': 'giraffe_render_fusion360.py:1200',
                     'message': 'Rendering cut timber in Fusion360',

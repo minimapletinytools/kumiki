@@ -1,5 +1,5 @@
 """
-Double Butt Joints Examples - Demonstration of double butt joint types in GiraffeCAD
+Double Butt Joints Examples - Demonstration of double butt joint types in Kumiki
 
 This file contains one example function for each double butt joint type.
 Each joint is created from 4"x5" timbers that are 4' long.
@@ -8,12 +8,12 @@ Each joint is created from 4"x5" timbers that are 4' long.
 from sympy import Rational
 from typing import Union
 
-from giraffecad.rule import V3, create_v3
-from giraffecad.timber import *
-from giraffecad.joints.double_butt_joints import cut_splined_opposing_double_butt_joint
-from giraffecad.joints.build_a_butt_joint_shavings import SimplePegParameters
-from giraffecad.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki.rule import V3, create_v3
+from kumiki.timber import *
+from kumiki.joints.double_butt_joints import cut_splined_opposing_double_butt_joint
+from kumiki.joints.build_a_butt_joint_shavings import SimplePegParameters
+from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 
 def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:

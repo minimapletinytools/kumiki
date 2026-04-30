@@ -1,9 +1,9 @@
 """
-Pytest configuration and fixtures for GiraffeCAD tests.
+Pytest configuration and fixtures for Kumiki tests.
 """
 
 import pytest
-from giraffecad.rule import set_numeric_mode, get_numeric_mode
+from kumiki.rule import set_numeric_mode, get_numeric_mode
 
 
 @pytest.fixture

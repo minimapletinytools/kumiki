@@ -1,5 +1,5 @@
 """
-Plain Joints Examples - Demonstration of all plain joint types in GiraffeCAD
+Plain Joints Examples - Demonstration of all plain joint types in Kumiki
 
 This file contains one example function for each plain joint type.
 Each joint is created from 4"x5" timbers that are 4' long,
@@ -10,15 +10,15 @@ from sympy import Matrix, Rational
 from typing import Union, List
 from dataclasses import replace
 
-from giraffecad.rule import inches, degrees, create_v2, create_v3, V3
-from giraffecad.ticket import TimberTicket
-from giraffecad.construction import (
+from kumiki.rule import inches, degrees, create_v2, create_v3, V3
+from kumiki.ticket import TimberTicket
+from kumiki.construction import (
     CornerJointTimberArrangement,
     ButtJointTimberArrangement,
     SpliceJointTimberArrangement,
     CrossJointTimberArrangement,
 )
-from giraffecad.timber import (
+from kumiki.timber import (
     TimberReferenceEnd,
     TimberFace,
     TimberLongFace,
@@ -26,7 +26,7 @@ from giraffecad.timber import (
     CutTimber,
     Frame,
 )
-from giraffecad.joints.plain_joints import (
+from kumiki.joints.plain_joints import (
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
     cut_plain_butt_joint_on_face_aligned_timbers,
@@ -37,13 +37,13 @@ from giraffecad.joints.plain_joints import (
     cut_plain_house_joint,
     cut_plain_splice_lap_joint_on_aligned_timbers,
 )
-from giraffecad.example_shavings import (
+from kumiki.example_shavings import (
     create_canonical_example_corner_joint_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_splice_joint_timbers,
 )
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 # Standard timber dimensions (4" x 5", 4' long) - matches canonical examples
 TIMBER_WIDTH = inches(4)   # 4"
@@ -458,7 +458,7 @@ example = create_all_joint_examples
 
 if __name__ == "__main__":
     print("="*70)
-    print("GiraffeCAD - Plain Joints Examples")
+    print("Kumiki - Plain Joints Examples")
     print("="*70)
     # Convert from meters back to inches for display (1m = 39.3701 inches)
     width_inches = float(TIMBER_WIDTH / inches(1))

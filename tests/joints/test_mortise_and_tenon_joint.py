@@ -5,19 +5,19 @@ Tests for mortise and tenon joint construction functions
 import pytest
 from typing import List
 from sympy import Matrix, Rational, simplify, sin, cos, pi
-from giraffecad.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector
-from giraffecad.timber import (
+from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector
+from kumiki.timber import (
     Timber, TimberReferenceEnd, TimberFace, TimberLongFace,
     V2, V3, Numeric, PegShape, WedgeShape, Peg,
     timber_from_directions, create_v3
 )
-from giraffecad.construction import ButtJointTimberArrangement
-from giraffecad.timber_shavings import are_timbers_plane_aligned
-from giraffecad.joints.build_a_butt_joint_shavings import (
+from kumiki.construction import ButtJointTimberArrangement
+from kumiki.timber_shavings import are_timbers_plane_aligned
+from kumiki.joints.build_a_butt_joint_shavings import (
     SimplePegParameters,
     PegPositionSpace,
 )
-from giraffecad.joints.mortise_and_tenon_joint import (
+from kumiki.joints.mortise_and_tenon_joint import (
     WedgeParameters,
     _does_shoulder_plane_need_notching,
     cut_mortise_and_tenon_joint_on_FAT,
@@ -232,7 +232,7 @@ class TestPegStuff:
         tenon_cut_csg = tenon_cut_timber.cuts[0].negative_csg
         
         # Verify CSG includes peg holes (should be a SolidUnion with multiple children)
-        from giraffecad.cutcsg import SolidUnion
+        from kumiki.cutcsg import SolidUnion
         assert isinstance(tenon_cut_csg, SolidUnion), \
             "Tenon cut CSG with pegs should be a SolidUnion"
         assert len(tenon_cut_csg.children) >= 2, \
@@ -468,8 +468,8 @@ class TestPegStuff:
         Requesting MORTISE orientation means the peg Y-axis must be parallel to
         the mortise length axis (+Y), not the brace length axis.
         """
-        from giraffecad.example_shavings import create_canonical_example_brace_joint_timbers
-        from giraffecad.rule import are_vectors_parallel
+        from kumiki.example_shavings import create_canonical_example_brace_joint_timbers
+        from kumiki.rule import are_vectors_parallel
 
         brace_arrangement = create_canonical_example_brace_joint_timbers()
         brace_timber = brace_arrangement.brace_timber
@@ -570,7 +570,7 @@ class TestMortiseAndTenonCSGHierarchy:
     """Test that the CSG tree has the expected named node hierarchy."""
 
     def test_tenon_timber_csg_hierarchy(self, simple_T_configuration):
-        from giraffecad.cutcsg import Difference, SolidUnion, HalfSpace, RectangularPrism
+        from kumiki.cutcsg import Difference, SolidUnion, HalfSpace, RectangularPrism
 
         tenon_timber, mortise_timber = simple_T_configuration
         arrangement = ButtJointTimberArrangement(
@@ -611,7 +611,7 @@ class TestMortiseAndTenonCSGHierarchy:
         assert isinstance(redundant_end, HalfSpace)
 
     def test_mortise_timber_csg_hierarchy(self, simple_T_configuration):
-        from giraffecad.cutcsg import Difference, SolidUnion, RectangularPrism
+        from kumiki.cutcsg import Difference, SolidUnion, RectangularPrism
 
         tenon_timber, mortise_timber = simple_T_configuration
         arrangement = ButtJointTimberArrangement(

@@ -1,11 +1,11 @@
 """
-GiraffeCAD - Double butt joint construction functions
+Kumiki - Double butt joint construction functions
 Contains functions for creating joints where two butt timbers meet a single receiving timber.
 """
 
-from giraffecad.timber import *
-from giraffecad.construction import *
-from giraffecad.rule import *
+from kumiki.timber import *
+from kumiki.construction import *
+from kumiki.rule import *
 from .joint_shavings import *
 from .build_a_butt_joint_shavings import (
     SimplePegParameters,

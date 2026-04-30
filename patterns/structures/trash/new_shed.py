@@ -1,7 +1,7 @@
 """
 The Honeycomb Shed - A hexagonal timber frame shed structure
 A creative variation with 6 sides and dramatic roof pitch!
-Built using the GiraffeCAD API
+Built using the Kumiki API
 """
 
 from sympy import Rational, cos, sin, pi, sqrt
@@ -9,9 +9,9 @@ from dataclasses import replace
 import sys
 sys.path.append('..')
 
-from giraffecad import *
-from giraffecad.timber import Frame
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki import *
+from kumiki.timber import Frame
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 # ============================================================================
 # PARAMETERS - Modify these to adjust the shed design

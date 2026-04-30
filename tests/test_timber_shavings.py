@@ -3,9 +3,9 @@ Tests for timber_shavings module (random timber-related helpers).
 """
 
 import pytest
-from giraffecad.timber_shavings import *
-from giraffecad.timber import *
-from giraffecad.rule import create_v3, create_v2, radians
+from kumiki.timber_shavings import *
+from kumiki.timber import *
+from kumiki.rule import create_v3, create_v2, radians
 from tests.testing_shavings import (
     create_standard_vertical_timber,
     create_standard_horizontal_timber,
@@ -261,7 +261,7 @@ class TestPeg:
         csg = peg.render_csg_local()
         
         # Should return a RectangularPrism
-        from giraffecad.cutcsg import RectangularPrism
+        from kumiki.cutcsg import RectangularPrism
         assert isinstance(csg, RectangularPrism)
         
         # Verify dimensions
@@ -283,7 +283,7 @@ class TestPeg:
         csg = peg.render_csg_local()
         
         # Should return a Cylinder
-        from giraffecad.cutcsg import Cylinder
+        from kumiki.cutcsg import Cylinder
         assert isinstance(csg, Cylinder)
         
         # Verify dimensions
@@ -354,7 +354,7 @@ class TestWedge:
         csg = wedge.render_csg_local()
         
         # Should return a ConvexPolygonExtrusion 
-        from giraffecad.cutcsg import ConvexPolygonExtrusion
+        from kumiki.cutcsg import ConvexPolygonExtrusion
         assert isinstance(csg, ConvexPolygonExtrusion)
         
 
@@ -763,7 +763,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_parallel(self):
         """Test are_timbers_parallel helper function."""
-        from giraffecad.timber_shavings import are_timbers_parallel
+        from kumiki.timber_shavings import are_timbers_parallel
         # Create two timbers with parallel length directions
         timber1 = timber_from_directions(
             length=Rational(2),
@@ -810,7 +810,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_orthogonal(self):
         """Test are_timbers_orthogonal helper function."""
-        from giraffecad.timber_shavings import are_timbers_orthogonal
+        from kumiki.timber_shavings import are_timbers_orthogonal
         # Create two timbers with perpendicular length directions
         timber1 = timber_from_directions(
             length=Rational(2),
@@ -857,7 +857,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_face_aligned(self):
         """Test are_timbers_face_aligned helper function."""
-        from giraffecad.timber_shavings import are_timbers_face_aligned
+        from kumiki.timber_shavings import are_timbers_face_aligned
         # Create a reference timber with standard orientation
         timber1 = timber_from_directions(
             length=Rational(2),
@@ -956,7 +956,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_parallel_rational(self):
         """Test are_timbers_parallel with rational (exact) values."""
-        from giraffecad.timber_shavings import are_timbers_parallel
+        from kumiki.timber_shavings import are_timbers_parallel
         from sympy import Rational
         
         # Create timbers with exact rational directions
@@ -1003,7 +1003,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_parallel_float(self):
         """Test are_timbers_parallel with float (fuzzy) values."""
-        from giraffecad.timber_shavings import are_timbers_parallel
+        from kumiki.timber_shavings import are_timbers_parallel
         import math
         
         # Create timbers with float directions
@@ -1024,7 +1024,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_orthogonal_rational(self):
         """Test are_timbers_orthogonal with rational (exact) values."""
-        from giraffecad.timber_shavings import are_timbers_orthogonal
+        from kumiki.timber_shavings import are_timbers_orthogonal
         from sympy import Rational
         
         # Create timbers with exact rational perpendicular directions
@@ -1060,7 +1060,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_orthogonal_fuzzy_fallback(self):
         """Test are_timbers_orthogonal with float (fuzzy) values."""
-        from giraffecad.timber_shavings import are_timbers_orthogonal
+        from kumiki.timber_shavings import are_timbers_orthogonal
         import math
         
         # Create timbers with float perpendicular directions
@@ -1081,7 +1081,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_face_aligned_exact_equality(self):
         """Test are_timbers_face_aligned with exact equality (no tolerance)."""
-        from giraffecad.timber_shavings import are_timbers_face_aligned
+        from kumiki.timber_shavings import are_timbers_face_aligned
         # Create two face-aligned timbers using exact rational values
         timber1 = timber_from_directions(
             length=2,  # Integer
@@ -1123,7 +1123,7 @@ class TestTimberRelationshipHelpers:
 
     def test_do_xy_cross_section_on_parallel_timbers_overlap(self):
         """Test do_xy_cross_section_on_parallel_timbers_overlap function."""
-        from giraffecad.timber_shavings import do_xy_cross_section_on_parallel_timbers_overlap
+        from kumiki.timber_shavings import do_xy_cross_section_on_parallel_timbers_overlap
         from sympy import Rational
         
         # Test 1: Two aligned timbers that overlap

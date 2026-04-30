@@ -1,5 +1,5 @@
 """
-GiraffeCAD - Mortise and Tenon Joint Construction Functions
+Kumiki - Mortise and Tenon Joint Construction Functions
 Contains various mortise and tenon joint implementations
 """
 
@@ -8,8 +8,8 @@ from __future__ import annotations  # Enable deferred annotation evaluation
 import warnings
 from functools import wraps
 
-from giraffecad.timber import *
-from giraffecad.measuring import (
+from kumiki.timber import *
+from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
     locate_position_on_centerline_from_bottom,
@@ -22,11 +22,11 @@ from giraffecad.measuring import (
     get_point_on_face_global,
     Space,
 )
-from giraffecad.construction import *
-from giraffecad.timber_shavings import are_timbers_plane_aligned
-from giraffecad.rule import *
-from giraffecad.rule import safe_dot_product
-from giraffecad.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, adopt_csg, PrismFace
+from kumiki.construction import *
+from kumiki.timber_shavings import are_timbers_plane_aligned
+from kumiki.rule import *
+from kumiki.rule import safe_dot_product
+from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, adopt_csg, PrismFace
 from .joint_shavings import chop_shoulder_notch_aligned_with_timber
 from .build_a_butt_joint_shavings import (
     PegPositionResult,

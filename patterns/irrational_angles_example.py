@@ -7,10 +7,10 @@ representations are converted to floating point values in CAD systems.
 """
 
 from sympy import Rational, pi, Matrix, cos, sin
-from giraffecad.timber import Frame, TimberFace, TimberReferenceEnd, create_v3, timber_from_directions
-from giraffecad.construction import ButtJointTimberArrangement
-from giraffecad.joints.mortise_and_tenon_joint import cut_mortise_and_tenon_joint
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki.timber import Frame, TimberFace, TimberReferenceEnd, create_v3, timber_from_directions
+from kumiki.construction import ButtJointTimberArrangement
+from kumiki.joints.mortise_and_tenon_joint import cut_mortise_and_tenon_joint
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 
 def create_irrational_angles_patternbook() -> PatternBook:

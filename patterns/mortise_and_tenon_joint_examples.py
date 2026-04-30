@@ -3,28 +3,28 @@ Example usage of mortise and tenon joint functions
 """
 
 from sympy import Matrix, Rational, Integer
-from giraffecad.rule import inches, Transform
-from giraffecad.timber import (
+from kumiki.rule import inches, Transform
+from kumiki.timber import (
     Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
-from giraffecad.joints.mortise_and_tenon_joint import *
+from kumiki.joints.mortise_and_tenon_joint import *
 
-from giraffecad.construction import (
+from kumiki.construction import (
     ButtJointTimberArrangement,
     Stickout,
     create_axis_aligned_timber,
     join_plane_aligned_on_place_aligned_timbers,
 )
-from giraffecad.example_shavings import (
+from kumiki.example_shavings import (
     create_canonical_example_brace_joint_timbers,
     create_canonical_example_butt_joint_timbers,
 )
-from giraffecad.joints.basic_joints import cut_basic_miter_joint
-from giraffecad.construction import CornerJointTimberArrangement
-from giraffecad.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint, make_pattern_from_frame
-from giraffecad.ticket import TimberTicket
+from kumiki.joints.basic_joints import cut_basic_miter_joint
+from kumiki.construction import CornerJointTimberArrangement
+from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint, make_pattern_from_frame
+from kumiki.ticket import TimberTicket
 
 
 def example_basic_mortise_and_tenon(position=None):
@@ -244,8 +244,8 @@ def example_double_angled_mortise_and_tenon(position=None):
     """
     from sympy import Integer, pi
     from dataclasses import replace
-    from giraffecad.rule import Orientation, radians
-    from giraffecad.ticket import Ticket
+    from kumiki.rule import Orientation, radians
+    from kumiki.ticket import Ticket
 
     if position is None:
         position = create_v3(0, 0, 0)

@@ -4,8 +4,8 @@ with different reference features
 """
 
 from sympy import Rational
-from giraffecad import *
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki import *
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 def inches(value):
     """Convert inches to meters using exact rational arithmetic."""

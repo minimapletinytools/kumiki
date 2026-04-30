@@ -1,5 +1,5 @@
 """
-GiraffeCAD - Blueprint export module (STL and STEP)
+Kumiki - Blueprint export module (STL and STEP)
 
 Exports CutTimber and Frame objects to standard CAD interchange formats.
 
@@ -168,7 +168,7 @@ def export_frame_stl(
 # STEP export helpers (OCP / OpenCascade direct)
 # ---------------------------------------------------------------------------
 
-# GiraffeCAD uses metres; OCP/STEP uses millimetres
+# Kumiki uses metres; OCP/STEP uses millimetres
 _M_TO_MM = 1000.0
 _STEP_HALF_SPACE_EXTENT = 10_000.0  # mm — large box stand-in for HalfSpace
 
@@ -274,7 +274,7 @@ def _apply_transform(shape: "TopoDS_Shape", trsf: "gp_Trsf") -> "TopoDS_Shape":
 
 
 def _transform_shape(shape: "TopoDS_Shape", transform: Transform) -> "TopoDS_Shape":
-    """Apply a GiraffeCAD Transform to an OCP shape."""
+    """Apply a Kumiki Transform to an OCP shape."""
     m = transform.orientation.matrix
     p = transform.position
     rot = [

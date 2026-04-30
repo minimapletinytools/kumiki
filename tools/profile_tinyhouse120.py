@@ -23,7 +23,7 @@ import argparse
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-from giraffecad.rule import set_numeric_mode, get_numeric_mode
+from kumiki.rule import set_numeric_mode, get_numeric_mode
 
 
 def _load_structure_factory(module_name: str, factory_name: str):

@@ -5,7 +5,7 @@ PatternBook is a helper structure for organizing multiple patterns (frames or CS
 and raising them at different positions for visualization and testing.
 """
 
-from giraffecad import *
+from kumiki import *
 
 
 def create_simple_post_pattern() -> PatternBook:

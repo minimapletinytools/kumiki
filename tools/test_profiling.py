@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Profiling script for all GiraffeCAD patterns.
+Profiling script for all Kumiki patterns.
 
 Imports every pattern module, builds each pattern, profiles execution time
 and call counts, then writes results to a text file.
 
 Usage:
     python test_profiling.py                      # profile all patterns
-    python test_profiling.py oscarshed horsey      # profile specific patterns
+    python test_profiling.py oscarshed kumiki      # profile specific patterns
 
 Output goes to step_test_output/profiling_results.txt
 """
@@ -28,7 +28,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "patterns" / "structures"))
 # import_func is a callable that returns (module_func, args) to defer imports
 PATTERN_REGISTRY = {
     # Structures (return Frame)
-    "horsey": lambda: (__import__("horsey_example", fromlist=["create_sawhorse"]).create_sawhorse, []),
+    "kumiki": lambda: (__import__("kumiki_example", fromlist=["create_sawhorse"]).create_sawhorse, []),
     "oscarshed": lambda: (__import__("oscarshed", fromlist=["create_oscarshed"]).create_oscarshed, []),
     "gateway": lambda: (__import__("gateway_example", fromlist=["create_gateway"]).create_gateway, []),
     "ladder": lambda: (__import__("ladder_example", fromlist=["create_ladder_frame"]).create_ladder_frame, []),
@@ -71,7 +71,7 @@ def profile_pattern(name, func, args):
 
 def profile_timber_hashing(result):
     """Hash all timbers in a Frame result. Returns (hash_time, timber_count) or (None, 0)."""
-    from giraffecad.timber import Frame
+    from kumiki.timber import Frame
 
     if not isinstance(result, Frame):
         return None, 0
@@ -86,8 +86,8 @@ def profile_timber_hashing(result):
 
 def describe_result(result):
     """Return a short description of the build result."""
-    from giraffecad.timber import Frame
-    from giraffecad.patternbook import PatternBook
+    from kumiki.timber import Frame
+    from kumiki.patternbook import PatternBook
 
     if isinstance(result, Frame):
         return f"Frame with {len(result.cut_timbers)} timbers"
@@ -112,7 +112,7 @@ def main():
     output_file = output_dir / "profiling_results.txt"
 
     lines = []
-    lines.append(f"GiraffeCAD Pattern Profiling Results")
+    lines.append(f"Kumiki Pattern Profiling Results")
     lines.append(f"Date: {datetime.now().isoformat()}")
     lines.append(f"Python: {sys.version}")
     lines.append(f"Patterns: {len(requested)}")

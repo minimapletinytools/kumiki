@@ -1,5 +1,5 @@
 """
-GiraffeCAD Fusion 360 Examples Runner - automatically reloads all modules.
+Kumiki Fusion 360 Examples Runner - automatically reloads all modules.
 
 This script provides multiple example rendering functions with automatic module reloading,
 so you can make changes to your code and re-run this script without restarting Fusion 360.
@@ -44,7 +44,7 @@ CSG_EXAMPLE_TO_RENDER = 'cube_cutout'  # Options: 'cube_cutout', 'halfspace_cut'
 # Anthology PatternBook - will be initialized after module reload
 ANTHOLOGY_PATTERN_BOOK = None
 
-# DO NOT import GiraffeCAD modules here at the top level!
+# DO NOT import Kumiki modules here at the top level!
 # They will be imported AFTER reload inside the render functions.
 # Importing here would create references to old classes that become stale after reload.
 try:
@@ -70,11 +70,11 @@ def create_anthology_pattern_book():
     Returns:
         PatternBook: A single PatternBook with all patterns from all examples
     """
-    from giraffecad.patternbook import PatternBook
+    from kumiki.patternbook import PatternBook
     from patterns.basic_joints_examples import create_basic_joints_patternbook
     from patterns.mortise_and_tenon_joint_examples import create_mortise_and_tenon_patternbook
     from patterns.construction_examples import create_construction_patternbook
-    from patterns.structures.horsey_example import create_horsey_patternbook
+    from patterns.structures.kumiki_example import create_kumiki_patternbook
     from patterns.structures.oscarshed import create_oscar_shed_patternbook
     from patterns.japanese_joints_example import create_japanese_joints_patternbook
     from patterns.irrational_angles_example import create_irrational_angles_patternbook
@@ -86,7 +86,7 @@ def create_anthology_pattern_book():
         create_basic_joints_patternbook(),
         create_mortise_and_tenon_patternbook(),
         create_construction_patternbook(),
-        create_horsey_patternbook(),
+        create_kumiki_patternbook(),
         create_oscar_shed_patternbook(),
         create_japanese_joints_patternbook(),
         create_irrational_angles_patternbook(),
@@ -104,21 +104,21 @@ def create_anthology_pattern_book():
 
 
 def reload_all_modules():
-    """Reload all GiraffeCAD modules in dependency order."""
+    """Reload all Kumiki modules in dependency order."""
     print("="*70)
-    print("GiraffeCAD Fusion 360 - Examples Runner")
+    print("Kumiki Fusion 360 - Examples Runner")
     print("="*70)
-    print("\nReloading all GiraffeCAD modules...")
-    app.log("Reloading all GiraffeCAD modules...")
+    print("\nReloading all Kumiki modules...")
+    app.log("Reloading all Kumiki modules...")
     
     import importlib
     
-    # AGGRESSIVE MODULE CLEANUP: Delete ALL GiraffeCAD-related modules
+    # AGGRESSIVE MODULE CLEANUP: Delete ALL Kumiki-related modules
     # This ensures no stale class references remain after reload
     modules_to_delete = []
     for module_name in list(sys.modules.keys()):
         # Delete any module that starts with our project prefixes
-        if (module_name.startswith('giraffecad') or 
+        if (module_name.startswith('kumiki') or 
             module_name.startswith('patterns') or 
             module_name == 'giraffe' or
             module_name.startswith('giraffe.') or
@@ -133,25 +133,25 @@ def reload_all_modules():
     
     # List of modules to reload in dependency order
     modules_to_reload = [
-        'giraffecad',  # Reload the package itself first
-        'giraffecad.rule',
-        'giraffecad.footprint',
-        'giraffecad.cutcsg',
-        'giraffecad.timber',
-        'giraffecad.construction',
-        'giraffecad.rendering_utils',
-        'giraffecad.joints.joint_shavings',
-        'giraffecad.measuring',
-        'giraffecad.joints.plain_joints',
-        'giraffecad.joints.mortise_and_tenon_joint',
-        'giraffecad.joints.japanese_joints',
-        'giraffecad.patternbook',
+        'kumiki',  # Reload the package itself first
+        'kumiki.rule',
+        'kumiki.footprint',
+        'kumiki.cutcsg',
+        'kumiki.timber',
+        'kumiki.construction',
+        'kumiki.rendering_utils',
+        'kumiki.joints.joint_shavings',
+        'kumiki.measuring',
+        'kumiki.joints.plain_joints',
+        'kumiki.joints.mortise_and_tenon_joint',
+        'kumiki.joints.japanese_joints',
+        'kumiki.patternbook',
         'giraffe',
         'patterns',  # Reload the patterns package
         'giraffe_render_fusion360',  # Add this so the rendering module itself gets reloaded
         'patterns.mortise_and_tenon_joint_examples',
         'patterns.basic_joints_examples',
-        'patterns.structures.horsey_example',
+        'patterns.structures.kumiki_example',
         'patterns.structures.oscarshed',
         'patterns.japanese_joints_example',
         'patterns.irrational_angles_example',
@@ -184,10 +184,10 @@ def reload_all_modules():
 def render_plain_joints():
     """Render all plain joint examples using anthology PatternBook."""
     from giraffe_render_fusion360 import render_frame, clear_design
-    from giraffecad.rule import m
+    from kumiki.rule import m
     
     print("="*60)
-    print("GiraffeCAD Fusion 360 - All Plain Joints")
+    print("Kumiki Fusion 360 - All Plain Joints")
     print("="*60)
     app.log("🦒 GIRAFFETEST: PLAIN JOINTS 🦒")
     
@@ -223,10 +223,10 @@ def render_plain_joints():
 def render_mortise_and_tenon():
     """Render mortise and tenon joint examples with pegs using anthology PatternBook."""
     from giraffe_render_fusion360 import render_frame, clear_design
-    from giraffecad.rule import inches
+    from kumiki.rule import inches
     
     print("="*70)
-    print("GiraffeCAD Fusion 360 - Mortise and Tenon Joint Examples")
+    print("Kumiki Fusion 360 - Mortise and Tenon Joint Examples")
     print("="*70)
     app.log("🦒 GIRAFFETEST: MORTISE AND TENON 🦒")
     
@@ -267,7 +267,7 @@ def render_gooseneck():
     from giraffe_render_fusion360 import render_frame, clear_design
     
     print("="*70)
-    print("GiraffeCAD Fusion 360 - Japanese Gooseneck Joint")
+    print("Kumiki Fusion 360 - Japanese Gooseneck Joint")
     print("="*70)
     app.log("🦒 GIRAFFETEST: JAPANESE GOOSENECK 🦒")
     
@@ -306,7 +306,7 @@ def render_oscar_shed():
     from giraffe_render_fusion360 import render_frame, clear_design
     
     print("="*60)
-    print("GiraffeCAD Fusion 360 - Oscar's Shed")
+    print("Kumiki Fusion 360 - Oscar's Shed")
     print("="*60)
     app.log("🦒 GIRAFFETEST: OSCAR'S SHED 🦒")
     
@@ -356,7 +356,7 @@ def render_irrational_angles():
     from giraffe_render_fusion360 import render_frame, clear_design
     
     print("="*70)
-    print("GiraffeCAD Fusion 360 - Irrational Angles Test")
+    print("Kumiki Fusion 360 - Irrational Angles Test")
     print("="*70)
     app.log("🦒 GIRAFFETEST: IRRATIONAL ANGLES 🦒")
     
@@ -400,7 +400,7 @@ def render_csg():
     from patterns.CSG_debug_examples import EXAMPLES
     
     print("="*70)
-    print("GiraffeCAD Fusion 360 - CSG Examples")
+    print("Kumiki Fusion 360 - CSG Examples")
     print("="*70)
     app.log("🦒 GIRAFFETEST: CSG EXAMPLES 🦒")
     
@@ -455,7 +455,7 @@ def run(_context: str):
     try:
         # Check for import errors first
         if not import_success:
-            ui.messageBox(f'Import Error: {import_error}', 'GiraffeCAD Import Failed')
+            ui.messageBox(f'Import Error: {import_error}', 'Kumiki Import Failed')
             return
 
         # Reload all modules
@@ -496,14 +496,14 @@ def run(_context: str):
         error_msg = f"Unexpected error: {str(e)}\n\n{traceback.format_exc()}"
         print(f"❌ {error_msg}")
         app.log(f"ERROR: {error_msg}")
-        ui.messageBox(f'Unexpected error:\n{str(e)}', 'GiraffeCAD Error')
+        ui.messageBox(f'Unexpected error:\n{str(e)}', 'Kumiki Error')
 
 
 def stop(_context: str):
     """This function is called by Fusion when the script is stopped."""
     try:
-        print("GiraffeCAD script stopped")
-        app.log("GiraffeCAD script stopped")
+        print("Kumiki script stopped")
+        app.log("Kumiki script stopped")
         
     except:  #pylint:disable=bare-except
         app.log(f'Stop failed:\n{traceback.format_exc()}')

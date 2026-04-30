@@ -1,14 +1,14 @@
 """
-GiraffeCAD - Plain joint construction functions
+Kumiki - Plain joint construction functions
 Contains functions for creating joints between timbers
 """
 
-from giraffecad.timber import *
-from giraffecad.construction import *
-from giraffecad.rule import *
+from kumiki.timber import *
+from kumiki.construction import *
+from kumiki.rule import *
 from .joint_shavings import *
-from giraffecad.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, get_point_on_face_global, Space
-from giraffecad.joints.build_a_butt_joint_shavings import (
+from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, get_point_on_face_global, Space
+from kumiki.joints.build_a_butt_joint_shavings import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
 )
 
@@ -124,7 +124,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # so we use +miter_normal. Otherwise, we use -miter_normal.
     
     # For timberA: check if miter_normal points away from or towards the timber
-    from giraffecad.rule import safe_compare, Comparison, safe_dot_product, safe_transform_vector
+    from kumiki.rule import safe_compare, Comparison, safe_dot_product, safe_transform_vector
     dot_A = safe_dot_product(normA, miter_normal)
     if safe_compare(dot_A, 0, Comparison.GT):
         # Miter normal points away from timberA (in the direction of timberA's end)
@@ -254,7 +254,7 @@ def cut_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArr
     face_center = _get_face_center_position(receiving_timber, receiving_face)
     
     # Calculate distance from the specified butt end to the receiving face
-    from giraffecad.rule import safe_dot_product
+    from kumiki.rule import safe_dot_product
     distance_from_bottom = safe_dot_product(face_center - butt_timber.get_bottom_position_global(), butt_timber.get_length_direction_global())
     distance_from_end = butt_timber.length - distance_from_bottom if butt_end == TimberReferenceEnd.TOP else distance_from_bottom
     
@@ -318,8 +318,8 @@ def cut_tongue_and_fork_corner_joint(
         AssertionError: If timbers are not plane aligned, are parallel, or tongue parameters
             are out of bounds.
     """
-    from giraffecad.cutcsg import RectangularPrism, HalfSpace, Difference, adopt_csg
-    from giraffecad.rule import safe_dot_product, safe_compare, Comparison
+    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, adopt_csg
+    from kumiki.rule import safe_dot_product, safe_compare, Comparison
 
     error = arrangement.check_plane_aligned()
     assert error is None, error
@@ -463,7 +463,7 @@ def cut_tongue_and_fork_corner_joint(
         else -fork_far_face_normal_global
     )
     # Convert to tongue timber local coordinates
-    from giraffecad.rule import safe_transform_vector
+    from kumiki.rule import safe_transform_vector
     tongue_end_cut_local_normal = safe_transform_vector(
         tongue_timber.orientation.matrix.T, tongue_end_hs_normal_global
     )
@@ -561,8 +561,8 @@ def cut_tongue_and_fork_butt_joint(
         AssertionError: If timbers are not plane aligned, are parallel, or
             tongue parameters are out of bounds.
     """
-    from giraffecad.cutcsg import RectangularPrism, HalfSpace, Difference, adopt_csg
-    from giraffecad.rule import safe_dot_product, safe_compare, Comparison
+    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, adopt_csg
+    from kumiki.rule import safe_dot_product, safe_compare, Comparison
 
     error = arrangement.check_plane_aligned()
     assert error is None, error
@@ -696,7 +696,7 @@ def cut_tongue_and_fork_butt_joint(
         if safe_dot_product(fork_far_face_normal_global, tongue_end_direction) > 0
         else -fork_far_face_normal_global
     )
-    from giraffecad.rule import safe_transform_vector
+    from kumiki.rule import safe_transform_vector
     tongue_end_cut_local_normal = safe_transform_vector(
         tongue_timber.orientation.matrix.T, tongue_end_hs_normal_global
     )
@@ -756,7 +756,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         ValueError: If the timbers do not have parallel length axes.
     """
     import warnings
-    from giraffecad.construction import _are_directions_parallel
+    from kumiki.construction import _are_directions_parallel
     
     timberA = arrangement.timber1
     timberA_end = arrangement.timber1_end
@@ -795,7 +795,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         to_splice = splice_point - timberA.get_bottom_position_global()
         
         # Project onto the centerline
-        from giraffecad.rule import safe_dot_product
+        from kumiki.rule import safe_dot_product
         distance_along_centerline = safe_dot_product(to_splice, length_dir_norm)
         projected_point = timberA.get_bottom_position_global() + length_dir_norm * distance_along_centerline
         
@@ -808,7 +808,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     # Check if timber cross sections overlap (approximate check using bounding boxes)
     # Project both timber cross-sections onto a plane perpendicular to the length direction
     # For simplicity, we'll warn if the centerlines are far apart
-    from giraffecad.rule import safe_dot_product
+    from kumiki.rule import safe_dot_product
     centerline_distance = vector_magnitude(
         (splice_point - timberA.get_bottom_position_global()) - 
         length_dir_norm * safe_dot_product(splice_point - timberA.get_bottom_position_global(), length_dir_norm) -
@@ -884,8 +884,8 @@ def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_rati
     Raises:
         AssertionError: If the timbers don't intersect, are parallel, or cut_ratio is out of range.
     """
-    from giraffecad.cutcsg import Difference, RectangularPrism, HalfSpace
-    from giraffecad.rule import safe_dot_product, safe_transform_vector, safe_norm
+    from kumiki.cutcsg import Difference, RectangularPrism, HalfSpace
+    from kumiki.rule import safe_dot_product, safe_transform_vector, safe_norm
     from sympy import Rational
     
     timberA = arrangement.timber1
@@ -943,7 +943,7 @@ def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_rati
     # Choose the face on that axis on timberA that's closest to timberB
     # Then pick the opposite face on timberB
     if timberA_cut_face is None:
-        from giraffecad.rule import cross_product, safe_normalize_vector as normalize_vector, safe_norm
+        from kumiki.rule import cross_product, safe_normalize_vector as normalize_vector, safe_norm
         
         # Get length directions of both timbers
         d1 = timberA.get_length_direction_global()
@@ -1286,10 +1286,10 @@ def cut_plain_house_joint_DEPRECATED(housing_timber: TimberLike, housed_timber: 
         A shelf (housed_timber) fitting into the side of a cabinet (housing_timber).
         The cabinet side gets a groove cut into it to receive the shelf.
     """
-    from giraffecad.cutcsg import Difference, RectangularPrism
+    from kumiki.cutcsg import Difference, RectangularPrism
     
     # Verify that the timbers are not parallel (their length directions must differ)
-    from giraffecad.rule import safe_dot_product
+    from kumiki.rule import safe_dot_product
     dot_product = safe_dot_product(housing_timber.get_length_direction_global(), housed_timber.get_length_direction_global())
     assert abs(abs(dot_product) - 1) > Rational(1, 1000000), \
         "Timbers must not be parallel (their length directions must differ)"
@@ -1354,7 +1354,7 @@ def cut_plain_house_joint_DEPRECATED(housing_timber: TimberLike, housed_timber: 
     
     # Calculate the relative transformation
     # housed_prism in housing_timber's local frame = housing_orientation^T * housed_orientation
-    from giraffecad.rule import safe_transform_vector
+    from kumiki.rule import safe_transform_vector
     relative_orientation = Orientation(safe_transform_vector(housing_timber.orientation.matrix.T, housed_timber.orientation.matrix))
     
     # Transform the housed timber's position to housing timber's local coordinates

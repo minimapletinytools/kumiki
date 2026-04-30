@@ -1,5 +1,5 @@
 """
-GiraffeCAD - Timber types, enums, constants, and core classes
+Kumiki - Timber types, enums, constants, and core classes
 Contains all core data structures and type definitions for the timber framing system
 """
 
@@ -680,7 +680,7 @@ class PerfectTimberWithin(ABC):
 
     def _get_closest_oriented_face_from_faces(self, faces: List[TimberFace], target_direction: Direction3D) -> TimberFace:
         """Return the face in `faces` whose outward normal best aligns with `target_direction` (max dot product)."""
-        from giraffecad.rule import numeric_dot_product
+        from kumiki.rule import numeric_dot_product
         best_face = faces[0]
         best_alignment = numeric_dot_product(target_direction, self.get_face_direction_global(faces[0]))
         for face in faces[1:]:
@@ -1492,7 +1492,7 @@ def did_end_cuts_extend_timber(timber: PerfectTimberWithin, cuts: List['Cutting'
     Returns:
         True if any end cut extends beyond the timber's original length
     """
-    from giraffecad.rule import safe_compare, Comparison
+    from kumiki.rule import safe_compare, Comparison
     
     for cut in cuts:
         # Check top end cut
@@ -1687,7 +1687,7 @@ class CutTimber:
             # Check if it's a simple HalfSpace or a Difference with HalfSpaces
             if isinstance(csg, HalfSpace):
                 half_space = csg
-                from giraffecad.rule import safe_compare, Comparison, safe_dot_product
+                from kumiki.rule import safe_compare, Comparison, safe_dot_product
                 dot_product = safe_dot_product(half_space.normal, length_direction_local)
                 
                 if equality_test(Abs(dot_product), 1):
@@ -2235,7 +2235,7 @@ class Frame:
                         local_corners.append(local_corner)
             
             # Transform each corner to global coordinates
-            from giraffecad.rule import safe_transform_vector
+            from kumiki.rule import safe_transform_vector
             for local_corner in local_corners:
                 global_corner = prism.transform.position + safe_transform_vector(prism.transform.orientation.matrix, local_corner)
                 
@@ -2351,11 +2351,11 @@ def add_milestone(name: str):
 
     Writes a JSON protocol message to the real stdout pipe so the viewer
     extension can display progress during script execution.  No-ops when
-    not running inside the Horsey Viewer (checks HORSEY_VIEWER_MILESTONES
+    not running inside the Kumiki Viewer (checks KUMIKI_VIEWER_MILESTONES
     environment variable).
     """
     import os, sys, json as _json  # noqa: E401 — lazy imports to avoid burdening the core module
-    if not os.environ.get("HORSEY_VIEWER_MILESTONES"):
+    if not os.environ.get("KUMIKI_VIEWER_MILESTONES"):
         return
     stdout = sys.__stdout__
     assert stdout is not None

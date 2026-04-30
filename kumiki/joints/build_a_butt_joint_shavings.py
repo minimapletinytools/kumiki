@@ -1,5 +1,5 @@
 """
-GiraffeCAD - Build-a-Butt-Joint Helpers
+Kumiki - Build-a-Butt-Joint Helpers
 Shared helpers for computing shoulder planes and marking spaces for butt joints.
 
 THe general approach to building-a-butt-joint is:
@@ -18,8 +18,8 @@ outside of the purview of build-a-butt-joint, finish the joint:
 from __future__ import annotations
 from typing import NamedTuple
 
-from giraffecad.timber import *
-from giraffecad.measuring import (
+from kumiki.timber import *
+from kumiki.measuring import (
     locate_centerline,
     locate_face,
     locate_plane_from_edge_in_direction,
@@ -28,10 +28,10 @@ from giraffecad.measuring import (
     Plane,
     Line,
 )
-from giraffecad.construction import *
-from giraffecad.rule import *
-from giraffecad.rule import safe_dot_product, safe_transform_vector
-from giraffecad.cutcsg import CutCSG
+from kumiki.construction import *
+from kumiki.rule import *
+from kumiki.rule import safe_dot_product, safe_transform_vector
+from kumiki.cutcsg import CutCSG
 
 # ============================================================================
 # Shoulder Plane
@@ -210,7 +210,7 @@ def build_dovetail_shoulder_geometery(
     The resulting CutCSG object is in global space. It includes part of the butt timber itself, not just the dovetail shape.
     The resulting CutCSG object includes part of the butt timber itself, not just the dovetail shape. This is useful for cutting notches into the receiving timber for non perfect receiving timbers.
     """
-    from giraffecad.cutcsg import ConvexPolygonExtrusion
+    from kumiki.cutcsg import ConvexPolygonExtrusion
 
     if safe_compare(dovetail_depth, Integer(0), Comparison.LE):
         raise ValueError(f"dovetail_depth must be positive, got {dovetail_depth}")

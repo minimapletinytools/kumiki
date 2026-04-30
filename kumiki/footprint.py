@@ -1,5 +1,5 @@
 """
-Footprint class for GiraffeCAD - Represents the 2D footprint of a structure
+Footprint class for Kumiki - Represents the 2D footprint of a structure
 """
 
 from enum import Enum

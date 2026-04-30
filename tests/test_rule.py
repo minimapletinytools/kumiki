@@ -9,7 +9,7 @@ import pytest
 import math
 import sympy as sp
 from sympy import Matrix, pi, simplify, Abs, eye, det, Rational, Integer, cos, sin, sqrt
-from giraffecad.rule import (
+from kumiki.rule import (
     Orientation,
     Transform,
     Axis,
@@ -1170,19 +1170,19 @@ class TestGiraffeEvalf:
 
 class TestCollapseMode:
     def test_smart_preserves_simple_in_symbolic_mode(self, symbolic_mode):
-        from giraffecad.rule import _collapse_scalar
+        from kumiki.rule import _collapse_scalar
         expr = Rational(1, 2)
         result = _collapse_scalar(expr, CollapseMode.SMART)
         assert result == Rational(1, 2)
 
     def test_always_collapses_simple(self):
-        from giraffecad.rule import _collapse_scalar
+        from kumiki.rule import _collapse_scalar
         expr = Rational(1, 2)
         result = _collapse_scalar(expr, CollapseMode.ALWAYS)
         assert isinstance(result, sp.Float)
 
     def test_never_preserves_complex(self):
-        from giraffecad.rule import _collapse_scalar
+        from kumiki.rule import _collapse_scalar
         # sin(1) is flagged as complex by is_complex_expr
         expr = sin(Integer(1)) + cos(Integer(2))
         result = _collapse_scalar(expr, CollapseMode.NEVER)

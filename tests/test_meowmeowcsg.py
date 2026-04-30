@@ -6,8 +6,8 @@ This module contains tests for the CSG primitives and operations.
 
 import pytest
 from sympy import Matrix, Rational, Integer, simplify, sqrt, cos, sin, pi
-from giraffecad.rule import Orientation, Transform, create_v3, radians
-from giraffecad.cutcsg import (
+from kumiki.rule import Orientation, Transform, create_v3, radians
+from kumiki.cutcsg import (
     HalfSpace,
     RectangularPrism,
     Cylinder,
@@ -23,7 +23,7 @@ from giraffecad.cutcsg import (
     translate_profile,
     translate_profiles,
 )
-from giraffecad.rule import create_v2
+from kumiki.rule import create_v2
 from tests.testing_shavings import assert_is_valid_rotation_matrix, create_standard_vertical_timber
 import random
 
@@ -2312,8 +2312,8 @@ class TestCSGNaming:
 
     def test_cutting_name_wraps_in_named_solid_union(self):
         """Cutting with a name wraps get_negative_csg_local() in a named SolidUnion."""
-        from giraffecad.timber import Cutting, Timber
-        from giraffecad.ticket import TimberTicket
+        from kumiki.timber import Cutting, Timber
+        from kumiki.ticket import TimberTicket
         timber = Timber(
             size=Matrix([Rational(4), Rational(6)]),
             length=Rational(100),
@@ -2328,8 +2328,8 @@ class TestCSGNaming:
 
     def test_cutting_no_name_returns_raw_csg(self):
         """Cutting without a name returns the raw CSG, not wrapped."""
-        from giraffecad.timber import Cutting, Timber
-        from giraffecad.ticket import TimberTicket
+        from kumiki.timber import Cutting, Timber
+        from kumiki.ticket import TimberTicket
         timber = Timber(
             size=Matrix([Rational(4), Rational(6)]),
             length=Rational(100),

@@ -1,6 +1,6 @@
 """
 Oscar's Shed - A simple timber frame shed structure
-Built using the GiraffeCAD API
+Built using the Kumiki API
 """
 
 from sympy import Rational
@@ -8,10 +8,10 @@ from typing import Optional
 import sys
 sys.path.append('..')
 
-from giraffecad import *
-from giraffecad.timber import Frame
-from giraffecad.patternbook import PatternBook, PatternMetadata
-from giraffecad.joints.basic_joints import cut_basic_mitered_and_keyed_lap_joint
+from kumiki import *
+from kumiki.timber import Frame
+from kumiki.patternbook import PatternBook, PatternMetadata
+from kumiki.joints.basic_joints import cut_basic_mitered_and_keyed_lap_joint
 
 
 # ============================================================================

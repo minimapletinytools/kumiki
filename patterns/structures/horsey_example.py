@@ -10,8 +10,8 @@ This example creates a sawhorse with:
 All joints are mortise and tenon with pegs.
 """
 
-from giraffecad import *
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki import *
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 # Define timber dimensions
 beam_size = Matrix([inches(4), inches(6)])  # 4x6 with 6" in Z
@@ -35,7 +35,7 @@ peg_diameter = inches(Rational(5, 8))
 peg_distance_from_shoulder = inches(1)
 
 
-def create_horsey_patternbook() -> PatternBook:
+def create_kumiki_patternbook() -> PatternBook:
     """
     Create a PatternBook with the sawhorse pattern.
     
@@ -43,14 +43,14 @@ def create_horsey_patternbook() -> PatternBook:
         PatternBook: PatternBook containing the sawhorse pattern
     """
     patterns = [
-        (PatternMetadata("sawhorse", ["horsey", "complete_structures"], "frame"),
+        (PatternMetadata("sawhorse", ["kumiki", "complete_structures"], "frame"),
          lambda center: create_sawhorse()),
     ]
     
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_horsey_patternbook()
+patternbook = create_kumiki_patternbook()
 
 
 def create_sawhorse() -> Frame:

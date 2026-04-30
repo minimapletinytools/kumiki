@@ -4,7 +4,7 @@ Test examples for CutCSG rendering.
 These examples create simple CSG operations to test and verify
 rendering backends (FreeCAD, Fusion 360, Rhino, etc.).
 
-All dimensions are in METERS (GiraffeCAD convention).
+All dimensions are in METERS (Kumiki convention).
 
 NOTE: Prism positioning follows the Timber convention:
 - The 'position' parameter specifies the CENTER of the cross-section (in XY)
@@ -14,13 +14,13 @@ NOTE: Prism positioning follows the Timber convention:
 """
 
 from sympy import Matrix, eye, Rational, sqrt
-from giraffecad.cutcsg import *
-from giraffecad.rule import Orientation, Transform, inches, feet
-from giraffecad.timber import Timber, TimberReferenceEnd, TimberFace, TimberLongFace, timber_from_directions
-from giraffecad.construction import ButtJointTimberArrangement
-from giraffecad.joints.joint_shavings import chop_lap_on_timber_end, chop_profile_on_timber_face, chop_shoulder_notch_on_timber_face
-from giraffecad.joints.japanese_joints import draw_gooseneck_polygon
-from giraffecad.joints.build_a_butt_joint_shavings import (
+from kumiki.cutcsg import *
+from kumiki.rule import Orientation, Transform, inches, feet
+from kumiki.timber import Timber, TimberReferenceEnd, TimberFace, TimberLongFace, timber_from_directions
+from kumiki.construction import ButtJointTimberArrangement
+from kumiki.joints.joint_shavings import chop_lap_on_timber_end, chop_profile_on_timber_face, chop_shoulder_notch_on_timber_face
+from kumiki.joints.japanese_joints import draw_gooseneck_polygon
+from kumiki.joints.build_a_butt_joint_shavings import (
     compute_butt_joint_shoulder,
     build_dovetail_shoulder_geometery,
     dovetail_tenon_geometry,
@@ -669,7 +669,7 @@ def create_csg_examples_patternbook():
     Returns:
         PatternBook: PatternBook containing all CSG example patterns
     """
-    from giraffecad.patternbook import PatternBook, PatternMetadata, make_pattern_from_csg
+    from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_csg
 
     patterns = []
     for key, info in EXAMPLES.items():

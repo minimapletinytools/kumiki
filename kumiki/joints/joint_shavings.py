@@ -6,11 +6,11 @@ These functions help ensure that joints are geometrically valid and sensibly con
 """
 
 from typing import Optional, Tuple, List, Union, cast
-from giraffecad.timber import *
-from giraffecad.rule import *
-from giraffecad.cutcsg import *
-from giraffecad.construction import *
-from giraffecad.measuring import *
+from kumiki.timber import *
+from kumiki.rule import *
+from kumiki.cutcsg import *
+from kumiki.construction import *
+from kumiki.measuring import *
 from sympy import Abs, Rational
 
 
@@ -205,7 +205,7 @@ def check_timber_overlap_for_splice_joint_is_sensible(
     # Check 1: The joint ends must be pointing in opposite directions (anti-parallel)
     # For a proper splice joint, the specified ends should point towards each other
     # (dot product of end directions should be close to -1)
-    from giraffecad.rule import safe_compare, Comparison
+    from kumiki.rule import safe_compare, Comparison
     end_dot_product = numeric_dot_product(timberA_end_direction, timberB_end_direction)
     
     if safe_compare(end_dot_product, 0, Comparison.GT):
@@ -707,8 +707,8 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberReferenceEnd, fac
     """
     assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
     from sympy import Rational, Matrix
-    from giraffecad.rule import Orientation, Transform, create_v3, cross_product, safe_normalize_vector as normalize_vector
-    from giraffecad.cutcsg import ConvexPolygonExtrusion
+    from kumiki.rule import Orientation, Transform, create_v3, cross_product, safe_normalize_vector as normalize_vector
+    from kumiki.cutcsg import ConvexPolygonExtrusion
     
     # Check if we have a single profile or multiple profiles
     # If the first element is a list, we have multiple profiles
@@ -968,7 +968,7 @@ def chop_shoulder_notch_aligned_with_timber(notch_timber: TimberLike, butting_ti
         end_distance=extended_end_distance
     )
 
-    from giraffecad.cutcsg import SolidUnion
+    from kumiki.cutcsg import SolidUnion
     return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
 
 def chop_shoulder_notch_on_timber_face(
@@ -1150,5 +1150,5 @@ def chop_shoulder_notch_on_timber_face(
     )
     
     # Union the main notch with the two angled wall prisms
-    from giraffecad.cutcsg import SolidUnion
+    from kumiki.cutcsg import SolidUnion
     return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])

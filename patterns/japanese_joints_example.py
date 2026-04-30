@@ -14,16 +14,16 @@ import sys
 sys.path.append('..')
 
 from sympy import Rational, Integer
-from giraffecad import *
-from giraffecad.ticket import TimberTicket
-from giraffecad.patternbook import PatternBook, PatternMetadata
-from giraffecad.example_shavings import (
+from kumiki import *
+from kumiki.ticket import TimberTicket
+from kumiki.patternbook import PatternBook, PatternMetadata
+from kumiki.example_shavings import (
     create_canonical_example_splice_joint_timbers,
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_corner_joint_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
 )
-from giraffecad.rule import inches, degrees
+from kumiki.rule import inches, degrees
 
 
 def create_japanese_joints_patternbook() -> PatternBook:

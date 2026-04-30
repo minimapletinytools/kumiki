@@ -1,5 +1,5 @@
 """
-CutCSG - Constructive Solid Geometry operations for GiraffeCAD
+CutCSG - Constructive Solid Geometry operations for Kumiki
 
 This module provides CSG primitives and operations for representing timber cuts
 and geometry operations. All operations use SymPy symbolic math for exact computation.
@@ -250,7 +250,7 @@ class HalfSpace(CutCSG):
         Returns:
             True if the point is on the boundary plane, False otherwise
         """
-        from giraffecad.rule import zero_test
+        from kumiki.rule import zero_test
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
         # Use zero_test to handle Float vs Integer comparison with tolerance
@@ -1262,7 +1262,7 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check Z bounds (use safe_compare for tolerance with Float vs Integer)
-        from giraffecad.rule import safe_compare, Comparison
+        from kumiki.rule import safe_compare, Comparison
         if self.start_distance is not None and safe_compare(z_coord - self.start_distance, 0, Comparison.LT):
             return False
         if self.end_distance is not None and safe_compare(z_coord - self.end_distance, 0, Comparison.GT):
@@ -1289,7 +1289,7 @@ class ConvexPolygonExtrusion(CutCSG):
             cross = edge[0] * to_point[1] - edge[1] * to_point[0]
             
             # Use safe_compare with tolerance to handle Float vs Integer comparisons
-            from giraffecad.rule import safe_compare, Comparison
+            from kumiki.rule import safe_compare, Comparison
             if safe_compare(cross, 0, Comparison.LT):
                 return False
         
@@ -1321,7 +1321,7 @@ class ConvexPolygonExtrusion(CutCSG):
         y_coord = local_coords[1]
         z_coord = local_coords[2]
         
-        from giraffecad.rule import zero_test
+        from kumiki.rule import zero_test
         # Check if on top or bottom face (if finite)
         if self.start_distance is not None and zero_test(z_coord - self.start_distance):
             return True
@@ -1354,7 +1354,7 @@ class ConvexPolygonExtrusion(CutCSG):
             t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
             
             # Check if projection is on the segment [0, 1]
-            from giraffecad.rule import safe_compare, Comparison
+            from kumiki.rule import safe_compare, Comparison
             t_in_range = safe_compare(t, 0, Comparison.GE) and safe_compare(t - Integer(1), 0, Comparison.LE)
             
             if t_in_range:

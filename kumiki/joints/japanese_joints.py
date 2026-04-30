@@ -1,15 +1,15 @@
 """
-GiraffeCAD - Japanese Joint Construction Functions
+Kumiki - Japanese Joint Construction Functions
 Contains traditional Japanese timber joint implementations
 """
 import warnings
 
-from giraffecad.timber import *
-from giraffecad.construction import *
+from kumiki.timber import *
+from kumiki.construction import *
 from .joint_shavings import *
-from giraffecad.measuring import locate_top_center_position, locate_centerline, mark_distance_from_end_along_centerline
-from giraffecad.rule import *
-from giraffecad.cutcsg import *
+from kumiki.measuring import locate_top_center_position, locate_centerline, mark_distance_from_end_along_centerline
+from kumiki.rule import *
+from kumiki.cutcsg import *
 
 # Aliases for backwards compatibility
 CSGUnion = SolidUnion
@@ -1019,8 +1019,8 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
         finger_local = replace(finger_global, transform=finger_transform_local)
         
         # Apply crop using the opposing timber's inner face
-        from giraffecad.measuring import locate_into_face
-        from giraffecad.rule import safe_transform_vector
+        from kumiki.measuring import locate_into_face
+        from kumiki.rule import safe_transform_vector
         
         # Measure into opposing timber's inner face to create a cutting plane (in global space)
         crop_distance = miter_face_width - distance_between_lap_and_outside

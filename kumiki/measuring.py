@@ -119,7 +119,7 @@ class Plane:
         Returns:
             Plane with normal in global coordinates and point at transform position
         """
-        from giraffecad.rule import safe_transform_vector
+        from kumiki.rule import safe_transform_vector
         return Plane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
 
 @dataclass(frozen=True)
@@ -146,7 +146,7 @@ class UnsignedPlane(Plane):
         Returns:
             UnsignedPlane with normal in global coordinates and point at transform position
         """
-        from giraffecad.rule import safe_transform_vector
+        from kumiki.rule import safe_transform_vector
         return UnsignedPlane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
 
 # TODO rename to LineOnPlane
@@ -620,7 +620,7 @@ def mark_distance_from_face_in_normal_direction(feature: Union[UnsignedPlane, Pl
     # Calculate signed distance: how far from the face is the point?
     # Positive if point is in the direction opposite to face_direction (inside timber)
     # Negative if point is in the direction of face_direction (outside timber)
-    from giraffecad.rule import safe_dot_product
+    from kumiki.rule import safe_dot_product
     distance = safe_dot_product(face_direction_global, (face_point_global - feature_point))
     
     return DistanceFromFace(distance=distance, timber=timber, face=face)

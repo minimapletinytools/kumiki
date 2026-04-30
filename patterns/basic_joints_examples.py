@@ -4,14 +4,14 @@ Uses canonical timber configurations from construction.py
 """
 
 from sympy import Matrix, Rational
-from giraffecad.rule import inches, Transform
-from giraffecad.timber import (
+from kumiki.rule import inches, Transform
+from kumiki.timber import (
     Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
-from giraffecad.ticket import Ticket
-from giraffecad.joints.basic_joints import (
+from kumiki.ticket import Ticket
+from kumiki.joints.basic_joints import (
     cut_basic_miter_joint,
     cut_basic_miter_joint_on_face_aligned_timbers,
     cut_basic_tongue_and_fork_corner_joint,
@@ -26,7 +26,7 @@ from giraffecad.joints.basic_joints import (
     cut_basic_housed_dovetail_butt_joint,
     cut_basic_mitered_and_keyed_lap_joint,
 )
-from giraffecad.example_shavings import (
+from kumiki.example_shavings import (
     create_canonical_example_right_angle_corner_joint_timbers,
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_splice_joint_timbers,
@@ -35,7 +35,7 @@ from giraffecad.example_shavings import (
     _CANONICAL_EXAMPLE_TIMBER_LENGTH,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from giraffecad.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint
+from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint
 
 
 def example_basic_miter_joint(position=None):
@@ -153,7 +153,7 @@ def example_basic_splice_lap_joint(position=None):
     if position is None:
         position = create_v3(0, 0, 0)
 
-    from giraffecad.construction import SpliceJointTimberArrangement
+    from kumiki.construction import SpliceJointTimberArrangement
     arrangement = create_canonical_example_splice_joint_timbers(position)
     joint = cut_basic_splice_lap_joint_on_aligned_timbers(
         SpliceJointTimberArrangement(

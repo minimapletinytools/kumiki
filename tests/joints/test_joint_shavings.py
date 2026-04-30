@@ -4,7 +4,7 @@ Tests for joint_shavings.py - Helper functions for joint validation
 
 import pytest
 from sympy import Rational
-from giraffecad.joints.joint_shavings import (
+from kumiki.joints.joint_shavings import (
     check_timber_overlap_for_splice_joint_is_sensible, 
     chop_timber_end_with_prism,
     chop_timber_end_with_half_plane,
@@ -13,10 +13,10 @@ from giraffecad.joints.joint_shavings import (
     scribe_face_plane_onto_centerline,
     scribe_centerline_onto_centerline
 )
-from giraffecad.timber import timber_from_directions, TimberReferenceEnd, TimberFace, TimberLongFace
-from giraffecad.rule import create_v3, create_v2, inches, are_vectors_parallel
-from giraffecad.cutcsg import SolidUnion, RectangularPrism, HalfSpace
-from giraffecad.measuring import mark_distance_from_end_along_centerline
+from kumiki.timber import timber_from_directions, TimberReferenceEnd, TimberFace, TimberLongFace
+from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel
+from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace
+from kumiki.measuring import mark_distance_from_end_along_centerline
 
 # TODO too many tests, just delete some lol... or combine into 1 test that varies only the timber length...
 class TestCheckTimberOverlapForSpliceJoint:

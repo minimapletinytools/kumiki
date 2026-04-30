@@ -4,9 +4,9 @@ Tests for rendering utilities shared across all rendering backends.
 
 import pytest
 from sympy import Matrix, Rational, Integer
-from giraffecad.timber import timber_from_directions, create_v2, create_v3, CutTimber
-from giraffecad.rule import Orientation
-from giraffecad.rendering_utils import (
+from kumiki.timber import timber_from_directions, create_v2, create_v3, CutTimber
+from kumiki.rule import Orientation
+from kumiki.rendering_utils import (
     sympy_to_float,
     matrix_to_floats,
     extract_rotation_matrix_columns,

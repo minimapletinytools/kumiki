@@ -9,8 +9,8 @@ Joinery used:
 - Rafter pair at ridge line: tongue-and-fork joint (no ridge beam)
 """
 
-from giraffecad import *
-from giraffecad.patternbook import PatternBook, PatternMetadata
+from kumiki import *
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 # Compatibility alias for watcher reloads that may still reference the old symbol name.
 cut_basic_mitered_and_keyed_lap_joint = cut_mitered_and_keyed_lap_joint
