@@ -1,6 +1,6 @@
 /**
  * RefreshProfiler — Centralises timing, milestone tracking, and stats I/O
- * for Kumiki Viewer refresh cycles.
+ * for Kigumi refresh cycles.
  */
 
 const fs = require('fs');

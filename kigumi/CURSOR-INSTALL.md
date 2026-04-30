@@ -1,4 +1,4 @@
-# Installing Kumiki Viewer in Cursor
+# Installing Kigumi in Cursor
 
 Cursor supports VSCode extensions since it's built on VSCode, but there are a few ways to use the extension:
 
@@ -7,24 +7,24 @@ Cursor supports VSCode extensions since it's built on VSCode, but there are a fe
 Since the extension is already in your project, you can install it directly:
 
 ```bash
-cd /Users/peter.lu/kitchen/faucet/kumiki-proto/kumiki-viewer
+cd /Users/peter.lu/kitchen/faucet/kumiki-proto/kigumi
 
 # For macOS/Linux
-mkdir -p ~/.vscode/extensions/kumiki-viewer
-cp -r . ~/.vscode/extensions/kumiki-viewer/
+mkdir -p ~/.vscode/extensions/kigumi
+cp -r . ~/.vscode/extensions/kigumi/
 
 # Also copy to Cursor's extensions directory
-mkdir -p ~/.cursor/extensions/kumiki-viewer
-cp -r . ~/.cursor/extensions/kumiki-viewer/
+mkdir -p ~/.cursor/extensions/kigumi
+cp -r . ~/.cursor/extensions/kigumi/
 ```
 
 Then **reload Cursor** (Cmd+Shift+P → "Developer: Reload Window")
 
 ## Option 2: Development Mode (Testing)
 
-1. **Open the `kumiki-viewer` folder** as the workspace in Cursor:
+1. **Open the `kigumi` folder** as the workspace in Cursor:
    ```bash
-   cd /Users/peter.lu/kitchen/faucet/kumiki-proto/kumiki-viewer
+   cd /Users/peter.lu/kitchen/faucet/kumiki-proto/kigumi
    cursor .
    ```
 
@@ -34,7 +34,7 @@ Then **reload Cursor** (Cmd+Shift+P → "Developer: Reload Window")
 
 4. A new Cursor/VSCode window will open with the extension loaded
 
-5. In that new window, open your test file and run "Render Kumiki"
+5. In that new window, open your test file and run "Render Kigumi"
 
 ## Option 3: Test Without Installing
 
@@ -44,7 +44,7 @@ You can also test the extension functionality without installing it as an extens
 cd /Users/peter.lu/kitchen/faucet/kumiki-proto
 
 # Test the runner directly
-venv/bin/python kumiki-viewer/runner.py kumiki-viewer/test-frame.py
+venv/bin/python kigumi/runner.py kigumi/test-frame.py
 ```
 
 This will output the JSON that would be displayed in the webview.
@@ -53,9 +53,9 @@ This will output the JSON that would be displayed in the webview.
 
 Once installed, test it works:
 
-1. Open `kumiki-viewer/test-frame.py` in Cursor
+1. Open `kigumi/test-frame.py` in Cursor
 2. Press `Cmd+Shift+P` (Command Palette)
-3. Type "Render Kumiki"
+3. Type "Render Kigumi"
 4. Select the command
 5. A new panel should open showing your frame!
 
@@ -66,7 +66,7 @@ Once installed, test it works:
 - Check the extension is in the right directory
 
 **Extension not loading in F5 mode**
-- Make sure you opened the `kumiki-viewer` directory itself, not the parent project
+- Make sure you opened the `kigumi` directory itself, not the parent project
 - Check the Output panel for errors: View → Output → Select "Extension Host"
 
 **Python errors**
@@ -78,10 +78,10 @@ Once installed, test it works:
 After installation, you can verify the extension is loaded:
 
 1. Cmd+Shift+P → "Developer: Show Running Extensions"
-2. Look for "Kumiki Viewer" in the list
+2. Look for "Kigumi" in the list
 
 Or check your extensions folder:
 ```bash
 # Check if files are there
-ls -la ~/.cursor/extensions/kumiki-viewer/
+ls -la ~/.cursor/extensions/kigumi/
 ```

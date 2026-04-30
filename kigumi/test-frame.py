@@ -1,6 +1,6 @@
 """
-Test file for Kumiki Viewer extension.
-Run 'Render Kumiki' command with this file open to test the viewer.
+Test file for Kigumi extension.
+Run 'Render Kigumi' command with this file open to test the viewer.
 """
 
 import sys
@@ -16,7 +16,7 @@ from kumiki.rule import create_v2, create_v3, mm
 
 def build_frame():
     """
-    This function is called by the Kumiki Viewer extension.
+    This function is called by the Kigumi extension.
     It should return a Frame object.
 
     Note: Originally wanted to call this 'raise' (as in 'raising a frame'),

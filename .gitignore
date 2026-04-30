@@ -163,8 +163,8 @@ cython_debug/
 .vscode/
 .vscode-test/
 .vscode-test-web/
-kumiki-viewer/.vscode-test/
-kumiki-viewer/.vscode-test-web/
+kigumi/.vscode-test/
+kigumi/.vscode-test-web/
 
 # macOS
 .DS_Store
@@ -173,6 +173,7 @@ kumiki-viewer/.vscode-test-web/
 *.tmp
 *.temp
 .kumiki/
+.kigumi/
 # Node.js / npm
 node_modules/
 package-lock.json

@@ -2351,11 +2351,11 @@ def add_milestone(name: str):
 
     Writes a JSON protocol message to the real stdout pipe so the viewer
     extension can display progress during script execution.  No-ops when
-    not running inside the Kumiki Viewer (checks KUMIKI_VIEWER_MILESTONES
+    not running inside the Kigumi extension (checks KIGUMI_VIEWER_MILESTONES
     environment variable).
     """
     import os, sys, json as _json  # noqa: E401 — lazy imports to avoid burdening the core module
-    if not os.environ.get("KUMIKI_VIEWER_MILESTONES"):
+    if not os.environ.get("KIGUMI_VIEWER_MILESTONES"):
         return
     stdout = sys.__stdout__
     assert stdout is not None

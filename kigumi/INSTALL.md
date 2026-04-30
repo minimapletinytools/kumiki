@@ -1,4 +1,4 @@
-# Installing Kumiki Viewer
+# Installing Kigumi
 
 ## Quick Install (Development Mode)
 
@@ -10,11 +10,11 @@
    - Open a new VSCode window with the extension loaded
    - The extension will be active in this development window
 
-3. In the new window, open `kumiki-viewer/test-frame.py`
+3. In the new window, open `kigumi/test-frame.py`
 
 4. Open the Command Palette (`Cmd+Shift+P` on Mac, `Ctrl+Shift+P` on Windows/Linux)
 
-5. Type "Render Kumiki" and select the command
+5. Type "Render Kigumi" and select the command
 
 6. A new panel should open showing the frame data!
 
@@ -25,17 +25,17 @@ To install the extension permanently in your VSCode:
 ### macOS / Linux
 
 ```bash
-cd kumiki-viewer
-mkdir -p ~/.vscode/extensions/kumiki-viewer
-cp -r . ~/.vscode/extensions/kumiki-viewer/
+cd kigumi
+mkdir -p ~/.vscode/extensions/kigumi
+cp -r . ~/.vscode/extensions/kigumi/
 ```
 
 ### Windows
 
 ```powershell
-cd kumiki-viewer
-mkdir $env:USERPROFILE\.vscode\extensions\kumiki-viewer
-Copy-Item -Recurse -Force . $env:USERPROFILE\.vscode\extensions\kumiki-viewer\
+cd kigumi
+mkdir $env:USERPROFILE\.vscode\extensions\kigumi
+Copy-Item -Recurse -Force . $env:USERPROFILE\.vscode\extensions\kigumi\
 ```
 
 Then reload VSCode.
@@ -46,7 +46,7 @@ Then reload VSCode.
 
 2. Open the file in VSCode
 
-3. Run the **Render Kumiki** command
+3. Run the **Render Kigumi** command
 
 4. The extension will:
    - Save your file

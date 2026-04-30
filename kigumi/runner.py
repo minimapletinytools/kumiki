@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Persistent stdio runner for the Kumiki Viewer VS Code extension.
+Persistent stdio runner for the Kigumi VS Code extension.
 
 Protocol:
 - stdin: newline-delimited JSON requests
@@ -32,7 +32,7 @@ def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
     while True:
         if (candidate / "kumiki").is_dir():
             return candidate, True
-        if (candidate / ".kumiki.yaml").is_file():
+        if (candidate / ".kigumi.yaml").is_file():
             return candidate, False
         parent = candidate.parent
         if parent == candidate:
@@ -62,9 +62,9 @@ if _project_root is not None:
 
 
 # Enable milestone emission so pattern scripts can report progress to the viewer.
-os.environ["KUMIKI_VIEWER_MILESTONES"] = "1"
+os.environ["KIGUMI_VIEWER_MILESTONES"] = "1"
 
-TARGET_MODULE_NAME = "_kumiki_viewer_target"
+TARGET_MODULE_NAME = "_kigumi_viewer_target"
 
 
 @dataclass

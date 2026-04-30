@@ -4,31 +4,29 @@ Kumiki is a Code aided Design (CoAD) library for programmatically designing timb
 
 As Kumiki is a CoAD library, it is well suited for usage with AI agents.
 
-## Setup
+Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki designs!
 
-TODO viewer setup instructions
-TODO pip package instructions
+## setup
 
-## trying out the exmaple
+Kumiki is best used with Kigumi. To install Kigumi, download [VSCode](https://code.visualstudio.com/) and install Kigumi (TODO link)
 
-You've setup your tools and you're almost ready to make your first sawhorse.
+Kumiki also requires [python3](https://www.python.org/downloads/).  
 
-But first, lets admire the one in the patterns folder
+You can of course use Kumiki withou Kigumi. You will still want to use Kigumi to setup your Kumiki projects and its dependencies.
 
-```python
-from patterns.structures.horsey_example import *
-...
-```
+## viewing the built in patterns and examples
 
-TODO finish
+Kigumi ships with a patternbook and several examples. To 
 
-## your first kumiki
+## your first kumiki project
 
-TODO finish
+Create a folder for your Kumiki project and open that folder in VSCode. Then hit cmd/ctrl+shift+p to open the command pallete, start typing "kigumi" and choose the "kigumi: initialize project" command. This command will setup 
 
 ## for advanced students
 
 TODO finish
+
+#
 
 
 # APPENDIX

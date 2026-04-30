@@ -1,6 +1,6 @@
 {
-  "name": "kumiki-viewer",
-  "displayName": "Kumiki Viewer",
+  "name": "kigumi",
+  "displayName": "Kigumi",
   "description": "Timber frame viewer for Kumiki",
   "version": "0.0.1",
   "publisher": "kumiki",
@@ -22,23 +22,23 @@
     "Visualization"
   ],
   "activationEvents": [
-    "onCommand:kumiki-viewer.renderKumiki",
-    "onCommand:kumiki-viewer.browsePatterns",
-    "onCommand:kumiki-viewer.unloadPattern"
+    "onCommand:kigumi.render",
+    "onCommand:kigumi.browsePatterns",
+    "onCommand:kigumi.unloadPattern"
   ],
   "main": "./extension.js",
   "contributes": {
     "commands": [
       {
-        "command": "kumiki-viewer.renderKumiki",
-        "title": "Render Kumiki"
+        "command": "kigumi.render",
+        "title": "Render Kigumi"
       },
       {
-        "command": "kumiki-viewer.browsePatterns",
+        "command": "kigumi.browsePatterns",
         "title": "Browse Patterns"
       },
       {
-        "command": "kumiki-viewer.unloadPattern",
+        "command": "kigumi.unloadPattern",
         "title": "Unload Pattern Viewer"
       }
     ]

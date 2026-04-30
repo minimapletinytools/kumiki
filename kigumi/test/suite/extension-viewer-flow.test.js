@@ -17,7 +17,7 @@ function getAllTabs() {
   return vscode.window.tabGroups.all.flatMap((group) => group.tabs);
 }
 
-describe('Kumiki Viewer extension flow', () => {
+describe('Kigumi extension flow', () => {
   it('renders milestone fixture and keeps panel healthy across rerender', async function () {
     this.timeout(40000);
 
@@ -28,9 +28,9 @@ describe('Kumiki Viewer extension flow', () => {
     const document = await vscode.workspace.openTextDocument(fixtureUri);
     await vscode.window.showTextDocument(document, { preview: false });
 
-    const expectedTabPrefix = 'Kumiki: Runner Milestone Joint Frame';
+    const expectedTabPrefix = 'Kigumi: Runner Milestone Joint Frame';
 
-    await vscode.commands.executeCommand('kumiki-viewer.renderKumiki');
+    await vscode.commands.executeCommand('kigumi.render');
 
     await waitFor(() => {
       const tabs = getAllTabs();
@@ -38,13 +38,13 @@ describe('Kumiki Viewer extension flow', () => {
     }, 25000, 150);
 
     await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('kumiki-viewer.renderKumiki');
+      await vscode.commands.executeCommand('kigumi.render');
     });
 
     const tabs = getAllTabs();
     assert.ok(
       tabs.some((tab) => tab.label.startsWith(expectedTabPrefix)),
-      'Expected Kumiki webview tab for milestone_joint_frame.py with the current frame-name title format'
+      'Expected Kigumi webview tab for milestone_joint_frame.py with the current frame-name title format'
     );
   });
 });

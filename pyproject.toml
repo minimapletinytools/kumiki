@@ -43,4 +43,4 @@ dev = [
 ]
 
 [tool.ty.src]
-exclude = ["oldcrap", "fusion360/libs", "kumiki-viewer", "fusion360", "freecad", "patterns"]
+exclude = ["oldcrap", "fusion360/libs", "kigumi", "fusion360", "freecad", "patterns"]

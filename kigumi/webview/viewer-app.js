@@ -21,7 +21,7 @@ function createInitialViewState() {
     };
 }
 
-const INITIAL_PAYLOAD = window.__KUMIKI_INITIAL_PAYLOAD__ || {
+const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
     frame: {},
     geometry: { meshes: [] },
     uiState: {
@@ -274,7 +274,7 @@ class ViewerSettingsPanel {
     }
 }
 
-class KumikiViewerApp extends LitElement {
+class KigumiViewerApp extends LitElement {
     constructor() {
         super();
         this.meshObjectsByKey = new Map();
@@ -661,7 +661,7 @@ class KumikiViewerApp extends LitElement {
             vscode.postMessage(payload);
             return;
         }
-        console.info('[KumikiViewer]', payload);
+        console.info('[Kigumi]', payload);
     }
 
     appendLogLine(text) {
@@ -2646,4 +2646,4 @@ class KumikiViewerApp extends LitElement {
     }
 }
 
-customElements.define('kumiki-viewer-app', KumikiViewerApp);
+customElements.define('kigumi-app', KigumiViewerApp);

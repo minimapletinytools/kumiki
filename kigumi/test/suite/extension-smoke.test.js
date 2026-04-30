@@ -3,19 +3,19 @@ const fs = require('fs');
 const path = require('path');
 const vscode = require('vscode');
 
-const SCREENSHOT_MODE = String(process.env.KUMIKI_EXT_SCREENSHOT_MODE || 'never').toLowerCase();
+const SCREENSHOT_MODE = String(process.env.KIGUMI_EXT_SCREENSHOT_MODE || 'never').toLowerCase();
 const SHOULD_CAPTURE_ALWAYS = SCREENSHOT_MODE === 'always';
 const SHOULD_CAPTURE_ON_FAILURE = SCREENSHOT_MODE === 'on-failure';
 
 function screenshotArtifactsDir() {
-  return process.env.KUMIKI_EXT_SCREENSHOT_DIR
-    ? path.resolve(process.env.KUMIKI_EXT_SCREENSHOT_DIR)
+  return process.env.KIGUMI_EXT_SCREENSHOT_DIR
+    ? path.resolve(process.env.KIGUMI_EXT_SCREENSHOT_DIR)
     : path.resolve(__dirname, '..', '..', '.artifacts', 'screenshots');
 }
 
 async function captureScreenshot(filePath, name) {
   const outputPath = path.join(screenshotArtifactsDir(), `${name}.png`);
-  const result = await vscode.commands.executeCommand('kumiki-viewer.captureRenderedScreenshot', {
+  const result = await vscode.commands.executeCommand('kigumi.captureRenderedScreenshot', {
     filePath,
     outputPath,
     timeoutMs: 10000,
@@ -42,29 +42,29 @@ function getAllTabs() {
   return vscode.window.tabGroups.all.flatMap((group) => group.tabs);
 }
 
-describe('Kumiki Viewer extension smoke', () => {
-  it('registers the Render Kumiki command', async () => {
+describe('Kigumi extension smoke', () => {
+  it('registers the Render Kigumi command', async () => {
     const extension = vscode.extensions.all.find((candidate) =>
-      candidate.id.toLowerCase().endsWith('.kumiki-viewer')
+      candidate.id.toLowerCase().endsWith('.kigumi')
     );
-    assert.ok(extension, 'Expected Kumiki Viewer extension to be available in Extension Host');
+    assert.ok(extension, 'Expected Kigumi extension to be available in Extension Host');
 
     await extension.activate();
 
     const commands = await vscode.commands.getCommands(true);
-    assert.ok(commands.includes('kumiki-viewer.renderKumiki'));
-    assert.ok(commands.includes('kumiki-viewer.browsePatterns'));
-    assert.ok(commands.includes('kumiki-viewer.unloadPattern'));
+    assert.ok(commands.includes('kigumi.render'));
+    assert.ok(commands.includes('kigumi.browsePatterns'));
+    assert.ok(commands.includes('kigumi.unloadPattern'));
   });
 
-  it('executes Render Kumiki command without crashing when no editor is active', async () => {
+  it('executes Render Kigumi command without crashing when no editor is active', async () => {
     await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     await assert.doesNotReject(async () => {
-      await vscode.commands.executeCommand('kumiki-viewer.renderKumiki');
+      await vscode.commands.executeCommand('kigumi.render');
     });
   });
 
-  it('opens fixture and renders Kumiki webview panel with frame name', async function () {
+  it('opens fixture and renders Kigumi webview panel with frame name', async function () {
     this.timeout(30000);
 
     const fixturePath = path.resolve(__dirname, '..', '..', 'test-fixtures', 'minimal_frame.py');
@@ -74,10 +74,10 @@ describe('Kumiki Viewer extension smoke', () => {
     const document = await vscode.workspace.openTextDocument(fixtureUri);
     await vscode.window.showTextDocument(document, { preview: false });
 
-    const expectedTabPrefix = 'Kumiki: Runner Test Frame';
+    const expectedTabPrefix = 'Kigumi: Runner Test Frame';
 
     const runAssertions = async () => {
-      await vscode.commands.executeCommand('kumiki-viewer.renderKumiki');
+      await vscode.commands.executeCommand('kigumi.render');
 
       await waitFor(() => {
         const tabs = getAllTabs();
@@ -87,7 +87,7 @@ describe('Kumiki Viewer extension smoke', () => {
       const tabs = getAllTabs();
       assert.ok(
         tabs.some((tab) => tab.label.startsWith(expectedTabPrefix)),
-        'Expected Kumiki webview tab for minimal_frame.py with rendered frame name'
+        'Expected Kigumi webview tab for minimal_frame.py with rendered frame name'
       );
     };
 

@@ -75,7 +75,7 @@ class FrameViewSession {
         const projectRoot = this.runnerSession && this.runnerSession.projectRoot
             ? this.runnerSession.projectRoot
             : path.dirname(this.filePath);
-        return path.join(projectRoot, '.kumiki', 'refresh-stats.json');
+        return path.join(projectRoot, '.kigumi', 'refresh-stats.json');
     }
 
     postLoadingStatus(stage, details = {}) {
@@ -633,17 +633,17 @@ class FrameViewSession {
 
         this.channel.show(true);
         const location = this.parseTracebackLocation(details.traceback);
-        const actions = ['Open Kumiki Output'];
+        const actions = ['Open Kigumi Output'];
         if (location) {
             actions.push('Go to Error');
         }
 
         const choice = await vscode.window.showErrorMessage(
-            `Kumiki Viewer Python error: ${details.message}`,
+            `Kigumi Python error: ${details.message}`,
             ...actions
         );
 
-        if (choice === 'Open Kumiki Output') {
+        if (choice === 'Open Kigumi Output') {
             this.channel.show(true);
         }
         if (choice === 'Go to Error' && location) {
@@ -651,7 +651,7 @@ class FrameViewSession {
         }
 
         if (error && typeof error === 'object') {
-            error.kumikiErrorNotified = true;
+            error.kigumiErrorNotified = true;
         }
     }
 

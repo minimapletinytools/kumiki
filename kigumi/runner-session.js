@@ -39,7 +39,7 @@ class PythonRunnerSession {
                 isLocalDev = true;
                 break;
             }
-            if (fs.existsSync(path.join(candidate, '.kumiki.yaml'))) {
+            if (fs.existsSync(path.join(candidate, '.kigumi.yaml'))) {
                 projectRoot = candidate;
                 isLocalDev = false;
                 break;
@@ -52,9 +52,9 @@ class PythonRunnerSession {
         }
 
         if (!projectRoot) {
-            // Not found, default to folder of the filePath and create .kumiki.yaml
+            // Not found, default to folder of the filePath and create .kigumi.yaml
             projectRoot = path.dirname(path.resolve(filePath));
-            const envYamlPath = path.join(projectRoot, '.kumiki.yaml');
+            const envYamlPath = path.join(projectRoot, '.kigumi.yaml');
             if (!fs.existsSync(envYamlPath)) {
                 fs.writeFileSync(envYamlPath, 'kumiki_version: latest\n', 'utf8');
             }
@@ -88,7 +88,7 @@ class PythonRunnerSession {
         if (!this.projectRoot) {
             return null;
         }
-        const yamlPath = path.join(this.projectRoot, '.kumiki', 'project.yaml');
+        const yamlPath = path.join(this.projectRoot, '.kigumi', 'project.yaml');
         if (!fs.existsSync(yamlPath)) {
             return null;
         }
@@ -103,7 +103,7 @@ class PythonRunnerSession {
                 return pythonPath;
             }
         } catch (error) {
-            this.channel.appendLine(`[env] Failed reading .kumiki/project.yaml: ${error.message}`);
+            this.channel.appendLine(`[env] Failed reading .kigumi/project.yaml: ${error.message}`);
         }
         return null;
     }
@@ -219,7 +219,7 @@ class PythonRunnerSession {
     getPythonInstallHelpMessage() {
         return [
             'Python was not found on this machine, so Kumiki cannot create a project virtual environment.',
-            'Install Python 3.10+ and then run Render Kumiki again.',
+            'Install Python 3.10+ and then run Render Kigumi again.',
             'Download: https://www.python.org/downloads/',
             process.platform === 'darwin' ? 'macOS (Homebrew): brew install python' : null,
             process.platform === 'win32' ? 'Windows: install Python from python.org and enable "Add python.exe to PATH".' : null,
@@ -249,7 +249,7 @@ class PythonRunnerSession {
         if (!this.projectRoot) {
             return;
         }
-        const kumikiDir = path.join(this.projectRoot, '.kumiki');
+        const kumikiDir = path.join(this.projectRoot, '.kigumi');
         fs.mkdirSync(kumikiDir, { recursive: true });
 
         const lines = [
@@ -296,7 +296,7 @@ class PythonRunnerSession {
         const expectedVenvPython = this.getPythonCandidates(this.projectRoot)[0];
         let createdVenv = false;
 
-        fs.mkdirSync(path.join(this.projectRoot, '.kumiki'), { recursive: true });
+        fs.mkdirSync(path.join(this.projectRoot, '.kigumi'), { recursive: true });
 
         if (!fs.existsSync(expectedVenvPython)) {
             this.channel.appendLine(`[env] Creating virtual environment at ${venvDir}`);

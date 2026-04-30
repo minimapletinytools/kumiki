@@ -1,15 +1,15 @@
-# Kumiki Viewer
+# Kigumi
 
-Kumiki Viewer is a VS Code extension that renders Kumiki frames from Python modules into an interactive webview.
+Kigumi is a VS Code extension that renders Kumiki frames from Python modules into an interactive webview.
 
 It is designed for two workflows:
 
 - Local Kumiki development checkouts (repo root contains `kumiki/`)
-- Installed-package projects (project root contains `.kumiki.yaml`)
+- Installed-package projects (project root contains `.kigumi.yaml`)
 
 ## What It Does
 
-- Renders the currently open Python file with the command **Render Kumiki**
+- Renders the currently open Python file with the command **Render Kigumi**
 - Watches files and refreshes the viewer when source changes
 - Browses shipped and local pattern libraries with **Browse Patterns**
 - Opens pattern results in separate tabs backed by one shared runner process
@@ -41,15 +41,15 @@ On first render in a project, Kumiki bootstraps a project-local environment auto
 4. Installs dependencies when missing:
    - Local dev checkout: `pip install -e <projectRoot>[viewer]`
    - Non-local project: `pip install kumiki[viewer]`
-5. Writes `.kumiki/project.yaml` with selected Python path and setup metadata
+5. Writes `.kigumi/project.yaml` with selected Python path and setup metadata
 
-On later runs, Kumiki reuses the configured interpreter from `.kumiki/project.yaml` when available.
+On later runs, Kumiki reuses the configured interpreter from `.kigumi/project.yaml` when available.
 
 ## Commands
 
-- `Render Kumiki` (`kumiki-viewer.renderKumiki`)
-- `Browse Patterns` (`kumiki-viewer.browsePatterns`)
-- `Unload Pattern Viewer` (`kumiki-viewer.unloadPattern`)
+- `Render Kigumi` (`kigumi.render`)
+- `Browse Patterns` (`kigumi.browsePatterns`)
+- `Unload Pattern Viewer` (`kigumi.unloadPattern`)
 
 Open the command palette and run any of the commands above.
 
@@ -72,10 +72,10 @@ npm install
 
 Then in VS Code:
 
-1. Open the `kumiki-viewer` folder
+1. Open the `kigumi` folder
 2. Press `F5` (Run Extension)
 3. In the Extension Development Host window, open a Python frame file
-4. Run **Render Kumiki**
+4. Run **Render Kigumi**
 
 ## Quick Example
 
@@ -107,7 +107,7 @@ The extension side is responsible for lifecycle/orchestration. The runner side i
 
 ## Testing
 
-From `kumiki-viewer/`:
+From `kigumi/`:
 
 ```bash
 npm run test:unit
@@ -118,23 +118,23 @@ npm run test:all
 
 Screenshot options for extension smoke tests:
 
-- `KUMIKI_EXT_SCREENSHOT_MODE=never`
-- `KUMIKI_EXT_SCREENSHOT_MODE=always`
-- `KUMIKI_EXT_SCREENSHOT_MODE=on-failure`
-- `KUMIKI_EXT_SCREENSHOT_DIR=/custom/path`
+- `KIGUMI_EXT_SCREENSHOT_MODE=never`
+- `KIGUMI_EXT_SCREENSHOT_MODE=always`
+- `KIGUMI_EXT_SCREENSHOT_MODE=on-failure`
+- `KIGUMI_EXT_SCREENSHOT_DIR=/custom/path`
 
 ## Troubleshooting
 
 ### Render command does nothing
 
 - Confirm the active editor is a Python file
-- Save the file and rerun **Render Kumiki**
-- Open the `Kumiki Viewer` output channel for logs
+- Save the file and rerun **Render Kigumi**
+- Open the `Kigumi` output channel for logs
 
 ### Missing Python dependencies
 
-- Run **Render Kumiki** once and let auto bootstrap finish
-- If your interpreter is non-standard, set `python_path` in `.kumiki/project.yaml` to a valid Python executable
+- Run **Render Kigumi** once and let auto bootstrap finish
+- If your interpreter is non-standard, set `python_path` in `.kigumi/project.yaml` to a valid Python executable
 
 ### Unsupported module shape
 

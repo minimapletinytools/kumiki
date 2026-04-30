@@ -3,8 +3,8 @@ const fs = require('fs');
 const { spawn } = require('child_process');
 
 function resolvePython(projectRoot) {
-  if (process.env.KUMIKI_VIEWER_PYTHON) {
-    return process.env.KUMIKI_VIEWER_PYTHON;
+  if (process.env.KIGUMI_VIEWER_PYTHON) {
+    return process.env.KIGUMI_VIEWER_PYTHON;
   }
 
   const candidates = [

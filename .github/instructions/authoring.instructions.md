@@ -19,7 +19,7 @@ uv run ty check
 
 If making changes to the viewer, run viewer tests:
 ```bash
-cd kumiki-viewer && npx jest && node ./test/run-extension-tests.js
+cd kigumi && npx jest && node ./test/run-extension-tests.js
 ```
 
 ## Key Files

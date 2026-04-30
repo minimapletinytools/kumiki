@@ -1,4 +1,4 @@
-Tag-Based Search Module Plan (Kumiki Viewer)
+Tag-Based Search Module Plan (Kigumi)
 
 Goal
 Create a reusable, client-side tag+name search module for the viewer to filter patterns, joints, and timbers.
@@ -62,20 +62,20 @@ Architecture
 - Keep filtering client-side in webview (no runner or extension protocol changes needed initially).
 
 Files To Add
-- kumiki-viewer/webview/tag-search-store.js
-- kumiki-viewer/__tests__/tag-search-store.test.js
+- kigumi/webview/tag-search-store.js
+- kigumi/__tests__/tag-search-store.test.js
 
 Files To Update
-- kumiki-viewer/webview/viewer-app.js
+- kigumi/webview/viewer-app.js
   - add TagSearchPanel
   - initialize TagSearchStore
   - wire setItems(...) when availablePatterns updates
   - render patterns from store.getResults()
-- kumiki-viewer/webview/viewer.css
+- kigumi/webview/viewer.css
   - add styles for search input, autocomplete list, tag rail, chips, active state
-- kumiki-viewer/viewer.js
+- kigumi/viewer.js
   - add URI injection for tag-search-store.js into template replacements
-- kumiki-viewer/webview/viewer.html
+- kigumi/webview/viewer.html
   - include tag-search-store.js script before viewer-app module
 
 Implementation Phases
@@ -94,10 +94,10 @@ Phase 4: Webview Script Wiring
 
 Validation
 1) Unit tests
-- cd kumiki-viewer && npx jest
+- cd kigumi && npx jest
 
 2) Extension smoke tests
-- cd kumiki-viewer && node ./test/run-extension-tests.js
+- cd kigumi && node ./test/run-extension-tests.js
 
 3) Manual checks
 - Load patterns and verify:
