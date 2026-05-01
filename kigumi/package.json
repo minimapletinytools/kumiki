@@ -24,11 +24,35 @@
   "activationEvents": [
     "onCommand:kigumi.render",
     "onCommand:kigumi.browsePatterns",
-    "onCommand:kigumi.unloadPattern"
+    "onCommand:kigumi.unloadPattern",
+    "onCommand:kigumi.openCurrentFileInViewer",
+    "onCommand:kigumi.initializeProjectInWorkspace",
+    "onCommand:kigumi.refreshSidebar",
+    "onCommand:kigumi.openFrameFromSidebar",
+    "onCommand:kigumi.openPatternFromSidebar",
+    "onCommand:kigumi.openExampleFromSidebar",
+    "onView:kigumi.explorer"
   ],
   "main": "./extension.js",
   "icon": "templogo.png",
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kigumi",
+          "title": "Kigumi",
+          "icon": "templogo.png"
+        }
+      ]
+    },
+    "views": {
+      "kigumi": [
+        {
+          "id": "kigumi.explorer",
+          "name": "Kigumi Explorer"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "kigumi.render",
@@ -41,8 +65,54 @@
       {
         "command": "kigumi.unloadPattern",
         "title": "Unload Pattern Viewer"
+      },
+      {
+        "command": "kigumi.openCurrentFileInViewer",
+        "title": "Kigumi: Open Current File In Viewer"
+      },
+      {
+        "command": "kigumi.initializeProjectInWorkspace",
+        "title": "Kigumi: Initialize Project In Workspace"
+      },
+      {
+        "command": "kigumi.refreshSidebar",
+        "title": "Kigumi: Refresh Explorer"
+      },
+      {
+        "command": "kigumi.openFrameFromSidebar",
+        "title": "Kigumi: Open Frame From Explorer"
+      },
+      {
+        "command": "kigumi.openPatternFromSidebar",
+        "title": "Kigumi: Open Pattern From Explorer"
+      },
+      {
+        "command": "kigumi.openExampleFromSidebar",
+        "title": "Kigumi: Open Example From Explorer"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "kigumi.refreshSidebar",
+          "when": "view == kigumi.explorer",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Kigumi",
+      "properties": {
+        "kigumi.explorer.scanTimeoutSeconds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 60,
+          "description": "Timeout in seconds for reading each Python file during Kigumi frame discovery scans."
+        }
+      }
+    }
   },
   "scripts": {
     "vscode:prepublish": "echo 'No build step needed'",
