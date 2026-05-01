@@ -185,7 +185,6 @@ async function discoverDependencyContent(workspaceRoot, options = {}) {
         '        name = entry.name',
         '        if name == "kumiki":',
         '            kumiki_patterns.extend(list_py_files(os.path.join(entry.path, "patterns")))',
-        '            kumiki_examples.extend(list_py_files(os.path.join(entry.path, "examples")))',
         '            continue',
         '        if name.startswith("_"):',
         '            continue',

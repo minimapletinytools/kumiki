@@ -69,11 +69,13 @@
       },
       {
         "command": "kigumi.openCurrentFileInViewer",
-        "title": "Kigumi: Open Current File In Viewer"
+        "title": "Kigumi: Open Current File In Viewer",
+        "icon": "$(play)"
       },
       {
         "command": "kigumi.initializeProjectInWorkspace",
-        "title": "Kigumi: Initialize Project In Workspace"
+        "title": "Kigumi: Initialize Project In Workspace",
+        "icon": "$(tools)"
       },
       {
         "command": "kigumi.refreshSidebar",
@@ -81,7 +83,8 @@
       },
       {
         "command": "kigumi.refreshPatterns",
-        "title": "Kigumi: Reload Patterns"
+        "title": "Kigumi: Reload Patterns",
+        "icon": "$(refresh)"
       },
       {
         "command": "kigumi.openFrameFromSidebar",
@@ -99,9 +102,19 @@
     "menus": {
       "view/title": [
         {
-          "command": "kigumi.refreshSidebar",
+          "command": "kigumi.openCurrentFileInViewer",
           "when": "view == kigumi.explorer",
-          "group": "navigation"
+          "group": "navigation@1"
+        },
+        {
+          "command": "kigumi.initializeProjectInWorkspace",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kigumi.refreshPatterns",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@3"
         }
       ]
     },

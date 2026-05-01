@@ -141,10 +141,13 @@ A couple other things, we may show patterns in the layers view using a similar l
   DONE-add loading grahpic and do background loading of patterns
   DONE-add refresh button
   DONE-remove examples from sidebar or get it work right
-  -only scan patterns folder
+  DONE-only scan patterns folder
+  DONE-make proper header and buttons or something...
+  -frames section should omit examples if it starts with "patternbook" as these are patterns
+  -patterns section should have a drop down that says "group by patternbook" and then cilcking on the patternbook folder opens the entire patternbook in the viewer
+  -allow viewing source on pattern/frames, obvious what to do in workspace patterns, for shipped pattern, it  will open a read only copy it from the dependencies folder?
+    -for kumiji shipped patterns also have an option to duplicate pattern in workspace, which will make a copy of teh pattern in workspace for you to modify
   -test the initialize project thing lol
-  -make proper header and buttons or something...
-  -allow viewing source from sidebar patterns
   -show proper error if you open a non pattern
 -rethink hierarchical feature selection, as you'll want to be able to select 2 features to measure them in the future.
 -do new selection hierarchy here are the states

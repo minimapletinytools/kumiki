@@ -286,16 +286,6 @@ class KigumiSidebarProvider {
     getRootNodes() {
         const nodes = [];
 
-        nodes.push(this.createOpenCurrentFileNode());
-        nodes.push(this.createInitializeProjectNode());
-
-        nodes.push(new SidebarNode({
-            key: 'action-divider',
-            type: 'separator',
-            label: '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
-            tooltip: '',
-        }));
-
         nodes.push(new SidebarNode({
             key: 'frames-root',
             type: 'framesRoot',
@@ -324,43 +314,6 @@ class KigumiSidebarProvider {
         }
 
         return nodes;
-    }
-
-    createOpenCurrentFileNode() {
-        return new SidebarNode({
-            key: 'action-open-current-file',
-            type: 'actionOpenCurrentFile',
-            label: 'Open current file in Kigumi',
-            description: '\u25b6 opens viewer',
-            tooltip: 'Render the active Python file in the Kigumi viewer.',
-            command: {
-                title: 'Open current file in Kigumi',
-                command: 'kigumi.openCurrentFileInViewer',
-            },
-            iconPath: new vscode.ThemeIcon('play-circle'),
-        });
-    }
-
-    createInitializeProjectNode() {
-        const initStatus = this._state.initStatus;
-        const isInitialized = !!(initStatus && initStatus.isInitialized);
-
-        return new SidebarNode({
-            key: 'action-init-project',
-            type: 'actionInitializeProject',
-            label: 'Initialize new project in workspace',
-            description: isInitialized ? '\u2713 already set up' : '\u25b6 create .kigumi + .venv',
-            tooltip: isInitialized
-                ? 'Project files already exist in this workspace (.kigumi.yaml, .venv, my_cute_frame.py).'
-                : 'Set up Kigumi project files, Python environment, and create my_cute_frame.py if missing.',
-            command: isInitialized
-                ? undefined
-                : {
-                    title: 'Initialize new project in workspace',
-                    command: 'kigumi.initializeProjectInWorkspace',
-                },
-            iconPath: new vscode.ThemeIcon(isInitialized ? 'check' : 'tools'),
-        });
     }
 
     getFrameFileNodes() {
@@ -408,19 +361,7 @@ class KigumiSidebarProvider {
     }
 
     getPatternSectionNodes() {
-        const nodes = [new SidebarNode({
-            key: 'action-reload-patterns',
-            type: 'actionReloadPatterns',
-            label: 'Reload patterns',
-            description: this._state.isRefreshingPatterns ? 'refresh in progress' : 'rescan pattern sources',
-            command: this._state.isRefreshingPatterns
-                ? undefined
-                : {
-                    title: 'Reload patterns',
-                    command: 'kigumi.refreshPatterns',
-                },
-            iconPath: new vscode.ThemeIcon(this._state.isRefreshingPatterns ? 'loading~spin' : 'refresh'),
-        })];
+        const nodes = [];
 
         if (this._state.isRefreshingPatterns) {
             nodes.push(new SidebarNode({
