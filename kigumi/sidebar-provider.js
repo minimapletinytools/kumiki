@@ -159,7 +159,10 @@ class KigumiSidebarProvider {
         };
 
         try {
-            framesResult = await scanWorkspaceForFrames(workspaceRoot, { timeoutMs });
+            framesResult = await scanWorkspaceForFrames(workspaceRoot, {
+                timeoutMs,
+                pythonCommand: this.options.getPythonCommand?.(),
+            });
         } catch (error) {
             discoveryErrors.push(`Frame scan failed: ${error.message || error}`);
         }
@@ -222,6 +225,13 @@ class KigumiSidebarProvider {
         nodes.push(this.createInitializeProjectNode());
 
         nodes.push(new SidebarNode({
+            key: 'action-divider',
+            type: 'separator',
+            label: '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500',
+            tooltip: '',
+        }));
+
+        nodes.push(new SidebarNode({
             key: 'frames-root',
             type: 'framesRoot',
             label: `Frames (${this._state.frames.length})`,
@@ -264,6 +274,8 @@ class KigumiSidebarProvider {
             key: 'action-open-current-file',
             type: 'actionOpenCurrentFile',
             label: 'Open current file in Kigumi',
+            description: '\u25b6 opens viewer',
+            tooltip: 'Render the active Python file in the Kigumi viewer.',
             command: {
                 title: 'Open current file in Kigumi',
                 command: 'kigumi.openCurrentFileInViewer',
@@ -280,9 +292,9 @@ class KigumiSidebarProvider {
             key: 'action-init-project',
             type: 'actionInitializeProject',
             label: 'Initialize new project in workspace',
-            description: isInitialized ? 'Already initialized' : 'Create .kigumi + .venv + sample',
+            description: isInitialized ? '\u2713 already set up' : '\u25b6 create .kigumi + .venv',
             tooltip: isInitialized
-                ? 'Project files already exist in this workspace.'
+                ? 'Project files already exist in this workspace (.kigumi.yaml, .venv, my_cute_frame.py).'
                 : 'Set up Kigumi project files, Python environment, and create my_cute_frame.py if missing.',
             command: isInitialized
                 ? undefined

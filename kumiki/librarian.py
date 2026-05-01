@@ -9,6 +9,7 @@ fallbacks when those entries are missing).
 from dataclasses import dataclass, field
 from pathlib import Path
 import importlib.util
+import re
 import sys
 import traceback
 from typing import Any, Dict, List, Optional, Tuple
@@ -166,6 +167,75 @@ def scan_library_folder(folder_path: str) -> LibrarianScanResult:
     for file_path in python_files:
         relative_path = str(file_path.relative_to(root_folder))
         module, load_error, load_error_traceback, module_name = _load_module_from_path(root_folder, file_path)
+
+        record = LibrarianModuleRecord(
+            relative_path=relative_path,
+            module_name=module_name,
+            load_error=load_error,
+            load_error_traceback=load_error_traceback,
+        )
+
+        if module is not None:
+            record.patternbook = _resolve_patternbook(module, record.warnings)
+            record.example = _resolve_example(module, record.warnings)
+
+        result.modules.append(record)
+
+    return result
+
+
+def might_contain_kumiki_frame(file_path: str) -> bool:
+    """Quick static pre-filter: read file content without importing it.
+
+    Returns True if the file likely contains a kumiki frame entry point.
+    Uses only string matching — no Python import is performed.
+    Checks for: ``example =``, ``patternbook =``, ``def build_frame(``, and
+    ``create_*_patternbook`` factory function definitions.
+    """
+    try:
+        text = Path(file_path).read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return False
+
+    # Module-level patternbook or example assignment
+    if re.search(r"^\s*patternbook\s*=", text, re.MULTILINE):
+        return True
+    if re.search(r"^\s*example\s*=", text, re.MULTILINE):
+        return True
+
+    # build_frame function definition
+    if re.search(r"^\s*def\s+build_frame\s*\(", text, re.MULTILINE):
+        return True
+
+    # create_*_patternbook factory function definition (anchored to line start)
+    if re.search(r"^\s*def\s+create_\w+_patternbook\s*\(", text, re.MULTILINE):
+        return True
+
+    return False
+
+
+def scan_specific_files(
+    file_paths: List[str],
+    root_folder: str,
+) -> LibrarianScanResult:
+    """Import and run patternbook/example resolution on a specific list of files.
+
+    Unlike :func:`scan_library_folder` which scans an entire directory tree,
+    this function only processes the given files.  All paths should be under
+    *root_folder*; the relative path stored in each record is computed from
+    there.
+    """
+    root = Path(root_folder).resolve()
+    result = LibrarianScanResult(root_folder=str(root))
+
+    for fp_str in file_paths:
+        file_path = Path(fp_str).resolve()
+        try:
+            relative_path = str(file_path.relative_to(root))
+        except ValueError:
+            relative_path = str(file_path)
+
+        module, load_error, load_error_traceback, module_name = _load_module_from_path(root, file_path)
 
         record = LibrarianModuleRecord(
             relative_path=relative_path,
