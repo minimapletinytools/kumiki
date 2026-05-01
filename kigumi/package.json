@@ -28,6 +28,7 @@
     "onCommand:kigumi.openCurrentFileInViewer",
     "onCommand:kigumi.initializeProjectInWorkspace",
     "onCommand:kigumi.refreshSidebar",
+    "onCommand:kigumi.refreshPatterns",
     "onCommand:kigumi.openFrameFromSidebar",
     "onCommand:kigumi.openPatternFromSidebar",
     "onCommand:kigumi.openExampleFromSidebar",
@@ -77,6 +78,10 @@
       {
         "command": "kigumi.refreshSidebar",
         "title": "Kigumi: Refresh Explorer"
+      },
+      {
+        "command": "kigumi.refreshPatterns",
+        "title": "Kigumi: Reload Patterns"
       },
       {
         "command": "kigumi.openFrameFromSidebar",

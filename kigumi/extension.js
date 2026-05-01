@@ -105,6 +105,13 @@ function activate(context) {
     });
     context.subscriptions.push(refreshSidebar);
 
+    const refreshPatterns = vscode.commands.registerCommand('kigumi.refreshPatterns', async () => {
+        if (sidebarProvider) {
+            await sidebarProvider.refreshPatterns(true);
+        }
+    });
+    context.subscriptions.push(refreshPatterns);
+
     const openFrameFromSidebar = vscode.commands.registerCommand('kigumi.openFrameFromSidebar', async (filePath) => {
         await openFileInViewer(filePath, context);
     });

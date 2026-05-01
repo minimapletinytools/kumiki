@@ -31,6 +31,7 @@ class KigumiSidebarProvider {
 
         this._didLoadOnce = false;
         this._loadPromise = null;
+        this._patternLoadPromise = null;
         this._state = {
             workspaceRoot: null,
             initStatus: null,
@@ -42,6 +43,8 @@ class KigumiSidebarProvider {
             shippedExamples: [],
             dependencyExamples: [],
             discoveryErrors: [],
+            isRefreshingFrames: false,
+            isRefreshingPatterns: false,
         };
     }
 
@@ -63,7 +66,7 @@ class KigumiSidebarProvider {
     }
 
     async getChildren(element) {
-        await this.ensureLoaded();
+        this.ensureLoaded();
 
         if (!element) {
             return this.getRootNodes();
@@ -85,14 +88,6 @@ class KigumiSidebarProvider {
             return this.getPatternNodesForSection(element.data.sectionKey);
         }
 
-        if (element.type === 'examplesRoot') {
-            return this.getExampleSectionNodes();
-        }
-
-        if (element.type === 'exampleSection') {
-            return this.getExampleNodesForSection(element.data.sectionKey);
-        }
-
         if (element.type === 'errorsRoot') {
             return this.getErrorNodes();
         }
@@ -100,11 +95,12 @@ class KigumiSidebarProvider {
         return [];
     }
 
-    async ensureLoaded() {
+    ensureLoaded() {
         if (this._didLoadOnce) {
             return;
         }
-        await this.refresh(false);
+        this._didLoadOnce = true;
+        void this.refresh(false);
     }
 
     async refresh(forceRescan = true) {
@@ -112,15 +108,35 @@ class KigumiSidebarProvider {
             return this._loadPromise;
         }
 
-        this._loadPromise = this.loadState(forceRescan)
+        this._loadPromise = this.loadFrameState(forceRescan)
             .finally(() => {
                 this._loadPromise = null;
             });
 
-        return this._loadPromise;
+        if (!this._patternLoadPromise) {
+            this._patternLoadPromise = this.loadPatternState(forceRescan)
+                .finally(() => {
+                    this._patternLoadPromise = null;
+                });
+        }
+
+        return Promise.allSettled([this._loadPromise, this._patternLoadPromise]);
     }
 
-    async loadState(forceRescan) {
+    async refreshPatterns(forceRescan = true) {
+        if (this._patternLoadPromise) {
+            return this._patternLoadPromise;
+        }
+
+        this._patternLoadPromise = this.loadPatternState(forceRescan)
+            .finally(() => {
+                this._patternLoadPromise = null;
+            });
+
+        return this._patternLoadPromise;
+    }
+
+    async loadFrameState(_forceRescan) {
         const workspaceFolder = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0];
         if (!workspaceFolder) {
             this._state = {
@@ -134,8 +150,9 @@ class KigumiSidebarProvider {
                 shippedExamples: [],
                 dependencyExamples: [],
                 discoveryErrors: ['Open a workspace folder to use Kigumi Explorer.'],
+                isRefreshingFrames: false,
+                isRefreshingPatterns: false,
             };
-            this._didLoadOnce = true;
             this._onDidChangeTreeData.fire();
             return;
         }
@@ -146,6 +163,45 @@ class KigumiSidebarProvider {
 
         const discoveryErrors = [];
         let framesResult = { frameFiles: [], scanErrors: [] };
+        this._state = {
+            ...this._state,
+            workspaceRoot,
+            initStatus: getInitializationStatus(workspaceRoot),
+            isRefreshingFrames: true,
+        };
+        this._onDidChangeTreeData.fire();
+
+        try {
+            framesResult = await scanWorkspaceForFrames(workspaceRoot, {
+                timeoutMs,
+                pythonCommand: this.options.getPythonCommand?.(),
+            });
+        } catch (error) {
+            discoveryErrors.push(`Frame scan failed: ${error.message || error}`);
+        }
+
+        this._state = {
+            ...this._state,
+            workspaceRoot,
+            initStatus: getInitializationStatus(workspaceRoot),
+            frames: framesResult.frameFiles || [],
+            frameErrors: framesResult.scanErrors || [],
+            discoveryErrors: this.mergeDiscoveryErrors(discoveryErrors, 'frames'),
+            isRefreshingFrames: false,
+        };
+        this._onDidChangeTreeData.fire();
+    }
+
+    async loadPatternState(forceRescan) {
+        const workspaceFolder = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0];
+        if (!workspaceFolder) {
+            return;
+        }
+
+        const workspaceRoot = workspaceFolder.uri.fsPath;
+        const timeoutSeconds = vscode.workspace.getConfiguration('kigumi').get('explorer.scanTimeoutSeconds', 5);
+        const timeoutMs = Math.max(1000, Number(timeoutSeconds) * 1000);
+
         let workspaceContent = { workspacePatterns: [] };
         let dependencyContent = {
             kumikiPatterns: [],
@@ -157,15 +213,15 @@ class KigumiSidebarProvider {
             workspacePatterns: [],
             kumikiShippedPatterns: [],
         };
+        const discoveryErrors = [];
 
-        try {
-            framesResult = await scanWorkspaceForFrames(workspaceRoot, {
-                timeoutMs,
-                pythonCommand: this.options.getPythonCommand?.(),
-            });
-        } catch (error) {
-            discoveryErrors.push(`Frame scan failed: ${error.message || error}`);
-        }
+        this._state = {
+            ...this._state,
+            workspaceRoot,
+            initStatus: getInitializationStatus(workspaceRoot),
+            isRefreshingPatterns: true,
+        };
+        this._onDidChangeTreeData.fire();
 
         try {
             workspaceContent = await discoverWorkspaceContent(workspaceRoot);
@@ -199,23 +255,32 @@ class KigumiSidebarProvider {
             ? runnerPatternData.workspacePatterns
             : fallbackWorkspacePatterns;
 
-        const initStatus = getInitializationStatus(workspaceRoot);
-
         this._state = {
-            workspaceRoot,
-            initStatus,
-            frames: framesResult.frameFiles || [],
-            frameErrors: framesResult.scanErrors || [],
+            ...this._state,
             workspacePatterns: mergedWorkspacePatterns,
             shippedPatterns: runnerPatternData.kumikiShippedPatterns || [],
             dependencyPatterns: (dependencyContent.dependencyPatterns || []).map((filePath) => ({ sourceFile: filePath })),
             shippedExamples: (dependencyContent.kumikiExamples || []).map((filePath) => ({ sourceFile: filePath })),
             dependencyExamples: (dependencyContent.dependencyExamples || []).map((filePath) => ({ sourceFile: filePath })),
-            discoveryErrors,
+            discoveryErrors: this.mergeDiscoveryErrors(discoveryErrors, 'patterns'),
+            isRefreshingPatterns: false,
         };
-
-        this._didLoadOnce = true;
         this._onDidChangeTreeData.fire();
+    }
+
+    mergeDiscoveryErrors(nextErrors, category) {
+        const existing = Array.isArray(this._state.discoveryErrors) ? this._state.discoveryErrors : [];
+        const keep = existing.filter((message) => {
+            if (category === 'frames') {
+                return !message.startsWith('Frame scan failed:');
+            }
+            return !(
+                message.startsWith('Workspace pattern scan failed:')
+                || message.startsWith('Runner pattern query failed:')
+                || message.startsWith('Dependency discovery failed:')
+            );
+        });
+        return keep.concat(nextErrors);
     }
 
     getRootNodes() {
@@ -242,17 +307,9 @@ class KigumiSidebarProvider {
         nodes.push(new SidebarNode({
             key: 'patterns-root',
             type: 'patternsRoot',
-            label: 'Patterns',
+            label: this._state.isRefreshingPatterns ? 'Patterns (loading...)' : 'Patterns',
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
-            iconPath: new vscode.ThemeIcon('symbol-array'),
-        }));
-
-        nodes.push(new SidebarNode({
-            key: 'examples-root',
-            type: 'examplesRoot',
-            label: 'Examples',
-            collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
-            iconPath: new vscode.ThemeIcon('beaker'),
+            iconPath: new vscode.ThemeIcon(this._state.isRefreshingPatterns ? 'loading~spin' : 'symbol-array'),
         }));
 
         const totalErrors = this._state.discoveryErrors.length + this._state.frameErrors.length;
@@ -351,6 +408,30 @@ class KigumiSidebarProvider {
     }
 
     getPatternSectionNodes() {
+        const nodes = [new SidebarNode({
+            key: 'action-reload-patterns',
+            type: 'actionReloadPatterns',
+            label: 'Reload patterns',
+            description: this._state.isRefreshingPatterns ? 'refresh in progress' : 'rescan pattern sources',
+            command: this._state.isRefreshingPatterns
+                ? undefined
+                : {
+                    title: 'Reload patterns',
+                    command: 'kigumi.refreshPatterns',
+                },
+            iconPath: new vscode.ThemeIcon(this._state.isRefreshingPatterns ? 'loading~spin' : 'refresh'),
+        })];
+
+        if (this._state.isRefreshingPatterns) {
+            nodes.push(new SidebarNode({
+                key: 'patterns-loading',
+                type: 'loading',
+                label: 'Loading patterns...',
+                description: 'searching workspace and dependencies',
+                iconPath: new vscode.ThemeIcon('loading~spin'),
+            }));
+        }
+
         const sections = [
             {
                 key: 'workspace-patterns',
@@ -364,16 +445,26 @@ class KigumiSidebarProvider {
                 key: 'dependency-patterns',
                 label: `Dependency patterns (${this._state.dependencyPatterns.length})`,
             },
+            {
+                key: 'shipped-examples',
+                label: `Kumiki examples (${this._state.shippedExamples.length})`,
+            },
+            {
+                key: 'dependency-examples',
+                label: `Dependency examples (${this._state.dependencyExamples.length})`,
+            },
         ];
 
-        return sections.map((section) => new SidebarNode({
+        nodes.push(...sections.map((section) => new SidebarNode({
             key: `pattern-section:${section.key}`,
             type: 'patternSection',
             label: section.label,
             collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
             iconPath: new vscode.ThemeIcon('list-tree'),
             data: { sectionKey: section.key },
-        }));
+        })));
+
+        return nodes;
     }
 
     getPatternNodesForSection(sectionKey) {
@@ -384,6 +475,10 @@ class KigumiSidebarProvider {
             patternItems = this._state.shippedPatterns;
         } else if (sectionKey === 'dependency-patterns') {
             patternItems = this._state.dependencyPatterns;
+        } else if (sectionKey === 'shipped-examples') {
+            return this.getExampleNodesForSection('shipped-examples');
+        } else if (sectionKey === 'dependency-examples') {
+            return this.getExampleNodesForSection('dependency-examples');
         }
 
         if (!patternItems || patternItems.length === 0) {
@@ -412,28 +507,6 @@ class KigumiSidebarProvider {
                 iconPath: new vscode.ThemeIcon('symbol-string'),
             });
         });
-    }
-
-    getExampleSectionNodes() {
-        const sections = [
-            {
-                key: 'shipped-examples',
-                label: `Kumiki shipped examples (${this._state.shippedExamples.length})`,
-            },
-            {
-                key: 'dependency-examples',
-                label: `Dependency examples (${this._state.dependencyExamples.length})`,
-            },
-        ];
-
-        return sections.map((section) => new SidebarNode({
-            key: `example-section:${section.key}`,
-            type: 'exampleSection',
-            label: section.label,
-            collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-            iconPath: new vscode.ThemeIcon('list-tree'),
-            data: { sectionKey: section.key },
-        }));
     }
 
     getExampleNodesForSection(sectionKey) {

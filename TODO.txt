@@ -138,10 +138,13 @@ A couple other things, we may show patterns in the layers view using a similar l
 :: TODO
 
 -kigumi
+  DONE-add loading grahpic and do background loading of patterns
+  DONE-add refresh button
+  DONE-remove examples from sidebar or get it work right
+  -only scan patterns folder
   -test the initialize project thing lol
   -make proper header and buttons or something...
   -allow viewing source from sidebar patterns
-  -remove examples from sidebar or get it work right
   -show proper error if you open a non pattern
 -rethink hierarchical feature selection, as you'll want to be able to select 2 features to measure them in the future.
 -do new selection hierarchy here are the states
