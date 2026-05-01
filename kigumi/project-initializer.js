@@ -135,17 +135,30 @@ async function installBasePackages(workspaceRoot, pythonPath) {
 }
 
 function getInitializationStatus(workspaceRoot) {
+    const isLocalDev = fs.existsSync(path.join(workspaceRoot, 'pyproject.toml'))
+        && fs.existsSync(path.join(workspaceRoot, 'kumiki'));
     const hasKigumiYaml = fs.existsSync(path.join(workspaceRoot, '.kigumi.yaml'));
     const hasProjectYaml = fs.existsSync(path.join(workspaceRoot, '.kigumi', 'project.yaml'));
     const hasVenvPython = fs.existsSync(getVenvPython(workspaceRoot));
     const hasExampleFile = fs.existsSync(path.join(workspaceRoot, 'my_cute_frame.py'));
+    const hasExistingProject = hasKigumiYaml || hasProjectYaml || hasVenvPython || hasExampleFile;
+
+    let projectStatus = 'no-project';
+    if (isLocalDev) {
+        projectStatus = 'local-dev';
+    } else if (hasExistingProject) {
+        projectStatus = 'existing-project';
+    }
 
     return {
+        projectStatus,
+        isLocalDev,
+        hasExistingProject,
         hasKigumiYaml,
         hasProjectYaml,
         hasVenvPython,
         hasExampleFile,
-        isInitialized: hasKigumiYaml && hasProjectYaml && hasVenvPython && hasExampleFile,
+        isInitialized: projectStatus === 'existing-project' && hasKigumiYaml && hasProjectYaml && hasVenvPython && hasExampleFile,
     };
 }
 

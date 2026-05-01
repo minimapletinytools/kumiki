@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const vscode = require('vscode');
 const { scanWorkspaceForFrames } = require('./frame-scanner');
 const {
@@ -7,9 +8,10 @@ const {
     normalizeRunnerPatterns,
 } = require('./discovery-adapter');
 const { getInitializationStatus } = require('./project-initializer');
+const { isPatternbookFile, groupPatternsByPatternbook } = require('./pattern-source-utils');
 
 class SidebarNode {
-    constructor({ key, type, label, collapsibleState = vscode.TreeItemCollapsibleState.None, command, description, tooltip, iconPath, data }) {
+    constructor({ key, type, label, collapsibleState = vscode.TreeItemCollapsibleState.None, command, description, tooltip, iconPath, data, contextValue }) {
         this.key = key;
         this.type = type;
         this.label = label;
@@ -19,6 +21,7 @@ class SidebarNode {
         this.tooltip = tooltip;
         this.iconPath = iconPath;
         this.data = data || {};
+        this.contextValue = contextValue;
     }
 }
 
@@ -32,12 +35,15 @@ class KigumiSidebarProvider {
         this._didLoadOnce = false;
         this._loadPromise = null;
         this._patternLoadPromise = null;
+        this._groupByPatternbook = true; // Default to grouping by patternbook
+        this._selectedElementData = null; // Track current selection for context menu commands
         this._state = {
             workspaceRoot: null,
             initStatus: null,
             frames: [],
             frameErrors: [],
             workspacePatterns: [],
+            workspaceExamples: [],
             shippedPatterns: [],
             dependencyPatterns: [],
             shippedExamples: [],
@@ -52,10 +58,19 @@ class KigumiSidebarProvider {
         this._onDidChangeTreeData.dispose();
     }
 
+    toggleGroupByPatternbook() {
+        this._groupByPatternbook = !this._groupByPatternbook;
+        this._onDidChangeTreeData.fire();
+    }
+
+    getGroupByPatternbook() {
+        return this._groupByPatternbook;
+    }
+
     getTreeItem(element) {
         const item = new vscode.TreeItem(element.label, element.collapsibleState);
         item.id = element.key;
-        item.contextValue = element.type;
+        item.contextValue = element.contextValue || element.type;
         item.command = element.command;
         item.description = element.description;
         item.tooltip = element.tooltip || element.label;
@@ -63,6 +78,14 @@ class KigumiSidebarProvider {
             item.iconPath = element.iconPath;
         }
         return item;
+    }
+
+    setSelectedElementData(element) {
+        this._selectedElementData = element;
+    }
+
+    getSelectedElementData() {
+        return this._selectedElementData;
     }
 
     async getChildren(element) {
@@ -86,6 +109,10 @@ class KigumiSidebarProvider {
 
         if (element.type === 'patternSection') {
             return this.getPatternNodesForSection(element.data.sectionKey);
+        }
+
+        if (element.type === 'patternbookGroup') {
+            return this.getPatternNodesForPatternbook(element.data.sectionKey, element.data.patternbookName);
         }
 
         if (element.type === 'errorsRoot') {
@@ -145,6 +172,7 @@ class KigumiSidebarProvider {
                 frames: [],
                 frameErrors: [],
                 workspacePatterns: [],
+                workspaceExamples: [],
                 shippedPatterns: [],
                 dependencyPatterns: [],
                 shippedExamples: [],
@@ -176,6 +204,21 @@ class KigumiSidebarProvider {
                 timeoutMs,
                 pythonCommand: this.options.getPythonCommand?.(),
             });
+            
+            // Filter out patternbook files from frames
+            const filteredFrames = [];
+            for (const frameFile of framesResult.frameFiles || []) {
+                try {
+                    const content = fs.readFileSync(frameFile.filePath, 'utf-8');
+                    if (!isPatternbookFile(content)) {
+                        filteredFrames.push(frameFile);
+                    }
+                } catch (_) {
+                    // If we can't read the file, include it in frames
+                    filteredFrames.push(frameFile);
+                }
+            }
+            framesResult.frameFiles = filteredFrames;
         } catch (error) {
             discoveryErrors.push(`Frame scan failed: ${error.message || error}`);
         }
@@ -199,10 +242,12 @@ class KigumiSidebarProvider {
         }
 
         const workspaceRoot = workspaceFolder.uri.fsPath;
+        const initStatus = getInitializationStatus(workspaceRoot);
+        const isLocalDev = initStatus.projectStatus === 'local-dev';
         const timeoutSeconds = vscode.workspace.getConfiguration('kigumi').get('explorer.scanTimeoutSeconds', 5);
         const timeoutMs = Math.max(1000, Number(timeoutSeconds) * 1000);
 
-        let workspaceContent = { workspacePatterns: [] };
+        let workspaceContent = { workspacePatterns: [], workspaceExamples: [] };
         let dependencyContent = {
             kumikiPatterns: [],
             kumikiExamples: [],
@@ -211,14 +256,16 @@ class KigumiSidebarProvider {
         };
         let runnerPatternData = {
             workspacePatterns: [],
+            workspaceExamples: [],
             kumikiShippedPatterns: [],
+            kumikiShippedExamples: [],
         };
         const discoveryErrors = [];
 
         this._state = {
             ...this._state,
             workspaceRoot,
-            initStatus: getInitializationStatus(workspaceRoot),
+            initStatus,
             isRefreshingPatterns: true,
         };
         this._onDidChangeTreeData.fire();
@@ -236,16 +283,24 @@ class KigumiSidebarProvider {
             discoveryErrors.push(`Runner pattern query failed: ${error.message || error}`);
         }
 
-        try {
-            dependencyContent = await discoverDependencyContent(workspaceRoot, {
-                timeoutMs,
-                pythonCommand: this.options.getPythonCommand?.(),
-            });
-        } catch (error) {
-            discoveryErrors.push(`Dependency discovery failed: ${error.message || error}`);
+        if (!isLocalDev) {
+            try {
+                dependencyContent = await discoverDependencyContent(workspaceRoot, {
+                    timeoutMs,
+                    pythonCommand: this.options.getPythonCommand?.(),
+                });
+            } catch (error) {
+                discoveryErrors.push(`Dependency discovery failed: ${error.message || error}`);
+            }
         }
 
         const fallbackWorkspacePatterns = (workspaceContent.workspacePatterns || []).map((filePath) => ({
+            sourceFile: filePath,
+            name: path.basename(filePath, '.py'),
+            groups: [],
+        }));
+
+        const fallbackWorkspaceExamples = (workspaceContent.workspaceExamples || []).map((filePath) => ({
             sourceFile: filePath,
             name: path.basename(filePath, '.py'),
             groups: [],
@@ -255,12 +310,41 @@ class KigumiSidebarProvider {
             ? runnerPatternData.workspacePatterns
             : fallbackWorkspacePatterns;
 
+        const mergedWorkspaceExamples = runnerPatternData.workspaceExamples.length > 0
+            ? runnerPatternData.workspaceExamples
+            : fallbackWorkspaceExamples;
+
+        const fallbackShippedPatterns = (dependencyContent.kumikiPatterns || []).map((filePath) => ({
+            sourceFile: filePath,
+            name: path.basename(filePath, '.py'),
+            groups: [],
+        }));
+
+        const fallbackShippedExamples = (dependencyContent.kumikiExamples || []).map((filePath) => ({
+            sourceFile: filePath,
+            name: path.basename(filePath, '.py'),
+            groups: [],
+        }));
+
+        const mergedShippedPatterns = isLocalDev
+            ? []
+            : (runnerPatternData.kumikiShippedPatterns.length > 0
+                ? runnerPatternData.kumikiShippedPatterns
+                : fallbackShippedPatterns);
+
+        const mergedShippedExamples = isLocalDev
+            ? []
+            : (runnerPatternData.kumikiShippedExamples.length > 0
+                ? runnerPatternData.kumikiShippedExamples
+                : fallbackShippedExamples);
+
         this._state = {
             ...this._state,
             workspacePatterns: mergedWorkspacePatterns,
-            shippedPatterns: runnerPatternData.kumikiShippedPatterns || [],
+            workspaceExamples: mergedWorkspaceExamples,
+            shippedPatterns: mergedShippedPatterns,
             dependencyPatterns: (dependencyContent.dependencyPatterns || []).map((filePath) => ({ sourceFile: filePath })),
-            shippedExamples: (dependencyContent.kumikiExamples || []).map((filePath) => ({ sourceFile: filePath })),
+            shippedExamples: mergedShippedExamples,
             dependencyExamples: (dependencyContent.dependencyExamples || []).map((filePath) => ({ sourceFile: filePath })),
             discoveryErrors: this.mergeDiscoveryErrors(discoveryErrors, 'patterns'),
             isRefreshingPatterns: false,
@@ -285,6 +369,16 @@ class KigumiSidebarProvider {
 
     getRootNodes() {
         const nodes = [];
+
+        if (this._state.initStatus && this._state.initStatus.projectStatus === 'local-dev') {
+            nodes.push(new SidebarNode({
+                key: 'local-dev-indicator',
+                type: 'info',
+                label: 'Local development mode active',
+                description: 'Using workspace patterns/examples',
+                iconPath: new vscode.ThemeIcon('beaker'),
+            }));
+        }
 
         nodes.push(new SidebarNode({
             key: 'frames-root',
@@ -379,6 +473,10 @@ class KigumiSidebarProvider {
                 label: `Workspace patterns (${this._state.workspacePatterns.length})`,
             },
             {
+                key: 'workspace-examples',
+                label: `Workspace examples (${this._state.workspaceExamples.length})`,
+            },
+            {
                 key: 'shipped-patterns',
                 label: `Kumiki shipped patterns (${this._state.shippedPatterns.length})`,
             },
@@ -396,14 +494,18 @@ class KigumiSidebarProvider {
             },
         ];
 
-        nodes.push(...sections.map((section) => new SidebarNode({
-            key: `pattern-section:${section.key}`,
-            type: 'patternSection',
-            label: section.label,
-            collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
-            iconPath: new vscode.ThemeIcon('list-tree'),
-            data: { sectionKey: section.key },
-        })));
+        nodes.push(...sections.map((section) => {
+            // Add grouping indicator for shipped-patterns section
+            const groupIndicator = section.key === 'shipped-patterns' && this._groupByPatternbook ? ' (grouped by patternbook)' : '';
+            return new SidebarNode({
+                key: `pattern-section:${section.key}`,
+                type: 'patternSection',
+                label: section.label + groupIndicator,
+                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                iconPath: new vscode.ThemeIcon('list-tree'),
+                data: { sectionKey: section.key },
+            });
+        }));
 
         return nodes;
     }
@@ -412,6 +514,8 @@ class KigumiSidebarProvider {
         let patternItems = [];
         if (sectionKey === 'workspace-patterns') {
             patternItems = this._state.workspacePatterns;
+        } else if (sectionKey === 'workspace-examples') {
+            return this.getExampleNodesForSection('workspace-examples');
         } else if (sectionKey === 'shipped-patterns') {
             patternItems = this._state.shippedPatterns;
         } else if (sectionKey === 'dependency-patterns') {
@@ -431,7 +535,74 @@ class KigumiSidebarProvider {
             })];
         }
 
+        // Group by patternbook if enabled for shipped-patterns
+        if (sectionKey === 'shipped-patterns' && this._groupByPatternbook) {
+            const grouped = groupPatternsByPatternbook(patternItems);
+            const nodes = [];
+            
+            for (const [patternbookName, items] of grouped.entries()) {
+                nodes.push(new SidebarNode({
+                    key: `patternbook-group:${sectionKey}:${patternbookName}`,
+                    type: 'patternbookGroup',
+                    label: patternbookName,
+                    description: `${items.length} pattern${items.length === 1 ? '' : 's'}`,
+                    collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                    iconPath: new vscode.ThemeIcon('folder'),
+                    command: {
+                        title: 'Open patternbook',
+                        command: 'kigumi.openPatternbookGroup',
+                        arguments: [{ sectionKey, patternbookName, patterns: items }],
+                    },
+                    data: { sectionKey, patternbookName, patterns: items },
+                }));
+            }
+            return nodes;
+        }
+
         return patternItems.map((item) => {
+            const itemName = item.name || path.basename(item.sourceFile, '.py');
+            const groups = Array.isArray(item.groups) && item.groups.length > 0 ? `Groups: ${item.groups.join(', ')}` : '';
+            // Only allow view/duplicate for shipped patterns, not workspace patterns
+            const contextValue = sectionKey === 'shipped-patterns' ? 'patternItem' : 'patternItemWorkspace';
+            return new SidebarNode({
+                key: `pattern-item:${sectionKey}:${item.sourceFile}:${itemName}`,
+                type: 'patternItem',
+                label: itemName,
+                description: groups,
+                tooltip: item.sourceFile,
+                command: {
+                    title: 'Open pattern',
+                    command: 'kigumi.openPatternFromSidebar',
+                    arguments: [{ sourceFile: item.sourceFile, patternName: item.name || null }],
+                },
+                iconPath: new vscode.ThemeIcon('symbol-string'),
+                data: { sourceFile: item.sourceFile, patternName: item.name, sectionKey },
+                contextValue,
+            });
+        });
+    }
+
+    getPatternNodesForPatternbook(sectionKey, patternbookName) {
+        let patternItems = [];
+        if (sectionKey === 'shipped-patterns') {
+            patternItems = this._state.shippedPatterns;
+        }
+
+        const filteredItems = patternItems.filter((item) => {
+            const pbName = path.basename(item.sourceFile, '.py');
+            return pbName === patternbookName;
+        });
+
+        if (filteredItems.length === 0) {
+            return [new SidebarNode({
+                key: `patternbook-empty:${sectionKey}:${patternbookName}`,
+                type: 'placeholder',
+                label: 'No patterns found',
+                iconPath: new vscode.ThemeIcon('circle-slash'),
+            })];
+        }
+
+        return filteredItems.map((item) => {
             const itemName = item.name || path.basename(item.sourceFile, '.py');
             const groups = Array.isArray(item.groups) && item.groups.length > 0 ? `Groups: ${item.groups.join(', ')}` : '';
             return new SidebarNode({
@@ -446,14 +617,19 @@ class KigumiSidebarProvider {
                     arguments: [{ sourceFile: item.sourceFile, patternName: item.name || null }],
                 },
                 iconPath: new vscode.ThemeIcon('symbol-string'),
+                data: { sourceFile: item.sourceFile, patternName: item.name, sectionKey },
+                contextValue: 'patternItem',
             });
         });
     }
 
     getExampleNodesForSection(sectionKey) {
-        const items = sectionKey === 'shipped-examples'
-            ? this._state.shippedExamples
-            : this._state.dependencyExamples;
+        let items = this._state.dependencyExamples;
+        if (sectionKey === 'workspace-examples') {
+            items = this._state.workspaceExamples;
+        } else if (sectionKey === 'shipped-examples') {
+            items = this._state.shippedExamples;
+        }
 
         if (!items || items.length === 0) {
             return [new SidebarNode({

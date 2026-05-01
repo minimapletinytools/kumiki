@@ -65,6 +65,7 @@ class FrameViewSession {
         this.slotName = options.slotName || 'main';
         this.sessionType = options.sessionType || 'main';
         this.patternName = options.patternName || null;
+        this.openInSplitView = options.openInSplitView !== false;
         // Cached payloads for potential panel re-open flows
         this._lastFrameData = null;
         this._lastGeometryData = null;
@@ -119,7 +120,7 @@ class FrameViewSession {
 
         this.profiler.markTiming(initTiming, 'initialize.createPanel.start');
         const isLocalDev = this.runnerSession.isLocalDev;
-        this.panel = createFrameViewer(this.filePath, this.patternName, isLocalDev);
+        this.panel = createFrameViewer(this.filePath, this.patternName, isLocalDev, this.openInSplitView);
         this.profiler.markTiming(initTiming, 'initialize.createPanel.end');
 
         this.profiler.markTiming(initTiming, 'initialize.webviewHtml.start');

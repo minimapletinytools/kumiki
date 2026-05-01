@@ -29,6 +29,7 @@
     "onCommand:kigumi.initializeProjectInWorkspace",
     "onCommand:kigumi.refreshSidebar",
     "onCommand:kigumi.refreshPatterns",
+    "onCommand:kigumi.toggleOpenInSplitView",
     "onCommand:kigumi.openFrameFromSidebar",
     "onCommand:kigumi.openPatternFromSidebar",
     "onCommand:kigumi.openExampleFromSidebar",
@@ -97,6 +98,27 @@
       {
         "command": "kigumi.openExampleFromSidebar",
         "title": "Kigumi: Open Example From Explorer"
+      },
+      {
+        "command": "kigumi.toggleGroupByPatternbook",
+        "title": "Kigumi: Toggle Group by Patternbook"
+      },
+      {
+        "command": "kigumi.toggleOpenInSplitView",
+        "title": "Kigumi: Toggle Open In Split View",
+        "icon": "$(split-horizontal)"
+      },
+      {
+        "command": "kigumi.openPatternbookGroup",
+        "title": "Kigumi: Open Patternbook Group"
+      },
+      {
+        "command": "kigumi.viewPatternSource",
+        "title": "View Source"
+      },
+      {
+        "command": "kigumi.duplicatePatternToWorkspace",
+        "title": "Duplicate Pattern to Workspace"
       }
     ],
     "menus": {
@@ -115,6 +137,33 @@
           "command": "kigumi.refreshPatterns",
           "when": "view == kigumi.explorer",
           "group": "navigation@3"
+        },
+        {
+          "command": "kigumi.toggleGroupByPatternbook",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@4"
+        },
+        {
+          "command": "kigumi.toggleOpenInSplitView",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@5"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "kigumi.viewPatternSource",
+          "when": "view == kigumi.explorer && viewItem == patternItem",
+          "group": "inline@1"
+        },
+        {
+          "command": "kigumi.viewPatternSource",
+          "when": "view == kigumi.explorer && viewItem == patternItemWorkspace",
+          "group": "inline@1"
+        },
+        {
+          "command": "kigumi.duplicatePatternToWorkspace",
+          "when": "view == kigumi.explorer && viewItem == patternItem",
+          "group": "inline@2"
         }
       ]
     },
@@ -128,6 +177,12 @@
           "minimum": 1,
           "maximum": 60,
           "description": "Timeout in seconds for reading each Python file during Kigumi frame discovery scans."
+        },
+        "kigumi.viewer.openInSplitView": {
+          "type": "boolean",
+          "default": true,
+          "scope": "application",
+          "description": "When enabled, opening frames/patterns/examples uses a split editor group. When disabled, opens in the current editor group."
         }
       }
     }

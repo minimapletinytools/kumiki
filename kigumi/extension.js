@@ -1,3 +1,4 @@
+const path = require('path');
 const vscode = require('vscode');
 const { FrameViewSession } = require('./frame-view-session');
 const { KigumiSidebarProvider } = require('./sidebar-provider');
@@ -8,6 +9,7 @@ const frameSessions = new Map();       // filePath → FrameViewSession (main se
 const patternSessions = new Map();     // slotName → FrameViewSession (pattern sessions)
 let patternSlotCounter = 0;
 let sidebarProvider = null;
+let openInSplitView = true;
 
 /**
  * Main activation function for the Kigumi extension.
@@ -16,6 +18,12 @@ let sidebarProvider = null;
 function activate(context) {
     outputChannel = vscode.window.createOutputChannel('Kigumi');
     context.subscriptions.push(outputChannel);
+    openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', true);
+    context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
+        if (event.affectsConfiguration('kigumi.viewer.openInSplitView')) {
+            openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', true);
+        }
+    }));
 
     sidebarProvider = new KigumiSidebarProvider(context, {
         getPatternSources: async (forceRescan) => {
@@ -41,6 +49,10 @@ function activate(context) {
         treeDataProvider: sidebarProvider,
         showCollapseAll: true,
     });
+    context.subscriptions.push(explorerTreeView.onDidChangeSelection((event) => {
+        const selected = event.selection && event.selection.length > 0 ? event.selection[0] : null;
+        sidebarProvider.setSelectedElementData(selected);
+    }));
     context.subscriptions.push(sidebarProvider, explorerTreeView);
 
     const disposable = vscode.commands.registerCommand('kigumi.render', async function () {
@@ -74,6 +86,11 @@ function activate(context) {
         }
 
         const initStatus = getInitializationStatus(workspaceRoot);
+        if (initStatus.projectStatus === 'local-dev') {
+            vscode.window.showInformationMessage('Kigumi local development mode detected. Project initialization is disabled for this workspace.');
+            await sidebarProvider.refresh(true);
+            return;
+        }
         if (initStatus.isInitialized) {
             vscode.window.showInformationMessage('Kigumi project is already initialized in this workspace.');
             await sidebarProvider.refresh(true);
@@ -111,6 +128,14 @@ function activate(context) {
         }
     });
     context.subscriptions.push(refreshPatterns);
+
+    const toggleOpenInSplitView = vscode.commands.registerCommand('kigumi.toggleOpenInSplitView', async () => {
+        openInSplitView = !openInSplitView;
+        await vscode.workspace.getConfiguration('kigumi').update('viewer.openInSplitView', openInSplitView, vscode.ConfigurationTarget.Global);
+        const mode = openInSplitView ? 'split view' : 'current view';
+        vscode.window.showInformationMessage(`Kigumi open mode: ${mode}`);
+    });
+    context.subscriptions.push(toggleOpenInSplitView);
 
     const openFrameFromSidebar = vscode.commands.registerCommand('kigumi.openFrameFromSidebar', async (filePath) => {
         await openFileInViewer(filePath, context);
@@ -153,6 +178,127 @@ function activate(context) {
         await openFileInViewer(sourceFile, context);
     });
     context.subscriptions.push(openExampleFromSidebar);
+
+    // --- Toggle Group by Patternbook ---
+    const toggleGroupByPatternbook = vscode.commands.registerCommand('kigumi.toggleGroupByPatternbook', async () => {
+        if (sidebarProvider) {
+            sidebarProvider.toggleGroupByPatternbook();
+        }
+    });
+    context.subscriptions.push(toggleGroupByPatternbook);
+
+    // --- Open Patternbook Group ---
+    const openPatternbookGroup = vscode.commands.registerCommand('kigumi.openPatternbookGroup', async (groupData) => {
+        if (!groupData || !groupData.patterns || groupData.patterns.length === 0) {
+            vscode.window.showErrorMessage('Patternbook has no patterns.');
+            return;
+        }
+
+        // Open the first pattern in the patternbook (which will load the whole patternbook)
+        const firstPattern = groupData.patterns[0];
+        if (!firstPattern || !firstPattern.sourceFile) {
+            vscode.window.showErrorMessage('Cannot find pattern source file.');
+            return;
+        }
+
+        try {
+            let mainSession = _findAnyAliveMainSession();
+            if (!mainSession) {
+                // Open the source file in the viewer first
+                await openFileInViewer(firstPattern.sourceFile, context);
+                mainSession = frameSessions.get(firstPattern.sourceFile);
+            }
+
+            if (!mainSession || !mainSession.runnerSession || !mainSession.runnerSession.isAlive()) {
+                vscode.window.showErrorMessage('Kigumi runner is not available. Open a frame first.');
+                return;
+            }
+
+            // Open the entire patternbook by opening it without a specific pattern name
+            await _openBookFromWebview(mainSession, firstPattern.sourceFile, context);
+        } catch (error) {
+            outputChannel.appendLine(`Open patternbook error: ${error.message}\n${error.stack}`);
+            vscode.window.showErrorMessage(`Failed to open patternbook: ${error.message}`);
+        }
+    });
+    context.subscriptions.push(openPatternbookGroup);
+
+    // --- View Pattern Source ---
+    const viewPatternSource = vscode.commands.registerCommand('kigumi.viewPatternSource', async (elementArg) => {
+        const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
+        if (!selectedElement || !selectedElement.data || !selectedElement.data.sourceFile) {
+            vscode.window.showErrorMessage('Please select a pattern first.');
+            return;
+        }
+
+        const patternData = selectedElement.data;
+        const workspaceRoot = getWorkspaceRoot();
+        if (!workspaceRoot) {
+            vscode.window.showErrorMessage('Open a workspace folder first.');
+            return;
+        }
+
+        try {
+            const { viewShippedPatternSource } = require('./pattern-source-utils');
+            
+            // Check if the file is in workspace or from dependencies
+            const isInWorkspace = patternData.sourceFile.startsWith(workspaceRoot);
+            
+            if (isInWorkspace) {
+                // Open workspace file directly
+                const uri = vscode.Uri.file(patternData.sourceFile);
+                const doc = await vscode.workspace.openTextDocument(uri);
+                await vscode.window.showTextDocument(doc);
+            } else {
+                // Create read-only copy in workspace
+                const readOnlyPath = await viewShippedPatternSource(patternData.sourceFile, workspaceRoot);
+                const uri = vscode.Uri.file(readOnlyPath);
+                const doc = await vscode.workspace.openTextDocument(uri);
+                const editor = await vscode.window.showTextDocument(doc);
+                vscode.window.showInformationMessage(`Opened read-only copy of pattern. Edit the original or create a new pattern.`);
+            }
+        } catch (error) {
+            outputChannel.appendLine(`View source error: ${error.message}\n${error.stack}`);
+            vscode.window.showErrorMessage(`Failed to view pattern source: ${error.message}`);
+        }
+    });
+    context.subscriptions.push(viewPatternSource);
+
+    // --- Duplicate Pattern to Workspace ---
+    const duplicatePatternToWorkspace = vscode.commands.registerCommand('kigumi.duplicatePatternToWorkspace', async (elementArg) => {
+        const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
+        if (!selectedElement || !selectedElement.data || !selectedElement.data.sourceFile) {
+            vscode.window.showErrorMessage('Please select a pattern first.');
+            return;
+        }
+
+        const patternData = selectedElement.data;
+        const workspaceRoot = getWorkspaceRoot();
+        if (!workspaceRoot) {
+            vscode.window.showErrorMessage('Open a workspace folder first.');
+            return;
+        }
+
+        try {
+            const { duplicatePatternToWorkspace: duplicateFn } = require('./pattern-source-utils');
+            const newPath = await duplicateFn(patternData.sourceFile, workspaceRoot);
+            
+            const uri = vscode.Uri.file(newPath);
+            const doc = await vscode.workspace.openTextDocument(uri);
+            await vscode.window.showTextDocument(doc);
+            
+            vscode.window.showInformationMessage(`Pattern duplicated to: ${path.relative(workspaceRoot, newPath)}`);
+            
+            // Refresh sidebar to show the new pattern
+            if (sidebarProvider) {
+                await sidebarProvider.refreshPatterns(true);
+            }
+        } catch (error) {
+            outputChannel.appendLine(`Duplicate pattern error: ${error.message}\n${error.stack}`);
+            vscode.window.showErrorMessage(`Failed to duplicate pattern: ${error.message}`);
+        }
+    });
+    context.subscriptions.push(duplicatePatternToWorkspace);
 
     // --- Browse Patterns command ---
     const browsePatterns = vscode.commands.registerCommand('kigumi.browsePatterns', async function () {
@@ -237,6 +383,7 @@ function activate(context) {
                     sessionType: 'pattern',
                     sharedRunner: runner,
                     patternName: picked._patternName,
+                    openInSplitView,
                 }
             );
             patternSessions.set(slotName, patternSession);
@@ -415,6 +562,7 @@ async function _openPatternFromWebview(mainSession, patternName, sourceFile, con
             sessionType: 'pattern',
             sharedRunner: runner,
             patternName,
+            openInSplitView,
         }
     );
     patternSessions.set(slotName, patternSession);
@@ -457,6 +605,7 @@ async function _openBookFromWebview(mainSession, sourceFile, context) {
             sessionType: 'pattern',
             sharedRunner: runner,
             patternName: bookName,
+            openInSplitView,
         }
     );
     patternSessions.set(slotName, patternSession);
@@ -484,7 +633,7 @@ async function getOrCreateSession(filePath, context) {
                 frameSessions.delete(disposedFilePath);
             }
         },
-        { slotName: 'main', sessionType: 'main' }
+        { slotName: 'main', sessionType: 'main', openInSplitView }
     );
     session.onLoadPattern = async (patternName, sourceFile) => {
         await _openPatternFromWebview(session, patternName, sourceFile, context);

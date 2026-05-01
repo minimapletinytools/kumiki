@@ -143,11 +143,24 @@ A couple other things, we may show patterns in the layers view using a similar l
   DONE-remove examples from sidebar or get it work right
   DONE-only scan patterns folder
   DONE-make proper header and buttons or something...
-  -frames section should omit examples if it starts with "patternbook" as these are patterns
-  -patterns section should have a drop down that says "group by patternbook" and then cilcking on the patternbook folder opens the entire patternbook in the viewer
-  -allow viewing source on pattern/frames, obvious what to do in workspace patterns, for shipped pattern, it  will open a read only copy it from the dependencies folder?
+  DONE?-frames section should omit examples if it starts with "patternbook" as these are patterns
+  DONE-patterns section should have a drop down that says "group by patternbook" and then cilcking on the patternbook folder opens the entire patternbook in the viewer
+  DONE-clicking on paternbook group folder opens the patternbook
+  DONE-allow viewing source on pattern/frames, obvious what to do in workspace patterns, for shipped pattern, it  will open a read only copy it from the dependencies folder?
     -for kumiji shipped patterns also have an option to duplicate pattern in workspace, which will make a copy of teh pattern in workspace for you to modify
+    -view source/duplicate source buttons are broken right now...
+  DONE?-add special mode for local development??
+    -does not initilaize python env stuff and detects that it is in local dev mode
+    -does not scan for kumiki (add a notice for local development, and patterns/exampes will show up as workspace patterns)
+  DONE-have toggel to choso et open kigumi in separate collumn or in same tab group
+  -have settings menu in extension menu to change settings like open in split tab
+  -pattern scanning still weird
+  -patternbook grouping not working for workspace pattern
+  -frames not being detected in local dev mode?
+  -fix examples and ptatern separation, or maybe just get rid of examples
+    -remove workspace examples as these are just frames, or perhaps workspace example and frame should follow the same format?
   -test the initialize project thing lol
+    -need to pbulish kumiki first
   -show proper error if you open a non pattern
 -rethink hierarchical feature selection, as you'll want to be able to select 2 features to measure them in the future.
 -do new selection hierarchy here are the states

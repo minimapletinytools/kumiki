@@ -37,11 +37,12 @@ function escapeScriptJson(value) {
         .replace(/\u2029/g, '\\u2029');
 }
 
-function createFrameViewer(filePath, frameName = null, isLocalDev = false) {
+function createFrameViewer(filePath, frameName = null, isLocalDev = false, openInSplitView = true) {
+    const targetColumn = openInSplitView ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active;
     return vscode.window.createWebviewPanel(
         'kigumiViewer',
         getViewerTitle(filePath, frameName, isLocalDev),
-        vscode.ViewColumn.Two,
+        targetColumn,
         {
             enableScripts: true,
             retainContextWhenHidden: true,

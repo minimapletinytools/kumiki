@@ -16,6 +16,44 @@ function dedupeAndSortPaths(pathsList) {
     return Array.from(new Set(pathsList || [])).sort((a, b) => a.localeCompare(b));
 }
 
+function classifyPythonFile(filePath) {
+    try {
+        const content = fs.readFileSync(filePath, 'utf8');
+        const hasPatternbook = /^\s*patternbook\s*=/m.test(content)
+            || /^\s*def\s+create_\w+_patternbook\s*\(/m.test(content);
+        const hasExample = /^\s*example\s*=/m.test(content);
+
+        if (hasPatternbook) {
+            return 'pattern';
+        }
+        if (hasExample) {
+            return 'example';
+        }
+        return 'other';
+    } catch (_error) {
+        return 'other';
+    }
+}
+
+function splitPatternAndExampleFiles(filePaths) {
+    const patterns = [];
+    const examples = [];
+
+    for (const filePath of filePaths || []) {
+        const classification = classifyPythonFile(filePath);
+        if (classification === 'pattern') {
+            patterns.push(filePath);
+        } else if (classification === 'example') {
+            examples.push(filePath);
+        }
+    }
+
+    return {
+        patterns: dedupeAndSortPaths(patterns),
+        examples: dedupeAndSortPaths(examples),
+    };
+}
+
 async function listPythonFiles(rootDir) {
     const results = [];
     const queue = [rootDir];
@@ -185,6 +223,9 @@ async function discoverDependencyContent(workspaceRoot, options = {}) {
         '        name = entry.name',
         '        if name == "kumiki":',
         '            kumiki_patterns.extend(list_py_files(os.path.join(entry.path, "patterns")))',
+        '            kumiki_examples.extend(list_py_files(os.path.join(entry.path, "examples")))',
+        '            kumiki_examples.extend(list_py_files(os.path.join(entry.path, "patterns", "examples")))',
+        '            kumiki_examples.extend(list_py_files(os.path.join(entry.path, "patternbooks", "examples")))',
         '            continue',
         '        if name.startswith("_"):',
         '            continue',
@@ -205,7 +246,17 @@ async function discoverDependencyContent(workspaceRoot, options = {}) {
             if (candidate.includes(path.sep) && !fs.existsSync(candidate)) {
                 continue;
             }
-            return await runPythonJson(candidate, script, workspaceRoot, timeoutMs);
+            const raw = await runPythonJson(candidate, script, workspaceRoot, timeoutMs);
+
+            const kumikiSplit = splitPatternAndExampleFiles(raw.kumikiPatterns || []);
+            const depSplit = splitPatternAndExampleFiles(raw.dependencyPatterns || []);
+
+            return {
+                kumikiPatterns: kumikiSplit.patterns,
+                kumikiExamples: dedupeAndSortPaths([...(raw.kumikiExamples || []), ...kumikiSplit.examples]),
+                dependencyPatterns: depSplit.patterns,
+                dependencyExamples: dedupeAndSortPaths([...(raw.dependencyExamples || []), ...depSplit.examples]),
+            };
         } catch (error) {
             lastError = error;
         }
@@ -217,11 +268,15 @@ async function discoverDependencyContent(workspaceRoot, options = {}) {
 async function discoverWorkspaceContent(workspaceRoot) {
     const result = {
         workspacePatterns: [],
+        workspaceExamples: [],
     };
 
     const workspacePatternsDir = path.join(workspaceRoot, 'patterns');
     if (fs.existsSync(workspacePatternsDir) && fs.statSync(workspacePatternsDir).isDirectory()) {
-        result.workspacePatterns = await listPythonFiles(workspacePatternsDir);
+        const files = await listPythonFiles(workspacePatternsDir);
+        const split = splitPatternAndExampleFiles(files);
+        result.workspacePatterns = split.patterns;
+        result.workspaceExamples = split.examples;
     }
 
     return result;
@@ -230,7 +285,9 @@ async function discoverWorkspaceContent(workspaceRoot) {
 function normalizeRunnerPatterns(result) {
     const output = {
         workspacePatterns: [],
+        workspaceExamples: [],
         kumikiShippedPatterns: [],
+        kumikiShippedExamples: [],
     };
 
     if (!result || !Array.isArray(result.sources)) {
@@ -239,21 +296,44 @@ function normalizeRunnerPatterns(result) {
 
     for (const source of result.sources) {
         const list = Array.isArray(source.patterns) ? source.patterns : [];
+        const exampleList = Array.isArray(source.examples) ? source.examples : [];
         const mapped = list.map((item) => ({
             name: item.name,
             groups: Array.isArray(item.groups) ? item.groups : [],
             sourceFile: item.source_file,
         }));
+        const mappedExamples = exampleList.map((item) => ({
+            name: item.name,
+            groups: Array.isArray(item.groups) ? item.groups : [],
+            sourceFile: item.source_file,
+        }));
+
+        const classifiedPatterns = [];
+        const classifiedExamples = [];
+        for (const item of mapped) {
+            const kind = classifyPythonFile(item.sourceFile);
+            if (kind === 'example') {
+                classifiedExamples.push(item);
+            } else {
+                classifiedPatterns.push(item);
+            }
+        }
+
+        const mergedExamples = mappedExamples.concat(classifiedExamples);
 
         if (source.source === 'local') {
-            output.workspacePatterns = output.workspacePatterns.concat(mapped);
+            output.workspacePatterns = output.workspacePatterns.concat(classifiedPatterns);
+            output.workspaceExamples = output.workspaceExamples.concat(mergedExamples);
         } else if (source.source === 'shipped') {
-            output.kumikiShippedPatterns = output.kumikiShippedPatterns.concat(mapped);
+            output.kumikiShippedPatterns = output.kumikiShippedPatterns.concat(classifiedPatterns);
+            output.kumikiShippedExamples = output.kumikiShippedExamples.concat(mergedExamples);
         }
     }
 
     output.workspacePatterns.sort((a, b) => `${a.sourceFile}:${a.name}`.localeCompare(`${b.sourceFile}:${b.name}`));
+    output.workspaceExamples.sort((a, b) => `${a.sourceFile}:${a.name}`.localeCompare(`${b.sourceFile}:${b.name}`));
     output.kumikiShippedPatterns.sort((a, b) => `${a.sourceFile}:${a.name}`.localeCompare(`${b.sourceFile}:${b.name}`));
+    output.kumikiShippedExamples.sort((a, b) => `${a.sourceFile}:${a.name}`.localeCompare(`${b.sourceFile}:${b.name}`));
     return output;
 }
 
