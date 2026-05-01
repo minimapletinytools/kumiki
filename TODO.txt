@@ -153,7 +153,7 @@ A couple other things, we may show patterns in the layers view using a similar l
     -does not initilaize python env stuff and detects that it is in local dev mode
     -does not scan for kumiki (add a notice for local development, and patterns/exampes will show up as workspace patterns)
   DONE-have toggel to choso et open kigumi in separate collumn or in same tab group
-  -have settings menu in extension menu to change settings like open in split tab
+  DONE-have settings menu in extension menu to change settings like open in split tab
   -pattern scanning still weird
   -patternbook grouping not working for workspace pattern
   -frames not being detected in local dev mode?

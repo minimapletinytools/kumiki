@@ -176,12 +176,13 @@
           "default": 5,
           "minimum": 1,
           "maximum": 60,
+          "scope": "window",
           "description": "Timeout in seconds for reading each Python file during Kigumi frame discovery scans."
         },
         "kigumi.viewer.openInSplitView": {
           "type": "boolean",
           "default": true,
-          "scope": "application",
+          "scope": "window",
           "description": "When enabled, opening frames/patterns/examples uses a split editor group. When disabled, opens in the current editor group."
         }
       }
