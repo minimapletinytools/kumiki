@@ -140,7 +140,18 @@ class FrameViewSession {
 
         this.profiler.resetMilestones();
         this.profiler.markTiming(initTiming, 'initialize.runner.start');
-        await this.runnerSession.start();
+        try {
+            await this.runnerSession.start();
+        } catch (startError) {
+            this.profiler.markTiming(initTiming, 'initialize.runner.error', {
+                message: startError && startError.message ? startError.message : String(startError),
+            });
+            this.channel.appendLine(`[${path.basename(this.filePath)}] Runner startup failed: ${startError && startError.message ? startError.message : String(startError)}`);
+            this.channel.show(true);
+            const errorMessage = `Failed to start Python runner. Check the output channel for details.`;
+            this.pushViewerErrorStateWithLink(errorMessage, `Kigumi Python Runner Error: ${startError && startError.message ? startError.message : 'unknown'}`);
+            throw startError;
+        }
         this.profiler.markTiming(initTiming, 'initialize.runner.end');
 
         // For shared-runner pattern sessions, load the slot now
@@ -197,6 +208,10 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'openOutputChannel') {
+                this.channel.show(true);
+                return;
+            }
+            if (message.type === 'openKigumiOutput') {
                 this.channel.show(true);
                 return;
             }
@@ -602,6 +617,66 @@ class FrameViewSession {
         return null;
     }
 
+    deriveViewerErrorMessage(details) {
+        const message = details && typeof details.message === 'string' ? details.message : '';
+        if (!message) {
+            return 'Unable to render this file in Kigumi viewer.';
+        }
+
+        if (message.includes("Module must expose a module-level 'example' Frame, a 'patternbook', or a build_frame() function")) {
+            return "This file is not a valid Kigumi frame/example/pattern. Add module-level 'example', 'patternbook', or build_frame().";
+        }
+
+        if (message.includes('No patternbook found in')) {
+            return 'This file does not define a patternbook that Kigumi can open.';
+        }
+
+        return `Kigumi failed to render this file: ${message}`;
+    }
+
+    pushViewerErrorState(details) {
+        if (!this.panel) {
+            return;
+        }
+
+        const refreshToken = this.refreshSequence;
+        const loadingText = this.deriveViewerErrorMessage(details);
+        this.panel.webview.postMessage({
+            type: 'viewerState',
+            uiState: {
+                phase: 'error',
+                loadingText,
+                keepLoading: true,
+                refreshToken,
+                error: details && typeof details.message === 'string' ? details.message : null,
+                showOutputLink: false,
+            },
+        }).catch((postError) => {
+            this.log(`[webview] Failed to post error state: ${postError.message || postError}`);
+        });
+    }
+
+    pushViewerErrorStateWithLink(displayMessage, fullError) {
+        if (!this.panel) {
+            return;
+        }
+
+        const refreshToken = this.refreshSequence;
+        this.panel.webview.postMessage({
+            type: 'viewerState',
+            uiState: {
+                phase: 'error',
+                loadingText: displayMessage,
+                keepLoading: true,
+                refreshToken,
+                error: fullError,
+                showOutputLink: true,
+            },
+        }).catch((postError) => {
+            this.log(`[webview] Failed to post error state with link: ${postError.message || postError}`);
+        });
+    }
+
     async openTracebackLocation(location) {
         if (!location) {
             return;
@@ -623,6 +698,7 @@ class FrameViewSession {
         const details = this.extractRunnerErrorDetails(error);
         const errorTypePart = details.type ? `${details.type}: ` : '';
         this.log(`[error] ${contextLabel} -> ${errorTypePart}${details.message}`);
+        this.pushViewerErrorState(details);
 
         if (details.traceback) {
             this.channel.appendLine(`[${path.basename(this.filePath)}] [traceback] BEGIN`);

@@ -29,18 +29,51 @@
     display: none;
     align-items: center;
     justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+    padding: 24px;
     background: rgba(255, 255, 255, 0.46);
     color: var(--hv-title);
     font: 600 14px/1.4 'Segoe UI', sans-serif;
     letter-spacing: 0.02em;
     text-transform: lowercase;
+    white-space: normal;
+    overflow-wrap: anywhere;
     user-select: none;
     pointer-events: none;
     z-index: 6;
     backdrop-filter: blur(2px);
 }
+#loading-text {
+    pointer-events: none;
+}
+#loading-overlay #output-btn {
+    pointer-events: all;
+    cursor: pointer;
+    padding: 8px 16px;
+    background: #8a2b2b;
+    color: #fefefe;
+    border: none;
+    border-radius: 4px;
+    font: 600 12px 'Segoe UI', sans-serif;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+    transition: background 0.2s ease;
+}
+#loading-overlay #output-btn:hover {
+    background: #a63535;
+}
+#loading-overlay #output-btn:active {
+    background: #6d1f1f;
+}
 #loading-overlay.visible {
     display: flex;
+}
+#loading-overlay.error {
+    background: rgba(255, 236, 236, 0.78);
+    color: #8a2b2b;
+    font-weight: 700;
 }
 canvas { display: block; width: 100%; height: 100%; }
 #info {

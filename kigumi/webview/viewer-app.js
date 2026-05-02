@@ -376,7 +376,10 @@ class KigumiViewerApp extends LitElement {
             <button id="to-v3d" title="Jump back to 3D view">to v3d view</button>
             <div id="viewport">
                 <canvas id="c"></canvas>
-                <div id="loading-overlay" class=${this.isOverlayVisible() ? 'visible' : ''}>${this.viewState.loadingText}</div>
+                <div id="loading-overlay" class=${this.isOverlayVisible() ? 'visible' : ''}>
+                    <div id="loading-text">${this.viewState.loadingText}</div>
+                    <button id="output-btn" type="button" title="Open Kigumi output channel" style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">view output</button>
+                </div>
                 <div id="info"></div>
                 <div id="gizmo-panel" aria-label="Camera and light gizmos">
                     <div class="gizmo-block">
@@ -557,6 +560,13 @@ class KigumiViewerApp extends LitElement {
         focusButton.addEventListener('click', () => {
             this.focusSelection();
         });
+
+        const outputBtn = this.renderRoot.querySelector('#output-btn');
+        if (outputBtn) {
+            outputBtn.addEventListener('click', () => {
+                if (vscode) { vscode.postMessage({ type: 'openKigumiOutput' }); }
+            });
+        }
 
         lightDialCanvas.addEventListener('pointerdown', (event) => {
             event.preventDefault();
@@ -2441,12 +2451,14 @@ class KigumiViewerApp extends LitElement {
             ? next.refreshToken
             : this.activeRefreshToken;
         const error = typeof next.error === 'string' && next.error ? next.error : null;
+        const showOutputLink = Boolean(next.showOutputLink);
 
         return {
             phase,
             loadingText,
             refreshToken,
             error,
+            showOutputLink,
             keepLoading: Boolean(next.keepLoading),
         };
     }
@@ -2481,8 +2493,18 @@ class KigumiViewerApp extends LitElement {
             ? this.renderRoot.querySelector('#loading-overlay')
             : null;
         if (overlay) {
-            overlay.textContent = this.viewState.loadingText;
+            const textEl = overlay.querySelector('#loading-text');
+            if (textEl) {
+                textEl.textContent = this.viewState.loadingText;
+            } else {
+                overlay.textContent = this.viewState.loadingText;
+            }
             overlay.classList.toggle('visible', this.isOverlayVisible());
+            overlay.classList.toggle('error', this.viewState.phase === ViewerPhase.ERROR);
+            const btn = overlay.querySelector('#output-btn');
+            if (btn) {
+                btn.style.display = this.viewState.showOutputLink ? 'block' : 'none';
+            }
         }
     }
 

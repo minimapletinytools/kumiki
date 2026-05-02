@@ -169,15 +169,19 @@ DONE-kigumi
     -remove the "open in split view" button in the top bar 
     -remov ethe open current file in viewer button in the top bar
     -remove the initialize project button in the top bar
-
+DONE-show proper error if you open a non pattern
 
 -publish python package
--show proper error if you open a non pattern
+  -publish to testpypi first
+  -setup pypi account
+  -publish to pypi
+
 -test the initialize project thing lol
   -need to pbulish kumiki first
 
 
 -rethink hierarchical feature selection, as you'll want to be able to select 2 features to measure them in the future.
+
 -do new selection hierarchy here are the states
   -nothing selected (show everything)
   -unselected (use transparency)
@@ -188,13 +192,10 @@ DONE-kigumi
   -feature selected
   -I guess just use transparency for outer stuff when focusing in on selection? But you should make distinct states for each of them... but maybe combine the options for changing their look 
 
-
--pattern viewer
-  -add tag searching module. it will be shared for searching both patterns and for layers stuff
-  -add tag searching funcitonailty to pattern selection
-  -allow opening groups of patterns hsaring the same tag as one unit
-  -tag-search-plan.txt
-  -but I think you want to integrate pattern with the viewer so you can more easily look at patterns and jumb cakt o your designs...
+-pattern viewer (improved)
+  -pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
+  -add searching + tag searching functionality on top of the patternbook/frames/examples
+  -allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
 
 -add dovetail shoulder to build a butt joint
 -add notching to build a butt joint (you can skip this if you want lol...)
@@ -243,8 +244,8 @@ DONE-kigumi
   -add layers view to left I guess
 
 -UI whatever
-  -output proper error if you try and open a non-frame file
-  -render kumiki should not open in new tab
+  DONE-output proper error if you try and open a non-frame file
+  DONE-render kumiki should not open in new tab
   -move focus button, make it more cute
   -add # joints table view at bottom (shouldh include joint type, but you need metadat for this)
   -maybe add "assume upright structure" to limit camera movement with mouse?
