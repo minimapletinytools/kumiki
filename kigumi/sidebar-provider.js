@@ -633,4 +633,5 @@ class KigumiSidebarProvider {
 
 module.exports = {
     KigumiSidebarProvider,
+    SidebarNode,
 };
