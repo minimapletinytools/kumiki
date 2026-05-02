@@ -96,11 +96,12 @@ jobs:
         id: version
         run: |
           python - <<'PY'
+          import os
           import tomllib
           from pathlib import Path
 
           version = tomllib.loads(Path('pyproject.toml').read_text())['project']['version']
-          with open('$GITHUB_OUTPUT', 'a', encoding='utf-8') as f:
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as f:
             f.write(f"version={version}\n")
           PY
 
