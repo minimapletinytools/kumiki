@@ -163,8 +163,8 @@ cython_debug/
 .vscode/
 .vscode-test/
 .vscode-test-web/
-horsey-viewer/.vscode-test/
-horsey-viewer/.vscode-test-web/
+kigumi/.vscode-test/
+kigumi/.vscode-test-web/
 
 # macOS
 .DS_Store
@@ -172,6 +172,11 @@ horsey-viewer/.vscode-test-web/
 # Temporary files
 *.tmp
 *.temp
+.kumiki/
+.kigumi/
 # Node.js / npm
 node_modules/
 package-lock.json
+patterns/structures/oscarshed_export
+patterns/structures/kumiki_example_export
+step_test_output

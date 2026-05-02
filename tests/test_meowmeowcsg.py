@@ -6,8 +6,8 @@ This module contains tests for the CSG primitives and operations.
 
 import pytest
 from sympy import Matrix, Rational, Integer, simplify, sqrt, cos, sin, pi
-from code_goes_here.rule import Orientation, Transform, create_v3, radians
-from code_goes_here.cutcsg import (
+from kumiki.rule import Orientation, Transform, create_v3, radians
+from kumiki.cutcsg import (
     HalfSpace,
     RectangularPrism,
     Cylinder,
@@ -15,12 +15,15 @@ from code_goes_here.cutcsg import (
     Difference,
     ConvexPolygonExtrusion,
     BoundingBox,
+    PrismFace,
+    HalfSpaceFeature,
+    RectangularPrismFeature,
     adopt_csg,
     translate_csg,
     translate_profile,
     translate_profiles,
 )
-from code_goes_here.rule import create_v2
+from kumiki.rule import create_v2
 from tests.testing_shavings import assert_is_valid_rotation_matrix, create_standard_vertical_timber
 import random
 
@@ -568,7 +571,7 @@ class TestPrismContainsPoint:
         point = Matrix([Integer(0), Integer(0), Integer(11)])
         assert prism.contains_point(point) == False
     
-    def test_prism_is_point_on_boundary_face(self):
+    def test_prism_is_point_on_boundary_face(self, symbolic_mode):
         """Test boundary detection on prism faces."""
         size = Matrix([Integer(4), Integer(6)])
         orientation = Orientation()  # Identity orientation
@@ -651,7 +654,7 @@ class TestCylinderContainsPoint:
         point = Matrix([Integer(0), Integer(0), Integer(11)])
         assert cylinder.contains_point(point) == False
     
-    def test_cylinder_is_point_on_boundary_surface(self):
+    def test_cylinder_is_point_on_boundary_surface(self, symbolic_mode):
         """Test boundary detection on cylindrical surface."""
         axis = Matrix([Integer(0), Integer(0), Integer(1)])
         radius = Rational(3)
@@ -661,7 +664,7 @@ class TestCylinderContainsPoint:
         assert cylinder.is_point_on_boundary(Matrix([Integer(3), Integer(0), Integer(5)])) == True
         assert cylinder.is_point_on_boundary(Matrix([Integer(0), Integer(3), Integer(5)])) == True
     
-    def test_cylinder_is_point_on_boundary_end_caps(self):
+    def test_cylinder_is_point_on_boundary_end_caps(self, symbolic_mode):
         """Test boundary detection on cylinder end caps."""
         axis = Matrix([Integer(0), Integer(0), Integer(1)])
         radius = Rational(3)
@@ -737,7 +740,7 @@ class TestUnionContainsPoint:
         # Point between the two prisms
         assert union.contains_point(Matrix([Integer(0), Integer(0), Integer(7)])) == False
     
-    def test_union_is_point_on_boundary(self):
+    def test_union_is_point_on_boundary(self, symbolic_mode):
         """Test boundary detection for union."""
         size = Matrix([Integer(2), Integer(2)])
         orientation = Orientation()  # Identity orientation
@@ -769,7 +772,7 @@ class TestUnionContainsPoint:
         # Point strictly inside second prism (not on boundary)
         assert union.is_point_on_boundary(Matrix([Integer(0), Integer(0), Integer(12)])) == False
     
-    def test_union_is_point_on_boundary_overlapping(self):
+    def test_union_is_point_on_boundary_overlapping(self, symbolic_mode):
         """Test boundary detection when prisms overlap."""
         size = Matrix([Integer(4), Integer(4)])
         orientation = Orientation()
@@ -855,7 +858,7 @@ class TestDifferenceContainsPoint:
         # Point outside base
         assert diff.contains_point(Matrix([Integer(10), Integer(10), Integer(5)])) == False
     
-    def test_difference_is_point_on_boundary_base(self):
+    def test_difference_is_point_on_boundary_base(self, symbolic_mode):
         """Test boundary detection on base boundary."""
         size_base = Matrix([Integer(10), Integer(10)])
         size_subtract = Matrix([Integer(2), Integer(2)])
@@ -869,7 +872,7 @@ class TestDifferenceContainsPoint:
         # Point on base boundary (not in subtract region)
         assert diff.is_point_on_boundary(Matrix([Integer(5), Integer(4), Integer(5)])) == True
     
-    def test_difference_is_point_on_boundary_subtract(self):
+    def test_difference_is_point_on_boundary_subtract(self, symbolic_mode):
         """Test boundary detection on subtract boundary."""
         size_base = Matrix([Integer(10), Integer(10)])
         size_subtract = Matrix([Integer(2), Integer(2)])
@@ -914,7 +917,7 @@ class TestDifferenceContainsPoint:
         assert diff.contains_point(point) == False
         assert diff.is_point_on_boundary(point) == False
     
-    def test_difference_contains_point_on_subtract_boundary(self):
+    def test_difference_contains_point_on_subtract_boundary(self, symbolic_mode):
         """Test that points on subtract boundary are contained in the difference."""
         size_base = Matrix([Integer(10), Integer(10)])
         size_subtract = Matrix([Integer(4), Integer(4)])
@@ -951,7 +954,7 @@ class TestDifferenceContainsPoint:
         # Point strictly above plane (removed by difference) should not be contained
         assert diff.contains_point(Matrix([Integer(0), Integer(0), Integer(7)])) == False
     
-    def test_difference_multiple_subtracts(self):
+    def test_difference_multiple_subtracts(self, symbolic_mode):
         """Test boundary detection with multiple subtract objects."""
         size_base = Matrix([Integer(10), Integer(10)])
         orientation = Orientation()
@@ -974,7 +977,7 @@ class TestDifferenceContainsPoint:
         # Point on base boundary (not near subtracts)
         assert diff.is_point_on_boundary(Matrix([Integer(5), Integer(0), Integer(0)])) == True
     
-    def test_difference_nested_differences(self):
+    def test_difference_nested_differences(self, symbolic_mode):
         """Test boundary detection with nested difference operations."""
         orientation = Orientation()
         
@@ -1060,7 +1063,7 @@ class TestDifferenceContainsPoint:
             assert empty_diff.contains_point(point) == False, \
                 f"Exterior point {point.T} should NOT be in empty difference"
     
-    def test_difference_two_prisms_sharing_one_plane_no_overlap(self):
+    def test_difference_two_prisms_sharing_one_plane_no_overlap(self, symbolic_mode):
         """Test difference with two prisms that share one plane but don't overlap.
         
         When two prisms just touch at a shared face (no volume overlap),
@@ -1447,7 +1450,7 @@ class TestBoundaryDetectionComprehensive:
     # RectangularPrism Boundary Tests
     # ========================================================================
     
-    def test_prism_all_corners_on_boundary(self):
+    def test_prism_all_corners_on_boundary(self, symbolic_mode):
         """Test that all 8 corners of a finite prism are on the boundary."""
         size = Matrix([Rational(4), Rational(6)])
         orientation = Orientation()
@@ -1466,7 +1469,7 @@ class TestBoundaryDetectionComprehensive:
             assert prism.is_point_on_boundary(corner) == True, \
                 f"Corner {corner.T} should be on boundary"
     
-    def test_prism_edge_points_on_boundary(self):
+    def test_prism_edge_points_on_boundary(self, symbolic_mode):
         """Test that points along prism edges are on the boundary."""
         size = Matrix([Rational(4), Rational(6)])
         orientation = Orientation()
@@ -1493,7 +1496,7 @@ class TestBoundaryDetectionComprehensive:
         assert prism.is_point_on_boundary(Matrix([-hw, hh, 5])) == True
         assert prism.is_point_on_boundary(Matrix([-hw, -hh, 5])) == True
     
-    def test_prism_face_centers_on_boundary(self):
+    def test_prism_face_centers_on_boundary(self, symbolic_mode):
         """Test that face centers are on the boundary."""
         size = Matrix([Rational(4), Rational(6)])
         orientation = Orientation()
@@ -1539,7 +1542,7 @@ class TestBoundaryDetectionComprehensive:
     # Cylinder Boundary Tests
     # ========================================================================
     
-    def test_cylinder_cap_centers_on_boundary(self):
+    def test_cylinder_cap_centers_on_boundary(self, symbolic_mode):
         """Test that cylinder cap centers are on the boundary."""
         axis = Matrix([Integer(0), Integer(0), Integer(1)])
         radius = Rational(3)
@@ -1552,7 +1555,7 @@ class TestBoundaryDetectionComprehensive:
         # Top cap center
         assert cylinder.is_point_on_boundary(Matrix([Integer(0), Integer(0), Integer(10)])) == True
     
-    def test_cylinder_cap_circumference_on_boundary(self):
+    def test_cylinder_cap_circumference_on_boundary(self, symbolic_mode):
         """Test that points on cap circumferences are on the boundary."""
         axis = Matrix([Integer(0), Integer(0), Integer(1)])
         radius = Rational(3)
@@ -1571,7 +1574,7 @@ class TestBoundaryDetectionComprehensive:
         assert cylinder.is_point_on_boundary(Matrix([-3, 0, 10])) == True
         assert cylinder.is_point_on_boundary(Matrix([0, -3, 10])) == True
     
-    def test_cylinder_surface_points_on_boundary(self):
+    def test_cylinder_surface_points_on_boundary(self, symbolic_mode):
         """Test that points on the cylindrical surface are on the boundary."""
         axis = Matrix([Integer(0), Integer(0), Integer(1)])
         radius = Rational(3)
@@ -1584,7 +1587,7 @@ class TestBoundaryDetectionComprehensive:
         assert cylinder.is_point_on_boundary(Matrix([-3, 0, 5])) == True
         assert cylinder.is_point_on_boundary(Matrix([0, -3, 5])) == True
     
-    def test_cylinder_round_edges_on_boundary(self):
+    def test_cylinder_round_edges_on_boundary(self, symbolic_mode):
         """Test that points on round edges (cap circumferences) are on boundary."""
         axis = Matrix([Integer(0), Integer(0), Integer(1)])
         radius = Rational(3)
@@ -1791,7 +1794,7 @@ class TestBoundaryDetectionComprehensive:
     # ========================================================================
     
     
-    def test_random_prisms_boundary_points(self):
+    def test_random_prisms_boundary_points(self, symbolic_mode):
         """Test boundary detection on 25 random prisms."""
         random.seed(42)  # For reproducibility
         
@@ -1814,7 +1817,7 @@ class TestBoundaryDetectionComprehensive:
                 assert prism.is_point_on_boundary(point) == False, \
                     f"RectangularPrism {i}: Point {point.T} should NOT be on boundary"
     
-    def test_random_cylinders_boundary_points(self):
+    def test_random_cylinders_boundary_points(self, symbolic_mode):
         """Test boundary detection on 25 random cylinders."""
         random.seed(43)  # For reproducibility
         
@@ -1837,7 +1840,7 @@ class TestBoundaryDetectionComprehensive:
                 assert cylinder.is_point_on_boundary(point) == False, \
                     f"Cylinder {i}: Point {point.T} should NOT be on boundary"
     
-    def test_random_halfspaces_boundary_points(self):
+    def test_random_halfspaces_boundary_points(self, symbolic_mode):
         """Test boundary detection on 25 random half-planes."""
         random.seed(44)  # For reproducibility
         
@@ -1860,7 +1863,7 @@ class TestBoundaryDetectionComprehensive:
                 assert halfspace.is_point_on_boundary(point) == False, \
                     f"HalfSpace {i}: Point {point.T} should NOT be on boundary"
     
-    def test_random_convex_polygons_boundary_points(self):
+    def test_random_convex_polygons_boundary_points(self, symbolic_mode):
         """Test boundary detection on 25 random convex polygon extrusions."""
         random.seed(45)  # For reproducibility
         
@@ -1940,7 +1943,7 @@ class TestGetAABB:
     # Primitives
     # ------------------------------------------------------------------
 
-    def test_bbox_axis_aligned_prism(self):
+    def test_bbox_axis_aligned_prism(self, symbolic_mode):
         """Identity-oriented prism at origin — AABB equals the exact local extents."""
         prism = RectangularPrism(
             size=Matrix([Rational(6), Rational(4)]),
@@ -1956,7 +1959,7 @@ class TestGetAABB:
         assert bbox.min_z == Rational(0)
         assert bbox.max_z == Rational(10)
 
-    def test_bbox_rotated_prism(self):
+    def test_bbox_rotated_prism(self, symbolic_mode):
         """Prism rotated 90° around Z — local X and Y axes swap in global space."""
         # rotate_left: local +X → global +Y, local +Y → global -X
         orientation = Orientation.rotate_left()
@@ -1976,7 +1979,7 @@ class TestGetAABB:
         assert bbox.min_z == Rational(0)
         assert bbox.max_z == Rational(10)
 
-    def test_bbox_axis_aligned_cylinder(self):
+    def test_bbox_axis_aligned_cylinder(self, symbolic_mode):
         """Z-axis cylinder at origin — AABB is [-r,r]×[-r,r]×[start,end]."""
         cyl = Cylinder(
             axis_direction=Matrix([Integer(0), Integer(0), Integer(1)]),
@@ -1993,7 +1996,7 @@ class TestGetAABB:
         assert bbox.min_z == Rational(2)
         assert bbox.max_z == Rational(8)
 
-    def test_bbox_convex_polygon_extrusion(self):
+    def test_bbox_convex_polygon_extrusion(self, symbolic_mode):
         """Square polygon extrusion at origin — matches equivalent prism bounds."""
         # Square with corners at (±3, ±3) in CCW order
         points = [
@@ -2020,7 +2023,7 @@ class TestGetAABB:
     # Infinite-extent warnings
     # ------------------------------------------------------------------
 
-    def test_bbox_halfspace_warns(self):
+    def test_bbox_halfspace_warns(self, symbolic_mode):
         """HalfSpace.get_aabb() should emit a UserWarning and return all-None."""
         hs = HalfSpace(
             normal=Matrix([Integer(1), Integer(0), Integer(0)]),
@@ -2035,7 +2038,7 @@ class TestGetAABB:
         assert bbox.min_z is None
         assert bbox.max_z is None
 
-    def test_bbox_infinite_prism_warns(self):
+    def test_bbox_infinite_prism_warns(self, symbolic_mode):
         """RectangularPrism with end_distance=None should emit a UserWarning."""
         prism = RectangularPrism(
             size=Matrix([Rational(4), Rational(4)]),
@@ -2052,7 +2055,7 @@ class TestGetAABB:
     # Composites
     # ------------------------------------------------------------------
 
-    def test_bbox_union(self):
+    def test_bbox_union(self, symbolic_mode):
         """Union of two offset prisms — merged bbox spans both."""
         # Prism A at origin: [-2,2]×[-2,2]×[0,5]
         prism_a = RectangularPrism(
@@ -2080,7 +2083,7 @@ class TestGetAABB:
         assert bbox.min_z == Rational(0)
         assert bbox.max_z == Rational(15)
 
-    def test_bbox_difference_halfspace_crop_non_orthogonal(self):
+    def test_bbox_difference_halfspace_crop_non_orthogonal(self, symbolic_mode):
         """Box [0,10]³ minus diagonal halfspace — bbox is tightened on X and Y."""
         # Prism centred at (5,5,5): spans [0,10]×[0,10]×[0,10]
         prism = RectangularPrism(
@@ -2109,4 +2112,232 @@ class TestGetAABB:
         assert bbox.min_y == Rational(0)
         assert simplify(bbox.max_x - 5 * sqrt(Integer(2))) == Integer(0)
         assert simplify(bbox.max_y - 5 * sqrt(Integer(2))) == Integer(0)
+
+
+# ============================================================================
+# CSG Feature Tests
+# ============================================================================
+
+class TestCSGFeatures:
+    """Tests for opt-in named CSG features on primitives."""
+
+    def test_halfspace_named_feature(self):
+        """HalfSpace with named_feature returns a HalfSpaceFeature for boundary points."""
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(5), named_feature="shoulder")
+        on_boundary = create_v3(Integer(0), Integer(0), Integer(5))
+        off_boundary = create_v3(Integer(0), Integer(0), Integer(6))
+
+        feat = hs.find_feature(on_boundary)
+        assert feat is not None
+        assert isinstance(feat, HalfSpaceFeature)
+        assert feat.name == "shoulder"
+        assert feat.owner is hs
+
+        assert hs.find_feature(off_boundary) is None
+
+    def test_halfspace_no_named_feature(self):
+        """HalfSpace without named_feature returns no features."""
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(5))
+        on_boundary = create_v3(Integer(0), Integer(0), Integer(5))
+        assert hs.find_feature(on_boundary) is None
+        assert hs.get_all_features(on_boundary) == []
+
+    def test_rectangular_prism_named_features(self):
+        """RectangularPrism with named_features returns features only for named faces."""
+        prism = RectangularPrism(
+            size=Matrix([Integer(4), Integer(6)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+            named_features=[("my_right", PrismFace.RIGHT), ("my_top", PrismFace.TOP)],
+        )
+        # Point on right face (x = +2, within height and length bounds)
+        right_pt = create_v3(Integer(2), Integer(0), Integer(5))
+        feat = prism.find_feature(right_pt)
+        assert feat is not None
+        assert isinstance(feat, RectangularPrismFeature)
+        assert feat.name == "my_right"
+        assert feat.face == PrismFace.RIGHT
+
+        # Point on top face (z = 10)
+        top_pt = create_v3(Integer(0), Integer(0), Integer(10))
+        feat = prism.find_feature(top_pt)
+        assert feat is not None
+        assert isinstance(feat, RectangularPrismFeature)
+        assert feat.name == "my_top"
+        assert feat.face == PrismFace.TOP
+
+        # Point on left face — not named, so no feature
+        left_pt = create_v3(Integer(-2), Integer(0), Integer(5))
+        assert prism.find_feature(left_pt) is None
+
+    def test_rectangular_prism_no_named_features(self):
+        """RectangularPrism without named_features returns nothing."""
+        prism = RectangularPrism(
+            size=Matrix([Integer(4), Integer(6)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+        )
+        right_pt = create_v3(Integer(2), Integer(0), Integer(5))
+        assert prism.find_feature(right_pt) is None
+
+    def test_cylinder_returns_no_features(self):
+        """Cylinder has no feature support — always returns empty."""
+        cyl = Cylinder(
+            axis_direction=Matrix([Integer(0), Integer(0), Integer(1)]),
+            radius=Integer(3),
+            position=create_v3(Integer(0), Integer(0), Integer(0)),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+        )
+        on_boundary = create_v3(Integer(3), Integer(0), Integer(5))
+        assert cyl.get_all_features(on_boundary) == []
+
+    def test_solid_union_collects_child_features(self):
+        """SolidUnion collects features from children that have named features."""
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(0), named_feature="floor")
+        prism = RectangularPrism(
+            size=Matrix([Integer(4), Integer(4)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+            named_features=[("wall", PrismFace.RIGHT)],
+        )
+        union = SolidUnion(children=[hs, prism])
+
+        # Point on the halfspace boundary (z=0) and inside prism bottom face
+        pt = create_v3(Integer(0), Integer(0), Integer(0))
+        features = union.get_all_features(pt)
+        names = [f.name for f in features]
+        assert "floor" in names
+
+    def test_difference_collects_features_from_base_and_subtract(self):
+        """Difference collects features from base and subtract children."""
+        base = RectangularPrism(
+            size=Matrix([Integer(10), Integer(10)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(20),
+            named_features=[("base_top", PrismFace.TOP)],
+        )
+        cut = HalfSpace(
+            normal=Matrix([Integer(0), Integer(0), Integer(-1)]),
+            offset=Integer(-15),
+            named_feature="cut_plane",
+        )
+        diff = Difference(base=base, subtract=[cut])
+
+        # Point on the cut plane (z=15) which is now a boundary of the difference
+        pt = create_v3(Integer(0), Integer(0), Integer(15))
+        features = diff.get_all_features(pt)
+        names = [f.name for f in features]
+        assert "cut_plane" in names
+
+
+class TestCSGNaming:
+    """Tests for the hierarchical name field on CutCSG subclasses."""
+
+    def test_halfspace_name_field(self):
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(0), tag="shoulder")
+        assert hs.tag == "shoulder"
+
+    def test_halfspace_name_default_none(self):
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(0))
+        assert hs.tag is None
+
+    def test_rectangular_prism_name_field(self):
+        prism = RectangularPrism(
+            size=Matrix([Integer(4), Integer(6)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+            tag="tenon",
+        )
+        assert prism.tag == "tenon"
+
+    def test_solid_union_name_field(self):
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(0))
+        union = SolidUnion(children=[hs], tag="my_cut")
+        assert union.tag == "my_cut"
+
+    def test_difference_name_field(self):
+        base = RectangularPrism(
+            size=Matrix([Integer(4), Integer(4)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+        )
+        cut = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(-1)]), offset=Integer(-5))
+        diff = Difference(base=base, subtract=[cut], tag="tenon_cut")
+        assert diff.tag == "tenon_cut"
+
+    def test_adopt_csg_preserves_name_on_solid_union(self):
+        """adopt_csg should preserve the name field when transforming SolidUnion."""
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(0), tag="plane_a")
+        union = SolidUnion(children=[hs], tag="my_joint")
+        adopted = adopt_csg(None, Transform.identity(), union)
+        assert isinstance(adopted, SolidUnion)
+        assert adopted.tag == "my_joint"
+        assert adopted.children[0].tag == "plane_a"
+
+    def test_adopt_csg_preserves_name_on_difference(self):
+        """adopt_csg should preserve the name field when transforming Difference."""
+        base = RectangularPrism(
+            size=Matrix([Integer(4), Integer(4)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+            tag="base_prism",
+        )
+        cut = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(-1)]), offset=Integer(-5), tag="cut_plane")
+        diff = Difference(base=base, subtract=[cut], tag="my_diff")
+        adopted = adopt_csg(None, Transform.identity(), diff)
+        assert isinstance(adopted, Difference)
+        assert adopted.tag == "my_diff"
+        assert adopted.base.tag == "base_prism"
+        assert adopted.subtract[0].tag == "cut_plane"
+
+    def test_adopt_csg_preserves_name_on_primitives(self):
+        """adopt_csg should preserve name on primitive types that use replace()."""
+        prism = RectangularPrism(
+            size=Matrix([Integer(4), Integer(4)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+            tag="my_prism",
+        )
+        adopted = adopt_csg(None, Transform.identity(), prism)
+        assert adopted.tag == "my_prism"
+
+    def test_cutting_name_wraps_in_named_solid_union(self):
+        """Cutting with a name wraps get_negative_csg_local() in a named SolidUnion."""
+        from kumiki.timber import Cutting, Timber
+        from kumiki.ticket import TimberTicket
+        timber = Timber(
+            size=Matrix([Rational(4), Rational(6)]),
+            length=Rational(100),
+            transform=Transform.identity(),
+            ticket=TimberTicket(name="test_timber"),
+        )
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(50))
+        cutting = Cutting(timber=timber, maybe_top_end_cut=hs, tag="my_joint")
+        result = cutting.get_negative_csg_local()
+        assert isinstance(result, SolidUnion)
+        assert result.tag == "my_joint"
+
+    def test_cutting_no_name_returns_raw_csg(self):
+        """Cutting without a name returns the raw CSG, not wrapped."""
+        from kumiki.timber import Cutting, Timber
+        from kumiki.ticket import TimberTicket
+        timber = Timber(
+            size=Matrix([Rational(4), Rational(6)]),
+            length=Rational(100),
+            transform=Transform.identity(),
+            ticket=TimberTicket(name="test_timber"),
+        )
+        hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(50))
+        cutting = Cutting(timber=timber, maybe_top_end_cut=hs)
+        result = cutting.get_negative_csg_local()
+        assert isinstance(result, HalfSpace)
 

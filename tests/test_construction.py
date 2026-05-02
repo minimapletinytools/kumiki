@@ -1,17 +1,17 @@
 """
-Tests for GiraffeCAD timber framing system
+Tests for Kumiki timber framing system
 """
 
 import pytest
 from sympy import Matrix, sqrt, simplify, Abs, Float, Rational
-from code_goes_here.rule import Orientation
-from giraffe import *
+from kumiki.rule import Orientation
+from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
     create_standard_horizontal_timber,
     assert_vectors_perpendicular
 )
-from code_goes_here.rule import inches, feet
+from kumiki.rule import inches, feet
 
 # ============================================================================
 # Tests for construction.py - Timber Creation and Manipulation
@@ -34,7 +34,7 @@ class TestTimberCreation:
         assert timber.get_bottom_position_global()[1] == Rational(1)
         assert timber.get_bottom_position_global()[2] == Rational(0)
     
-    def test_create_axis_aligned_timber(self):
+    def test_create_axis_aligned_timber(self, symbolic_mode):
         """Test axis-aligned timber creation with explicit width_direction."""
         position = create_v3(0, 0, 0)  # Use exact integers
         size = create_v2(Rational(1, 10), Rational(1, 10))  # 0.1 as exact rational
@@ -50,7 +50,7 @@ class TestTimberCreation:
         assert timber.get_length_direction_global()[2] == 1  # Up (exact integer)
         assert timber.get_width_direction_global()[0] == 1    # East (exact integer)
     
-    def test_create_axis_aligned_timber_default_width(self):
+    def test_create_axis_aligned_timber_default_width(self, symbolic_mode):
         """Test axis-aligned timber creation with default width_direction."""
         position = create_v3(0, 0, 0)
         size = create_v2(Rational(1, 10), Rational(1, 10))
@@ -85,7 +85,7 @@ class TestTimberCreation:
         assert timber3.get_length_direction_global()[0] == 1  # Length in +X
         assert timber3.get_width_direction_global()[2] == 1    # Width in +Z (special case)
     
-    def test_create_axis_aligned_timber_explicit_overrides_default(self):
+    def test_create_axis_aligned_timber_explicit_overrides_default(self, symbolic_mode):
         """Test that explicit width_direction overrides the default."""
         position = create_v3(0, 0, 0)
         size = create_v2(Rational(1, 10), Rational(1, 10))
@@ -100,7 +100,7 @@ class TestTimberCreation:
         assert timber.get_length_direction_global()[0] == 1  # Length in +X
         assert timber.get_width_direction_global()[1] == 1    # Width in +Y (explicit)
     
-    def test_create_vertical_timber_on_footprint_corner(self):
+    def test_create_vertical_timber_on_footprint_corner(self, symbolic_mode):
         """Test vertical timber creation on footprint corner with INSIDE, OUTSIDE, and CENTER."""
         # Create a square footprint with exact integer corners
         corners = [
@@ -122,9 +122,9 @@ class TestTimberCreation:
         )
         
         assert timber_inside.length == Rational(5, 2)
-        # For INSIDE, vertex is at corner (0, 0) - exact!
-        assert timber_inside.get_bottom_position_global()[0] == 0
-        assert timber_inside.get_bottom_position_global()[1] == 0
+        # For INSIDE, center is shifted inward by half dimensions.
+        assert timber_inside.get_bottom_position_global()[0] == Rational(9, 200)
+        assert timber_inside.get_bottom_position_global()[1] == Rational(9, 200)
         assert timber_inside.get_bottom_position_global()[2] == 0
         # Should be vertical
         assert timber_inside.get_length_direction_global()[2] == 1
@@ -141,9 +141,9 @@ class TestTimberCreation:
         )
         
         assert timber_center.length == Rational(5, 2)
-        # For CENTER, offset by half dimensions: -9/200 in both X and Y - exact!
-        assert timber_center.get_bottom_position_global()[0] == Rational(-9, 200)
-        assert timber_center.get_bottom_position_global()[1] == Rational(-9, 200)
+        # For CENTER, center lies on corner.
+        assert timber_center.get_bottom_position_global()[0] == 0
+        assert timber_center.get_bottom_position_global()[1] == 0
         assert timber_center.get_bottom_position_global()[2] == 0
         # Should be vertical
         assert timber_center.get_length_direction_global()[2] == 1
@@ -159,9 +159,9 @@ class TestTimberCreation:
         )
         
         assert timber_outside.length == Rational(5, 2)
-        # For OUTSIDE, offset by full dimensions: -9/100 in both X and Y - exact!
-        assert timber_outside.get_bottom_position_global()[0] == Rational(-9, 100)
-        assert timber_outside.get_bottom_position_global()[1] == Rational(-9, 100)
+        # For OUTSIDE, center is shifted outward by half dimensions.
+        assert timber_outside.get_bottom_position_global()[0] == Rational(-9, 200)
+        assert timber_outside.get_bottom_position_global()[1] == Rational(-9, 200)
         assert timber_outside.get_bottom_position_global()[2] == 0
         # Should be vertical
         assert timber_outside.get_length_direction_global()[2] == 1
@@ -170,7 +170,7 @@ class TestTimberCreation:
         assert timber_outside.get_width_direction_global()[0] == 1
         assert timber_outside.get_width_direction_global()[1] == 0
     
-    def test_create_vertical_timber_on_footprint_side(self):
+    def test_create_vertical_timber_on_footprint_side(self, symbolic_mode):
         """Test vertical timber creation on footprint side with INSIDE, OUTSIDE, and CENTER."""
         # Create a square footprint with exact integer corners
         corners = [
@@ -238,8 +238,63 @@ class TestTimberCreation:
         # Face direction parallel to side
         assert timber_outside.get_width_direction_global()[0] == 1
         assert timber_outside.get_width_direction_global()[1] == 0
+
+    def test_inside_corner_lines_up_with_inside_side(self, symbolic_mode):
+        """INSIDE corner and INSIDE side placement should lie on the same inside boundary line."""
+        corners = [
+            create_v2(0, 0),
+            create_v2(4, 0),
+            create_v2(4, 3),
+            create_v2(0, 3),
+        ]
+        footprint = Footprint(tuple(corners))
+        size = create_v2(Rational(1, 10), Rational(1, 10))
+        post_height = Rational(3, 1)
+
+        corner_post_inside = create_vertical_timber_on_footprint_corner(
+            footprint, 0, post_height, FootprintLocation.INSIDE, size
+        )
+        side_post_inside = create_vertical_timber_on_footprint_side(
+            footprint, 0, Rational(1, 1), post_height, FootprintLocation.INSIDE, size
+        )
+
+        # Side-0 inside line is y = +depth/2 for this rectangular footprint.
+        assert side_post_inside.get_bottom_position_global()[1] == size[1] / 2
+        assert corner_post_inside.get_bottom_position_global()[1] == side_post_inside.get_bottom_position_global()[1]
+
+    def test_corner_side_location_alignment_pairs(self, symbolic_mode):
+        """CENTER/CENTER and OUTSIDE/OUTSIDE align, while INSIDE/CENTER do not."""
+        corners = [
+            create_v2(0, 0),
+            create_v2(4, 0),
+            create_v2(4, 3),
+            create_v2(0, 3),
+        ]
+        footprint = Footprint(tuple(corners))
+        size = create_v2(Rational(1, 10), Rational(1, 10))
+        post_height = Rational(3, 1)
+
+        corner_center = create_vertical_timber_on_footprint_corner(
+            footprint, 0, post_height, FootprintLocation.CENTER, size
+        )
+        side_center = create_vertical_timber_on_footprint_side(
+            footprint, 0, Rational(1, 1), post_height, FootprintLocation.CENTER, size
+        )
+        corner_outside = create_vertical_timber_on_footprint_corner(
+            footprint, 0, post_height, FootprintLocation.OUTSIDE, size
+        )
+        side_outside = create_vertical_timber_on_footprint_side(
+            footprint, 0, Rational(1, 1), post_height, FootprintLocation.OUTSIDE, size
+        )
+        corner_inside = create_vertical_timber_on_footprint_corner(
+            footprint, 0, post_height, FootprintLocation.INSIDE, size
+        )
+
+        assert corner_center.get_bottom_position_global()[1] == side_center.get_bottom_position_global()[1]
+        assert corner_outside.get_bottom_position_global()[1] == side_outside.get_bottom_position_global()[1]
+        assert corner_inside.get_bottom_position_global()[1] != side_center.get_bottom_position_global()[1]
     
-    def test_create_horizontal_timber_on_footprint(self):
+    def test_create_horizontal_timber_on_footprint(self, symbolic_mode):
         """Test horizontal timber creation on footprint."""
         corners = [
             create_v2(Rational(0), Rational(0)),
@@ -261,7 +316,7 @@ class TestTimberCreation:
         assert timber.get_length_direction_global()[0] == 1
         assert timber.get_length_direction_global()[2] == 0
     
-    def test_create_horizontal_timber_on_footprint_location_types(self):
+    def test_create_horizontal_timber_on_footprint_location_types(self, symbolic_mode):
         """Test horizontal timber positioning with INSIDE, OUTSIDE, and CENTER location types."""
         # Create a square footprint with exact integer coordinates
         corners = [
@@ -350,7 +405,7 @@ class TestTimberCreation:
         assert timber_center_right.get_bottom_position_global()[0] == Rational(2)  # X on boundary
         assert timber_center_right.get_bottom_position_global()[1] == Rational(0)  # Y unchanged
     
-    def test_stretch_timber(self):
+    def test_stretch_timber(self, symbolic_mode):
         """Test timber extension creation with correct length calculation."""
         # Create a vertical timber from Z=0 to Z=10
         original_timber = create_standard_vertical_timber(height=10, size=(0.2, 0.2), position=(0, 0, 0))
@@ -440,7 +495,7 @@ class TestJoinTimbers:
         # Check that the timber actually spans the connection points correctly
         # The timber should start before pos1 and end after pos2 (or vice versa)
         timber_start = joining_timber.get_bottom_position_global()
-        timber_end = measure_position_on_centerline_from_bottom(joining_timber, joining_timber.length).position
+        timber_end = locate_position_on_centerline_from_bottom(joining_timber, joining_timber.length).position
         
         # Verify timber spans the connection region
         assert joining_timber.length > Rational(2)  # Should be longer than just the span between points
@@ -513,33 +568,33 @@ class TestJoinTimbers:
         timber2 = create_standard_horizontal_timber(direction='x', length=3, size=(0.2, 0.2), position=(0, 2, 0))
         return timber1, timber2
     
-    def test_join_perpendicular_on_face_parallel_timbers_position_is_correct(self):
+    def test_join_face_aligned_on_face_aligned_timbers_position_is_correct(self):
         """Test perpendicular joining of face-aligned timbers."""
         timber1, timber2 = self.make_parallel_timbers()
 
-        joining_timber2 = join_perpendicular_on_face_parallel_timbers(
+        joining_timber2 = join_face_aligned_on_face_aligned_timbers(
             timber1, timber2,
             location_on_timber1=Rational("1.5"),
             stickout=Stickout(0, 0),  # No stickout
-            lateral_offset_from_centerline_timber1=Rational(0),
+            lateral_offset_from_timber1=Rational(0),
             size=create_v2(Rational("0.15"), Rational("0.15")),
             feature_to_mark_on_joining_timber=None,
             orientation_face_on_timber1=TimberFace.TOP
         )
    
-        assert joining_timber2.get_bottom_position_global() == measure_position_on_centerline_from_bottom(timber1, Rational("1.5")).position
+        assert joining_timber2.get_bottom_position_global() == locate_position_on_centerline_from_bottom(timber1, Rational("1.5")).position
         print(joining_timber2.orientation)
         
         
-    def test_join_perpendicular_on_face_parallel_timbers_length_is_correct(self):
+    def test_join_face_aligned_on_face_aligned_timbers_length_is_correct(self):
         """Test perpendicular joining of face-aligned timbers."""
         timber1, timber2 = self.make_parallel_timbers()
         
-        joining_timber2 = join_perpendicular_on_face_parallel_timbers(
+        joining_timber2 = join_face_aligned_on_face_aligned_timbers(
             timber1, timber2,
             location_on_timber1=Rational("1.5"),
             stickout=Stickout(Rational("1.2"), Rational("1.2")),  # Symmetric stickout
-            lateral_offset_from_centerline_timber1=Rational(0),
+            lateral_offset_from_timber1=Rational(0),
             size=create_v2(Rational("0.15"), Rational("0.15")),
             feature_to_mark_on_joining_timber=None,
             orientation_face_on_timber1=TimberFace.TOP
@@ -549,8 +604,8 @@ class TestJoinTimbers:
         # Length should be centerline distance (2.0) + stickout1 (1.2) + stickout2 (1.2) = 4.4
         assert abs(joining_timber2.length - Rational("4.4")) < 1e-10
     
-    def test_join_perpendicular_on_face_parallel_timbers_assertion(self):
-        """Test that join_perpendicular_on_face_parallel_timbers asserts when timbers are not face-aligned."""
+    def test_join_face_aligned_on_face_aligned_timbers_assertion(self):
+        """Test that join_face_aligned_on_face_aligned_timbers asserts when timbers are not face-aligned."""
         import pytest
         
         # Create two timbers that are NOT face-aligned
@@ -571,30 +626,30 @@ class TestJoinTimbers:
         
         # Now try to join them - should raise AssertionError
         with pytest.raises(AssertionError, match="must be face-aligned"):
-            join_perpendicular_on_face_parallel_timbers(
+            join_face_aligned_on_face_aligned_timbers(
                 timber1, timber2,
                 location_on_timber1=Rational("1.5"),
                 stickout=Stickout(Rational(0), Rational(0)),
-                lateral_offset_from_centerline_timber1=Rational(0),
+                lateral_offset_from_timber1=Rational(0),
                 size=create_v2(Rational("0.15"), Rational("0.15")),
                 feature_to_mark_on_joining_timber=None,
                 orientation_face_on_timber1=TimberFace.TOP
             )
     
-    def test_join_perpendicular_on_face_parallel_timbers_auto_size(self):
-        """Test automatic size determination in join_perpendicular_on_face_parallel_timbers."""
+    def test_join_face_aligned_on_face_aligned_timbers_auto_size(self, symbolic_mode):
+        """Test automatic size determination in join_face_aligned_on_face_aligned_timbers."""
         # Create two vertical posts with 1" x 2" cross-section
         post1 = create_standard_vertical_timber(height=3, size=(inches(1), inches(2)), position=(0, 0, 0))
         # Post2 is 5 feet away in the X direction
         post2 = create_standard_vertical_timber(height=3, size=(inches(1), inches(2)), position=(feet(5), 0, 0))
         
         # Join perpendicular with size=None (auto-determine)
-        beam = join_perpendicular_on_face_parallel_timbers(
+        beam = join_face_aligned_on_face_aligned_timbers(
             timber1=post1,
             timber2=post2,
             location_on_timber1=Rational(3, 2),  # 1.5m up the post (exact rational)
             stickout=Stickout.nostickout(),
-            lateral_offset_from_centerline_timber1=Rational(0),
+            lateral_offset_from_timber1=Rational(0),
             size=None,  # Auto-determine size  # type: ignore
             feature_to_mark_on_joining_timber=None,
             orientation_face_on_timber1=TimberFace.TOP
@@ -625,7 +680,7 @@ class TestJoinTimbers:
         assert beam.get_bottom_position_global()[2] == expected_bottom_z, \
             f"Beam should be at Z={expected_bottom_z}, got Z={beam.get_bottom_position_global()[2]}"
 
-    def test_join_timbers_creates_orthogonal_rotation_matrix(self):
+    def test_join_timbers_creates_orthogonal_rotation_matrix(self, symbolic_mode):
         """Test that join_timbers creates valid orthogonal orientation matrices."""
         # Create two non-parallel timbers to ensure non-trivial orientation
         # Use exact integer/rational inputs for exact SymPy results
@@ -675,7 +730,7 @@ class TestJoinTimbers:
         assert_vectors_perpendicular(length_dir, height_dir)
         assert_vectors_perpendicular(width_dir, height_dir)
 
-    def test_create_timber_creates_orthogonal_matrix(self):
+    def test_create_timber_creates_orthogonal_matrix(self, symbolic_mode):
         """Test that create_timber creates valid orthogonal orientation matrices."""
         # Test with arbitrary (but orthogonal) input directions using exact inputs
         length_dir = create_v3(1, 1, 0)  # Will be normalized (integers)
@@ -703,7 +758,7 @@ class TestJoinTimbers:
         det = orientation_matrix.det()
         assert simplify(det - 1) == 0, "Determinant should be exactly 1"
 
-    def test_orthogonal_matrix_with_non_orthogonal_input(self):
+    def test_orthogonal_matrix_with_non_orthogonal_input(self, symbolic_mode):
         """Test that orthogonal matrix is created even with non-orthogonal input directions."""
         # Use non-orthogonal input directions to test the orthogonalization process
         # Using exact rational numbers for exact results
@@ -814,12 +869,12 @@ class TestJoinTimbers:
             # Join base timber to beam
             # Let the function determine the orientation automatically by projecting
             # timber1's length direction onto the perpendicular plane
-            joining_timber = join_perpendicular_on_face_parallel_timbers(
+            joining_timber = join_face_aligned_on_face_aligned_timbers(
                 timber1=base_timber,
                 timber2=beam,
                 location_on_timber1=location_on_base,
                 stickout=Stickout(stickout, stickout),  # Symmetric stickout
-                lateral_offset_from_centerline_timber1=Rational(0),
+                lateral_offset_from_timber1=Rational(0),
                 size=create_v2(Rational(8, 100), Rational(8, 100)),  # 8cm x 8cm posts
                 feature_to_mark_on_joining_timber=None
                 # Note: orientation_face_on_timber1 not specified - uses default projection
@@ -839,7 +894,7 @@ class TestJoinTimbers:
             assert vertical_component > Rational("0.8"), f"Post_{i} should be mostly vertical, got length_direction={[float(x) for x in length_dir]}"
             
             # 2. Verify the joining timber connects to the correct position on the base timber
-            expected_base_pos = measure_position_on_centerline_from_bottom(base_timber, location_used).position
+            expected_base_pos = locate_position_on_centerline_from_bottom(base_timber, location_used).position
             
             # The joining timber should start from approximately the top face of the base timber
             expected_start_z = expected_base_pos[2] + base_timber.size[1]  # Top of base timber
@@ -851,7 +906,7 @@ class TestJoinTimbers:
             
             # 3. Verify the joining timber connects to the beam
             # The top of the joining timber should be near the beam
-            joining_top = measure_top_center_position(joining_timber).position
+            joining_top = locate_top_center_position(joining_timber).position
             beam_bottom_z = beam.get_bottom_position_global()[2]
             
             # Should connect somewhere on or near the beam - use exact comparison
@@ -878,9 +933,11 @@ class TestJoinTimbers:
         
         # Use deterministic pairs and rational parameters for cross-connections
         cross_connection_configs = [
-            (0, 2, Rational(1, 3), Rational(1, 20)),   # Left to Right, loc=0.333, stickout=0.05
-            (1, 3, Rational(1, 2), Rational(3, 40)),   # Center to Back, loc=0.5, stickout=0.075
-            (2, 4, Rational(2, 3), Rational(1, 10)),   # Right to Front, loc=0.667, stickout=0.1
+            # Use non-colinear pairs so projected points are distinct under
+            # unclamped join_face_aligned_on_face_aligned_timbers behavior.
+            (0, 3, Rational(1, 3), Rational(1, 20)),   # Left to Back, loc=0.333, stickout=0.05
+            (1, 4, Rational(1, 2), Rational(3, 40)),   # Center to Front, loc=0.5, stickout=0.075
+            (2, 3, Rational(2, 3), Rational(1, 10)),   # Right to Back, loc=0.667, stickout=0.1
         ]
         
         # Connect some base timbers to each other horizontally
@@ -888,12 +945,12 @@ class TestJoinTimbers:
             timber1 = base_timbers[timber1_idx]
             timber2 = base_timbers[timber2_idx]
             
-            cross_timber = join_perpendicular_on_face_parallel_timbers(
+            cross_timber = join_face_aligned_on_face_aligned_timbers(
                 timber1=timber1,
                 timber2=timber2,
                 location_on_timber1=loc1,
                 stickout=Stickout(stickout, stickout),  # Symmetric stickout
-                lateral_offset_from_centerline_timber1=Rational(0),
+                lateral_offset_from_timber1=Rational(0),
                 size=create_v2(Rational(6, 100), Rational(6, 100)),  # 6cm x 6cm
                 feature_to_mark_on_joining_timber=None,
                 orientation_face_on_timber1=TimberFace.TOP
@@ -962,12 +1019,12 @@ class TestJoinTimbers:
         
         beams = {}
         for feature in face_features:
-            beam = join_perpendicular_on_face_parallel_timbers(
+            beam = join_face_aligned_on_face_aligned_timbers(
                 timber1=post_left,
                 timber2=post_right,
                 location_on_timber1=inches(48),  # Mid-height
                 stickout=Stickout.nostickout(),
-                lateral_offset_from_centerline_timber1=Rational(0),  # No additional offset
+                lateral_offset_from_timber1=Rational(0),  # No additional offset
                 size=beam_size,
                 feature_to_mark_on_joining_timber=feature,
                 orientation_face_on_timber1=TimberFace.TOP,
@@ -1004,8 +1061,8 @@ class TestJoinTimbers:
         beam_right = beams[TimberFeature.RIGHT_FACE]
         beam_left = beams[TimberFeature.LEFT_FACE]
         
-        right_center = measure_position_on_centerline_from_bottom(beam_right, beam_right.length / Integer(2)).position
-        left_center = measure_position_on_centerline_from_bottom(beam_left, beam_left.length / Integer(2)).position
+        right_center = locate_position_on_centerline_from_bottom(beam_right, beam_right.length / Integer(2)).position
+        left_center = locate_position_on_centerline_from_bottom(beam_left, beam_left.length / Integer(2)).position
         
         # The difference should be along the Z axis (vertical, which is the beam's width direction)
         diff_right_left = right_center - left_center
@@ -1022,8 +1079,8 @@ class TestJoinTimbers:
         beam_front = beams[TimberFeature.FRONT_FACE]
         beam_back = beams[TimberFeature.BACK_FACE]
         
-        front_center = measure_position_on_centerline_from_bottom(beam_front, beam_front.length / Integer(2)).position
-        back_center = measure_position_on_centerline_from_bottom(beam_back, beam_back.length / Integer(2)).position
+        front_center = locate_position_on_centerline_from_bottom(beam_front, beam_front.length / Integer(2)).position
+        back_center = locate_position_on_centerline_from_bottom(beam_back, beam_back.length / Integer(2)).position
         
         # The difference should be along the Y axis (beam's height direction)
         diff_front_back = front_center - back_center
@@ -1333,7 +1390,7 @@ class TestHelperFunctions:
     def test_stickout_reference_assertions(self):
         """Test that join_timbers asserts when non-CENTER_LINE references are used."""
         import pytest
-        from giraffe import StickoutReference
+        from kumiki import StickoutReference
         
         # Create two posts 2.0 meters apart
         post1 = create_standard_vertical_timber(height=2, size=(0.2, 0.2), position=(0, 0, 0))
@@ -1363,7 +1420,7 @@ class TestHelperFunctions:
     
     def test_stickout_reference_inside_face_aligned(self):
         """Test INSIDE stickout reference with face-aligned timbers."""
-        from giraffe import StickoutReference, join_perpendicular_on_face_parallel_timbers, TimberFace
+        from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace
         
         # Create two parallel horizontal posts 2.0 meters apart
         post1 = timber_from_directions(
@@ -1383,11 +1440,11 @@ class TestHelperFunctions:
         )
         
         # Join with INSIDE reference
-        beam = join_perpendicular_on_face_parallel_timbers(
+        beam = join_face_aligned_on_face_aligned_timbers(
             post1, post2,
             location_on_timber1=Rational("1.5"),
             stickout=Stickout(Rational("0.1"), Rational("0.1"), StickoutReference.INSIDE, StickoutReference.INSIDE),
-            lateral_offset_from_centerline_timber1=Rational(0),
+            lateral_offset_from_timber1=Rational(0),
             size=create_v2(Rational("0.2"), Rational("0.2")),
             feature_to_mark_on_joining_timber=None,
             orientation_face_on_timber1=TimberFace.TOP
@@ -1399,7 +1456,7 @@ class TestHelperFunctions:
     
     def test_stickout_reference_outside_face_aligned(self):
         """Test OUTSIDE stickout reference with face-aligned timbers."""
-        from giraffe import StickoutReference, join_perpendicular_on_face_parallel_timbers, TimberFace
+        from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace
         
         # Create two parallel horizontal posts 2.0 meters apart
         post1 = timber_from_directions(
@@ -1419,11 +1476,11 @@ class TestHelperFunctions:
         )
         
         # Join with OUTSIDE reference
-        beam = join_perpendicular_on_face_parallel_timbers(
+        beam = join_face_aligned_on_face_aligned_timbers(
             post1, post2,
             location_on_timber1=Rational("1.5"),
             stickout=Stickout(Rational("0.2"), Rational("0.2"), StickoutReference.OUTSIDE, StickoutReference.OUTSIDE),
-            lateral_offset_from_centerline_timber1=Rational(0),
+            lateral_offset_from_timber1=Rational(0),
             size=create_v2(Rational("0.2"), Rational("0.2")),
             feature_to_mark_on_joining_timber=None,
             orientation_face_on_timber1=TimberFace.TOP
@@ -1531,7 +1588,7 @@ class TestTimberFootprintOrientation:
 class TestSplitTimber:
     """Test the split_timber method"""
     
-    def test_split_timber_basic(self):
+    def test_split_timber_basic(self, symbolic_mode):
         """Test basic timber splitting at midpoint"""
         # Create a simple vertical timber
         timber = create_standard_vertical_timber(height=10, size=(4, 4), position=(0, 0, 0), ticket="Test Timber")
@@ -1557,7 +1614,7 @@ class TestSplitTimber:
         assert top_timber.get_width_direction_global() == create_v3(Rational(1), Rational(0), Rational(0))
         assert top_timber.ticket.name == "Test Timber_top"
     
-    def test_split_timber_horizontal(self):
+    def test_split_timber_horizontal(self, symbolic_mode):
         """Test splitting a horizontal timber"""
         # Create a horizontal timber along X axis
         timber = timber_from_directions(
@@ -1579,7 +1636,7 @@ class TestSplitTimber:
         assert top_timber.length == Rational(12)
         assert top_timber.get_bottom_position_global() == create_v3(Rational(13), Rational(10), Rational(2))  # 5 + 8
     
-    def test_split_timber_diagonal(self):
+    def test_split_timber_diagonal(self, symbolic_mode):
         """Test splitting a diagonal timber"""
         # Create a diagonal timber at 45 degrees
         length_dir = normalize_vector(create_v3(Rational(1), Rational(1), Rational(0)))
@@ -1610,7 +1667,7 @@ class TestSplitTimber:
         assert bottom_timber.get_length_direction_global() == length_dir
         assert top_timber.get_length_direction_global() == length_dir
     
-    def test_split_timber_with_rational(self):
+    def test_split_timber_with_rational(self, symbolic_mode):
         """Test splitting with exact rational arithmetic"""
         # Create a timber with rational values
         timber = timber_from_directions(
@@ -1696,4 +1753,19 @@ class TestSplitTimber:
         assert top_timber.size[0] == timber.size[0]
         assert top_timber.size[1] == timber.size[1]
 
+
+def test_join_plane_aligned_on_place_aligned_timbers():
+    # Let's use create_timber
+    t1 = create_timber(create_v3(0, 0, 0), Rational(100), create_v2(10, 10), length_direction=create_v3(0, 1, 0), width_direction=create_v3(0, 0, 1))
+    t2 = create_timber(create_v3(50, -50, 0), Rational(100), create_v2(10, 10), length_direction=create_v3(1, 0, 0), width_direction=create_v3(0, 0, 1))
+    
+    stickout = Stickout(stickout1=Rational(0), stickout2=Rational(0))
+    size = create_v2(10, 10)
+    
+    res = join_plane_aligned_on_place_aligned_timbers(t1, t2, Rational(20), Rational(70), stickout, size)
+    assert float(res.length) == pytest.approx(138.924, 0.01)
+    assert are_vectors_parallel(
+        res.get_face_direction_global(TimberLongFace.RIGHT),
+        t1.get_face_direction_global(TimberLongFace.LEFT),
+    )
 

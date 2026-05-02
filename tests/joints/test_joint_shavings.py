@@ -4,7 +4,7 @@ Tests for joint_shavings.py - Helper functions for joint validation
 
 import pytest
 from sympy import Rational
-from code_goes_here.joints.joint_shavings import (
+from kumiki.joints.joint_shavings import (
     check_timber_overlap_for_splice_joint_is_sensible, 
     chop_timber_end_with_prism,
     chop_timber_end_with_half_plane,
@@ -13,10 +13,10 @@ from code_goes_here.joints.joint_shavings import (
     scribe_face_plane_onto_centerline,
     scribe_centerline_onto_centerline
 )
-from code_goes_here.timber import timber_from_directions, TimberReferenceEnd, TimberFace, TimberLongFace
-from code_goes_here.rule import create_v3, create_v2, inches, are_vectors_parallel
-from code_goes_here.cutcsg import SolidUnion, RectangularPrism, HalfSpace
-from code_goes_here.measuring import mark_distance_from_end_along_centerline
+from kumiki.timber import timber_from_directions, TimberReferenceEnd, TimberFace, TimberLongFace
+from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel
+from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace
+from kumiki.measuring import mark_distance_from_end_along_centerline
 
 # TODO too many tests, just delete some lol... or combine into 1 test that varies only the timber length...
 class TestCheckTimberOverlapForSpliceJoint:
@@ -500,7 +500,7 @@ class TestChopTimberEndWithHalfspace:
 class TestChopLapOnTimberEnd:
     """Tests for chop_lap_on_timber_end function."""
     
-    def test_lap_on_right_face_geometry(self):
+    def test_lap_on_right_face_geometry(self, symbolic_mode):
         """
         Test lap joint cut on RIGHT face of a timber.
         
@@ -674,7 +674,7 @@ class TestChopShoulderNotchOnTimberFace:
 class TestScribeFaceOnCenterline:
     """Tests for scribe_face_plane_onto_centerline function."""
     
-    def test_horizontal_timbers_butt_joint(self):
+    def test_horizontal_timbers_butt_joint(self, symbolic_mode):
         """
         Test scribing from timber_a's TOP end to timber_b's LEFT face.
         
@@ -720,7 +720,7 @@ class TestScribeFaceOnCenterline:
         assert distance == expected_distance, \
             f"Expected distance {expected_distance}, got {distance}"
     
-    def test_vertical_timbers_face_to_face(self):
+    def test_vertical_timbers_face_to_face(self, symbolic_mode):
         """
         Test scribing between a vertical timber and a horizontal timber's vertical face.
         """
@@ -764,7 +764,7 @@ class TestScribeFaceOnCenterline:
         assert distance == expected_distance, \
             f"Expected distance {expected_distance}, got {distance}"
     
-    def test_scribe_from_bottom_end(self):
+    def test_scribe_from_bottom_end(self, symbolic_mode):
         """Test scribing from the BOTTOM end of a timber."""
         # Create timber_a pointing up
         timber_a = timber_from_directions(
@@ -807,7 +807,7 @@ class TestScribeFaceOnCenterline:
         assert distance == expected_distance, \
             f"Expected distance {expected_distance}, got {distance}"
     
-    def test_scribe_to_end_face_top(self):
+    def test_scribe_to_end_face_top(self, symbolic_mode):
         """Test scribing to an upward-pointing face."""
         # Create timber_a vertical
         timber_a = timber_from_directions(
@@ -849,7 +849,7 @@ class TestScribeFaceOnCenterline:
         assert distance == expected_distance, \
             f"Expected distance {expected_distance}, got {distance}"
     
-    def test_scribe_to_long_face(self):
+    def test_scribe_to_long_face(self, symbolic_mode):
         """Test scribing to a long face (FRONT/BACK/LEFT/RIGHT)."""
         # Create timber_a horizontal
         timber_a = timber_from_directions(
@@ -893,7 +893,7 @@ class TestScribeFaceOnCenterline:
         assert distance == expected_distance, \
             f"Expected distance {expected_distance}, got {distance}"
     
-    def test_with_rational_arithmetic(self):
+    def test_with_rational_arithmetic(self, symbolic_mode):
         """Test that the function works correctly with exact Rational arithmetic."""
         # Create timber_a vertical with Rational dimensions
         timber_a = timber_from_directions(
@@ -935,7 +935,7 @@ class TestScribeFaceOnCenterline:
         assert distance == expected_distance, \
             f"Expected exact rational {expected_distance}, got {distance}"
     
-    def test_positive_distance_into_timber(self):
+    def test_positive_distance_into_timber(self, symbolic_mode):
         """Test a case where the intersection is in the positive direction (into the timber)."""
         # Create timber_a pointing east
         timber_a = timber_from_directions(
@@ -977,7 +977,7 @@ class TestScribeFaceOnCenterline:
         assert distance == expected_distance, \
             f"Expected distance {expected_distance}, got {distance}"
     
-    def test_different_timber_sizes(self):
+    def test_different_timber_sizes(self, symbolic_mode):
         """Test scribing between timbers of different cross-sectional sizes."""
         # Create small timber_a
         timber_a = timber_from_directions(
@@ -1023,7 +1023,7 @@ class TestScribeFaceOnCenterline:
 class TestFindProjectedIntersectionOnCenterlines:
     """Tests for scribe_centerline_onto_centerline function."""
     
-    def test_orthogonal_timbers_t_joint(self):
+    def test_orthogonal_timbers_t_joint(self, symbolic_mode):
         """Test with orthogonal timbers forming a T-joint."""
         # Vertical timber (receiving)
         timber_vertical = timber_from_directions(
@@ -1089,7 +1089,7 @@ class TestFindProjectedIntersectionOnCenterlines:
             distA = marking_a.distance
         
     
-    def test_with_different_reference_ends(self):
+    def test_with_different_reference_ends(self, symbolic_mode):
         """Test measuring from different reference ends (TOP vs BOTTOM)."""
         # Vertical timber
         timber_vertical = timber_from_directions(

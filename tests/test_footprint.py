@@ -1,14 +1,14 @@
 """
 Tests for footprint.py module.
 
-This module contains tests for the Footprint class in the GiraffeCAD system.
+This module contains tests for the Footprint class in the Kumiki system.
 """
 
 import pytest
 from sympy import Matrix
-from code_goes_here.footprint import *
-from code_goes_here.footprint import _segment_to_segment_distance
-from giraffe import create_v2
+from kumiki.footprint import *
+from kumiki.footprint import _segment_to_segment_distance
+from kumiki import create_v2
 from tests.testing_shavings import create_test_footprint
 
 

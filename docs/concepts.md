@@ -1,6 +1,6 @@
 
 # Coordinate System
-GiraffeCAD uses a right-hand coordinate system.
+Kumiki uses a right-hand coordinate system.
 
 - XY is the "ground" and Z is "up" 
 
@@ -20,11 +20,9 @@ Since faces live on solid objects, they are "sided" objects:
 
 - we say 2 faces are *oriented* if they share the same normal, and *opposite* if their normals are opposites
 
-
-
 # Timber
 
-A *Timber* is one of the fundamental building blocks of your structure and the majority of GiraffeCAD is designed around this class.
+A *Timber* is one of the fundamental building blocks of your structure and the majority of Kumiki is designed around this class.
 
 ```
 class Timber:
@@ -52,12 +50,11 @@ By default, a timber is oriented with its bottom cross section centered on the X
 
 To orient the timber we position, we often position the +Z and +X axis of the timber.
 
-- We say a timber is *axis aligned* if its length vector is parallel to the +Z axis and its face vectors are parallel to either the X or Y axis.
-- We say two timbers are *face parallel* if each of the 6 faces of one timber is parallel with one of the 6 faces of the other timber. 
+- A timber is *axis aligned* if its length vector is parallel to the +Z axis and its face vectors are parallel to either the X or Y axis.
+- Timbers are *face aligned* if each of the 6 faces of one timber is parallel with one of the 6 faces of the other timbers. 
+- Timbers are *plane aligned* if 2 of the 4 long faces on one timber are parallel to 2 of 4 long faces on the other timbers. These faces are parallel to the *parallel face plane*.
 
-So it follows 2 axis aligned timbers are face parallel.
-
-we often do not care to distinguish between 2 opposing faces on a timber thus
+We often do not care to distinguish between 2 opposing faces on a timber thus:
 
 - the *width-sides* of a timber are the 2 faces perpendicular to its local X axis
 - the *height-sides* of a timber are the 2 faces perpendicular to its local Y axis
@@ -75,43 +72,18 @@ class TimberFace(Enum):
     BACK = 6 # the face vector with normal vector in the -Y axis direction
 ```
 
-When taking measurements from a timber, we measure from a *reference feature* of the timber. Since timbers are stick-like (根) objects rather than box-like (块) objects, we distinguish between faces/edges on the ends of the timber and on the sides of the timber. We refer to features on the sides of the timber as *long*.
+### measuring and marking
 
-
-```
-class TimberReferenceEnd(Enum):
-    TOP = 1
-    BOTTOM = 2
-```
-
-```
-class TimberLongEdge(Enum):
-    RIGHT_FORWARD = 7
-    FORWARD_LEFT = 8
-    LEFT_BACK = 9
-    BACK_RIGHT = 10
-```
-
-```
-class TimberLongFace(Enum):
-    RIGHT = 3
-    FRONT = 4
-    LEFT = 5
-    BACK = 6
-```
-
-
-### marking and measuring 
-TODO
+Joint functions take measurents for its features relative to one of the features on one of the timbers in the joint arrangement. Often you may want to position the joint feature relative to some other featuer perhaps on a different timber. Functions in `measuring.py` are designed to help you do this. TLDR; you `locate` a  feature you want to mesaure from, and then you `mark` that feature onto the feature that the joint function needs. If you don't understand what I mean by this no worries, because the AI does understand :|.
 
 ## member names
 
-When timbers are part of a structure, they may be referred to as members. Members have no logical distinction from each other as far as GiraffeCAD is concerned, but the concepts are useful for explaining the intended use of various functions and you may also want to use these names to organize your projects. The remainder of this doc will assume knowledge of various member names to elaborate certain concepts.
+When timbers are part of a structure, they may be referred to as members. Members have no logical distinction from each other as far as Kumiki is concerned, but the concepts are useful for explaining the intended use of various functions and you may also want to use these names to organize your projects. It is also useful to describe them as such as the AI will understand things like "beams" being horizontal members. The remainder of this doc will assume knowledge of various member names to elaborate certain concepts.
 
 
 # Footprint
 
-A support class representing the footprint of the structure in the XY plane to help position and orient timbers. Footprints are always defined at Z=0 and timbers defined on the footprint are always above Z=0.
+A support class representing the footprint of the structure in the XY plane to help position and orient timbers. Footprints are always defined at Z=0 and timbers defined on the footprint are always have their bottom surface at Z=0 in global space.
 
 
 ```
@@ -133,64 +105,63 @@ class FootprintLocation(Enum):
 ```
 
 Timbers are positioned either on boundary sides or boundary corners. They can either be positioned "inside", "outside", "on center". Each boundary corner and boundary side also have a notion of inside and outside. 
-For boundary sides, the inside side is simply the side of the boundary side that is towards the inside of the boundary and the outside the opposite.
-For boundary corners it is a little more complicated because we want to orient vertices of posts around the inside/outside of the boundary corner. This is elaborated in the "From a Footprint" section of "Creating Timbers"
 
-
-
-
-## timber position and orientation relative to footprint
-
-TODO
-
+- For boundary sides, the inside side is simply the side of the boundary side that is towards the inside of the boundary and the outside the opposite.
+- For boundary corners it is a little more complicated because we want to orient vertices of posts around the inside/outside of the boundary corner. This is elaborated in the "From a Footprint" section of "Creating Timbers"
 
 # Creating Timbers
 
 ## Out of Nowhere
 
-TODO create_timber create_axis_aligned_timber
+You can use methods like `create_timber` and  `create_axis_aligned_timber` to create timbers in arbitrary places in space. In most cases it is better not to create timbers "out of nowhere"
 
 ## From a Footprint
 
-It is often best to create your timbers from a footprint. Mudsills and Posts can be created on the *inside*, *outside* and *center* of a footprint.
-
+When starting your structure, it's often best to create timbers from a footprint. This defines the boundary and foundation of your structure. This approach is also appropriate for smaller things like furnture and so on. Mudsills and Posts can be created on the *inside*, *outside* and *center* of a footprint.
 
 
 ### mudsills go on boundary sides
+
+use `create_horizontal_timber_on_footprint` to create "mudsills" on your footprint.
 
 - A mudsill on a boundary side of a footprint will have its length run from one boundary corner to the other boundary corner of the boundary side.
 - A mudsill on the inside/outside of a boundary side will have an edge lying on the boundary side with the mudsill on the inside/outside side of the boundary side.
 - A mudsill on center of a boundary side will have its midline lying on the same plane 
 
-TODO create_horizontal_timber_on_footprint
-
 ### posts go on points on boundary sides
+
+- use `create_vertical_timber_on_footprint_side` to create "posts" on the sides of your footprint.
 
 - A post can be positioned on a point along a boundary side. 
 - If the post is on center, it will have its center of the bottom face lying on the point, and 2 of the edges of the bottom face will be parallel to the boundary side.
 - If the post is inside/outside, it will have one edge of the bottom face lying on the boundary side with the center of that edge coincident with the point, with the rest of the post inside/outside of the boundary side.
 
-TODO create_vertical_timber_on_footprint_side
-
 ### posts go on boundary corners
+
+use `create_vertical_timber_on_footprint_corner` to create "posts" on the corners of your footprint
 
 - A post can be positioned on the inside/outside of a boundary corner IF the boundary corner is orthogonal, i.e. the two boundary sides coming out of the boundary corner are perpendicular.
 - If it is on the inside of the boundary corner, position the post such that it overlaps with the inside of the boundary, has one vertex of its bottom face lying on the boundary corner, and has 2 edges of its bottom face aligning with the 2 boundary sides coming out of the boundary corner. 
 - If it is on the outside of the boundary corner, then position the post first on the inside of the boundary corner, and take the vertex of its bottom face that is opposite to the vertex lying on the boundary corner and move it so that the opposite vertex is instead on the boundary corner.
 
-TODO create_vertical_timber_on_footprint_corner
-
 
 ## Joining Timbers
  
-TODO
+Use joint timber methods to two timbers with a spanning timber (for example, adding a joist between 2 posts).
+
+If you want to maintain face alignment, use `join_face_aligned_on_face_aligned_timbers` which will ensure all created timbers are joined. The joining timber will be perpendicular and face aligned with the input timbers or it will error if not possible.
+
+Otherwise, use `join_timbers` which will create a new timber connecting the centerlines of the input timbers.
 
 ## Extending or Splitting Timbers
 
-TODO
-
-
+- Use split_timber to split a timber in two. The input timber should be discarded. This is useful for splitting long timbers for splice joints.
+- Use stretch_timber to an extend a timber. The input timber should be discarded.
 
 # Joints 
+
+Once your timbers have been created, it's time to cut them to make joints.
+
+TODO
 
 

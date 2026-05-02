@@ -11,8 +11,7 @@ Layout summary:
 from sympy import Rational
 from typing import Optional
 
-from giraffe import *
-from code_goes_here.patternbook import PatternBook, PatternMetadata
+from kumiki import *
 
 
 # Timber sizes (metric)
@@ -55,19 +54,6 @@ beam_tenon_size = Matrix([cm(4), cm(4)])
 beam_tenon_length_into_post = post_size[0] / Rational(2)
 post_tenon_size = Matrix([cm(4), cm(4)])
 post_tenon_length_into_plate = plate_size[0] / Rational(2)
-
-
-def create_gateway_patternbook() -> PatternBook:
-    patterns = [
-        (
-            PatternMetadata("gateway", ["gateway", "complete_structures"], "frame"),
-            lambda center: create_gateway(center=center),
-        ),
-    ]
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_gateway_patternbook()
 
 
 def _offset_position(x: Numeric, y: Numeric, z: Numeric, center: V3) -> V3:
@@ -571,7 +557,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
     )
 
 
-example = create_gateway()
+example = create_gateway
 
 
 def main() -> Frame:

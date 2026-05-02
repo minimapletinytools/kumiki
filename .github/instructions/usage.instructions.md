@@ -2,11 +2,9 @@
 applyTo: "patterns/**, experiments/**"
 ---
 
-<!-- The content below is kept in sync with AGENT_INSTRUCTIONS.md. If you edit one, edit the other. -->
+# Kumiki Agent Instructions
 
-# GiraffeCAD Agent Instructions
-
-Copy this file into your project's `.github/copilot-instructions.md` (or `.cursorrules`) to give your AI coding agent context for designing timber frames with GiraffeCAD.
+Copy this file into your project's `.github/copilot-instructions.md` (or `.cursorrules`) to give your AI coding agent context for designing timber frames with Kumiki. Do not copy the applyTo field above.
 
 ---
 
@@ -19,7 +17,7 @@ from giraffe import *
 
 ## Numeric Values
 
-- **Always use SymPy `Rational` — never Python floats.**
+- **Always use SymPy types (Rational or Float) — never Python floats.**
 - Use the `inches()` and `feet()` helpers for imperial measurements:
   ```python
   inches(3)               # 3 inches
@@ -42,11 +40,11 @@ Timbers for a typical structure are usually defined
 - use methods in `footprint.py` to define timbers on the footprint
     - ... TODO
 - use methods in `construction.py` to define remaining timbers
-    - ... TODO
+    - `join_face_aligned_on_face_aligned_timbers` for connecting timbers at right angles
+    - `join_timbers` for simple connections between two timbers
     - `create_axis_aligned_timber` for timbers aligned to cartesian axis
     - `timber_from_directions` for arbitrarily aligned timbers
 
-TODO point to example
 
 ## Cutting Joints
 
@@ -64,4 +62,8 @@ frame = Frame.from_joints([joint1, joint2, joint3], name="my_frame")
 TODO how to actually return the frame for rendering (not through a pattern)
 
 ## Creating new Patterns
+
+
+## General tips
+- One dimension of the tenon should be sized to about 1/3 of the thickness of the mortise timber in the axis perpendicular to the the joining axis. This dimensioon should be perpendicular to the length of the mortise timber for strength. The other dimension of the tenon should be about 4/5 of the tenon timber in the matching axis.
 

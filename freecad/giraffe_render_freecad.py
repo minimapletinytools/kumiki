@@ -1,22 +1,22 @@
 """
-FreeCAD rendering module for GiraffeCAD timber framing system using CSG.
+FreeCAD rendering module for Kumiki timber framing system using CSG.
 
 This module provides functions to render timber structures in FreeCAD
 using the CutCSG system for constructive solid geometry operations.
 
 UNIT CONVERSION:
-    GiraffeCAD uses METERS internally, FreeCAD uses MILLIMETERS by default.
+    Kumiki uses METERS internally, FreeCAD uses MILLIMETERS by default.
     This module handles conversion using these helper functions:
     - distance_to_mm(value): Convert distances/positions (meters -> mm)
     - direction_to_float(value): Convert direction vectors (no scaling)
     - meters_to_mm(value): Convert float meters to millimeters
     
-    All geometric values are converted at the boundary between GiraffeCAD
+    All geometric values are converted at the boundary between Kumiki
     and FreeCAD to ensure consistency and avoid unit mixing bugs.
 
 Usage (as FreeCAD macro):
     # Import this module in your FreeCAD macro
-    import giraffe_render_freecad
+    import kumiki_render_freecad
     
     # Your timber structure code here...
     cut_timbers = [...]
@@ -32,7 +32,7 @@ from typing import Optional, List, Tuple
 import traceback
 import math
 
-# Add parent directory to path to import GiraffeCAD modules
+# Add parent directory to path to import Kumiki modules
 script_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(script_dir)
 if parent_dir not in sys.path:
@@ -47,15 +47,15 @@ except ImportError:
     print("Warning: FreeCAD modules not available.")
     print("This module is designed to run as a FreeCAD macro.")
 
-# GiraffeCAD imports
+# Kumiki imports
 from sympy import Matrix
-from giraffe import CutTimber, Timber, Frame
-from code_goes_here.timber import JointAccessory, Peg, Wedge, PegShape
-from code_goes_here.rule import Orientation
-from code_goes_here.cutcsg import (
+from kumiki import CutTimber, Timber, Frame
+from kumiki.timber import JointAccessory, Peg, Wedge, PegShape
+from kumiki.rule import Orientation
+from kumiki.cutcsg import (
     CutCSG, HalfSpace, RectangularPrism, Cylinder, SolidUnion, Difference, ConvexPolygonExtrusion
 )
-from code_goes_here.rendering_utils import (
+from kumiki.rendering_utils import (
     calculate_structure_extents,
     sympy_to_float as _sympy_to_float_base
 )
@@ -64,7 +64,7 @@ from code_goes_here.rendering_utils import (
 # ============================================================================
 # Unit Conversion Helpers
 # ============================================================================
-# GiraffeCAD uses METERS as base unit, FreeCAD uses MILLIMETERS by default.
+# Kumiki uses METERS as base unit, FreeCAD uses MILLIMETERS by default.
 # These helpers ensure we convert correctly and avoid mixing units.
 
 def distance_to_mm(value):
@@ -97,12 +97,12 @@ def sympy_to_float(value):
     return distance_to_mm(value)
 
 
-def get_active_document(doc_name: str = "GiraffeCAD") -> Optional['FreeCAD.Document']:
+def get_active_document(doc_name: str = "Kumiki") -> Optional['FreeCAD.Document']:
     """
     Get or create a FreeCAD document.
     
     Args:
-        doc_name: Name for the document (default: "GiraffeCAD")
+        doc_name: Name for the document (default: "Kumiki")
         
     Returns:
         FreeCAD.Document instance or None on error
@@ -118,12 +118,12 @@ def get_active_document(doc_name: str = "GiraffeCAD") -> Optional['FreeCAD.Docum
         return None
 
 
-def create_new_document(doc_name: str = "GiraffeCAD") -> Optional['FreeCAD.Document']:
+def create_new_document(doc_name: str = "Kumiki") -> Optional['FreeCAD.Document']:
     """
     Create a new FreeCAD document.
     
     Args:
-        doc_name: Name for the document (default: "GiraffeCAD")
+        doc_name: Name for the document (default: "Kumiki")
         
     Returns:
         FreeCAD.Document instance or None on error
@@ -876,7 +876,7 @@ def render_multiple_timbers(cut_timbers: List[CutTimber], base_name: str = "Timb
         import json
         import datetime
         try:
-            with open('/Users/peter.lu/kitchen/faucet/giraffeCAD-proto/.cursor/debug.log', 'a') as f:
+            with open('/Users/peter.lu/kitchen/faucet/kumiki-proto/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps({
                     'location': 'giraffe_render_freecad.py:754',
                     'message': 'Rendering cut timber in FreeCAD',
@@ -956,15 +956,16 @@ def render_multiple_timbers(cut_timbers: List[CutTimber], base_name: str = "Timb
                     # Add to document
                     obj = doc.addObject("Part::Feature", accessory_name)
                     obj.Shape = shape
-                    
-                    # Accessory position and orientation are already in global space
-                    # Simply use them directly to create the global placement
-                    global_placement = create_placement_from_orientation(accessory.transform.position, accessory.transform.orientation)
-                    
-                    # Compose placements: global * local
-                    # The shape already has local centering placement applied (e.g., for prism cross-section centering)
-                    local_placement = shape.Placement
-                    obj.Placement = global_placement.multiply(local_placement)
+
+                    if hasattr(accessory, "transform"):
+                        # Accessory position and orientation are already in global space
+                        # Simply use them directly to create the global placement
+                        global_placement = create_placement_from_orientation(accessory.transform.position, accessory.transform.orientation)
+
+                        # Compose placements: global * local
+                        # The shape already has local centering placement applied (e.g., for prism cross-section centering)
+                        local_placement = shape.Placement
+                        obj.Placement = global_placement.multiply(local_placement)
                     
                     # Recompute to update bounding box
                     doc.recompute()

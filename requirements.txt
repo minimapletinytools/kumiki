@@ -1,9 +1,0 @@
-numpy>=1.21.0
-manifold3d>=3.4.0
-sympy>=1.12.0
-trimesh>=4.7.0
-
-# Testing dependencies
-pytest>=7.0.0
-pytest-cov>=4.0.0
-pytest-mock>=3.10.0

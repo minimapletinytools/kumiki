@@ -1,8 +1,8 @@
 ---
-applyTo: "code_goes_here/**,tests/**"
+applyTo: "girrafecad/**,tests/**"
 ---
 
-# GiraffeCAD Library Authoring Rules
+# Kumiki Library Authoring Rules
 
 ## Running Tests
 
@@ -17,24 +17,29 @@ Always run the type checker after making changes:
 uv run ty check
 ```
 
+If making changes to the viewer, run viewer tests:
+```bash
+cd kigumi && npx jest && node ./test/run-extension-tests.js
+```
+
 ## Key Files
 
-### code_goes_here/timber.py
+### girrafecad/timber.py
 Core immutable types: `Timber`, `TimberFace`, `TimberLongFace`, `TimberReferenceEnd`, etc. All timber-related geometric operations (axes, size, position). All timber-related core APIs and types live here.
 
-### code_goes_here/construction.py
+### girrafecad/construction.py
 Core construction logic and timber joinery helpers: joining timbers, computing join positions, projecting axes, relationships between multiple members. Canonical location for geometry construction logic beyond simple data definition.
 
-### code_goes_here/footprint.py
+### girrafecad/footprint.py
 `Footprint` — key utility class for positioning timbers and cuts.
 
-### code_goes_here/joints/*_joints.py
+### girrafecad/joints/*_joints.py
 Joints are split into separate files by group.
 
-### code_goes_here/rule.py
+### girrafecad/rule.py
 Math types, units, and math-related utilities. All math code must use these types and helpers.
 
-### code_goes_here/measuring.py
+### girrafecad/measuring.py
 Measure/mark pattern for locating features on timbers and marking things relative to features.
 
 ## General Coding Philosophy
@@ -46,7 +51,7 @@ Measure/mark pattern for locating features on timbers and marking things relativ
 
 ## General Coding Conventions
 
-- Always use SymPy types — never Python floats
+- Always use SymPy types (Rational or Float) never Python floats
 - Use math types in `rule.py`
 - ALWAYS run tests after making changes
 - ALWAYS run type checker after making changes
@@ -89,3 +94,7 @@ Additional tests (not required but encouraged):
 2. Test specific parameter effects
 3. Test that invalid configurations raise errors
 4. Test degenerate / edge cases (e.g. tenon length of 0)
+
+Do not write too many tests that aren't actually testing geometry. We want quality over quantity. Look for tests marked with `# 🐪` for examples of good tests. In particular, look at the ones in `test_plain_joints.py`
+
+Tests marked with a `# 🐪` have been hand verified to be relevant, never mark tests as `# 🐪` unless user gives the ok. Never delete tests marked with `# 🐪` and be a little more cautious when modifynig them. In contrasts, tests not morked with a `# 🐪` can be deleted and rewritten at will.

@@ -1,3 +1,3 @@
 """
-Tests package for GiraffeCAD.
+Tests package for Kumiki.
 """

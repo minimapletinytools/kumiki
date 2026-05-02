@@ -1,5 +1,5 @@
 """
-GiraffeCAD FreeCAD Examples Runner - uses PatternBook for unified rendering.
+Kumiki FreeCAD Examples Runner - uses PatternBook for unified rendering.
 
 This script uses the Anthology PatternBook to render all examples with automatic module reloading,
 so you can make changes to your code and re-run this macro without restarting FreeCAD.
@@ -29,7 +29,7 @@ import sys
 import os
 import importlib
 
-# Add GiraffeCAD to path
+# Add Kumiki to path
 script_dir = os.path.dirname(os.path.realpath(__file__))
 parent_dir = os.path.dirname(script_dir)
 if parent_dir not in sys.path:
@@ -65,15 +65,16 @@ RENDER_TYPE = 'group'
 #PATTERN_NAME = 'brace_joint'
 #PATTERN_NAME = 'sawhorse'
 #PATTERN_NAME = 'irrational_angles'
-PATTERN_NAME = 'tongue_and_fork_corner_joint_135'
+#PATTERN_NAME = 'tongue_and_fork_butt_joint_138'
 
 # GROUP_NAME: Name of a pattern group to render (when RENDER_TYPE = 'group')
-GROUP_NAME = 'plain_joints'
+#GROUP_NAME = 'plain_joints'
 #GROUP_NAME = 'mortise_tenon'  # All mortise and tenon examples (brace_joint excluded until angled M&T is implemented)
-#GROUP_NAME = 'basic_joints'  # All simplified basic joint examples
+GROUP_NAME = 'basic_joints'  # All simplified basic joint examples
 #GROUP_NAME = 'japanese_joints'
 #GROUP_NAME = 'posts'
 #GROUP_NAME = 'csg'
+#GROUP_NAME = 'double_butt_joints'
 
 # SEPARATION_DISTANCE: Distance between patterns when rendering a group (in meters)
 # Common values: m(1), m(2), feet(3), feet(4), inches(24)
@@ -90,7 +91,7 @@ def create_anthology_pattern_book():
     Returns:
         PatternBook: A single PatternBook with all patterns from all examples
     """
-    from code_goes_here.librarian import create_anthology_pattern_book_from_folder
+    from kumiki.librarian import create_anthology_pattern_book_from_folder
 
     patterns_dir = os.path.join(parent_dir, 'patterns')
     anthology_book, scan_result = create_anthology_pattern_book_from_folder(patterns_dir)
@@ -115,18 +116,18 @@ def create_anthology_pattern_book():
 
 
 def reload_all_modules():
-    """Reload all GiraffeCAD modules in dependency order."""
+    """Reload all Kumiki modules in dependency order."""
     print("="*70)
-    print("GiraffeCAD FreeCAD - Examples Runner")
+    print("Kumiki FreeCAD - Examples Runner")
     print("="*70)
-    print("\nReloading all GiraffeCAD modules...")
+    print("\nReloading all Kumiki modules...")
     
-    # AGGRESSIVE MODULE CLEANUP: Delete ALL GiraffeCAD-related modules
+    # AGGRESSIVE MODULE CLEANUP: Delete ALL Kumiki-related modules
     # This ensures no stale class references remain after reload
     modules_to_delete = []
     for module_name in list(sys.modules.keys()):
         # Delete any module that starts with our project prefixes
-        if (module_name.startswith('code_goes_here') or 
+        if (module_name.startswith('kumiki') or 
             module_name.startswith('patterns') or 
             module_name.startswith('giraffe_librarian_dynamic') or
             module_name == 'giraffe' or
@@ -141,22 +142,21 @@ def reload_all_modules():
     
     # List of modules to reload in dependency order
     modules_to_reload = [
-        'code_goes_here',  # Reload the package itself first
-        'code_goes_here.rule',
-        'code_goes_here.footprint',
-        'code_goes_here.cutcsg',
-        'code_goes_here.timber',
-        'code_goes_here.measuring',
-        'code_goes_here.construction',
-        'code_goes_here.rendering_utils',
-        'code_goes_here.joints.joint_shavings',
-        'code_goes_here.joints.plain_joints',
-        'code_goes_here.joints.basic_joints',
-        'code_goes_here.joints.mortise_and_tenon_joint',
-        'code_goes_here.joints.japanese_joints',
-        'code_goes_here.patternbook',
-        'code_goes_here.librarian',
-        'giraffe',
+        'kumiki',  # Reload the package itself first
+        'kumiki.rule',
+        'kumiki.footprint',
+        'kumiki.cutcsg',
+        'kumiki.timber',
+        'kumiki.measuring',
+        'kumiki.construction',
+        'kumiki.rendering_utils',
+        'kumiki.joints.joint_shavings',
+        'kumiki.joints.plain_joints',
+        'kumiki.joints.basic_joints',
+        'kumiki.joints.mortise_and_tenon_joint',
+        'kumiki.joints.japanese_joints',
+        'kumiki.patternbook',
+        'kumiki.librarian',
         'patterns',  # Reload the patterns package
         'giraffe_render_freecad',
     ]
@@ -187,11 +187,11 @@ def render_from_patternbook():
     Renders either a single pattern or a group of patterns based on configuration.
     """
     from giraffe_render_freecad import render_frame, render_csg_shape, clear_document, get_active_document
-    from code_goes_here.rule import m
-    from code_goes_here.timber import Frame
+    from kumiki.rule import m
+    from kumiki.timber import Frame
     
     print("="*70)
-    print("GiraffeCAD FreeCAD - PatternBook Renderer")
+    print("Kumiki FreeCAD - PatternBook Renderer")
     print("="*70)
     print()
     

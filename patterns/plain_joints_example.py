@@ -1,5 +1,5 @@
 """
-Plain Joints Examples - Demonstration of all plain joint types in GiraffeCAD
+Plain Joints Examples - Demonstration of all plain joint types in Kumiki
 
 This file contains one example function for each plain joint type.
 Each joint is created from 4"x5" timbers that are 4' long,
@@ -10,15 +10,15 @@ from sympy import Matrix, Rational
 from typing import Union, List
 from dataclasses import replace
 
-from code_goes_here.rule import inches, degrees, create_v2, create_v3, V3
-from code_goes_here.ticket import Ticket
-from code_goes_here.construction import (
+from kumiki.rule import inches, degrees, create_v2, create_v3, V3
+from kumiki.ticket import TimberTicket
+from kumiki.construction import (
     CornerJointTimberArrangement,
     ButtJointTimberArrangement,
     SpliceJointTimberArrangement,
     CrossJointTimberArrangement,
 )
-from code_goes_here.timber import (
+from kumiki.timber import (
     TimberReferenceEnd,
     TimberFace,
     TimberLongFace,
@@ -26,23 +26,24 @@ from code_goes_here.timber import (
     CutTimber,
     Frame,
 )
-from code_goes_here.joints.plain_joints import (
+from kumiki.joints.plain_joints import (
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
     cut_plain_butt_joint_on_face_aligned_timbers,
     cut_tongue_and_fork_corner_joint,
+    cut_tongue_and_fork_butt_joint,
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_cross_lap_joint,
     cut_plain_house_joint,
     cut_plain_splice_lap_joint_on_aligned_timbers,
 )
-from code_goes_here.example_shavings import (
+from kumiki.example_shavings import (
     create_canonical_example_corner_joint_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_splice_joint_timbers,
 )
-from code_goes_here.patternbook import PatternBook, PatternMetadata
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 # Standard timber dimensions (4" x 5", 4' long) - matches canonical examples
 TIMBER_WIDTH = inches(4)   # 4"
@@ -67,8 +68,8 @@ def make_miter_joint_example(position: V3) -> list[CutTimber]:
         corner_angle=degrees(67),
         position=position,
     )
-    timberA = replace(arrangement.timber1, ticket=Ticket("MiterJoint_TimberA"))
-    timberB = replace(arrangement.timber2, ticket=Ticket("MiterJoint_TimberB"))
+    timberA = replace(arrangement.timber1, ticket=TimberTicket("MiterJoint_TimberA"))
+    timberB = replace(arrangement.timber2, ticket=TimberTicket("MiterJoint_TimberB"))
     miter_arrangement = CornerJointTimberArrangement(
         timber1=timberA,
         timber2=timberB,
@@ -95,8 +96,8 @@ def make_miter_joint_face_aligned_example(position: V3) -> list[CutTimber]:
     arrangement = create_canonical_example_right_angle_corner_joint_timbers(position=position)
 
     # Rename timbers for clarity (timber2 is +X, timber1 is +Y)
-    timberA = replace(arrangement.timber2, ticket=Ticket("MiterFaceAligned_TimberA"))  # +X direction
-    timberB = replace(arrangement.timber1, ticket=Ticket("MiterFaceAligned_TimberB"))  # +Y direction
+    timberA = replace(arrangement.timber2, ticket=TimberTicket("MiterFaceAligned_TimberA"))  # +X direction
+    timberB = replace(arrangement.timber1, ticket=TimberTicket("MiterFaceAligned_TimberB"))  # +Y direction
 
     miter_arrangement = CornerJointTimberArrangement(
         timber1=timberA,
@@ -124,10 +125,58 @@ def make_tongue_and_fork_corner_joint_135_example(position: V3) -> list[CutTimbe
     """
     arrangement = create_canonical_example_corner_joint_timbers(
         # TODO change to 135...
-        corner_angle=degrees(134),
+        corner_angle=degrees(138),
         position=position,
     )
     joint = cut_tongue_and_fork_corner_joint(arrangement)
+    return list(joint.cut_timbers.values())
+
+
+def make_tongue_and_fork_butt_joint_90_example(position: V3) -> list[CutTimber]:
+    """
+    Create a tongue-and-fork butt joint at 90 degrees using canonical butt joint timbers.
+    """
+    arrangement = create_canonical_example_butt_joint_timbers(position=position)
+    joint = cut_tongue_and_fork_butt_joint(arrangement)
+    return list(joint.cut_timbers.values())
+
+
+def make_tongue_and_fork_butt_joint_angled_example(position: V3) -> list[CutTimber]:
+    """
+    Create a tongue-and-fork butt joint at 138 degrees.
+    The butt (tongue) timber approaches the receiving (fork) timber at an angle.
+    """
+    from sympy import sin, cos, Integer
+    angle = degrees(138)
+    if position is None:
+        position = create_v3(Integer(0), Integer(0), Integer(0))
+
+    receiving_bottom = position + create_v3(-TIMBER_LENGTH / Rational(2), Integer(0), Integer(0))
+    receiving_timber = timber_from_directions(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=receiving_bottom,
+        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+        ticket="receiving_timber",
+    )
+
+    butt_length_direction = create_v3(sin(angle), cos(angle), Integer(0))
+    butt_timber = timber_from_directions(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=position,
+        length_direction=butt_length_direction,
+        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+        ticket="butt_timber",
+    )
+
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=butt_timber,
+        receiving_timber=receiving_timber,
+        butt_timber_end=TimberReferenceEnd.BOTTOM,
+    )
+    joint = cut_tongue_and_fork_butt_joint(arrangement)
     return list(joint.cut_timbers.values())
 
 
@@ -147,8 +196,8 @@ def make_butt_joint_example(position: V3) -> list[CutTimber]:
     arrangement = create_canonical_example_butt_joint_timbers(position=position)
 
     # Rename timbers for clarity
-    receiving_timber = replace(arrangement.receiving_timber, ticket=Ticket("ButtJoint_Receiving"))
-    butt_timber = replace(arrangement.butt_timber, ticket=Ticket("ButtJoint_Butt"))
+    receiving_timber = replace(arrangement.receiving_timber, ticket=TimberTicket("ButtJoint_Receiving"))
+    butt_timber = replace(arrangement.butt_timber, ticket=TimberTicket("ButtJoint_Butt"))
 
     butt_arrangement = ButtJointTimberArrangement(
         receiving_timber=receiving_timber,
@@ -176,8 +225,8 @@ def make_splice_joint_example(position: V3) -> list[CutTimber]:
     arrangement = create_canonical_example_splice_joint_timbers(position=position)
 
     # Rename timbers for clarity
-    timberA = replace(arrangement.timber1, ticket=Ticket("SpliceJoint_TimberA"))
-    timberB = replace(arrangement.timber2, ticket=Ticket("SpliceJoint_TimberB"))
+    timberA = replace(arrangement.timber1, ticket=TimberTicket("SpliceJoint_TimberA"))
+    timberB = replace(arrangement.timber2, ticket=TimberTicket("SpliceJoint_TimberB"))
 
     splice_arrangement = SpliceJointTimberArrangement(
         timber1=timberA,
@@ -312,8 +361,8 @@ def make_splice_lap_joint_example(position: V3) -> list[CutTimber]:
     arrangement = create_canonical_example_splice_joint_timbers(position=position)
 
     # Rename timbers for clarity
-    timberA = replace(arrangement.timber1, ticket=Ticket("SpliceLap_TimberA"))
-    timberB = replace(arrangement.timber2, ticket=Ticket("SpliceLap_TimberB"))
+    timberA = replace(arrangement.timber1, ticket=TimberTicket("SpliceLap_TimberA"))
+    timberB = replace(arrangement.timber2, ticket=TimberTicket("SpliceLap_TimberB"))
 
     # Update arrangement
     splice_arrangement = replace(
@@ -358,6 +407,12 @@ def create_plain_joints_patternbook() -> PatternBook:
         (PatternMetadata("tongue_and_fork_corner_joint_135", ["plain_joints", "tongue_and_fork"], "frame"),
          lambda center: Frame(cut_timbers=make_tongue_and_fork_corner_joint_135_example(center), name="Tongue and Fork Corner (135°)")),
 
+        (PatternMetadata("tongue_and_fork_butt_joint_90", ["plain_joints", "tongue_and_fork"], "frame"),
+         lambda center: Frame(cut_timbers=make_tongue_and_fork_butt_joint_90_example(center), name="Tongue and Fork Butt (90°)")),
+
+        (PatternMetadata("tongue_and_fork_butt_joint_138", ["plain_joints", "tongue_and_fork"], "frame"),
+         lambda center: Frame(cut_timbers=make_tongue_and_fork_butt_joint_angled_example(center), name="Tongue and Fork Butt (138°)")),
+
         (PatternMetadata("splice_joint", ["plain_joints", "splice"], "frame"),
          lambda center: Frame(cut_timbers=make_splice_joint_example(center), name="Splice Joint")),
 
@@ -394,7 +449,7 @@ def create_all_joint_examples() -> Union[Frame, List]:
     return frame
 
 
-example = create_all_joint_examples()
+example = create_all_joint_examples
 
 
 # ============================================================================
@@ -403,7 +458,7 @@ example = create_all_joint_examples()
 
 if __name__ == "__main__":
     print("="*70)
-    print("GiraffeCAD - Plain Joints Examples")
+    print("Kumiki - Plain Joints Examples")
     print("="*70)
     # Convert from meters back to inches for display (1m = 39.3701 inches)
     width_inches = float(TIMBER_WIDTH / inches(1))

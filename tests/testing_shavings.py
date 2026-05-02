@@ -1,5 +1,5 @@
 """
-Shared test utilities and fixtures for GiraffeCAD test suite (testing_shavings.py).
+Shared test utilities and fixtures for Kumiki test suite (testing_shavings.py).
 
 This module contains:
 - Common constants (INCH_TO_METER, TOLERANCE, etc.)
@@ -15,8 +15,8 @@ import random
 import math
 from typing import Optional, Tuple
 from sympy import Matrix, Rational, simplify, det, eye
-from code_goes_here.rule import *
-from giraffe import *
+from kumiki.rule import *
+from kumiki import *
 
 
 # ============================================================================

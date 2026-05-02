@@ -5,7 +5,7 @@ PatternBook is a helper structure for organizing multiple patterns (frames or CS
 and raising them at different positions for visualization and testing.
 """
 
-from giraffe import *
+from kumiki import *
 
 
 def create_simple_post_pattern() -> PatternBook:
@@ -206,13 +206,13 @@ def example_raise_single_pattern():
     
     # Raise a single pattern at the origin
     frame = book.raise_pattern("tall_post")
-    print(f"Raised pattern: {frame.name}")
+    print(f"Raised pattern: {frame.tag}")
     print(f"  Number of timbers: {len(frame.cut_timbers)}")
     
     # Raise a pattern at a specific location
     center = create_v3(feet(10), feet(5), 0)
     frame2 = book.raise_pattern("wide_post", center=center)
-    print(f"\nRaised pattern at custom location: {frame2.name}")
+    print(f"\nRaised pattern at custom location: {frame2.tag}")
     print(f"  Position: {frame2.cut_timbers[0].timber.transform.position.T}")
     
     return frame

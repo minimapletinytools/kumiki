@@ -2,26 +2,29 @@
 Example usage of mortise and tenon joint functions
 """
 
-from sympy import Matrix, Rational
-from code_goes_here.rule import inches, Transform
-from code_goes_here.timber import (
+from sympy import Matrix, Rational, Integer
+from kumiki.rule import inches, Transform
+from kumiki.timber import (
     Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
-from code_goes_here.joints.mortise_and_tenon_joint import *
+from kumiki.joints.mortise_and_tenon_joint import *
 
-from code_goes_here.construction import (
+from kumiki.construction import (
     ButtJointTimberArrangement,
+    Stickout,
     create_axis_aligned_timber,
+    join_plane_aligned_on_place_aligned_timbers,
 )
-from code_goes_here.example_shavings import (
+from kumiki.example_shavings import (
     create_canonical_example_brace_joint_timbers,
     create_canonical_example_butt_joint_timbers,
 )
-from code_goes_here.joints.basic_joints import cut_basic_miter_joint
-from code_goes_here.construction import CornerJointTimberArrangement
-from code_goes_here.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint, make_pattern_from_frame
+from kumiki.joints.basic_joints import cut_basic_miter_joint
+from kumiki.construction import CornerJointTimberArrangement
+from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint, make_pattern_from_frame
+from kumiki.ticket import TimberTicket
 
 
 def example_basic_mortise_and_tenon(position=None):
@@ -147,7 +150,17 @@ def example_brace_joint(position=None):
     brace_arrangement = create_canonical_example_brace_joint_timbers(position)
     timber1 = brace_arrangement.timber1
     timber2 = brace_arrangement.timber2
-    brace_timber = brace_arrangement.brace_timber
+    brace_timber = join_plane_aligned_on_place_aligned_timbers(
+        timber1=timber1,
+        timber2=timber2,
+        location_on_timber1=timber1.length / Integer(2),
+        location_on_timber2=timber2.length / Integer(2),
+        stickout=Stickout.nostickout(),
+        size=timber1.size,
+        orientation_long_face_on_timber1=TimberLongFace.RIGHT,
+        orientation_long_face_on_timber2=TimberLongFace.RIGHT,
+        ticket="brace_timber",
+    )
     
     # Plain miter joint between the two corner timbers
     miter_joint = cut_basic_miter_joint(
@@ -231,8 +244,8 @@ def example_double_angled_mortise_and_tenon(position=None):
     """
     from sympy import Integer, pi
     from dataclasses import replace
-    from code_goes_here.rule import Orientation, radians
-    from code_goes_here.ticket import Ticket
+    from kumiki.rule import Orientation, radians
+    from kumiki.ticket import Ticket
 
     if position is None:
         position = create_v3(0, 0, 0)
@@ -245,7 +258,7 @@ def example_double_angled_mortise_and_tenon(position=None):
     rotation = Orientation.from_angle_axis(radians(pi / Integer(6)), local_z)
     rotated_orientation = timber1.orientation * rotation
     rotated_transform = Transform(position=timber1.transform.position, orientation=rotated_orientation)
-    mortise_timber = replace(timber1, transform=rotated_transform, ticket=Ticket("rotated_mortise"))
+    mortise_timber = replace(timber1, transform=rotated_transform, ticket=TimberTicket("rotated_mortise"))
 
     peg_params = SimplePegParameters(
         shape=PegShape.SQUARE,
@@ -327,7 +340,7 @@ def create_all_mortise_and_tenon_examples():
     return frame
 
 
-example = create_all_mortise_and_tenon_examples()
+example = create_all_mortise_and_tenon_examples
 
 
 if __name__ == "__main__":

@@ -1,0 +1,109 @@
+Tag-Based Search Module Plan (Kigumi)
+
+Goal
+Create a reusable, client-side tag+name search module for the viewer to filter patterns, joints, and timbers.
+
+Decisions Locked
+- Multi-tag matching: AND (item must contain all selected tags)
+- Name + tag filters: AND (both apply)
+- Autocomplete source: all tags across all items
+- Low-tag-count threshold: 12 (show toggle rail)
+
+Core Concepts
+- Names
+- Tags
+
+Public Contract
+Input:
+1) List of typed objects
+2) Function(s) that return name and tags for each object
+
+Output:
+- Callback-driven filter state + API that returns sublist of matching elements
+
+Proposed Module API
+- setItems(items, nameExtractor, tagExtractor)
+- setNameQuery(query)
+- addTag(tag)
+- removeTag(tag)
+- toggleTag(tag)
+- clearAll()
+- getResults()
+- getActiveTags()
+- getAllTags()
+- getAutocomplete(partial)
+- onChanged(callback) -> unsubscribe function
+
+Filter Behavior
+- Name filter: case-insensitive partial match
+- Tag filter: all active tags must be present (AND)
+- Combined filter: name match AND tag match
+
+UI Behavior
+1) Name search input
+- Typing updates results immediately via partial substring match.
+
+2) Tag search with autocomplete
+- Tag input suggests matching tags from all available tags.
+- Selecting an autocomplete option adds that tag to active tag filters.
+
+3) Active tag chips
+- Show all active tags as chips.
+- Each chip has an X button; clicking removes that tag filter.
+
+4) Low-tag-count mode
+- If total unique tag count <= 12, show all tags as clickable toggles.
+- Active tags appear visually distinct (grayed/selected state).
+- Clicking a tag toggles it on/off.
+
+Architecture
+- Keep state in a pure store module (no DOM dependencies).
+- Keep rendering/event wiring in a UI panel module.
+- Keep filtering client-side in webview (no runner or extension protocol changes needed initially).
+
+Files To Add
+- kigumi/webview/tag-search-store.js
+- kigumi/__tests__/tag-search-store.test.js
+
+Files To Update
+- kigumi/webview/viewer-app.js
+  - add TagSearchPanel
+  - initialize TagSearchStore
+  - wire setItems(...) when availablePatterns updates
+  - render patterns from store.getResults()
+- kigumi/webview/viewer.css
+  - add styles for search input, autocomplete list, tag rail, chips, active state
+- kigumi/viewer.js
+  - add URI injection for tag-search-store.js into template replacements
+- kigumi/webview/viewer.html
+  - include tag-search-store.js script before viewer-app module
+
+Implementation Phases
+Phase 1: Store
+- Build store and tests first.
+
+Phase 2: Styles
+- Add CSS for all search/tag states.
+
+Phase 3: Panel Integration
+- Add panel render + bindEvents in viewer-app.
+- Connect store updates to patterns list rendering.
+
+Phase 4: Webview Script Wiring
+- Ensure store script is loaded by viewer.html via viewer.js template replacement.
+
+Validation
+1) Unit tests
+- cd kigumi && npx jest
+
+2) Extension smoke tests
+- cd kigumi && node ./test/run-extension-tests.js
+
+3) Manual checks
+- Load patterns and verify:
+  - name partial search works
+  - tag autocomplete adds chips
+  - chip X removes filters
+  - <=12 tags shows rail toggle mode
+  - >12 tags shows autocomplete mode
+  - combined name+tags uses AND behavior

@@ -3,9 +3,9 @@ Tests for timber_shavings module (random timber-related helpers).
 """
 
 import pytest
-from code_goes_here.timber_shavings import *
-from code_goes_here.timber import *
-from code_goes_here.rule import create_v3, create_v2, radians
+from kumiki.timber_shavings import *
+from kumiki.timber import *
+from kumiki.rule import create_v3, create_v2, radians
 from tests.testing_shavings import (
     create_standard_vertical_timber,
     create_standard_horizontal_timber,
@@ -261,7 +261,7 @@ class TestPeg:
         csg = peg.render_csg_local()
         
         # Should return a RectangularPrism
-        from code_goes_here.cutcsg import RectangularPrism
+        from kumiki.cutcsg import RectangularPrism
         assert isinstance(csg, RectangularPrism)
         
         # Verify dimensions
@@ -283,7 +283,7 @@ class TestPeg:
         csg = peg.render_csg_local()
         
         # Should return a Cylinder
-        from code_goes_here.cutcsg import Cylinder
+        from kumiki.cutcsg import Cylinder
         assert isinstance(csg, Cylinder)
         
         # Verify dimensions
@@ -354,7 +354,7 @@ class TestWedge:
         csg = wedge.render_csg_local()
         
         # Should return a ConvexPolygonExtrusion 
-        from code_goes_here.cutcsg import ConvexPolygonExtrusion
+        from kumiki.cutcsg import ConvexPolygonExtrusion
         assert isinstance(csg, ConvexPolygonExtrusion)
         
 
@@ -469,7 +469,7 @@ class TestCreatePegGoingIntoFace:
 class TestProjectGlobalPointOntoTimberFace:
     """Test Timber.project_global_point_onto_timber_face_global() method."""
     
-    def test_project_onto_top_face_axis_aligned(self):
+    def test_project_onto_top_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the top face of an axis-aligned timber."""
         # Create a simple vertical timber
         timber = timber_from_directions(
@@ -490,7 +490,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(0, 0, 1)
         assert projected_global == expected_global
     
-    def test_project_onto_bottom_face_axis_aligned(self):
+    def test_project_onto_bottom_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the bottom face."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -510,7 +510,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(Rational("0.05"), Rational("0.1"), -1)
         assert projected_global == expected_global
     
-    def test_project_onto_right_face_axis_aligned(self):
+    def test_project_onto_right_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the right face."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -529,7 +529,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(Rational("0.1"), 0, 0)
         assert projected_global == expected_global
     
-    def test_project_onto_left_face_axis_aligned(self):
+    def test_project_onto_left_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the left face."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -547,7 +547,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(Rational("-0.1"), Rational("0.1"), Rational("0.5"))
         assert projected_global == expected_global
     
-    def test_project_onto_front_face_axis_aligned(self):
+    def test_project_onto_front_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the front face."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -565,7 +565,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(0, Rational("0.15"), 0)
         assert projected_global == expected_global
     
-    def test_project_onto_back_face_axis_aligned(self):
+    def test_project_onto_back_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the back face."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -583,7 +583,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(Rational("0.05"), Rational("-0.15"), Rational("0.5"))
         assert projected_global == expected_global
     
-    def test_project_point_already_on_face(self):
+    def test_project_point_already_on_face(self, symbolic_mode):
         """Test that projecting a point already on the face returns the same point."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -601,7 +601,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(Rational("0.05"), Rational("0.1"), 1)
         assert projected_global == expected_global
     
-    def test_project_onto_rotated_timber(self):
+    def test_project_onto_rotated_timber(self, symbolic_mode):
         """Test projecting onto a face of a rotated timber."""
         # Create a timber pointing east (along X-axis)
         timber = timber_from_directions(
@@ -622,7 +622,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(1, 0, 0)
         assert projected_global == expected_global
     
-    def test_project_with_offset_bottom_position(self):
+    def test_project_with_offset_bottom_position(self, symbolic_mode):
         """Test projection on a timber with non-zero bottom position."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -640,7 +640,7 @@ class TestProjectGlobalPointOntoTimberFace:
         expected_global = create_v3(5, 10, 21)
         assert projected_global == expected_global
     
-    def test_project_accepts_timber_reference_end(self):
+    def test_project_accepts_timber_reference_end(self, symbolic_mode):
         """Test that the method accepts TimberReferenceEnd as well as TimberFace."""
         timber = timber_from_directions(
             length=Rational(2),
@@ -763,7 +763,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_parallel(self):
         """Test are_timbers_parallel helper function."""
-        from code_goes_here.timber_shavings import are_timbers_parallel
+        from kumiki.timber_shavings import are_timbers_parallel
         # Create two timbers with parallel length directions
         timber1 = timber_from_directions(
             length=Rational(2),
@@ -810,7 +810,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_orthogonal(self):
         """Test are_timbers_orthogonal helper function."""
-        from code_goes_here.timber_shavings import are_timbers_orthogonal
+        from kumiki.timber_shavings import are_timbers_orthogonal
         # Create two timbers with perpendicular length directions
         timber1 = timber_from_directions(
             length=Rational(2),
@@ -857,7 +857,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_face_aligned(self):
         """Test are_timbers_face_aligned helper function."""
-        from code_goes_here.timber_shavings import are_timbers_face_aligned
+        from kumiki.timber_shavings import are_timbers_face_aligned
         # Create a reference timber with standard orientation
         timber1 = timber_from_directions(
             length=Rational(2),
@@ -956,7 +956,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_parallel_rational(self):
         """Test are_timbers_parallel with rational (exact) values."""
-        from code_goes_here.timber_shavings import are_timbers_parallel
+        from kumiki.timber_shavings import are_timbers_parallel
         from sympy import Rational
         
         # Create timbers with exact rational directions
@@ -1003,7 +1003,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_parallel_float(self):
         """Test are_timbers_parallel with float (fuzzy) values."""
-        from code_goes_here.timber_shavings import are_timbers_parallel
+        from kumiki.timber_shavings import are_timbers_parallel
         import math
         
         # Create timbers with float directions
@@ -1024,7 +1024,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_orthogonal_rational(self):
         """Test are_timbers_orthogonal with rational (exact) values."""
-        from code_goes_here.timber_shavings import are_timbers_orthogonal
+        from kumiki.timber_shavings import are_timbers_orthogonal
         from sympy import Rational
         
         # Create timbers with exact rational perpendicular directions
@@ -1060,7 +1060,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_orthogonal_fuzzy_fallback(self):
         """Test are_timbers_orthogonal with float (fuzzy) values."""
-        from code_goes_here.timber_shavings import are_timbers_orthogonal
+        from kumiki.timber_shavings import are_timbers_orthogonal
         import math
         
         # Create timbers with float perpendicular directions
@@ -1081,7 +1081,7 @@ class TestTimberRelationshipHelpers:
     
     def testare_timbers_face_aligned_exact_equality(self):
         """Test are_timbers_face_aligned with exact equality (no tolerance)."""
-        from code_goes_here.timber_shavings import are_timbers_face_aligned
+        from kumiki.timber_shavings import are_timbers_face_aligned
         # Create two face-aligned timbers using exact rational values
         timber1 = timber_from_directions(
             length=2,  # Integer
@@ -1123,7 +1123,7 @@ class TestTimberRelationshipHelpers:
 
     def test_do_xy_cross_section_on_parallel_timbers_overlap(self):
         """Test do_xy_cross_section_on_parallel_timbers_overlap function."""
-        from code_goes_here.timber_shavings import do_xy_cross_section_on_parallel_timbers_overlap
+        from kumiki.timber_shavings import do_xy_cross_section_on_parallel_timbers_overlap
         from sympy import Rational
         
         # Test 1: Two aligned timbers that overlap

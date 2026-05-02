@@ -1,0 +1,196 @@
+{
+  "name": "kigumi",
+  "displayName": "Kigumi",
+  "description": "Kiguim is a viewer tool for Kumiki designs",
+  "version": "0.0.1",
+  "publisher": "minimapletinytools",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/minimapletinytools/kumiki/kigumi"
+  },
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "keywords": [
+    "cad",
+    "timber",
+    "woodworking",
+    "geometry",
+    "viewer"
+  ],
+  "categories": [
+    "Visualization"
+  ],
+  "activationEvents": [
+    "onCommand:kigumi.render",
+    "onCommand:kigumi.browsePatterns",
+    "onCommand:kigumi.unloadPattern",
+    "onCommand:kigumi.openCurrentFileInViewer",
+    "onCommand:kigumi.initializeProjectInWorkspace",
+    "onCommand:kigumi.refreshSidebar",
+    "onCommand:kigumi.refreshPatterns",
+    "onCommand:kigumi.toggleOpenInSplitView",
+    "onCommand:kigumi.openFrameFromSidebar",
+    "onCommand:kigumi.openPatternFromSidebar",
+    "onCommand:kigumi.openExampleFromSidebar",
+    "onView:kigumi.explorer"
+  ],
+  "main": "./extension.js",
+  "icon": "templogo.png",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "kigumi",
+          "title": "Kigumi",
+          "icon": "templogo.png"
+        }
+      ]
+    },
+    "views": {
+      "kigumi": [
+        {
+          "id": "kigumi.explorer",
+          "name": "Kigumi Explorer"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "kigumi.render",
+        "title": "Render Kigumi"
+      },
+      {
+        "command": "kigumi.browsePatterns",
+        "title": "Browse Patterns"
+      },
+      {
+        "command": "kigumi.unloadPattern",
+        "title": "Unload Pattern Viewer"
+      },
+      {
+        "command": "kigumi.openCurrentFileInViewer",
+        "title": "Kigumi: Open Current File In Viewer",
+        "icon": "$(play)"
+      },
+      {
+        "command": "kigumi.initializeProjectInWorkspace",
+        "title": "Kigumi: Initialize Project In Workspace",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "kigumi.refreshSidebar",
+        "title": "Kigumi: Refresh Explorer"
+      },
+      {
+        "command": "kigumi.refreshPatterns",
+        "title": "Kigumi: Reload Patterns",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kigumi.openFrameFromSidebar",
+        "title": "Kigumi: Open Frame From Explorer"
+      },
+      {
+        "command": "kigumi.openPatternFromSidebar",
+        "title": "Kigumi: Open Pattern From Explorer"
+      },
+      {
+        "command": "kigumi.openExampleFromSidebar",
+        "title": "Kigumi: Open Example From Explorer"
+      },
+      {
+        "command": "kigumi.toggleGroupByPatternbook",
+        "title": "Kigumi: Toggle Group by Patternbook",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "kigumi.projectHeaderAction",
+        "title": "Kigumi: Project Header Action"
+      },
+      {
+        "command": "kigumi.openPatternbookGroup",
+        "title": "Kigumi: Open Patternbook Group"
+      },
+      {
+        "command": "kigumi.viewPatternSource",
+        "title": "View Source"
+      },
+      {
+        "command": "kigumi.duplicatePatternToWorkspace",
+        "title": "Duplicate Pattern to Workspace"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "kigumi.refreshPatterns",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@1"
+        },
+        {
+          "command": "kigumi.toggleGroupByPatternbook",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@2"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "kigumi.viewPatternSource",
+          "when": "view == kigumi.explorer && viewItem == patternItem",
+          "group": "inline@1"
+        },
+        {
+          "command": "kigumi.viewPatternSource",
+          "when": "view == kigumi.explorer && viewItem == patternItemWorkspace",
+          "group": "inline@1"
+        },
+        {
+          "command": "kigumi.viewPatternSource",
+          "when": "view == kigumi.explorer && viewItem == frameFile",
+          "group": "inline@1"
+        },
+        {
+          "command": "kigumi.duplicatePatternToWorkspace",
+          "when": "view == kigumi.explorer && viewItem == patternItem",
+          "group": "inline@2"
+        }
+      ]
+    },
+    "configuration": {
+      "type": "object",
+      "title": "Kigumi",
+      "properties": {
+        "kigumi.explorer.scanTimeoutSeconds": {
+          "type": "number",
+          "default": 5,
+          "minimum": 1,
+          "maximum": 60,
+          "scope": "window",
+          "description": "Timeout in seconds for reading each Python file during Kigumi frame discovery scans."
+        },
+        "kigumi.viewer.openInSplitView": {
+          "type": "boolean",
+          "default": true,
+          "scope": "window",
+          "description": "When enabled, opening frames/patterns/examples uses a split editor group. When disabled, opens in the current editor group."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "echo 'No build step needed'",
+    "test": "npm run test:unit",
+    "test:unit": "jest",
+    "test:runner": "jest --runInBand __tests__/runner-protocol.test.js",
+    "test:ext": "node ./test/run-extension-tests.js",
+    "test:all": "npm run test:unit && npm run test:ext"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.6.2",
+    "@vscode/test-electron": "^2.5.2",
+    "@types/vscode": "^1.60.0",
+    "jest": "^29.7.0",
+    "mocha": "^11.2.2"
+  }
+}

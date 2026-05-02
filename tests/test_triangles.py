@@ -1,7 +1,7 @@
 import pytest
 from sympy import Integer, Rational
 
-from giraffe import (
+from kumiki import (
     ConvexPolygonExtrusion,
     Cylinder,
     Difference,

@@ -1,0 +1,7 @@
+.vscode/**
+.vscode-test/**
+node_modules/**
+test-frame.py
+install.sh
+INSTALL.md
+CURSOR-INSTALL.md

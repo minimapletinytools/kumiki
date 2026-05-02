@@ -4,10 +4,10 @@ Tests for the PatternBook module
 
 import pytest
 from sympy import Integer, Rational
-from code_goes_here.rule import create_v3, create_v2, inches, Transform, Orientation
-from code_goes_here.timber import timber_from_directions, Frame, CutTimber
-from code_goes_here.cutcsg import RectangularPrism
-from code_goes_here.patternbook import PatternMetadata, PatternBook, PatternLambda
+from kumiki.rule import create_v3, create_v2, inches, Transform, Orientation
+from kumiki.timber import timber_from_directions, Frame, CutTimber, CSGAccessory
+from kumiki.cutcsg import RectangularPrism
+from kumiki.patternbook import PatternMetadata, PatternBook, PatternLambda
 
 
 def test_pattern_metadata_creation():
@@ -218,6 +218,67 @@ def test_raise_pattern_group_csg():
     assert isinstance(csg_list, list)
     assert len(csg_list) == 2
     assert all(isinstance(obj, RectangularPrism) for obj in csg_list)
+
+
+def test_raise_patternbook_as_frame_wraps_single_csg_pattern_as_accessory():
+    """CSG-only patternbooks should still be viewable as a Frame."""
+
+    def make_box(center):
+        size = inches(2)
+        return RectangularPrism(
+            size=create_v2(size, size),
+            transform=Transform(position=center, orientation=Orientation.identity()),
+            start_distance=-size / Integer(2),
+            end_distance=size / Integer(2)
+        )
+
+    metadata = PatternMetadata(pattern_name="box", pattern_type="csg")
+    book = PatternBook(patterns=[(metadata, make_box)])
+
+    frame = book.raise_patternbook_as_frame()
+
+    assert isinstance(frame, Frame)
+    assert len(frame.cut_timbers) == 0
+    assert len(frame.accessories) == 1
+    assert isinstance(frame.accessories[0], CSGAccessory)
+    assert frame.name == "box"
+
+
+def test_raise_patternbook_as_frame_combines_frame_and_csg_patterns():
+    """Mixed frame/CSG patternbooks should combine into one viewable Frame."""
+
+    def make_frame(center):
+        timber = timber_from_directions(
+            length=inches(24),
+            size=create_v2(inches(2), inches(4)),
+            bottom_position=center,
+            length_direction=create_v3(1, 0, 0),
+            width_direction=create_v3(0, 1, 0),
+            ticket="test_timber"
+        )
+        return Frame(cut_timbers=[CutTimber(timber=timber, cuts=[])], name="simple_frame")
+
+    def make_box(center):
+        size = inches(2)
+        return RectangularPrism(
+            size=create_v2(size, size),
+            transform=Transform(position=center, orientation=Orientation.identity()),
+            start_distance=-size / Integer(2),
+            end_distance=size / Integer(2)
+        )
+
+    patterns = [
+        (PatternMetadata("frame1", [], "frame"), make_frame),
+        (PatternMetadata("box1", [], "csg"), make_box),
+    ]
+    book = PatternBook(patterns=patterns)
+
+    frame = book.raise_patternbook_as_frame(separation_distance=inches(12))
+
+    assert isinstance(frame, Frame)
+    assert len(frame.cut_timbers) == 1
+    assert len(frame.accessories) == 1
+    assert isinstance(frame.accessories[0], CSGAccessory)
 
 
 def test_raise_pattern_group_mixed_types():

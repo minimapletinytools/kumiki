@@ -1,33 +1,47 @@
-# HorseCoAD
+# Kumiki
 
-HorseCoAD is a Code Aided Design library for programmatically designing timber framed structures.
+Kumiki is a Code aided Design (CoAD) library for programmatically designing timber framed structures and woodworking in general.
 
-HorseCoAD is written as an **AI friendly** library meaning it was designed to be easily understood and used by AI agents. 
+As Kumiki is a CoAD library, it is well suited for usage with AI agents.
 
-## Current State
+Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki designs!
 
-HorseCoAD is intended to ship with its own viewing app as a VSCode extension.
-Until then, HorseCoAD designs is visualized by writing to Fusion 360 and FreeCAD via their scripting APIs. This is intended to be replaced with exporting to common CAD file formats in the future as the scripting API workflow for most CAD programs is clunky.
 
-## Setup
+INSTRUCTIONS BELOW DO NOT WORK YET DO NOT TRY!!!
 
-TODO viewer setup instructions
-TODO pip package instructions
+## setup
 
-## trying out the exmaple
+## local development
 
-You've setup your tools and you're almost ready to make your first sawhorse.
+If you are working in this repository directly, you can import and run Kumiki from the repo without installing from PyPI.
 
-But first, lets admire the one in the patterns folder
+If you are working in a separate project and want to use the latest Kumiki code from git, install it from GitHub:
 
-```python
-from patterns.structures.horsey_example import *
-...
+```bash
+pip install "git+https://github.com/minimaple/kumiki.git"
 ```
 
-TODO finish
+For a pinned revision, append a commit, branch, or tag:
 
-## your first horsey
+```bash
+pip install "git+https://github.com/minimaple/kumiki.git@<ref>"
+```
+
+Kumiki is best used with Kigumi. To install Kigumi, download [VSCode](https://code.visualstudio.com/) and install Kigumi (TODO link)
+
+Kumiki also requires [python3](https://www.python.org/downloads/).  
+
+You can of course use Kumiki withou Kigumi. You will still want to use Kigumi to setup your Kumiki projects and its dependencies.
+
+## viewing the built in patterns and examples
+
+Kigumi ships with a patternbook and several examples. Open the Kumiki menu by clicking on the Kumiki horse icon in the bar on the left side and click "Open Kigumi".
+
+You may also open Kigumi by opening the command palette in VScode (cmd/ctrl+shift+p). Start typing "kigumi" and choose the "kigumi: open" command.
+
+## your first kumiki project
+
+Create a folder for your Kumiki project and open that folder in VSCode. Then click "Initialize Project" from the Kumiki menu. You may also run "kigumi: initialize project" command from the command pallete.
 
 TODO finish
 
@@ -36,70 +50,26 @@ TODO finish
 TODO finish
 
 
+# Contributing
+
+If making changes to Kumiki itself, a separate workflow is used. 
+
+Once you've made your changes, open up a PR. 
+
+
+## Developing Kumiki
+
+TODO
+
+Kigumi has a separate project scanning flow such that it can be used with the Kumiki repo itself as the workspace. Just use Kigumi like you normally would to test Kumiki.
+
+## Developing Kigumi
+
+TODO
+
+
 # APPENDIX
 
 ## FreeCAD and Fusion360 usage
 
 Rendering in FreeCAD and Fusion360 currently requires checking out the entire repo. We do not plan to work around this and support for these tools will be removed soon. 
-
-To add your own examples, modify the respective example running file to point to your own example.
-
-### FreeCAD Integration
-
-To render structures in FreeCAD (open source, free):
-
-1. **Install FreeCAD** (version 0.19 or later)
-   - Download from https://www.freecad.org/
-   - Or use package manager: `brew install freecad` (macOS)
-
-2. **Set up macro folder** (one-time setup):
-   - Open FreeCAD
-   - Go to **Edit** → **Preferences** → **Python** → **Macro**
-   - Click **Add** under "Macro path"
-   - Navigate to and select: `/path/to/giraffeCAD-proto/freecad`
-   - Click **OK**
-
-3. **Run the renderer**:
-   - Open FreeCAD
-   - Go to **Macro** → **Macros...**
-   - Select `render_example.py` from the list
-   - Click **Execute**
-   
-   The rendered structure will appear in FreeCAD's 3D view!
-
-### Fusion 360 Integration
-
-To render the example in Autodesk Fusion 360:
-
-#### 1. Setup Fusion 360 Script Environment
-
-1. Navigate to the `fusion360/` directory in the project
-2. Install local dependencies for Fusion 360's isolated Python environment:
-
-```bash
-cd fusion360
-pip install --target libs sympy
-```
-
-#### 2. Add Script to Fusion 360
-
-1. Open Autodesk Fusion 360
-2. Go to **Design** workspace
-3. Click **Utilities** → **ADD-INS** → **Scripts and Add-Ins** (or just `s` and type in "scripts and add-ins")
-4. Click the **+** button next to "My Scripts"
-5. Navigate to the `fusion360/` folder and select it
-6. You should now see "giraffetest" in your scripts list
-
-#### 3. Run the Script
-
-1. Select "giraffetest" from the scripts list
-2. Click **Run**
-3. The script will:
-   - Clear any existing design
-   - Generate the sawhorse geometry using your selected example
-   - Render all timbers as 3D components in Fusion 360
-   - Apply proper transformations and positioning
-
-#### 4. What You'll See
-
-TODO

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Delegate to install.sh (which uses rsync with proper excludes)
+exec "$(cd "$(dirname "$0")" && pwd)/install.sh" "$@"

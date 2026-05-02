@@ -4,7 +4,7 @@ Test examples for CutCSG rendering.
 These examples create simple CSG operations to test and verify
 rendering backends (FreeCAD, Fusion 360, Rhino, etc.).
 
-All dimensions are in METERS (GiraffeCAD convention).
+All dimensions are in METERS (Kumiki convention).
 
 NOTE: Prism positioning follows the Timber convention:
 - The 'position' parameter specifies the CENTER of the cross-section (in XY)
@@ -14,11 +14,17 @@ NOTE: Prism positioning follows the Timber convention:
 """
 
 from sympy import Matrix, eye, Rational, sqrt
-from code_goes_here.cutcsg import *
-from code_goes_here.rule import Orientation, Transform, inches, feet
-from code_goes_here.timber import Timber, TimberReferenceEnd, TimberFace, timber_from_directions
-from code_goes_here.joints.joint_shavings import chop_lap_on_timber_end, chop_profile_on_timber_face, chop_shoulder_notch_on_timber_face
-from code_goes_here.joints.japanese_joints import draw_gooseneck_polygon
+from kumiki.cutcsg import *
+from kumiki.rule import Orientation, Transform, inches, feet
+from kumiki.timber import Timber, TimberReferenceEnd, TimberFace, TimberLongFace, timber_from_directions
+from kumiki.construction import ButtJointTimberArrangement
+from kumiki.joints.joint_shavings import chop_lap_on_timber_end, chop_profile_on_timber_face, chop_shoulder_notch_on_timber_face
+from kumiki.joints.japanese_joints import draw_gooseneck_polygon
+from kumiki.joints.build_a_butt_joint_shavings import (
+    compute_butt_joint_shoulder,
+    build_dovetail_shoulder_geometery,
+    dovetail_tenon_geometry,
+)
 
 
 def example_cube_with_cube_cutout():
@@ -520,6 +526,75 @@ def example_angled_shoulder_notch_on_timber():
     return result
 
 
+def _create_dovetail_debug_arrangement() -> ButtJointTimberArrangement:
+    """Create a simple orthogonal butt arrangement used by dovetail debug examples."""
+    receiving_timber = timber_from_directions(
+        length=feet(5),
+        size=Matrix([inches(4), inches(6)]),
+        bottom_position=Matrix([0, 0, 0]),
+        length_direction=Matrix([1, 0, 0]),
+        width_direction=Matrix([0, 1, 0]),
+        ticket='debug_receiving_timber',
+    )
+    butt_timber = timber_from_directions(
+        length=feet(4),
+        size=Matrix([inches(4), inches(4)]),
+        bottom_position=Matrix([inches(18), 0, -feet(2)]),
+        length_direction=Matrix([0, 0, 1]),
+        width_direction=Matrix([1, 0, 0]),
+        ticket='debug_butt_timber',
+    )
+    return ButtJointTimberArrangement(
+        butt_timber=butt_timber,
+        receiving_timber=receiving_timber,
+        butt_timber_end=TimberReferenceEnd.TOP,
+        front_face_on_butt_timber=TimberLongFace.RIGHT,
+    )
+
+
+def example_dovetail_shoulder_geometry_raw():
+    """Raw global CSG output of build_dovetail_shoulder_geometery."""
+    arrangement = _create_dovetail_debug_arrangement()
+    shoulder_result = compute_butt_joint_shoulder(
+        arrangement=arrangement,
+        distance_from_centerline=inches(1),
+        up_direction=arrangement.butt_timber.get_height_direction_global(),
+    )
+    return build_dovetail_shoulder_geometery(
+        arrangement=arrangement,
+        shoulder_result=shoulder_result,
+        dovetail_depth=inches(3),
+    )
+
+
+def example_dovetail_tenon_geometry_raw():
+    """Raw CSG output of dovetail_tenon_geometry (tenon + mortise shapes)."""
+    arrangement = _create_dovetail_debug_arrangement()
+    shoulder_result = compute_butt_joint_shoulder(
+        arrangement=arrangement,
+        distance_from_centerline=inches(1),
+        up_direction=arrangement.butt_timber.get_height_direction_global(),
+    )
+    geo = dovetail_tenon_geometry(
+        arrangement=arrangement,
+        shoulder_result=shoulder_result,
+        dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_depth=inches(5),
+        dovetail_depth=inches(1),
+        tenon_lateral_offset=Rational(0),
+        receiving_timber_extra_depth=inches(1, 2),
+    )
+
+    # Render both shapes side-by-side for easier visual inspection.
+    tenon_offset = Transform(position=Matrix([0, 0, 0]), orientation=Orientation.identity())
+    mortise_offset = Transform(position=Matrix([inches(8), 0, 0]), orientation=Orientation.identity())
+
+    tenon_shifted = adopt_csg(None, tenon_offset, geo.tenon_csg)
+    mortise_shifted = adopt_csg(None, mortise_offset, geo.mortise_csg)
+    return SolidUnion(children=[tenon_shifted, mortise_shifted])
+
+
 # Dictionary for easy example selection
 EXAMPLES = {
     'cube_cutout': {
@@ -571,6 +646,16 @@ EXAMPLES = {
         'name': 'Raw Shoulder Notch CSG (45° walls)',
         'description': 'Direct CSG output from chop_shoulder_notch_on_timber_face with 45° angled walls',
         'function': example_chop_shoulder_notch_on_timber_face_raw
+    },
+    'dovetail_shoulder_geometry_raw': {
+        'name': 'Raw Dovetail Shoulder Geometry CSG',
+        'description': 'Direct CSG output from build_dovetail_shoulder_geometery',
+        'function': example_dovetail_shoulder_geometry_raw
+    },
+    'dovetail_tenon_geometry_raw': {
+        'name': 'Raw Dovetail Tenon Geometry CSG',
+        'description': 'Direct CSG output from dovetail_tenon_geometry (tenon + mortise, offset side-by-side)',
+        'function': example_dovetail_tenon_geometry_raw
     }
 }
 
@@ -584,7 +669,7 @@ def create_csg_examples_patternbook():
     Returns:
         PatternBook: PatternBook containing all CSG example patterns
     """
-    from code_goes_here.patternbook import PatternBook, PatternMetadata, make_pattern_from_csg
+    from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_csg
 
     patterns = []
     for key, info in EXAMPLES.items():

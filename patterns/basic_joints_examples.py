@@ -4,14 +4,14 @@ Uses canonical timber configurations from construction.py
 """
 
 from sympy import Matrix, Rational
-from code_goes_here.rule import inches, Transform
-from code_goes_here.timber import (
+from kumiki.rule import inches, Transform
+from kumiki.timber import (
     Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
-from code_goes_here.ticket import Ticket
-from code_goes_here.joints.basic_joints import (
+from kumiki.ticket import Ticket
+from kumiki.joints.basic_joints import (
     cut_basic_miter_joint,
     cut_basic_miter_joint_on_face_aligned_timbers,
     cut_basic_tongue_and_fork_corner_joint,
@@ -19,21 +19,23 @@ from code_goes_here.joints.basic_joints import (
     cut_basic_butt_splice_joint_on_aligned_timbers,
     cut_basic_cross_lap_joint,
     cut_basic_house_joint,
+    cut_basic_splined_opposing_double_butt_joint,
     cut_basic_splice_lap_joint_on_aligned_timbers,
     cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_basic_lapped_gooseneck_joint,
     cut_basic_housed_dovetail_butt_joint,
     cut_basic_mitered_and_keyed_lap_joint,
 )
-from code_goes_here.example_shavings import (
+from kumiki.example_shavings import (
     create_canonical_example_right_angle_corner_joint_timbers,
     create_canonical_example_butt_joint_timbers,
     create_canonical_example_splice_joint_timbers,
     create_canonical_example_cross_joint_timbers,
+    create_canonical_example_opposing_double_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_LENGTH,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from code_goes_here.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint
+from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint
 
 
 def example_basic_miter_joint(position=None):
@@ -128,6 +130,22 @@ def example_basic_house_joint(position=None):
     return joint
 
 
+def example_basic_splined_opposing_double_butt_joint(position=None):
+    """
+    Create a basic splined opposing double butt joint using canonical timbers.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_opposing_double_butt_joint_timbers(position)
+    joint = cut_basic_splined_opposing_double_butt_joint(
+        arrangement=arrangement,
+        slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+    )
+
+    return joint
+
+
 def example_basic_splice_lap_joint(position=None):
     """
     Create a basic splice lap joint using canonical splice joint timbers.
@@ -135,7 +153,7 @@ def example_basic_splice_lap_joint(position=None):
     if position is None:
         position = create_v3(0, 0, 0)
 
-    from code_goes_here.construction import SpliceJointTimberArrangement
+    from kumiki.construction import SpliceJointTimberArrangement
     arrangement = create_canonical_example_splice_joint_timbers(position)
     joint = cut_basic_splice_lap_joint_on_aligned_timbers(
         SpliceJointTimberArrangement(
@@ -275,6 +293,9 @@ def create_basic_joints_patternbook() -> PatternBook:
         
         (PatternMetadata("basic_house", ["basic_joints", "house"], "frame"),
          make_pattern_from_joint(example_basic_house_joint)),
+
+        (PatternMetadata("basic_splined_double_butt", ["basic_joints", "butt"], "frame"),
+         make_pattern_from_joint(example_basic_splined_opposing_double_butt_joint)),
         
         (PatternMetadata("basic_splice_lap", ["basic_joints", "lap"], "frame"),
          make_pattern_from_joint(example_basic_splice_lap_joint)),
@@ -318,4 +339,4 @@ def create_all_basic_joints_examples():
     return frame
 
 
-example = create_all_basic_joints_examples()
+example = create_all_basic_joints_examples

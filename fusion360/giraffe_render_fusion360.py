@@ -1,5 +1,5 @@
 """
-Fusion 360 rendering module for GiraffeCAD timber framing system using CSG.
+Fusion 360 rendering module for Kumiki timber framing system using CSG.
 
 This module provides functions to render timber structures in Autodesk Fusion 360
 using the CutCSG system for constructive solid geometry operations.
@@ -20,12 +20,12 @@ import traceback
 import time
 from typing import Optional, List, Tuple
 from sympy import Matrix, Float
-from giraffe import CutTimber, Timber, JointAccessory, Peg, PegShape, Wedge, Frame
-from code_goes_here.rule import Orientation
-from code_goes_here.cutcsg import (
+from kumiki import CutTimber, Timber, JointAccessory, Peg, PegShape, Wedge, Frame
+from kumiki.rule import Orientation
+from kumiki.cutcsg import (
     CutCSG, HalfSpace, RectangularPrism, Cylinder, SolidUnion, Difference, ConvexPolygonExtrusion
 )
-from code_goes_here.rendering_utils import (
+from kumiki.rendering_utils import (
     calculate_structure_extents,
     transform_halfspace_to_timber_local,
     sympy_to_float
@@ -1237,7 +1237,7 @@ def log_structure_extents(extent: float, cut_timbers: List[CutTimber]):
     app = get_fusion_app()
     if app:
         # Calculate detailed extents for logging
-        from code_goes_here.rendering_utils import calculate_timber_corners
+        from kumiki.rendering_utils import calculate_timber_corners
         
     min_x = min_y = min_z = float('inf')
     max_x = max_y = max_z = float('-inf')
@@ -1436,7 +1436,7 @@ def render_multiple_timbers(cut_timbers: List[CutTimber], base_name: str = "Timb
         import json
         import datetime
         try:
-            with open('/Users/peter.lu/kitchen/faucet/giraffeCAD-proto/.cursor/debug.log', 'a') as f:
+            with open('/Users/peter.lu/kitchen/faucet/kumiki-proto/.cursor/debug.log', 'a') as f:
                 f.write(json.dumps({
                     'location': 'giraffe_render_fusion360.py:1200',
                     'message': 'Rendering cut timber in Fusion360',
@@ -1601,7 +1601,17 @@ def render_multiple_timbers(cut_timbers: List[CutTimber], base_name: str = "Timb
     for occurrence, accessory, accessory_name in created_accessories:
         try:
             print(f"Transforming {accessory_name}... (method: {'body' if use_body_transform else 'occurrence'})")
-            
+            has_transform = hasattr(accessory, "transform")
+
+            if not has_transform:
+                accessories_transformed += 1
+                print(f"  ✓ {accessory_name} has no transform field; geometry already in global space")
+                if app:
+                    app.log(f"  ✓ {accessory_name} has no transform field; geometry already in global space")
+                time.sleep(0.05)
+                adsk.doEvents()
+                continue
+
             if app:
                 app.log(f"  Transforming {accessory_name}: (method: {'body' if use_body_transform else 'occurrence'})")
                 app.log(f"    Accessory position (global): {[float(x) for x in accessory.transform.position]}")
@@ -1609,7 +1619,7 @@ def render_multiple_timbers(cut_timbers: List[CutTimber], base_name: str = "Timb
                 for i in range(3):
                     row = [float(accessory.transform.orientation.matrix[i, j]) for j in range(3)]
                     app.log(f"      [{row[0]:.3f}, {row[1]:.3f}, {row[2]:.3f}]")
-            
+
             # Accessory position and orientation are already in global space
             # Use them directly without transformation
             success = apply_timber_transform(occurrence, accessory.transform.position, accessory.transform.orientation, accessory_name, use_body_transform)

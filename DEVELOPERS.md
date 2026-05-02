@@ -1,10 +1,22 @@
 ## Quick Start
 
-To setup your environment, run `make setup` and run `make test` to run tests. 
+```bash
+# Install uv if you don't have it
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Setup (creates .venv, installs everything)
+make setup
+
+# Run tests
+make test
+
+# Run type checker
+make typecheck
+```
 
 ## Development Setup
 
-`make setup` or run `/.setup_dev.sh`
+The `make setup` command runs `uv sync`, which automatically manages your virtual environment (`.venv`), Python version, and project dependencies.
 
 ### Note on CAD Integrations
 
@@ -12,25 +24,20 @@ CAD applications ship with their own Python environments use their own Python en
 
 ## Running Tests
 
-### Manual Testing
-
-To run the test suite manually:
+To run the test suite manually with `uv`:
 
 ```bash
-# Make sure your virtual environment is activated
-source venv/bin/activate
-
 # Run all tests
-python3 -m pytest tests/ -v
+uv run pytest tests/
 
-# Or use the test runner script
-python3 run_tests.py
+# Run tests with verbose output
+uv run pytest tests/ -v
 
-# Or run specific test files
-python3 -m pytest tests/test_rule.py -v
+# Run a specific test file
+uv run pytest tests/test_rule.py -v
 
-# Run with coverage
-python3 -m pytest tests/ --cov=code_goes_here --cov-report=html
+# Run with coverage (or use make test-cov)
+uv run pytest tests/ --cov=kumiki --cov-report=html
 ```
 
 Tests flagged with # 🐪 have been hand reviewed, the rest are AI slop
@@ -39,37 +46,7 @@ Tests flagged with # 🐪 have been hand reviewed, the rest are AI slop
 
 This project uses [ty](https://docs.astral.sh/ty/), an extremely fast Python type checker written in Rust by Astral (the creators of Ruff). ty is 10x-100x faster than traditional type checkers like mypy and Pyright.
 
-📖 **See [TYPECHECK_SETUP.md](TYPECHECK_SETUP.md) for detailed setup instructions.**
-
-### Installing ty
-
-#### Recommended: Using uv (Easiest, Project-Managed)
-
-If you don't have `uv` yet, install it first:
-
-```bash
-# macOS/Linux
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Or using Homebrew on macOS
-brew install uv
-```
-
-Then add `ty` as a development dependency:
-
-```bash
-# Add ty to your project
-uv add --dev ty
-
-# Run ty (uv will manage the installation)
-uv run ty check
-```
-
-This is the recommended approach because:
-- `uv` manages ty versions per-project
-- No global installation needed
-- Works consistently across all team members
-- Automatically handles updates
+`ty` is automatically installed as a development dependency when you run `make setup`.
 
 ### Running Type Checking
 
@@ -80,24 +57,19 @@ make typecheck        # Run type checking on all files
 make typecheck-watch  # Run type checking in watch mode (auto-checks on file changes)
 ```
 
-or manually:
+or manually via `uv`:
 
 ```bash
-# If using uv (recommended)
+# Run ty
 uv run ty check
 
-# If installed globally
-ty check
-
 # Check specific files or directories
-uv run ty check code_goes_here/timber.py
-uv run ty check code_goes_here/
+uv run ty check kumiki/timber.py
+uv run ty check kumiki/
 
 # Watch mode - automatically re-checks when files change
 uv run ty check --watch
 ```
-
-
 
 ### Cleaning Build Artifacts
 

@@ -25,7 +25,17 @@ jobs:
       run: |
         curl -LsSf https://astral.sh/uv/install.sh | sh
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-        
+
+    - name: Cache uv packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cache/uv
+          .venv
+        key: uv-${{ runner.os }}-py3.9-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        restore-keys: |
+          uv-${{ runner.os }}-py3.9-
+
     - name: Install ty and dependencies
       run: |
         uv sync --dev

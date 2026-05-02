@@ -1,5 +1,5 @@
 """
-Fusion 360 rendering module for GiraffeCAD timber framing system.
+Fusion 360 rendering module for Kumiki timber framing system.
 
 This module provides functions to render timber structures in Autodesk Fusion 360
 using the Fusion 360 Python API.
@@ -20,8 +20,8 @@ import traceback
 import time
 from typing import Optional, Tuple, List
 from sympy import Matrix, Float
-from giraffe import CutTimber, Timber, TimberFace, TimberReferenceEnd, TimberLongFace
-from code_goes_here.rule import Orientation
+from kumiki import CutTimber, Timber, TimberFace, TimberReferenceEnd, TimberLongFace
+from kumiki.rule import Orientation
 
 
 def get_fusion_app() -> Optional[adsk.core.Application]:

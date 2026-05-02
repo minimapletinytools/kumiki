@@ -7,10 +7,10 @@ representations are converted to floating point values in CAD systems.
 """
 
 from sympy import Rational, pi, Matrix, cos, sin
-from code_goes_here.timber import Frame, TimberFace, TimberReferenceEnd, create_v3, timber_from_directions
-from code_goes_here.construction import ButtJointTimberArrangement
-from code_goes_here.joints.mortise_and_tenon_joint import cut_mortise_and_tenon_joint
-from code_goes_here.patternbook import PatternBook, PatternMetadata
+from kumiki.timber import Frame, TimberFace, TimberReferenceEnd, create_v3, timber_from_directions
+from kumiki.construction import ButtJointTimberArrangement
+from kumiki.joints.mortise_and_tenon_joint import cut_mortise_and_tenon_joint
+from kumiki.patternbook import PatternBook, PatternMetadata
 
 
 def create_irrational_angles_patternbook() -> PatternBook:
@@ -96,7 +96,7 @@ def create_all_irrational_examples() -> Frame:
     return frame
 
 
-example = create_all_irrational_examples()
+example = create_all_irrational_examples
 
 
 if __name__ == "__main__":

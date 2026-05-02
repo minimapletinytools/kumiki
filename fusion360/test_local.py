@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Test script to verify that all GiraffeCAD dependencies work locally.
+Test script to verify that all Kumiki dependencies work locally.
 This simulates what Fusion 360 will do when importing our modules.
 """
 
@@ -41,26 +41,26 @@ def test_dependencies():
     
     return True
 
-def test_giraffe_modules():
-    """Test that GiraffeCAD modules can be imported from parent directory."""
-    print("\nTesting GiraffeCAD module imports from parent directory...")
+def test_kumiki_modules():
+    """Test that Kumiki modules can be imported from parent directory."""
+    print("\nTesting Kumiki module imports from parent directory...")
     
     try:
-        from code_goes_here.rule import Orientation
+        from kumiki.rule import Orientation
         print("✓ rule.Orientation imported successfully from parent dir")
     except ImportError as e:
         print(f"✗ Failed to import rule from parent dir: {e}")
         return False
     
     try:
-        from giraffe import CutTimber, Timber, create_v3
+        from kumiki import CutTimber, Timber, create_v3
         print("✓ giraffe core classes imported successfully from parent dir")
     except ImportError as e:
-        print(f"✗ Failed to import giraffe from parent dir: {e}")
+        print(f"✗ Failed to import kumiki from parent dir: {e}")
         return False
     
     try:
-        from patterns.structures.horsey_example import create_sawhorse
+        from patterns.structures.kumiki_example import create_sawhorse
         print("✓ sawhorse_example imported successfully from parent dir")
     except ImportError as e:
         print(f"✗ Failed to import sawhorse_example from parent dir: {e}")
@@ -69,7 +69,7 @@ def test_giraffe_modules():
     # Note: We can't test giraffe_render_fusion360 outside of Fusion 360
     # because it depends on adsk modules, but we can test that the file exists
     try:
-        import giraffe_render_fusion360
+        import kumiki_render_fusion360
         print("✓ giraffe_render_fusion360 found in current dir (requires Fusion 360 to run)")
     except ImportError as e:
         if "adsk" in str(e):
@@ -85,7 +85,7 @@ def test_sawhorse_creation():
     print("\nTesting sawhorse creation with path imports...")
     
     try:
-        from patterns.structures.horsey_example import create_sawhorse
+        from patterns.structures.kumiki_example import create_sawhorse
         sawhorse = create_sawhorse()
         cut_timbers = sawhorse.cut_timbers if hasattr(sawhorse, 'cut_timbers') else sawhorse
         
@@ -114,8 +114,8 @@ def test_path_structure():
     # Files that should be in parent directory
     parent_required_files = [
         'giraffe.py',
-        'code_goes_here/rule.py', 
-        'patterns/structures/horsey_example.py',
+        'kumiki/rule.py', 
+        'patterns/structures/kumiki_example.py',
     ]
     
     # Files that should be in current (fusion360) directory
@@ -151,7 +151,7 @@ def test_path_structure():
 
 def main():
     """Run all tests."""
-    print("GiraffeCAD Local Dependency Test (Path Import Version)")
+    print("Kumiki Local Dependency Test (Path Import Version)")
     print("=" * 50)
     
     all_passed = True

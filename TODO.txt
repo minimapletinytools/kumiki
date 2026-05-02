@@ -1,3 +1,59 @@
+
+:: 4/14/2026 menu view
+So it goes as follows, the LHS has 3 sections in this order
+>files
+  **currently open pattern overriding frame x
+  *currently open frame
+  >current project folder
+    >current frame (the currentyl open frame in the viewer)
+    >(other frames in the directory)
+  >(cached history of other projects folders you've opened recently I guess) 
+>patterns
+  >project patterns (in your project dirs pattern folder and its dependency patterns)
+  >builtin patterns (from jonits)
+  >beta patterns (from joints/beta)
+>shop
+  >timbers
+  >joints
+I guess you have a radio toggle to pick which ones to show? Or just collaps projects and patterns it's fine...
+The advantage of the radio toggel is that you can remove the top level folder in teh view...
+
+
+-clicking on patterns opens them in temp override viewer
+-you can also right click or command cilkc to open in new tab 
+  -this open up the pattern as a regular project? or maybe still temp, but without regular project open why not
+
+
+
+
+:: 4/14/2026 drawing generation coad
+
+automatic drawing
+- ensures every feature can be solved
+- can tag features to be used as reference features and drawer prioritizes drawing to these features
+- can tag features with pN to determine order which they get solved in. And P0 means a reference feature
+- solve the feature tree such taht each feature is referenced to some other fetaure and teh entire tree is navigatable
+- can tag features as no measure
+- some feature are coincident (e.g. one face of a row of ortise holes are all coplanar) and only one of the needs to be drawn
+  - this can be represented as a "shares plane" or whatever measure so no specila treatment neede necessarily
+bonus
+-in UI, can select which fetaure to use a reference to draw some other feature
+  -so ecah feature has a list of features it is measured to
+
+
+CoAD based feature refreenceing
+we have a way to reference any feature on the cut timbers, so this will be the unit that CoAD drawing is done from
+
+case study: double miter 2x4 with double miter on both end
+- first flag one vertex and adjacent edge as p0
+  - all miter angles will get mesaured to this edge by default 
+- flag the opposite vertex as p1 and the remaining vertices are flagged as p∞ as we don't want to show solutions for them in the drawing
+- using default drawer, we get the first set of stuff we need
+- next, use custom drawer, we could generate a table referencing each miter angle in the drawing write the matching bevel angle for it into a table
+- I guess we could also mark the bevel angle directly on the drawnig
+- we could create a feature plane that cuts on the first miter and then use that to generate the bevel angle directly in the 3d view!
+
+
 :: 3/17/2026 selection / layer view
 
 Lets add a layout view.... We want a little menu on that spans the entire left side collumn that has an option >> expansion thingy to collapse it.
@@ -11,348 +67,212 @@ it should contain a hirerchacial list view. For now, the list view contais the f
 - joints
   - list of all joints
      - list of timbers belonging to that joint (these will be duplicated)
+     - list af accesories belonging to the joint
 
-introduce a concept of selection.  we can keep it simple. when objcets are selected make everything else slightly mor etransparent
-escape deselects
-pressing F focuses on the selection
+Timbers themselves have a sub hierarchy
+-timber 
+  -tagged CSGs
+    -features
 
+Accessories do not have the sub hierarchy
 
+we may support stuff like locking, fixing and hiding through the layers view so make sure to architect it to support this
 
+when you select an element in the viewer it should also highlight in the layers view and conversely as well
+so basically there needs to be mapping sbetween th eselection manage,r layers view and main view.
 
-:: 3/8/2025 viewer next steps
-DONE-update vscode plugin to use python IPC or something
-  -probably wrap in an interface s you can use websocket or stdio or whatever
+Propose a refactor to suppor this.
 
-DONE-triangulation in python
-  -try triangulating CSG in python first, you can add more triangle data in the future but for now just need tris
-  -actualy I think you want to store fetaure information as features need to be highlightable, not trias correspond to facees, you need to store edges and points separately
-    -I guess after generating mesh you walk the mesh to tie back to features :( hope that's not too slow
 
-DONE-smart refresh
-  DONE-add filewatcher
-  DONE-add hashing on timbers to determine which ones changed
-  DONE-the runner keeps a hash map
-  DONE-then only generate triangles for stuff that changed
+A couple other things, we may show patterns in the layers view using a similar looking UI. patterns are semantically different as they are just a file browser, but they should levearge the same UI to do this. please work this into your plan
 
-IGNORE-doc tab support?
 
-IGNORE-debug console lol
 
--cute backgrounds
-  -creamy gradient background
-  DONE-simple drop shadows? (you can fake this one)
-  DONE-simple reflections? 
-  -fun horse walking trhough background or osmething
-    -still walking trhough structure
-    -slow down speed and spawn rate a lot. jumps should eb more subtle
 
--select support
-  -select timber highlights it in 3d
+:: 3/30/2026 kumiki viewer environment
 
-DONE-navigation support
-  -by default camera center is in center of focused objects, can be moved in view plane by panning
-  -middle mouse pans
-  -scroll wheel zooms and pans towards where mouse location is (in particular, it zooms to the mous eprojected onto the focal plane which is parallel to the screen and intersects the mouse orbit center)
-  -pressing F resets focus (using lepr)
-  DONE-right click drag rotates camera (or maybe just left click...)
-  DONE-maybe include cube gizmo with preset views
-  -ortho perspective toggle?
-  DONE-must lerp between all transitions!!!
+- when you open a my_structure.py file with the extension
+- check the parent folder for an existing .kumiki/project.yaml file which will contain info on the python environment and the girrafecad version, otheriwse create it using the latest version available
+- cerate teh python virtual environment to run runner.py in
 
--simple list view
-  -needs parent list hirearchy support
-  -for now just show a list of timbers
-    -double clicking on a timber focuses in on it
-  -also show list of joints
-    -double clicking focuses in on the joint (you probably need some joint center metadata, but you can just derive from the 2 timbers that make the joint for now)
 
--save as STL or STEP or whatever button
 
+:: V0 release
+-finalize kigumi functions
+  -add menu, menu should populate list of patterns and projects in the open folder (maybe ditch the in-viewer thing)
+-come up with sensible instalation strat
+  -do pip package for release
+  DONE-do proper python env on installing extension, maybe add installation loading screen
+  -do vscode extension release
+-do the layers view for timbers and joints, don't do projects/patterns since you can put that in the menu, or maybe youshould still just do it? idk
+-add generic miter joint
+-finish docs
+  -finish README
+  -finish agents doc
+  -finish ond remove docs folder
+-marketing
+  -make simple website
+  -make some content drip
 
--patternbook integration 
-  -patterns are loaded in a hierarchy (horesCoAd < imported libraries < user space)
-  -"try me" button creates a copy of teh pattern script in user space with comments indicating that this is temporar yand ovewriting
-  -"view source" button takes you to github or something? or maybe just makes a copy in user space or whatever
 
--bonus feature highlighting
-  -clicking on a timber that is in focus highlight sthe featuer on the timber
-    -umm, but yo udon't want to do this when too much is selecetd, maybe only do this if a joint or single timber is selected
 
--bonus, simple drawing support??
-  -identify 2 features and draw a distance line between them, lines always show up above everything
-  -distance lines can be clicked on which highlight the fetaures they measure from, hence features need to be selectively rendered
+::layers TODO
+-NO dynamic folder for now, hardcode folders insted
+-worry about patterns later, they are logically different even if visually the same
+-add tags to timbers and joints, as a 1 tier overlapping folder system
+-search bar, autocompletes both names and tags
+-tag selection bar
+  -has option to choose how many tags to show
+  -unselected tags are grayed out, if all grayed out then show everything
+  -when one tag is selected, unavaialble tags dissapear
+-timbers/joints
+  -allow foldering by first tag option
+  -clicknig on fol
+-joints (separate group, shows up below timbers)
+  -allow foldering by first tag option?
+  -clicking on joint selects all timbers and accesories contained in it
+  -accessories only viewable as children of joints
 
-
-
-
-:: 2/24/2025 measure/mark rules
-
-we have the following measurements
-MeasuredTimberFeature = Union['Point', 'Line', 'Plane', 'UnsignedPlane', 'HalfPlane', 'Space']
-
-And a bunch of different markings which are local to timber features. 
-
-But markings follow the general pattern
-
-mark(measured_feature, timber, feature)
-
-and then their measure function returns another measured_feature, they type of which should be determined from mesaured_feature and feature 
-
-we want a set of rules to determine what feature type gets returned
-
-
-:: 2/5/2026 CSG feature notes
-
-CSG creates features, I think we can reasonable identify all faces and edges from intersections in our potato CSG code
-After CSG gets triangulated, when we click/hover we can raycast onto that triangle
-So we want to reveres map from that triangle to some feature
-Face features can be uniquely identified by normal and boundaries
-edge features are harder, as you can't click exactly on an edge, instead we can check proximity, however we only want to click on the edge if the triangle we clicked on a face that forms that edge. We can map to teh faec first, and then maybe in our csg logic we can find all edges on that face :O
-
-Ok, so we only need to do the following:
--find the fetaure we want to track, this is either a primitive CSG feature or a derived one in the derived case, I think it's really only edges fromed from halfplanes and prism differences (e.g. the edges of a tenon shoulder)
--so we need CSG feature and we need to be able to send it through the CSG tree to diff away stuff from it.
--and CSG features can be primitive CSG features or derived ones. For derived features... maybe the noly derived feature we support is differences between some primitive CSG feature and the uncut timber prism :O, that seems reasoabel to me?
-
-
-:: 2/5/2026 JS<->Python interaction DREAM
-viewer js calls frame manager python script that holds hores code and hot reloads the target script and runs it and stores the resulting frame. The frame manager has a websocket or whatever that communicates with js. The socket has teh following things:
-
-- on_frame_updated(): fires when target script changes and script was rerun, if success, gives a list of CHANGED timbers names in the frame
-- get_frame(): gets the entire frame CSG and metadata for rendering
-- get_member(name): gets CSG and metadata for a specific timber
-- raycast_feature(member/feature filter, raycast_point_location): returns feature that got clicked on
-
-:: 1/23/2026 viewer planning notes
-
-use three.js to implement viewer as a VScode plugin
-
-base features:
--vscode integration (must be easy to use and integrate with some main script)
--render all timbers
--3d space navigation
--click on timber to focus and see more details
-  -render gimbal to show local coordinates
-
-additional features:
--incremental rerendering upon refresh
--timber/folder hierarchy (show/hide/collapse)
--hover over focused timber individual fetaures 
--feature rendering (e.g. render a face in a different color, render joint cuts in different color, etc)
-
-future features:
--2d/3d drawing generation and view (add mesaurements to )
-  -a good step 1 would be to show some basic measurements when focused on 1 timber
--assembly explosion
-
-
-major decision points and things you'll probably need
--triangulation in python or js  (probably in js)
--CSG to mesh function
--add metadata to timbers
--add metadata to CSG/joints for features
-  -this includes naming cuts and sub cuts like faces of a prism
-  -TODO you probably need some feature CSG classes and then learn to intersect them for new features...
-  -TODO this needs to be its own spec
-
-for the naive version of feature highlighting:
-  -CSG metadata maps to feature filter functions so that we can do the following
-    -you probbaly need some kinda BVH to do this efficiently, but linear search is fine too LOL
-  -hover -> raycast triangle -> find feature on timber
-
-
-
-
-:: 1/23/2026 viewer and drawing notes [messy]
-
-We want to be able to generate 2d/3d drawings and be able to highlight features in the viewer.
-
-so the key thing we need is to be able to identify features on timbers. Thihhs comes in 2 flavors
-1. when generating diagrams, it needs a list of features to create drawings from
-2. when in the viewer, it needs to raycast to see which featuer your hovering over.
-
-2. is more or less covered by 1, perhaps we need some additional data to deal with priorities or something but it should nto be a big deal.
-
-For features when generating drawings, lets worok through some broad examples:
-
--round draw bore holes need their centers and diameters marked
--mortise holes need their dimensions and depth marked
--angled things can have lengths projected onto axis and/OR show actual angle
--only 1 side of parallel lines of rectangles need to be marked
--view from multiple isometric angles, each measurement need only be drawn once (do this automatically or allow user to specify which measurement goes to which view)
--measurements are specified to some reference point
-  -you could auto pick reference point and ensure all referenced points can be referenced to face/edge on the timber I guess?
-  -or allow user to specify which feature to reference to in the drawing
--automatic marking generation will probbaly make too many marking so maybe remove some?
--I think in general we need to make suer all features are solveable, have priority on some fetaures, 
-  -but prehaps we just name some featuers and do due diligence in coding to ensure everything else is solveable
-
-examples of features we want to mark:
-
--distance between 2 parallel faces
-  -choose side perpendicular to these 2 faces to draw on (or with smallest dot product)
-
-
--special rules for face aligned features:
-TODO
-
-
-specific examples:
-
--mortise example:
-  -mortise width and height (distance between opposing parallel faces of the mortise)
-    -pick a view to draw it, either top or side, but not from the ends (could use priority system to determine which face of the timber to mark on?)
-  -morties depth
-    -distance between morties shoulder face and mortise bottom
-  -mortise shoulder
-    -side view only, distance between mortise shoulder face and timber face that the morties is on 
-  -mortise position
-    -distance from one side of the mortise to timber face
-    -distance from one side of the mortise to the timber end (need rule to pick side, I guess just pick the closest?)
-    -(HARD) if multiple mrotises in a row on a timber we may want to do interval spacing (from center) or side to side on the mortises
-    -if rotated on face normal axis, mortise, then do a corner of the mortise + angles I guess?
-    -if rotated on another axis then mortise depth is measured from 1 side of the 
-  
-
-So we need to design a way to 
-1. mark features with names 
-
-
-
-
-:: 1/6/2026 metadata
-
--timber metadata 
-  -material
-  -reference face(s) 
-    -used for generating drawings
-
--joint metadata
-  -assembly order
-  -assembly DOF
-    -by combining order and DOF you can validate if it's possible to assemble
-  -feature information (maybe just create a dict of named features for now and fill out the info later)
-  -CSG metadata
-    -named features
-
-
-we want to generaize name/parent so we can build ahirerachy, 
-there is one special distiction which is that there are Construction and Concept names, Construction maps to actual objects or are used to organize actual objects. Concepts map to things like joints and features
-
-I guess for now just mash them all together but flag them as such. when rendering in something that doesn't support concepts, just omit them, or we can extract concepts into a sepaarte tree but use the same hierarchy (if they were parented to a construction, then just create ap roxy for the construction in the concept tree)
-
-
-class TicketType(Enum):
-  Folder
-  Timber
-  Accessory
-  Board
-  Joint
-  etc
-
-class Ticket
-  name
-  parent
-  type: TicketType
-  def is_type()
-  def is_concept()
-  def is_construction()
-
-
-:: documentation
-
--installation
--quick start 
--simple reference
-  -simple examples of how to use each method with default parameters (axis aligned, face parallel only)
-  -ALWAYS use Sympy types
--terminology
-  -detailed examples explaing all cnocepts
--advanced reference
-  -detailed examples outlining every parameter (generate from python files)
--appendix shit
 
 
 :: TODO
 
-DONE-decide what "vanilla" project looks like
-  DONE-can we just run the cdoe and take what it returns
-  DONE-or do we scan for certain patterns
-DONE-new shed and irrational angles are failing
-DONE-start viewer I guess?
-  DONE-setup stdio
-  DONE-load example
-  ODNE-do basic frame rendering (as boxes) get_bounding_box_prism
-  DONE-do camera centering and navigation using 3js package I guess
-DONE-add wireframe rendering
-DONE-3d view
-  DONE-add gizmo in upper right corner
-  DONE-add focus button
-DONE-move out CSS html and frontend scripts into their own thing
-DONE-double/triple/quadruple butt arrangement
-  -assert for butt timbers pointing in cardinal directions
-  -check_face_aligned_and_cardinal checks that each butt timber is pointing in one of the 4 cardinal direction orthogonal to the receiving timber, and they should all be different
+DONE-kigumi
+  DONE-add loading grahpic and do background loading of patterns
+  DONE-add refresh button
+  DONE-remove examples from sidebar or get it work right
+  DONE-only scan patterns folder
+  DONE-make proper header and buttons or something...
+  DONE?-frames section should omit examples if it starts with "patternbook" as these are patterns
+  DONE-patterns section should have a drop down that says "group by patternbook" and then cilcking on the patternbook folder opens the entire patternbook in the viewer
+  DONE-clicking on paternbook group folder opens the patternbook
+  DONE-allow viewing source on pattern/frames, obvious what to do in workspace patterns, for shipped pattern, it  will open a read only copy it from the dependencies folder?
+    -for kumiji shipped patterns also have an option to duplicate pattern in workspace, which will make a copy of teh pattern in workspace for you to modify
+    -view source/duplicate source buttons are broken right now...
+  DONE?-add special mode for local development??
+    -does not initilaize python env stuff and detects that it is in local dev mode
+    -does not scan for kumiki (add a notice for local development, and patterns/exampes will show up as workspace patterns)
+  DONE-have toggel to choso et open kigumi in separate collumn or in same tab group
+  DONE-have settings menu in extension menu to change settings like open in split tab
+  DONE-pattern scanning still weird
+  DONE-patternbook grouping not working for workspace pattern
+  DONE-frames not being detected in local dev mode?
+  DONE-group by patternbook still does not have an icon
+  DONE-add view source button to frames
+  DONE-remove toggle split view button from sidebar, or when you click it it should turn from a single to a double square
+  DONE-add integration test for sidebar
+  DONE-update examples to be exmaples and not patterns
+  DONE-fix examples and ptatern separation, or maybe just get rid of examples
+    -remove workspace examples as these are just frames, or perhaps workspace example and frame should follow the same format?
+  DONE-add header section to kigumi explorer, it should have 1 box shaped buttons
+    -initialize current project, or if project is already initilized, it shows information about the initialized project (or if its a local development mode)
+    -remove the "open in split view" button in the top bar 
+    -remov ethe open current file in viewer button in the top bar
+    -remove the initialize project button in the top bar
+DONE-show proper error if you open a non pattern
 
--bugs
-  -fix the error you have in one of your examples
-  -fix csg test error
+-publish python package
+  -publish to testpypi first
+  -setup pypi account
+  -publish to pypi
 
--lincoln log joints?
+-test the initialize project thing lol
+  -need to pbulish kumiki first
 
--splined opposing double butt joint :D (could have drawbore or key)
 
--move all jonits over to arrangements
+-rethink hierarchical feature selection, as you'll want to be able to select 2 features to measure them in the future.
 
--add sensibility checks to arrangement (so basically they intersect at least a little bit)
-  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
+-do new selection hierarchy here are the states
+  -nothing selected (show everything)
+  -unselected (use transparency)
+  -timber selected (no sub selection)
+  -timber selected (with sub selection)
+  -tagged CSG selected (no sub selection)
+  -tagged CSG selected (with sub selection)
+  -feature selected
+  -I guess just use transparency for outer stuff when focusing in on selection? But you should make distinct states for each of them... but maybe combine the options for changing their look 
 
--add tongue and fork joint
--create experiments folder 
-  -do image to frame experiments (some with chain of reason promptitng, some without)
+-pattern viewer (improved)
+  -pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
+  -add searching + tag searching functionality on top of the patternbook/frames/examples
+  -allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
 
--feature selection
-  -add feature selection support to viewer
-  -add some selection/feature selection info panel
+-add dovetail shoulder to build a butt joint
+-add notching to build a butt joint (you can skip this if you want lol...)
+
+-do assembly metadata
+  DONE-create assemblydirection class 
+  -for accessories, have assemblydriection but also have locking accessory
+  -can you rename accessory btw??
+  -add assembly directions to existing joints
+    -can have helpers from arragement classes to do this in most cases
+
+  
+-add more tests using the right way
+-the right way to do hashing is to have all joints hash their input properties and store a _hash property
+
+-decide on layer view
+  -is patternbook part of layer view or separate thing
+  -figure out how to do show hide option
+  -decide on section: timbers, joints (this is fine for now)
+    -how do these sections integrate with folders
+  -decide on folders being string refs or actual refs when constructing...
+
+-do tinyhouse shed
+  DONE-fix joists between intermediate posts, they should mortise and tenon into the posts
+  DONE-make floor joist dovetails smaller so they don't intersect with the post tenons
+  DONE-add pegs to all horizontal mortise and tenons
+  DONE-adjust tenons so the are measured from the outside reference faces
+  DONE-add new joints for floor beams
+  DONE-add double buttj oint to floor beams
+  -lower rafters to be flush with ridge beam and then use housed dovetail joints on ridge beam
+  -use cross lap point on the other side (you may need ot update cross lap joint to work on non FAT timbers)
+  -make rafter logic not suck lol...
+  -do yo uneed/want more rafters?
+  
+
+
+-UI feature select
   -if 2 feature sselected, do measurement rendering between them :O
   -byd efault, noly features are the 6 sides of a timber
     -you can usually not select the end face so how can we tell which is the top/bottom?
       -maybe add an arrow gizmo pointing to the top in the center of teh timber?
       -or for features that coincide with local cardinal dircetions of timber you can flag it
-  -figure out how to do feature metadata and allow feature selection?
-    -review yoru notes
-    -you also wanted key named features for auto generation of drawings???
+-UI layer view 
+  -decide on layer view organization
+  -finish ticket system
+  -add layers view to left I guess
 
--do assembly metadata
-  -create assemblydirection class 
-  -for accessories, have assemblydriection but also have locking accessory
-  -can you rename accessory btw??
+-UI whatever
+  DONE-output proper error if you try and open a non-frame file
+  DONE-render kumiki should not open in new tab
+  -move focus button, make it more cute
+  -add # joints table view at bottom (shouldh include joint type, but you need metadat for this)
+  -maybe add "assume upright structure" to limit camera movement with mouse?
+  -figure out why box view doesn't render right for the gooseneck, end cut is correct
+  -background seleciton should also change font color in viewer
+  -blueprint background sucks lololol blueprint should do infinite blueprint plane with horizon instead (horizon backgrounds)
+  DONE-add toggle for  debug info in lower right
+  DONE-selected info should just be one line
+  IGNORE-add front facing direction3d to Frame
+  DONE-add some background color choices (colors, gradient,s whatever fun stuff)
+  
+-perf related stuff stuff 
+  -see what you can do about numeric percision of contains_point
+  -do yet another perf pass, still pretty slow
+  -decide if hashing is ever worth it and or just remove it entirely
+    -or maybe come up with a faster hashing method?
 
--saw/chisel metadata 
-  -allow features to be labeled as saw or chisel so we can do cutting instructions
-  -for saw, you need to be able to saw a triangel shape (specify 3 vertices)
-
--how dose selection change after refresh?
+-rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future
+-add accessories to STEP STL and viewer
+-and export STEP/STL button back into viewer (comibne/single, step/stl options, defaultable)
+-lincoln log joints?
+-consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
+-add sensibility checks to arrangement (so basically they intersect at least a little bit)
+  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
+-do image to frame experiments (some with chain of reason promptitng, some without)
+DONE/IGNORE-how dose selection change after refresh?
 -highlight timebrs in timber list with selection, or just get rid of timber list?
--seemst o freak out after a python cash, need to add error handling
--disable critters or fix it.... (and turn off logging ug)
--I think you need a 3 way joint, or at least a placeholder for it. Shachisen-tsugi (車知栓継ぎ)
-
--do layout
-  -pop out left tab for hierarchy
-  -pop up right tab for gizmos
-  -info tab at right/bottom right???
-  -bottom left/center section to help you scroll further down to bottom views
-    -view options can go here
-
--do new mouse navigation
--render accessories
--fix reflection rendering and make background nicer?
--maybe background colors should inehirt from vscode theme :O
--add front facing direction3d to Frame
--maybe add "assume upright structure" to limit camera movement with mouse?
--figure out why box view doesn't render right for the gooseneck, end cut is correct
-
-
 -document example/patternbook stuff
 -after viewer, you should integrate patternbook into viewer
 -update agent insturction
@@ -390,8 +310,8 @@ EXEMPLIFY
 
 
 RENAMEIFY
-  -rename measure to locate
-  -then you can use measure to measure between two located features (which we don't actually care about, we need to measure between 2 CSG features...)
+  DONE-rename measure to locate
+    -then you can use measure to measure between two located features (which we don't actually care about, we need to measure between 2 CSG features...)
   -be consistent about function local/golbal naming
     -local input vars should have the suffix  _local
       -some things must be interpreted locally such as "face" or "distance", these d onot have the suffix
@@ -413,7 +333,7 @@ RENAMEIFY
     -add from_joints -> raise function to Frame
       -have an on class member version of it to cuz its cutre that way
     -oscar shed -> tiny snack house
-    -horsey viewer -> horse watcher or barn raising? or 建前 or tatemae
+    -kumiki viewer -> horse watcher or barn raising? or 建前 or tatemae
   -consider doing a rename pass on validitiy checkers  
     -assert
     -check
@@ -441,12 +361,239 @@ TESTIFY
   -setup one test template so it can be used as an agent template for everything else
   -add test timber construction thingies on top of the example ones
     -btw you should update your current example so that everything is in the XY plane I think yo uhave soem in the Z plane
-  -do better testing on join_perpendicular_on_face_parallel_timbers to make sure it's right....
+  -do better testing on join_face_aligned_on_face_aligned_timbers to make sure it's right....
   -create test runner for examples so the exmaples are also tests :O
   -add test for finger miter joint thingy
 
 
--M1 (reward is reimburse H2D LOL)
+
+DONE-M2 (reward: reimburse camera)
+  DONE-VIEWER
+
+-M2.5 V0 release
+  -improve ticket class
+  -features but no sub features
+    -allow clicknig on joint parts
+    -allow clicking onfaces to display which face yo uclicked on
+
+-M2.75
+  -add panel/board support 
+  -update shed example to include panels
+  -add screw joint
+  -add stl support for joint accessories so you can use framing hardware
+
+
+-M3 (reward: HNT gordon plane :D)
+  -decorative cuts
+    -basically joints with 1 timber
+    -you'll need to add curve CSG D:
+  -add more features to mortise and tenon joint
+    -extract out peg creation stuff, it will be useful in other places
+      -basically, just figure out the start point and direction of the peg... it will return to you a tuple of prisms to substract from the mortise and tenon timber, and a peg accessory
+    -support non face aligned cases
+      -clean up the mortise shoulder calculation shit wtf or maybe yo uneed it for non face aligned cases?
+    -end wedged mortise and tenon
+    -fox wedge mortise and tenon
+    -Hōzo-zashi Komisen-dome (ほぞ差し込み栓止め)
+      -same as draw bore but with komisen peg,
+    -tusked mortise and tenon
+    -support tenon_rotation
+    -support mortise_shoulder
+    IGNORE-add additinoal mortise timbers to mortise tenon joint.. so you can do the thing like the stacked joint on the back post of oscarshed
+      -actually better to do this as a house joint and 2 separate mortise and tenon joints. the second mortise and tenon joint will be awkard but it works so why not
+    -end_mortise_and_tenon (opitonally extends the mortising timber and offsets the tenon)
+      -otherwise calls into mortise_and_tenon above
+      -also needs to convert the mortise into an "end cut"
+  -basic joints, or maybe move these to "lap joints" file?
+    -half_lap (use same code as cross lap joint?)
+    -bridle joint (special case of mortise and tenon? nah)
+  -sidewedged dovetail mortise and tenon joint (this method is its own method)
+  -a few more fancy ones from here https://architizer.com/blog/inspiration/industry/japanese-art-of-wood-joinery/
+
+M3.5
+  -drawing support
+
+-M4
+  -IFC rendering?
+  -more joints
+    -splice joints
+      -TODO 
+    -coner joints
+      -mortise and tenon end joint (calls mortise and tenon but positions the tenon in away from the end)
+      -half lap
+    -cross joints
+      -double notch
+    -fancy joints
+      -the one where 2 beams butt up against 1 post and have the thing that passes through them
+  -chamfer render support?
+  -define assembly directions for each joint (does this go in meta data?)
+  -assembly solver thing :D (lol no) 
+
+
+
+
+
+
+:: FUTURE shit
+
+-should I make a "block" class that parents "Timber" and then make a "board" class?
+-should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
+- add nominal_size sup port for square and line rule desgins
+- make really awesome examples that showcase each parameter of each function
+
+
+
+:: TODONE 
+DONE-review TestHousedDovetailButtJoint and see if it deserves a camel
+DONE-fix feature issues
+  DONE-come up with a better term for "named CSG"
+    -how about tagged CSG
+  DONE-when generating named CSG meshes, it's selecting way too much, maybe you can fix with broad phase? or explicitly test each point against the CSG rather than just using geometry + normal which I assume is what's it's donig right now... or maybe it's using the CSG name which is the same rather than using CSG hierarchy
+    -I think it general you should just rewrite named CSG mesh/feature generation. 
+  DONE-selecting feature still doesn't highlight properly. I suspect its related to geo generation
+DONE-refactor patterns to not actually load the entire pattern
+DONE-BUG basic_gooseneck pattern is broken, it's not rendering teh housing tiimber. It works fine when I opne the xample in freecad. in the viewer it shows only 1 timber when there should be 2 so it's not rendering one of the timbers for some reason ,prheaps due to a name duplication? Can you figuer out why.
+DONE-fix 0 length prism rendering triangulation
+DONE-BUG hrosey viewer seems to run in teh background after closing all tabs... need better cleanup routine, 
+DONE-BUG sharde runners that have been stopped stil have their auto relod watcher thingy running, make suer to stop it when you close it or whatever when yo cuose the tab
+DONE-BUG pattern viewer thingy does not support CSG stuff
+  [tinyhouse120.py] [patterns] loadPattern error: Runner command 'raise_specific_pattern' failed: Pattern 'halfspace_cut' returned Difference, expected Frame can you lok into 
+DONE-BUG doubel dildo joint on oscar shed still having z fighting issues.
+DONE-get rid of the old step file generatinon thing and then figure out which dependencies are mandatory and just amke them all mandatory, ono optional deps!!
+DONE-rename to kumiki/kigumi
+
+DONE-TICKET TODO
+  DONE-add reference faces to PTW ticket
+    -add a post init step to PTW that does the following
+      -assert they are coincident
+      -for now require nominal and ptw dimensions to match on reference faces
+  DONE-do basic named tagging of features on CSGs 
+    -just support tagging faces on halfspace and prism
+    -and passing through union/difference
+  IGNORE-then must be able to reference named tags inside of joint ticket
+    -then when you click on a cut timber, you need to find all joints the timber belongs to to find which features on that joint you clicked
+  IGNORE-add some notes for adding broadphase so you don't forget.
+DONE-add stdout makers for better profiling
+DONE-add settings class for persisted settings in viewer
+DONE-add unselecetd transparency option
+  -add a slider option so that we can set the transparency of unselected timbers (default 40%)
+  -if no timbers are selected, then everything renders as if it were selected (I believe this is current behavior)
+DONE/FAIL-add test for joints using max mode or something
+DONE/IGNORE-improve integration tests on the viewer. Can you think of some tests to help improve it 
+  -epen a test file with a couple milestones, simple timebrs and joints
+    -expect timbers show up in raw data
+    -expect milestones
+  -one test for each of the options to see that they work
+  -can we test each of the mouse/keyboard navigation things?
+DONE-unselected transparency slider should be inverted
+DONE-edge rendering on unselected things should also have transparency applied
+DONE-transparent rendering covers shadow and reflection and also covers feature highlights :( fix pls
+DONE-probably remove hashing stuff you added
+DONE-redo CSG features
+  -add an optional name field to CutCSG which creates a hierarchical naming scheme e.g. for mortise and tenon joint
+    -timber, top level, the entire timber is considered a named CSG
+      -* unnamed csg that is the top level mortise and tenon joint, which is a difference halfspace, rectangular prism CSG
+        -halfspace -> "shoulderplane"
+        -rectangular prism -> "tenon"
+  -each time you click, it navigates a layer deeper
+  -feature mesh generation should happen in python on request, not in javascript
+    -walk over existing mesh and extract points that land on the feature in question, return resulting tris
+  -you still want to be able to select features
+    -clicking on selected CSG raycasts and selsects named CSGs within it or features if raycast hits no named CSG
+    -ctrl click goes straigh to selecting features
+    -not all CSGs have features yet, in these cases, you just select the CSG itself
+  -add feature mesh finding/generation/rendering stats each time you click
+  -display the CSG/fetaure selection string in the info section
+    -hard code in "front/back/left/right/top/bot" face by checking normal when you select a face, so if you select a face that shares a normal with these direction (locally) display it e.g. (selected: post > beam mortise and tenon joint > top end tenon > face (front))
+  -keep named features, they are specifically for saw/chisel metadata where we need feature level tagging, however they aren't actually being used at the moment.
+      -allow features to be labeled as saw or chisel so we can do cutting instructions
+      -for saw, you need to be able to saw a triangel shape (specify 3 vertices)
+DONE/IGNORE-improved CSG tagging
+  DONE-allow half faces on prism
+  -allow full CSG feature naming
+  -allow side faces and top/bot flats to be tagged on CSG extrusion
+    -would be cool to allow union faces that are coplanar... but I think you can just name 2 features when defining the cutting instructions and check that they are coplanar then
+DONE-try auto authoring tests again, this time ask it to use plain_joints as an example
+IGNORE-update timber creation to do eval if the expression is even alittle complex and see how honeycomb shed profiling differs
+DONE-fix all the crud you have in your safe math functions, maybe just clean up to all floats...
+  DONE-girrafe_* methods 
+  DONE-remove fast_zero test and fast_equality test
+  DONe-safe_compare to take a compare arg
+  DONE-do girrafe_* for compare and have all test function call it. all test functions should just be numeric
+  DONE-I guess you might want symbolic test methods for some tests?? nah
+  IGNORE-cleanup transform class to always use numeric
+  DONE-add docs explaining how all this shit works
+DONE-do another perf pass  
+DONE-add plane aligned variant of join_timbers
+DONE-rename join_plane_aligned_on_place_aligned_timbers to join_plane_aligned...
+  DONE-update brace example to use join_plane_aligned
+  IGNORE-create some example with corner braces...
+DONE-I think the meshing n/N in viewer is broken??? doesnt' match profiling times? in general displayed profiling times mismatch actual time  
+
+DONE-splined opposing double butt joint :D (could have drawbore or key)
+  -you need to create shoulder_shavings for making shoulder cuts
+    -shoulder cuts should be infinite in one direction so can generate the positive and negative for both sides easily
+      -I guess you need a full space cut?
+DONE-see what you can do about zfighting issues
+DONE/IGNORE-ui widgets need to capture mouse inputs so they don't reset selection
+DONE-I think you need a 3 way joint, or at least a placeholder for it. Shachisen-tsugi (車知栓継ぎ)
+DONE-seemst o freak out after a python cash, need to add error handling
+DONE-disable critters or fix it.... (and turn off logging ug)
+
+DONE-do new mouse navigation
+DONE-render accessories
+DONE-fix reflection rendering and make background nicer?
+IGNORE-maybe background colors should inehirt from vscode theme :O
+DONE-need plain_double_butt joint examlpe
+IGNORE-do layout
+  -pop out left tab for hierarchy
+  -pop up right tab for gizmos
+  -info tab at right/bottom right???
+  -bottom left/center section to help you scroll further down to bottom views
+    -view options can go here
+
+
+DONE-decide what "vanilla" project looks like
+  DONE-can we just run the cdoe and take what it returns
+  DONE-or do we scan for certain patterns
+DONE-new shed and irrational angles are failing
+DONE-start viewer I guess?
+  DONE-setup stdio
+  DONE-load example
+  ODNE-do basic frame rendering (as boxes) get_bounding_box_prism
+  DONE-do camera centering and navigation using 3js package I guess
+DONE-add wireframe rendering
+DONE-3d view
+  DONE-add gizmo in upper right corner
+  DONE-add focus button
+DONE-move out CSS html and frontend scripts into their own thing
+DONE-double/triple/quadruple butt arrangement
+  -assert for butt timbers pointing in cardinal directions
+  -check_face_aligned_and_cardinal checks that each butt timber is pointing in one of the 4 cardinal direction orthogonal to the receiving timber, and they should all be different
+DONE-add tongue and fork joint
+DONE-bugs
+  -fix the error you have in one of your examples
+  -fix csg test error
+DONE-move all jonits over to arrangements
+DONE-implement tongue and fork butt joint 
+DONE-fix step output
+DONE-add profiing stats
+DONE-add get_perfect_size_in_direction
+DONE-change nominal size to nominal half size in direction (this is kind acute actually cuz it can do diagonal size which is something you need, except you probably want get_perfect_size_in_direction)
+  -maybe rename to something else
+DONE-rename measure to locate
+DONE-build-a-butt_joint.py
+DONE-I think your hashing the sympy crap so it's taking forever LOL
+  DONE-add a toggle to disable the hash check thingy
+DONE-need to do perf and figure out why it takes so long....
+  -add loading bar on initial load
+  -add individual stats for meshing (python -> js round trip. Iguess?)
+    -not ecomplexiyt of teh timber
+    -write stats to a file?
+DONE-be able to tell which timber you clicked on if you clicked on a single timber
+
+
+DONE-M1 (reward is reimburse H2D LOL)
   DONE-address TODOS in join_timbers
   DONE-create a split timber method that takes a timebr and returns 2 timbers (you splice joint themy ourself later)
   DONE-consider making a better way to store TimberWithJoints and joints class etc...
@@ -492,74 +639,6 @@ TESTIFY
       - so I guess joints will resize the timber, even tusk tenon joints take a tusk length parameter, tenon joints have a tenon depth parameter etc.. 
       - i think this is how it already is, update the README to explain this
     - move joint section from morenotes into concepts.md and then delete morenotes
-
--M2 (reward: reimburse camera)
-  -decorative cuts
-    -basically joints with 1 timber
-    -you'll need to add curve CSG D:
-  -improve ticket class
-  -VIEWER :D
-
-
--M3 (reward: HNT gordon plane :D)
-  -add more features to mortise and tenon joint
-    -extract out peg creation stuff, it will be useful in other places
-      -basically, just figure out the start point and direction of the peg... it will return to you a tuple of prisms to substract from the mortise and tenon timber, and a peg accessory
-    -support non face aligned cases
-      -clean up the mortise shoulder calculation shit wtf or maybe yo uneed it for non face aligned cases?
-    -end wedged mortise and tenon
-    -fox wedge mortise and tenon
-    -Hōzo-zashi Komisen-dome (ほぞ差し込み栓止め)
-      -same as draw bore but with komisen peg,
-    -tusked mortise and tenon
-    -support tenon_rotation
-    -support mortise_shoulder
-    IGNORE-add additinoal mortise timbers to mortise tenon joint.. so you can do the thing like the stacked joint on the back post of oscarshed
-      -actually better to do this as a house joint and 2 separate mortise and tenon joints. the second mortise and tenon joint will be awkard but it works so why not
-    -end_mortise_and_tenon (opitonally extends the mortising timber and offsets the tenon)
-      -otherwise calls into mortise_and_tenon above
-      -also needs to convert the mortise into an "end cut"
-  -basic joints, or maybe move these to "lap joints" file?
-    -half_lap (use same code as cross lap joint?)
-    -bridle joint (special case of mortise and tenon? nah)
-  -sidewedged dovetail mortise and tenon joint (this method is its own method)
-  -a few more fancy ones from here https://architizer.com/blog/inspiration/industry/japanese-art-of-wood-joinery/
-
--M4
-  -IFC rendering?
-  -add panel/board support 
-  -update shed example to include panels
-  -more joints
-    -splice joints
-      -TODO 
-    -coner joints
-      -mortise and tenon end joint (calls mortise and tenon but positions the tenon in away from the end)
-      -half lap
-    -cross joints
-      -double notch
-    -fancy joints
-      -the one where 2 beams butt up against 1 post and have the thing that passes through them
-  -add screw joint
-  -chamfer render support?
-  -add stl support for joint accessories so you can use framing hardware
-  -define assembly directions for each joint (does this go in meta data?)
-  -assembly solver thing :D (lol no) 
-
-
-
-
-
-
-:: FUTURE shit
-
--should I make a "block" class that parents "Timber" and then make a "board" class?
--should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
-- add nominal_size sup port for square and line rule desgins
-- make really awesome examples that showcase each parameter of each function
-
-
-
-:: TODONE
 
 DONE-finish mortise and tenon joint non angle stuff and peg depth
 DONE/IGNORE-clean up docs on one joint function
@@ -669,7 +748,7 @@ DONE-sympy refactor fml
 DONE-all methods have a property `as` that returns TimberFeature 
   -TimberFeature has methods `face` `reference_end` `long_face` etc 
   -so you do long_face.as.face() to do your enum castings
-DONE-MeasuredTimberFeature -> MarkedTimberFeature
+DONE-LocatedTimberFeature -> MarkedTimberFeature
 DONE-swap measure/mark
 DONE-move out all the get_ methods in Timber.py (change into mark functions)
 DONE-be consistent about get/find usage
@@ -727,7 +806,7 @@ DONE-gooseneck lap joint
 DONE-change gooseneck to return 2 Convex CSGs or support non convex polygon extrusion CSG (errors on some functions or returns None or whatever)
 DONE-rafters get added twice in oscar shed
 DONE-add extrude polygon csg rendering to fusino 360
-DONE-fix the 13:43:54  /Users/peter.lu/kitchen/faucet/giraffeCAD-proto/code_goes_here/japanese_joints.py:221: UserWarning: Gooseneck joint configuration may not be sensible: Joint ends are pointing in the same direction (dot product = 1.000). For a splice joint, the ends should point in opposite directions (dot product should be -1) warning
+DONE-fix the 13:43:54  /Users/peter.lu/kitchen/faucet/kumiki-proto/code_goes_here/japanese_joints.py:221: UserWarning: Gooseneck joint configuration may not be sensible: Joint ends are pointing in the same direction (dot product = 1.000). For a splice joint, the ends should point in opposite directions (dot product should be -1) warning
 DONE-do irrational joint test for rendering
 DONE/IGNORE-static method in orientation class
 DONE-fix or delete goosenecksplice example in japanese joints examples
@@ -860,6 +939,292 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: END TODONE
+
+:: 3/30/2026 math cleanup prompt
+
+Please review rule.py and all math operations in the code base.
+
+At some ponit Itried to make everything symbolic but realized that would accumluate too many symbols and make things impossibly slow so I switched back to floats but there are some hacks and stuff in the code that make thin sugly. Here's what I want
+
+when creating timbers from literals, use symbolic math everywhere possible and if symbols get even a little too complicated, eval down to float
+symbols should never exceed more than like 10 symbols, so lambify/numpy probably not necessary? stick to evalf? However creaet a giraffe_evalf function that calls evalf rather than call evalf directly. Basically I don't trust evalf and worry it will cause issues down the road so I want t obottle neck it all in my operation so I can do stuff like lambidy or timeouts if needed
+remove all the timeout and weird hacky stuff I did in rule.py
+use the safe_* math operations as much as possible. these check for symbols and shortcut to evalf if the symbols accumulate too much. in practice, they can always just eval down to floats.
+Any suggestions in the future? I think in many cases I don't even need to try and preserve symbols. So should we create numeric_* math operations that automatically collapse everything down to floats and prefer using these in most places. For example, CUTCsg are easily supre complicated and shouldnot really attempt to accumulate floats as they aren't used as features to generate anythnig else.
+
+
+:: 3/8/2025 viewer next steps
+DONE-update vscode plugin to use python IPC or something
+  -probably wrap in an interface s you can use websocket or stdio or whatever
+
+DONE-triangulation in python
+  -try triangulating CSG in python first, you can add more triangle data in the future but for now just need tris
+  -actualy I think you want to store fetaure information as features need to be highlightable, not trias correspond to facees, you need to store edges and points separately
+    -I guess after generating mesh you walk the mesh to tie back to features :( hope that's not too slow
+
+DONE-smart refresh
+  DONE-add filewatcher
+  DONE-add hashing on timbers to determine which ones changed
+  DONE-the runner keeps a hash map
+  DONE-then only generate triangles for stuff that changed
+
+IGNORE-doc tab support?
+
+IGNORE-debug console lol
+
+DONE-select support
+  -select timber highlights it in 3d
+
+DONE-navigation support
+  -by default camera center is in center of focused objects, can be moved in view plane by panning
+  -middle mouse pans
+  -scroll wheel zooms and pans towards where mouse location is (in particular, it zooms to the mous eprojected onto the focal plane which is parallel to the screen and intersects the mouse orbit center)
+  -pressing F resets focus (using lepr)
+  DONE-right click drag rotates camera (or maybe just left click...)
+  DONE-maybe include cube gizmo with preset views
+  -ortho perspective toggle?
+  DONE-must lerp between all transitions!!!
+
+DONE-cute backgrounds
+  DONE-creamy gradient background
+  DONE-simple drop shadows? (you can fake this one)
+  DONE-simple reflections? 
+  -fun horse walking trhough background or osmething
+    -still walking trhough structure
+    -slow down speed and spawn rate a lot. jumps should eb more subtle
+
+-simple list view
+  -needs parent list hirearchy support
+  -for now just show a list of timbers
+    -double clicking on a timber focuses in on it
+  -also show list of joints
+    -double clicking focuses in on the joint (you probably need some joint center metadata, but you can just derive from the 2 timbers that make the joint for now)
+
+-save as STL or STEP or whatever button
+
+-patternbook integration 
+  -patterns are loaded in a hierarchy (horesCoAd < imported libraries < user space)
+  -"try me" button creates a copy of teh pattern script in user space with comments indicating that this is temporar yand ovewriting
+  -"view source" button takes you to github or something? or maybe just makes a copy in user space or whatever
+
+-bonus feature highlighting
+  -clicking on a timber that is in focus highlight sthe featuer on the timber
+    -umm, but yo udon't want to do this when too much is selecetd, maybe only do this if a joint or single timber is selected
+
+-bonus, simple measurement support??
+  -identify 2 features and draw a distance line between them, lines always show up above everything
+  -distance lines can be clicked on which highlight the fetaures they measure from, hence features need to be selectively rendered
+
+-bonus ortho view drawing support
+  -take simple measurement support and then render a single timber in ortho view
+  -you need a method to check if 2 timbers are the same or rotatinos/reflections of each other
+  -maybe there is a likea. "drawing page" that lets you group timbers into pages, and then select how to orient timbers
+
+
+
+:: 2/5/2026 CSG feature notes
+
+CSG creates features, I think we can reasonable identify all faces and edges from intersections in our potato CSG code
+After CSG gets triangulated, when we click/hover we can raycast onto that triangle
+So we want to reveres map from that triangle to some feature
+Face features can be uniquely identified by normal and boundaries
+edge features are harder, as you can't click exactly on an edge, instead we can check proximity, however we only want to click on the edge if the triangle we clicked on a face that forms that edge. We can map to teh faec first, and then maybe in our csg logic we can find all edges on that face :O
+
+Ok, so we only need to do the following:
+-find the fetaure we want to track, this is either a primitive CSG feature or a derived one in the derived case, I think it's really only edges fromed from halfplanes and prism differences (e.g. the edges of a tenon shoulder)
+-so we need CSG feature and we need to be able to send it through the CSG tree to diff away stuff from it.
+-and CSG features can be primitive CSG features or derived ones. For derived features... maybe the noly derived feature we support is differences between some primitive CSG feature and the uncut timber prism :O, that seems reasoabel to me?
+
+3/22 actual plan:
+
+interface looks like:
+`check_feature(csg, feature) -> bool`
+
+feature are defined when constructing the CSG tree. We can limit it to the following 2 cases:
+- as as an edge or face feature of a primitive
+- as an edge feature in a difference/union of 2 face features
+
+features are stored in a tree
+- ecah csg has a feature field (should I just derive from the Ticket class so you can use the name field? probably not??)
+- derive_fetaure(csg, feature_field) -> CSGFeature
+- feature_field is CSG class specific, it can refer to child features in union/difference, in primitives it refers to the primitive geometry
+
+the final returned csg has a ticket that points to a feature in the top level Difference(ptw, [negative_cuts]) 
+- you will need to store this object now in cut timber instead of building it on the fly
+
+
+
+:: 2025 documentation
+
+-installation
+-quick start 
+-simple reference
+  -simple examples of how to use each method with default parameters (axis aligned, face parallel only)
+  -ALWAYS use Sympy types
+-terminology
+  -detailed examples explaing all cnocepts
+-advanced reference
+  -detailed examples outlining every parameter (generate from python files)
+-appendix shit
+
+:: 1/6/2026 metadata
+
+-timber metadata 
+  -material
+  -reference face(s) 
+    -used for generating drawings
+
+-joint metadata
+  -assembly order
+  -assembly DOF
+    -by combining order and DOF you can validate if it's possible to assemble
+  -feature information (maybe just create a dict of named features for now and fill out the info later)
+  -CSG metadata
+    -named features
+
+
+we want to generaize name/parent so we can build ahirerachy, 
+there is one special distiction which is that there are Construction and Concept names, Construction maps to actual objects or are used to organize actual objects. Concepts map to things like joints and features
+
+I guess for now just mash them all together but flag them as such. when rendering in something that doesn't support concepts, just omit them, or we can extract concepts into a sepaarte tree but use the same hierarchy (if they were parented to a construction, then just create ap roxy for the construction in the concept tree)
+
+
+class TicketType(Enum):
+  Folder
+  Timber
+  Accessory
+  Board
+  Joint
+  etc
+
+class Ticket
+  name
+  parent
+  type: TicketType
+  def is_type()
+  def is_concept()
+  def is_construction()
+
+
+
+:: 2/24/2025 measure/mark rules
+
+we have the following measurements
+LocatedTimberFeature = Union['Point', 'Line', 'Plane', 'UnsignedPlane', 'HalfPlane', 'Space']
+
+And a bunch of different markings which are local to timber features. 
+
+But markings follow the general pattern
+
+mark(measured_feature, timber, feature)
+
+and then their measure function returns another measured_feature, they type of which should be determined from mesaured_feature and feature 
+
+we want a set of rules to determine what feature type gets returned
+
+:: 2/5/2026 JS<->Python interaction DREAM
+viewer js calls frame manager python script that holds hores code and hot reloads the target script and runs it and stores the resulting frame. The frame manager has a websocket or whatever that communicates with js. The socket has teh following things:
+
+- on_frame_updated(): fires when target script changes and script was rerun, if success, gives a list of CHANGED timbers names in the frame
+- get_frame(): gets the entire frame CSG and metadata for rendering
+- get_member(name): gets CSG and metadata for a specific timber
+- raycast_feature(member/feature filter, raycast_point_location): returns feature that got clicked on
+
+:: 1/23/2026 viewer planning notes
+
+use three.js to implement viewer as a VScode plugin
+
+base features:
+-vscode integration (must be easy to use and integrate with some main script)
+-render all timbers
+-3d space navigation
+-click on timber to focus and see more details
+  -render gimbal to show local coordinates
+
+additional features:
+-incremental rerendering upon refresh
+-timber/folder hierarchy (show/hide/collapse)
+-hover over focused timber individual fetaures 
+-feature rendering (e.g. render a face in a different color, render joint cuts in different color, etc)
+
+future features:
+-2d/3d drawing generation and view (add mesaurements to )
+  -a good step 1 would be to show some basic measurements when focused on 1 timber
+-assembly explosion
+
+
+major decision points and things you'll probably need
+-triangulation in python or js  (probably in js)
+-CSG to mesh function
+-add metadata to timbers
+-add metadata to CSG/joints for features
+  -this includes naming cuts and sub cuts like faces of a prism
+  -TODO you probably need some feature CSG classes and then learn to intersect them for new features...
+  -TODO this needs to be its own spec
+
+for the naive version of feature highlighting:
+  -CSG metadata maps to feature filter functions so that we can do the following
+    -you probbaly need some kinda BVH to do this efficiently, but linear search is fine too LOL
+  -hover -> raycast triangle -> find feature on timber
+
+
+
+
+:: 1/23/2026 viewer and drawing notes [messy]
+
+We want to be able to generate 2d/3d drawings and be able to highlight features in the viewer.
+
+so the key thing we need is to be able to identify features on timbers. Thihhs comes in 2 flavors
+1. when generating diagrams, it needs a list of features to create drawings from
+2. when in the viewer, it needs to raycast to see which featuer your hovering over.
+
+2. is more or less covered by 1, perhaps we need some additional data to deal with priorities or something but it should nto be a big deal.
+
+For features when generating drawings, lets worok through some broad examples:
+
+-round draw bore holes need their centers and diameters marked
+-mortise holes need their dimensions and depth marked
+-angled things can have lengths projected onto axis and/OR show actual angle
+-only 1 side of parallel lines of rectangles need to be marked
+-view from multiple isometric angles, each measurement need only be drawn once (do this automatically or allow user to specify which measurement goes to which view)
+-measurements are specified to some reference point
+  -you could auto pick reference point and ensure all referenced points can be referenced to face/edge on the timber I guess?
+  -or allow user to specify which feature to reference to in the drawing
+-automatic marking generation will probbaly make too many marking so maybe remove some?
+-I think in general we need to make suer all features are solveable, have priority on some fetaures, 
+  -but prehaps we just name some featuers and do due diligence in coding to ensure everything else is solveable
+
+examples of features we want to mark:
+
+-distance between 2 parallel faces
+  -choose side perpendicular to these 2 faces to draw on (or with smallest dot product)
+
+
+-special rules for face aligned features:
+TODO
+
+
+specific examples:
+
+-mortise example:
+  -mortise width and height (distance between opposing parallel faces of the mortise)
+    -pick a view to draw it, either top or side, but not from the ends (could use priority system to determine which face of the timber to mark on?)
+  -morties depth
+    -distance between morties shoulder face and mortise bottom
+  -mortise shoulder
+    -side view only, distance between mortise shoulder face and timber face that the morties is on 
+  -mortise position
+    -distance from one side of the mortise to timber face
+    -distance from one side of the mortise to the timber end (need rule to pick side, I guess just pick the closest?)
+    -(HARD) if multiple mrotises in a row on a timber we may want to do interval spacing (from center) or side to side on the mortises
+    -if rotated on face normal axis, mortise, then do a corner of the mortise + angles I guess?
+    -if rotated on another axis then mortise depth is measured from 1 side of the 
+  
+
+So we need to design a way to 
+1. mark features with names 
+
+
 
 :: 1/11/2026 advancedtimber class
 

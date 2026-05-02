@@ -1,6 +1,6 @@
 """
 Oscar's Shed - A simple timber frame shed structure
-Built using the GiraffeCAD API
+Built using the Kumiki API
 """
 
 from sympy import Rational
@@ -8,10 +8,10 @@ from typing import Optional
 import sys
 sys.path.append('..')
 
-from giraffe import *
-from code_goes_here.timber import Frame
-from code_goes_here.patternbook import PatternBook, PatternMetadata
-from code_goes_here.joints.basic_joints import cut_basic_mitered_and_keyed_lap_joint
+from kumiki import *
+from kumiki.timber import Frame
+from kumiki.joints.basic_joints import cut_basic_mitered_and_keyed_lap_joint
+
 
 # ============================================================================
 # PARAMETERS - Modify these to adjust the shed design
@@ -35,24 +35,6 @@ post_front_height = feet(5)   # Height of front posts
 small_timber_size = create_v2(inches(4), inches(Rational(5, 2)))   # 4" vertical x 2.5" depth
 med_timber_size = create_v2(inches(4), inches(4))                   # 4" x 4"
 big_timber_size = create_v2(inches(6), inches(4))                   # 6" vertical x 4" depth
-
-
-def create_oscar_shed_patternbook() -> PatternBook:
-    """
-    Create a PatternBook with Oscar's Shed pattern.
-    
-    Returns:
-        PatternBook: PatternBook containing the Oscar's Shed pattern
-    """
-    patterns = [
-        (PatternMetadata("oscar_shed", ["oscar_shed", "complete_structures"], "frame"),
-         lambda center: create_oscarshed(center=center)),
-    ]
-    
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_oscar_shed_patternbook()
 
 
 def create_oscarshed(center: Optional[V3] = None):
@@ -902,6 +884,7 @@ def create_oscarshed(center: Optional[V3] = None):
         )
         joists.append(joist)
 
+
     # ============================================================================
     # Create dovetail butt joints for joists with mudsills
     # ============================================================================
@@ -1086,7 +1069,7 @@ def create_oscarshed(center: Optional[V3] = None):
     return Frame.from_joints(all_joints, additional_unjointed_timbers=unjointed_timbers, name="Oscar's Shed")
 
 
-example = create_oscarshed()
+example = create_oscarshed
 
 
 # ============================================================================
