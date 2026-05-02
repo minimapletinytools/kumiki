@@ -154,9 +154,13 @@ A couple other things, we may show patterns in the layers view using a similar l
     -does not scan for kumiki (add a notice for local development, and patterns/exampes will show up as workspace patterns)
   DONE-have toggel to choso et open kigumi in separate collumn or in same tab group
   DONE-have settings menu in extension menu to change settings like open in split tab
-  -pattern scanning still weird
-  -patternbook grouping not working for workspace pattern
-  -frames not being detected in local dev mode?
+  DONE-pattern scanning still weird
+  DONE-patternbook grouping not working for workspace pattern
+  DONE-frames not being detected in local dev mode?
+  -remove toggle split view button from sidebar, or when you click it it should turn from a single to a double square
+  DONE-group by patternbook still does not have an icon
+  DONE-add view source button to frames
+  -update examples to be exmaples and not patterns
   -fix examples and ptatern separation, or maybe just get rid of examples
     -remove workspace examples as these are just frames, or perhaps workspace example and frame should follow the same format?
   -test the initialize project thing lol

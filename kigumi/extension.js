@@ -216,12 +216,15 @@ function activate(context) {
     // --- View Pattern Source ---
     const viewPatternSource = vscode.commands.registerCommand('kigumi.viewPatternSource', async (elementArg) => {
         const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
-        if (!selectedElement || !selectedElement.data || !selectedElement.data.sourceFile) {
-            vscode.window.showErrorMessage('Please select a pattern first.');
+        const sourcePath = selectedElement && selectedElement.data
+            ? (selectedElement.data.sourceFile || selectedElement.data.filePath)
+            : null;
+
+        if (!selectedElement || !selectedElement.data || !sourcePath) {
+            vscode.window.showErrorMessage('Please select a pattern or frame first.');
             return;
         }
 
-        const patternData = selectedElement.data;
         const workspaceRoot = getWorkspaceRoot();
         if (!workspaceRoot) {
             vscode.window.showErrorMessage('Open a workspace folder first.');
@@ -232,19 +235,19 @@ function activate(context) {
             const { viewShippedPatternSource } = require('./pattern-source-utils');
             
             // Check if the file is in workspace or from dependencies
-            const isInWorkspace = patternData.sourceFile.startsWith(workspaceRoot);
+            const isInWorkspace = sourcePath.startsWith(workspaceRoot);
             
             if (isInWorkspace) {
                 // Open workspace file directly
-                const uri = vscode.Uri.file(patternData.sourceFile);
+                const uri = vscode.Uri.file(sourcePath);
                 const doc = await vscode.workspace.openTextDocument(uri);
                 await vscode.window.showTextDocument(doc);
             } else {
                 // Create read-only copy in workspace
-                const readOnlyPath = await viewShippedPatternSource(patternData.sourceFile, workspaceRoot);
+                const readOnlyPath = await viewShippedPatternSource(sourcePath, workspaceRoot);
                 const uri = vscode.Uri.file(readOnlyPath);
                 const doc = await vscode.workspace.openTextDocument(uri);
-                const editor = await vscode.window.showTextDocument(doc);
+                await vscode.window.showTextDocument(doc);
                 vscode.window.showInformationMessage(`Opened read-only copy of pattern. Edit the original or create a new pattern.`);
             }
         } catch (error) {
@@ -489,10 +492,6 @@ async function renderActiveEditor(context) {
     const session = await getOrCreateSession(filePath, context);
     session.reveal();
     await session.refresh();
-
-    if (sidebarProvider) {
-        await sidebarProvider.refresh(false);
-    }
 }
 
 async function openFileInViewer(filePath, context) {

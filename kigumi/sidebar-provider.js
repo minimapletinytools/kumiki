@@ -29,6 +29,7 @@ class KigumiSidebarProvider {
 
         this._didLoadOnce = false;
         this._scanPromise = null;
+        this._groupByPatternbook = true;
         this._selectedElementData = null;
         this._state = {
             workspaceRoot: null,
@@ -53,13 +54,12 @@ class KigumiSidebarProvider {
     }
 
     toggleGroupByPatternbook() {
-        // Workspace patternbooks are always grouped by definition.
-        // Toggling on shipped patterns just fires a refresh — they also always group.
+        this._groupByPatternbook = !this._groupByPatternbook;
         this._onDidChangeTreeData.fire();
     }
 
     getGroupByPatternbook() {
-        return true;
+        return this._groupByPatternbook;
     }
 
     getTreeItem(element) {
@@ -310,26 +310,28 @@ class KigumiSidebarProvider {
     }
 
     getFrameFileNodes() {
+        const nodes = [];
         if (this._state.isScanning) {
-            return [new SidebarNode({
+            nodes.push(new SidebarNode({
                 key: 'frames-scanning',
                 type: 'loading',
                 label: 'Scanning workspace...',
                 iconPath: new vscode.ThemeIcon('loading~spin'),
-            })];
+            }));
         }
 
         if (this._state.frames.length === 0) {
-            return [new SidebarNode({
+            nodes.push(new SidebarNode({
                 key: 'frames-empty',
                 type: 'placeholder',
                 label: 'No frame definitions found',
                 description: this._state.workspaceRoot ? '' : 'Open a workspace',
                 iconPath: new vscode.ThemeIcon('circle-slash'),
-            })];
+            }));
+            return nodes;
         }
 
-        return this._state.frames.map((frameFile) => new SidebarNode({
+        nodes.push(...this._state.frames.map((frameFile) => new SidebarNode({
             key: `frame-file:${frameFile.filePath}`,
             type: 'frameFile',
             label: frameFile.relativePath,
@@ -341,7 +343,9 @@ class KigumiSidebarProvider {
             },
             iconPath: new vscode.ThemeIcon('file-code'),
             data: frameFile,
-        }));
+        })));
+
+        return nodes;
     }
 
     getPatternSectionNodes() {
@@ -355,7 +359,6 @@ class KigumiSidebarProvider {
                 description: 'searching workspace and dependencies',
                 iconPath: new vscode.ThemeIcon('loading~spin'),
             }));
-            return nodes;
         }
 
         // Workspace patternbooks section
@@ -363,7 +366,9 @@ class KigumiSidebarProvider {
         nodes.push(new SidebarNode({
             key: 'pattern-section:workspace-patternbooks',
             type: 'patternSection',
-            label: `Workspace (${pbCount} patternbook${pbCount === 1 ? '' : 's'})`,
+            label: this._groupByPatternbook
+                ? `Workspace (${pbCount} patternbook${pbCount === 1 ? '' : 's'})`
+                : 'Workspace patterns',
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             iconPath: new vscode.ThemeIcon('folder-opened'),
             data: { sectionKey: 'workspace-patternbooks' },
@@ -400,13 +405,15 @@ class KigumiSidebarProvider {
 
     getPatternNodesForSection(sectionKey) {
         if (sectionKey === 'workspace-patternbooks') {
-            return this.getWorkspacePatternbookNodes();
+            return this._groupByPatternbook
+                ? this.getWorkspacePatternbookNodes()
+                : this.getFlatWorkspacePatternNodes();
         }
         if (sectionKey === 'shipped-patterns') {
-            return this.getShippedPatternSectionNodes('shipped-patterns', this._state.shippedPatterns);
+            return this.getShippedPatternSectionNodes('shipped-patterns', this._state.shippedPatterns, this._groupByPatternbook);
         }
         if (sectionKey === 'dependency-patterns') {
-            return this.getShippedPatternSectionNodes('dependency-patterns', this._state.dependencyPatterns);
+            return this.getShippedPatternSectionNodes('dependency-patterns', this._state.dependencyPatterns, this._groupByPatternbook);
         }
         return [];
     }
@@ -469,7 +476,45 @@ class KigumiSidebarProvider {
         }));
     }
 
-    getShippedPatternSectionNodes(sectionKey, patternItems) {
+    getFlatWorkspacePatternNodes() {
+        const patternbooks = this._state.workspacePatternbooks || [];
+        const nodes = [];
+
+        for (const pb of patternbooks) {
+            const names = Array.isArray(pb.patternNames) ? pb.patternNames : [];
+            for (const patternName of names) {
+                nodes.push(new SidebarNode({
+                    key: `workspace-pattern-flat:${pb.filePath}:${patternName}`,
+                    type: 'patternItem',
+                    label: patternName,
+                    description: pb.patternbookName,
+                    tooltip: `${patternName} — ${pb.filePath}`,
+                    command: {
+                        title: 'Open pattern',
+                        command: 'kigumi.openPatternFromSidebar',
+                        arguments: [{ sourceFile: pb.filePath, patternName }],
+                    },
+                    iconPath: new vscode.ThemeIcon('symbol-string'),
+                    data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
+                    contextValue: 'patternItemWorkspace',
+                }));
+            }
+        }
+
+        if (nodes.length === 0) {
+            return [new SidebarNode({
+                key: 'workspace-patterns-empty',
+                type: 'placeholder',
+                label: 'No patterns found',
+                iconPath: new vscode.ThemeIcon('circle-slash'),
+            })];
+        }
+
+        nodes.sort((a, b) => `${a.label}:${a.description}`.localeCompare(`${b.label}:${b.description}`));
+        return nodes;
+    }
+
+    getShippedPatternSectionNodes(sectionKey, patternItems, grouped = true) {
         if (!patternItems || patternItems.length === 0) {
             return [new SidebarNode({
                 key: `patterns-empty:${sectionKey}`,
@@ -479,10 +524,34 @@ class KigumiSidebarProvider {
             })];
         }
 
-        const grouped = groupPatternsByPatternbook(patternItems);
+        if (!grouped) {
+            return patternItems
+                .map((item) => {
+                    const itemName = item.name || path.basename(item.sourceFile, '.py');
+                    const patternbookName = path.basename(item.sourceFile, '.py');
+                    return new SidebarNode({
+                        key: `pattern-item-flat:${sectionKey}:${item.sourceFile}:${itemName}`,
+                        type: 'patternItem',
+                        label: itemName,
+                        description: patternbookName,
+                        tooltip: item.sourceFile,
+                        command: {
+                            title: 'Open pattern',
+                            command: 'kigumi.openPatternFromSidebar',
+                            arguments: [{ sourceFile: item.sourceFile, patternName: item.name || null }],
+                        },
+                        iconPath: new vscode.ThemeIcon('symbol-string'),
+                        data: { sourceFile: item.sourceFile, patternName: item.name, sectionKey },
+                        contextValue: 'patternItem',
+                    });
+                })
+                .sort((a, b) => `${a.label}:${a.description}`.localeCompare(`${b.label}:${b.description}`));
+        }
+
+        const groupedMap = groupPatternsByPatternbook(patternItems);
         const nodes = [];
 
-        for (const [patternbookName, items] of grouped.entries()) {
+        for (const [patternbookName, items] of groupedMap.entries()) {
             nodes.push(new SidebarNode({
                 key: `patternbook-group:${sectionKey}:${patternbookName}`,
                 type: 'patternbookGroup',

@@ -101,7 +101,8 @@
       },
       {
         "command": "kigumi.toggleGroupByPatternbook",
-        "title": "Kigumi: Toggle Group by Patternbook"
+        "title": "Kigumi: Toggle Group by Patternbook",
+        "icon": "$(list-tree)"
       },
       {
         "command": "kigumi.toggleOpenInSplitView",
@@ -158,6 +159,11 @@
         {
           "command": "kigumi.viewPatternSource",
           "when": "view == kigumi.explorer && viewItem == patternItemWorkspace",
+          "group": "inline@1"
+        },
+        {
+          "command": "kigumi.viewPatternSource",
+          "when": "view == kigumi.explorer && viewItem == frameFile",
           "group": "inline@1"
         },
         {
