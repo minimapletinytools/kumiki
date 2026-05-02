@@ -70,41 +70,14 @@ function activate(context) {
     context.subscriptions.push(openCurrentFileInViewer);
 
     const initializeProjectInWorkspace = vscode.commands.registerCommand('kigumi.initializeProjectInWorkspace', async () => {
-        const workspaceRoot = getWorkspaceRoot();
-        if (!workspaceRoot) {
-            vscode.window.showErrorMessage('Open a workspace folder first.');
-            return;
-        }
-
-        const initStatus = getInitializationStatus(workspaceRoot);
-        if (initStatus.projectStatus === 'local-dev') {
-            vscode.window.showInformationMessage('Kigumi local development mode detected. Project initialization is disabled for this workspace.');
-            await sidebarProvider.refresh(true);
-            return;
-        }
-        if (initStatus.isInitialized) {
-            vscode.window.showInformationMessage('Kigumi project is already initialized in this workspace.');
-            await sidebarProvider.refresh(true);
-            return;
-        }
-
-        try {
-            await vscode.window.withProgress({
-                location: vscode.ProgressLocation.Notification,
-                title: 'Initializing Kigumi project',
-                cancellable: false,
-            }, async () => {
-                await initializeWorkspaceProject(workspaceRoot);
-            });
-            vscode.window.showInformationMessage('Kigumi workspace initialized.');
-        } catch (error) {
-            outputChannel.show(true);
-            vscode.window.showErrorMessage(`Initialize project failed: ${error.message || error}`);
-        } finally {
-            await sidebarProvider.refresh(true);
-        }
+        await runProjectHeaderAction();
     });
     context.subscriptions.push(initializeProjectInWorkspace);
+
+    const projectHeaderAction = vscode.commands.registerCommand('kigumi.projectHeaderAction', async () => {
+        await runProjectHeaderAction();
+    });
+    context.subscriptions.push(projectHeaderAction);
 
     const refreshSidebar = vscode.commands.registerCommand('kigumi.refreshSidebar', async () => {
         if (sidebarProvider) {
@@ -459,6 +432,43 @@ function activate(context) {
 
     // Initialize context variable for dynamic icon
     void vscode.commands.executeCommand('setContext', 'kigumi.splitViewEnabled', openInSplitView);
+
+    async function runProjectHeaderAction() {
+        const workspaceRoot = getWorkspaceRoot();
+        if (!workspaceRoot) {
+            vscode.window.showErrorMessage('Open a workspace folder first.');
+            return;
+        }
+
+        const initStatus = getInitializationStatus(workspaceRoot);
+        if (initStatus.projectStatus === 'local-dev') {
+            vscode.window.showInformationMessage('Local development mode: using workspace kumiki source; initialization is disabled.');
+            await sidebarProvider.refresh(true);
+            return;
+        }
+
+        if (initStatus.isInitialized) {
+            vscode.window.showInformationMessage('Project initialized: .kigumi.yaml, .kigumi/project.yaml, .venv, and my_cute_frame.py are present.');
+            await sidebarProvider.refresh(true);
+            return;
+        }
+
+        try {
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Initializing Kigumi project',
+                cancellable: false,
+            }, async () => {
+                await initializeWorkspaceProject(workspaceRoot);
+            });
+            vscode.window.showInformationMessage('Kigumi workspace initialized.');
+        } catch (error) {
+            outputChannel.show(true);
+            vscode.window.showErrorMessage(`Initialize project failed: ${error.message || error}`);
+        } finally {
+            await sidebarProvider.refresh(true);
+        }
+    }
 }
 
 function getWorkspaceRoot() {

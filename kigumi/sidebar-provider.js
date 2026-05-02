@@ -90,6 +90,10 @@ class KigumiSidebarProvider {
             return this.getRootNodes();
         }
 
+        if (element.type === 'projectHeaderRoot') {
+            return this.getProjectHeaderActionNodes();
+        }
+
         if (element.type === 'framesRoot') {
             return this.getFrameFileNodes();
         }
@@ -266,15 +270,13 @@ class KigumiSidebarProvider {
     getRootNodes() {
         const nodes = [];
 
-        if (this._state.initStatus && this._state.initStatus.projectStatus === 'local-dev') {
-            nodes.push(new SidebarNode({
-                key: 'local-dev-indicator',
-                type: 'info',
-                label: 'Local development mode active',
-                description: 'Using workspace patterns',
-                iconPath: new vscode.ThemeIcon('beaker'),
-            }));
-        }
+        nodes.push(new SidebarNode({
+            key: 'project-header-root',
+            type: 'projectHeaderRoot',
+            label: 'Project',
+            collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
+            iconPath: new vscode.ThemeIcon('tools'),
+        }));
 
         const frameCount = this._state.frames.length;
         nodes.push(new SidebarNode({
@@ -307,6 +309,80 @@ class KigumiSidebarProvider {
         }
 
         return nodes;
+    }
+
+    getProjectHeaderActionNodes() {
+        const workspaceRoot = this._state.workspaceRoot;
+        const initStatus = this._state.initStatus;
+
+        if (!workspaceRoot) {
+            return [new SidebarNode({
+                key: 'project-header-action:no-workspace',
+                type: 'projectHeaderAction',
+                label: '[ Open Workspace Folder ]',
+                description: 'required for initialization',
+                iconPath: new vscode.ThemeIcon('folder-opened'),
+                contextValue: 'projectHeaderAction',
+            })];
+        }
+
+        if (initStatus && initStatus.projectStatus === 'local-dev') {
+            return [new SidebarNode({
+                key: 'project-header-action:local-dev',
+                type: 'projectHeaderAction',
+                label: '[ Local Development Mode ]',
+                description: 'workspace is kumiki source',
+                iconPath: new vscode.ThemeIcon('beaker'),
+                contextValue: 'projectHeaderAction',
+                command: {
+                    title: 'Show project status',
+                    command: 'kigumi.projectHeaderAction',
+                },
+            })];
+        }
+
+        if (initStatus && initStatus.isInitialized) {
+            return [new SidebarNode({
+                key: 'project-header-action:initialized',
+                type: 'projectHeaderAction',
+                label: '[ Project Initialized ]',
+                description: '.kigumi + .venv ready',
+                iconPath: new vscode.ThemeIcon('pass'),
+                contextValue: 'projectHeaderAction',
+                command: {
+                    title: 'Show project status',
+                    command: 'kigumi.projectHeaderAction',
+                },
+            })];
+        }
+
+        if (initStatus && initStatus.hasExistingProject) {
+            return [new SidebarNode({
+                key: 'project-header-action:existing',
+                type: 'projectHeaderAction',
+                label: '[ Finish Project Setup ]',
+                description: 'project files detected',
+                iconPath: new vscode.ThemeIcon('warning'),
+                contextValue: 'projectHeaderAction',
+                command: {
+                    title: 'Initialize project',
+                    command: 'kigumi.projectHeaderAction',
+                },
+            })];
+        }
+
+        return [new SidebarNode({
+            key: 'project-header-action:init',
+            type: 'projectHeaderAction',
+            label: '[ Initialize Current Project ]',
+            description: 'create .kigumi config and .venv',
+            iconPath: new vscode.ThemeIcon('tools'),
+            contextValue: 'projectHeaderAction',
+            command: {
+                title: 'Initialize project',
+                command: 'kigumi.projectHeaderAction',
+            },
+        })];
     }
 
     getFrameFileNodes() {

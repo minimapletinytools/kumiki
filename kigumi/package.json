@@ -105,6 +105,10 @@
         "icon": "$(list-tree)"
       },
       {
+        "command": "kigumi.projectHeaderAction",
+        "title": "Kigumi: Project Header Action"
+      },
+      {
         "command": "kigumi.openPatternbookGroup",
         "title": "Kigumi: Open Patternbook Group"
       },
@@ -120,24 +124,14 @@
     "menus": {
       "view/title": [
         {
-          "command": "kigumi.openCurrentFileInViewer",
+          "command": "kigumi.refreshPatterns",
           "when": "view == kigumi.explorer",
           "group": "navigation@1"
         },
         {
-          "command": "kigumi.initializeProjectInWorkspace",
-          "when": "view == kigumi.explorer",
-          "group": "navigation@2"
-        },
-        {
-          "command": "kigumi.refreshPatterns",
-          "when": "view == kigumi.explorer",
-          "group": "navigation@3"
-        },
-        {
           "command": "kigumi.toggleGroupByPatternbook",
           "when": "view == kigumi.explorer",
-          "group": "navigation@4"
+          "group": "navigation@2"
         }
       ],
       "view/item/context": [
