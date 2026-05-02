@@ -22,6 +22,7 @@ function activate(context) {
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('kigumi.viewer.openInSplitView')) {
             openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', true);
+            void vscode.commands.executeCommand('setContext', 'kigumi.splitViewEnabled', openInSplitView);
         }
     }));
 
@@ -119,13 +120,7 @@ function activate(context) {
     });
     context.subscriptions.push(refreshPatterns);
 
-    const toggleOpenInSplitView = vscode.commands.registerCommand('kigumi.toggleOpenInSplitView', async () => {
-        openInSplitView = !openInSplitView;
-        await vscode.workspace.getConfiguration('kigumi').update('viewer.openInSplitView', openInSplitView, vscode.ConfigurationTarget.Global);
-        const mode = openInSplitView ? 'split view' : 'current view';
-        vscode.window.showInformationMessage(`Kigumi open mode: ${mode}`);
-    });
-    context.subscriptions.push(toggleOpenInSplitView);
+    // Split-view toggle now handled via Settings panel only (kigumi.viewer.openInSplitView setting)
 
     const openFrameFromSidebar = vscode.commands.registerCommand('kigumi.openFrameFromSidebar', async (filePath) => {
         await openFileInViewer(filePath, context);
@@ -461,6 +456,9 @@ function activate(context) {
             await Promise.allSettled(allSessions.map((session) => session.dispose()));
         },
     });
+
+    // Initialize context variable for dynamic icon
+    void vscode.commands.executeCommand('setContext', 'kigumi.splitViewEnabled', openInSplitView);
 }
 
 function getWorkspaceRoot() {

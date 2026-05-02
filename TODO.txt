@@ -157,9 +157,10 @@ A couple other things, we may show patterns in the layers view using a similar l
   DONE-pattern scanning still weird
   DONE-patternbook grouping not working for workspace pattern
   DONE-frames not being detected in local dev mode?
-  -remove toggle split view button from sidebar, or when you click it it should turn from a single to a double square
   DONE-group by patternbook still does not have an icon
   DONE-add view source button to frames
+  DONE-remove toggle split view button from sidebar, or when you click it it should turn from a single to a double square
+  -add integration test for sidebar
   -update examples to be exmaples and not patterns
   -fix examples and ptatern separation, or maybe just get rid of examples
     -remove workspace examples as these are just frames, or perhaps workspace example and frame should follow the same format?
