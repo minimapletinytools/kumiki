@@ -16,16 +16,16 @@ help:
 	@echo ""
 
 setup:
-	uv sync
+	uv sync --group dev
 
 test:
-	uv run pytest tests/
+	uv run --group dev python -m pytest tests/
 
 test-verbose:
-	uv run pytest tests/ -v
+	uv run --group dev python -m pytest tests/ -v
 
 test-cov:
-	uv run pytest tests/ --cov=kumiki --cov-report=html --cov-report=term-missing
+	uv run --group dev python -m pytest tests/ --cov=kumiki --cov-report=html --cov-report=term-missing
 	@echo ""
 	@echo "✅ Coverage report generated in htmlcov/index.html"
 
