@@ -6,12 +6,32 @@ requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "minimaple" }]
 readme = "README.md"
+keywords = ["timber", "woodworking", "cad", "parametric", "sympy"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Manufacturing",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Libraries",
+]
 dependencies = [
     "sympy>=1.12.0",
     "numpy>=1.21.0",
     "trimesh>=4.7.0",
     "manifold3d>=3.4.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/minimaple/kumiki"
+Repository = "https://github.com/minimaple/kumiki"
+Documentation = "https://github.com/minimaple/kumiki/tree/main/docs"
 
 [build-system]
 requires = ["hatchling"]

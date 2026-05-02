@@ -11,34 +11,29 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
+
     - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.14'
+      run: uv python install 3.12
 
-    - name: Cache venv
+    - name: Cache uv artifacts
       uses: actions/cache@v4
-      id: cache-venv
       with:
-        path: venv
-        key: venv-${{ runner.os }}-py3.14-${{ hashFiles('requirements.txt') }}
+        path: |
+          ~/.cache/uv
+          .venv
+        key: uv-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml', 'uv.lock') }}
         restore-keys: |
-          venv-${{ runner.os }}-py3.14-
+          uv-${{ runner.os }}-py3.12-
 
-    - name: Create virtual environment & install dependencies
-      if: steps.cache-venv.outputs.cache-hit != 'true'
-      run: |
-        python -m venv venv
-        source venv/bin/activate
-        pip install --upgrade pip
-        pip install -r requirements.txt
-        
+    - name: Install dependencies
+      run: uv sync --group dev
+
     - name: Run pytest
-      run: |
-        source venv/bin/activate
-        python3 -m pytest
+      run: uv run --group dev python -m pytest tests/

@@ -137,7 +137,7 @@ A couple other things, we may show patterns in the layers view using a similar l
 
 :: TODO
 
--kigumi
+DONE-kigumi
   DONE-add loading grahpic and do background loading of patterns
   DONE-add refresh button
   DONE-remove examples from sidebar or get it work right

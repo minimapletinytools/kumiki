@@ -11,6 +11,22 @@ INSTRUCTIONS BELOW DO NOT WORK YET DO NOT TRY!!!
 
 ## setup
 
+## local development
+
+If you are working in this repository directly, you can import and run Kumiki from the repo without installing from PyPI.
+
+If you are working in a separate project and want to use the latest Kumiki code from git, install it from GitHub:
+
+```bash
+pip install "git+https://github.com/minimaple/kumiki.git"
+```
+
+For a pinned revision, append a commit, branch, or tag:
+
+```bash
+pip install "git+https://github.com/minimaple/kumiki.git@<ref>"
+```
+
 Kumiki is best used with Kigumi. To install Kigumi, download [VSCode](https://code.visualstudio.com/) and install Kigumi (TODO link)
 
 Kumiki also requires [python3](https://www.python.org/downloads/).  
@@ -32,6 +48,24 @@ TODO finish
 ## for advanced students
 
 TODO finish
+
+
+# Contributing
+
+If making changes to Kumiki itself, a separate workflow is used. 
+
+Once you've made your changes, open up a PR. 
+
+
+## Developing Kumiki
+
+TODO
+
+Kigumi has a separate project scanning flow such that it can be used with the Kumiki repo itself as the workspace. Just use Kigumi like you normally would to test Kumiki.
+
+## Developing Kigumi
+
+TODO
 
 
 # APPENDIX
