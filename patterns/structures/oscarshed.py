@@ -10,7 +10,6 @@ sys.path.append('..')
 
 from kumiki import *
 from kumiki.timber import Frame
-from kumiki.patternbook import PatternBook, PatternMetadata
 from kumiki.joints.basic_joints import cut_basic_mitered_and_keyed_lap_joint
 
 
@@ -36,24 +35,6 @@ post_front_height = feet(5)   # Height of front posts
 small_timber_size = create_v2(inches(4), inches(Rational(5, 2)))   # 4" vertical x 2.5" depth
 med_timber_size = create_v2(inches(4), inches(4))                   # 4" x 4"
 big_timber_size = create_v2(inches(6), inches(4))                   # 6" vertical x 4" depth
-
-
-def create_oscar_shed_patternbook() -> PatternBook:
-    """
-    Create a PatternBook with Oscar's Shed pattern.
-    
-    Returns:
-        PatternBook: PatternBook containing the Oscar's Shed pattern
-    """
-    patterns = [
-        (PatternMetadata("oscar_shed", ["oscar_shed", "complete_structures"], "frame"),
-         lambda center: create_oscarshed(center=center)),
-    ]
-    
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_oscar_shed_patternbook()
 
 
 def create_oscarshed(center: Optional[V3] = None):

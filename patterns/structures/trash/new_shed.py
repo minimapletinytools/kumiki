@@ -11,7 +11,6 @@ sys.path.append('..')
 
 from kumiki import *
 from kumiki.timber import Frame
-from kumiki.patternbook import PatternBook, PatternMetadata
 
 # ============================================================================
 # PARAMETERS - Modify these to adjust the shed design
@@ -28,24 +27,6 @@ post_front_height = feet(7)  # Height of front 3 posts (dramatic pitch!)
 small_timber_size = create_v2(inches(3), inches(3))     # 3" x 3"
 med_timber_size = create_v2(inches(4), inches(4))       # 4" x 4"
 large_timber_size = create_v2(inches(6), inches(4))     # 6" x 4"
-
-def create_honeycomb_shed_patternbook() -> PatternBook:
-    """
-    Create a PatternBook with the Honeycomb Shed pattern.
-    
-    Returns:
-        PatternBook: PatternBook containing the Honeycomb Shed pattern
-    """
-    patterns = [
-        (PatternMetadata("honeycomb_shed", ["honeycomb_shed", "complete_structures"], "frame"),
-         lambda center: create_honeycomb_shed()),
-    ]
-    
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_honeycomb_shed_patternbook()
-
 
 def create_honeycomb_shed():
     """

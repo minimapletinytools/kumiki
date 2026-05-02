@@ -9,7 +9,6 @@ All dimensions use exact SymPy Rational values through helper unit functions.
 """
 
 from kumiki import *
-from kumiki.patternbook import PatternBook, PatternMetadata
 from kumiki.joints.basic_joints import cut_basic_miter_joint
 
 
@@ -248,23 +247,6 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
         joints.append(back_right_rung_joint)
 
     return Frame.from_joints(joints=joints, name="A Ladder Frame")
-
-
-# -----------------------------------------------------------------------------
-# PatternBook wiring
-# -----------------------------------------------------------------------------
-
-def create_ladder_patternbook() -> PatternBook:
-    patterns = [
-        (
-            PatternMetadata("a_ladder_timber_frame", ["structures", "ladder"], "frame"),
-            lambda center: create_ladder_frame(center),
-        ),
-    ]
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_ladder_patternbook()
 
 
 def create_all_ladder_examples() -> Frame:

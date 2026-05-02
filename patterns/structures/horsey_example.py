@@ -11,7 +11,6 @@ All joints are mortise and tenon with pegs.
 """
 
 from kumiki import *
-from kumiki.patternbook import PatternBook, PatternMetadata
 
 # Define timber dimensions
 beam_size = Matrix([inches(4), inches(6)])  # 4x6 with 6" in Z
@@ -33,24 +32,6 @@ tenon_length = inches(3)
 mortise_depth = tenon_length + inches(0.25)
 peg_diameter = inches(Rational(5, 8))
 peg_distance_from_shoulder = inches(1)
-
-
-def create_kumiki_patternbook() -> PatternBook:
-    """
-    Create a PatternBook with the sawhorse pattern.
-    
-    Returns:
-        PatternBook: PatternBook containing the sawhorse pattern
-    """
-    patterns = [
-        (PatternMetadata("sawhorse", ["kumiki", "complete_structures"], "frame"),
-         lambda center: create_sawhorse()),
-    ]
-    
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_kumiki_patternbook()
 
 
 def create_sawhorse() -> Frame:

@@ -10,7 +10,6 @@ from typing import Optional
 
 from kumiki import *
 from kumiki.timber import Frame, add_milestone
-from kumiki.patternbook import PatternBook, PatternMetadata
 
 # ============================================================================
 # PARAMETERS
@@ -45,17 +44,6 @@ stud_tenon_size = create_v2(inches(1), inches(Rational(5, 2)))
 stud_tenon_depth = inches(Rational(5, 2))
 stud_tenon_outside_offset = inches(1)
 
-
-
-def create_tinyhouse120_patternbook() -> PatternBook:
-    patterns = [
-        (PatternMetadata("tinyhouse120", ["tinyhouse", "complete_structures"], "frame"),
-         lambda center: create_tinyhouse120(center=center)),
-    ]
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_tinyhouse120_patternbook()
 
 
 def create_tinyhouse120(center: Optional[V3] = None):
@@ -1496,3 +1484,6 @@ def create_tinyhouse120(center: Optional[V3] = None):
         additional_unjointed_timbers=unjointed_timbers,
         name="Tiny House 120"
     )
+
+
+example = create_tinyhouse120

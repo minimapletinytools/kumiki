@@ -10,7 +10,6 @@ Joinery used:
 """
 
 from kumiki import *
-from kumiki.patternbook import PatternBook, PatternMetadata
 
 # Compatibility alias for watcher reloads that may still reference the old symbol name.
 cut_basic_mitered_and_keyed_lap_joint = cut_mitered_and_keyed_lap_joint
@@ -326,23 +325,6 @@ def create_sillyshed_frame(origin: Optional[V3] = None) -> Frame:
     )
 
     return Frame.from_joints(joints=joints, name="Silly Shed Frame")
-
-
-# -----------------------------------------------------------------------------
-# PatternBook wiring
-# -----------------------------------------------------------------------------
-
-def create_sillyshed_patternbook() -> PatternBook:
-    patterns = [
-        (
-            PatternMetadata("sillyshed", ["structures", "sillyshed"], "frame"),
-            lambda center: create_sillyshed_frame(center),
-        ),
-    ]
-    return PatternBook(patterns=patterns)
-
-
-patternbook = create_sillyshed_patternbook()
 
 
 def create_all_sillyshed_examples() -> Frame:
