@@ -55,7 +55,7 @@ function mightContainKumiFrame(fileContent) {
 // ---------------------------------------------------------------------------
 
 const PYTHON_CONFIRM_SCRIPT = `
-import json, sys, os, contextlib
+import json, sys, os, contextlib, importlib
 
 ws = sys.argv[1] if len(sys.argv) > 1 else '.'
 if os.path.isdir(os.path.join(ws, 'kumiki')) and ws not in sys.path:
@@ -70,16 +70,31 @@ try:
     modules = []
     for rec in result.modules:
         fp = os.path.join(result.root_folder, rec.relative_path)
+        pattern_names = []
+        if rec.patternbook is not None:
+            try:
+                pattern_names = [m.pattern_name for m, _ in rec.patternbook.patterns]
+            except Exception:
+                pass
+        has_build_frame = False
+        if rec.patternbook is None:
+            mod = sys.modules.get(rec.module_name)
+            if mod is not None:
+                fn = getattr(mod, 'build_frame', None)
+                has_build_frame = callable(fn)
         modules.append({
             'filePath': fp,
             'relativePath': rec.relative_path,
             'hasPatternbook': rec.patternbook is not None,
+            'patternNames': pattern_names,
             'hasExample': rec.example is not None,
+            'hasBuildFrame': has_build_frame,
             'loadError': rec.load_error,
         })
     print(json.dumps({'ok': True, 'modules': modules}))
 except Exception as e:
-    print(json.dumps({'ok': False, 'error': str(e)}))
+    import traceback
+    print(json.dumps({'ok': False, 'error': str(e), 'traceback': traceback.format_exc()}))
 `.trim();
 
 function getPythonCandidates(workspaceRoot) {
@@ -263,7 +278,7 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
     }
 
     if (candidates.length === 0) {
-        return { frameFiles: [], scanErrors };
+        return { frameFiles: [], patternbookFiles: [], scanErrors };
     }
 
     // --- Phase 2: Python librarian confirmation ---
@@ -272,32 +287,42 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
         confirmedModules = await confirmCandidatesWithPython(candidates, workspaceRoot, timeoutMs * 4, pythonCommand);
     } catch (error) {
         scanErrors.push({ filePath: workspaceRoot, reason: `Python scan failed, showing pre-filter candidates: ${error.message || error}` });
-        // Fallback: return pre-filter candidates with basic entry info
+        // Fallback: use pre-filter candidates; treat everything as a frame file (unconfirmed)
         const fallback = candidates.map((fp) => ({
             filePath: fp,
             relativePath: path.relative(workspaceRoot, fp),
-            frameEntries: ['(unconfirmed)'],
         }));
         fallback.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
-        return { frameFiles: fallback, scanErrors };
+        return { frameFiles: fallback, patternbookFiles: [], scanErrors };
     }
 
-    const frameFiles = confirmedModules
-        .filter((mod) => mod.hasPatternbook || mod.hasExample)
-        .map((mod) => {
-            const entries = [];
-            if (mod.hasPatternbook) entries.push('patternbook');
-            if (mod.hasExample) entries.push('example');
-            return {
+    // Split into frame files (example/build_frame, no patternbook) and patternbook files.
+    const frameFiles = [];
+    const patternbookFiles = [];
+
+    for (const mod of confirmedModules) {
+        const relPath = mod.relativePath || path.relative(workspaceRoot, mod.filePath);
+        if (mod.hasPatternbook) {
+            patternbookFiles.push({
                 filePath: mod.filePath,
-                relativePath: mod.relativePath || path.relative(workspaceRoot, mod.filePath),
-                frameEntries: entries,
-            };
-        });
+                relativePath: relPath,
+                patternbookName: path.basename(mod.filePath, '.py'),
+                patternNames: Array.isArray(mod.patternNames) ? mod.patternNames : [],
+                loadError: mod.loadError || null,
+            });
+        } else if (mod.hasExample || mod.hasBuildFrame) {
+            frameFiles.push({
+                filePath: mod.filePath,
+                relativePath: relPath,
+                loadError: mod.loadError || null,
+            });
+        }
+    }
 
     frameFiles.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
+    patternbookFiles.sort((a, b) => a.relativePath.localeCompare(b.relativePath));
 
-    return { frameFiles, scanErrors };
+    return { frameFiles, patternbookFiles, scanErrors };
 }
 
 module.exports = {

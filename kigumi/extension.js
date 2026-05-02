@@ -26,16 +26,6 @@ function activate(context) {
     }));
 
     sidebarProvider = new KigumiSidebarProvider(context, {
-        getPatternSources: async (forceRescan) => {
-            const mainSession = _findAnyAliveMainSession();
-            if (!mainSession || !mainSession.runnerSession || !mainSession.runnerSession.isAlive()) {
-                return { sources: [] };
-            }
-            return mainSession.runnerSession.request(
-                'list_available_patterns',
-                forceRescan ? { rescan: true } : {}
-            );
-        },
         getPythonCommand: () => {
             const mainSession = _findAnyAliveMainSession();
             if (!mainSession || !mainSession.runnerSession || !mainSession.runnerSession.isAlive()) {
