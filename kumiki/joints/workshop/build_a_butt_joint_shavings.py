@@ -290,15 +290,17 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
 
 
         __
-        | \
+        | \ wedge_tip_extra_length 
       __|  \____________________ <- wedge_small_height measured at this line
         |   \
         |    \
         |     \
       __|      \________________
-        |       \
+        |       \ wedge_base_extra_length
         |________\
         
+    
+    
 
     Attributes:
         wedge_from_receiving_timber_side: If true, the wedge is designed to be cut from the receiving timber and inserted from that side. If false, the wedge is designed to be cut from the tenon timber and inserted from the tenon side. We must have tenon_depth + receiving_timber_extra_depth > the matching width on the receivingtimber for this to work
@@ -308,6 +310,11 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
     wedge_from_receiving_timber_side: bool = False
     wedge_angle: Numeric = degrees(10)
     wedge_small_height: Optional[Numeric] = None
+    # the wedge length without extra is just tenon_depth
+    # this one can actually be negative which you'll want to do if the tenon is not a through tenon
+    wedge_tip_extra_length: Numeric = 0
+    wedge_base_extra_length: Numeric = 0
+
 
 def dovetail_tenon_geometry(
     arrangement: ButtJointTimberArrangement,
@@ -351,6 +358,10 @@ def dovetail_tenon_geometry(
         raise ValueError(f"tenon_size values must be positive, got {tenon_size}")
 
     # TODO assert that the shoulder is orthognal (we can add support for non orthogonal shoulders later I guess)
+
+    # TODO if tenon_depth + receiving_timber_mortise_extra_depth < receiving timber's width in the receiving axis, assert that wedge_tip_extra_length <= receiving_timber_mortise_extra_depth, otherwise the wedge won't fit!
+    # TODO if tenon_depth + receiving_timber_mortise_extra_depth < receiving timber's width in the receiving axis, assert that wedge_from_receiving_timber_side is False, otherwise the wedge can't enter!
+
 
     from kumiki.cutcsg import ConvexPolygonExtrusion, HalfSpace, Difference
 
@@ -437,6 +448,14 @@ def dovetail_tenon_geometry(
         subtract=[positive_tenon],
     )
 
+
+    # TODO make the wedge accessory using CSGAccessory
+    # the "flat" side of the wedge sits on top of dovetail_top_side_on_butt_timber
+    # the "length of the wedge is base_extra + tenon_depth + tip_extra with 
+    # (0,0) of the wedge is right at the shoulder if wedge_from_receiving_timber_side is False, or on the other side of the receiving timber if wedge_from_receiving_timber_side is True
+    # make the wedge shape as a ConvexPolygonExtrusion
+    # create the CSGAccessory using the ConvexPolygonExtrusion and position it accordingly.
+
     # ---- Mortise negative prism ----
     # Same dovetail plane (same bottom slope), but the prism is longer so the mortise cavity
     # extends past the tenon tip by receiving_timber_mortise_extra_depth.
@@ -451,6 +470,9 @@ def dovetail_tenon_geometry(
         create_v2(mortise_total_depth, Integer(0)),
         create_v2(mortise_total_depth, mortise_bottom_at_tip),
     ]
+
+    # TODO next, extend the mortise negative geometry to include a slot for the wedge, you can just use the ConvexPolygonExtrusion from earlier
+
     mortise_negative_csg = ConvexPolygonExtrusion(
         points=mortise_profile_points,
         transform=extrusion_transform,
