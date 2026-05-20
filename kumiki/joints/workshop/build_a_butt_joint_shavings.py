@@ -280,8 +280,8 @@ class DovetailTenonGeometeryResult(NamedTuple):
         tenon_csg: CSG representing the tenon shape to be cut from the butt timber.
         mortise_csg: CSG representing the mortise shape to be cut from the receiving timber.
     """
-    tenon_csg: CutCSG
-    mortise_csg: CutCSG
+    tenon_negative_csg: CutCSG
+    mortise_negative_csg: CutCSG
     wedge_accessory_csg: Optional[CutCSG] = None
 
 class DovetailTenonWedgeAccessoryParameters(NamedTuple):
@@ -306,7 +306,7 @@ def dovetail_tenon_geometry(
     dovetail_depth: Numeric,
     tenon_lateral_offset: Numeric = 0,
     # the extra depth for the mortise hole in the receiving timber
-    receiving_timber_extra_depth: Numeric = 0,
+    receiving_timber_mortise_extra_depth: Numeric = 0,
     wedge_accessory_parameters: Optional[DovetailTenonWedgeAccessoryParameters] = None,
 ) -> DovetailTenonGeometeryResult:
     """
@@ -330,15 +330,128 @@ def dovetail_tenon_geometry(
         raise ValueError(f"tenon_depth must be positive, got {tenon_depth}")
     if safe_compare(dovetail_depth, Integer(0), Comparison.LT):
         raise ValueError(f"dovetail_depth must be non-negative, got {dovetail_depth}")
-    if safe_compare(receiving_timber_extra_depth, Integer(0), Comparison.LT):
+    if safe_compare(receiving_timber_mortise_extra_depth, Integer(0), Comparison.LT):
         raise ValueError(
-            "receiving_timber_extra_depth must be non-negative, "
-            f"got {receiving_timber_extra_depth}"
+            "receiving_timber_mortise_extra_depth must be non-negative, "
+            f"got {receiving_timber_mortise_extra_depth}"
         )
     if safe_compare(tenon_size[0], Integer(0), Comparison.LE) or safe_compare(tenon_size[1], Integer(0), Comparison.LE):
         raise ValueError(f"tenon_size values must be positive, got {tenon_size}")
 
-    raise NotImplementedError("dovetail tenon geometry function is not implemented yet")
+    # TODO assert that the shoulder is orthognal (we can add support for non orthogonal shoulders later I guess)
+
+    from kumiki.cutcsg import ConvexPolygonExtrusion, HalfSpace, Difference
+
+    tenon_timber = arrangement.butt_timber
+
+    # Direction the tenon points from the shoulder into the receiving (mortise) timber.
+    into_mortise_dir = shoulder_result.butt_direction
+
+    # Outward normal of the face the dovetail top is flush with.
+    top_face_dir = tenon_timber.get_face_direction_global(
+        dovetail_top_side_on_butt_timber.to.face()
+    )
+
+    # Lateral direction (across the joint width), perpendicular to both length and top-bottom.
+    lateral_dir = normalize_vector(cross_product(into_mortise_dir, top_face_dir))
+
+    # tenon_size[0] aligns with the butt timber's width axis (RIGHT direction);
+    # tenon_size[1] aligns with the butt timber's height axis (TOP direction).
+    # The "top-to-bottom" of the dovetail is along whichever butt axis the top side belongs to.
+    if dovetail_top_side_on_butt_timber in (TimberLongFace.RIGHT, TimberLongFace.LEFT):
+        tenon_top_to_bottom_dim = tenon_size[0]
+        tenon_lateral_dim = tenon_size[1]
+    else:
+        tenon_top_to_bottom_dim = tenon_size[1]
+        tenon_lateral_dim = tenon_size[0]
+
+    # Start at the centerline / shoulder-plane intersection on the butt timber.
+    shoulder_origin = shoulder_result.marking_space.transform.position
+
+    # Move to the dovetail_top_side face at the shoulder (centered laterally on the butt timber).
+    butt_half_in_top_dir = tenon_timber.get_size_in_direction_3d(top_face_dir) / Rational(2)
+    top_face_center_at_shoulder = shoulder_origin + top_face_dir * butt_half_in_top_dir
+
+    # Apply the lateral offset (perpendicular axis on the tenon timber).
+    top_face_tenon_center_at_shoulder = (
+        top_face_center_at_shoulder + lateral_dir * tenon_lateral_offset
+    )
+
+    # Extrusion local frame:
+    #   profile X = into_mortise_dir  (depth along tenon length, starting at the shoulder)
+    #   profile Y = top_face_dir      (Y=0 sits on the dovetail_top_side face; the tenon body lives at Y<0)
+    #   extrude Z = X × Y = lateral_dir
+    extrusion_orientation = Orientation.from_x_and_y(
+        x_direction=into_mortise_dir,
+        y_direction=top_face_dir,
+    )
+    extrusion_transform = Transform(
+        position=top_face_tenon_center_at_shoulder,
+        orientation=extrusion_orientation,
+    )
+
+    half_lateral = tenon_lateral_dim / Rational(2)
+
+    # ---- Positive tenon prism (the dovetail-shaped solid the tenon should be) ----
+    # Top edge (flush with dovetail_top_side) runs at Y = 0 from X = 0 to X = tenon_depth.
+    # Bottom edge slopes from (0, -t) at the shoulder to (tenon_depth, -t - d) at the tip,
+    # giving the dovetail its characteristic widening toward the tip.
+    tenon_bottom_at_shoulder = -tenon_top_to_bottom_dim
+    tenon_bottom_at_tip = -(tenon_top_to_bottom_dim + dovetail_depth)
+    tenon_profile_points = [
+        create_v2(Integer(0), tenon_bottom_at_shoulder),
+        create_v2(Integer(0), Integer(0)),
+        create_v2(tenon_depth, Integer(0)),
+        create_v2(tenon_depth, tenon_bottom_at_tip),
+    ]
+    positive_tenon = ConvexPolygonExtrusion(
+        points=tenon_profile_points,
+        transform=extrusion_transform,
+        start_distance=-half_lateral,
+        end_distance=half_lateral,
+    )
+
+    # ---- HalfSpace covering everything beyond the shoulder plane (into the mortise) ----
+    # Used as the "box" that is differenced with the tenon: removing this from the butt timber
+    # strips away material past the shoulder, except where the positive tenon lives.
+    shoulder_offset = safe_dot_product(shoulder_origin, into_mortise_dir)
+    shoulder_halfspace = HalfSpace(
+        normal=into_mortise_dir,
+        offset=shoulder_offset,
+    )
+
+    tenon_negative_csg = Difference(
+        base=shoulder_halfspace,
+        subtract=[positive_tenon],
+    )
+
+    # ---- Mortise negative prism ----
+    # Same dovetail plane (same bottom slope), but the prism is longer so the mortise cavity
+    # extends past the tenon tip by receiving_timber_mortise_extra_depth.
+    mortise_total_depth = tenon_depth + receiving_timber_mortise_extra_depth
+    # Extend the bottom-edge slope to the deeper tip (slope = -dovetail_depth / tenon_depth).
+    mortise_bottom_at_tip = -tenon_top_to_bottom_dim - (
+        dovetail_depth * mortise_total_depth / tenon_depth
+    )
+    mortise_profile_points = [
+        create_v2(Integer(0), tenon_bottom_at_shoulder),
+        create_v2(Integer(0), Integer(0)),
+        create_v2(mortise_total_depth, Integer(0)),
+        create_v2(mortise_total_depth, mortise_bottom_at_tip),
+    ]
+    mortise_negative_csg = ConvexPolygonExtrusion(
+        points=mortise_profile_points,
+        transform=extrusion_transform,
+        start_distance=-half_lateral,
+        end_distance=half_lateral,
+    )
+
+    # Wedge accessory support is intentionally deferred (see TODO at top of function).
+    return DovetailTenonGeometeryResult(
+        tenon_negative_csg=positive_tenon,
+        mortise_negative_csg=mortise_negative_csg,
+        wedge_accessory_csg=None,
+    )
 
 # ============================================================================
 # Peg Geometry

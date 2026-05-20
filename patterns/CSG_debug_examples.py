@@ -583,16 +583,17 @@ def example_dovetail_tenon_geometry_raw():
         tenon_depth=inches(5),
         dovetail_depth=inches(1),
         tenon_lateral_offset=Rational(0),
-        receiving_timber_extra_depth=inches(1, 2),
+        receiving_timber_mortise_extra_depth=inches(1, 2),
     )
 
     # Render both shapes side-by-side for easier visual inspection.
     tenon_offset = Transform(position=Matrix([0, 0, 0]), orientation=Orientation.identity())
     mortise_offset = Transform(position=Matrix([inches(8), 0, 0]), orientation=Orientation.identity())
 
-    tenon_shifted = adopt_csg(None, tenon_offset, geo.tenon_csg)
-    mortise_shifted = adopt_csg(None, mortise_offset, geo.mortise_csg)
-    return SolidUnion(children=[tenon_shifted, mortise_shifted])
+    tenon_shifted = adopt_csg(None, tenon_offset, geo.tenon_negative_csg)
+    mortise_shifted = adopt_csg(None, mortise_offset, geo.mortise_negative_csg)
+    #return SolidUnion(children=[tenon_shifted, mortise_shifted])
+    return SolidUnion(children=[mortise_shifted])
 
 
 # Dictionary for easy example selection
