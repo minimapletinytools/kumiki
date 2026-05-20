@@ -288,14 +288,26 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
     """
     Parameters for an optional wedge accessory for a dovetail tenon.
 
+
+        __
+        | \
+      __|  \____________________ <- wedge_small_height measured at this line
+        |   \
+        |    \
+        |     \
+      __|      \________________
+        |       \
+        |________\
+        
+
     Attributes:
         wedge_from_receiving_timber_side: If true, the wedge is designed to be cut from the receiving timber and inserted from that side. If false, the wedge is designed to be cut from the tenon timber and inserted from the tenon side. We must have tenon_depth + receiving_timber_extra_depth > the matching width on the receivingtimber for this to work
         wedge_angle: The angle of the wedge taper. 0 means a rectangular wedge, X means a wedge with an X angle taper.
-        wedge_small_width: The width of the narrow end of the wedge. Measured at tenon_length if wedge_from_receiving_timber_side is False, measured from the shoulder if wedge_from_receiving_timber_side is True. If None, dovetail_depth is used.
+        wedge_small_height: The height of the narrow end of the wedge. Measured at tenon_length if wedge_from_receiving_timber_side is False, measured from the shoulder if wedge_from_receiving_timber_side is True. If None, dovetail_depth is used.
     """
     wedge_from_receiving_timber_side: bool = False
     wedge_angle: Numeric = degrees(10)
-    wedge_small_width: Optional[Numeric] = None
+    wedge_small_height: Optional[Numeric] = None
 
 def dovetail_tenon_geometry(
     arrangement: ButtJointTimberArrangement,
