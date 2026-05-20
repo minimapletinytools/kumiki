@@ -105,13 +105,18 @@ DONE-opening pattern errors should go to console. Im' not sure why it's not, so 
 DONE-indent for joints layers view is broken
 DONE-fresh install not picking up patterns in kumiki library
 DONE-add a command to open kigumi in the left hand side bar
--create sensible kigumi commands, and remove or hide the rest with kigumiinternalignoreme or osmething
+DONE-create sensible kigumi commands, and remove or hide the rest with kigumiinternalignoreme or osmething
   -Kigumi: Open explorer
   -Kigumi: Open Current File in Viewer
+DONE-top level "timbers" and "joints" folder text in the layers view should be bolded
+DONE-set shadows to be off by default
+DONE-the viewer area should be slightly smaller vertically so that it's easier to see and interact with the non-viewer area at the bottom
+
+-shadows broken in tinyshed120
+-layers view needs to be scrollable 
+-should be IN the webview, or at least cropped to not overflow it
+
 -make sure kigumi installs ltaest version of kumiki
--top level frame and joints folder should be bolded
--shadows off or lower by default (maybe 2 shadow transparency settings)
--the bottom no viewer area needs to be a little bigger, at least see 1 row ofthe option clearly
 -test installation
   -raw installation of kigumi, installs deps
   -create new project/design

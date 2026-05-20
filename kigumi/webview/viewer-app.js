@@ -353,7 +353,7 @@ class KigumiViewerApp extends LitElement {
 
         this.showCenterGizmo = true;
         this.edgesEnabled = true;
-        this.shadowsEnabled = true;
+        this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
         this.debugEnabled = false;
         this.showLayerTags = true;
@@ -744,7 +744,7 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(viewport.offsetWidth, viewport.offsetHeight, false);
         this.renderer.outputEncoding = THREE.sRGBEncoding;
-        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.enabled = false;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         this.scene = new THREE.Scene();

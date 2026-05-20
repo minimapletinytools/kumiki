@@ -19,7 +19,7 @@
 #viewport {
     position: relative;
     width: 100%;
-    height: 95vh;
+    height: 90vh; /* Reduced from 95vh to make the viewer area slightly smaller */
     min-height: 420px;
     border-bottom: 1px solid var(--hv-panel-border);
 }
