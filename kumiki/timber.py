@@ -1352,7 +1352,8 @@ class Cutting:
             csg_components.append(self.maybe_bottom_end_cut)
 
         if len(csg_components) == 0:
-            return HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(1)), offset=Rational(-999999))
+            return EmptyCSG()
+
         elif len(csg_components) == 1:
             result = csg_components[0]
             if self.label is not None:

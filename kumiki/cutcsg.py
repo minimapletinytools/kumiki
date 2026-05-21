@@ -203,6 +203,33 @@ class CutCSG(ABC):
 
 
 @dataclass(frozen=True)
+class EmptyCSG(CutCSG):
+    """Represents an empty solid (contains no points)."""
+
+    def __repr__(self) -> str:
+        return "EmptyCSG()"
+
+    def contains_point(self, point: V3) -> bool:
+        return False
+
+    def is_point_on_boundary(self, point: V3) -> bool:
+        return False
+
+    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+        return None
+
+    def get_aabb(self) -> 'BoundingBox':
+        return BoundingBox(
+            min_x=None,
+            min_y=None,
+            min_z=None,
+            max_x=None,
+            max_y=None,
+            max_z=None,
+        )
+
+
+@dataclass(frozen=True)
 class HalfSpace(CutCSG):
     """
     An infinite half-plane defined by a normal vector and offset from origin.
