@@ -332,6 +332,7 @@ def example_wedged_half_dovetail_mortise_and_tenon_no_wedge(position=None):
         tenon_depth=inches(5),
         receiving_timber_mortise_extra_depth=inches(1, 2),
         dovetail_depth=inches(1, 2),
+        mortise_shoulder_inset = inches(1, 2),
     )
 
 

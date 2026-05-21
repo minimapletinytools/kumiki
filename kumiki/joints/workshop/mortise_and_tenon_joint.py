@@ -699,6 +699,26 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     tenon_negative_local = adopt_csg(None, tenon_timber.transform, geo.tenon_negative_csg)
     mortise_negative_local = adopt_csg(None, mortise_timber.transform, geo.mortise_negative_csg)
 
+    # Shoulder notch on the receiving timber when the shoulder is inset from the entry
+    # face (matches the behavior of `cut_mortise_and_tenon_joint`). For face-aligned
+    # orthogonal arrangements the approach angle is pi/2 (no relief cut needed).
+    if _does_shoulder_plane_need_notching(
+        arrangement, mortise_shoulder_distance_from_centerline
+    ):
+        from sympy import pi
+
+        shoulder_notch_local = chop_shoulder_notch_aligned_with_timber(
+            notch_timber=mortise_timber,
+            butting_timber=tenon_timber,
+            butting_timber_end=tenon_end,
+            distance_from_centerline=mortise_shoulder_distance_from_centerline,
+            # TODO add parameter for this
+            notch_wall_relief_cut_angle_radians=degrees(45),
+        )
+        mortise_negative_local = CSGUnion(
+            children=[mortise_negative_local, shoulder_notch_local]
+        )
+
     # Redundant end cut at the tenon tip (shoulder + tenon_depth along the butt direction).
     tenon_tip_position_global = (
         shoulder_result.marking_space.transform.position
