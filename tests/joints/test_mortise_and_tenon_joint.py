@@ -642,3 +642,127 @@ class TestMortiseAndTenonCSGHierarchy:
         mortise_hole = mt_union.children[0]
         assert isinstance(mortise_hole, RectangularPrism)
         assert mortise_hole.label == "mortise_hole"
+
+# ============================================================================
+# Tests for Wedged Half-Dovetail Mortise and Tenon Joint
+# ============================================================================
+
+from kumiki.joints.workshop.mortise_and_tenon_joint import (
+    cut_wedged_half_dovetail_mortise_and_tenon_joint,
+)
+from kumiki.joints.workshop.build_a_butt_joint_shavings import (
+    DovetailTenonWedgeAccessoryParameters,
+)
+from kumiki.rule import degrees as _degrees
+from kumiki.timber import CSGAccessory
+
+
+class TestWedgedHalfDovetailMortiseAndTenonJoint:
+    """Tests for cut_wedged_half_dovetail_mortise_and_tenon_joint."""
+
+    def _make_arrangement(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        return ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            front_face_on_butt_timber=None,
+        )
+
+    def test_general_wedged_half_dovetail_mortise_and_tenon(self, simple_T_configuration):
+        """
+        Build the joint and walk points along the tenon centerline.
+
+        Geometry (simple_T_configuration + shoulder at mortise top face z=3):
+        - tenon_timber: vertical +Z, height 100, size 4x4 at origin.
+          BOTTOM end (at z=0) faces -Z into the mortise.
+        - mortise_timber: horizontal +X, length 100, size 6x6 centered at origin
+          (cross-section y ∈ [-3, 3], z ∈ [-3, 3]).
+        - mortise_shoulder_inset defaults to 0 → shoulder flush with the mortise
+          entry face at z = 3 (global).
+        - tenon_depth = 4 → tenon tip at z = -1 (penetrating past mortise centerline).
+        - dovetail_depth = 1 → inside the mortise, the dovetail flares by 1 in the
+          -Z direction (away from the dovetail-top side, which is RIGHT → +Z).
+        """
+        arrangement = self._make_arrangement(simple_T_configuration)
+        tenon_timber = arrangement.butt_timber
+        mortise_timber = arrangement.receiving_timber
+
+        tenon_depth = Rational(4)
+        dovetail_depth = Rational(1)
+        tenon_size = Matrix([Rational(2), Rational(2)])
+
+        joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
+            arrangement=arrangement,
+            dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
+            tenon_size=tenon_size,
+            tenon_depth=tenon_depth,
+            dovetail_depth=dovetail_depth,
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+                wedge_angle=_degrees(8),
+                wedge_base_extra_length=Rational(1, 2),
+            ),
+        )
+
+        # ---- structure ----
+        assert joint.ticket.joint_type == "wedged_half_dovetail_mortise_and_tenon"
+        assert set(joint.cut_timbers.keys()) == {"tenon_timber", "mortise_timber"}
+        assert "wedge" in joint.jointAccessories
+        assert isinstance(joint.jointAccessories["wedge"], CSGAccessory)
+
+        tenon_ct = joint.cut_timbers["tenon_timber"]
+        mortise_ct = joint.cut_timbers["mortise_timber"]
+        assert len(tenon_ct.cuts) == 1
+        assert len(mortise_ct.cuts) == 1
+        # Butt end is BOTTOM, so the redundant end cut lives on the bottom end.
+        assert tenon_ct.cuts[0].maybe_bottom_end_cut is not None
+        assert tenon_ct.cuts[0].maybe_top_end_cut is None
+        assert mortise_ct.cuts[0].maybe_top_end_cut is None
+        assert mortise_ct.cuts[0].maybe_bottom_end_cut is None
+        assert tenon_ct.cuts[0].label == "wedged_half_dovetail_mortise_and_tenon"
+        assert mortise_ct.cuts[0].label == "wedged_half_dovetail_mortise_and_tenon"
+
+        # ---- walk points along the tenon centerline (x=0, y=0, varying z) ----
+        tenon_csg = tenon_ct.render_timber_with_cuts_csg_local()
+        mortise_csg = mortise_ct.render_timber_with_cuts_csg_local()
+
+        # Shoulder at z=3 (mortise top face).
+        # Above the shoulder: deep in tenon body, untouched.
+        for z in [Rational(10), Rational(50)]:
+            pt = create_v3(Rational(0), Rational(0), z)
+            pt_local = tenon_timber.transform.global_to_local(pt)
+            assert tenon_csg.contains_point(pt_local), \
+                f"tenon body should remain at z={z}"
+
+        # Past the shoulder (z<3) and far from the dovetail footprint (a corner
+        # of the butt cross-section): the shoulder cut should have removed this.
+        cut_corner = create_v3(Rational(19, 10), Rational(19, 10), Rational(2))
+        cut_corner_local = tenon_timber.transform.global_to_local(cut_corner)
+        assert not tenon_csg.contains_point(cut_corner_local), \
+            "butt corner past the shoulder should be cut"
+
+        # Past the tenon tip (z < -1) on the centerline: end cut should remove this.
+        past_tip = create_v3(Rational(0), Rational(0), Rational(-3, 2))
+        past_tip_local = tenon_timber.transform.global_to_local(past_tip)
+        assert not tenon_csg.contains_point(past_tip_local), \
+            "tenon material past the tip should be cut"
+
+        # Mortise body away from the cavity remains.
+        mortise_far = create_v3(Rational(40), Rational(0), Rational(0))
+        mortise_far_local = mortise_timber.transform.global_to_local(mortise_far)
+        assert mortise_csg.contains_point(mortise_far_local)
+
+    def test_no_wedge_accessory(self, simple_T_configuration):
+        """Without wedge_accessory_parameters, the joint has no wedge accessory."""
+        arrangement = self._make_arrangement(simple_T_configuration)
+        joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
+            arrangement=arrangement,
+            dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
+            tenon_size=Matrix([Rational(2), Rational(2)]),
+            tenon_depth=Rational(4),
+            dovetail_depth=Rational(1),
+        )
+        assert len(joint.jointAccessories) == 0
+        # Both timbers still render to valid CSGs.
+        joint.cut_timbers["tenon_timber"].render_timber_with_cuts_csg_local()
+        joint.cut_timbers["mortise_timber"].render_timber_with_cuts_csg_local()

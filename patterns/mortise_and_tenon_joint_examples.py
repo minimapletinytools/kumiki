@@ -3,13 +3,16 @@ Example usage of mortise and tenon joint functions
 """
 
 from sympy import Matrix, Rational, Integer
-from kumiki.rule import inches, Transform
+from kumiki.rule import inches, Transform, degrees
 from kumiki.timber import (
     Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
 from kumiki.joints.workshop.mortise_and_tenon_joint import *
+from kumiki.joints.workshop.build_a_butt_joint_shavings import (
+    DovetailTenonWedgeAccessoryParameters,
+)
 
 from kumiki.construction import (
     ButtJointTimberArrangement,
@@ -287,13 +290,58 @@ def example_double_angled_mortise_and_tenon(position=None):
 
 
 
+def example_wedged_half_dovetail_mortise_and_tenon(position=None):
+    """
+    Wedged half-dovetail mortise and tenon joint on the canonical 4"x5"x4'
+    butt joint timbers. The dovetail's flat (top) side sits on the FRONT face
+    of the butt timber, which aligns with the receiving timber's length axis.
+    A wedge accessory is included to lock the tenon.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(position)
+    return cut_wedged_half_dovetail_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_depth=inches(5),
+        dovetail_depth=inches(1, 2),
+        receiving_timber_mortise_extra_depth=inches(1, 2),
+        wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+            wedge_angle=degrees(8),
+            wedge_base_extra_length=inches(1, 2),
+        ),
+    )
+
+
+def example_wedged_half_dovetail_mortise_and_tenon_no_wedge(position=None):
+    """
+    Half-dovetail mortise and tenon (no wedge accessory) on the canonical
+    4"x5"x4' butt joint timbers. The dovetail's flat (top) side sits on the
+    FRONT face of the butt timber (along the receiving timber's length axis).
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(position)
+    return cut_wedged_half_dovetail_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_depth=inches(5),
+        receiving_timber_mortise_extra_depth=inches(1, 2),
+        dovetail_depth=inches(1, 2),
+    )
+
+
 def create_mortise_and_tenon_patternbook() -> PatternBook:
     """
     Create a PatternBook with all mortise and tenon joint patterns.
-    
+
     Each pattern has groups: ["mortise_tenon", "{variant}"]
     For example: ["mortise_tenon", "basic"] or ["mortise_tenon", "with_pegs"]
-    
+
     Returns:
         PatternBook: PatternBook containing all mortise and tenon joint patterns
     """
@@ -315,8 +363,14 @@ def create_mortise_and_tenon_patternbook() -> PatternBook:
 
         (PatternMetadata("double_angled", ["mortise_tenon", "double_angled"], "frame"),
          make_pattern_from_joint(example_double_angled_mortise_and_tenon)),
+
+        (PatternMetadata("wedged_half_dovetail", ["mortise_tenon", "wedged_half_dovetail"], "frame"),
+         make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon)),
+
+        (PatternMetadata("half_dovetail_no_wedge", ["mortise_tenon", "wedged_half_dovetail"], "frame"),
+         make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge)),
     ]
-    
+
     return PatternBook(patterns=patterns)
 
 

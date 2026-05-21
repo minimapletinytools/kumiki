@@ -282,7 +282,7 @@ class DovetailTenonGeometeryResult(NamedTuple):
     """
     tenon_negative_csg: CutCSG
     mortise_negative_csg: CutCSG
-    wedge_accessory_csg: Optional[CutCSG] = None
+    wedge_accessory_csg: Optional[CSGAccessory] = None
 
 class DovetailTenonWedgeAccessoryParameters(NamedTuple):
     """
@@ -316,6 +316,7 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
     wedge_base_extra_length: Numeric = 0
 
 
+# TODO rename to half_dovetail_mortise_and_tenon_geometry
 def dovetail_tenon_geometry(
     arrangement: ButtJointTimberArrangement,
     shoulder_result: ButtJointShoulderResult,
@@ -394,6 +395,19 @@ def dovetail_tenon_geometry(
     top_face_dir = tenon_timber.get_face_direction_global(
         dovetail_top_side_on_butt_timber.to.face()
     )
+
+    # The dovetail's "top" (the flat side) must lie along the receiving timber's length
+    # axis: that's the only orientation where the dovetail's pull-out resistance is along
+    # the joint's load axis. The opposite (sloped) side then naturally wraps around the
+    # receiving timber's cross-section.
+    receiving_length_dir = arrangement.receiving_timber.get_length_direction_global()
+    top_dot_receiving_length = safe_dot_product(top_face_dir, receiving_length_dir)
+    if not (zero_test(top_dot_receiving_length - Integer(1)) or zero_test(top_dot_receiving_length + Integer(1))):
+        raise AssertionError(
+            f"dovetail_top_side_on_butt_timber ({dovetail_top_side_on_butt_timber}) must point "
+            f"along the receiving timber's length axis (dot product was {top_dot_receiving_length}, "
+            "expected +/-1)."
+        )
 
     # Lateral direction (across the joint width), perpendicular to both length and top-bottom.
     lateral_dir = normalize_vector(cross_product(into_mortise_dir, top_face_dir))
@@ -574,7 +588,7 @@ def dovetail_tenon_geometry(
         mortise_negative_csg = mortise_dovetail_prism
 
     return DovetailTenonGeometeryResult(
-        tenon_negative_csg=positive_tenon,
+        tenon_negative_csg=tenon_negative_csg,
         mortise_negative_csg=mortise_negative_csg,
         wedge_accessory_csg=wedge_accessory_csg,
     )

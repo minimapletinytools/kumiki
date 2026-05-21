@@ -26,13 +26,17 @@ from kumiki.construction import *
 from kumiki.timber_shavings import are_timbers_plane_aligned
 from kumiki.rule import *
 from kumiki.rule import safe_dot_product
-from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, adopt_csg, PrismFace, Cylinder
+from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder
 from .joint_shavings import chop_shoulder_notch_aligned_with_timber
 from .build_a_butt_joint_shavings import (
     PegPositionResult,
     PegPositionSpace,
     SimplePegParameters,
     compute_peg_positions,
+    compute_butt_joint_shoulder,
+    dovetail_tenon_geometry,
+    DovetailTenonGeometeryResult,
+    DovetailTenonWedgeAccessoryParameters,
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
 )
 
@@ -602,3 +606,137 @@ def cut_mortise_and_tenon_joint_on_FAT(
         peg_parameters=peg_parameters,
     )
 
+
+
+# ============================================================================
+# Wedged Half-Dovetail Mortise and Tenon Joint
+# ============================================================================
+
+
+def cut_wedged_half_dovetail_mortise_and_tenon_joint(
+    arrangement: ButtJointTimberArrangement,
+    dovetail_top_side_on_butt_timber: TimberLongFace,
+    tenon_size: V2,
+    tenon_depth: Numeric,
+    dovetail_depth: Numeric,
+    tenon_lateral_offset: Numeric = Rational(0),
+    receiving_timber_mortise_extra_depth: Numeric = Rational(0),
+    mortise_shoulder_inset: Numeric = Rational(0),
+    wedge_accessory_parameters: Optional[DovetailTenonWedgeAccessoryParameters] = None,
+) -> Joint:
+    """
+    Create a half-dovetail mortise-and-tenon joint (with an optional wedge accessory).
+
+    Built on top of `dovetail_tenon_geometry`. The "top" of the dovetail is flush with
+    `dovetail_top_side_on_butt_timber`; the opposite side slopes outward by `dovetail_depth`
+    over `tenon_depth` to give the joint its mechanical pull-out resistance.
+
+    Args:
+        arrangement: Butt joint arrangement (butt_timber = tenon, receiving_timber = mortise).
+            Must be face-aligned and orthogonal.
+        dovetail_top_side_on_butt_timber: Which face of the butt timber the dovetail's flat
+            "top" is flush with. The opposite face is the sloped side.
+        tenon_size: Cross-section of the tenon (X = butt RIGHT axis, Y = butt TOP axis).
+        tenon_depth: Depth of the tenon into the receiving timber, measured from the shoulder.
+        dovetail_depth: How far the sloped side of the dovetail kicks out over `tenon_depth`.
+        tenon_lateral_offset: Offset of the tenon along the lateral direction (perpendicular
+            to both length and top-to-bottom). 0 = centered on the butt timber.
+        receiving_timber_mortise_extra_depth: Extra mortise depth in the receiving timber past
+            the tenon tip.
+        mortise_shoulder_inset: Distance from the mortise entry face to the shoulder plane,
+            measured perpendicular to the entry face inward. 0 = shoulder flush with the
+            entry face (the default). Positive pushes the shoulder deeper into the receiving
+            timber.
+        wedge_accessory_parameters: If provided, a wedge accessory is added on the
+            `dovetail_top_side_on_butt_timber` side of the tenon and a matching slot is cut
+            into the receiving timber.
+
+    Returns:
+        Joint object with cuts on both timbers and (optionally) a "wedge" accessory.
+    """
+    tenon_timber = arrangement.butt_timber
+    mortise_timber = arrangement.receiving_timber
+    tenon_end = arrangement.butt_timber_end
+
+    # Convert the user-facing `mortise_shoulder_inset` (measured inward from the mortise
+    # entry face) into the signed-from-centerline distance that `compute_butt_joint_shoulder`
+    # expects. This mirrors how `cut_mortise_and_tenon_joint_on_PAT/FAT` handle the inset.
+    tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
+    mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
+        -tenon_end_direction
+    ).to.face()
+    inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, mortise_timber)
+    inset_marking = mark_plane_from_edge_in_direction(
+        inset_plane, mortise_timber, TimberCenterline.CENTERLINE
+    )
+    mortise_shoulder_distance_from_centerline = inset_marking.distance
+
+    # The shoulder marking space's up_direction only orients the marking frame; the geometry
+    # function derives its own frame from `dovetail_top_side_on_butt_timber`. Pick the butt
+    # timber's height direction (a stable, non-parallel choice for any orthogonal arrangement).
+    up_direction = tenon_timber.get_height_direction_global()
+
+    shoulder_result = compute_butt_joint_shoulder(
+        arrangement=arrangement,
+        distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        up_direction=up_direction,
+    )
+
+    geo = dovetail_tenon_geometry(
+        arrangement=arrangement,
+        shoulder_result=shoulder_result,
+        dovetail_top_side_on_butt_timber=dovetail_top_side_on_butt_timber,
+        tenon_size=tenon_size,
+        tenon_depth=tenon_depth,
+        dovetail_depth=dovetail_depth,
+        tenon_lateral_offset=tenon_lateral_offset,
+        receiving_timber_mortise_extra_depth=receiving_timber_mortise_extra_depth,
+        wedge_accessory_parameters=wedge_accessory_parameters,
+    )
+
+    # The CSGs from dovetail_tenon_geometry are in global space. Adopt them into each
+    # timber's local frame for cutting.
+    tenon_negative_local = adopt_csg(None, tenon_timber.transform, geo.tenon_negative_csg)
+    mortise_negative_local = adopt_csg(None, mortise_timber.transform, geo.mortise_negative_csg)
+
+    # Redundant end cut at the tenon tip (shoulder + tenon_depth along the butt direction).
+    tenon_tip_position_global = (
+        shoulder_result.marking_space.transform.position
+        + shoulder_result.butt_direction * tenon_depth
+    )
+    tip_position_local = tenon_timber.transform.global_to_local(tenon_tip_position_global)
+    tip_z_local = tip_position_local[2]
+    redundant_end_cut = (
+        HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(1)), offset=tip_z_local)
+        if tenon_end == TimberReferenceEnd.TOP
+        else HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(-1)), offset=-tip_z_local)
+    )
+
+    tenon_cut = Cutting(
+        timber=tenon_timber,
+        maybe_top_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=tenon_negative_local,
+        label="wedged_half_dovetail_mortise_and_tenon",
+    )
+
+    mortise_cut = Cutting(
+        timber=mortise_timber,
+        maybe_top_end_cut=None,
+        maybe_bottom_end_cut=None,
+        negative_csg=mortise_negative_local,
+        label="wedged_half_dovetail_mortise_and_tenon",
+    )
+
+    joint_accessories = {}
+    if geo.wedge_accessory_csg is not None:
+        joint_accessories["wedge"] = geo.wedge_accessory_csg
+
+    return Joint(
+        cut_timbers={
+            tenon_timber.ticket.name: CutTimber(timber=tenon_timber, cuts=[tenon_cut]),
+            mortise_timber.ticket.name: CutTimber(timber=mortise_timber, cuts=[mortise_cut]),
+        },
+        ticket=JointTicket(joint_type="wedged_half_dovetail_mortise_and_tenon"),
+        jointAccessories=joint_accessories,
+    )
