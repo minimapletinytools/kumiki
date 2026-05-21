@@ -162,6 +162,15 @@ DONE/IGNORE-decide on layer view
   -decide on section: timbers, joints (this is fine for now)
     -how do these sections integrate with folders
   -decide on folders being string refs or actual refs when constructing...
+DONE-add dovetail shoulder to build a butt Joint 
+
+-consider making all end cuts 90 degrees rather than half spaces, that was prob a bad idea
+-improve joint writing agent instructinos
+  -marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
+  -build a butt joint guidance
+  -peg and notching guidance
+
+
 -add a new integration test that  createsa. new kigumi projcet in some temp directory and initializes it and checks
   -kumiki patterns load correctly
   -workspace patterns load correctly
@@ -171,8 +180,6 @@ DONE/IGNORE-decide on layer view
   -you can probably at least promote the plain joints...
 
 -add an optional scale ruler to the view and havei t default off
-
-
 
 -finish build a butt joint to do the wedged dovetail morties and tenon
 -I guessy ou probably want to do tusked mortise and tenon joint too
@@ -189,9 +196,21 @@ DONE/IGNORE-decide on layer view
   -add searching + tag searching functionality on top of the patternbook/frames/examples
   -allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
 
--add dovetail shoulder to build a butt Joint 
-  -add notch relief angle parameter
--making notching generic in build a butt joint maybe
+
+-make notching more generic
+  -when to notch: 
+    -when there is a shoulder
+    -entering into a non perfect timber face
+    -entering timber from a non face perpendicular angle
+  -notching should work off the shoulder geometery results
+    -needs notching (checks for condititions above)
+    -notch_length, measured in the length direction of the receiving timber
+    -notch_width, always 100% the full dimension of the receiving timber
+    -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
+    -notch_style, straight walls only for now
+  -notching in other situations?
+  -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
+  -build notching into build a butt joint somehow?
 
 -do assembly metadata
   DONE-create assemblydirection class 
