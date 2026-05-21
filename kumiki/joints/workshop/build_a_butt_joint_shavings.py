@@ -369,11 +369,12 @@ def dovetail_tenon_geometry(
         receiving_timber = arrangement.receiving_timber
         # The axis along which the wedge enters is the normal to the dovetail_top_side_on_butt_timber face
         receiving_axis_dir = receiving_timber.get_face_direction_global(dovetail_top_side_on_butt_timber.to.face())
-        receiving_axis_width = receiving_timber.get_size_in_face_normal_axis(dovetail_top_side_on_butt_timber.to.face())
+        receiving_axis_width = receiving_timber.get_size_in_face_normal_axis(dovetail_top_side_on_butt_timber.rotate_left().to.face())
         total_depth = tenon_depth + receiving_timber_mortise_extra_depth
         # If the mortise is shallower than the timber's width in the receiving axis, wedge fit is constrained
         if safe_compare(total_depth, receiving_axis_width, Comparison.LT):
             wedge_tip_extra_length = getattr(wedge_accessory_parameters, "wedge_tip_extra_length", None)
+
             if wedge_tip_extra_length is not None and safe_compare(wedge_tip_extra_length, receiving_timber_mortise_extra_depth, Comparison.GT):
                 raise AssertionError(
                     f"wedge_tip_extra_length ({wedge_tip_extra_length}) must be <= receiving_timber_mortise_extra_depth ({receiving_timber_mortise_extra_depth}) for wedge to fit!"

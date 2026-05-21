@@ -189,19 +189,9 @@ DONE/IGNORE-decide on layer view
   -add searching + tag searching functionality on top of the patternbook/frames/examples
   -allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
 
--add dovetail shoulder to build a butt joint
-
-    # first start from the center line on dovetail_top_side_on_butt_timber face where it intersects the shoulder plane
-    # then move by tenon_lateral_offset in the lateral direction of the tenon timber to get the center of the tenon
-    # then go down by tenon_size[0/1]/2 (depending on dovetail_top_side_on_butt_timber orientation) to get the bottom center of the tenon
-    # then extrude by tenon_depth in the dovetail timber length direction to get the main tenon shape
-    # next use a half plane cut to cut out the dovetail shape, determine the angle from dovetail depth and tenon_depth and position the half plane accordingly.
-    # we need to convert this to a negative CSG, so create a box that starts at the shoulder plane and extends infinitely in the lenght direction
-    # difference these two geometries together to create tenon_negative_csg
-    # for mortise_negative_csg we will use the same dovetail plane, but the prism should have length tenon_depth + receiving_timber_mortise_extra_depth
-    # don't worry about the wedge for now, we will fix it later
-
--add notching to build a butt joint (you can skip this if you want lol...)
+-add dovetail shoulder to build a butt Joint 
+  -add notch relief angle parameter
+-making notching generic in build a butt joint maybe
 
 -do assembly metadata
   DONE-create assemblydirection class 

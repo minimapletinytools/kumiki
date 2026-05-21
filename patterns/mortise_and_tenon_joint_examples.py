@@ -304,13 +304,16 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None):
     return cut_wedged_half_dovetail_mortise_and_tenon_joint(
         arrangement=arrangement,
         dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
-        tenon_size=Matrix([inches(2), inches(2)]),
-        tenon_depth=inches(5),
+        tenon_size=Matrix([inches(2), inches(4)]),
+        tenon_depth=inches(4),
         dovetail_depth=inches(1, 2),
+        mortise_shoulder_inset = inches(1, 2),
         receiving_timber_mortise_extra_depth=inches(1, 2),
+        
         wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
             wedge_angle=degrees(8),
-            wedge_base_extra_length=inches(1, 2),
+            wedge_tip_extra_length=inches(1),
+            wedge_base_extra_length=inches(1),
         ),
     )
 
