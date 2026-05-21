@@ -21,6 +21,7 @@ from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.joint_shavings import chop_lap_on_timber_end, chop_profile_on_timber_face, chop_shoulder_notch_on_timber_face
 from kumiki.joints.workshop.japanese_joints import draw_gooseneck_polygon
 from kumiki.joints.workshop.build_a_butt_joint_shavings import (
+    DovetailTenonWedgeAccessoryParameters,
     compute_butt_joint_shoulder,
     build_dovetail_shoulder_geometery,
     dovetail_tenon_geometry,
@@ -584,14 +585,25 @@ def example_dovetail_tenon_geometry_raw():
         dovetail_depth=inches(1),
         tenon_lateral_offset=Rational(0),
         receiving_timber_mortise_extra_depth=inches(1, 2),
+        wedge_accessory_parameters = DovetailTenonWedgeAccessoryParameters(
+            #wedge_from_receiving_timber_side: bool = False
+            #wedge_angle: Numeric = degrees(10)
+            #wedge_small_height: Optional[Numeric] = None
+            # the wedge length without extra is just tenon_depth
+            # this one can actually be negative which you'll want to do if the tenon is not a through tenon
+            #wedge_tip_extra_length: Numeric = 0
+            #wedge_base_extra_length: Numeric = 0
+        )
     )
 
     # Render both shapes side-by-side for easier visual inspection.
     tenon_offset = Transform(position=Matrix([0, 0, 0]), orientation=Orientation.identity())
     mortise_offset = Transform(position=Matrix([inches(8), 0, 0]), orientation=Orientation.identity())
+    wedge_offset = Transform(position=Matrix([inches(16), 0, 0]), orientation=Orientation.identity())
 
     tenon_shifted = adopt_csg(None, tenon_offset, geo.tenon_negative_csg)
     mortise_shifted = adopt_csg(None, mortise_offset, geo.mortise_negative_csg)
+    wedge_shifted = adopt_csg(None, wedge_offset, geo.wedge_accessory_csg)
     #return SolidUnion(children=[tenon_shifted, mortise_shifted])
     return SolidUnion(children=[mortise_shifted])
 

@@ -468,13 +468,81 @@ def dovetail_tenon_geometry(
         subtract=[positive_tenon],
     )
 
+    # ---- Wedge accessory (optional) ----
+    # The wedge's flat side sits on top of dovetail_top_side_on_butt_timber. Its length is
+    # wedge_base_extra_length + tenon_depth + wedge_tip_extra_length. In the extrusion frame
+    # (origin = shoulder, +X = into mortise, +Y = out of dovetail_top_side):
+    #   - if wedge_from_receiving_timber_side is False, the wedge spec origin is at the shoulder
+    #     (X=0); the base extends "back" by wedge_base_extra (X<0) and the tip extends "forward"
+    #     by wedge_tip_extra past tenon_depth. wedge_small_height is measured at the tenon tip
+    #     (X = tenon_depth).
+    #   - if wedge_from_receiving_timber_side is True, the wedge spec origin is on the receiving
+    #     timber's far face; the wedge enters from there and points back toward the butt timber.
+    #     wedge_small_height is measured at the shoulder (X = 0).
+    from sympy import tan as _sym_tan
 
-    # TODO make the wedge accessory using CSGAccessory
-    # the "flat" side of the wedge sits on top of dovetail_top_side_on_butt_timber
-    # the "length of the wedge is base_extra + tenon_depth + tip_extra with 
-    # (0,0) of the wedge is right at the shoulder if wedge_from_receiving_timber_side is False, or on the other side of the receiving timber if wedge_from_receiving_timber_side is True
-    # make the wedge shape as a ConvexPolygonExtrusion
-    # create the CSGAccessory using the ConvexPolygonExtrusion and position it accordingly.
+    wedge_accessory_csg = None
+    wedge_slot_in_mortise_csg = None
+    if wedge_accessory_parameters is not None:
+        wedge_small_height_value = wedge_accessory_parameters.wedge_small_height
+        if wedge_small_height_value is None:
+            wedge_small_height_value = dovetail_depth
+        wedge_angle = wedge_accessory_parameters.wedge_angle
+        wedge_base_extra = wedge_accessory_parameters.wedge_base_extra_length
+        wedge_tip_extra = wedge_accessory_parameters.wedge_tip_extra_length
+
+        tan_wedge_angle = _sym_tan(wedge_angle)
+
+        # Thicknesses at the base (large) and tip (small) ends.
+        # The small_height reference is wedge_tip_extra away from the tip end (toward base),
+        # so distance from base to small_height ref = wedge_base_extra + tenon_depth.
+        h_base = wedge_small_height_value + (wedge_base_extra + tenon_depth) * tan_wedge_angle
+        h_tip = wedge_small_height_value - wedge_tip_extra * tan_wedge_angle
+
+        if not wedge_accessory_parameters.wedge_from_receiving_timber_side:
+            # (0,0) at shoulder; base back, tip forward.
+            x_base = -wedge_base_extra
+            x_tip = tenon_depth + wedge_tip_extra
+        else:
+            # (0,0) at the receiving timber's far face. The wedge points back toward the butt
+            # timber. The earlier wedge-fit assertion guarantees this case is only used when the
+            # mortise is at least as deep as the receiving timber, so the wedge clears.
+            receiving_axis_width = arrangement.receiving_timber.get_size_in_face_normal_axis(
+                dovetail_top_side_on_butt_timber.to.face()
+            )
+            x_base = receiving_axis_width + wedge_base_extra
+            x_tip = -wedge_tip_extra
+
+        # Profile points (CW in math orientation) in the extrusion frame X-Y plane.
+        wedge_profile_points = [
+            create_v2(x_base, Integer(0)),
+            create_v2(x_base, h_base),
+            create_v2(x_tip, h_tip),
+            create_v2(x_tip, Integer(0)),
+        ]
+
+        # Accessory geometry is rendered in its own local frame; the CSGAccessory.transform
+        # places it globally. We keep the wedge polygon in the extrusion frame's coordinates,
+        # so the accessory transform IS the extrusion transform.
+        wedge_positive_csg = ConvexPolygonExtrusion(
+            points=wedge_profile_points,
+            transform=Transform.identity(),
+            start_distance=-half_lateral,
+            end_distance=half_lateral,
+        )
+        wedge_accessory_csg = CSGAccessory(
+            transform=extrusion_transform,
+            positive_csg=wedge_positive_csg,
+        )
+
+        # The mortise cavity must also include the wedge's slot (above Y=0), so the wedge can
+        # actually sit in the receiving timber. Use the same profile in the extrusion frame.
+        wedge_slot_in_mortise_csg = ConvexPolygonExtrusion(
+            points=wedge_profile_points,
+            transform=extrusion_transform,
+            start_distance=-half_lateral,
+            end_distance=half_lateral,
+        )
 
     # ---- Mortise negative prism ----
     # Same dovetail plane (same bottom slope), but the prism is longer so the mortise cavity
@@ -491,20 +559,24 @@ def dovetail_tenon_geometry(
         create_v2(mortise_total_depth, mortise_bottom_at_tip),
     ]
 
-    # TODO next, extend the mortise negative geometry to include a slot for the wedge, you can just use the ConvexPolygonExtrusion from earlier
-
-    mortise_negative_csg = ConvexPolygonExtrusion(
+    mortise_dovetail_prism = ConvexPolygonExtrusion(
         points=mortise_profile_points,
         transform=extrusion_transform,
         start_distance=-half_lateral,
         end_distance=half_lateral,
     )
 
-    # Wedge accessory support is intentionally deferred (see TODO at top of function).
+    if wedge_slot_in_mortise_csg is not None:
+        mortise_negative_csg = SolidUnion(
+            children=[mortise_dovetail_prism, wedge_slot_in_mortise_csg]
+        )
+    else:
+        mortise_negative_csg = mortise_dovetail_prism
+
     return DovetailTenonGeometeryResult(
         tenon_negative_csg=positive_tenon,
         mortise_negative_csg=mortise_negative_csg,
-        wedge_accessory_csg=None,
+        wedge_accessory_csg=wedge_accessory_csg,
     )
 
 # ============================================================================
