@@ -112,12 +112,16 @@ DONE-top level "timbers" and "joints" folder text in the layers view should be b
 DONE-set shadows to be off by default
 DONE-the viewer area should be slightly smaller vertically so that it's easier to see and interact with the non-viewer area at the bottom
 IGNORE/DONE-shadows broken in tinyshed120
--text over dark background still needs to be fixed
+DONE-text over dark background still needs to be fixed
+IGNORE-even scrolling down a little bit shows the "scorll to top" button
+  DONE-or perhaps if window is scrolled even a bit, scrolling the top view scrolls the entire window
+DONE-layers view needs to be scrollable 
+DONE-layers view should be IN the webview, or at least cropped to not overflow it
 -camera controls should be absolute? use focus to reset
--even scrolling down a little bit shows the "scorll to top" button
-  -or perhaps if window is scrolled even a bit, scrolling the top view scrolls the entire window
--layers view needs to be scrollable 
--layers view should be IN the webview, or at least cropped to not overflow it
+-searching
+  -show layer tags is broken
+  -searching should search for either tags or joint name (figure out a way to do this)
+
 -do a design pass
   -better logo
   -stuff showing below the view should be cleaner/tighter 

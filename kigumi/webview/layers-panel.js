@@ -18,12 +18,14 @@
             this.viewport = null;
             this._unsubSelection = null;
             this._unsubLayerState = null;
+            this._onPanelWheel = this._onPanelWheel.bind(this);
         }
 
         mount(viewport) {
             this.viewport = viewport;
             this.el = document.createElement('div');
             this.el.id = 'layers-panel';
+            this.el.addEventListener('wheel', this._onPanelWheel, { passive: false });
             viewport.insertBefore(this.el, viewport.firstChild);
             this._render();
 
@@ -53,8 +55,26 @@
         destroy() {
             if (this._unsubSelection) this._unsubSelection();
             if (this._unsubLayerState) this._unsubLayerState();
+            if (this.el) {
+                this.el.removeEventListener('wheel', this._onPanelWheel);
+            }
             if (this.el && this.el.parentNode) this.el.parentNode.removeChild(this.el);
             this.el = null;
+        }
+
+        _onPanelWheel(event) {
+            if (!this.el || this.collapsed) {
+                return;
+            }
+            const tree = this.el.querySelector('.lp-tree');
+            if (!tree) {
+                return;
+            }
+
+            // Keep wheel interaction local to layers so viewport wheel-zoom doesn't fire.
+            tree.scrollTop += event.deltaY;
+            event.preventDefault();
+            event.stopPropagation();
         }
 
         // ------------------------------------------------------------------
