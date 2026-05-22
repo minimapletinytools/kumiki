@@ -32,6 +32,13 @@ Keep frontend implementation migration-safe so Lit can be swapped to React later
 - Avoid introducing broad frontend dependencies unless explicitly requested.
 - Keep the current Three.js scene behavior intact unless task requirements ask for a rendering behavior change.
 
+## Theme System Policy
+
+- Use a single theme registry for viewer appearance: background, UI chrome tokens, and default timber/accessory render profiles should be selected together.
+- Do not add separate background-only presets alongside the unified theme selector.
+- Do not reintroduce the `blueprint` viewer theme.
+- Prefer semantic CSS variables (`--hv-*`) for UI colors; avoid adding new hard-coded color literals in component rules.
+
 ## Running Tests
 
 Always run viewer tests after making changes:

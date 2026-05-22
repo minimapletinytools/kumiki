@@ -112,43 +112,152 @@ const RENDER_PROFILES = Object.freeze({
     }),
 });
 
-const BACKGROUND_PRESETS = Object.freeze({
-    'cream': Object.freeze({
+const DEFAULT_THEME_UI = Object.freeze({
+    mode: 'light',
+    bgTop: '#fff8dc',
+    bgBottom: '#ffeef4',
+    panelBg: 'rgba(255, 255, 255, 0.78)',
+    panelBorder: '#d7dbe8',
+    text: '#3a4152',
+    title: '#5873a6',
+    dim: '#6e7691',
+    accent: '#8ca4cf',
+    mesh: '#afbccf',
+    edge: '#5d6882',
+    strong: '#39496e',
+    hint: 'rgba(72, 77, 94, 0.58)',
+    overlayBg: 'rgba(255, 255, 255, 0.46)',
+    overlayErrorBg: 'rgba(255, 236, 236, 0.78)',
+    error: '#8a2b2b',
+    errorHover: '#a63535',
+    errorActive: '#6d1f1f',
+    errorFg: '#fefefe',
+    debugAccent: '#9eb5dc',
+    controlBg: 'rgba(255, 255, 255, 0.55)',
+    controlBgStrong: 'rgba(255, 255, 255, 0.9)',
+    controlBgHover: 'rgba(140, 164, 207, 0.25)',
+    controlBgSolid: 'rgba(255, 255, 255, 0.92)',
+    controlBgSolidHover: '#ffffff',
+    controlBorder: 'rgba(140, 164, 207, 0.22)',
+    controlBorderStrong: 'rgba(140, 164, 207, 0.45)',
+    panelHeaderBg: 'rgba(255, 255, 255, 0.6)',
+    tableHeadBg: 'rgba(255, 255, 255, 0.95)',
+    rowHoverBg: 'rgba(145, 161, 192, 0.12)',
+    rowBorder: '#e8ebf3',
+    rowIndex: '#707a97',
+    inputBg: 'rgba(255, 255, 255, 0.7)',
+    inputBorder: 'rgba(140, 164, 207, 0.22)',
+    accentSoft: 'rgba(140, 164, 207, 0.08)',
+    accentMid: 'rgba(140, 164, 207, 0.18)',
+    accentStrong: 'rgba(140, 164, 207, 0.28)',
+    accentBorder: 'rgba(140, 164, 207, 0.22)',
+    accentBorderStrong: 'rgba(140, 164, 207, 0.7)',
+    layersBg: 'rgba(255, 255, 255, 0.55)',
+    layersCollapsedBg: 'rgba(255, 255, 255, 0.4)',
+    layersHeaderBg: 'rgba(255, 255, 255, 0.35)',
+    layersHoverBg: 'rgba(140, 164, 207, 0.18)',
+    layersSelectedBg: 'rgba(140, 164, 207, 0.32)',
+    chipBg: 'rgba(255, 255, 255, 0.8)',
+});
+
+function createTheme(theme) {
+    return Object.freeze({
+        ...theme,
+        ui: Object.freeze({
+            ...DEFAULT_THEME_UI,
+            ...(theme.ui || {}),
+        }),
+    });
+}
+
+const THEMES = Object.freeze({
+    'cream': createTheme({
         label: 'Cream',
         gradientTop: '#fff8dc',
         gradientBottom: '#ffeef4',
+        timberProfileId: 'timber-warm',
+        accessoryProfileId: 'accessory-cute',
     }),
-    'sky': Object.freeze({
+    'sky': createTheme({
         label: 'Sky',
         gradientTop: '#cde4ff',
         gradientBottom: '#e6f2ff',
+        timberProfileId: 'timber-default',
+        accessoryProfileId: 'accessory-cute',
     }),
-    'forest': Object.freeze({
+    'forest': createTheme({
         label: 'Forest Mist',
         gradientTop: '#d4ead0',
         gradientBottom: '#e8f5ea',
+        timberProfileId: 'timber-warm',
+        accessoryProfileId: 'accessory-brass',
     }),
-    'warm-white': Object.freeze({
+    'warm-white': createTheme({
         label: 'Warm White',
         gradientTop: '#fdfaf5',
         gradientBottom: '#f8f4ee',
+        timberProfileId: 'timber-warm',
+        accessoryProfileId: 'accessory-cute',
     }),
-    'linen': Object.freeze({
+    'linen': createTheme({
         label: 'Linen',
         gradientTop: '#f5efe0',
         gradientBottom: '#ece6d5',
         pattern: 'linen',
+        timberProfileId: 'timber-warm',
+        accessoryProfileId: 'accessory-brass',
     }),
-    'slate': Object.freeze({
+    'slate': createTheme({
         label: 'Slate Night',
         gradientTop: '#1a2030',
         gradientBottom: '#2a3244',
-    }),
-    'blueprint': Object.freeze({
-        label: 'Blueprint',
-        gradientTop: '#0e1e3c',
-        gradientBottom: '#152a50',
-        pattern: 'grid',
+        timberProfileId: 'timber-dark',
+        accessoryProfileId: 'accessory-brass',
+        ui: {
+            mode: 'dark',
+            panelBg: 'rgba(24, 30, 44, 0.72)',
+            panelBorder: '#3f4d66',
+            text: '#d7deea',
+            title: '#c1d1f4',
+            dim: '#9aa8c4',
+            accent: '#82a3de',
+            mesh: '#7f93b3',
+            edge: '#d2def5',
+            strong: '#eaf1ff',
+            hint: 'rgba(204, 218, 242, 0.74)',
+            overlayBg: 'rgba(17, 22, 33, 0.56)',
+            overlayErrorBg: 'rgba(67, 28, 38, 0.74)',
+            error: '#ff8ea3',
+            errorHover: '#ff9db0',
+            errorActive: '#ef708b',
+            errorFg: '#1c0f13',
+            debugAccent: '#89a9e8',
+            controlBg: 'rgba(37, 46, 68, 0.78)',
+            controlBgStrong: 'rgba(40, 50, 75, 0.9)',
+            controlBgHover: 'rgba(111, 143, 201, 0.34)',
+            controlBgSolid: 'rgba(38, 47, 70, 0.94)',
+            controlBgSolidHover: 'rgba(58, 71, 101, 0.97)',
+            controlBorder: 'rgba(130, 163, 222, 0.35)',
+            controlBorderStrong: 'rgba(130, 163, 222, 0.55)',
+            panelHeaderBg: 'rgba(30, 38, 57, 0.78)',
+            tableHeadBg: 'rgba(31, 40, 60, 0.92)',
+            rowHoverBg: 'rgba(130, 163, 222, 0.16)',
+            rowBorder: '#34425c',
+            rowIndex: '#aebcdc',
+            inputBg: 'rgba(37, 46, 68, 0.86)',
+            inputBorder: 'rgba(130, 163, 222, 0.35)',
+            accentSoft: 'rgba(130, 163, 222, 0.16)',
+            accentMid: 'rgba(130, 163, 222, 0.27)',
+            accentStrong: 'rgba(130, 163, 222, 0.38)',
+            accentBorder: 'rgba(130, 163, 222, 0.35)',
+            accentBorderStrong: 'rgba(130, 163, 222, 0.65)',
+            layersBg: 'rgba(24, 30, 44, 0.74)',
+            layersCollapsedBg: 'rgba(24, 30, 44, 0.84)',
+            layersHeaderBg: 'rgba(30, 38, 57, 0.78)',
+            layersHoverBg: 'rgba(130, 163, 222, 0.2)',
+            layersSelectedBg: 'rgba(130, 163, 222, 0.3)',
+            chipBg: 'rgba(40, 50, 75, 0.9)',
+        },
     }),
 });
 
@@ -210,21 +319,9 @@ class ViewerSettingsPanel {
                         .value=${String(100 - this.app.unselectedTransparencyPercent)}>
                 </label>
                 <label>
-                    timber profile
-                    <select id="timber-profile-select" .value=${this.app.memberRenderProfileByType.timber}>
-                        ${Object.entries(this.app.renderProfiles).map(([profileId, profile]) => html`<option value=${profileId}>${profile.label}</option>`)}
-                    </select>
-                </label>
-                <label>
-                    accessory profile
-                    <select id="accessory-profile-select" .value=${this.app.memberRenderProfileByType.accessory}>
-                        ${Object.entries(this.app.renderProfiles).map(([profileId, profile]) => html`<option value=${profileId}>${profile.label}</option>`)}
-                    </select>
-                </label>
-                <label>
-                    background
-                    <select id="background-select" .value=${this.app.activeBackground}>
-                        ${Object.entries(BACKGROUND_PRESETS).map(([bgId, bg]) => html`<option value=${bgId}>${bg.label}</option>`)}
+                    theme
+                    <select id="theme-select" .value=${this.app.activeTheme}>
+                        ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${theme.label}</option>`)}
                     </select>
                 </label>
             </section>
@@ -240,10 +337,8 @@ class ViewerSettingsPanel {
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const debugToggle = renderRoot.querySelector('#debug-toggle');
         const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
-        const timberProfileSelect = renderRoot.querySelector('#timber-profile-select');
-        const accessoryProfileSelect = renderRoot.querySelector('#accessory-profile-select');
         const refreshButton = renderRoot.querySelector('#refresh-btn');
-        const backgroundSelect = renderRoot.querySelector('#background-select');
+        const themeSelect = renderRoot.querySelector('#theme-select');
 
         centerGizmoToggle.addEventListener('change', (event) => {
             this.app.setCenterGizmoEnabled(event.target.checked);
@@ -289,22 +384,14 @@ class ViewerSettingsPanel {
             this.app.setUnselectedTransparencyPercent(100 - normalizedVisibility);
         });
 
-        timberProfileSelect.addEventListener('change', (event) => {
-            this.app.setMemberRenderProfile('timber', event.target.value);
-        });
-
-        accessoryProfileSelect.addEventListener('change', (event) => {
-            this.app.setMemberRenderProfile('accessory', event.target.value);
-        });
-
         refreshButton.addEventListener('click', () => {
             if (vscode) {
                 vscode.postMessage({ type: 'requestRefresh' });
             }
         });
 
-        backgroundSelect.addEventListener('change', (event) => {
-            this.app.setBackground(event.target.value);
+        themeSelect.addEventListener('change', (event) => {
+            this.app.setTheme(event.target.value);
         });
     }
 
@@ -312,7 +399,7 @@ class ViewerSettingsPanel {
         const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
-        const backgroundSelect = renderRoot.querySelector('#background-select');
+        const themeSelect = renderRoot.querySelector('#theme-select');
         if (edgeVisibilitySlider) {
             edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
         }
@@ -322,8 +409,8 @@ class ViewerSettingsPanel {
         if (layerTagsToggle) {
             layerTagsToggle.checked = this.app.showLayerTags;
         }
-        if (backgroundSelect) {
-            backgroundSelect.value = this.app.activeBackground;
+        if (themeSelect) {
+            themeSelect.value = this.app.activeTheme;
         }
     }
 }
@@ -401,7 +488,8 @@ class KigumiViewerApp extends LitElement {
         };
         this.edgeLineVisibilityPercent = 100;
         this.unselectedTransparencyPercent = 70;
-        this.activeBackground = 'slate';
+        this.activeTheme = 'slate';
+        this.activeBackground = this.activeTheme;
 
         this.availablePatterns = [];  // [{name, groups, source_file, source}]
         this.patternsLoading = new Set();  // pattern names currently loading
@@ -751,7 +839,7 @@ class KigumiViewerApp extends LitElement {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         this.scene = new THREE.Scene();
-        this.scene.background = this._buildBackgroundTexture(BACKGROUND_PRESETS[this.activeBackground]);
+        this.setTheme(this.activeTheme);
 
         this.camera = new THREE.PerspectiveCamera(45, viewport.offsetWidth / viewport.offsetHeight, 0.01, 10000);
         this.camera.up.set(0, 0, 1);
@@ -1853,21 +1941,86 @@ class KigumiViewerApp extends LitElement {
         return { minX, minY, minZ, maxX, maxY, maxZ };
     }
 
-    setBackground(id) {
-        const preset = BACKGROUND_PRESETS[id];
-        if (!preset) {
+    setTheme(id) {
+        const theme = THEMES[id];
+        if (!theme) {
             return;
         }
+        this.activeTheme = id;
         this.activeBackground = id;
+        this.memberRenderProfileByType = {
+            timber: theme.timberProfileId,
+            accessory: theme.accessoryProfileId,
+        };
+        this.applyThemeUiTokens(theme);
         if (this.scene) {
-            const tex = this._buildBackgroundTexture(preset);
+            const tex = this._buildBackgroundTexture(theme);
             if (this.scene.background && this.scene.background.isTexture) {
                 this.scene.background.dispose();
             }
             this.scene.background = tex;
         }
-        this.style.background = this._buildCssBg(preset);
+        this.style.background = this._buildCssBg(theme);
+        this.applyRenderProfilesToScene();
         this.requestUpdate();
+    }
+
+    setBackground(id) {
+        this.setTheme(id);
+    }
+
+    applyThemeUiTokens(theme) {
+        const ui = theme && theme.ui ? theme.ui : DEFAULT_THEME_UI;
+        const tokenMap = {
+            '--hv-bg-top': ui.bgTop,
+            '--hv-bg-bottom': ui.bgBottom,
+            '--hv-panel-bg': ui.panelBg,
+            '--hv-panel-border': ui.panelBorder,
+            '--hv-text': ui.text,
+            '--hv-title': ui.title,
+            '--hv-dim': ui.dim,
+            '--hv-accent': ui.accent,
+            '--hv-mesh': ui.mesh,
+            '--hv-edge': ui.edge,
+            '--hv-strong': ui.strong,
+            '--hv-hint': ui.hint,
+            '--hv-overlay-bg': ui.overlayBg,
+            '--hv-overlay-error-bg': ui.overlayErrorBg,
+            '--hv-error': ui.error,
+            '--hv-error-hover': ui.errorHover,
+            '--hv-error-active': ui.errorActive,
+            '--hv-error-fg': ui.errorFg,
+            '--hv-debug-accent': ui.debugAccent,
+            '--hv-control-bg': ui.controlBg,
+            '--hv-control-bg-strong': ui.controlBgStrong,
+            '--hv-control-bg-hover': ui.controlBgHover,
+            '--hv-control-bg-solid': ui.controlBgSolid,
+            '--hv-control-bg-solid-hover': ui.controlBgSolidHover,
+            '--hv-control-border': ui.controlBorder,
+            '--hv-control-border-strong': ui.controlBorderStrong,
+            '--hv-panel-header-bg': ui.panelHeaderBg,
+            '--hv-table-head-bg': ui.tableHeadBg,
+            '--hv-row-hover-bg': ui.rowHoverBg,
+            '--hv-row-border': ui.rowBorder,
+            '--hv-row-index': ui.rowIndex,
+            '--hv-input-bg': ui.inputBg,
+            '--hv-input-border': ui.inputBorder,
+            '--hv-accent-soft': ui.accentSoft,
+            '--hv-accent-mid': ui.accentMid,
+            '--hv-accent-strong': ui.accentStrong,
+            '--hv-accent-border': ui.accentBorder,
+            '--hv-accent-border-strong': ui.accentBorderStrong,
+            '--hv-layers-bg': ui.layersBg,
+            '--hv-layers-collapsed-bg': ui.layersCollapsedBg,
+            '--hv-layers-header-bg': ui.layersHeaderBg,
+            '--hv-layers-hover-bg': ui.layersHoverBg,
+            '--hv-layers-selected-bg': ui.layersSelectedBg,
+            '--hv-chip-bg': ui.chipBg,
+        };
+        for (const [cssVar, value] of Object.entries(tokenMap)) {
+            this.style.setProperty(cssVar, value);
+        }
+        this.dataset.theme = ui.mode || 'light';
     }
 
     _buildBackgroundTexture(preset) {

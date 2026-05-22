@@ -10,6 +10,40 @@
     --hv-accent: #8ca4cf;
     --hv-mesh: #afbccf;
     --hv-edge: #5d6882;
+    --hv-strong: #39496e;
+    --hv-hint: rgba(72, 77, 94, 0.58);
+    --hv-overlay-bg: rgba(255, 255, 255, 0.46);
+    --hv-overlay-error-bg: rgba(255, 236, 236, 0.78);
+    --hv-error: #8a2b2b;
+    --hv-error-hover: #a63535;
+    --hv-error-active: #6d1f1f;
+    --hv-error-fg: #fefefe;
+    --hv-debug-accent: #9eb5dc;
+    --hv-control-bg: rgba(255, 255, 255, 0.55);
+    --hv-control-bg-strong: rgba(255, 255, 255, 0.9);
+    --hv-control-bg-hover: rgba(140, 164, 207, 0.25);
+    --hv-control-bg-solid: rgba(255, 255, 255, 0.92);
+    --hv-control-bg-solid-hover: #ffffff;
+    --hv-control-border: rgba(140, 164, 207, 0.22);
+    --hv-control-border-strong: rgba(140, 164, 207, 0.45);
+    --hv-panel-header-bg: rgba(255, 255, 255, 0.6);
+    --hv-table-head-bg: rgba(255, 255, 255, 0.95);
+    --hv-row-hover-bg: rgba(145, 161, 192, 0.12);
+    --hv-row-border: #e8ebf3;
+    --hv-row-index: #707a97;
+    --hv-input-bg: rgba(255, 255, 255, 0.7);
+    --hv-input-border: rgba(140, 164, 207, 0.22);
+    --hv-accent-soft: rgba(140, 164, 207, 0.08);
+    --hv-accent-mid: rgba(140, 164, 207, 0.18);
+    --hv-accent-strong: rgba(140, 164, 207, 0.28);
+    --hv-accent-border: rgba(140, 164, 207, 0.22);
+    --hv-accent-border-strong: rgba(140, 164, 207, 0.7);
+    --hv-layers-bg: rgba(255, 255, 255, 0.55);
+    --hv-layers-collapsed-bg: rgba(255, 255, 255, 0.4);
+    --hv-layers-header-bg: rgba(255, 255, 255, 0.35);
+    --hv-layers-hover-bg: rgba(140, 164, 207, 0.18);
+    --hv-layers-selected-bg: rgba(140, 164, 207, 0.32);
+    --hv-chip-bg: rgba(255, 255, 255, 0.8);
     display: block;
     min-height: 100vh;
     background: linear-gradient(180deg, var(--hv-bg-top) 0%, var(--hv-bg-bottom) 100%);
@@ -33,7 +67,7 @@
     gap: 16px;
     text-align: center;
     padding: 24px;
-    background: rgba(255, 255, 255, 0.46);
+    background: var(--hv-overlay-bg);
     color: var(--hv-title);
     font: 600 14px/1.4 'Segoe UI', sans-serif;
     letter-spacing: 0.02em;
@@ -52,8 +86,8 @@
     pointer-events: all;
     cursor: pointer;
     padding: 8px 16px;
-    background: #8a2b2b;
-    color: #fefefe;
+    background: var(--hv-error);
+    color: var(--hv-error-fg);
     border: none;
     border-radius: 4px;
     font: 600 12px 'Segoe UI', sans-serif;
@@ -62,17 +96,17 @@
     transition: background 0.2s ease;
 }
 #loading-overlay #output-btn:hover {
-    background: #a63535;
+    background: var(--hv-error-hover);
 }
 #loading-overlay #output-btn:active {
-    background: #6d1f1f;
+    background: var(--hv-error-active);
 }
 #loading-overlay.visible {
     display: flex;
 }
 #loading-overlay.error {
-    background: rgba(255, 236, 236, 0.78);
-    color: #8a2b2b;
+    background: var(--hv-overlay-error-bg);
+    color: var(--hv-error);
     font-weight: 700;
 }
 canvas { display: block; width: 100%; height: 100%; }
@@ -88,7 +122,7 @@ canvas { display: block; width: 100%; height: 100%; }
     user-select: none;
     backdrop-filter: blur(4px);
 }
-#info strong { color: #39496e; font-size: 13px; }
+#info strong { color: var(--hv-strong); font-size: 13px; }
 #debug {
     display: none;
     position: absolute;
@@ -100,13 +134,13 @@ canvas { display: block; width: 100%; height: 100%; }
     padding: 8px 12px;
     border-radius: 4px;
     border: 1px solid var(--hv-panel-border);
-    border-left: 3px solid #9eb5dc;
+    border-left: 3px solid var(--hv-debug-accent);
     pointer-events: none;
     user-select: none;
     text-align: right;
     backdrop-filter: blur(4px);
 }
-#debug strong { color: #39496e; font-size: 13px; }
+#debug strong { color: var(--hv-strong); font-size: 13px; }
 #gizmo-panel {
     position: absolute;
     top: 12px;
@@ -137,8 +171,8 @@ canvas { display: block; width: 100%; height: 100%; }
     height: 96px;
     display: block;
     border-radius: 4px;
-    border: 1px solid rgba(140, 164, 207, 0.45);
-    background: rgba(255, 255, 255, 0.46);
+    border: 1px solid var(--hv-control-border-strong);
+    background: var(--hv-overlay-bg);
     touch-action: none;
     cursor: grab;
 }
@@ -150,14 +184,14 @@ canvas { display: block; width: 100%; height: 100%; }
     width: 108px;
     border: 1px solid var(--hv-panel-border);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.9);
+    background: var(--hv-control-bg-strong);
     color: var(--hv-title);
     font: 12px 'Segoe UI', sans-serif;
     padding: 6px 10px;
     cursor: pointer;
 }
 #focus-btn:hover {
-    background: #ffffff;
+    background: var(--hv-control-bg-solid-hover);
 }
 #render-controls {
     max-width: 1200px;
@@ -188,8 +222,8 @@ canvas { display: block; width: 100%; height: 100%; }
     user-select: none;
     padding: 4px 8px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(140, 164, 207, 0.22);
+    background: var(--hv-control-bg);
+    border: 1px solid var(--hv-control-border);
 }
 #render-controls input {
     accent-color: var(--hv-accent);
@@ -197,19 +231,19 @@ canvas { display: block; width: 100%; height: 100%; }
 #refresh-btn {
     padding: 4px 12px;
     border-radius: 999px;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(140, 164, 207, 0.22);
+    background: var(--hv-control-bg);
+    border: 1px solid var(--hv-control-border);
     color: var(--hv-text);
     font: 12px/1.5 'Segoe UI', sans-serif;
     cursor: pointer;
     user-select: none;
 }
 #refresh-btn:hover {
-    background: rgba(140, 164, 207, 0.25);
+    background: var(--hv-control-bg-hover);
 }
 #hint {
     position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
-    color: rgba(72, 77, 94, 0.58); font: 11px 'Segoe UI', sans-serif;
+    color: var(--hv-hint); font: 11px 'Segoe UI', sans-serif;
     pointer-events: none; user-select: none; white-space: nowrap;
 }
 #panels {
@@ -227,7 +261,7 @@ canvas { display: block; width: 100%; height: 100%; }
     backdrop-filter: blur(4px);
 }
 .panel-title {
-    background: rgba(255, 255, 255, 0.6);
+    background: var(--hv-panel-header-bg);
     color: var(--hv-title);
     font: 12px 'Segoe UI', sans-serif;
     padding: 8px 10px;
@@ -241,14 +275,14 @@ canvas { display: block; width: 100%; height: 100%; }
 #patterns-load-btn {
     padding: 2px 10px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(140, 164, 207, 0.22);
+    background: var(--hv-control-bg);
+    border: 1px solid var(--hv-control-border);
     color: var(--hv-text);
     font: 11px 'Segoe UI', sans-serif;
     cursor: pointer;
 }
 #patterns-load-btn:hover {
-    background: rgba(140, 164, 207, 0.25);
+    background: var(--hv-control-bg-hover);
 }
 #patterns-load-btn:disabled {
     opacity: 0.5;
@@ -264,18 +298,18 @@ canvas { display: block; width: 100%; height: 100%; }
     font: 11px/1.5 'Segoe UI', monospace; color: var(--hv-text);
 }
 #timber-panel thead th {
-    position: sticky; top: 0; background: rgba(255, 255, 255, 0.95);
+    position: sticky; top: 0; background: var(--hv-table-head-bg);
     color: var(--hv-title); font-weight: 600; text-align: left;
     padding: 4px 10px; border-bottom: 1px solid var(--hv-panel-border);
     white-space: nowrap;
 }
-#timber-panel tbody tr:hover { background: rgba(145, 161, 192, 0.12); }
+#timber-panel tbody tr:hover { background: var(--hv-row-hover-bg); }
 #timber-panel tbody td {
-    padding: 3px 10px; border-bottom: 1px solid #e8ebf3;
+    padding: 3px 10px; border-bottom: 1px solid var(--hv-row-border);
     white-space: nowrap; font-family: 'Courier New', monospace;
 }
 #timber-panel tbody td:first-child {
-    color: #707a97; font-family: 'Segoe UI', sans-serif;
+    color: var(--hv-row-index); font-family: 'Segoe UI', sans-serif;
 }
 #raw-output {
     max-height: 260px;
@@ -299,20 +333,20 @@ canvas { display: block; width: 100%; height: 100%; }
 #log-panel-toolbar button {
     padding: 2px 8px;
     border-radius: 4px;
-    background: rgba(255, 255, 255, 0.55);
-    border: 1px solid rgba(140, 164, 207, 0.22);
+    background: var(--hv-control-bg);
+    border: 1px solid var(--hv-control-border);
     color: var(--hv-text);
     font: 11px 'Segoe UI', sans-serif;
     cursor: pointer;
 }
 #log-panel-toolbar button:hover {
-    background: rgba(140, 164, 207, 0.25);
+    background: var(--hv-control-bg-hover);
 }
 #log-filter {
     padding: 2px 6px;
     border-radius: 4px;
-    border: 1px solid rgba(140, 164, 207, 0.22);
-    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid var(--hv-input-border);
+    background: var(--hv-input-bg);
     color: var(--hv-text);
     font: 11px 'Segoe UI', sans-serif;
     width: 140px;
@@ -343,7 +377,7 @@ canvas { display: block; width: 100%; height: 100%; }
     padding: 6px 10px;
     border: 1px solid var(--hv-panel-border);
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.92);
+    background: var(--hv-control-bg-solid);
     color: var(--hv-title);
     font: 12px 'Segoe UI', sans-serif;
     cursor: pointer;
@@ -351,7 +385,7 @@ canvas { display: block; width: 100%; height: 100%; }
     z-index: 50;
 }
 #to-v3d:hover {
-    background: #ffffff;
+    background: var(--hv-control-bg-solid-hover);
 }
 .dim { color: var(--hv-dim); }
 #patterns-panel {
@@ -383,18 +417,18 @@ canvas { display: block; width: 100%; height: 100%; }
     padding: 4px 8px;
     border: 1px solid transparent;
     border-radius: 4px;
-    background: rgba(140, 164, 207, 0.08);
+    background: var(--hv-accent-soft);
     color: var(--hv-text);
     font: 11px/1.5 'Segoe UI', sans-serif;
     cursor: pointer;
     transition: background 0.12s, border-color 0.12s;
 }
 .patterns-book-header:hover {
-    background: rgba(140, 164, 207, 0.18);
-    border-color: rgba(140, 164, 207, 0.22);
+    background: var(--hv-accent-mid);
+    border-color: var(--hv-accent-border);
 }
 .patterns-book-header:active {
-    background: rgba(140, 164, 207, 0.28);
+    background: var(--hv-accent-strong);
 }
 .patterns-book-header:disabled {
     opacity: 0.5;
@@ -430,11 +464,11 @@ canvas { display: block; width: 100%; height: 100%; }
     transition: background 0.12s, border-color 0.12s;
 }
 .patterns-item:hover {
-    background: rgba(145, 161, 192, 0.12);
-    border-color: rgba(140, 164, 207, 0.22);
+    background: var(--hv-row-hover-bg);
+    border-color: var(--hv-accent-border);
 }
 .patterns-item:active {
-    background: rgba(140, 164, 207, 0.25);
+    background: var(--hv-control-bg-hover);
 }
 .patterns-item-loading {
     opacity: 0.6;
@@ -468,7 +502,7 @@ kigumi-layers-view {
     flex-direction: column;
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.55);
+    background: var(--hv-layers-bg);
     color: var(--hv-text);
     border: 1px solid var(--hv-panel-border);
     border-radius: 6px;
@@ -480,7 +514,7 @@ kigumi-layers-view {
 .layers-panel.is-collapsed {
     width: 28px;
     height: 28px;
-    background: rgba(255, 255, 255, 0.4);
+    background: var(--hv-layers-collapsed-bg);
 }
 kigumi-layers-view:has(.layers-panel.is-collapsed) {
     width: 28px;
@@ -492,7 +526,7 @@ kigumi-layers-view:has(.layers-panel.is-collapsed) {
     gap: 6px;
     padding: 4px 6px;
     border-bottom: 1px solid var(--hv-panel-border);
-    background: rgba(255, 255, 255, 0.35);
+    background: var(--hv-layers-header-bg);
 }
 .layers-collapse-btn {
     background: transparent;
@@ -505,7 +539,7 @@ kigumi-layers-view:has(.layers-panel.is-collapsed) {
     padding: 2px 6px;
 }
 .layers-collapse-btn:hover {
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--hv-control-bg-solid-hover);
 }
 .layers-title {
     color: var(--hv-title);
@@ -539,10 +573,10 @@ kigumi-layers-view:has(.layers-panel.is-collapsed) {
     border-radius: 3px;
 }
 .layers-row:hover {
-    background: rgba(140, 164, 207, 0.18);
+    background: var(--hv-layers-hover-bg);
 }
 .layers-row.is-highlighted {
-    background: rgba(140, 164, 207, 0.32);
+    background: var(--hv-layers-selected-bg);
     color: var(--hv-title);
     font-weight: 600;
 }
@@ -598,7 +632,7 @@ kigumi-layers-view:has(.lp-collapsed) {
     flex-direction: column;
     width: 100%;
     height: 100%;
-    background: rgba(255, 255, 255, 0.55);
+    background: var(--hv-layers-bg);
     color: var(--hv-text);
     border: 1px solid var(--hv-panel-border);
     border-radius: 6px;
@@ -611,7 +645,7 @@ kigumi-layers-view:has(.lp-collapsed) {
 .lp-panel.lp-collapsed {
     width: 28px;
     height: 28px;
-    background: rgba(255, 255, 255, 0.4);
+    background: var(--hv-layers-collapsed-bg);
 }
 
 .lp-toggle-btn {
@@ -628,7 +662,7 @@ kigumi-layers-view:has(.lp-collapsed) {
 }
 
 .lp-toggle-btn:hover {
-    background: rgba(255, 255, 255, 0.7);
+    background: var(--hv-control-bg-solid-hover);
 }
 
 .lp-header {
@@ -639,20 +673,20 @@ kigumi-layers-view:has(.lp-collapsed) {
     text-transform: lowercase;
     padding: 4px 8px;
     border-bottom: 1px solid var(--hv-panel-border);
-    background: rgba(255, 255, 255, 0.35);
+    background: var(--hv-layers-header-bg);
 }
 
 .lp-filter-bar {
     padding: 6px 8px;
-    border-bottom: 1px solid rgba(140, 164, 207, 0.2);
+    border-bottom: 1px solid var(--hv-accent-border);
 }
 
 .lp-filter-input {
     width: 100%;
     padding: 4px 6px;
     border-radius: 4px;
-    border: 1px solid rgba(140, 164, 207, 0.3);
-    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--hv-accent-border);
+    background: var(--hv-input-bg);
     color: var(--hv-text);
     font: 12px/1.3 'Segoe UI', sans-serif;
 }
@@ -668,8 +702,8 @@ kigumi-layers-view:has(.lp-collapsed) {
 .lp-active-chip-remove,
 .lp-footer-btn,
 .lp-icon-btn {
-    border: 1px solid rgba(140, 164, 207, 0.35);
-    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--hv-accent-border);
+    background: var(--hv-chip-bg);
     color: var(--hv-text);
     border-radius: 4px;
     cursor: pointer;
@@ -687,8 +721,8 @@ kigumi-layers-view:has(.lp-collapsed) {
     gap: 4px;
     padding: 1px 4px;
     border-radius: 10px;
-    border: 1px solid rgba(140, 164, 207, 0.3);
-    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--hv-accent-border);
+    background: var(--hv-chip-bg);
     font-size: 11px;
 }
 
@@ -721,7 +755,7 @@ kigumi-layers-view:has(.lp-collapsed) {
 
 .lp-section-header:hover,
 .lp-row:hover {
-    background: rgba(140, 164, 207, 0.18);
+    background: var(--hv-layers-hover-bg);
 }
 
 .lp-section-body {
@@ -743,7 +777,7 @@ kigumi-layers-view:has(.lp-collapsed) {
 }
 
 .lp-row.lp-selected {
-    background: rgba(140, 164, 207, 0.32);
+    background: var(--hv-layers-selected-bg);
     color: var(--hv-title);
     font-weight: 600;
 }
@@ -794,16 +828,16 @@ kigumi-layers-view:has(.lp-collapsed) {
     display: inline-block;
     padding: 0 5px;
     border-radius: 10px;
-    border: 1px solid rgba(140, 164, 207, 0.3);
-    background: rgba(255, 255, 255, 0.8);
+    border: 1px solid var(--hv-accent-border);
+    background: var(--hv-chip-bg);
     font-size: 10px;
     color: var(--hv-dim);
 }
 
 .lp-chip.lp-chip-active {
-    border-color: rgba(140, 164, 207, 0.7);
+    border-color: var(--hv-accent-border-strong);
     color: var(--hv-title);
-    background: rgba(140, 164, 207, 0.18);
+    background: var(--hv-accent-mid);
 }
 
 .lp-icons {
@@ -821,8 +855,8 @@ kigumi-layers-view:has(.lp-collapsed) {
 }
 
 .lp-icon-btn.lp-active {
-    border-color: rgba(140, 164, 207, 0.7);
-    background: rgba(140, 164, 207, 0.22);
+    border-color: var(--hv-accent-border-strong);
+    background: var(--hv-control-bg-hover);
 }
 
 .lp-footer {
@@ -830,5 +864,5 @@ kigumi-layers-view:has(.lp-collapsed) {
     gap: 6px;
     flex-wrap: wrap;
     padding: 6px 8px;
-    border-top: 1px solid rgba(140, 164, 207, 0.2);
+    border-top: 1px solid var(--hv-accent-border);
 }
