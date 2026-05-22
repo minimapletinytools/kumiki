@@ -31,6 +31,7 @@ from kumiki.joints.workshop.plain_joints import (
     cut_plain_miter_joint_on_face_aligned_timbers,
     cut_plain_butt_joint,
     cut_plain_butt_joint_on_face_aligned_timbers,
+    cut_plain_corner_lap_joint,
     cut_tongue_and_fork_corner_joint,
     cut_tongue_and_fork_butt_joint,
     cut_plain_butt_splice_joint_on_aligned_timbers,
@@ -444,6 +445,24 @@ def make_cross_lap_joint_example(position: V3) -> list[CutTimber]:
     return list(joint.cut_timbers.values())
 
 
+def make_corner_lap_joint_example(position: V3) -> list[CutTimber]:
+    """
+    Create a corner lap joint where each corner timber gets a lap plus an end cut.
+    """
+    arrangement = create_canonical_example_right_angle_corner_joint_timbers(position=position)
+    joint = cut_plain_corner_lap_joint(
+        CornerJointTimberArrangement(
+            timber1=arrangement.timber1,
+            timber2=arrangement.timber2,
+            timber1_end=arrangement.timber1_end,
+            timber2_end=arrangement.timber2_end,
+            front_face_on_timber1=None,
+        ),
+        cut_ratio=Rational(1, 2),
+    )
+    return list(joint.cut_timbers.values())
+
+
 def make_splice_lap_joint_example(position: V3) -> list[CutTimber]:
     """
     Create a splice lap joint example.
@@ -531,6 +550,9 @@ def create_plain_joints_patternbook() -> PatternBook:
 
         (PatternMetadata("cross_lap_joint", ["plain_joints", "cross_lap"], "frame"),
          lambda center: Frame(cut_timbers=make_cross_lap_joint_example(center), name="Cross Lap Joint")),
+
+        (PatternMetadata("corner_lap_joint", ["plain_joints", "corner_lap"], "frame"),
+         lambda center: Frame(cut_timbers=make_corner_lap_joint_example(center), name="Corner Lap Joint")),
     ]
 
     return PatternBook(patterns=patterns)
