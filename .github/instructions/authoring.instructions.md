@@ -1,5 +1,5 @@
 ---
-applyTo: "girrafecad/**,tests/**"
+applyTo: "kumiki/**,tests/**"
 ---
 
 # Kumiki Library Authoring Rules
@@ -24,22 +24,22 @@ cd kigumi && npx jest && node ./test/run-extension-tests.js
 
 ## Key Files
 
-### girrafecad/timber.py
+### kumiki/timber.py
 Core immutable types: `Timber`, `TimberFace`, `TimberLongFace`, `TimberReferenceEnd`, etc. All timber-related geometric operations (axes, size, position). All timber-related core APIs and types live here.
 
-### girrafecad/construction.py
+### kumiki/construction.py
 Core construction logic and timber joinery helpers: joining timbers, computing join positions, projecting axes, relationships between multiple members. Canonical location for geometry construction logic beyond simple data definition.
 
-### girrafecad/footprint.py
+### kumiki/footprint.py
 `Footprint` — key utility class for positioning timbers and cuts.
 
-### girrafecad/joints/*_joints.py
+### kumiki/joints/*_joints.py
 Joints are split into separate files by group.
 
-### girrafecad/rule.py
+### kumiki/rule.py
 Math types, units, and math-related utilities. All math code must use these types and helpers.
 
-### girrafecad/measuring.py
+### kumiki/measuring.py
 Measure/mark pattern for locating features on timbers and marking things relative to features.
 
 ## General Coding Philosophy
@@ -63,18 +63,21 @@ Joints involve creating CSG cuts on one or more timbers. A typical joint impleme
 1. Validate input parameters
 2. Locate key features (e.g. where the shoulder is for a mortise and tenon cut)
 3. Pick a timber to start working on
-4. Create a sensible `marking_transform : Transform` on that timber — a transform from which all further calculations are made. May be in local or global coordinates (if local, postfix with `_<timber_name>_local`)
-    - e.g. for a tenon cut, `marking_transform` could be where the tenon centerline intersects the tenon shoulder pointing in the tenon direction
-    - for marking transforms inside the timber pointing in the length/−length direction, the `+x` axis should line up with the timber's `+x` axis
-    - for marking transforms on the surface of the timber, `+y` should point into the timber
-5. Calculate positions from `marking_transform` to locate features and generate CSG cuts
+4. Optionally, create a sensible `marking_space : MarkingSpace` on that timber — a transform from which further calculations can be made from. May be in local or global coordinates (if local, postfix with `_<timber_name>_local`)
+    - e.g. for a tenon cut, `marking_space` could be where the tenon centerline intersects the tenon shoulder pointing in the tenon direction
+    - for marking spaces inside the timber pointing in the length/−length direction, the `+x` axis should line up with the timber's `+x` axis
+    - for marking spaces on the surface of the timber, `+y` should point into the timber
+5. Calculate parameters to generate CSG cuts, either from global features, or locally relative to `marking_space`
+    - it is often useful to convert back and forth from global and local coordinates. Make sure local coordinates are always clearly marked with the `<timber_name>_local` postfix to avoid confusion
+    - there are many helper methods to do this, please see other joints for examples
 6. Repeat steps 3–5 until all cuts are done
-7. Return a joint object containing the cuts
+7. If the joint is at the end of any one of the timbers, set `maybe_top/bottom_end_cut_distance_from_bottom` for that timber to allow the proper rough end cuts to be generated
+8. Return a joint object containing the cuts
 
 Variable naming rules:
 - ALWAYS postfix markings in global space with `_global`
 - Postfix markings in local space with `_{timber_name}_local`, e.g. `some_feature_timberA_local`
-- Omit the postfix only if there is exactly ONE timber in the current scope
+- Omit the {timber_name} postfix only if there is exactly ONE timber in the current scope
 
 Use nested functions to create local variable scopes where helpful (especially to keep naming simple).
 
