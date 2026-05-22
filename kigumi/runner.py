@@ -603,8 +603,8 @@ def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
     for idx, cut in enumerate(cuts):
         tag = getattr(cut, "tag", None)
         has_csg = getattr(cut, "negative_csg", None) is not None
-        has_top = getattr(cut, "maybe_top_end_cut", None) is not None
-        has_bot = getattr(cut, "maybe_bottom_end_cut", None) is not None
+        has_top = getattr(cut, "maybe_top_end_cut_distance_from_bottom", None) is not None
+        has_bot = getattr(cut, "maybe_bottom_end_cut_distance_from_bottom", None) is not None
         if tag and isinstance(tag, str):
             display = tag
         elif has_csg:

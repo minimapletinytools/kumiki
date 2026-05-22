@@ -348,27 +348,19 @@ def cut_mortise_and_tenon_joint(
 
     mortise_cut = Cutting(
         timber=mortise_timber,
-        maybe_top_end_cut=None,
-        maybe_bottom_end_cut=None,
         negative_csg=mortise_negative_csg,
         label="mortise_and_tenon",
     )
 
-    # Redundant end cut at the tip of the tenon prism (in tenon timber local)
     tenon_length_direction_global = tenon_timber.get_face_direction_global(tenon_end)
     tip_position_global = marking_space.transform.position + tenon_length_direction_global * max(tenon_length, max(tenon_size[0], tenon_size[1])/cos_angle)
     tip_position_local = tenon_timber.transform.global_to_local(tip_position_global)
     tip_z_local = tip_position_local[2]
-    redundant_end_cut = (
-        HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(1)), offset=tip_z_local)
-        if tenon_end == TimberReferenceEnd.TOP
-        else HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(-1)), offset=-tip_z_local)
-    )
     
     tenon_cut = Cutting(
         timber=tenon_timber,
-        maybe_top_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=tenon_cut_csg,
         label="mortise_and_tenon",
     )
@@ -445,8 +437,8 @@ def cut_mortise_and_tenon_joint(
             tenon_cut_with_pegs_csg = CSGUnion(children=[tenon_cut_csg] + peg_holes_in_tenon_local)
             tenon_cut = Cutting(
                 timber=tenon_timber,
-                maybe_top_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.TOP else None,
-                maybe_bottom_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.BOTTOM else None,
+                maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.TOP else None,
+                maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.BOTTOM else None,
                 negative_csg=tenon_cut_with_pegs_csg,
                 label="mortise_and_tenon",
             )
@@ -454,8 +446,6 @@ def cut_mortise_and_tenon_joint(
             mortise_cut_with_pegs_csg = CSGUnion(children=[mortise_negative_csg] + peg_holes_in_mortise_local)
             mortise_cut = Cutting(
                 timber=mortise_timber,
-                maybe_top_end_cut=None,
-                maybe_bottom_end_cut=None,
                 negative_csg=mortise_cut_with_pegs_csg,
                 label="mortise_and_tenon",
             )
@@ -719,31 +709,23 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
             children=[mortise_negative_local, shoulder_notch_local]
         )
 
-    # Redundant end cut at the tenon tip (shoulder + tenon_depth along the butt direction).
     tenon_tip_position_global = (
         shoulder_result.marking_space.transform.position
         + shoulder_result.butt_direction * tenon_depth
     )
     tip_position_local = tenon_timber.transform.global_to_local(tenon_tip_position_global)
     tip_z_local = tip_position_local[2]
-    redundant_end_cut = (
-        HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(1)), offset=tip_z_local)
-        if tenon_end == TimberReferenceEnd.TOP
-        else HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(-1)), offset=-tip_z_local)
-    )
 
     tenon_cut = Cutting(
         timber=tenon_timber,
-        maybe_top_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=redundant_end_cut if tenon_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=tenon_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
     )
 
     mortise_cut = Cutting(
         timber=mortise_timber,
-        maybe_top_end_cut=None,
-        maybe_bottom_end_cut=None,
         negative_csg=mortise_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
     )

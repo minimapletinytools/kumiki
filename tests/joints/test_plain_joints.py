@@ -31,8 +31,12 @@ class TestMiterJoint:
             timberB: Second timber in the joint
         """
         # Get the local normals from the cuts
-        normal_A_local = joint.cut_timbers["timberA"].cuts[0].get_negative_csg_local().normal
-        normal_B_local = joint.cut_timbers["timberB"].cuts[0].get_negative_csg_local().normal
+        cut_A_csg = joint.cut_timbers["timberA"].cuts[0].negative_csg
+        cut_B_csg = joint.cut_timbers["timberB"].cuts[0].negative_csg
+        assert isinstance(cut_A_csg, HalfSpace)
+        assert isinstance(cut_B_csg, HalfSpace)
+        normal_A_local = cut_A_csg.normal
+        normal_B_local = cut_B_csg.normal
         
         # Convert to global coordinates
         normal_A_global = timberA.orientation.matrix * normal_A_local
@@ -94,11 +98,9 @@ class TestMiterJoint:
         assert joint is not None
         assert len(joint.cut_timbers) == 2
         assert joint.cut_timbers["timberA"].timber == timberA
-        assert joint.cut_timbers["timberA"].cuts[0].maybe_bottom_end_cut is not None
-        assert joint.cut_timbers["timberA"].cuts[0].maybe_top_end_cut is None
+        assert joint.cut_timbers["timberA"].cuts[0].get_maybe_bottom_end_cut() is not None
         assert joint.cut_timbers["timberB"].timber == timberB
-        assert joint.cut_timbers["timberB"].cuts[0].maybe_bottom_end_cut is not None
-        assert joint.cut_timbers["timberB"].cuts[0].maybe_top_end_cut is None
+        assert joint.cut_timbers["timberB"].cuts[0].get_maybe_bottom_end_cut() is not None
 
         # check that the two cuts are Cut objects
         assert isinstance(joint.cut_timbers["timberA"].cuts[0], Cutting)
@@ -114,8 +116,10 @@ class TestMiterJoint:
         corner_point_global = create_v3(Rational(-3), Rational(-3), Rational(0))
         corner_point_local_A = timberA.transform.global_to_local(corner_point_global)
         corner_point_local_B = timberB.transform.global_to_local(corner_point_global)
-        assert joint.cut_timbers["timberA"].cuts[0].get_negative_csg_local().is_point_on_boundary(corner_point_local_A)
-        assert joint.cut_timbers["timberB"].cuts[0].get_negative_csg_local().is_point_on_boundary(corner_point_local_B)
+        assert joint.cut_timbers["timberA"].cuts[0].negative_csg is not None
+        assert joint.cut_timbers["timberB"].cuts[0].negative_csg is not None
+        assert joint.cut_timbers["timberA"].cuts[0].negative_csg.is_point_on_boundary(corner_point_local_A)
+        assert joint.cut_timbers["timberB"].cuts[0].negative_csg.is_point_on_boundary(corner_point_local_B)
 
         # check that the "bottom" point of timberA (after cutting) is contained in timberB but not timber A
         # This point is at (0, -3, 0) in global coordinates, which is:
@@ -124,8 +128,10 @@ class TestMiterJoint:
         bottom_point_A_after_cutting_global = create_v3(Rational(0), Rational(-3), Rational(0))
         bottom_point_A_after_cutting_local_A = timberA.transform.global_to_local(bottom_point_A_after_cutting_global)
         bottom_point_A_after_cutting_local_B = timberB.transform.global_to_local(bottom_point_A_after_cutting_global)
-        assert not joint.cut_timbers["timberA"].cuts[0].get_negative_csg_local().contains_point(bottom_point_A_after_cutting_local_A)
-        assert joint.cut_timbers["timberB"].cuts[0].get_negative_csg_local().contains_point(bottom_point_A_after_cutting_local_B)
+        assert joint.cut_timbers["timberA"].cuts[0].negative_csg is not None
+        assert joint.cut_timbers["timberB"].cuts[0].negative_csg is not None
+        assert not joint.cut_timbers["timberA"].cuts[0].negative_csg.contains_point(bottom_point_A_after_cutting_local_A)
+        assert joint.cut_timbers["timberB"].cuts[0].negative_csg.contains_point(bottom_point_A_after_cutting_local_B)
 
     # 🐪
     def test_basic_miter_joint_on_various_angles(self): 
@@ -221,7 +227,7 @@ class TestMiterJoint:
 
         for key, timber in [("timberA", timberA), ("timberB", timberB)]:
             cut = joint.cut_timbers[key].cuts[0]
-            end_cut = cut.maybe_bottom_end_cut
+            end_cut = cut.get_maybe_bottom_end_cut()
             assert end_cut is not None, f"{key} should have a bottom end cut"
             global_normal = timber.orientation.matrix * end_cut.normal
             length_dir = timber.get_length_direction_global()
@@ -260,8 +266,7 @@ class TestButtJoint:
 
         # The butt timber (timberB) should have exactly one cut at the specified end
         assert len(joint.cut_timbers["butt_timber"].cuts) == 1, "Butt timber should have one cut"
-        assert joint.cut_timbers["butt_timber"].cuts[0].maybe_bottom_end_cut is not None
-        assert joint.cut_timbers["butt_timber"].cuts[0].maybe_top_end_cut is None
+        assert joint.cut_timbers["butt_timber"].cuts[0].get_maybe_bottom_end_cut() is not None
 
         # Verify the cut is a Cut object
         assert isinstance(joint.cut_timbers["butt_timber"].cuts[0], Cutting)
@@ -357,10 +362,10 @@ class TestSpliceJoint:
         cutB = joint.cut_timbers["timberB"].cuts[0]
         
         # Verify both cuts are end cuts
-        assert cutA.maybe_top_end_cut is not None
-        assert cutA.maybe_bottom_end_cut is None
-        assert cutB.maybe_bottom_end_cut is not None
-        assert cutB.maybe_top_end_cut is None
+        assert cutA.get_maybe_top_end_cut() is not None
+        assert cutA.get_maybe_bottom_end_cut() is None
+        assert cutB.get_maybe_bottom_end_cut() is not None
+        assert cutB.get_maybe_top_end_cut() is None
         
         # Verify the cut planes are perpendicular to the timber axis (X axis)
         # In global coordinates, the plane normal should be ±(1, 0, 0)
@@ -401,7 +406,7 @@ class TestSpliceJoint:
         cutA = joint.cut_timbers["timberA"].cuts[0]
         
         # Verify the end cut exists
-        assert cutA.maybe_top_end_cut is not None
+        assert cutA.get_maybe_top_end_cut() is not None
         
     # 🐪
     def test_splice_joint_opposite_orientation(self):
@@ -440,7 +445,7 @@ class TestSpliceJoint:
         cutA = joint.cut_timbers["timberA"].cuts[0]
         
         # Verify the end cut exists
-        assert cutA.maybe_top_end_cut is not None
+        assert cutA.get_maybe_top_end_cut() is not None
         
     # 🐪
     def test_splice_joint_non_aligned_timbers_raises_error(self):
@@ -494,8 +499,8 @@ class TestHouseJoint:
         assert len(joint.cut_timbers["timberA"].cuts) == 1
         assert len(joint.cut_timbers["timberB"].cuts) == 0
         
-        assert joint.cut_timbers["timberA"].cuts[0].maybe_top_end_cut is None
-        assert joint.cut_timbers["timberA"].cuts[0].maybe_bottom_end_cut is None
+        assert joint.cut_timbers["timberA"].cuts[0].get_maybe_top_end_cut() is None
+        assert joint.cut_timbers["timberA"].cuts[0].get_maybe_bottom_end_cut() is None
 
         # test that the origin point lies in the housed timber but not the housing timber
         origin = create_v3(Rational(0), Rational(0), Rational(0))
@@ -605,10 +610,10 @@ class TestCrossLapJoint:
         assert joint.cut_timbers["timberB"].timber == timberB
         assert len(joint.cut_timbers["timberA"].cuts) == 1
         assert len(joint.cut_timbers["timberB"].cuts) == 1
-        assert joint.cut_timbers["timberA"].cuts[0].maybe_top_end_cut is None
-        assert joint.cut_timbers["timberA"].cuts[0].maybe_bottom_end_cut is None
-        assert joint.cut_timbers["timberB"].cuts[0].maybe_top_end_cut is None
-        assert joint.cut_timbers["timberB"].cuts[0].maybe_bottom_end_cut is None
+        assert joint.cut_timbers["timberA"].cuts[0].get_maybe_top_end_cut() is None
+        assert joint.cut_timbers["timberA"].cuts[0].get_maybe_bottom_end_cut() is None
+        assert joint.cut_timbers["timberB"].cuts[0].get_maybe_top_end_cut() is None
+        assert joint.cut_timbers["timberB"].cuts[0].get_maybe_bottom_end_cut() is None
 
         # test that the origin point lies on the boundary of both timbers
         origin = create_v3(Rational(0), Rational(0), Rational(0))
@@ -823,8 +828,8 @@ class TestTongueAndForkJoint:
         fork_cut = joint.cut_timbers["fork_timber"].cuts[0]
         assert tongue_cut.negative_csg is not None
         assert fork_cut.negative_csg is not None
-        assert tongue_cut.maybe_bottom_end_cut is not None
-        assert fork_cut.maybe_bottom_end_cut is not None
+        assert tongue_cut.get_maybe_bottom_end_cut() is not None
+        assert fork_cut.get_maybe_bottom_end_cut() is not None
 
         tongue_end_direction = -tongue_timber.get_length_direction_global()
         fork_entry_face = fork_timber.get_closest_oriented_face_from_global_direction(-tongue_end_direction)
@@ -843,7 +848,7 @@ class TestTongueAndForkJoint:
             TimberReferenceEnd.BOTTOM,
             tongue_distance_from_bottom,
         )
-        actual_tongue_end_cut = tongue_cut.maybe_bottom_end_cut
+        actual_tongue_end_cut = tongue_cut.get_maybe_bottom_end_cut()
         assert actual_tongue_end_cut is not None
         assert actual_tongue_end_cut.normal.equals(expected_tongue_end_cut.normal)
         assert actual_tongue_end_cut.offset == expected_tongue_end_cut.offset
@@ -857,7 +862,7 @@ class TestTongueAndForkJoint:
             TimberReferenceEnd.BOTTOM,
             fork_distance_from_bottom,
         )
-        actual_fork_end_cut = fork_cut.maybe_bottom_end_cut
+        actual_fork_end_cut = fork_cut.get_maybe_bottom_end_cut()
         assert actual_fork_end_cut is not None
         assert actual_fork_end_cut.normal.equals(expected_fork_end_cut.normal)
         assert actual_fork_end_cut.offset == expected_fork_end_cut.offset
@@ -963,12 +968,12 @@ class TestTongueAndForkButtJoint:
 
         # Tongue timber has cheek removal and an end cut
         assert tongue_cut.negative_csg is not None
-        assert tongue_cut.maybe_top_end_cut is not None
+        assert tongue_cut.get_maybe_top_end_cut() is not None
 
         # Fork timber has a slot but NO end cut
         assert fork_cut.negative_csg is not None
-        assert fork_cut.maybe_top_end_cut is None
-        assert fork_cut.maybe_bottom_end_cut is None
+        assert fork_cut.get_maybe_top_end_cut() is None
+        assert fork_cut.get_maybe_bottom_end_cut() is None
 
         # Verify cuts produce valid CSG
         tongue_csg = joint.cut_timbers["tongue_timber"].render_timber_with_cuts_csg_local()

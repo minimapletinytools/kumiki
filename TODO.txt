@@ -111,11 +111,17 @@ DONE-create sensible kigumi commands, and remove or hide the rest with kigumiint
 DONE-top level "timbers" and "joints" folder text in the layers view should be bolded
 DONE-set shadows to be off by default
 DONE-the viewer area should be slightly smaller vertically so that it's easier to see and interact with the non-viewer area at the bottom
+IGNORE/DONE-shadows broken in tinyshed120
 
--shadows broken in tinyshed120
+-even scrolling down a little bit shows the "scorll to top" button
+  -or perhaps if window is scrolled even a bit, scrolling the top view scrolls the entire window
 -layers view needs to be scrollable 
--should be IN the webview, or at least cropped to not overflow it
-
+-layers view should be IN the webview, or at least cropped to not overflow it
+-do a design pass
+  -better logo
+  -stuff showing below the view should be cleaner/tighter 
+  -move focus button
+  -timber list view should actually be useful
 -make sure kigumi installs ltaest version of kumiki
 -test installation
   -raw installation of kigumi, installs deps
@@ -165,6 +171,9 @@ DONE/IGNORE-decide on layer view
 DONE-add dovetail shoulder to build a butt Joint 
 
 -consider making all end cuts 90 degrees rather than half spaces, that was prob a bad idea
+
+-address # TODO this is wrong, just return a new EmptyCSG
+
 -improve joint writing agent instructinos
   -marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
   -build a butt joint guidance

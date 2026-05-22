@@ -2321,7 +2321,7 @@ class TestCSGNaming:
             ticket=TimberTicket(name="test_timber"),
         )
         hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(50))
-        cutting = Cutting(timber=timber, maybe_top_end_cut=hs, label="my_joint")
+        cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=hs.offset, label="my_joint")
         result = cutting.get_negative_csg_local()
         assert isinstance(result, SolidUnion)
         assert result.label == "my_joint"
@@ -2337,7 +2337,7 @@ class TestCSGNaming:
             ticket=TimberTicket(name="test_timber"),
         )
         hs = HalfSpace(normal=Matrix([Integer(0), Integer(0), Integer(1)]), offset=Integer(50))
-        cutting = Cutting(timber=timber, maybe_top_end_cut=hs)
+        cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=hs.offset)
         result = cutting.get_negative_csg_local()
         assert isinstance(result, HalfSpace)
 

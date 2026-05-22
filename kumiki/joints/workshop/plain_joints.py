@@ -155,20 +155,27 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # Create the end cut HalfSpaces (in LOCAL coordinates relative to each timber)
     end_cut_A = HalfSpace(normal=local_normalA, offset=local_offsetA)
     end_cut_B = HalfSpace(normal=local_normalB, offset=local_offsetB)
+    end_cut_A_distance_from_bottom = safe_dot_product(
+        intersection_point - timberA.get_bottom_position_global(),
+        timberA.get_length_direction_global(),
+    )
+    end_cut_B_distance_from_bottom = safe_dot_product(
+        intersection_point - timberB.get_bottom_position_global(),
+        timberB.get_length_direction_global(),
+    )
     
-    # Create the Cuts
     cutA = Cutting(
         timber=timberA,
-        maybe_top_end_cut=end_cut_A if timberA_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=end_cut_A if timberA_end == TimberReferenceEnd.BOTTOM else None,
-        negative_csg=None
+        maybe_top_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=end_cut_A,
     )
     
     cutB = Cutting(
         timber=timberB,
-        maybe_top_end_cut=end_cut_B if timberB_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=end_cut_B if timberB_end == TimberReferenceEnd.BOTTOM else None,
-        negative_csg=None
+        maybe_top_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=end_cut_B,
     )
     
     # Create CutTimbers with cuts passed at construction
@@ -269,14 +276,18 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
         safe_dot_product(cut_normal_global, face_center)
         - safe_dot_product(cut_normal_global, butt_timber.get_bottom_position_global())
     )
+    end_cut_distance_from_bottom = safe_dot_product(
+        face_center - butt_timber.get_bottom_position_global(),
+        butt_timber.get_length_direction_global(),
+    )
 
     end_cut = HalfSpace(normal=local_normal, offset=local_offset)
 
     cut = Cutting(
         timber=butt_timber,
-        maybe_top_end_cut=end_cut if butt_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=end_cut if butt_end == TimberReferenceEnd.BOTTOM else None,
-        negative_csg=None,
+        maybe_top_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=end_cut,
     )
 
     joint = Joint(
@@ -344,12 +355,10 @@ def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJoi
     distance_from_bottom = safe_dot_product(face_center - butt_timber.get_bottom_position_global(), butt_timber.get_length_direction_global())
     distance_from_end = butt_timber.length - distance_from_bottom if butt_end == TimberReferenceEnd.TOP else distance_from_bottom
 
-    end_cut_half_space = Cutting.make_end_cut(butt_timber, butt_end, distance_from_end)
-
     cut = Cutting(
         timber=butt_timber,
-        maybe_top_end_cut=end_cut_half_space if butt_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=end_cut_half_space if butt_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=None
     )
 
@@ -570,21 +579,33 @@ def cut_tongue_and_fork_corner_joint(
     )
     fork_end_cut = HalfSpace(normal=fork_end_cut_local_normal, offset=fork_end_cut_local_offset)
 
+    tongue_end_cut_distance_from_bottom = safe_dot_product(
+        fork_far_face_point_global - tongue_timber.get_bottom_position_global(),
+        tongue_timber.get_length_direction_global(),
+    )
+    fork_end_cut_distance_from_bottom = safe_dot_product(
+        tongue_far_face_point_global - fork_timber.get_bottom_position_global(),
+        fork_timber.get_length_direction_global(),
+    )
+
+    tongue_negative_parts = [tongue_negative_csg, tongue_end_cut]
+    fork_negative_parts = [fork_negative_csg, fork_end_cut]
+
     # -------------------------------------------------------------------------
     # Assemble cuts and joint
     # -------------------------------------------------------------------------
     tongue_cut = Cutting(
         timber=tongue_timber,
-        maybe_top_end_cut=tongue_end_cut if tongue_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=tongue_end_cut if tongue_end == TimberReferenceEnd.BOTTOM else None,
-        negative_csg=tongue_negative_csg,
+        maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=CSGUnion(children=tongue_negative_parts),
     )
 
     fork_cut = Cutting(
         timber=fork_timber,
-        maybe_top_end_cut=fork_end_cut if fork_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=fork_end_cut if fork_end == TimberReferenceEnd.BOTTOM else None,
-        negative_csg=fork_negative_csg,
+        maybe_top_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=CSGUnion(children=fork_negative_parts),
     )
 
     return Joint(
@@ -782,25 +803,29 @@ def cut_tongue_and_fork_butt_joint(
         - safe_dot_product(tongue_end_hs_normal_global, tongue_timber.get_bottom_position_global())
     )
     tongue_end_cut = HalfSpace(normal=tongue_end_cut_local_normal, offset=tongue_end_cut_local_offset)
+    tongue_end_cut_distance_from_bottom = safe_dot_product(
+        fork_far_face_point_global - tongue_timber.get_bottom_position_global(),
+        tongue_timber.get_length_direction_global(),
+    )
 
     # -------------------------------------------------------------------------
     # No fork end cut — fork timber continues through the joint
     # -------------------------------------------------------------------------
+
+    tongue_negative_parts = [tongue_negative_csg, tongue_end_cut]
 
     # -------------------------------------------------------------------------
     # Assemble cuts and joint
     # -------------------------------------------------------------------------
     tongue_cut = Cutting(
         timber=tongue_timber,
-        maybe_top_end_cut=tongue_end_cut if tongue_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=tongue_end_cut if tongue_end == TimberReferenceEnd.BOTTOM else None,
-        negative_csg=tongue_negative_csg,
+        maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=CSGUnion(children=tongue_negative_parts),
     )
 
     fork_cut = Cutting(
         timber=fork_timber,
-        maybe_top_end_cut=None,
-        maybe_bottom_end_cut=None,
         negative_csg=fork_negative_csg,
     )
 
@@ -906,22 +931,18 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     distance_B_from_bottom = safe_dot_product(splice_point - timberB.get_bottom_position_global(), timberB.get_length_direction_global())
     distance_B_from_end = timberB.length - distance_B_from_bottom if timberB_end == TimberReferenceEnd.TOP else distance_B_from_bottom
     
-    # Create the end cut HalfSpaces
-    end_cut_A = Cutting.make_end_cut(timberA, timberA_end, distance_A_from_end)
-    end_cut_B = Cutting.make_end_cut(timberB, timberB_end, distance_B_from_end)
-    
     # Create the Cuts
     cutA = Cutting(
         timber=timberA,
-        maybe_top_end_cut=end_cut_A if timberA_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=end_cut_A if timberA_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=None
     )
     
     cutB = Cutting(
         timber=timberB,
-        maybe_top_end_cut=end_cut_B if timberB_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=end_cut_B if timberB_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=None
     )
     
@@ -1192,8 +1213,6 @@ def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_rati
         
         cut_A = Cutting(
             timber=timberA,
-            maybe_top_end_cut=None,
-            maybe_bottom_end_cut=None,
             negative_csg=negative_csg_A
         )
         cuts_A.append(cut_A)
@@ -1233,8 +1252,6 @@ def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_rati
         
         cut_B = Cutting(
             timber=timberB,
-            maybe_top_end_cut=None,
-            maybe_bottom_end_cut=None,
             negative_csg=negative_csg_B
         )
         cuts_B.append(cut_B)
@@ -1461,8 +1478,6 @@ def cut_plain_house_joint_DEPRECATED(housing_timber: TimberLike, housed_timber: 
     # Create the CSG cut for the housing timber
     cut = Cutting(
         timber=housing_timber,
-        maybe_top_end_cut=None,
-        maybe_bottom_end_cut=None,
         negative_csg=housed_prism_local  # Subtract the housed timber's volume
     )
     
@@ -1550,17 +1565,28 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
     )
 
     # Create Cuts for both timbers with separated lap and end cuts
+    top_end_cut_distance_from_bottom = (
+        top_end_cut.offset
+        if top_lap_timber_end == TimberReferenceEnd.TOP
+        else -top_end_cut.offset
+    )
+    bottom_end_cut_distance_from_bottom = (
+        bottom_end_cut.offset
+        if bottom_lap_timber_end == TimberReferenceEnd.TOP
+        else -bottom_end_cut.offset
+    )
+
     cut_top = Cutting(
         timber=top_lap_timber,
-        maybe_top_end_cut=top_end_cut if top_lap_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=top_end_cut if top_lap_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=top_lap_prism
     )
     
     cut_bottom = Cutting(
         timber=bottom_lap_timber,
-        maybe_top_end_cut=bottom_end_cut if bottom_lap_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=bottom_end_cut if bottom_lap_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=bottom_lap_prism
     )
     

@@ -310,17 +310,23 @@ class MockCutting:
         self._end_position = end_position
         # Convert old maybe_end_cut to new format
         if maybe_end_cut == TimberReferenceEnd.TOP:
-            self.maybe_top_end_cut = True  # Mock value
-            self.maybe_bottom_end_cut = None
+            self._maybe_top_end_cut = True  # Mock value
+            self._maybe_bottom_end_cut = None
         elif maybe_end_cut == TimberReferenceEnd.BOTTOM:
-            self.maybe_top_end_cut = None
-            self.maybe_bottom_end_cut = True  # Mock value
+            self._maybe_top_end_cut = None
+            self._maybe_bottom_end_cut = True  # Mock value
         else:
-            self.maybe_top_end_cut = None
-            self.maybe_bottom_end_cut = None
+            self._maybe_top_end_cut = None
+            self._maybe_bottom_end_cut = None
         self.origin = Matrix([0, 0, 0])
         self.orientation = Orientation()
         self.negative_csg = None  # Mock CSG - not actually used
+
+    def get_maybe_top_end_cut(self):
+        return self._maybe_top_end_cut
+
+    def get_maybe_bottom_end_cut(self):
+        return self._maybe_bottom_end_cut
     
     def get_negative_csg_local(self):
         """Get the negative CSG (not implemented for mock)."""

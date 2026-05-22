@@ -380,6 +380,14 @@ def cut_lapped_gooseneck_joint(
         gooseneck_end_cut_local_z = gooseneck_end_position_from_timber_end
         gooseneck_timber_end_cut = HalfSpace(normal=create_v3(0, 0, -1), offset=-gooseneck_end_cut_local_z)
 
+    receiving_end_cut_local_z = None
+    if receiving_timber_end_cut is not None:
+        receiving_end_cut_local_z = (
+            receiving_timber_end_cut.offset
+            if receiving_timber_end == TimberReferenceEnd.TOP
+            else -receiving_timber_end_cut.offset
+        )
+
     # Transform the gooseneck profile CSG from gooseneck_timber coordinates to receiving_timber coordinates
     # Use the generic adopt_csg function to handle all CSG types (SolidUnion, Difference, RectangularPrism, etc.)
     gooseneck_csg_on_receiving_timber = adopt_csg(gooseneck_timber.transform, receiving_timber.transform, gooseneck_profile_csg)
@@ -392,14 +400,14 @@ def cut_lapped_gooseneck_joint(
     # Create Cut objects for each timber
     receiving_timber_cut_obj = Cutting(
         timber=receiving_timber,
-        maybe_top_end_cut=receiving_timber_end_cut if receiving_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=receiving_timber_end_cut if receiving_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=receiving_timber_negative_csg
     )
     gooseneck_timber_cut_obj = Cutting(
         timber=gooseneck_timber,
-        maybe_top_end_cut=gooseneck_timber_end_cut if gooseneck_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=gooseneck_timber_end_cut if gooseneck_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=gooseneck_timber_combined_csg
     )
     
@@ -629,8 +637,8 @@ def cut_housed_dovetail_butt_joint(
     
     dovetail_timber_cut_obj = Cutting(
         timber=dovetail_timber,
-        maybe_top_end_cut=dovetail_timber_end_cut if dovetail_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=dovetail_timber_end_cut if dovetail_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=Difference(dovetail_housing_prism, [dovetail_profile_csg])
     )
     
@@ -642,8 +650,6 @@ def cut_housed_dovetail_butt_joint(
     
     receiving_timber_cut_obj = Cutting(
         timber=receiving_timber,
-        maybe_top_end_cut=None,
-        maybe_bottom_end_cut=None,
         negative_csg=receiving_timber_negative_csg
     )
     
@@ -1257,19 +1263,30 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
         negative_csg_B = CSGUnion([miter_cut_B_with_fingers] + voids_in_B)
     else:
         negative_csg_B = miter_cut_B_with_fingers
+
+    rough_end_cut_A_z = (
+        rough_end_cut_A.offset
+        if timberA_end == TimberReferenceEnd.TOP
+        else -rough_end_cut_A.offset
+    )
+    rough_end_cut_B_z = (
+        rough_end_cut_B.offset
+        if timberB_end == TimberReferenceEnd.TOP
+        else -rough_end_cut_B.offset
+    )
     
     # Create Cutting objects
     cutA = Cutting(
         timber=timberA,
-        maybe_top_end_cut=rough_end_cut_A if timberA_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=rough_end_cut_A if timberA_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=negative_csg_A
     )
     
     cutB = Cutting(
         timber=timberB,
-        maybe_top_end_cut=rough_end_cut_B if timberB_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut=rough_end_cut_B if timberB_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberReferenceEnd.BOTTOM else None,
         negative_csg=negative_csg_B
     )
     

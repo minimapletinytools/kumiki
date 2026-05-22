@@ -210,10 +210,10 @@ class TestPegStuff:
         assert len(joint.cut_timbers["tenon_timber"].cuts) == 1
         assert len(joint.cut_timbers["mortise_timber"].cuts) == 1
         # Tenon cut has a redundant end cut marker (points away from timber, doesn't cut anything extra)
-        assert joint.cut_timbers["tenon_timber"].cuts[0].maybe_bottom_end_cut is not None
-        assert joint.cut_timbers["tenon_timber"].cuts[0].maybe_top_end_cut is None
-        assert joint.cut_timbers["mortise_timber"].cuts[0].maybe_top_end_cut is None
-        assert joint.cut_timbers["mortise_timber"].cuts[0].maybe_bottom_end_cut is None
+        assert joint.cut_timbers["tenon_timber"].cuts[0].get_maybe_bottom_end_cut() is not None
+        assert joint.cut_timbers["tenon_timber"].cuts[0].get_maybe_top_end_cut() is None
+        assert joint.cut_timbers["mortise_timber"].cuts[0].get_maybe_top_end_cut() is None
+        assert joint.cut_timbers["mortise_timber"].cuts[0].get_maybe_bottom_end_cut() is None
         
         peg = joint.jointAccessories["peg_0"]
         assert isinstance(peg, Peg), "Expected peg to be a Peg instance"
@@ -715,10 +715,10 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         assert len(tenon_ct.cuts) == 1
         assert len(mortise_ct.cuts) == 1
         # Butt end is BOTTOM, so the redundant end cut lives on the bottom end.
-        assert tenon_ct.cuts[0].maybe_bottom_end_cut is not None
-        assert tenon_ct.cuts[0].maybe_top_end_cut is None
-        assert mortise_ct.cuts[0].maybe_top_end_cut is None
-        assert mortise_ct.cuts[0].maybe_bottom_end_cut is None
+        assert tenon_ct.cuts[0].get_maybe_bottom_end_cut() is not None
+        assert tenon_ct.cuts[0].get_maybe_top_end_cut() is None
+        assert mortise_ct.cuts[0].get_maybe_top_end_cut() is None
+        assert mortise_ct.cuts[0].get_maybe_bottom_end_cut() is None
         assert tenon_ct.cuts[0].label == "wedged_half_dovetail_mortise_and_tenon"
         assert mortise_ct.cuts[0].label == "wedged_half_dovetail_mortise_and_tenon"
 

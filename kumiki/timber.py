@@ -1319,10 +1319,10 @@ class Cutting:
     # each Cutting is tied to a timber so this is very reasonable to store here
     timber: PerfectTimberWithin
 
-    # these end cuts are special as they determine "rough cut" of the timber in that direction.
-    # If there is not an end cut in a direction, the original timber end point in that direction is used instead.
-    maybe_top_end_cut: Optional[HalfSpace] = None
-    maybe_bottom_end_cut: Optional[HalfSpace] = None
+    # End cuts are represented canonically as fixed distances from timber bottom
+    # (local z), with normals constrained to +/- local Z.
+    maybe_top_end_cut_distance_from_bottom: Optional[Numeric] = None
+    maybe_bottom_end_cut_distance_from_bottom: Optional[Numeric] = None
 
     # The negative CSG of the cut (the part of the timber that is removed by the cut)
     # in LOCAL coordinates (relative to timber.bottom_position)
@@ -1334,6 +1334,32 @@ class Cutting:
     # node so that the viewer can navigate the CSG tree by label.
     label: Optional[str] = None
 
+    def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
+        """Return the top end cut HalfSpace derived from distance metadata."""
+        if self.maybe_top_end_cut_distance_from_bottom is not None:
+            return HalfSpace(
+                normal=create_v3(Integer(0), Integer(0), Integer(1)),
+                offset=self.maybe_top_end_cut_distance_from_bottom,
+            )
+        return None
+
+    def get_maybe_bottom_end_cut(self) -> Optional[HalfSpace]:
+        """Return the bottom end cut HalfSpace derived from distance metadata."""
+        if self.maybe_bottom_end_cut_distance_from_bottom is not None:
+            return HalfSpace(
+                normal=create_v3(Integer(0), Integer(0), Integer(-1)),
+                offset=-self.maybe_bottom_end_cut_distance_from_bottom,
+            )
+        return None
+
+    def get_top_end_cut_local(self) -> Optional[HalfSpace]:
+        """Backward-compatible alias for get_maybe_top_end_cut()."""
+        return self.get_maybe_top_end_cut()
+
+    def get_bottom_end_cut_local(self) -> Optional[HalfSpace]:
+        """Backward-compatible alias for get_maybe_bottom_end_cut()."""
+        return self.get_maybe_bottom_end_cut()
+
     def get_negative_csg_local(self) -> CutCSG:
         """
         Get the complete negative CSG including end cuts.
@@ -1343,13 +1369,25 @@ class Cutting:
         """
         csg_components = []
 
-        if self.negative_csg is not None:
-            csg_components.append(self.negative_csg)
+        def _append_component(component: CutCSG) -> None:
+            # Avoid duplicate HalfSpace planes when both negative_csg and
+            # end-cut metadata describe the same geometric cut.
+            if isinstance(component, HalfSpace):
+                for existing in csg_components:
+                    if isinstance(existing, HalfSpace):
+                        if existing.normal.equals(component.normal) and equality_test(existing.offset, component.offset):
+                            return
+            csg_components.append(component)
 
-        if self.maybe_top_end_cut is not None:
-            csg_components.append(self.maybe_top_end_cut)
-        if self.maybe_bottom_end_cut is not None:
-            csg_components.append(self.maybe_bottom_end_cut)
+        if self.negative_csg is not None:
+            _append_component(self.negative_csg)
+
+        top_end_cut = self.get_top_end_cut_local()
+        bottom_end_cut = self.get_bottom_end_cut_local()
+        if top_end_cut is not None:
+            _append_component(top_end_cut)
+        if bottom_end_cut is not None:
+            _append_component(bottom_end_cut)
 
         if len(csg_components) == 0:
             return EmptyCSG()
@@ -1383,6 +1421,18 @@ class Cutting:
             return HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(1)), offset=timber.length - distance_from_end_to_cut)
         else:
             return HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(-1)), offset=-distance_from_end_to_cut)
+
+    @staticmethod
+    def make_end_cut_distance_from_bottom(
+        timber: PerfectTimberWithin,
+        end: TimberReferenceEnd,
+        distance_from_end_to_cut: Numeric,
+    ) -> Numeric:
+        """Convert distance-from-end to cut-plane distance from timber bottom."""
+        assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
+        if end == TimberReferenceEnd.TOP:
+            return timber.length - distance_from_end_to_cut
+        return distance_from_end_to_cut
 
 
 def _timber_face_tags() -> List[Tuple[str, PrismFace]]:
@@ -1446,13 +1496,13 @@ def _create_timber_prism_csg_local(
     """
     # Check if bottom end has cuts
     has_bottom_cut = any(
-        cut.maybe_bottom_end_cut is not None
+        cut.get_bottom_end_cut_local() is not None
         for cut in cuts
     )
     
     # Check if top end has cuts  
     has_top_cut = any(
-        cut.maybe_top_end_cut is not None
+        cut.get_top_end_cut_local() is not None
         for cut in cuts
     )
     
@@ -1489,18 +1539,21 @@ def did_end_cuts_extend_timber(timber: PerfectTimberWithin, cuts: List['Cutting'
     from kumiki.rule import safe_compare, Comparison
     
     for cut in cuts:
+        top_end_cut = cut.get_top_end_cut_local()
+        bottom_end_cut = cut.get_bottom_end_cut_local()
+
         # Check top end cut
-        if cut.maybe_top_end_cut is not None:
+        if top_end_cut is not None:
             # For top cuts, normal is (0,0,1) and offset is the z-position of the cut
             # If offset > timber.length, the cut extends beyond the top
-            if safe_compare(cut.maybe_top_end_cut.offset - timber.length, 0, Comparison.GT):
+            if safe_compare(top_end_cut.offset - timber.length, 0, Comparison.GT):
                 return True
         
         # Check bottom end cut
-        if cut.maybe_bottom_end_cut is not None:
+        if bottom_end_cut is not None:
             # For bottom cuts, normal is (0,0,-1) and offset is negative
             # If offset > 0, the cut extends beyond the bottom (into negative z)
-            if safe_compare(cut.maybe_bottom_end_cut.offset, 0, Comparison.GT):
+            if safe_compare(bottom_end_cut.offset, 0, Comparison.GT):
                 return True
     
     return False
@@ -1605,9 +1658,12 @@ class CutTimber:
         
         # Check all cuts for end cuts
         for cut in self.cuts:
+            top_end_cut = cut.get_top_end_cut_local()
+            bottom_end_cut = cut.get_bottom_end_cut_local()
+
             # Handle top end cut
-            if cut.maybe_top_end_cut is not None:
-                end_cut = cut.maybe_top_end_cut
+            if top_end_cut is not None:
+                end_cut = top_end_cut
                 # Find where the plane intersects each of the four corner edges
                 # Plane equation: normal · point = offset
                 # Point on edge: (corner_x, corner_y, z)
@@ -1626,8 +1682,8 @@ class CutTimber:
                     max_z = Max(max_z, *intersections)
             
             # Handle bottom end cut
-            if cut.maybe_bottom_end_cut is not None:
-                end_cut = cut.maybe_bottom_end_cut
+            if bottom_end_cut is not None:
+                end_cut = bottom_end_cut
                 # Same logic as above
                 intersections = []
                 for corner_x, corner_y in corner_positions:

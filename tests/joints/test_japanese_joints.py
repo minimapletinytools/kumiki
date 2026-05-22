@@ -83,18 +83,18 @@ def _assert_end_cuts_match_arrangement(joint, arrangement):
     cutB = joint.cut_timbers["timberB"].cuts[0]
 
     if arrangement.timber1_end == TimberReferenceEnd.TOP:
-        assert cutA.maybe_top_end_cut is not None
-        assert cutA.maybe_bottom_end_cut is None
+        assert cutA.get_maybe_top_end_cut() is not None
+        assert cutA.get_maybe_bottom_end_cut() is None
     else:
-        assert cutA.maybe_bottom_end_cut is not None
-        assert cutA.maybe_top_end_cut is None
+        assert cutA.get_maybe_bottom_end_cut() is not None
+        assert cutA.get_maybe_top_end_cut() is None
 
     if arrangement.timber2_end == TimberReferenceEnd.TOP:
-        assert cutB.maybe_top_end_cut is not None
-        assert cutB.maybe_bottom_end_cut is None
+        assert cutB.get_maybe_top_end_cut() is not None
+        assert cutB.get_maybe_bottom_end_cut() is None
     else:
-        assert cutB.maybe_bottom_end_cut is not None
-        assert cutB.maybe_top_end_cut is None
+        assert cutB.get_maybe_bottom_end_cut() is not None
+        assert cutB.get_maybe_top_end_cut() is None
 
 
 def _assert_miter_boundary_point(joint, timberA, timberB, point_global):
@@ -330,15 +330,15 @@ class TestHousedDovetailButtJoint:
         # Dovetail timber: 1 cut, end cut at TOP, negative CSG = Difference(housing, profile)
         assert len(dt_cut.cuts) == 1
         assert isinstance(dt_cut.cuts[0], Cutting)
-        assert dt_cut.cuts[0].maybe_top_end_cut is not None
-        assert dt_cut.cuts[0].maybe_bottom_end_cut is None
+        assert dt_cut.cuts[0].get_maybe_top_end_cut() is not None
+        assert dt_cut.cuts[0].get_maybe_bottom_end_cut() is None
         assert isinstance(dt_cut.cuts[0].negative_csg, Difference)
 
         # Receiving timber: 1 cut, no end cuts, with inset > 0 → SolidUnion(notch, socket)
         assert len(recv_cut.cuts) == 1
         assert isinstance(recv_cut.cuts[0], Cutting)
-        assert recv_cut.cuts[0].maybe_top_end_cut is None
-        assert recv_cut.cuts[0].maybe_bottom_end_cut is None
+        assert recv_cut.cuts[0].get_maybe_top_end_cut() is None
+        assert recv_cut.cuts[0].get_maybe_bottom_end_cut() is None
         assert isinstance(recv_cut.cuts[0].negative_csg, SolidUnion)
 
         # ---- render both timbers ----

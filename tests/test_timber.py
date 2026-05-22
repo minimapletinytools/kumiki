@@ -801,8 +801,6 @@ class TestCutTimber:
         )
         cut = Cutting(
             timber=timber,
-            maybe_top_end_cut=None,
-            maybe_bottom_end_cut=None,
             negative_csg=half_plane
         )
         
@@ -836,8 +834,6 @@ class TestCutTimber:
         )
         cut1 = Cutting(
             timber=timber,
-            maybe_top_end_cut=None,
-            maybe_bottom_end_cut=None,
             negative_csg=half_plane1
         )
         
@@ -847,8 +843,6 @@ class TestCutTimber:
         )
         cut2 = Cutting(
             timber=timber,
-            maybe_top_end_cut=None,
-            maybe_bottom_end_cut=None,
             negative_csg=half_plane2
         )
         
@@ -882,8 +876,7 @@ class TestCutTimber:
         )
         end_cut = Cutting(
             timber=timber,
-            maybe_top_end_cut=half_plane,
-            maybe_bottom_end_cut=None,
+            maybe_top_end_cut_distance_from_bottom=Rational(50),
             negative_csg=None
         )
         

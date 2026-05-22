@@ -105,8 +105,8 @@ class TestSplinedOpposingDoubleButtJoint:
             shoulder_symmetric_inset=inches(1),
         )
 
-        butt_1_flush_end_cut = joint_flush.cut_timbers["butt_timber_1"].cuts[0].maybe_top_end_cut
-        butt_1_inset_end_cut = joint_inset.cut_timbers["butt_timber_1"].cuts[0].maybe_top_end_cut
+        butt_1_flush_end_cut = joint_flush.cut_timbers["butt_timber_1"].cuts[0].get_maybe_top_end_cut()
+        butt_1_inset_end_cut = joint_inset.cut_timbers["butt_timber_1"].cuts[0].get_maybe_top_end_cut()
 
         assert butt_1_flush_end_cut is not None
         assert butt_1_inset_end_cut is not None
