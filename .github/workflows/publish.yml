@@ -11,22 +11,13 @@ on:
         options:
           - testpypi
           - pypi
-      bump_version_and_create_tag:
-        description: Bump the kumiki patch version, commit, and create a release tag before publishing
-        required: true
-        default: false
-        type: boolean
-      existing_tag:
-        description: Use an existing tag for publishing (overrides bump_version_and_create_tag)
-        required: false
-        type: string
 
 jobs:
   build:
     name: Build Distribution
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     outputs:
       version: ${{ steps.package_info.outputs.version }}
 
@@ -35,47 +26,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.existing_tag != '' && github.event.inputs.existing_tag || github.head_ref || github.ref_name }}
-
-      - name: Bump version, commit, and tag
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.bump_version_and_create_tag == 'true'
-        shell: bash
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          NEW_VERSION=$(python - <<'PY'
-          import re
-          import tomllib
-          from pathlib import Path
-
-          pyproject_path = Path('pyproject.toml')
-          pyproject_text = pyproject_path.read_text(encoding='utf-8')
-          current = tomllib.loads(pyproject_text)['project']['version']
-          major, minor, patch = map(int, current.split('.'))
-          new_version = f"{major}.{minor}.{patch + 1}"
-          pyproject_text = re.sub(r'(?m)^version = "[^"]+"$', f'version = "{new_version}"', pyproject_text, count=1)
-          pyproject_path.write_text(pyproject_text, encoding='utf-8')
-
-          init_path = Path('kumiki/__init__.py')
-          init_text = init_path.read_text(encoding='utf-8')
-          init_text = re.sub(r'(?m)^__version__\s*=\s*"[^"]+"$', f'__version__ = "{new_version}"', init_text, count=1)
-          init_path.write_text(init_text, encoding='utf-8')
-          print(new_version)
-          PY
-          )
-
-          TAG="kumiki-v${NEW_VERSION}"
-          if git show-ref --verify --quiet "refs/tags/${TAG}"; then
-            echo "Tag already exists: ${TAG}" >&2
-            exit 1
-          fi
-
-          git add pyproject.toml kumiki/__init__.py
-          git commit -m "Release kumiki v${NEW_VERSION}"
-          git tag -a "${TAG}" -m "Release kumiki v${NEW_VERSION}"
-          git push origin "HEAD:${{ github.ref_name }}"
-          git push origin "${TAG}"
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -106,26 +57,7 @@ jobs:
         id: package_info
         shell: bash
         run: |
-          if [ -n "${{ github.event.inputs.existing_tag }}" ]; then
-            TAG="${{ github.event.inputs.existing_tag }}"
-            if [[ "$TAG" != kumiki-v* ]]; then
-              echo "existing_tag must start with kumiki-v (got: $TAG)" >&2
-              exit 1
-            fi
-            VERSION="${TAG#kumiki-v}"
-            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
-              echo "Could not parse version from tag: $TAG" >&2
-              exit 1
-            fi
-          else
-            VERSION=$(python - <<'PY'
-            import tomllib
-            from pathlib import Path
-
-            print(tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])
-            PY
-            )
-          fi
+          VERSION=$(python -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")
 
           echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
 
