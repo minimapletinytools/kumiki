@@ -668,6 +668,9 @@ class KigumiViewerApp extends LitElement {
         });
 
         viewport.addEventListener('wheel', (event) => {
+            if (window.scrollY > 0) {
+                return;
+            }
             event.preventDefault();
             // Calculate adaptive zoom factor based on current distance
             // This makes zoom speed feel consistent across all scales
