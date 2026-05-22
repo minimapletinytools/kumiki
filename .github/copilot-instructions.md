@@ -1,8 +1,10 @@
 # Kumiki
 
-This repo contains both the Kumiki library (`girrafecad/`) and example timber frame designs (`patterns/`).
+Primary instructions now live in `AGENTS.md` at the repository root.
 
-- For rules on **authoring the library**, see `.github/instructions/authoring.instructions.md` (auto-applied to `girrafecad/**` and `tests/**`).
-- For rules on **writing timber frame designs** with the API, see `.github/instructions/usage.instructions.md` (auto-applied to `patterns/**`).
+Read and follow:
 
-Always use SymPy types (Rational or Float) for all numeric values — never Python floats.
+- `AGENTS.md`
+
+Always use SymPy types (Rational or Float) for all numeric values - never Python floats.
+
