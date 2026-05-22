@@ -159,21 +159,23 @@ DONE-lock and hide fetaures
 
 :: TODO
 
-DONE-create workshop jonits folders
-DONE-have publish package job bump the version number (check current version and bump I guess)
-DONE-test the initialize project thing lol
-  -need to pbulish kumiki first
-DONE/IGNORE-decide on layer view
-  -is patternbook part of layer view or separate thing
-  -figure out how to do show hide option
-  -decide on section: timbers, joints (this is fine for now)
-    -how do these sections integrate with folders
-  -decide on folders being string refs or actual refs when constructing...
-DONE-add dovetail shoulder to build a butt Joint 
+-cut_dropin_housed_butt_joint
+  -assert that timbers are face aligned (orthogonal not required)
+  -assert that faces of both timbers on the "front" of the joint 
+  -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
+  -takes a dropin_depth measured from the dropin face (based on front_face_on_butt_timber) are coplaner. this is the "dropin" face on the receeiving timber
+  -if orthognoal, cut a prism out of the receiving timber to match
+  -take a half space cut on the butt timber angled to the receiving timber and aligned to the insertion depth
+  -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
+  -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
+  -leave a TODO to add notching for non perfect timbers
 
--consider making all end cuts 90 degrees rather than half spaces, that was prob a bad idea
 
--address # TODO this is wrong, just return a new EmptyCSG
+-reorganize agent files
+-instead of just example = also support structure = frame = and mayb esome other stuf.f.
+-non perfect timber helpers
+  -I think receiving timber notching is mostly good?
+  -notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
 
 -improve joint writing agent instructinos
   -marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
@@ -331,17 +333,7 @@ EXEMPLIFY
 RENAMEIFY
   DONE-rename measure to locate
     -then you can use measure to measure between two located features (which we don't actually care about, we need to measure between 2 CSG features...)
-  -be consistent about function local/golbal naming
-    -local input vars should have the suffix  _local
-      -some things must be interpreted locally such as "face" or "distance", these d onot have the suffix
-    -functions return things in golbal space by default unless _local suffix
-  -come up with joint naming rules, in particular if _on_face_aligned_timbers sholud be used or not
-    -oFAT on face aligned timbers
-    -oFAACaT on face aligned coaxial timbers
-    -oPAT on plane aligned timbers (one pair of faces are parallel)
-    -oPT on parallel timbers
-    -oOT on orthognal timbers
-  -do the horseCoAD rename
+  DONE-do the horseCoAD rename
     -rename code_goes_here to horse
     -change cut_ to layout_? or plan_?
     -rename create_timber to hew?
@@ -353,7 +345,7 @@ RENAMEIFY
       -have an on class member version of it to cuz its cutre that way
     -oscar shed -> tiny snack house
     -kumiki viewer -> horse watcher or barn raising? or 建前 or tatemae
-  -consider doing a rename pass on validitiy checkers  
+  IGONRE-consider doing a rename pass on validitiy checkers  
     -assert
     -check
     -is
@@ -361,6 +353,17 @@ RENAMEIFY
     -contains (specific to cutcsg...)
     -are
 
+  -be consistent about function local/golbal naming
+    -local input vars should have the suffix  _local
+      -some things must be interpreted locally such as "face" or "distance", these d onot have the suffix
+    -functions return things in golbal space by default unless _local suffix
+  -come up with joint naming rules, in particular if _on_face_aligned_timbers sholud be used or not
+    -oFAT on face aligned timbers
+    -oFAACaT on face aligned coaxial timbers
+    -oPAT on plane aligned timbers (one pair of faces are parallel)
+    -oPT on parallel timbers
+    -oOT on orthognal timbers
+  
 
 
 VIEWER PREP
@@ -464,6 +467,20 @@ M3.5
 
 :: TODONE 
 
+
+DONE-create workshop jonits folders
+DONE-have publish package job bump the version number (check current version and bump I guess)
+DONE-test the initialize project thing lol
+  -need to pbulish kumiki first
+DONE/IGNORE-decide on layer view
+  -is patternbook part of layer view or separate thing
+  -figure out how to do show hide option
+  -decide on section: timbers, joints (this is fine for now)
+    -how do these sections integrate with folders
+  -decide on folders being string refs or actual refs when constructing...
+DONE-add dovetail shoulder to build a butt Joint 
+DONE-consider making all end cuts 90 degrees rather than half spaces, that was prob a bad idea
+DONE-address # TODO this is wrong, just return a new EmptyCSG
 
 DONE-kigumi
   DONE-add loading grahpic and do background loading of patterns

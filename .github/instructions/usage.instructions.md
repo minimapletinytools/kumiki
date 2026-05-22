@@ -37,33 +37,68 @@ TODO point to docs
 Timbers for a typical structure are usually defined 
 
 - first create a `Footprint` for the footprint of the structure.
-- use methods in `footprint.py` to define timbers on the footprint
-    - ... TODO
-- use methods in `construction.py` to define remaining timbers
+- then use methods in `footprint.py` to define timbers directly on the footprint (touching the ground)
+    - `create_horizontal_timber_on_footprint`
+    - `create_vertical_timber_on_footprint`
+- use methods in `construction.py` to define remaining timbers based on existing timbers
     - `join_face_aligned_on_face_aligned_timbers` for connecting timbers at right angles
     - `join_timbers` for simple connections between two timbers
     - `create_axis_aligned_timber` for timbers aligned to cartesian axis
     - `timber_from_directions` for arbitrarily aligned timbers
 
-
 ## Cutting Joints
 
-TODO 
+Once timbers have been laid out, use the various `cut_*` methods to cut joints joining the timbers. There are many types of joints. 
 
-TODO always use joints for basic_joints which provide sensible default parameters if no specifics about the joint were provided
+Almost all joints have a `cut_basic_*` variation inside of basic_joints.py which take minimal parameters. Always use the basic variants until the user provides specific requirements.
+
+### finding joint parameters
+
+Joint parameters are always set relative to one of the features on one of the timbers in the arrangement. Oftentimes the user will want to set the parameter relative to some other feature. Use the methods in measuring.py to convert measurements between features.
+
+### default joints for generic designs
+
+If the user does not specify which joint, use the following (or one of its variants) as defaults:
+
+- for butt joints use cut_mortise_and_tenon_joint
+- for corner joints use cut_plain_miter_joint or cut_plain_corner_lap_joint
+- for splice joint use cut_plain_splice_lap_joint_on_aligned_timbers
+- for cross joints use cut_plain_cross_lap_joint
+
+### default joints for timber frames
+
+- for beam-to-post joints use cut_mortise_and_tenon_joint, with a peg if the beam butts into the post, and without a peg if the beam sits above the post
+- for tie-beams or beams under substantial loads, consider using cut_wedged_half_dovetail_mortise_and_tenon_joint instead as it's much stronger
+- for rafter-to-rafter joints use cut_tongue_and_fork_corner_joint
+- for mudsill splice joints use cut_lapped_gooseneck_joint with the gooseneck facing upwards
+- for mudsill corner joints use either 
+    - cut_plain_corner_lap_joint (simplest)
+    - cut_mortise_and_tenon_joint (more complicated)
+    - cut_mitered_and_keyed_lap_joint (most complicated, no end grain exposed)
+- for joist-to-beam or joist-to-mudsill joints use 
+    - cut_dropin_housed_butt_joint (simplest)
+    - cut_housed_dovetail_butt_joint (if joist needs to resist spreading forces)
 
 ## Combining everything into a Frame
 
-Use `Frame.from_joints` to merge cuts on shared timbers across multiple joints:
+Your file should typically have some `example` function that returns a Frame
+
+Use `Frame.from_joints` to merge cuts on shared timbers across multiple joints. 
+
 ```python
-frame = Frame.from_joints([joint1, joint2, joint3], name="my_frame")
+def example():
+    # establish footprint
+    # create timbers
+    # create joints
+    # merge into. aframe and return the results
+    return Frame.from_joints([joint1, joint2, joint3], name="my_frame")
 ```
 
-TODO how to actually return the frame for rendering (not through a pattern)
+The `example` function name is special, it is what kigumi will scan for and render when opening your file.
 
-## Creating new Patterns
+# Creating new Patterns
+
+TODO
 
 
-## General tips
-- One dimension of the tenon should be sized to about 1/3 of the thickness of the mortise timber in the axis perpendicular to the the joining axis. This dimensioon should be perpendicular to the length of the mortise timber for strength. The other dimension of the tenon should be about 4/5 of the tenon timber in the matching axis.
 
