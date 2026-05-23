@@ -3,14 +3,12 @@ const vscode = require('vscode');
 const { FrameViewSession } = require('./frame-view-session');
 const { KigumiSidebarProvider } = require('./sidebar-provider');
 const { getInitializationStatus, initializeWorkspaceProject, updateWorkspaceKumiki, isInitializationInProgress } = require('./project-initializer');
-const { KigumiProjectHeaderProvider } = require('./project-header-view');
 
 let outputChannel = null;
 const frameSessions = new Map();       // filePath → FrameViewSession (main sessions)
 const patternSessions = new Map();     // slotName → FrameViewSession (pattern sessions)
 let patternSlotCounter = 0;
 let sidebarProvider = null;
-let projectHeaderProvider = null;
 let openInSplitView = true;
 const BUILD_MARKER = '🧪 KIGUMI_BUILD_2026-05-17T02:45Z';
 
@@ -60,28 +58,6 @@ function activate(context) {
     }));
     context.subscriptions.push(sidebarProvider, explorerTreeView);
 
-    projectHeaderProvider = new KigumiProjectHeaderProvider(context, {
-        getWorkspaceRoot,
-        getActivePythonFilePath,
-        runInitialize: async () => {
-            await runProjectHeaderAction();
-        },
-        runUpdateKumiki: async () => {
-            await runProjectHeaderUpdateAction();
-        },
-    });
-    context.subscriptions.push(
-        vscode.window.registerWebviewViewProvider('kigumi.projectHeader', projectHeaderProvider),
-    );
-
-    // Refresh project header status when active editor or workspace changes.
-    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(() => {
-        if (projectHeaderProvider) projectHeaderProvider.update();
-    }));
-    context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
-        if (projectHeaderProvider) projectHeaderProvider.update();
-    }));
-
     const disposable = vscode.commands.registerCommand('kigumi.render', async function () {
         try {
             await renderActiveEditor(context);
@@ -104,6 +80,11 @@ function activate(context) {
         }
     });
     context.subscriptions.push(openCurrentFileInViewer);
+
+    const openExplorer = vscode.commands.registerCommand('kigumi.explorer', async () => {
+        await vscode.commands.executeCommand('workbench.view.extension.kigumi');
+    });
+    context.subscriptions.push(openExplorer);
 
     const initializeProjectInWorkspace = vscode.commands.registerCommand('kigumi.initializeProjectInWorkspace', async () => {
         await runProjectHeaderAction();
@@ -479,7 +460,6 @@ function activate(context) {
 
         if (isInitializationInProgress()) {
             vscode.window.showInformationMessage('Kigumi initialization is already in progress.');
-            if (projectHeaderProvider) projectHeaderProvider.update();
             return;
         }
 
@@ -491,7 +471,6 @@ function activate(context) {
             if (sidebarProvider) {
                 await sidebarProvider.refresh(true);
             }
-            if (projectHeaderProvider) projectHeaderProvider.update();
             return;
         }
 
@@ -500,11 +479,9 @@ function activate(context) {
             if (sidebarProvider) {
                 await sidebarProvider.refresh(true);
             }
-            if (projectHeaderProvider) projectHeaderProvider.update();
             return;
         }
 
-        if (projectHeaderProvider) projectHeaderProvider.setInitializing(true);
         try {
             let initializeResult = null;
             await vscode.window.withProgress({
@@ -529,7 +506,6 @@ function activate(context) {
                 vscode.window.showErrorMessage(`Initialize project failed: ${error.message || error}`);
             }
         } finally {
-            if (projectHeaderProvider) projectHeaderProvider.setInitializing(false);
             if (sidebarProvider) {
                 await sidebarProvider.refresh(true);
             }
@@ -546,12 +522,10 @@ function activate(context) {
 
         if (isInitializationInProgress()) {
             vscode.window.showInformationMessage('Kigumi update is already in progress.');
-            if (projectHeaderProvider) projectHeaderProvider.update();
             return;
         }
 
         const rootHint = workspaceRoot || path.dirname(activeFilePath);
-        if (projectHeaderProvider) projectHeaderProvider.setInitializing(true);
         try {
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
@@ -570,7 +544,6 @@ function activate(context) {
                 vscode.window.showErrorMessage(`Update Kumiki failed: ${error.message || error}`);
             }
         } finally {
-            if (projectHeaderProvider) projectHeaderProvider.setInitializing(false);
             if (sidebarProvider) {
                 await sidebarProvider.refresh(true);
             }

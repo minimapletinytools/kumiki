@@ -336,6 +336,28 @@ class KigumiSidebarProvider {
     getRootNodes() {
         const nodes = [];
 
+        const initStatus = this._state.initStatus;
+        const shouldShowInitializeCta = !!initStatus
+            && initStatus.projectStatus !== 'local-dev'
+            && !initStatus.hasExistingProject
+            && !initStatus.isInitialized;
+
+        if (shouldShowInitializeCta) {
+            nodes.push(new SidebarNode({
+                key: 'init-cta',
+                type: 'initializeCallToAction',
+                label: '[ 🐪 Initialize Kigumi Project ]',
+                description: 'Click to create .kigumi config and .venv',
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                command: {
+                    title: 'Initialize project',
+                    command: 'kigumi.projectHeaderAction',
+                },
+                iconPath: new vscode.ThemeIcon('play-circle'),
+                contextValue: 'initializeCallToAction',
+            }));
+        }
+
         const frameCount = this._state.frames.length;
         nodes.push(new SidebarNode({
             key: 'frames-root',

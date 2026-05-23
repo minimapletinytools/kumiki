@@ -41,7 +41,8 @@
       "kigumi": [
         {
           "id": "kigumi.explorer",
-          "name": "Kigumi Explorer"
+          "name": "Kigumi Explorer",
+          "icon": "templogo.png"
         }
       ]
     },
@@ -52,6 +53,31 @@
         "icon": "$(play)"
       },
       {
+        "command": "kigumi.projectHeaderAction",
+        "title": "Kigumi: Initialize Project",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "kigumi.initializeProjectInWorkspace",
+        "title": "Kigumi: Initialize Project In Workspace",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "kigumi.refreshSidebar",
+        "title": "Kigumi: Refresh Sidebar",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kigumi.refreshPatterns",
+        "title": "Kigumi: Refresh Patterns",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "kigumi.toggleGroupByPatternbook",
+        "title": "Kigumi: Toggle Patternbook Grouping",
+        "icon": "$(list-tree)"
+      },
+      {
         "command": "kigumi.explorer",
         "title": "Kigumi: Open Explorer",
         "icon": "$(file-directory)"
@@ -60,9 +86,51 @@
     "menus": {
       "view/title": [
         {
+          "command": "kigumi.initializeProjectInWorkspace",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@0"
+        },
+        {
           "command": "kigumi.openCurrentFileInViewer",
           "when": "view == kigumi.explorer",
           "group": "navigation@1"
+        },
+        {
+          "command": "kigumi.toggleGroupByPatternbook",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@2"
+        },
+        {
+          "command": "kigumi.refreshPatterns",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@3"
+        },
+        {
+          "command": "kigumi.refreshSidebar",
+          "when": "view == kigumi.explorer",
+          "group": "navigation@4"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "kigumi.projectHeaderAction",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.initializeProjectInWorkspace",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.refreshSidebar",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.refreshPatterns",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.toggleGroupByPatternbook",
+          "when": "false"
         }
       ]
     }
