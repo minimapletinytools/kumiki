@@ -52,62 +52,62 @@ const SELECTION_VISUAL_STATES = Object.freeze({
 const RENDER_PROFILES = Object.freeze({
     'timber-default': Object.freeze({
         label: 'Timber Default',
-        solidColor: 0xafbccf,
-        edgeColor: 0x5d6882,
+        solidColor: 0xb8c4d5,
+        edgeColor: 0x49546d,
         reflectionColor: 0xe7edf8,
         roughness: 0.68,
         metalness: 0.02,
         reflectionRoughness: 0.28,
         reflectionMetalness: 0.04,
-        edgeOpacity: 0.42,
+        edgeOpacity: 0.52,
         reflectionOpacity: 0.14,
     }),
     'timber-warm': Object.freeze({
         label: 'Timber Warm',
-        solidColor: 0xc3b08f,
-        edgeColor: 0x6b5c49,
+        solidColor: 0xcbb898,
+        edgeColor: 0x564737,
         reflectionColor: 0xe7d8c2,
         roughness: 0.73,
         metalness: 0.01,
         reflectionRoughness: 0.31,
         reflectionMetalness: 0.02,
-        edgeOpacity: 0.45,
+        edgeOpacity: 0.56,
         reflectionOpacity: 0.12,
     }),
     'accessory-cute': Object.freeze({
         label: 'Accessory Cute Tint',
         solidColor: 0xffb3c7,
-        edgeColor: 0x994f68,
+        edgeColor: 0x7d4055,
         reflectionColor: 0xffd9e6,
         roughness: 0.54,
         metalness: 0.03,
         reflectionRoughness: 0.24,
         reflectionMetalness: 0.05,
-        edgeOpacity: 0.5,
+        edgeOpacity: 0.56,
         reflectionOpacity: 0.17,
     }),
     'accessory-brass': Object.freeze({
         label: 'Accessory Brass',
         solidColor: 0xc8a64d,
-        edgeColor: 0x5f4c1f,
+        edgeColor: 0x4a3b17,
         reflectionColor: 0xe8cd80,
         roughness: 0.42,
         metalness: 0.2,
         reflectionRoughness: 0.2,
         reflectionMetalness: 0.24,
-        edgeOpacity: 0.48,
+        edgeOpacity: 0.54,
         reflectionOpacity: 0.18,
     }),
     'timber-dark': Object.freeze({
         label: 'Timber Dark',
-        solidColor: 0x4a5468,
-        edgeColor: 0x1c2232,
+        solidColor: 0x586278,
+        edgeColor: 0x171d2a,
         reflectionColor: 0x6a7a92,
         roughness: 0.75,
         metalness: 0.03,
         reflectionRoughness: 0.32,
         reflectionMetalness: 0.04,
-        edgeOpacity: 0.65,
+        edgeOpacity: 0.72,
         reflectionOpacity: 0.10,
     }),
 });
@@ -488,7 +488,7 @@ class KigumiViewerApp extends LitElement {
         };
         this.edgeLineVisibilityPercent = 100;
         this.unselectedTransparencyPercent = 70;
-        this.activeTheme = 'slate';
+        this.activeTheme = 'forest';
         this.activeBackground = this.activeTheme;
 
         this.availablePatterns = [];  // [{name, groups, source_file, source}]
@@ -844,14 +844,14 @@ class KigumiViewerApp extends LitElement {
         this.camera = new THREE.PerspectiveCamera(45, viewport.offsetWidth / viewport.offsetHeight, 0.01, 10000);
         this.camera.up.set(0, 0, 1);
 
-        this.scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+        this.scene.add(new THREE.AmbientLight(0xffffff, 0.61));
         this.sun = new THREE.DirectionalLight(0xffffff, 0.62);
         this.sun.position.set(2, 1, 18);
         this.sun.castShadow = true;
         this.sun.shadow.bias = -0.00008;
         this.sun.shadow.mapSize.set(2048, 2048);
         this.scene.add(this.sun);
-        const fill = new THREE.DirectionalLight(0xd8e3f5, 0.28);
+        const fill = new THREE.DirectionalLight(0xd8e3f5, 0.34);
         fill.position.set(-4, 3, -6);
         this.scene.add(fill);
 
