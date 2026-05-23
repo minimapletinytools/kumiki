@@ -27,7 +27,10 @@ from kumiki.timber_shavings import are_timbers_plane_aligned
 from kumiki.rule import *
 from kumiki.rule import safe_dot_product
 from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder
-from .joint_shavings import chop_shoulder_notch_aligned_with_timber
+from .notching import (
+    chop_shoulder_notch_aligned_with_timber,
+    locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+)
 from .build_a_butt_joint_shavings import (
     PegPositionResult,
     PegPositionSpace,
@@ -37,7 +40,6 @@ from .build_a_butt_joint_shavings import (
     dovetail_tenon_geometry,
     DovetailTenonGeometeryResult,
     DovetailTenonWedgeAccessoryParameters,
-    locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
 )
 
 

@@ -202,9 +202,11 @@ DONE-reorganize agent files
 
 
 -rename?
-  -notching.py
+  -create notching.py
   -build-a-butt-joint -> build-a-butt.py
   -joint_shavings.py->shavings.py?
+
+
 -NOTCHING
   -I think receiving timber notching is mostly good?
   -notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
@@ -221,9 +223,10 @@ DONE-reorganize agent files
   
 
 -improve joint writing agent instructinos
-  -marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
-  -build a butt joint guidance
-  -peg and notching guidance
+  DONE-marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
+  DONE-build a butt joint guidance
+  DONE-notching guidance
+  -peg guidance
 
 
 -add a new integration test that  createsa. new kigumi projcet in some temp directory and initializes it and checks
