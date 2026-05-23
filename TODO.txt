@@ -122,6 +122,9 @@ DONE-layers view should be IN the webview, or at least cropped to not overflow i
   -show layer tags is broken
   -searching should search for either tags or joint name (figure out a way to do this)
 -ensure make pattern-index before each publish (maybe run as part of the bump version job)
+-cleanup the bottom area for kigumi
+  -remove the patternbook
+  -tighten the member list, dimenison + rought cut + add export button
 -do a design pass
   -better logo
   -stuff showing below the view should be cleaner/tighter 
@@ -211,7 +214,7 @@ DONE-reorganize agent files
     -the only weird thing is that for inset shoulders you need notching on perfect timebrs too..
 
 -NON PERFECT TIMBER
-  -do mortise and tenon joint test with round timebr to see wha thappen lol
+  DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
   -add annotations to joint functions to indicate if they can support non perfect timbers
   -add regular timber stuff
   -add round timber stuff

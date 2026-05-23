@@ -84,19 +84,19 @@ def example_basic_mortise_and_tenon_on_FAT_two_round_timbers(position=None):
         position = create_v3(0, 0, 0)
 
     arrangement = create_canonical_example_butt_joint_timbers(position)
-    diameter = inches(4)
-    round_size = Matrix([diameter, diameter])
+    size = arrangement.butt_timber.size
+    diameter = max(size[0], size[1]) * 2/sqrt(2)  # Use the same width as the original timbers for the round diameter
 
     round_receiving_timber = RoundTimber(
         length=arrangement.receiving_timber.length,
-        size=round_size,
+        size=size,
         transform=arrangement.receiving_timber.transform,
         ticket=TimberTicket("round_receiving_timber"),
         diameter=diameter,
     )
     round_butt_timber = RoundTimber(
         length=arrangement.butt_timber.length,
-        size=round_size,
+        size=size,
         transform=arrangement.butt_timber.transform,
         ticket=TimberTicket("round_butt_timber"),
         diameter=diameter,

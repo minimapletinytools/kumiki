@@ -7,7 +7,7 @@ and raise them at different positions for visualization and testing.
 
 from sympy import Rational
 from typing import List, Tuple, Optional, Callable, Union, Literal, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from .rule import V3, create_v3, Transform
 from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, JointAccessory
 from .cutcsg import CutCSG, translate_csg
@@ -28,11 +28,10 @@ def make_pattern_from_joint(joint_func: Callable[[], Joint]) -> PatternLambda:
         translated_timbers: List[CutTimber] = []
         for timber in joint.cut_timbers.values():
             new_position = timber.timber.get_bottom_position_global() + center
-            translated_timber = Timber(
-                ticket=timber.timber.ticket,
+            # Preserve the concrete timber subclass (RoundTimber, MeshTimber, etc.) — only override the transform.
+            translated_timber = replace(
+                timber.timber,
                 transform=Transform(position=new_position, orientation=timber.timber.orientation),
-                size=timber.timber.size,
-                length=timber.timber.length
             )
             translated_timbers.append(CutTimber(timber=translated_timber, cuts=timber.cuts))
 
@@ -94,11 +93,10 @@ def make_pattern_from_frame(frame_func: Callable[[], Frame]) -> PatternLambda:
         translated_timbers = []
         for cut_timber in frame.cut_timbers:
             new_position = cut_timber.timber.get_bottom_position_global() + center
-            translated_timber = Timber(
-                ticket=cut_timber.timber.ticket,
+            # Preserve the concrete timber subclass (RoundTimber, MeshTimber, etc.) — only override the transform.
+            translated_timber = replace(
+                cut_timber.timber,
                 transform=Transform(position=new_position, orientation=cut_timber.timber.orientation),
-                size=cut_timber.timber.size,
-                length=cut_timber.timber.length
             )
             translated_timbers.append(CutTimber(timber=translated_timber, cuts=cut_timber.cuts))
 
