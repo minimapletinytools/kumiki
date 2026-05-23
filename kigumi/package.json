@@ -23,6 +23,7 @@
   ],
   "activationEvents": [
     "onCommand:kigumi.openCurrentFileInViewer",
+    "onCommand:kigumi.initializeProjectInWorkspace",
     "onView:kigumi.explorer"
   ],
   "main": "./extension.js",
@@ -59,7 +60,7 @@
       },
       {
         "command": "kigumi.initializeProjectInWorkspace",
-        "title": "Kigumi: Initialize Project In Workspace",
+        "title": "Kigumi: Initialize Project",
         "icon": "$(rocket)"
       },
       {
@@ -114,10 +115,6 @@
       "commandPalette": [
         {
           "command": "kigumi.projectHeaderAction",
-          "when": "false"
-        },
-        {
-          "command": "kigumi.initializeProjectInWorkspace",
           "when": "false"
         },
         {
