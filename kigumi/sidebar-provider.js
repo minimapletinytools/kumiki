@@ -170,7 +170,7 @@ class KigumiSidebarProvider {
         const workspaceRoot = workspaceFolder.uri.fsPath;
         const initStatus = getInitializationStatus(workspaceRoot);
         const isLocalDev = initStatus.projectStatus === 'local-dev';
-        const timeoutSeconds = vscode.workspace.getConfiguration('kigumi').get('explorer.scanTimeoutSeconds', 5);
+        const timeoutSeconds = vscode.workspace.getConfiguration('kigumi').get('explorer.scanTimeoutSeconds', 15);
         const timeoutMs = Math.max(1000, Number(timeoutSeconds) * 1000);
 
         // Show scanning state immediately

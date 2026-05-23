@@ -1,4 +1,4 @@
-.PHONY: help setup test test-verbose test-cov typecheck typecheck-watch clean profile stepout
+.PHONY: help setup test test-verbose test-cov typecheck typecheck-watch clean profile stepout pattern-index
 
 help:
 	@echo "🦒 Kumiki Development Commands"
@@ -42,6 +42,10 @@ profile:
 
 stepout:
 	uv run python tools/test_step_output.py $(PATTERN)
+
+pattern-index:
+	uv run python tools/build_pattern_index.py
+	@echo "✅ kumiki/_pattern_index.json regenerated"
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
