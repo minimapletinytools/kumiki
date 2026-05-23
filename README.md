@@ -1,6 +1,6 @@
 # Kumiki
 
-Kumiki is a Code aided Design (CoAD) library for programmatically designing timber framed structures and woodworking in general.
+Kumiki is a Code assisted Design (CoAD) library for programmatically designing timber framed structures and woodworking in general.
 
 As Kumiki is a CoAD library, it is well suited for usage with AI agents.
 
@@ -16,7 +16,7 @@ You can of course use Kumiki without Kigumi. You can still use Kigumi to setup y
 
 ## your first kumiki project
 
-Create a folder for your Kumiki project and open that folder in VSCode. Then click "Initialize Project" from the Kumiki menu. You may also run "kigumi: initialize project" command from the command pallete. This will create a placeholder MyCuteFrame.py project file for you that you can build on! 
+Create a folder for your Kumiki project and open that folder in VSCode. Then click "Initialize Project" from the Kumiki menu. You may also run "kigumi: initialize project" command from the command pallete. This will create a placeholder my_cute_frame.py project file for you that you can build on! 
 
 Open the Kigumi menu by clicking on the Kigumi extension icon in the left side bar.
 You may also open Kigumi by opening the command palette in VScode (cmd/ctrl+shift+p). Start typing "kigumi" and choose the "View: Show Kigumi" command. 
@@ -24,13 +24,13 @@ You can open a Kumiki project file directly by choosing "Kigumi: Open Current Fi
 
 ## viewing the built in patterns and examples
 
-Kigumi ships with a patternbook and several examples. These can be explored through the kigumi menu. You can choose to "view source" or "duplicate in workspace" if you want to modify the patterns.
+Kigumi ships with a patternbook and several examples. These can be explored through the kigumi menu. You can choose to "view source" or "duplicate in workspace" if you want to modify the patterns. 
 
 ## making changes
 
-Kigumi installs with a set of AI agent instructions and skills, and the AI agent has access to the entire Kumiki source code so it more or less knows to how to write Kumiki designs. Using human like prompting should serve you pretty well. Please refer to the patternbook for the list of available joints. It's best to build your structure in increments previewing each step along the way but I won't stop you from asking your agent to "build me a house".
+Kigumi installs with a set of AI agent instructions. The installed `kumiki` Python package includes the Kumiki library source files, built-in patterns, and the `docs/` content, so those resources are present in the Python environment used by Kigumi. Using human like prompting should serve you pretty well. Using carpentry or woodworknig terminology will serve you better. Please refer to the patternbook for the list of available joints. It's best to build your structure in increments previewing each step along the way but I won't stop you from asking your agent to "build me a house".
 
-You can implement your own joints as well but AI agents currently struggle with this so don't expect much.
+You can implement your own joints as well but AI agents currently struggle with this, especially if you are unfamiliar with terminology and geometry conventions for prompting it, so don't expect much.
 
 Understanding Kumiki will allow you to better pilot the AI agent to implement your designs. Please see the docs folder to learn more about Kumiki's designs. You can of course implement your designs yourself too!
 
