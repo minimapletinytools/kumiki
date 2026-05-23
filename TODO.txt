@@ -175,12 +175,20 @@ DONE-lock and hide fetaures
   -leave a TODO to add notching for non perfect timbers
 
 
--reorganize agent files
+DONE-reorganize agent files
 -instead of just example = also support structure = frame = and mayb esome other stuf.f.
--non perfect timber helper/fixes 
-  -I think receiving timber notching is mostly good?
-  -notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
-  -many joints need to be updated
+
+
+-NON PERFECT TIMBER
+  -add regular timber stuff
+  -add round timber stuff
+  -non perfect timber helper/fixes 
+    -I think receiving timber notching is mostly good?
+    -notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
+    -many joints need to be on_frame_updated
+    -make a generic verion of this, one for each joint configuration type
+    -make non PTW notching settings helper class
+      -the only weird thing is that for inset shoulders you need notching on perfect timebrs too..
 
 -improve joint writing agent instructinos
   -marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed

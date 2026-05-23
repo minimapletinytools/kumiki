@@ -91,7 +91,9 @@ jobs:
 
   verify:
     name: Verify Published Package
-    needs: publish
+    needs:
+      - build
+      - publish
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch'
 
@@ -103,15 +105,21 @@ jobs:
 
       - name: Install from selected index
         run: |
+          VERSION="${{ needs.build.outputs.version }}"
+          if [ -z "$VERSION" ]; then
+            echo "Build output version is empty" >&2
+            exit 1
+          fi
+
           if [ "${{ github.event.inputs.target }}" = "testpypi" ]; then
             python -m pip install --upgrade pip
             python -m pip install \
               --index-url https://test.pypi.org/simple/ \
               --extra-index-url https://pypi.org/simple \
-              "kumiki==${{ needs.build.outputs.version }}"
+              "kumiki==$VERSION"
           else
             python -m pip install --upgrade pip
-            python -m pip install "kumiki==${{ needs.build.outputs.version }}"
+            python -m pip install "kumiki==$VERSION"
           fi
 
       - name: Verify import and version
