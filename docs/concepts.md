@@ -74,7 +74,7 @@ class TimberFace(Enum):
 
 ### measuring and marking
 
-Joint functions take measurents for its features relative to one of the features on one of the timbers in the joint arrangement. Often you may want to position the joint feature relative to some other featuer perhaps on a different timber. Functions in `measuring.py` are designed to help you do this. TLDR; you `locate` a  feature you want to mesaure from, and then you `mark` that feature onto the feature that the joint function needs. If you don't understand what I mean by this no worries, because the AI does understand :|.
+Joint functions take measurents for its features relative to one of the features on one of the timbers in the joint arrangement. Often you may want to position the joint feature relative to some other feature perhaps on a different timber. Functions in `measuring.py` are designed to help you do this. TLDR; you `locate` a  feature you want to mesaure from, and then you `mark` that feature onto the feature that the joint function needs. If you don't understand what I mean by this no worries, because the AI does understand :|.
 
 ## member names
 
@@ -84,7 +84,6 @@ When timbers are part of a structure, they may be referred to as members. Member
 # Footprint
 
 A support class representing the footprint of the structure in the XY plane to help position and orient timbers. Footprints are always defined at Z=0 and timbers defined on the footprint are always have their bottom surface at Z=0 in global space.
-
 
 ```
 class Footprint:
@@ -160,8 +159,33 @@ Otherwise, use `join_timbers` which will create a new timber connecting the cent
 
 # Joints 
 
-Once your timbers have been created, it's time to cut them to make joints.
+Once your timbers have been created, it's time to cut them to make joints. 
 
+## Arrangements
+
+Joints functions take arrangements (defined in construction.py) which are collections of timbers involved in a joint as well as some optional orientation paremeters. Arrangements contain check functions to ensure alignment assumptions needed by the joint.
+
+## Cuttings
+
+Joints contain a dictionary of `CutTimbers` which are a `Timber` with a `Cutting` removing away part of the timber. Cuttings contain a `negative_csg: Optional[CutCSG]` representing what needs to be removed from the timber. In addition they contain `maybe_top/bottom_end_cut_distance_from_bottom` which are 90 degree cross cuts at the top/bottom end of the timber which represent. These end cuts should always remove maximal material (i.e. as "close" to `negative_csg` as possible). They may sometimes be required to complete the cut (i.e. `negative_csg` by itself may not be enough). These end cuts are used to generate minimal axis aligned bounding boxes for `CutTimbers` and also used to "rough cut" length for material bills.
+
+Another important detail. If a timber has an end cut on one of its ends, the "length" of the timber in that direction (as determined by its length and bottom position) is ignored. Instead, the "end" of the timber in that direction is determined by `maybe_top/bottom_end_cut_distance_from_bottom`. Thus, timbers with end joints do not need to be precisely sized as cutting the end joint effectively sets the size for that end :O!
+
+## Accesories
+
+Joints also contain a dictionary of `JointAccessory` which are additional *things* needed to complete the joint, such as pegs, nails, or other hardware.
+
+## Joint Organization
 TODO
+### joint folders
+#### workshop joints
+### joint tags
 
+### Basic Joints
+Almost every joint has a basic joint variation inside basic_joints.py. Basic joints take minimal parameters providing sensible default parameters for the rest of the joint. Basic joints are a also a great place to understand how to interpret joint parameters in practice.
 
+# Putting it all together
+
+When all timbers are arranged and joints are cut, they must be assmembled into a Frame using the `Frame.from_joints` method.. A frame is simply a collection of joints and timbers which can then be rendered, exported, drawn, etc.
+
+Since most of Kumiki is written in potato python code and uses high precision floating point or symbolic math, operations can take a while. As such, use the `add_milestone` method to set milestones in construction to get a more descriptive loading bar when viewing inside Kigumi.
