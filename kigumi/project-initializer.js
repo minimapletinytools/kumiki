@@ -3,6 +3,109 @@ const path = require('path');
 const { spawn } = require('child_process');
 const { ensureKigumiYaml, resolveProjectEnvironment } = require('./project-root');
 
+const GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '.generated', 'bundled-usage-instructions.md');
+const CANONICAL_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '..', '.github', 'instructions', 'usage.instructions.md');
+
+function stripLeadingYamlFrontmatter(content) {
+    if (!content.startsWith('---')) {
+        return content;
+    }
+
+    const endMarker = content.indexOf('\n---', 3);
+    if (endMarker === -1) {
+        return content;
+    }
+
+    const afterFrontmatterIndex = endMarker + '\n---'.length;
+    return content.slice(afterFrontmatterIndex).replace(/^\s+/, '');
+}
+
+function getBundledAgentInstructionsContent() {
+    const sourcePath = fs.existsSync(GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH)
+        ? GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH
+        : CANONICAL_USAGE_INSTRUCTIONS_PATH;
+
+    if (fs.existsSync(sourcePath)) {
+        const rawContent = fs.readFileSync(sourcePath, 'utf8');
+        return stripLeadingYamlFrontmatter(rawContent).trimEnd() + '\n';
+    }
+
+    return [
+        '# Kumiki Agent Instructions',
+        '',
+        'Always read and follow the project root AGENTS.md instructions.',
+        '',
+        '## Numeric Values',
+        '',
+        '- Always use SymPy types (Rational or Float) for numeric values.',
+        '- Never use Python floats.',
+        '',
+    ].join('\n');
+}
+
+function writeFileIfMissing(filePath, content) {
+    if (fs.existsSync(filePath)) {
+        return false;
+    }
+
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, content, 'utf8');
+    return true;
+}
+
+function ensureAgentsInstructionsFile(agentsPath, bundledInstructionsContent) {
+    const normalizedContent = bundledInstructionsContent.trimEnd() + '\n';
+    fs.mkdirSync(path.dirname(agentsPath), { recursive: true });
+
+    if (!fs.existsSync(agentsPath)) {
+        fs.writeFileSync(agentsPath, normalizedContent, 'utf8');
+        return {
+            createdAgentsFile: true,
+            appendedToExistingAgentsFile: false,
+            warning: null,
+        };
+    }
+
+    const warning = `AGENTS.md already exists at ${agentsPath}; appending Kigumi setup instructions to the end.`;
+    console.warn(`[kigumi] ${warning}`);
+    fs.appendFileSync(agentsPath, `\n\n${normalizedContent}`, 'utf8');
+
+    return {
+        createdAgentsFile: false,
+        appendedToExistingAgentsFile: true,
+        warning,
+    };
+}
+
+function ensureAgentInstructionFiles(workspaceRoot) {
+    const agentsPath = path.join(workspaceRoot, 'AGENTS.md');
+    const copilotPath = path.join(workspaceRoot, '.github', 'copilot-instructions.md');
+    const claudePath = path.join(workspaceRoot, 'CLAUDE.md');
+    const cursorPath = path.join(workspaceRoot, '.cursorrules');
+
+    const pointerContent = [
+        '# Agent Instructions',
+        '',
+        'Primary instructions live in AGENTS.md at the repository root.',
+        '',
+        'Always read and follow:',
+        '',
+        '- AGENTS.md',
+        '',
+    ].join('\n');
+
+    const agentsResult = ensureAgentsInstructionsFile(agentsPath, getBundledAgentInstructionsContent());
+
+    return {
+        createdAgentsFile: agentsResult.createdAgentsFile,
+        appendedToExistingAgentsFile: agentsResult.appendedToExistingAgentsFile,
+        createdCopilotInstructionsFile: writeFileIfMissing(copilotPath, pointerContent),
+        createdClaudeInstructionsFile: writeFileIfMissing(claudePath, pointerContent),
+        createdCursorRulesFile: writeFileIfMissing(cursorPath, pointerContent),
+        instructionWarnings: agentsResult.warning ? [agentsResult.warning] : [],
+    };
+}
+
 function getVenvPython(workspaceRoot) {
     if (process.platform === 'win32') {
         return path.join(workspaceRoot, '.venv', 'Scripts', 'python.exe');
@@ -380,6 +483,7 @@ async function initializeWorkspaceProject(workspaceRoot, filePath) {
         });
 
         const exampleResult = ensureExampleFrame(resolvedRoot);
+        const instructionsResult = ensureAgentInstructionFiles(resolvedRoot);
 
         return {
             projectRoot: resolvedRoot,
@@ -393,6 +497,7 @@ async function initializeWorkspaceProject(workspaceRoot, filePath) {
             installSummary: installResult.summary,
             exampleFilePath: exampleResult.filePath,
             createdExampleFile: exampleResult.created,
+            ...instructionsResult,
         };
     } finally {
         _initializationInProgress = false;

@@ -506,14 +506,20 @@ function activate(context) {
 
         if (projectHeaderProvider) projectHeaderProvider.setInitializing(true);
         try {
+            let initializeResult = null;
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
                 title: 'Initializing Kigumi project',
                 cancellable: false,
             }, async () => {
-                const result = await initializeWorkspaceProject(rootHint, activeFilePath);
-                logKumikiInstallResult('initialize', result);
+                initializeResult = await initializeWorkspaceProject(rootHint, activeFilePath);
+                logKumikiInstallResult('initialize', initializeResult);
             });
+            if (initializeResult && Array.isArray(initializeResult.instructionWarnings)) {
+                for (const warning of initializeResult.instructionWarnings) {
+                    vscode.window.showWarningMessage(warning);
+                }
+            }
             vscode.window.showInformationMessage('Kigumi workspace initialized and Kumiki was updated to latest.');
         } catch (error) {
             if (error && error.code === 'INITIALIZATION_IN_PROGRESS') {
@@ -582,6 +588,11 @@ function activate(context) {
             outputChannel.appendLine('[kigumi] Summary:');
             for (const line of result.installSummary) {
                 outputChannel.appendLine(`[kigumi] - ${line}`);
+            }
+        }
+        if (Array.isArray(result.instructionWarnings) && result.instructionWarnings.length > 0) {
+            for (const warning of result.instructionWarnings) {
+                outputChannel.appendLine(`[kigumi] Warning: ${warning}`);
             }
         }
     }

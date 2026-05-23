@@ -68,7 +68,8 @@
     }
   },
   "scripts": {
-    "vscode:prepublish": "echo 'No build step needed'",
+    "prepare:instructions": "node ./scripts/prepare-bundled-instructions.js",
+    "vscode:prepublish": "npm run prepare:instructions",
     "test": "npm run test:unit",
     "test:unit": "jest",
     "test:runner": "jest --runInBand __tests__/runner-protocol.test.js",
