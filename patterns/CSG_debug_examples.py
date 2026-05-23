@@ -18,9 +18,10 @@ from kumiki.cutcsg import *
 from kumiki.rule import Orientation, Transform, inches, feet
 from kumiki.timber import Timber, TimberReferenceEnd, TimberFace, TimberLongFace, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
-from kumiki.joints.workshop.joint_shavings import chop_lap_on_timber_end, chop_profile_on_timber_face, chop_shoulder_notch_on_timber_face
+from kumiki.joints.workshop.shavings import chop_lap_on_timber_end, chop_profile_on_timber_face
+from kumiki.joints.workshop.notching import chop_shoulder_notch_on_timber_face
 from kumiki.joints.workshop.japanese_joints import draw_gooseneck_polygon
-from kumiki.joints.workshop.build_a_butt_joint_shavings import (
+from kumiki.joints.workshop.build_a_butt import (
     DovetailTenonWedgeAccessoryParameters,
     compute_butt_joint_shoulder,
     build_dovetail_shoulder_geometery,

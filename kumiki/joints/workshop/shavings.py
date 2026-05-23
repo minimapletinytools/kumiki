@@ -1,5 +1,5 @@
 """
-Joint Helper Functions (joint_shavings.py)
+Joint Helper Functions (shavings.py)
 
 Collection of helper functions for validating and checking timber joint configurations.
 These functions help ensure that joints are geometrically valid and sensibly constructed.

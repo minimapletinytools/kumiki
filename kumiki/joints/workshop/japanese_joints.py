@@ -6,7 +6,8 @@ import warnings
 
 from kumiki.timber import *
 from kumiki.construction import *
-from .joint_shavings import *
+from .shavings import *
+from .notching import chop_shoulder_notch_on_timber_face
 from kumiki.measuring import locate_top_center_position, locate_centerline, mark_distance_from_end_along_centerline
 from kumiki.rule import *
 from kumiki.cutcsg import *

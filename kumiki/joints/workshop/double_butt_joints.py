@@ -8,9 +8,12 @@ TODO rename this file to three_way_joints.py
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
-from .joint_shavings import *
-from .build_a_butt_joint_shavings import SimplePegParameters
-from .notching import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
+from .shavings import *
+from .build_a_butt import SimplePegParameters
+from .notching import (
+    chop_shoulder_notch_aligned_with_timber,
+    locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+)
 
 
 def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArrangement,

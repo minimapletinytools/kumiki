@@ -10,7 +10,7 @@ from kumiki.timber import (
     create_v3, V2, CutTimber, Frame
 )
 from kumiki.joints.workshop.mortise_and_tenon_joint import *
-from kumiki.joints.workshop.build_a_butt_joint_shavings import (
+from kumiki.joints.workshop.build_a_butt import (
     DovetailTenonWedgeAccessoryParameters,
 )
 

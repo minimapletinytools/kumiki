@@ -33,7 +33,7 @@ from kumiki.construction import (
 from .mortise_and_tenon_joint import (
     cut_mortise_and_tenon_joint_on_FAT,
 )
-from .build_a_butt_joint_shavings import SimplePegParameters
+from .build_a_butt import SimplePegParameters
 from .double_butt_joints import cut_splined_opposing_double_butt_joint
 from .japanese_joints import (
     cut_lapped_gooseneck_joint,

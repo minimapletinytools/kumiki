@@ -6,7 +6,7 @@ from dataclasses import replace
 from sympy import Rational, Abs
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
-from kumiki.joints.workshop.build_a_butt_joint_shavings import SimplePegParameters
+from kumiki.joints.workshop.build_a_butt import SimplePegParameters
 
 
 class TestSplinedOpposingDoubleButtJoint:

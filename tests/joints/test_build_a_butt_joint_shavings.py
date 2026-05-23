@@ -10,7 +10,7 @@ from kumiki.timber import (
     timber_from_directions, create_v3
 )
 from kumiki.construction import ButtJointTimberArrangement
-from kumiki.joints.workshop.build_a_butt_joint_shavings import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
+from kumiki.joints.workshop.build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
 
 
 class TestMeasureMortiseShoulderPlane:

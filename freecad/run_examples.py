@@ -150,7 +150,7 @@ def reload_all_modules():
         'kumiki.measuring',
         'kumiki.construction',
         'kumiki.rendering_utils',
-        'kumiki.joints.workshop.joint_shavings',
+        'kumiki.joints.workshop.shavings',
         'kumiki.joints.workshop.plain_joints',
         'kumiki.joints.workshop.basic_joints',
         'kumiki.joints.workshop.mortise_and_tenon_joint',

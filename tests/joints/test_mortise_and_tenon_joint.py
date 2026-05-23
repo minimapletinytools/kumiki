@@ -13,7 +13,7 @@ from kumiki.timber import (
 )
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.timber_shavings import are_timbers_plane_aligned
-from kumiki.joints.workshop.build_a_butt_joint_shavings import (
+from kumiki.joints.workshop.build_a_butt import (
     SimplePegParameters,
     PegPositionSpace,
 )
@@ -650,7 +650,7 @@ class TestMortiseAndTenonCSGHierarchy:
 from kumiki.joints.workshop.mortise_and_tenon_joint import (
     cut_wedged_half_dovetail_mortise_and_tenon_joint,
 )
-from kumiki.joints.workshop.build_a_butt_joint_shavings import (
+from kumiki.joints.workshop.build_a_butt import (
     DovetailTenonWedgeAccessoryParameters,
 )
 from kumiki.rule import degrees as _degrees

@@ -165,20 +165,7 @@ DONE-lock and hide fetaures
 
 
 :: TODO
-
--cut_dropin_housed_butt_joint
-  -assert that timbers are face aligned (orthogonal not required)
-  -assert that faces of both timbers on the "front" of the joint 
-  -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
-  -takes a dropin_depth measured from the dropin face (based on front_face_on_butt_timber) are coplaner. this is the "dropin" face on the receeiving timber
-  -if orthognoal, cut a prism out of the receiving timber to match
-  -take a half space cut on the butt timber angled to the receiving timber and aligned to the insertion depth
-  -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
-  -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
-  -leave a TODO to add notching for non perfect timbers
-
-
--improve librarian
+DONE-improve librarian
   -generate pattern index file for kumiki before pubishing
   -search order
     -workspace
@@ -195,16 +182,26 @@ DONE-lock and hide fetaures
       -if multiple frames found, show only the last one and indicate multiple frames found 
     -if patternbook, then actually load teh file to get teh patterns and sub patterns
       -optionall write to an index file which also contains file hash
-  
-
 DONE-reorganize agent files
+DONE-rename?
+  DONE-create notching.py
+  DONE-build-a-butt-joint -> build-a-butt.py
+  DONE-joint_shavings.py->shavings.py
 
 
 
--rename?
-  -create notching.py
-  -build-a-butt-joint -> build-a-butt.py
-  -joint_shavings.py->shavings.py?
+-cut_dropin_housed_butt_joint
+  -assert that timbers are face aligned (orthogonal not required)
+  -assert that faces of both timbers on the "front" of the joint 
+  -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
+  -takes a dropin_depth measured from the dropin face (based on front_face_on_butt_timber) are coplaner. this is the "dropin" face on the receeiving timber
+  -if orthognoal, cut a prism out of the receiving timber to match
+  -take a half space cut on the butt timber angled to the receiving timber and aligned to the insertion depth
+  -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
+  -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
+  -leave a TODO to add notching for non perfect timbers
+
+
 
 
 -NOTCHING

@@ -10,10 +10,10 @@ joints/
 ├── __init__.py
 └── workshop/          ← joints under active development
     ├── basic_joints.py
-    ├── build_a_butt_joint_shavings.py
+    ├── build_a_butt.py
     ├── double_butt_joints.py
     ├── japanese_joints.py
-    ├── joint_shavings.py
+    ├── shavings.py
     ├── mortise_and_tenon_joint.py
     └── plain_joints.py
 ```
