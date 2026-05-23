@@ -81,6 +81,26 @@ Variable naming rules:
 
 Use nested functions to create local variable scopes where helpful (especially to keep naming simple).
 
+### the notching pattern
+
+A notch is a cutout timbers in a joint to create clearance. 
+
+Notching timbers is needed such that non-perfect timbers can be joined together consistently without collision. It is also used when insetting a timber into the face of another timber. Almost all joints will need notching.
+
+The `notching.py` file contains sets of notching utility methods based on arrangement type and other properties. 
+
+Joints should only notch if necessary (i.e. input timber is non perfect or there is an inset) to avoid CSG bloat.
+
+### the build-a-butt-joint-pattern
+
+Butt joints typically compose of 
+
+- some "tenon" like insertion on the butt timber that inserts into some "mortise" like hole in the receiving timber.
+- some shoulder pattern between the butt and receiving timber.
+- accessories to complete the joint
+
+These can sometimes be interchanged. The `build-a-butt.py` file deconstructs these operations so they can be composed to build a variety of butt joints. Butt joints should make use of build-a-butt whenever possible.
+
 ## Coding Conventions when Writing Tests for Joints
 
 Each joint must have at least one "general" test that:

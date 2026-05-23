@@ -1024,8 +1024,8 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
 
 @dataclass(frozen=True)
 class ButtJointTimberArrangement:
-    butt_timber: Timber
-    receiving_timber: Timber
+    butt_timber: TimberLike
+    receiving_timber: TimberLike
     butt_timber_end: TimberReferenceEnd
     front_face_on_butt_timber: Optional[TimberLongFace] = None
 
@@ -1043,10 +1043,10 @@ class ButtJointTimberArrangement:
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.butt_timber, Timber):
-            return f"butt_timber must be Timber, got {type(self.butt_timber).__name__}"
-        if not isinstance(self.receiving_timber, Timber):
-            return f"receiving_timber must be Timber, got {type(self.receiving_timber).__name__}"
+        if not isinstance(self.butt_timber, PerfectTimberWithin):
+            return f"butt_timber must be PerfectTimberWithin, got {type(self.butt_timber).__name__}"
+        if not isinstance(self.receiving_timber, PerfectTimberWithin):
+            return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
         if not isinstance(self.butt_timber_end, TimberReferenceEnd):
             return f"butt_timber_end must be TimberReferenceEnd, got {type(self.butt_timber_end).__name__}"
         if self.front_face_on_butt_timber is not None and not isinstance(self.front_face_on_butt_timber, TimberLongFace):
@@ -1086,21 +1086,21 @@ class DoubleButtJointTimberArrangement:
     - Orthogonal: butt_timber_1 and butt_timber_2 point in perpendicular cardinal directions
       (90° apart, like an L at the receiving timber).
     """
-    butt_timber_1: Timber
-    butt_timber_2: Timber
-    receiving_timber: Timber
+    butt_timber_1: TimberLike
+    butt_timber_2: TimberLike
+    receiving_timber: TimberLike
     butt_timber_1_end: TimberReferenceEnd
     butt_timber_2_end: TimberReferenceEnd
     front_face_on_butt_timber_1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.butt_timber_1, Timber):
-            return f"butt_timber_1 must be Timber, got {type(self.butt_timber_1).__name__}"
-        if not isinstance(self.butt_timber_2, Timber):
-            return f"butt_timber_2 must be Timber, got {type(self.butt_timber_2).__name__}"
-        if not isinstance(self.receiving_timber, Timber):
-            return f"receiving_timber must be Timber, got {type(self.receiving_timber).__name__}"
+        if not isinstance(self.butt_timber_1, PerfectTimberWithin):
+            return f"butt_timber_1 must be PerfectTimberWithin, got {type(self.butt_timber_1).__name__}"
+        if not isinstance(self.butt_timber_2, PerfectTimberWithin):
+            return f"butt_timber_2 must be PerfectTimberWithin, got {type(self.butt_timber_2).__name__}"
+        if not isinstance(self.receiving_timber, PerfectTimberWithin):
+            return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
         if not isinstance(self.butt_timber_1_end, TimberReferenceEnd):
             return f"butt_timber_1_end must be TimberReferenceEnd, got {type(self.butt_timber_1_end).__name__}"
         if not isinstance(self.butt_timber_2_end, TimberReferenceEnd):
@@ -1182,24 +1182,24 @@ class TripleButtJointTimberArrangement:
     main_butt_timber_1 and main_butt_timber_2 form an opposing pair (antiparallel).
     awk_timber is the third butt timber pointing in a third cardinal direction.
     """
-    main_butt_timber_1: Timber
-    main_butt_timber_2: Timber
-    awk_timber: Timber
-    receiving_timber: Timber
+    main_butt_timber_1: TimberLike
+    main_butt_timber_2: TimberLike
+    awk_timber: TimberLike
+    receiving_timber: TimberLike
     main_butt_timber_1_end: TimberReferenceEnd
     main_butt_timber_2_end: TimberReferenceEnd
     awk_timber_end: TimberReferenceEnd
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.main_butt_timber_1, Timber):
-            return f"main_butt_timber_1 must be Timber, got {type(self.main_butt_timber_1).__name__}"
-        if not isinstance(self.main_butt_timber_2, Timber):
-            return f"main_butt_timber_2 must be Timber, got {type(self.main_butt_timber_2).__name__}"
-        if not isinstance(self.awk_timber, Timber):
-            return f"awk_timber must be Timber, got {type(self.awk_timber).__name__}"
-        if not isinstance(self.receiving_timber, Timber):
-            return f"receiving_timber must be Timber, got {type(self.receiving_timber).__name__}"
+        if not isinstance(self.main_butt_timber_1, PerfectTimberWithin):
+            return f"main_butt_timber_1 must be PerfectTimberWithin, got {type(self.main_butt_timber_1).__name__}"
+        if not isinstance(self.main_butt_timber_2, PerfectTimberWithin):
+            return f"main_butt_timber_2 must be PerfectTimberWithin, got {type(self.main_butt_timber_2).__name__}"
+        if not isinstance(self.awk_timber, PerfectTimberWithin):
+            return f"awk_timber must be PerfectTimberWithin, got {type(self.awk_timber).__name__}"
+        if not isinstance(self.receiving_timber, PerfectTimberWithin):
+            return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
         if not isinstance(self.main_butt_timber_1_end, TimberReferenceEnd):
             return f"main_butt_timber_1_end must be TimberReferenceEnd, got {type(self.main_butt_timber_1_end).__name__}"
         if not isinstance(self.main_butt_timber_2_end, TimberReferenceEnd):
@@ -1262,11 +1262,11 @@ class QuadrupleButtJointTimberArrangement:
     main_butt_timber_1 and main_butt_timber_2 form one opposing pair (antiparallel).
     awk_1 and awk_2 form the second opposing pair (antiparallel, on the perpendicular axis).
     """
-    main_butt_timber_1: Timber
-    main_butt_timber_2: Timber
-    awk_1: Timber
-    awk_2: Timber
-    receiving_timber: Timber
+    main_butt_timber_1: TimberLike
+    main_butt_timber_2: TimberLike
+    awk_1: TimberLike
+    awk_2: TimberLike
+    receiving_timber: TimberLike
     main_butt_timber_1_end: TimberReferenceEnd
     main_butt_timber_2_end: TimberReferenceEnd
     awk_1_end: TimberReferenceEnd
@@ -1274,16 +1274,16 @@ class QuadrupleButtJointTimberArrangement:
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.main_butt_timber_1, Timber):
-            return f"main_butt_timber_1 must be Timber, got {type(self.main_butt_timber_1).__name__}"
-        if not isinstance(self.main_butt_timber_2, Timber):
-            return f"main_butt_timber_2 must be Timber, got {type(self.main_butt_timber_2).__name__}"
-        if not isinstance(self.awk_1, Timber):
-            return f"awk_1 must be Timber, got {type(self.awk_1).__name__}"
-        if not isinstance(self.awk_2, Timber):
-            return f"awk_2 must be Timber, got {type(self.awk_2).__name__}"
-        if not isinstance(self.receiving_timber, Timber):
-            return f"receiving_timber must be Timber, got {type(self.receiving_timber).__name__}"
+        if not isinstance(self.main_butt_timber_1, PerfectTimberWithin):
+            return f"main_butt_timber_1 must be PerfectTimberWithin, got {type(self.main_butt_timber_1).__name__}"
+        if not isinstance(self.main_butt_timber_2, PerfectTimberWithin):
+            return f"main_butt_timber_2 must be PerfectTimberWithin, got {type(self.main_butt_timber_2).__name__}"
+        if not isinstance(self.awk_1, PerfectTimberWithin):
+            return f"awk_1 must be PerfectTimberWithin, got {type(self.awk_1).__name__}"
+        if not isinstance(self.awk_2, PerfectTimberWithin):
+            return f"awk_2 must be PerfectTimberWithin, got {type(self.awk_2).__name__}"
+        if not isinstance(self.receiving_timber, PerfectTimberWithin):
+            return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
         if not isinstance(self.main_butt_timber_1_end, TimberReferenceEnd):
             return f"main_butt_timber_1_end must be TimberReferenceEnd, got {type(self.main_butt_timber_1_end).__name__}"
         if not isinstance(self.main_butt_timber_2_end, TimberReferenceEnd):
@@ -1351,20 +1351,20 @@ class QuadrupleButtJointTimberArrangement:
 class CrossCapJointTimberArrangement:
     """A butting post timber "capped" by two crossed timbers.
     """
-    post_timber: Timber
+    post_timber: TimberLike
     post_timber_end: TimberReferenceEnd
-    cross_timber_1: Timber
-    cross_timber_2: Timber
+    cross_timber_1: TimberLike
+    cross_timber_2: TimberLike
 
     def check_types_valid(self) -> Optional[str]:
-        if not isinstance(self.post_timber, Timber):
-            return f"post_timber must be Timber, got {type(self.post_timber).__name__}"
+        if not isinstance(self.post_timber, PerfectTimberWithin):
+            return f"post_timber must be PerfectTimberWithin, got {type(self.post_timber).__name__}"
         if not isinstance(self.post_timber_end, TimberReferenceEnd):
             return f"post_timber_end must be TimberReferenceEnd, got {type(self.post_timber_end).__name__}"
-        if not isinstance(self.cross_timber_1, Timber):
-            return f"cross_timber_1 must be Timber, got {type(self.cross_timber_1).__name__}"
-        if not isinstance(self.cross_timber_2, Timber):
-            return f"cross_timber_2 must be Timber, got {type(self.cross_timber_2).__name__}"
+        if not isinstance(self.cross_timber_1, PerfectTimberWithin):
+            return f"cross_timber_1 must be PerfectTimberWithin, got {type(self.cross_timber_1).__name__}"
+        if not isinstance(self.cross_timber_2, PerfectTimberWithin):
+            return f"cross_timber_2 must be PerfectTimberWithin, got {type(self.cross_timber_2).__name__}"
         return None
 
     def __post_init__(self):
@@ -1387,18 +1387,18 @@ class CrossCapJointTimberArrangement:
 
 @dataclass(frozen=True)
 class SpliceJointTimberArrangement:
-    timber1: Timber
-    timber2: Timber
+    timber1: TimberLike
+    timber2: TimberLike
     timber1_end: TimberReferenceEnd
     timber2_end: TimberReferenceEnd 
     front_face_on_timber1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.timber1, Timber):
-            return f"timber1 must be Timber, got {type(self.timber1).__name__}"
-        if not isinstance(self.timber2, Timber):
-            return f"timber2 must be Timber, got {type(self.timber2).__name__}"
+        if not isinstance(self.timber1, PerfectTimberWithin):
+            return f"timber1 must be PerfectTimberWithin, got {type(self.timber1).__name__}"
+        if not isinstance(self.timber2, PerfectTimberWithin):
+            return f"timber2 must be PerfectTimberWithin, got {type(self.timber2).__name__}"
         if not isinstance(self.timber1_end, TimberReferenceEnd):
             return f"timber1_end must be TimberReferenceEnd, got {type(self.timber1_end).__name__}"
         if not isinstance(self.timber2_end, TimberReferenceEnd):
@@ -1421,18 +1421,18 @@ class SpliceJointTimberArrangement:
 
 @dataclass(frozen=True)
 class CornerJointTimberArrangement:
-    timber1: Timber
-    timber2: Timber
+    timber1: TimberLike
+    timber2: TimberLike
     timber1_end: TimberReferenceEnd
     timber2_end: TimberReferenceEnd
     front_face_on_timber1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.timber1, Timber):
-            return f"timber1 must be Timber, got {type(self.timber1).__name__}"
-        if not isinstance(self.timber2, Timber):
-            return f"timber2 must be Timber, got {type(self.timber2).__name__}"
+        if not isinstance(self.timber1, PerfectTimberWithin):
+            return f"timber1 must be PerfectTimberWithin, got {type(self.timber1).__name__}"
+        if not isinstance(self.timber2, PerfectTimberWithin):
+            return f"timber2 must be PerfectTimberWithin, got {type(self.timber2).__name__}"
         if not isinstance(self.timber1_end, TimberReferenceEnd):
             return f"timber1_end must be TimberReferenceEnd, got {type(self.timber1_end).__name__}"
         if not isinstance(self.timber2_end, TimberReferenceEnd):
@@ -1470,16 +1470,16 @@ class CornerJointTimberArrangement:
 
 @dataclass(frozen=True)
 class CrossJointTimberArrangement:
-    timber1: Timber
-    timber2: Timber
+    timber1: TimberLike
+    timber2: TimberLike
     front_face_on_timber1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.timber1, Timber):
-            return f"timber1 must be Timber, got {type(self.timber1).__name__}"
-        if not isinstance(self.timber2, Timber):
-            return f"timber2 must be Timber, got {type(self.timber2).__name__}"
+        if not isinstance(self.timber1, PerfectTimberWithin):
+            return f"timber1 must be PerfectTimberWithin, got {type(self.timber1).__name__}"
+        if not isinstance(self.timber2, PerfectTimberWithin):
+            return f"timber2 must be PerfectTimberWithin, got {type(self.timber2).__name__}"
         if self.front_face_on_timber1 is not None and not isinstance(self.front_face_on_timber1, TimberLongFace):
             return f"front_face_on_timber1 must be TimberLongFace or None, got {type(self.front_face_on_timber1).__name__}"
         return None
@@ -1513,21 +1513,21 @@ class CrossJointTimberArrangement:
 
 @dataclass(frozen=True)
 class BraceJointTimberArrangement:
-    timber1: Timber
-    timber2: Timber
-    brace_timber: Timber
+    timber1: TimberLike
+    timber2: TimberLike
+    brace_timber: TimberLike
     timber1_end: TimberReferenceEnd
     timber2_end: TimberReferenceEnd
     front_face_on_timber1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
-        if not isinstance(self.timber1, Timber):
-            return f"timber1 must be Timber, got {type(self.timber1).__name__}"
-        if not isinstance(self.timber2, Timber):
-            return f"timber2 must be Timber, got {type(self.timber2).__name__}"
-        if not isinstance(self.brace_timber, Timber):
-            return f"brace_timber must be Timber, got {type(self.brace_timber).__name__}"
+        if not isinstance(self.timber1, PerfectTimberWithin):
+            return f"timber1 must be PerfectTimberWithin, got {type(self.timber1).__name__}"
+        if not isinstance(self.timber2, PerfectTimberWithin):
+            return f"timber2 must be PerfectTimberWithin, got {type(self.timber2).__name__}"
+        if not isinstance(self.brace_timber, PerfectTimberWithin):
+            return f"brace_timber must be PerfectTimberWithin, got {type(self.brace_timber).__name__}"
         if not isinstance(self.timber1_end, TimberReferenceEnd):
             return f"timber1_end must be TimberReferenceEnd, got {type(self.timber1_end).__name__}"
         if not isinstance(self.timber2_end, TimberReferenceEnd):

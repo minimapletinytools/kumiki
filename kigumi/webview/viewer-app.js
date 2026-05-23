@@ -8,8 +8,12 @@ const ViewerPhase = Object.freeze({
     ERROR: 'error',
 });
 
+const VALID_GEOMETRY_MODES = new Set(['actual', 'perfectAabb']);
+
 function normalizeViewerOptions(viewerOptions) {
-    return {};
+    const opts = (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
+    const geometryMode = VALID_GEOMETRY_MODES.has(opts.geometryMode) ? opts.geometryMode : 'actual';
+    return { geometryMode };
 }
 
 function createInitialViewState() {
@@ -309,6 +313,13 @@ class ViewerSettingsPanel {
                     show layer tags
                 </label>
                 <label>
+                    geometry
+                    <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
+                        <option value="actual">actual</option>
+                        <option value="perfectAabb">perfect AABB</option>
+                    </select>
+                </label>
+                <label>
                     unselected visibility (${100 - this.app.unselectedTransparencyPercent}%)
                     <input
                         id="unselected-transparency-slider"
@@ -393,6 +404,13 @@ class ViewerSettingsPanel {
         themeSelect.addEventListener('change', (event) => {
             this.app.setTheme(event.target.value);
         });
+
+        const geometryModeSelect = renderRoot.querySelector('#geometry-mode-select');
+        if (geometryModeSelect) {
+            geometryModeSelect.addEventListener('change', (event) => {
+                this.app.setGeometryMode(event.target.value);
+            });
+        }
     }
 
     syncControls(renderRoot) {
@@ -411,6 +429,10 @@ class ViewerSettingsPanel {
         }
         if (themeSelect) {
             themeSelect.value = this.app.activeTheme;
+        }
+        const geometryModeSelect = renderRoot.querySelector('#geometry-mode-select');
+        if (geometryModeSelect && this.app.viewerOptions) {
+            geometryModeSelect.value = this.app.viewerOptions.geometryMode || 'actual';
         }
     }
 }
@@ -1969,6 +1991,70 @@ class KigumiViewerApp extends LitElement {
         this.setTheme(id);
     }
 
+    setGeometryMode(mode) {
+        const next = VALID_GEOMETRY_MODES.has(mode) ? mode : 'actual';
+        const prev = (this.viewerOptions && this.viewerOptions.geometryMode) || 'actual';
+        if (next === prev) {
+            return;
+        }
+        this.viewerOptions = { ...this.viewerOptions, geometryMode: next };
+
+        // Identify timbers whose displayed mesh will actually swap when the mode
+        // changes. Only non-perfect timbers carry both meshes; perfect timbers
+        // (and accessories) render the same geometry in either mode.
+        const lastMeshes = (this._lastGeometryData && this._lastGeometryData.meshes) || [];
+        const swappedKeys = new Set();
+        for (const mesh of lastMeshes) {
+            if (mesh && mesh.memberType === 'timber'
+                && mesh.hasActualGeometryDifferentFromPerfect
+                && Array.isArray(mesh.perfectAabbVertices)) {
+                const key = mesh.memberKey || mesh.timberKey;
+                if (key) {
+                    swappedKeys.add(key);
+                }
+            }
+        }
+
+        // Feature/CSG selections reference triangles on the actual-geometry mesh;
+        // the perfect-AABB mesh is a different surface, so sub-selections become
+        // invalid when geometry swaps. Timber-level selection (memberKey) is
+        // preserved because identity is keyed by memberKey, not by mesh contents.
+        if (swappedKeys.size > 0 && this.selectionManager) {
+            const remainingFeatures = (this.selectionManager.selectedFeatures || []).filter(
+                (f) => !swappedKeys.has(f.timberName)
+            );
+            if (remainingFeatures.length !== (this.selectionManager.selectedFeatures || []).length) {
+                this.selectionManager.selectedFeatures = remainingFeatures;
+                this.selectionManager.emit && this.selectionManager.emit({ type: 'clear-features' });
+            }
+            const csgSel = this.selectionManager.csgSelection;
+            if (csgSel && swappedKeys.has(csgSel.timberKey)) {
+                this.selectionManager.clearCSGSelection();
+            }
+        }
+
+        if (this._lastGeometryData) {
+            this.refreshSequence = (this.refreshSequence || 0) + 1;
+            const token = this.refreshSequence;
+            this.updateMeshScene(this._lastGeometryData, token, null).catch((err) => {
+                // eslint-disable-next-line no-console
+                console.error('setGeometryMode: updateMeshScene failed', err);
+            });
+        }
+
+        if (this.settingsPanel && this.renderRoot && this.renderRoot.querySelector) {
+            this.settingsPanel.syncControls(this.renderRoot);
+        }
+
+        // Persist the mode through the extension so subsequent refreshes start
+        // in the same geometry mode. The runner does not need to act on this
+        // (both meshes are always sent for non-perfect timbers), but the
+        // extension echoes viewerOptions back on payload init.
+        if (vscode) {
+            vscode.postMessage({ type: 'setRefreshOptions', options: this.viewerOptions });
+        }
+    }
+
     applyThemeUiTokens(theme) {
         const ui = theme && theme.ui ? theme.ui : DEFAULT_THEME_UI;
         const tokenMap = {
@@ -2813,7 +2899,11 @@ class KigumiViewerApp extends LitElement {
     }
 
     async updateMeshScene(geometryData, refreshToken, onProgress) {
+        // Cache the last geometry payload so we can re-run mesh building when the
+        // user toggles geometryMode without round-tripping to Python.
+        this._lastGeometryData = geometryData;
         const meshes = (geometryData && geometryData.meshes) ? geometryData.meshes : [];
+        const geometryMode = (this.viewerOptions && this.viewerOptions.geometryMode) || 'actual';
         const total = meshes.length;
         let processed = 0;
         const nextKeys = new Set();
@@ -2846,10 +2936,22 @@ class KigumiViewerApp extends LitElement {
             }
 
             const meshT0 = performance.now();
-            const positions = new Float32Array(mesh.vertices || []);
+            // Choose vertex/index arrays based on geometryMode. Non-perfect timbers
+            // include perfectAabbVertices/perfectAabbIndices; perfect timbers and
+            // accessories always use the actual vertices/indices regardless of mode.
+            const useAabb = (
+                geometryMode === 'perfectAabb'
+                && memberType === 'timber'
+                && mesh.hasActualGeometryDifferentFromPerfect
+                && Array.isArray(mesh.perfectAabbVertices)
+                && Array.isArray(mesh.perfectAabbIndices)
+            );
+            const vertexSource = useAabb ? mesh.perfectAabbVertices : (mesh.vertices || []);
+            const indexSource = useAabb ? mesh.perfectAabbIndices : (mesh.indices || []);
+            const positions = new Float32Array(vertexSource);
             const indexedGeometry = new THREE.BufferGeometry();
             indexedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-            indexedGeometry.setIndex(mesh.indices || []);
+            indexedGeometry.setIndex(indexSource);
 
             const geometry = indexedGeometry.toNonIndexed();
             geometry.computeVertexNormals();

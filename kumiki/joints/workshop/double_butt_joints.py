@@ -106,7 +106,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     slot_length = spline_length + Rational(2) * slot_symmetric_extra_length
     assert safe_compare(slot_length, 0, Comparison.GT), "slot_length must be > 0"
 
-    def _locate_butt_end_center_global(timber: Timber, end: TimberReferenceEnd) -> V3:
+    def _locate_butt_end_center_global(timber: TimberLike, end: TimberReferenceEnd) -> V3:
         if end == TimberReferenceEnd.TOP:
             return locate_top_center_position(timber).position
         return timber.get_bottom_position_global()
@@ -155,7 +155,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
         end_distance=slot_length / Rational(2),
     )
 
-    def _make_shoulder_end_cut(timber: Timber, timber_end: TimberReferenceEnd) -> HalfSpace:
+    def _make_shoulder_end_cut(timber: TimberLike, timber_end: TimberReferenceEnd) -> HalfSpace:
         butt_end_direction_global = timber.get_face_direction_global(timber_end)
         receiving_face = receiving_timber.get_closest_oriented_face_from_global_direction(-butt_end_direction_global)
         receiving_face_center_global = get_point_on_face_global(receiving_face, receiving_timber)
@@ -197,7 +197,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
 
     if safe_compare(shoulder_symmetric_inset, 0, Comparison.GT):
         def _make_receiving_shoulder_notch_local(
-            butting_timber: Timber,
+            butting_timber: TimberLike,
             butting_timber_end: TimberReferenceEnd,
         ) -> CutCSG:
             butt_end_direction_global = butting_timber.get_face_direction_global(butting_timber_end)
@@ -276,7 +276,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
         )
 
         def _append_pegs_for_butt(
-            butt_timber: Timber,
+            butt_timber: TimberLike,
             butt_end: TimberReferenceEnd,
             peg_face_on_butt: TimberLongFace,
             butt_negative_parts: List[CutCSG],

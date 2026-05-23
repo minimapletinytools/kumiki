@@ -5,7 +5,7 @@ Example usage of mortise and tenon joint functions
 from sympy import Matrix, Rational, Integer
 from kumiki.rule import inches, Transform, degrees
 from kumiki.timber import (
-    Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
+    Timber, RoundTimber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
@@ -66,6 +66,51 @@ def example_basic_mortise_and_tenon_on_FAT(position=None):
     arrangement = create_canonical_example_butt_joint_timbers(position)
     return cut_mortise_and_tenon_joint_on_FAT(
         arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length=inches(3),
+        mortise_depth=inches(7, 2),
+    )
+
+
+def example_basic_mortise_and_tenon_on_FAT_two_round_timbers(position=None):
+    """
+    Basic blind mortise and tenon on the canonical butt-joint layout,
+    but with both timbers represented as RoundTimber.
+
+    Uses 4" diameter round timbers in the same +X receiving / +Y butt
+    arrangement as the standard canonical example.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(position)
+    diameter = inches(4)
+    round_size = Matrix([diameter, diameter])
+
+    round_receiving_timber = RoundTimber(
+        length=arrangement.receiving_timber.length,
+        size=round_size,
+        transform=arrangement.receiving_timber.transform,
+        ticket=TimberTicket("round_receiving_timber"),
+        diameter=diameter,
+    )
+    round_butt_timber = RoundTimber(
+        length=arrangement.butt_timber.length,
+        size=round_size,
+        transform=arrangement.butt_timber.transform,
+        ticket=TimberTicket("round_butt_timber"),
+        diameter=diameter,
+    )
+
+    round_arrangement = ButtJointTimberArrangement(
+        butt_timber=round_butt_timber,
+        receiving_timber=round_receiving_timber,
+        butt_timber_end=arrangement.butt_timber_end,
+        front_face_on_butt_timber=arrangement.front_face_on_butt_timber,
+    )
+
+    return cut_mortise_and_tenon_joint_on_FAT(
+        arrangement=round_arrangement,
         tenon_size=Matrix([inches(2), inches(2)]),
         tenon_length=inches(3),
         mortise_depth=inches(7, 2),
@@ -355,6 +400,9 @@ def create_mortise_and_tenon_patternbook() -> PatternBook:
 
         (PatternMetadata("basic_FAT", ["mortise_tenon", "basic_fat"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT)),
+
+        (PatternMetadata("basic_FAT_two_round_timbers", ["mortise_tenon", "basic_fat_round"], "frame"),
+         make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT_two_round_timbers)),
 
         (PatternMetadata("through_tenon_FAT", ["mortise_tenon", "through_fat"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT_with_through_tenon)),

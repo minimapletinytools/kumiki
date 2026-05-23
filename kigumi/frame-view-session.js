@@ -187,6 +187,17 @@ class FrameViewSession {
                 this.onFileChanged('manual refresh button');
                 return;
             }
+            if (message.type === 'setRefreshOptions') {
+                // Merge viewer-supplied refresh options (e.g. geometryMode) into the
+                // session's stored options so subsequent get_geometry calls include
+                // them. We do NOT trigger a refresh here: the viewer applies
+                // client-side options (like geometryMode mesh swap) locally, and
+                // any future refresh will pick up the stored options automatically.
+                const options = (message.options && typeof message.options === 'object') ? message.options : {};
+                this.refreshOptions = { ...this.refreshOptions, ...options };
+                this.log(`[webview] setRefreshOptions: ${JSON.stringify(options)}`);
+                return;
+            }
             if (message.type === 'loadPattern') {
                 this._handleLoadPatternFromWebview(message).catch((err) => {
                     this.log(`[patterns] loadPattern error: ${err.message || err}`);

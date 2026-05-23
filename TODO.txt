@@ -121,7 +121,7 @@ DONE-layers view should be IN the webview, or at least cropped to not overflow i
 -searching
   -show layer tags is broken
   -searching should search for either tags or joint name (figure out a way to do this)
-
+-ensure make pattern-index before each publish (maybe run as part of the bump version job)
 -do a design pass
   -better logo
   -stuff showing below the view should be cleaner/tighter 
@@ -175,20 +175,47 @@ DONE-lock and hide fetaures
   -leave a TODO to add notching for non perfect timbers
 
 
-DONE-reorganize agent files
--instead of just example = also support structure = frame = and mayb esome other stuf.f.
+-improve librarian
+  -generate pattern index file for kumiki before pubishing
+  -search order
+    -workspace
+    -kumiki dep
+    -other depnedencies
+  -when searching a dependency
+    -only proceed if found kumiki dependency (unless kumiki itself)
+      -check for pattern index
+      -scan all files
+  -when scanning for files
+    -check for kumiki dependency and early quit if not found to save processing time
+    -run type analyzer to pull out stuff with frames and patternbooks
+    -if frame, just use static analyzer results to list the filename
+      -if multiple frames found, show only the last one and indicate multiple frames found 
+    -if patternbook, then actually load teh file to get teh patterns and sub patterns
+      -optionall write to an index file which also contains file hash
+  
 
+DONE-reorganize agent files
+
+
+
+-rename?
+  -notching.py
+  -build-a-butt-joint -> build-a-butt.py
+  -joint_shavings.py->shavings.py?
+-NOTCHING
+  -I think receiving timber notching is mostly good?
+  -notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
+  -many joints need to be on_frame_updated
+  -make a generic verion of this, one for each joint configuration type
+  -make non PTW notching settings helper class
+    -the only weird thing is that for inset shoulders you need notching on perfect timebrs too..
 
 -NON PERFECT TIMBER
+  -do mortise and tenon joint test with round timebr to see wha thappen lol
+  -add annotations to joint functions to indicate if they can support non perfect timbers
   -add regular timber stuff
   -add round timber stuff
-  -non perfect timber helper/fixes 
-    -I think receiving timber notching is mostly good?
-    -notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
-    -many joints need to be on_frame_updated
-    -make a generic verion of this, one for each joint configuration type
-    -make non PTW notching settings helper class
-      -the only weird thing is that for inset shoulders you need notching on perfect timebrs too..
+  
 
 -improve joint writing agent instructinos
   -marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed

@@ -270,11 +270,36 @@ def prism_to_mesh(prism: Any) -> Dict[str, Any]:
     }
 
 
-def _cut_timber_to_triangle_mesh_payload(
-    cut_timber: Any,
-    local_csg: Any,
-    timber_key: str,
-) -> Dict[str, Any]:
+def _build_perfect_aabb_csg_local(cut_timber: Any) -> Any:
+    """Build a perfect-AABB (rectangular prism) CSG with the same cuts applied.
+
+    This mirrors CutTimber.render_timber_with_cuts_csg_local, but substitutes a
+    plain rectangular prism (sized to the timber's perfect bounding box) for the
+    timber's actual base CSG. Used to render a "perfect AABB" preview of
+    non-perfect timbers (e.g. RoundTimber, RegularPolygonTimber, MeshTimber).
+    """
+    from kumiki.cutcsg import Difference
+    from kumiki.timber import _create_extended_rectangular_prism
+
+    timber = cut_timber.timber
+    has_bottom_cut = any(c.get_bottom_end_cut_local() is not None for c in cut_timber.cuts)
+    has_top_cut = any(c.get_top_end_cut_local() is not None for c in cut_timber.cuts)
+
+    base_prism = _create_extended_rectangular_prism(
+        size=timber.get_perfect_size(),
+        length=timber.length,
+        extend_bot=has_bottom_cut,
+        extend_top=has_top_cut,
+    )
+
+    if not cut_timber.cuts:
+        return base_prism
+    negs = [c.get_negative_csg_local() for c in cut_timber.cuts]
+    return Difference(base_prism, negs)
+
+
+def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
+    """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
     from kumiki.cutcsg import adopt_csg
     from kumiki.rule import Transform
     from kumiki.triangles import triangulate_cutcsg
@@ -285,24 +310,49 @@ def _cut_timber_to_triangle_mesh_payload(
     if triangle_mesh.vertices.size == 0 or triangle_mesh.faces.size == 0:
         raise RuntimeError("triangulate_cutcsg produced empty mesh")
 
-    vertices = triangle_mesh.vertices.reshape(-1).tolist()
-    indices = triangle_mesh.faces.reshape(-1).tolist()
-
     bounds = triangle_mesh.bounds
     if bounds is None:
         raise RuntimeError("triangulate_cutcsg produced mesh without bounds")
-    dims = bounds[1] - bounds[0]
+
+    return {
+        "vertices": triangle_mesh.vertices.reshape(-1).tolist(),
+        "indices": triangle_mesh.faces.reshape(-1).tolist(),
+        "bounds": bounds,
+    }
+
+
+def _cut_timber_to_triangle_mesh_payload(
+    cut_timber: Any,
+    local_csg: Any,
+    timber_key: str,
+) -> Dict[str, Any]:
+    actual = _triangulate_local_csg(cut_timber, local_csg)
+    vertices = actual["vertices"]
+    indices = actual["indices"]
+    dims = actual["bounds"][1] - actual["bounds"][0]
 
     timber = cut_timber.timber
     csg_nodes, csg_features = _count_csg_nodes_and_features(local_csg)
     timber_kumiki_id = int(timber.ticket.kumiki_id)
-    return {
+    timber_class = type(timber).__name__
+    is_perfect = bool(timber.is_perfect_timber())
+    # is_perfect_timber() only checks nominal half-sizes vs perfect size; it
+    # does not detect actual non-rectangular geometry (e.g. RoundTimber has
+    # is_perfect_timber()==True when diameter==size, but its actual CSG is a
+    # cylinder, not a rectangular prism). Use class identity to determine
+    # whether the actual geometry differs from the perfect AABB.
+    non_rectangular_classes = ('RoundTimber', 'MeshTimber', 'RegularPolygonTimber')
+    has_non_rectangular_actual = timber_class in non_rectangular_classes
+
+    payload: Dict[str, Any] = {
         "name": get_timber_display_name(timber),
         "memberName": get_timber_display_name(timber),
         "memberType": "timber",
         "memberKey": timber_key,
         "timberKey": timber_key,
         "kumikiId": timber_kumiki_id,
+        # Top-level vertices/indices remain the actual-geometry mesh for
+        # backwards compatibility with viewers that pre-date the dual mesh.
         "vertices": vertices,
         "indices": indices,
         "prism_length": round(float(getattr(timber, "length", dims[2])), 6),
@@ -310,7 +360,29 @@ def _cut_timber_to_triangle_mesh_payload(
         "prism_height": round(float(getattr(timber, "size", [dims[0], dims[1]])[1]), 6),
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
+        "timberClass": timber_class,
+        "isPerfectTimber": is_perfect,
     }
+
+    # For non-rectangular-actual timbers, also triangulate the perfect-AABB CSG
+    # so the viewer can swap meshes locally without round-tripping to Python.
+    if has_non_rectangular_actual:
+        try:
+            perfect_csg = _build_perfect_aabb_csg_local(cut_timber)
+            perfect = _triangulate_local_csg(cut_timber, perfect_csg)
+            payload["perfectAabbVertices"] = perfect["vertices"]
+            payload["perfectAabbIndices"] = perfect["indices"]
+            payload["hasActualGeometryDifferentFromPerfect"] = True
+        except Exception as exc:  # noqa: BLE001 — best-effort optional payload
+            log_stderr(
+                f"Warning: failed to build perfect-AABB mesh for "
+                f"{get_timber_display_name(timber)}: {exc}"
+            )
+            payload["hasActualGeometryDifferentFromPerfect"] = False
+    else:
+        payload["hasActualGeometryDifferentFromPerfect"] = False
+
+    return payload
 
 
 def _accessory_to_triangle_mesh_payload(
@@ -370,6 +442,8 @@ def _cut_timber_to_bbox_mesh_payload(
 
     csg_nodes, csg_features = _count_csg_nodes_and_features(cut_timber.render_timber_with_cuts_csg_local())
     timber_kumiki_id = int(timber.ticket.kumiki_id)
+    timber_class = type(timber).__name__
+    is_perfect = bool(timber.is_perfect_timber())
     return {
         "name": get_timber_display_name(timber),
         "memberName": get_timber_display_name(timber),
@@ -385,6 +459,9 @@ def _cut_timber_to_bbox_mesh_payload(
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
         "meshSource": "bounding-prism-fallback",
+        "timberClass": timber_class,
+        "isPerfectTimber": is_perfect,
+        "hasActualGeometryDifferentFromPerfect": False,
     }
 
 
