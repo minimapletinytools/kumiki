@@ -9,10 +9,12 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .build_a_butt import SimplePegParameters
+from .build_a_butt import (
+    SimplePegParameters,
+    locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+)
 from .notching import (
     chop_shoulder_notch_aligned_with_timber,
-    locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
 )
 
 

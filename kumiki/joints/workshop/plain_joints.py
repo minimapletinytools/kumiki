@@ -8,7 +8,7 @@ from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
 from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, get_point_on_face_global, Space
-from .notching import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
+from .build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
 
 
 # ============================================================================
