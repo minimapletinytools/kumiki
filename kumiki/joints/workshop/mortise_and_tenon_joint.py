@@ -29,6 +29,7 @@ from kumiki.rule import safe_dot_product
 from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder
 from .notching import (
     chop_shoulder_notch_aligned_with_timber,
+    does_shoulder_plane_need_notching,
 )
 from .build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
@@ -46,38 +47,6 @@ from .build_a_butt import (
 # ============================================================================
 # Helepers
 # ============================================================================
-
-
-def _does_shoulder_plane_need_notching(
-    arrangement: ButtJointTimberArrangement,
-    mortise_shoulder_distance_from_centerline: Numeric,
-) -> bool:
-    """
-    Determines whether a shoulder notch is needed on the mortise timber.
-
-    For plane-aligned timbers, checks whether the shoulder is inset from the
-    mortise face surface. For non-plane-aligned timbers, always returns True.
-    """
-    mortise_timber = arrangement.receiving_timber
-    tenon_timber = arrangement.butt_timber
-    tenon_end = arrangement.butt_timber_end
-
-    # we could check if the shoulder plane intersects the timber here, but then you'd have an unsupported tenon shoulder which is likely unintentional and certainly rare.
-    # so just assume it does intersect and a notch is required
-    if not are_timbers_plane_aligned(mortise_timber, tenon_timber):
-        return True
-
-    tenon_end_direction = tenon_timber.get_face_direction_global(
-        TimberFace.TOP if tenon_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
-    )
-    mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
-        -tenon_end_direction
-    ).to.face()
-    face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / Integer(2)
-    return (
-        mortise_shoulder_distance_from_centerline < face_half_size
-        and not zero_test(face_half_size - mortise_shoulder_distance_from_centerline)
-    )
 
 
 @dataclass(frozen=True)
@@ -316,13 +285,14 @@ def cut_mortise_and_tenon_joint(
     # shoulder notch on mortise timber (when shoulder is inset from face)
     # -------------------------------------------------------------------------
 
-    needs_shoulder_notch = _does_shoulder_plane_need_notching(
+    needs_shoulder_notch = does_shoulder_plane_need_notching(
         arrangement, mortise_shoulder_distance_from_centerline
     )
 
     shoulder_notch_local = None
     if needs_shoulder_notch:
         from sympy import acos
+        # TODO this won't work if tenon timber is also non perfect...
         approach_angle_radians = acos(Abs(cos_angle))
         shoulder_notch_local = chop_shoulder_notch_aligned_with_timber(
             notch_timber=mortise_timber,
@@ -694,7 +664,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     # Shoulder notch on the receiving timber when the shoulder is inset from the entry
     # face (matches the behavior of `cut_mortise_and_tenon_joint`). For face-aligned
     # orthogonal arrangements the approach angle is pi/2 (no relief cut needed).
-    if _does_shoulder_plane_need_notching(
+    if does_shoulder_plane_need_notching(
         arrangement, mortise_shoulder_distance_from_centerline
     ):
         from sympy import pi

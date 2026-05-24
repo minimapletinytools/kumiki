@@ -218,6 +218,7 @@ DONE-rename?
   -add regular timber stuff
   -add round timber stuff
   
+-maybe qualify get_size -> get_perfect_size
 
 -improve joint writing agent instructinos
   DONE-marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed

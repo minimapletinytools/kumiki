@@ -15,6 +15,51 @@ from kumiki.cutcsg import RectangularPrism, SolidUnion
 from kumiki.measuring import Plane, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
 from kumiki.timber import TimberCenterline, TimberFace, TimberLike, TimberReferenceEnd
+from kumiki.timber_shavings import are_timbers_plane_aligned
+
+
+def does_shoulder_plane_need_notching(
+    arrangement: ButtJointTimberArrangement,
+    mortise_shoulder_distance_from_centerline: Numeric,
+    check_against_nominal_size: bool = True,
+) -> bool:
+    """
+    Determines whether a shoulder notch is needed on the mortise timber.
+
+    For plane-aligned timbers, checks whether the shoulder is inset from the
+    mortise face surface. For non-plane-aligned timbers, always returns True.
+
+    Args:
+        arrangement: Butt joint arrangement (receiving_timber = mortise, butt_timber = tenon).
+        mortise_shoulder_distance_from_centerline: Distance from the mortise centerline
+            to the shoulder plane, measured toward the tenon.
+        check_against_nominal_size: If True (default), compare against the mortise timber's
+            nominal half-size on the entry face (using ``get_half_nominal_size_in_face_normal_axis``).
+            If False, compare against the perfect-timber half-size (``get_size_in_face_normal_axis / 2``).
+    """
+    mortise_timber = arrangement.receiving_timber
+    tenon_timber = arrangement.butt_timber
+    tenon_end = arrangement.butt_timber_end
+
+    # we could check if the shoulder plane intersects the timber here, but then you'd have an unsupported tenon shoulder which is likely unintentional and certainly rare.
+    # so just assume it does intersect and a notch is required
+    if not are_timbers_plane_aligned(mortise_timber, tenon_timber):
+        return True
+
+    tenon_end_direction = tenon_timber.get_face_direction_global(
+        TimberFace.TOP if tenon_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
+    )
+    mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
+        -tenon_end_direction
+    ).to.face()
+    if check_against_nominal_size:
+        face_half_size = mortise_timber.get_half_nominal_size_in_face_normal_axis(mortise_face)
+    else:
+        face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / Integer(2)
+    return (
+        mortise_shoulder_distance_from_centerline < face_half_size
+        and not zero_test(face_half_size - mortise_shoulder_distance_from_centerline)
+    )
 
 
 def chop_shoulder_notch_aligned_with_timber(
@@ -67,7 +112,10 @@ def chop_shoulder_notch_aligned_with_timber(
     ) / denom
     intersection_global = butting_centerline.point + butting_centerline.direction * t
 
-    max_size = Max(notch_timber.size[0], notch_timber.size[1])
+    max_size = Max(
+        notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT),
+        notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT),
+    )
     notch_span = max_size * sqrt(Integer(2))
     notch_depth = max_size * sqrt(Integer(2)) / Integer(2)
 
@@ -165,71 +213,80 @@ def chop_shoulder_notch_on_timber_face(
             f"notch_wall_relief_cut_angle must be between 0 and 90 degrees, got {notch_wall_relief_cut_angle}"
         )
 
+    # Use nominal half-sizes so asymmetric timbers (where the centerline isn't
+    # at the geometric center of the nominal bounding box) place the notch at
+    # the correct face plane.
+    half_face_offset = timber.get_half_nominal_size_in_face_normal_axis(notch_face)
+
     if notch_face == TimberFace.FRONT:
-        position = create_v3(Integer(0), timber.size[1] / Rational(2) - notch_depth, distance_along_timber)
+        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT)
+        position = create_v3(Integer(0), half_face_offset - notch_depth, distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(Integer(0), Integer(1), Integer(0)),
             create_v3(Integer(0), Integer(0), Integer(1)),
         )
-        prism_size = create_v2(notch_width, timber.size[0])
+        prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
             Integer(0),
-            timber.size[1] / Rational(2) - notch_depth,
+            half_face_offset - notch_depth,
             distance_along_timber + notch_width / Rational(2),
         )
         corner_point_2 = create_v3(
             Integer(0),
-            timber.size[1] / Rational(2) - notch_depth,
+            half_face_offset - notch_depth,
             distance_along_timber - notch_width / Rational(2),
         )
     elif notch_face == TimberFace.BACK:
-        position = create_v3(Integer(0), -timber.size[1] / Rational(2) + notch_depth, distance_along_timber)
+        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT)
+        position = create_v3(Integer(0), -half_face_offset + notch_depth, distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(Integer(0), Integer(-1), Integer(0)),
             create_v3(Integer(0), Integer(0), Integer(1)),
         )
-        prism_size = create_v2(notch_width, timber.size[0])
+        prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
             Integer(0),
-            -timber.size[1] / Rational(2) + notch_depth,
+            -half_face_offset + notch_depth,
             distance_along_timber + notch_width / Rational(2),
         )
         corner_point_2 = create_v3(
             Integer(0),
-            -timber.size[1] / Rational(2) + notch_depth,
+            -half_face_offset + notch_depth,
             distance_along_timber - notch_width / Rational(2),
         )
     elif notch_face == TimberFace.RIGHT:
-        position = create_v3(timber.size[0] / Rational(2) - notch_depth, Integer(0), distance_along_timber)
+        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT)
+        position = create_v3(half_face_offset - notch_depth, Integer(0), distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(Integer(1), Integer(0), Integer(0)),
             create_v3(Integer(0), Integer(0), Integer(1)),
         )
-        prism_size = create_v2(notch_width, timber.size[1])
+        prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
-            timber.size[0] / Rational(2) - notch_depth,
+            half_face_offset - notch_depth,
             Integer(0),
             distance_along_timber + notch_width / Rational(2),
         )
         corner_point_2 = create_v3(
-            timber.size[0] / Rational(2) - notch_depth,
+            half_face_offset - notch_depth,
             Integer(0),
             distance_along_timber - notch_width / Rational(2),
         )
     else:
-        position = create_v3(-timber.size[0] / Rational(2) + notch_depth, Integer(0), distance_along_timber)
+        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT)
+        position = create_v3(-half_face_offset + notch_depth, Integer(0), distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(Integer(-1), Integer(0), Integer(0)),
             create_v3(Integer(0), Integer(0), Integer(1)),
         )
-        prism_size = create_v2(notch_width, timber.size[1])
+        prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
-            -timber.size[0] / Rational(2) + notch_depth,
+            -half_face_offset + notch_depth,
             Integer(0),
             distance_along_timber + notch_width / Rational(2),
         )
         corner_point_2 = create_v3(
-            -timber.size[0] / Rational(2) + notch_depth,
+            -half_face_offset + notch_depth,
             Integer(0),
             distance_along_timber - notch_width / Rational(2),
         )

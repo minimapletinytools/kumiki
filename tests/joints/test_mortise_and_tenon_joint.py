@@ -19,10 +19,10 @@ from kumiki.joints.workshop.build_a_butt import (
 )
 from kumiki.joints.workshop.mortise_and_tenon_joint import (
     WedgeParameters,
-    _does_shoulder_plane_need_notching,
     cut_mortise_and_tenon_joint_on_FAT,
     cut_mortise_and_tenon_joint_on_PAT,
 )
+from kumiki.joints.workshop.notching import does_shoulder_plane_need_notching
 from tests.testing_shavings import (
     create_standard_vertical_timber,
     create_standard_horizontal_timber,
@@ -518,7 +518,7 @@ class TestPegStuff:
 
 
 class TestShoulderNotchingDecision:
-    """Tests for _does_shoulder_plane_need_notching."""
+    """Tests for does_shoulder_plane_need_notching."""
 
     def test_does_shoulder_plane_need_notching(self, simple_T_configuration):
         """Uses face/plane-aligned logic when aligned, and always True when not plane-aligned."""
@@ -537,8 +537,8 @@ class TestShoulderNotchingDecision:
         ).to.face()
         face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / Rational(2)
 
-        assert _does_shoulder_plane_need_notching(aligned_arrangement, face_half_size - Rational(1))
-        assert not _does_shoulder_plane_need_notching(aligned_arrangement, face_half_size)
+        assert does_shoulder_plane_need_notching(aligned_arrangement, face_half_size - Rational(1))
+        assert not does_shoulder_plane_need_notching(aligned_arrangement, face_half_size)
 
         non_plane_mortise = timber_from_directions(
             length=Rational(100),
@@ -563,7 +563,7 @@ class TestShoulderNotchingDecision:
         )
 
         assert not are_timbers_plane_aligned(non_plane_mortise, non_plane_tenon)
-        assert _does_shoulder_plane_need_notching(non_plane_arrangement, Rational(100))
+        assert does_shoulder_plane_need_notching(non_plane_arrangement, Rational(100))
 
 
 class TestMortiseAndTenonCSGHierarchy:
