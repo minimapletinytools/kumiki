@@ -45,7 +45,16 @@ jobs:
             uv-${{ runner.os }}-py3.12-
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: |
+          # Pre-create placeholder so the editable install doesn't fail on the
+          # force-include before deps are installed.
+          if [ ! -f kumiki/_pattern_index.json ]; then
+            echo '{"schema_version":1,"entries":{}}' > kumiki/_pattern_index.json
+          fi
+          uv sync --group dev
+
+      - name: Generate pattern index
+        run: uv run --group dev python tools/build_pattern_index.py
 
       - name: Build package
         run: uv build

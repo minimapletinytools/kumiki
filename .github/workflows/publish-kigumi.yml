@@ -52,7 +52,11 @@ jobs:
             uv-${{ runner.os }}-py3.12-
 
       - name: Install dependencies
-        run: uv sync --group dev
+        run: |
+          if [ ! -f kumiki/_pattern_index.json ]; then
+            echo '{"schema_version":1,"entries":{}}' > kumiki/_pattern_index.json
+          fi
+          uv sync --group dev
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
