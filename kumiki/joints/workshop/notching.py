@@ -329,3 +329,31 @@ def chop_shoulder_notch_on_timber_face(
     )
 
     return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
+
+
+
+@dataclass(frozen=True)
+class ShoulderNotchCSGGeometry():
+    receiving_timber_notch_negative_CSG: Union[RectangularPrism, SolidUnion]
+    butting_timber_relief_negative_CSG: Union[RectangularPrism, SolidUnion] | None
+
+chop_notch_for_butt_joint_arrangement(
+    arrangement: ButtJointTimberArrangement,
+    mortise_shoulder_distance_from_centerline: Numeric,
+    # the min is taken between this parameter and the angle the butt timber approaches the shoulder plane at
+    notch_wall_min_relief_cut_angle: Numeric = Integer(0),
+    use_receiving_timber_nominal_size_for_butting_timber_relief_depth = True,
+) -> ShoulderNotchCSGGeometry | None:
+
+    # determine the butt timber approach angle
+    # copmute the notch relief angle
+    # cut the notch using chop_shoulder_notch_on_timber_face
+
+    # next cut the relief on the butting timber
+    # 1. first determine how far the receiving timber extends in the direction of the butt timber approach (based on its nominal or perfect size depending on the use_receiving_timber_nominal_size_for_butting_timber_relief_depth flag)
+    # 2. create a half space parallel to the shoulder plane at this distance pointing away from the joint
+    # 3. next create a prism matching the perfect timber size of the butting timber, it should extend from the half space to the shoulder plane (you can go beyond this too if convenient)
+    # 4. take the notch geometery returned by chop_shoulder_notch_on_timber_face and the difference it with the half space and prism from 2./3. to get the relief cut geometry
+    
+    # return the results
+    pass
