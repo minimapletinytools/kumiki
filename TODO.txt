@@ -191,6 +191,8 @@ DONE-rename?
 BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 
 
+
+
 -cut_dropin_housed_butt_joint
   -assert that timbers are face aligned (orthogonal not required)
   -assert that faces of both timbers on the "front" of the joint 
@@ -204,11 +206,13 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 
 
 
+-add parameterization support, in particular, patterns should be parameterizable :o
+  -then you can add notch variations to patterns I guess?
 
 -NOTCHING
-  -I think receiving timber notching is mostly good?
-  -notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
-  -many joints need to be on_frame_updated
+  DONE-I think receiving timber notching is mostly good?
+  DONE-notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
+  -test notching you just added to the half dovetail joint
   -make a generic verion of this, one for each joint configuration type
   -make non PTW notching settings helper class
     -the only weird thing is that for inset shoulders you need notching on perfect timebrs too..
