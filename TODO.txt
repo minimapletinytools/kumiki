@@ -188,6 +188,7 @@ DONE-rename?
   DONE-build-a-butt-joint -> build-a-butt.py
   DONE-joint_shavings.py->shavings.py
 
+BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 
 
 -cut_dropin_housed_butt_joint

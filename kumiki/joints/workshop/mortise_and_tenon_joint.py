@@ -28,6 +28,8 @@ from kumiki.rule import *
 from kumiki.rule import safe_dot_product
 from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder
 from .notching import (
+    ShoulderNotchCSGGeometry,
+    chop_notch_for_butt_joint_arrangement,
     chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
 )
@@ -282,39 +284,42 @@ def cut_mortise_and_tenon_joint(
         )
 
     # -------------------------------------------------------------------------
-    # shoulder notch on mortise timber (when shoulder is inset from face)
+    # shoulder notch on mortise timber and matching relief on tenon timber
+    # (when shoulder is inset from the mortise entry face)
     # -------------------------------------------------------------------------
 
-    needs_shoulder_notch = does_shoulder_plane_need_notching(
-        arrangement, mortise_shoulder_distance_from_centerline
-    )
+    from sympy import pi as _pi
 
-    shoulder_notch_local = None
-    if needs_shoulder_notch:
-        from sympy import acos
-        # TODO this won't work if tenon timber is also non perfect...
-        approach_angle_radians = acos(Abs(cos_angle))
-        shoulder_notch_local = chop_shoulder_notch_aligned_with_timber(
-            notch_timber=mortise_timber,
-            butting_timber=tenon_timber,
-            butting_timber_end=tenon_end,
-            distance_from_centerline=mortise_shoulder_distance_from_centerline,
-            notch_wall_relief_cut_angle_radians=approach_angle_radians,
-        )
+    notch_geom = chop_notch_for_butt_joint_arrangement(
+        arrangement,
+        mortise_shoulder_distance_from_centerline,
+        # pass pi/2 so the relief angle naturally follows the butt approach angle
+        notch_wall_min_relief_cut_angle=_pi / Rational(2),
+    )
 
     # -------------------------------------------------------------------------
     # make the final cut CSGs
     # -------------------------------------------------------------------------
 
+    # Base volume for the tenon cut: everything past the shoulder, plus the relief
+    # pocket on the butting timber (so the tenon clears the receiving timber's notch).
+    tenon_negative_base: CutCSG = shoulder_half_space_local
+    if notch_geom is not None and notch_geom.butting_timber_relief_negative_CSG is not None:
+        tenon_negative_base = SolidUnion(
+            children=[shoulder_half_space_local, notch_geom.butting_timber_relief_negative_CSG]
+        )
+
     tenon_cut_csg = Difference(
-        base=shoulder_half_space_local,
+        base=tenon_negative_base,
         subtract=[tenon_prism_local],
     )
 
     mortise_hole_prism_local = adopt_csg(None, mortise_timber.transform, mortise_hole_prism_global)
 
-    if shoulder_notch_local is not None:
-        mortise_negative_csg = CSGUnion(children=[mortise_hole_prism_local, shoulder_notch_local])
+    if notch_geom is not None:
+        mortise_negative_csg = CSGUnion(
+            children=[mortise_hole_prism_local, notch_geom.receiving_timber_notch_negative_CSG]
+        )
     else:
         mortise_negative_csg = mortise_hole_prism_local
 
@@ -424,6 +429,14 @@ def cut_mortise_and_tenon_joint(
 
     tenon_cut_timber = CutTimber(timber=tenon_timber, cuts=[tenon_cut])
     mortise_cut_timber = CutTimber(mortise_timber, cuts=[mortise_cut])
+
+
+    #joint_accessories["debug"] = CSGAccessory(
+    #    transform = tenon_timber.transform,
+    #    positive_csg = notch_geom.butting_timber_relief_negative_CSG if notch_geom is not None else None,
+    #)
+
+
 
     return Joint(
         cut_timbers={
@@ -661,25 +674,30 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     tenon_negative_local = adopt_csg(None, tenon_timber.transform, geo.tenon_negative_csg)
     mortise_negative_local = adopt_csg(None, mortise_timber.transform, geo.mortise_negative_csg)
 
-    # Shoulder notch on the receiving timber when the shoulder is inset from the entry
-    # face (matches the behavior of `cut_mortise_and_tenon_joint`). For face-aligned
-    # orthogonal arrangements the approach angle is pi/2 (no relief cut needed).
-    if does_shoulder_plane_need_notching(
-        arrangement, mortise_shoulder_distance_from_centerline
-    ):
-        from sympy import pi
-
-        shoulder_notch_local = chop_shoulder_notch_aligned_with_timber(
-            notch_timber=mortise_timber,
-            butting_timber=tenon_timber,
-            butting_timber_end=tenon_end,
-            distance_from_centerline=mortise_shoulder_distance_from_centerline,
-            # TODO add parameter for this
-            notch_wall_relief_cut_angle_radians=degrees(45),
-        )
+    # Shoulder notch on the receiving timber (and matching relief on the butting
+    # timber) when the shoulder is inset from the entry face. For face-aligned
+    # orthogonal arrangements the approach angle is pi/2 (no relief walls).
+    notch_geom = chop_notch_for_butt_joint_arrangement(
+        arrangement,
+        mortise_shoulder_distance_from_centerline,
+        notch_wall_min_relief_cut_angle=degrees(45),
+    )
+    if notch_geom is not None:
         mortise_negative_local = CSGUnion(
-            children=[mortise_negative_local, shoulder_notch_local]
+            children=[
+                mortise_negative_local,
+                notch_geom.receiving_timber_notch_negative_CSG,
+            ]
         )
+        if notch_geom.butting_timber_relief_negative_CSG is not None:
+            # Add the relief volume to the tenon negative CSG so the butting timber
+            # gets carved away against the receiving timber's notch walls.
+            tenon_negative_local = CSGUnion(
+                children=[
+                    tenon_negative_local,
+                    notch_geom.butting_timber_relief_negative_CSG,
+                ]
+            )
 
     tenon_tip_position_global = (
         shoulder_result.marking_space.transform.position

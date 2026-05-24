@@ -6,12 +6,21 @@ Shared helper functions for shoulder-plane calculations and notch CSG generation
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Union
 
-from sympy import Abs, Rational
+from sympy import Abs, Max, Min, Rational, acos
 
 from kumiki.construction import ButtJointTimberArrangement
-from kumiki.cutcsg import RectangularPrism, SolidUnion
+from kumiki.cutcsg import (
+    CutCSG,
+    Difference,
+    HalfSpace,
+    RectangularPrism,
+    SolidUnion,
+    adopt_csg,
+    make_finite_rectangular_prism_from_half_space,
+)
 from kumiki.measuring import Plane, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
 from kumiki.timber import TimberCenterline, TimberFace, TimberLike, TimberReferenceEnd
@@ -333,27 +342,188 @@ def chop_shoulder_notch_on_timber_face(
 
 
 @dataclass(frozen=True)
-class ShoulderNotchCSGGeometry():
-    receiving_timber_notch_negative_CSG: Union[RectangularPrism, SolidUnion]
-    butting_timber_relief_negative_CSG: Union[RectangularPrism, SolidUnion] | None
+class ShoulderNotchCSGGeometry:
+    """
+    CSG geometry produced by ``chop_notch_for_butt_joint_arrangement``.
 
-chop_notch_for_butt_joint_arrangement(
+    - ``receiving_timber_notch_negative_CSG``: cut applied to the receiving
+      (mortise) timber, expressed in that timber's local frame.
+    - ``butting_timber_relief_negative_CSG``: cut applied to the butting
+      (tenon) timber, expressed in that timber's local frame. ``None`` only
+      when no relief geometry is necessary (currently always populated).
+    """
+    receiving_timber_notch_negative_CSG: Union[RectangularPrism, SolidUnion]
+    butting_timber_relief_negative_CSG: CutCSG | None
+
+
+def chop_notch_for_butt_joint_arrangement(
     arrangement: ButtJointTimberArrangement,
     mortise_shoulder_distance_from_centerline: Numeric,
-    # the min is taken between this parameter and the angle the butt timber approaches the shoulder plane at
+    # the min is taken between this parameter and the angle the butt timber
+    # approaches the shoulder plane at (both in radians)
     notch_wall_min_relief_cut_angle: Numeric = Integer(0),
-    use_receiving_timber_nominal_size_for_butting_timber_relief_depth = True,
+    use_receiving_timber_nominal_size_for_butting_timber_relief_depth: bool = True,
 ) -> ShoulderNotchCSGGeometry | None:
+    """
+    Compute the shoulder notch on the receiving timber AND the matching
+    relief cut on the butting timber for a butt-joint arrangement.
 
-    # determine the butt timber approach angle
-    # copmute the notch relief angle
-    # cut the notch using chop_shoulder_notch_on_timber_face
+    Returns ``None`` when no notch is required (shoulder sits at or past the
+    receiving timber's nominal entry face).
+    """
+    from sympy import sqrt
 
-    # next cut the relief on the butting timber
-    # 1. first determine how far the receiving timber extends in the direction of the butt timber approach (based on its nominal or perfect size depending on the use_receiving_timber_nominal_size_for_butting_timber_relief_depth flag)
-    # 2. create a half space parallel to the shoulder plane at this distance pointing away from the joint
-    # 3. next create a prism matching the perfect timber size of the butting timber, it should extend from the half space to the shoulder plane (you can go beyond this too if convenient)
-    # 4. take the notch geometery returned by chop_shoulder_notch_on_timber_face and the difference it with the half space and prism from 2./3. to get the relief cut geometry
-    
-    # return the results
-    pass
+    if not does_shoulder_plane_need_notching(
+        arrangement,
+        mortise_shoulder_distance_from_centerline,
+        check_against_nominal_size=True,
+    ):
+        return None
+
+    receiving_timber = arrangement.receiving_timber
+    butt_timber = arrangement.butt_timber
+    butt_timber_end = arrangement.butt_timber_end
+
+    # Direction from butt body out the joining end (= into receiving timber).
+    butt_end_face = (
+        TimberFace.TOP if butt_timber_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
+    )
+    butt_end_direction_global = butt_timber.get_face_direction_global(butt_end_face)
+
+    # Receiving timber's entry face (the face nearest the butt timber).
+    receiving_entry_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(
+        -butt_end_direction_global
+    ).to.face()
+    receiving_entry_face_half_size = receiving_timber.get_half_nominal_size_in_face_normal_axis(
+        receiving_entry_face
+    )
+    notch_depth = receiving_entry_face_half_size - mortise_shoulder_distance_from_centerline
+
+    # Approach direction projected perpendicular to receiving timber's length axis.
+    receiving_length_dir = receiving_timber.get_length_direction_global()
+    projected = butt_end_direction_global - receiving_length_dir * safe_dot_product(
+        butt_end_direction_global, receiving_length_dir
+    )
+    approach_into_receiving = normalize_vector(projected)
+
+    # Angle the butt timber makes with the shoulder-plane normal (0 when perpendicular).
+    cos_butt_dev = safe_dot_product(butt_end_direction_global, approach_into_receiving)
+    butt_approach_angle_radians = acos(Abs(cos_butt_dev))
+
+    # Notch wall relief angle: min(user cap, actual butt approach angle).
+    relief_angle_radians = Min(notch_wall_min_relief_cut_angle, butt_approach_angle_radians)
+
+    # Shoulder plane and joint-center intersection (butt centerline meets shoulder plane).
+    shoulder_plane = locate_plane_from_edge_in_direction(
+        receiving_timber,
+        TimberCenterline.CENTERLINE,
+        -approach_into_receiving,
+        mortise_shoulder_distance_from_centerline,
+    )
+    butt_centerline = locate_centerline(butt_timber)
+    denom = safe_dot_product(shoulder_plane.normal, butt_centerline.direction)
+    assert not zero_test(denom), "Butt centerline is parallel to the shoulder plane"
+    t = safe_dot_product(
+        shoulder_plane.normal, shoulder_plane.point - butt_centerline.point
+    ) / denom
+    joint_center_global = butt_centerline.point + butt_centerline.direction * t
+
+    # Distance along the receiving timber to the joint center.
+    joint_center_in_receiver_local = receiving_timber.transform.global_to_local(
+        joint_center_global
+    )
+    distance_along_receiver = joint_center_in_receiver_local[2]
+
+    # Notch width: butt cross-section projected onto receiving timber length axis,
+    # plus extra width to absorb the tilt of an angled butt timber.
+    butt_w_dir = butt_timber.get_width_direction_global()
+    butt_h_dir = butt_timber.get_height_direction_global()
+    cross_section_span_on_receiver_length = (
+        Abs(safe_dot_product(butt_w_dir, receiving_length_dir)) * butt_timber.size[0]
+        + Abs(safe_dot_product(butt_h_dir, receiving_length_dir)) * butt_timber.size[1]
+    )
+    if zero_test(cos_butt_dev):
+        shift_along_length = Integer(0)
+    else:
+        sin_sq = Integer(1) - cos_butt_dev * cos_butt_dev
+        sin_dev = sqrt(Abs(sin_sq)) if not zero_test(sin_sq) else Integer(0)
+        shift_along_length = notch_depth * sin_dev / Abs(cos_butt_dev)
+    notch_width = cross_section_span_on_receiver_length + shift_along_length
+
+    receiving_timber_notch_local = chop_shoulder_notch_on_timber_face(
+        timber=receiving_timber,
+        notch_face=receiving_entry_face,
+        distance_along_timber=distance_along_receiver,
+        notch_width=notch_width,
+        notch_depth=notch_depth,
+        # the helper expects DEGREES, our parameter is in radians
+        notch_wall_relief_cut_angle=relief_angle_radians * Rational(180) / pi,
+    )
+
+    # ------------------------------------------------------------------
+    # Butting timber relief
+    # ------------------------------------------------------------------
+    # 1. Receiving extent in approach direction (shoulder plane -> far face).
+    far_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(
+        butt_end_direction_global
+    ).to.face()
+    if use_receiving_timber_nominal_size_for_butting_timber_relief_depth:
+        far_face_half_size = receiving_timber.get_half_nominal_size_in_face_normal_axis(far_face)
+    else:
+        far_face_half_size = receiving_timber.get_size_in_face_normal_axis(far_face) / Integer(2)
+    receiving_extent_in_approach = (
+        mortise_shoulder_distance_from_centerline + far_face_half_size
+    )
+
+    # 2. Half space at the far face of the receiving timber, pointing TOWARDS
+    #    the joint (so it covers the region on the butt side, including the
+    #    notch and the butt-prism region inside the receiving timber).
+    far_face_point_global = (
+        shoulder_plane.point + approach_into_receiving * receiving_extent_in_approach
+    )
+
+    halfspace_global = HalfSpace(
+        normal=approach_into_receiving,
+        offset=safe_dot_product(-approach_into_receiving, far_face_point_global),
+    )
+
+    # 3. Prism matching the butt timber's perfect cross-section, extending
+    #    along the butt centerline from past the shoulder plane to past the
+    #    far face of the receiving timber.
+    if zero_test(cos_butt_dev):
+        butt_extent_along_centerline = receiving_extent_in_approach
+    else:
+        butt_extent_along_centerline = receiving_extent_in_approach / Abs(cos_butt_dev)
+    joint_center_in_butt_local = butt_timber.transform.global_to_local(joint_center_global)
+    joint_center_butt_z = joint_center_in_butt_local[2]
+    extra = Max(butt_timber.size[0], butt_timber.size[1])
+    butt_prism_in_butt_local = RectangularPrism(
+        size=butt_timber.size,
+        transform=Transform(
+            position=create_v3(Integer(0), Integer(0), joint_center_butt_z),
+            orientation=Orientation.from_z_and_x(
+                create_v3(Integer(0), Integer(0), Integer(1)),
+                create_v3(Integer(1), Integer(0), Integer(0)),
+            ),
+        ),
+        start_distance=-butt_extent_along_centerline - extra,
+        end_distance=butt_extent_along_centerline + extra,
+    )
+
+    # 4. Difference: take the half-space and remove the notch and the butt
+    #    prism from it, in the butt timber's local frame, to produce the
+    #    relief cut.
+    notch_in_butt_local = adopt_csg(
+        receiving_timber.transform, butt_timber.transform, receiving_timber_notch_local
+    )
+    halfspace_in_butt_local = adopt_csg(None, butt_timber.transform, halfspace_global)
+    relief_in_butt_local = Difference(
+        #base=halfspace_in_butt_local,
+        base = make_finite_rectangular_prism_from_half_space(halfspace_in_butt_local, inches(12), inches(10)),
+        subtract=[notch_in_butt_local, butt_prism_in_butt_local],
+    )
+
+    return ShoulderNotchCSGGeometry(
+        receiving_timber_notch_negative_CSG=receiving_timber_notch_local,
+        butting_timber_relief_negative_CSG=relief_in_butt_local,
+    )

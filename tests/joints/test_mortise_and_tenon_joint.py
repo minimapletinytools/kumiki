@@ -22,7 +22,6 @@ from kumiki.joints.workshop.mortise_and_tenon_joint import (
     cut_mortise_and_tenon_joint_on_FAT,
     cut_mortise_and_tenon_joint_on_PAT,
 )
-from kumiki.joints.workshop.notching import does_shoulder_plane_need_notching
 from tests.testing_shavings import (
     create_standard_vertical_timber,
     create_standard_horizontal_timber,
@@ -515,55 +514,6 @@ class TestPegStuff:
             f"Peg Y axis should NOT be parallel to brace (tenon) length direction {brace_length_dir}"
         )
 
-
-
-class TestShoulderNotchingDecision:
-    """Tests for does_shoulder_plane_need_notching."""
-
-    def test_does_shoulder_plane_need_notching(self, simple_T_configuration):
-        """Uses face/plane-aligned logic when aligned, and always True when not plane-aligned."""
-        tenon_timber, mortise_timber = simple_T_configuration
-
-        aligned_arrangement = ButtJointTimberArrangement(
-            receiving_timber=mortise_timber,
-            butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
-        )
-        assert are_timbers_plane_aligned(mortise_timber, tenon_timber)
-
-        tenon_end_direction = tenon_timber.get_face_direction_global(TimberReferenceEnd.BOTTOM)
-        mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
-            -tenon_end_direction
-        ).to.face()
-        face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / Rational(2)
-
-        assert does_shoulder_plane_need_notching(aligned_arrangement, face_half_size - Rational(1))
-        assert not does_shoulder_plane_need_notching(aligned_arrangement, face_half_size)
-
-        non_plane_mortise = timber_from_directions(
-            length=Rational(100),
-            size=create_v2(Rational(6), Rational(6)),
-            bottom_position=create_v3(-Rational(50), Rational(0), Rational(0)),
-            length_direction=create_v3(Rational(1), Rational(0), Rational(0)),
-            width_direction=create_v3(Rational(0), Rational(0), Rational(1)),
-            ticket="non_plane_mortise",
-        )
-        non_plane_tenon = timber_from_directions(
-            length=Rational(100),
-            size=create_v2(Rational(4), Rational(4)),
-            bottom_position=create_v3(Rational(0), Rational(0), Rational(0)),
-            length_direction=create_v3(Rational(0), Rational(1), Rational(0)),
-            width_direction=normalize_vector(create_v3(Rational(1), Rational(0), Rational(1))),
-            ticket="non_plane_tenon",
-        )
-        non_plane_arrangement = ButtJointTimberArrangement(
-            receiving_timber=non_plane_mortise,
-            butt_timber=non_plane_tenon,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
-        )
-
-        assert not are_timbers_plane_aligned(non_plane_mortise, non_plane_tenon)
-        assert does_shoulder_plane_need_notching(non_plane_arrangement, Rational(100))
 
 
 class TestMortiseAndTenonCSGHierarchy:

@@ -5,7 +5,7 @@ This module provides CSG primitives and operations for representing timber cuts
 and geometry operations. All operations use SymPy symbolic math for exact computation.
 """
 
-from sympy import Matrix, Rational, Expr, sqrt, oo
+from sympy import Matrix, Rational, Expr, sqrt, oo, Abs
 from typing import List, Optional, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
@@ -309,8 +309,6 @@ class HalfSpace(CutCSG):
             stacklevel=2,
         )
         return BoundingBox(None, None, None, None, None, None)
-
-
 @dataclass(frozen=True)
 class RectangularPrism(CutCSG):
     """
@@ -662,6 +660,48 @@ class RectangularPrism(CutCSG):
         )
 
 
+def make_finite_rectangular_prism_from_half_space(half_space: HalfSpace, size_of_space: Numeric, depth_of_space: Numeric) -> RectangularPrism:
+    """
+    Build a finite RectangularPrism that approximates ``half_space`` near its boundary.
+
+    The returned prism:
+    - has its "bottom" face (at start_distance = 0) lying on the half-space boundary plane,
+    - extends ``depth_of_space`` into the half-space (in the +normal direction, i.e. the
+      direction in which the half-space extends),
+    - has a square cross-section of ``size_of_space`` × ``size_of_space`` centered on the
+      point where the line through the origin along ``normal`` meets the boundary plane.
+
+    The cross-section orientation perpendicular to the normal is chosen arbitrarily.
+    """
+    # Unit normal pointing into the half-space (HalfSpace contains points where P·normal >= offset)
+    unit_normal = safe_normalize_vector(half_space.normal)
+
+    # Pick a reference direction not parallel to the normal to build a perpendicular x-axis.
+    world_x = Matrix([Integer(1), Integer(0), Integer(0)])
+    world_y = Matrix([Integer(0), Integer(1), Integer(0)])
+    if safe_compare(Abs(safe_dot_product(unit_normal, world_x)) - Rational(9, 10), 0, Comparison.LT):
+        reference = world_x
+    else:
+        reference = world_y
+
+    # Gram-Schmidt: project reference onto plane perpendicular to unit_normal, then normalize.
+    x_direction = safe_normalize_vector(
+        reference - unit_normal * safe_dot_product(reference, unit_normal)
+    )
+
+    orientation = Orientation.from_z_and_x(unit_normal, x_direction)
+
+    # A point on the boundary plane: nearest point to origin on the plane P·normal = offset.
+    # For normalized normal n, plane is P·n = offset/|normal|.
+    normal_magnitude = safe_norm(half_space.normal)
+    point_on_plane = unit_normal * (half_space.offset / normal_magnitude)
+
+    return RectangularPrism(
+        size=Matrix([size_of_space, size_of_space]),
+        transform=Transform(position=point_on_plane, orientation=orientation),
+        start_distance=Integer(0),
+        end_distance=depth_of_space,
+    )
 @dataclass(frozen=True)
 class Cylinder(CutCSG):
     """
