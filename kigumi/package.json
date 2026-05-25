@@ -79,6 +79,16 @@
         "icon": "$(list-tree)"
       },
       {
+        "command": "kigumi.updateKumiki",
+        "title": "Kigumi: Update Kumiki",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "kigumi.openWebsite",
+        "title": "Kigumi: Open Kumiki Website",
+        "icon": "$(link-external)"
+      },
+      {
         "command": "kigumi.explorer",
         "title": "Kigumi: Open Explorer",
         "icon": "$(file-directory)"

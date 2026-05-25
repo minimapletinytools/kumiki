@@ -2,7 +2,13 @@ const path = require('path');
 const vscode = require('vscode');
 const { FrameViewSession } = require('./frame-view-session');
 const { KigumiSidebarProvider } = require('./sidebar-provider');
-const { getInitializationStatus, initializeWorkspaceProject, updateWorkspaceKumiki, isInitializationInProgress } = require('./project-initializer');
+const {
+    getInitializationStatus,
+    initializeWorkspaceProject,
+    updateWorkspaceKumiki,
+    isInitializationInProgress,
+    getWorkspaceKumikiVersionInfo,
+} = require('./project-initializer');
 
 let outputChannel = null;
 const frameSessions = new Map();       // filePath → FrameViewSession (main sessions)
@@ -38,6 +44,10 @@ function activate(context) {
                 return undefined;
             }
             return mainSession.runnerSession.getPythonCommand();
+        },
+        getKumikiVersionInfo: async (workspaceRoot) => {
+            const activeFilePath = getActivePythonFilePath();
+            return getWorkspaceKumikiVersionInfo(workspaceRoot, activeFilePath);
         },
         logLine: (message) => {
             if (!outputChannel) {
@@ -95,6 +105,16 @@ function activate(context) {
         await runProjectHeaderAction();
     });
     context.subscriptions.push(projectHeaderAction);
+
+    const updateKumiki = vscode.commands.registerCommand('kigumi.updateKumiki', async () => {
+        await runProjectHeaderUpdateAction();
+    });
+    context.subscriptions.push(updateKumiki);
+
+    const openWebsite = vscode.commands.registerCommand('kigumi.openWebsite', async () => {
+        await vscode.env.openExternal(vscode.Uri.parse('https://github.com/minimapletinytools/kumiki'));
+    });
+    context.subscriptions.push(openWebsite);
 
     const refreshSidebar = vscode.commands.registerCommand('kigumi.refreshSidebar', async () => {
         if (sidebarProvider) {

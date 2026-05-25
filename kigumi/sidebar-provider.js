@@ -34,6 +34,8 @@ class KigumiSidebarProvider {
         this._state = {
             workspaceRoot: null,
             initStatus: null,
+            kumikiInstalledVersion: 'unknown',
+            kumikiLatestVersion: 'unknown',
             // Frames: files with example= or build_frame (not patternbooks)
             frames: [],
             // Workspace patternbooks discovered via scanner
@@ -153,6 +155,8 @@ class KigumiSidebarProvider {
             this._state = {
                 workspaceRoot: null,
                 initStatus: null,
+                kumikiInstalledVersion: 'unknown',
+                kumikiLatestVersion: 'unknown',
                 frames: [],
                 workspacePatternbooks: [],
                 shippedPatterns: [],
@@ -169,6 +173,9 @@ class KigumiSidebarProvider {
 
         const workspaceRoot = workspaceFolder.uri.fsPath;
         const initStatus = getInitializationStatus(workspaceRoot);
+        const versionInfoPromise = this.options.getKumikiVersionInfo
+            ? this.options.getKumikiVersionInfo(workspaceRoot)
+            : Promise.resolve({ installedVersion: 'unknown', latestVersion: 'unknown' });
         const isLocalDev = initStatus.projectStatus === 'local-dev';
         const timeoutSeconds = vscode.workspace.getConfiguration('kigumi').get('explorer.scanTimeoutSeconds', 15);
         const timeoutMs = Math.max(1000, Number(timeoutSeconds) * 1000);
@@ -214,9 +221,22 @@ class KigumiSidebarProvider {
             discoveryErrors.push(`Dependency discovery failed: ${shippedResult.reason?.message || shippedResult.reason}`);
         }
 
+        let kumikiInstalledVersion = 'unknown';
+        let kumikiLatestVersion = 'unknown';
+        try {
+            const payload = await versionInfoPromise;
+            kumikiInstalledVersion = (payload && payload.installedVersion) || 'unknown';
+            kumikiLatestVersion = (payload && payload.latestVersion) || 'unknown';
+        } catch (_error) {
+            kumikiInstalledVersion = 'unknown';
+            kumikiLatestVersion = 'unknown';
+        }
+
         this._state = {
             workspaceRoot,
             initStatus,
+            kumikiInstalledVersion,
+            kumikiLatestVersion,
             frames,
             workspacePatternbooks,
             shippedPatterns,
@@ -337,26 +357,80 @@ class KigumiSidebarProvider {
         const nodes = [];
 
         const initStatus = this._state.initStatus;
-        const shouldShowInitializeCta = !!initStatus
-            && initStatus.projectStatus !== 'local-dev'
-            && !initStatus.hasExistingProject
-            && !initStatus.isInitialized;
-
-        if (shouldShowInitializeCta) {
+        const isLocalDev = !!(initStatus && initStatus.projectStatus === 'local-dev');
+        const hasProject = !!(initStatus && (initStatus.hasExistingProject || initStatus.isInitialized));
+        if (isLocalDev) {
             nodes.push(new SidebarNode({
-                key: 'init-cta',
-                type: 'initializeCallToAction',
-                label: '[ 🐪 Initialize Kigumi Project ]',
-                description: 'Click to create .kigumi config and .venv',
+                key: 'project-status-local-dev',
+                type: 'projectStatusAction',
+                label: '[ Kumiki Dev Mode ]',
+                description: 'kumiki repo detected',
+                iconPath: new vscode.ThemeIcon('beaker'),
+                contextValue: 'projectStatusAction',
+            }));
+        } else if (hasProject) {
+            nodes.push(new SidebarNode({
+                key: 'project-status-detected',
+                type: 'projectStatusAction',
+                label: '[ Project Detected ]',
+                description: '.kigumi project is available',
+                iconPath: new vscode.ThemeIcon('pass'),
+                contextValue: 'projectStatusAction',
+            }));
+        } else {
+            nodes.push(new SidebarNode({
+                key: 'project-status-initialize',
+                type: 'projectStatusAction',
+                label: '[ Initialize Project ]',
+                description: 'Create .kigumi config and .venv',
                 collapsibleState: vscode.TreeItemCollapsibleState.None,
                 command: {
                     title: 'Initialize project',
                     command: 'kigumi.projectHeaderAction',
                 },
-                iconPath: new vscode.ThemeIcon('play-circle'),
-                contextValue: 'initializeCallToAction',
+                iconPath: new vscode.ThemeIcon('rocket'),
+                contextValue: 'projectStatusAction',
             }));
         }
+
+        const installed = this._state.kumikiInstalledVersion || 'unknown';
+        const latest = this._state.kumikiLatestVersion || 'unknown';
+        if (installed !== 'unknown' && latest !== 'unknown' && installed === latest) {
+            nodes.push(new SidebarNode({
+                key: 'kumiki-version-up-to-date',
+                type: 'kumikiVersionAction',
+                label: `[ Kumiki up to date: v${installed} ]`,
+                description: 'latest from PyPI',
+                iconPath: new vscode.ThemeIcon('verified-filled'),
+                contextValue: 'kumikiVersionAction',
+            }));
+        } else {
+            nodes.push(new SidebarNode({
+                key: 'kumiki-version-update',
+                type: 'kumikiVersionAction',
+                label: `[ Update Kumiki from v${installed} -> v${latest} ]`,
+                description: 'Install latest from PyPI',
+                command: {
+                    title: 'Update Kumiki',
+                    command: 'kigumi.updateKumiki',
+                },
+                iconPath: new vscode.ThemeIcon('cloud-download'),
+                contextValue: 'kumikiVersionAction',
+            }));
+        }
+
+        nodes.push(new SidebarNode({
+            key: 'kumiki-website-action',
+            type: 'kumikiWebsiteAction',
+            label: '[ Go to Kumiki Website ]',
+            description: 'github.com/minimapletinytools/kumiki',
+            command: {
+                title: 'Open Kumiki Website',
+                command: 'kigumi.openWebsite',
+            },
+            iconPath: new vscode.ThemeIcon('link-external'),
+            contextValue: 'kumikiWebsiteAction',
+        }));
 
         const frameCount = this._state.frames.length;
         nodes.push(new SidebarNode({

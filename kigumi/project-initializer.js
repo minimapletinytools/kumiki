@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const https = require('https');
 const { ensureKigumiYaml, resolveProjectEnvironment } = require('./project-root');
 
 const GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '.generated', 'bundled-usage-instructions.md');
@@ -374,6 +375,63 @@ async function getInstalledKumikiVersion(workspaceRoot, pythonPath) {
     return (stdout || '').trim() || 'unknown';
 }
 
+async function getLatestKumikiVersionFromPyPI() {
+    return new Promise((resolve) => {
+        const req = https.get('https://pypi.org/pypi/kumiki/json', (res) => {
+            if (res.statusCode !== 200) {
+                resolve('unknown');
+                res.resume();
+                return;
+            }
+
+            let data = '';
+            res.on('data', (chunk) => {
+                data += chunk.toString();
+            });
+            res.on('end', () => {
+                try {
+                    const payload = JSON.parse(data);
+                    const version = payload && payload.info && payload.info.version;
+                    resolve(version ? String(version) : 'unknown');
+                } catch (_error) {
+                    resolve('unknown');
+                }
+            });
+        });
+
+        req.on('error', () => resolve('unknown'));
+        req.setTimeout(4000, () => {
+            req.destroy();
+            resolve('unknown');
+        });
+    });
+}
+
+async function getWorkspaceKumikiVersionInfo(workspaceRoot, filePath) {
+    const env = resolveProjectEnvironment({
+        workspaceRoot,
+        filePath,
+        createMarkerIfMissing: false,
+    });
+    const resolvedRoot = env.projectRoot || workspaceRoot;
+    const pythonPath = getVenvPython(resolvedRoot);
+
+    let installedVersion = 'unknown';
+    if (fs.existsSync(pythonPath)) {
+        try {
+            installedVersion = await getInstalledKumikiVersion(resolvedRoot, pythonPath);
+        } catch (_error) {
+            installedVersion = 'unknown';
+        }
+    }
+
+    const latestVersion = await getLatestKumikiVersionFromPyPI();
+    return {
+        installedVersion,
+        latestVersion,
+    };
+}
+
 async function installOrUpdateKumiki(workspaceRoot, pythonPath, isLocalDev) {
     const missingBefore = await getMissingViewerDependencies(workspaceRoot, pythonPath);
     const summary = [];
@@ -552,4 +610,5 @@ module.exports = {
     initializeWorkspaceProject,
     updateWorkspaceKumiki,
     isInitializationInProgress,
+    getWorkspaceKumikiVersionInfo,
 };
