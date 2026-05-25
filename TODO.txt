@@ -118,13 +118,13 @@ IGNORE-even scrolling down a little bit shows the "scorll to top" button
 DONE-layers view needs to be scrollable 
 DONE-layers view should be IN the webview, or at least cropped to not overflow it
 -kigumi sidebar
-  -remove the rocket ship initialize kigumi buton from the top bar
-  -rmove the play button from teh top bar
-  -there seem to be 2x refresh buttons in the top bar, we only need 1
+  DONE-remove the rocket ship initialize kigumi buton from the top bar
+  DONE-rmove the play button from teh top bar
+  DONE-there seem to be 2x refresh buttons in the top bar, we only need 1
   -initilaize project should also set .gitignore
-  -add a current/latest kumiki version display, fetch version from https://pypi.org/project/kumiki/
-  -add an update kumiki button to kigumi
-  -add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
+  DONE-add a current/latest kumiki version display, fetch version from https://pypi.org/project/kumiki/
+  DONE-add an update kumiki button to kigumi
+  DONE-add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
 
 -initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
 -camera controls should be absolute? use focus to reset

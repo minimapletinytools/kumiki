@@ -363,7 +363,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'project-status-local-dev',
                 type: 'projectStatusAction',
-                label: '[ Kumiki Dev Mode ]',
+                label: 'Kumiki Dev Mode',
                 description: 'kumiki repo detected',
                 iconPath: new vscode.ThemeIcon('beaker'),
                 contextValue: 'projectStatusAction',
@@ -372,7 +372,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'project-status-detected',
                 type: 'projectStatusAction',
-                label: '[ Project Detected ]',
+                label: 'Project Detected',
                 description: '.kigumi project is available',
                 iconPath: new vscode.ThemeIcon('pass'),
                 contextValue: 'projectStatusAction',
@@ -381,7 +381,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'project-status-initialize',
                 type: 'projectStatusAction',
-                label: '[ Initialize Project ]',
+                label: '[ Initialize Project ] 🖱️',
                 description: 'Create .kigumi config and .venv',
                 collapsibleState: vscode.TreeItemCollapsibleState.None,
                 command: {
@@ -399,7 +399,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'kumiki-version-up-to-date',
                 type: 'kumikiVersionAction',
-                label: `[ Kumiki up to date: v${installed} ]`,
+                label: `Kumiki up to date: v${installed}`,
                 description: 'latest from PyPI',
                 iconPath: new vscode.ThemeIcon('verified-filled'),
                 contextValue: 'kumikiVersionAction',
@@ -408,7 +408,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'kumiki-version-update',
                 type: 'kumikiVersionAction',
-                label: `[ Update Kumiki from v${installed} -> v${latest} ]`,
+                label: `[ Update Kumiki from v${installed} -> v${latest} ] 🖱️`,
                 description: 'Install latest from PyPI',
                 command: {
                     title: 'Update Kumiki',
@@ -422,7 +422,7 @@ class KigumiSidebarProvider {
         nodes.push(new SidebarNode({
             key: 'kumiki-website-action',
             type: 'kumikiWebsiteAction',
-            label: '[ Go to Kumiki Website ]',
+            label: '[ Go to Kumiki Website ] 🖱️',
             description: 'github.com/minimapletinytools/kumiki',
             command: {
                 title: 'Open Kumiki Website',
