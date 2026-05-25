@@ -87,24 +87,9 @@
     "menus": {
       "view/title": [
         {
-          "command": "kigumi.initializeProjectInWorkspace",
-          "when": "view == kigumi.explorer",
-          "group": "navigation@0"
-        },
-        {
-          "command": "kigumi.openCurrentFileInViewer",
-          "when": "view == kigumi.explorer",
-          "group": "navigation@1"
-        },
-        {
           "command": "kigumi.toggleGroupByPatternbook",
           "when": "view == kigumi.explorer",
           "group": "navigation@2"
-        },
-        {
-          "command": "kigumi.refreshPatterns",
-          "when": "view == kigumi.explorer",
-          "group": "navigation@3"
         },
         {
           "command": "kigumi.refreshSidebar",
