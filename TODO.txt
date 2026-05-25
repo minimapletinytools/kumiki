@@ -124,14 +124,15 @@ DONE-kigumi sidebar
   DONE-add a current/latest kumiki version display, fetch version from https://pypi.org/project/kumiki/
   DONE-add an update kumiki button to kigumi
   DONE-add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
+DONE-ensure make pattern-index before each publish (maybe run as part of the bump version job)
+-fix export
 -kigumi init
-  -initilaize project should also set .gitignore
+  DONE-initilaize project should also set .gitignore
   -initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
 -camera controls should be absolute? use focus to reset
 -searching
   -show layer tags is broken
   -searching should search for either tags or joint name (figure out a way to do this)
--ensure make pattern-index before each publish (maybe run as part of the bump version job)
 -cleanup the bottom area for kigumi
   -remove the patternbook
   -tighten the member list, dimenison + rought cut + add export button
@@ -146,8 +147,8 @@ DONE-kigumi sidebar
   -create new project/design
   -able to open patterns and copy them into self workspace
 -finish docs
-  -finish README
-  -finish agents doc
+  DONE-finish README
+  DONE-finish agents doc
   -finish ond remove docs folder
 -new kigumi icon
 -marketing
@@ -175,33 +176,7 @@ DONE-lock and hide fetaures
 
 
 :: TODO
-DONE-improve librarian
-  -generate pattern index file for kumiki before pubishing
-  -search order
-    -workspace
-    -kumiki dep
-    -other depnedencies
-  -when searching a dependency
-    -only proceed if found kumiki dependency (unless kumiki itself)
-      -check for pattern index
-      -scan all files
-  -when scanning for files
-    -check for kumiki dependency and early quit if not found to save processing time
-    -run type analyzer to pull out stuff with frames and patternbooks
-    -if frame, just use static analyzer results to list the filename
-      -if multiple frames found, show only the last one and indicate multiple frames found 
-    -if patternbook, then actually load teh file to get teh patterns and sub patterns
-      -optionall write to an index file which also contains file hash
-DONE-reorganize agent files
-DONE-rename?
-  DONE-create notching.py
-  DONE-build-a-butt-joint -> build-a-butt.py
-  DONE-joint_shavings.py->shavings.py
 
-BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
-
-
--internet seems to be necessary for rendering?
 
 -PATTERN VIEWER
   DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
@@ -231,6 +206,16 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
   -allow decorative extrusions (polygon on a face that extrudes into the face) so you can cut the \____/ shape out of the sawhores feet
   -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap
     -# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
+  -lincoln log joints?
+
+TESTS
+  -fresh install test
+    -check .gitignore
+    -check for my frame
+    -check venv is installde correctly
+    -check kumiki version
+    -check kumiki has correct pattern index (technically this is a kumiki publish test)
+    
 
 
 -PARAMETERIZATION
@@ -349,7 +334,7 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 -rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future
 -add accessories to STEP STL and viewer
 -and export STEP/STL button back into viewer (comibne/single, step/stl options, defaultable)
--lincoln log joints?
+
 -consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
@@ -404,7 +389,6 @@ RENAMEIFY
     -does
     -contains (specific to cutcsg...)
     -are
-
   -be consistent about function local/golbal naming
     -local input vars should have the suffix  _local
       -some things must be interpreted locally such as "face" or "distance", these d onot have the suffix
@@ -518,7 +502,30 @@ M3.5
 
 
 :: TODONE 
-
+DONE-improve librarian
+  -generate pattern index file for kumiki before pubishing
+  -search order
+    -workspace
+    -kumiki dep
+    -other depnedencies
+  -when searching a dependency
+    -only proceed if found kumiki dependency (unless kumiki itself)
+      -check for pattern index
+      -scan all files
+  -when scanning for files
+    -check for kumiki dependency and early quit if not found to save processing time
+    -run type analyzer to pull out stuff with frames and patternbooks
+    -if frame, just use static analyzer results to list the filename
+      -if multiple frames found, show only the last one and indicate multiple frames found 
+    -if patternbook, then actually load teh file to get teh patterns and sub patterns
+      -optionall write to an index file which also contains file hash
+DONE-reorganize agent files
+DONE-rename?
+  DONE-create notching.py
+  DONE-build-a-butt-joint -> build-a-butt.py
+  DONE-joint_shavings.py->shavings.py
+BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
+DONE-internet seems to be necessary for rendering?
 DONE-do image to frame experiments (some with chain of reason promptitng, some without)
 DONE-improve joint writing agent instructinos
   DONE-marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
