@@ -117,16 +117,16 @@ IGNORE-even scrolling down a little bit shows the "scorll to top" button
   DONE-or perhaps if window is scrolled even a bit, scrolling the top view scrolls the entire window
 DONE-layers view needs to be scrollable 
 DONE-layers view should be IN the webview, or at least cropped to not overflow it
--kigumi sidebar
+DONE-kigumi sidebar
   DONE-remove the rocket ship initialize kigumi buton from the top bar
   DONE-rmove the play button from teh top bar
   DONE-there seem to be 2x refresh buttons in the top bar, we only need 1
-  -initilaize project should also set .gitignore
   DONE-add a current/latest kumiki version display, fetch version from https://pypi.org/project/kumiki/
   DONE-add an update kumiki button to kigumi
   DONE-add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
-
--initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
+-kigumi init
+  -initilaize project should also set .gitignore
+  -initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
 -camera controls should be absolute? use focus to reset
 -searching
   -show layer tags is broken
@@ -226,6 +226,7 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
     -may as well do the oscar hsed 3 way joint hingy as well
   -do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
   -nuki_end_joint
+    -this is actually just your wedged half dovetail joint :O
   -nuki_cross_joint
   -allow decorative extrusions (polygon on a face that extrudes into the face) so you can cut the \____/ shape out of the sawhores feet
   -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap

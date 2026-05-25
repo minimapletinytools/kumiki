@@ -3,7 +3,6 @@
 Kumiki uses a right-hand coordinate system.
 
 - XY is the "ground" and Z is "up" 
-
 - +X/-x is also "right"/"left"
 - +Y/-Y is also "forward"/"back"
 - +Z/-Z is also "up"/"down" or "top"/"bottom"

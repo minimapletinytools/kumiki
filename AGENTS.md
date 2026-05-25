@@ -13,3 +13,8 @@ This is the canonical instruction entry point for AI coding agents in this repos
 - Repository-local Claude skills folder: `.claude/skills/`
 
 Use relevant instruction files based on the files you are editing.
+
+
+# Concepts
+
+please see docs/concepts.md

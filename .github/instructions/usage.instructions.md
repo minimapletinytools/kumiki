@@ -2,17 +2,17 @@
 applyTo: "patterns/**, experiments/**"
 ---
 
-# Kumiki Agent Instructions
-
 Copy this file into your project's `.github/copilot-instructions.md` (or `.cursorrules`) to give your AI coding agent context for designing timber frames with Kumiki. Do not copy the applyTo field above.
 
----
+
+
+# Kumiki Usage Instructions
 
 ## Imports
 
-Always import via the top-level `giraffe` module:
+Always import via the top-level `kumiki` module:
 ```python
-from giraffe import *
+from kumiki import *
 ```
 
 ## Numeric Values
@@ -27,10 +27,6 @@ from giraffe import *
 - Use `mm()`, `cm()` and `m()` for metric
 - Use `degrees()` and `radians()` for angles
 - Use `Matrix([...])` for vectors, always with `Rational` or `Integer` values.
-
-## Philosophy
-
-As a primer before working with Kumiki, pleaes see docs/concepts.md for an overview of the core concepts and philosophy behind Kumiki's design.
 
 ## Creating Timbers
 
