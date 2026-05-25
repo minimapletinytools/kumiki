@@ -30,7 +30,7 @@ from giraffe import *
 
 ## Philosophy
 
-TODO point to docs
+As a primer before working with Kumiki, pleaes see docs/concepts.md for an overview of the core concepts and philosophy behind Kumiki's design.
 
 ## Creating Timbers
 

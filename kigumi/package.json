@@ -134,6 +134,7 @@
   },
   "scripts": {
     "prepare:instructions": "node ./scripts/prepare-bundled-instructions.js",
+    "update-vendor": "node ./scripts/update-vendor.js",
     "vscode:prepublish": "npm run prepare:instructions",
     "test": "npm run test:unit",
     "test:unit": "jest",

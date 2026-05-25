@@ -1,4 +1,4 @@
-import { LitElement, html } from 'https://unpkg.com/lit@3.2.0/index.js?module';
+import { LitElement, html } from 'lit';
 
 const ViewerPhase = Object.freeze({
     BOOTING: 'booting',

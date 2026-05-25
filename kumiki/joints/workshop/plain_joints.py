@@ -1267,7 +1267,7 @@ def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_rati
     
     return joint
 
-
+# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
 def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ratio: Numeric = Rational(1, 2)) -> Joint:
     """
     Creates a corner-lap joint between two corner timbers with trimmed ends.

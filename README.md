@@ -36,9 +36,14 @@ Understanding Kumiki will allow you to better pilot the AI agent to implement yo
 
 Someday I'll have better prompting examples and skills to share here. Stay tuned.
 
-# Contributing
 
-There are many many more feature, resources and examples I'd like to add to Kumiki/Kigumi! You are welcome to open issues or make PRs to update Kumiki. Unfortunately I do not have any contribution guidelines ready so you may want to reach out to me before making any changes. 
+## Drawing Support
+
+To generate drawings, your best bet right now is to export as STEP or STL files and generate drawings in another software. Kumiki/Kigumi will add support for this in 3 stages:
+
+1. ability to measure features relative to each other in Kigumi
+2. ability to generate and export drawings inside kigumi
+
 
 ## Developing Kumiki
 
@@ -50,9 +55,6 @@ Kigumi has a separate project scanning flow such that it can be used with the Ku
 
 TODO
 
-
-
-# APPENDIX
 
 ## FreeCAD and Fusion360 usage
 

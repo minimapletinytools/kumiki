@@ -118,11 +118,15 @@ IGNORE-even scrolling down a little bit shows the "scorll to top" button
 DONE-layers view needs to be scrollable 
 DONE-layers view should be IN the webview, or at least cropped to not overflow it
 -kigumi sidebar
+  -remove the rocket ship initialize kigumi buton from the top bar
+  -rmove the play button from teh top bar
+  -there seem to be 2x refresh buttons in the top bar, we only need 1
   -initilaize project should also set .gitignore
-  -add a current/latest kumiki version button
-  -add an update kumiki button to kiguim
-  -add a go to website button in kigumi
+  -add a current/latest kumiki version display, fetch version from https://pypi.org/project/kumiki/
+  -add an update kumiki button to kigumi
+  -add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
 
+-initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
 -camera controls should be absolute? use focus to reset
 -searching
   -show layer tags is broken
@@ -206,6 +210,7 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon
+  DONE-wedged_half_dovetail_mortise_and_tenon
   -I guessy ou probably want to do tusked mortise and tenon joint too
   -cut_dropin_housed_butt_joint
     -assert that timbers are face aligned (orthogonal not required)
@@ -222,8 +227,9 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
   -do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
   -nuki_end_joint
   -nuki_cross_joint
-  -wedged_half_dovetail_mortise_and_tenon
   -allow decorative extrusions (polygon on a face that extrudes into the face) so you can cut the \____/ shape out of the sawhores feet
+  -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap
+    -# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
 
 
 -PARAMETERIZATION
