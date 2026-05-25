@@ -107,6 +107,47 @@ function ensureAgentInstructionFiles(workspaceRoot) {
     };
 }
 
+
+function ensureGitignore(workspaceRoot) {
+    const gitignorePath = path.join(workspaceRoot, '.gitignore');
+    const requiredEntries = [
+        '.venv/',
+    ];
+
+    if (!fs.existsSync(gitignorePath)) {
+        fs.writeFileSync(gitignorePath, `${requiredEntries.join('\n')}\n`, 'utf8');
+        return {
+            created: true,
+            addedEntries: requiredEntries,
+        };
+    }
+
+    const existingLines = new Set(
+        fs.readFileSync(gitignorePath, 'utf8')
+            .split(/\r?\n/)
+            .map((line) => line.trim())
+            .filter((line) => line.length > 0)
+    );
+
+    const missingEntries = requiredEntries.filter((entry) => !existingLines.has(entry));
+    if (missingEntries.length === 0) {
+        return {
+            created: false,
+            addedEntries: [],
+        };
+    }
+
+    const existingContent = fs.readFileSync(gitignorePath, 'utf8');
+    const needsNewline = existingContent.length > 0 && !existingContent.endsWith('\n');
+    const appendPrefix = needsNewline ? '\n' : '';
+    fs.appendFileSync(gitignorePath, `${appendPrefix}${missingEntries.join('\n')}\n`, 'utf8');
+
+    return {
+        created: false,
+        addedEntries: missingEntries,
+    };
+}
+
 function getVenvPython(workspaceRoot) {
     if (process.platform === 'win32') {
         return path.join(workspaceRoot, '.venv', 'Scripts', 'python.exe');
@@ -541,6 +582,7 @@ async function initializeWorkspaceProject(workspaceRoot, filePath) {
         });
 
         const exampleResult = ensureExampleFrame(resolvedRoot);
+        const gitignoreResult = ensureGitignore(resolvedRoot);
         const instructionsResult = ensureAgentInstructionFiles(resolvedRoot);
 
         return {
@@ -555,6 +597,8 @@ async function initializeWorkspaceProject(workspaceRoot, filePath) {
             installSummary: installResult.summary,
             exampleFilePath: exampleResult.filePath,
             createdExampleFile: exampleResult.created,
+            createdGitignoreFile: gitignoreResult.created,
+            addedGitignoreEntries: gitignoreResult.addedEntries,
             ...instructionsResult,
         };
     } finally {

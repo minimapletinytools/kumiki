@@ -65,11 +65,13 @@ describe('project-initializer', () => {
     const copilotPath = path.join(tmpRoot, '.github', 'copilot-instructions.md');
     const claudePath = path.join(tmpRoot, 'CLAUDE.md');
     const cursorPath = path.join(tmpRoot, '.cursorrules');
+    const gitignorePath = path.join(tmpRoot, '.gitignore');
 
     expect(fs.existsSync(agentsPath)).toBe(true);
     expect(fs.existsSync(copilotPath)).toBe(true);
     expect(fs.existsSync(claudePath)).toBe(true);
     expect(fs.existsSync(cursorPath)).toBe(true);
+    expect(fs.existsSync(gitignorePath)).toBe(true);
 
     const agentsContent = fs.readFileSync(agentsPath, 'utf8');
     expect(agentsContent.startsWith('---')).toBe(false);
@@ -78,14 +80,21 @@ describe('project-initializer', () => {
     const copilotContent = fs.readFileSync(copilotPath, 'utf8');
     const claudeContent = fs.readFileSync(claudePath, 'utf8');
     const cursorContent = fs.readFileSync(cursorPath, 'utf8');
+    const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
 
     expect(copilotContent).toContain('AGENTS.md');
     expect(claudeContent).toContain('AGENTS.md');
     expect(cursorContent).toContain('AGENTS.md');
+    expect(gitignoreContent).toContain('.venv/');
+    expect(gitignoreContent).not.toContain('.kigumi/');
+    expect(gitignoreContent).not.toContain('.kigumi.yaml');
+    expect(gitignoreContent).not.toContain('.kigumi_readonly_sources/');
 
     expect(result.createdAgentsFile).toBe(true);
     expect(result.appendedToExistingAgentsFile).toBe(false);
     expect(result.instructionWarnings).toEqual([]);
+    expect(result.createdGitignoreFile).toBe(true);
+    expect(result.addedGitignoreEntries).toEqual(['.venv/']);
   });
 
   test('initializeWorkspaceProject appends to existing AGENTS.md and outputs warning', async () => {
