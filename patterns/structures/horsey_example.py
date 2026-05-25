@@ -161,38 +161,49 @@ def create_sawhorse() -> Frame:
         peg_parameters=peg_params_post_beam,
     )
     
-    # Joint 3 & 4: Stretcher into posts
+    # Joint 3 & 4: Stretcher into posts (wedged half-dovetail through mortise & tenon)
     # Stretcher: length=X (RIGHT), width=Y (FRONT), depth=Z
     # Post: length=Z (TOP), mortise on LEFT/RIGHT face
-    # Tenon at stretcher ends going sideways into posts - peg through LEFT face
-    peg_params_stretcher = base_peg_params
+    # Dovetail's flat "top" is flush with the stretcher's TOP face; the sloped
+    # side kicks outward on the BOTTOM, giving the joint pull-out resistance.
+    # The tenon passes all the way through the post (4" thick) with extra stickout
+    # past the far face, and is locked with a wedge driven in from the far side.
+    dovetail_depth_for_stretcher = inches(Rational(1, 2))
+    stretcher_tenon_depth = post_size[0] + inches(1)  # through post + 1" stickout
+    stretcher_wedge_params = DovetailTenonWedgeAccessoryParameters(
+        wedge_from_receiving_timber_side=True,
+        wedge_tip_extra_length=inches(1),
+        wedge_base_extra_length=inches(1),
+    )
 
-    left_post_stretcher_joint = cut_mortise_and_tenon_joint_on_FAT(
+    left_post_stretcher_joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=left_post,
             butt_timber=stretcher,
             butt_timber_end=TimberReferenceEnd.BOTTOM,  # Left end of stretcher
             front_face_on_butt_timber=TimberLongFace.LEFT,
         ),
+        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in post's Z direction)
-        tenon_length=tenon_length,
-        mortise_depth=mortise_depth,
-        peg_parameters=peg_params_stretcher,
+        tenon_depth=stretcher_tenon_depth,
+        dovetail_depth=dovetail_depth_for_stretcher,
+        wedge_accessory_parameters=stretcher_wedge_params,
     )
 
-    right_post_stretcher_joint = cut_mortise_and_tenon_joint_on_FAT(
+    right_post_stretcher_joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_post,
             butt_timber=stretcher,
             butt_timber_end=TimberReferenceEnd.TOP,  # Right end of stretcher
             front_face_on_butt_timber=TimberLongFace.LEFT,
         ),
+        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in post's Z direction)
-        tenon_length=tenon_length,
-        mortise_depth=mortise_depth,
-        peg_parameters=peg_params_stretcher,
+        tenon_depth=stretcher_tenon_depth,
+        dovetail_depth=dovetail_depth_for_stretcher,
+        wedge_accessory_parameters=stretcher_wedge_params,
     )
-    
+
     # Joint 5 & 6: Posts into plate
     # Post: length=Z (TOP), width=X (RIGHT), depth=Y (FRONT)
     # Plate: length=X (RIGHT)

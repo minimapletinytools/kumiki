@@ -475,6 +475,8 @@ def chop_notch_for_butt_joint_arrangement(
         mortise_shoulder_distance_from_centerline + far_face_half_size
     )
 
+    # TODO this is not required, only if yo uwant the -|_|- kinda shape which is useful if the relief angle is close to zero
+    # for relief angles closer to 45 better not to have this at all, but in order for that to work, you need to modify the relief cut prisms to extend out far enough to cut off the non-perfect sides of the butting timber
     # 2. Half space at the far face of the receiving timber, pointing TOWARDS
     #    the joint (so it covers the region on the butt side, including the
     #    notch and the butt-prism region inside the receiving timber).

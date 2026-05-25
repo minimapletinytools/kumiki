@@ -101,6 +101,10 @@ Butt joints typically compose of
 
 These can sometimes be interchanged. The `build-a-butt.py` file deconstructs these operations so they can be composed to build a variety of butt joints. Butt joints should make use of build-a-butt whenever possible.
 
+### pegging
+
+Pegs (AKA draw bores, komisen) are often used in mortise-and-tenon-like joints to tighten the joint. Pegs may be positioned generically for most butt joints based on where the tenon centerline meets joint shoulder using the `compute_peg_positions` function in `build_a_butt.py`.
+
 ## Coding Conventions when Writing Tests for Joints
 
 Each joint must have at least one "general" test that:

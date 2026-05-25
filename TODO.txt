@@ -117,6 +117,12 @@ IGNORE-even scrolling down a little bit shows the "scorll to top" button
   DONE-or perhaps if window is scrolled even a bit, scrolling the top view scrolls the entire window
 DONE-layers view needs to be scrollable 
 DONE-layers view should be IN the webview, or at least cropped to not overflow it
+-kigumi sidebar
+  -initilaize project should also set .gitignore
+  -add a current/latest kumiki version button
+  -add an update kumiki button to kiguim
+  -add a go to website button in kigumi
+
 -camera controls should be absolute? use focus to reset
 -searching
   -show layer tags is broken
@@ -191,30 +197,60 @@ DONE-rename?
 BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 
 
+-internet seems to be necessary for rendering?
+
+-PATTERN VIEWER
+  DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
+  DONE-allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
+  -add searching + tag searching functionality on top of the patternbook/frames/examples
+
+-JOINTS
+  DONE-finish build a butt joint to do the wedged dovetail morties and tenon
+  -I guessy ou probably want to do tusked mortise and tenon joint too
+  -cut_dropin_housed_butt_joint
+    -assert that timbers are face aligned (orthogonal not required)
+    -assert that faces of both timbers on the "front" of the joint 
+    -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
+    -takes a dropin_depth measured from the dropin face (based on front_face_on_butt_timber) are coplaner. this is the "dropin" face on the receeiving timber
+    -if orthognoal, cut a prism out of the receiving timber to match
+    -take a half space cut on the butt timber angled to the receiving timber and aligned to the insertion depth
+    -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
+    -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
+    -leave a TODO to add notching for non perfect timbers
+  -do the castle joint 3 way joint thingy that should be easy?
+    -may as well do the oscar hsed 3 way joint hingy as well
+  -do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
+  -nuki_end_joint
+  -nuki_cross_joint
+  -wedged_half_dovetail_mortise_and_tenon
+  -allow decorative extrusions (polygon on a face that extrudes into the face) so you can cut the \____/ shape out of the sawhores feet
 
 
--cut_dropin_housed_butt_joint
-  -assert that timbers are face aligned (orthogonal not required)
-  -assert that faces of both timbers on the "front" of the joint 
-  -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
-  -takes a dropin_depth measured from the dropin face (based on front_face_on_butt_timber) are coplaner. this is the "dropin" face on the receeiving timber
-  -if orthognoal, cut a prism out of the receiving timber to match
-  -take a half space cut on the butt timber angled to the receiving timber and aligned to the insertion depth
-  -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
-  -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
-  -leave a TODO to add notching for non perfect timbers
-
-
-
--add parameterization support, in particular, patterns should be parameterizable :o
-  -then you can add notch variations to patterns I guess?
+-PARAMETERIZATION
+  -do create_frame(paremteers) thing so that parameters can be tuned in UI
+  -pattern parameterization
+    -then you can add notch variations to patterns I guess?
+    -update example_shaving ctors to take some additional parameters
 
 -NOTCHING
   DONE-I think receiving timber notching is mostly good?
   DONE-notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
   -test notching you just added to the half dovetail joint
-  -make a generic verion of this, one for each joint configuration type
-  -make non PTW notching settings helper class
+  -make notching more generic
+    -when to notch: 
+      -when there is a shoulder
+      -entering into a non perfect timber face
+      -entering timber from a non face perpendicular angle
+    -notching should work off the shoulder geometery results
+      -needs notching (checks for condititions above)
+      -notch_length, measured in the length direction of the receiving timber
+      -notch_width, always 100% the full dimension of the receiving timber
+      -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
+      -notch_style, straight walls only for now
+    -notching in other situations?
+    -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
+    -build notching into build a butt joint somehow?
+  -make non PTW notching settings helper class allowing you to configure notching genericaly across all joints
     -the only weird thing is that for inset shoulders you need notching on perfect timebrs too..
 
 -NON PERFECT TIMBER
@@ -223,16 +259,16 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
   -add regular timber stuff
   -add round timber stuff
   
+
+-BOARDS
+  -decide if you even want boards..
+  -convert_to_timberlike(board : Board, top_maps_to : TimberFace, right_maps_to : TimberFace) -> Timber (or maybe some temp Timber class)
+  -do tongue and groove joint
+  -do the ita-kura joint (board in groove)
+  
 -maybe qualify get_size -> get_perfect_size
 
--improve joint writing agent instructinos
-  DONE-marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
-  DONE-build a butt joint guidance
-  DONE-notching guidance
-  -peg guidance
-
-
--add a new integration test that  createsa. new kigumi projcet in some temp directory and initializes it and checks
+-add a new integration test that  creates a new kigumi projcet in some temp directory and initializes it and checks
   -kumiki patterns load correctly
   -workspace patterns load correctly
   -workspace frames load correctly
@@ -242,36 +278,6 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 
 -add an optional scale ruler to the view and havei t default off
 
--finish build a butt joint to do the wedged dovetail morties and tenon
--I guessy ou probably want to do tusked mortise and tenon joint too
--do the castle joint 3 way joint thingy that should be easy?
-  -may as well do the oscar hsed 3 way joint hingy as well
-
--do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
-
-
--do create_frame(paremteers) thing so that parameters can be tuned in UI
-
--pattern viewer (improved)
-  DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
-  -add searching + tag searching functionality on top of the patternbook/frames/examples
-  -allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
-
-
--make notching more generic
-  -when to notch: 
-    -when there is a shoulder
-    -entering into a non perfect timber face
-    -entering timber from a non face perpendicular angle
-  -notching should work off the shoulder geometery results
-    -needs notching (checks for condititions above)
-    -notch_length, measured in the length direction of the receiving timber
-    -notch_width, always 100% the full dimension of the receiving timber
-    -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
-    -notch_style, straight walls only for now
-  -notching in other situations?
-  -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
-  -build notching into build a butt joint somehow?
 
 -do assembly metadata
   DONE-create assemblydirection class 
@@ -340,9 +346,6 @@ BUG-joint list not shoiwng up for round timber mortise and tenon joint exapmle
 -consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
--do image to frame experiments (some with chain of reason promptitng, some without)
-DONE/IGNORE-how dose selection change after refresh?
--highlight timebrs in timber list with selection, or just get rid of timber list?
 -document example/patternbook stuff
 -after viewer, you should integrate patternbook into viewer
 -update agent insturction
@@ -356,13 +359,6 @@ DONE/IGNORE-how dose selection change after refresh?
   -prompt address @TODO.txt (202-204)  in the helper, first assert that the 2 timbers are are_timbers_plane_aligned. next assert that the 2 timbers are not parallel. then proceed with the logic @basic_joints.py (97-113). put this helper function in mortise_and_tenon_joint.py
 
 
--new joints (need wedge accessory)
-  -nuki_end_joint
-  -nuki_cross_joint
-  -wedged_half_dovetail_mortise_and_tenon
-
--board support 
-  -convert_to_timberlike(board : Board, top_maps_to : TimberFace, right_maps_to : TimberFace) -> Timber (or maybe some temp Timber class)
     
 
 
@@ -516,7 +512,14 @@ M3.5
 
 :: TODONE 
 
-
+DONE-do image to frame experiments (some with chain of reason promptitng, some without)
+DONE-improve joint writing agent instructinos
+  DONE-marking space step is optional, not actually all that useful, instead clearly annotate reference features/spaces on the joint and use what's needed
+  DONE-build a butt joint guidance
+  DONE-notching guidance
+  DONE-peg guidance
+DONE/IGNORE-how dose selection change after refresh?
+IGNORE-highlight timebrs in timber list with selection, or just get rid of timber list?
 DONE-create workshop jonits folders
 DONE-have publish package job bump the version number (check current version and bump I guess)
 DONE-test the initialize project thing lol
