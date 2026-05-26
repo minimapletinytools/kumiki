@@ -520,8 +520,7 @@ def chop_notch_for_butt_joint_arrangement(
     )
     halfspace_in_butt_local = adopt_csg(None, butt_timber.transform, halfspace_global)
     relief_in_butt_local = Difference(
-        #base=halfspace_in_butt_local,
-        base = make_finite_rectangular_prism_from_half_space(halfspace_in_butt_local, inches(12), inches(10)),
+        base=halfspace_in_butt_local,
         subtract=[notch_in_butt_local, butt_prism_in_butt_local],
     )
 
