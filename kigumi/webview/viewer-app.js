@@ -467,6 +467,13 @@ class KigumiViewerApp extends LitElement {
         this.debugEnabled = false;
         this.showLayerTags = true;
         this.logFilterText = '';
+        this.memberListRoughLengthAllowanceMm = 30;
+        this.memberListOptions = {
+            showRoughLength: false,
+            showNominalSizes: true,
+            showCsgFeatureCount: true,
+            showTags: true,
+        };
 
         this.lightAzimuth = 0;
         this.lightElevation = 0.8;
@@ -569,14 +576,42 @@ class KigumiViewerApp extends LitElement {
             <div id="panels">
                 <div class="panel-box">
                     <div class="panel-title">Member List</div>
+                    <div id="member-list-options" aria-label="Member list options">
+                        <label>
+                            <input id="member-opt-rough-length" type="checkbox" ?checked=${this.memberListOptions.showRoughLength}>
+                            show rough length (exact + ${this.memberListRoughLengthAllowanceMm})
+                        </label>
+                        <label>
+                            <input id="member-opt-sizes" type="checkbox" ?checked=${this.memberListOptions.showNominalSizes}>
+                            show perfect timber within/nominal sizes
+                        </label>
+                        <label>
+                            <input id="member-opt-csg" type="checkbox" ?checked=${this.memberListOptions.showCsgFeatureCount}>
+                            show CSG/feature count
+                        </label>
+                        <label>
+                            <input id="member-opt-tags" type="checkbox" ?checked=${this.memberListOptions.showTags}>
+                            show tags
+                        </label>
+                    </div>
+                    <details id="member-list-legend" open>
+                        <summary>Legend</summary>
+                        <div class="member-list-legend-body">
+                            <p><strong>length</strong>: exact length of timber after making all joint cuts (add a bit to this for rough cut length) / rough cut length (depending on option)</p>
+                            <p><strong>nominal sizes</strong>: nominal timber width/height dimensions from the member definition.</p>
+                            <p><strong>#CSGs</strong>: total constructive solid geometry nodes used for the member.</p>
+                            <p><strong>#Features</strong>: number of named CSG features on that member.</p>
+                            <p><strong>tags</strong>: all ticket tags attached to the member.</p>
+                        </div>
+                    </details>
                     <div id="timber-panel">
                         <table>
                             <thead>
                                 <tr>
                                     <th>#</th><th>Type</th><th>Name</th>
-                                    <th>Tags</th>
-                                    <th>Length</th><th>Width</th><th>Height</th>
-                                    <th>#CSGs</th><th>#Features</th>
+                                    <th data-col="tags">Tags</th>
+                                    <th data-col="length">Length (Exact)</th><th data-col="width">Width</th><th data-col="height">Height</th>
+                                    <th data-col="csg">#CSGs</th><th data-col="feature">#Features</th>
                                 </tr>
                             </thead>
                             <tbody id="timber-rows"></tbody>
@@ -834,6 +869,38 @@ class KigumiViewerApp extends LitElement {
                 this.requestLoadPatterns();
             });
         }
+
+        const memberOptRoughLength = this.renderRoot.querySelector('#member-opt-rough-length');
+        const memberOptSizes = this.renderRoot.querySelector('#member-opt-sizes');
+        const memberOptCsg = this.renderRoot.querySelector('#member-opt-csg');
+        const memberOptTags = this.renderRoot.querySelector('#member-opt-tags');
+
+        if (memberOptRoughLength) {
+            memberOptRoughLength.addEventListener('change', (event) => {
+                this.memberListOptions.showRoughLength = Boolean(event.target.checked);
+                this._refreshMemberList();
+            });
+        }
+        if (memberOptSizes) {
+            memberOptSizes.addEventListener('change', (event) => {
+                this.memberListOptions.showNominalSizes = Boolean(event.target.checked);
+                this._applyMemberListOptionVisibility();
+            });
+        }
+        if (memberOptCsg) {
+            memberOptCsg.addEventListener('change', (event) => {
+                this.memberListOptions.showCsgFeatureCount = Boolean(event.target.checked);
+                this._applyMemberListOptionVisibility();
+            });
+        }
+        if (memberOptTags) {
+            memberOptTags.addEventListener('change', (event) => {
+                this.memberListOptions.showTags = Boolean(event.target.checked);
+                this._applyMemberListOptionVisibility();
+            });
+        }
+
+        this._applyMemberListOptionVisibility();
 
         window.addEventListener('scroll', this.onWindowScroll);
         window.addEventListener('mouseup', this.onWindowMouseUp);
@@ -2763,16 +2830,59 @@ class KigumiViewerApp extends LitElement {
                 : [];
             const tagsLabel = tags.length > 0 ? tags.join(', ') : '—';
             const row = document.createElement('tr');
+            const lengthValue = this._formatMemberLength(mesh);
             row.innerHTML = '<td>' + (index + 1) + '</td>' +
-                '<td>' + typeLabel + '</td>' +
-                '<td>' + memberName + '</td>' +
-                '<td class="dim">' + tagsLabel + '</td>' +
-                '<td class="dim">' + (mesh.prism_length !== undefined ? this.fmt(mesh.prism_length) : '—') + '</td>' +
-                '<td class="dim">' + (mesh.prism_width  !== undefined ? this.fmt(mesh.prism_width)  : '—') + '</td>' +
-                '<td class="dim">' + (mesh.prism_height !== undefined ? this.fmt(mesh.prism_height) : '—') + '</td>' +
-                '<td class="dim">' + (mesh.csg_nodes !== undefined ? mesh.csg_nodes : '—') + '</td>' +
-                '<td class="dim">' + (mesh.csg_features !== undefined ? mesh.csg_features : '—') + '</td>';
+                '<td>' + this._escapeHtml(typeLabel) + '</td>' +
+                '<td>' + this._escapeHtml(memberName) + '</td>' +
+                '<td data-col="tags" class="dim">' + this._escapeHtml(tagsLabel) + '</td>' +
+                '<td data-col="length" class="dim">' + lengthValue + '</td>' +
+                '<td data-col="width" class="dim">' + (mesh.prism_width  !== undefined ? this.fmt(mesh.prism_width)  : '—') + '</td>' +
+                '<td data-col="height" class="dim">' + (mesh.prism_height !== undefined ? this.fmt(mesh.prism_height) : '—') + '</td>' +
+                '<td data-col="csg" class="dim">' + (mesh.csg_nodes !== undefined ? mesh.csg_nodes : '—') + '</td>' +
+                '<td data-col="feature" class="dim">' + (mesh.csg_features !== undefined ? mesh.csg_features : '—') + '</td>';
             tbody.appendChild(row);
+        }
+        this._applyMemberListOptionVisibility();
+    }
+
+    _formatMemberLength(mesh) {
+        if (mesh.prism_length === undefined) {
+            return '—';
+        }
+
+        const exactLengthM = Number(mesh.prism_length);
+        if (!Number.isFinite(exactLengthM)) {
+            return '—';
+        }
+
+        if (this.memberListOptions.showRoughLength) {
+            const roughLengthM = exactLengthM + (this.memberListRoughLengthAllowanceMm / 1000);
+            return this.fmt(roughLengthM);
+        }
+
+        return this.fmt(exactLengthM);
+    }
+
+    _refreshMemberList() {
+        const meshes = (this._lastGeometryData && this._lastGeometryData.meshes) ? this._lastGeometryData.meshes : [];
+        this.rebuildTimberTable(meshes);
+    }
+
+    _applyMemberListOptionVisibility() {
+        const table = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#timber-panel table')
+            : null;
+        if (!table) {
+            return;
+        }
+
+        table.classList.toggle('member-hide-tags', !this.memberListOptions.showTags);
+        table.classList.toggle('member-hide-sizes', !this.memberListOptions.showNominalSizes);
+        table.classList.toggle('member-hide-csg', !this.memberListOptions.showCsgFeatureCount);
+
+        const lengthHeader = table.querySelector('th[data-col="length"]');
+        if (lengthHeader) {
+            lengthHeader.textContent = this.memberListOptions.showRoughLength ? 'Length (Rough)' : 'Length (Exact)';
         }
     }
 
