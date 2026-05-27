@@ -130,6 +130,9 @@
     "test:unit": "jest",
     "test:runner": "jest --runInBand __tests__/runner-protocol.test.js",
     "test:ext": "node ./test/run-extension-tests.js",
+    "test:ext:initial": "node ./test/run-extension-tests.js --suite initial",
+    "test:ext:complex": "node ./test/run-extension-tests.js --suite complex",
+    "test:ext:complex:grep": "node ./test/run-extension-tests.js --suite complex --grep",
     "test:all": "npm run test:unit && npm run test:ext"
   },
   "devDependencies": {

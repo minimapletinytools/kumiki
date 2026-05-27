@@ -17,9 +17,19 @@ function getAllTabs() {
   return vscode.window.tabGroups.all.flatMap((group) => group.tabs);
 }
 
+async function activateKigumiExtension() {
+  const extension = vscode.extensions.all.find((candidate) =>
+    candidate.id.toLowerCase().endsWith('.kigumi')
+  );
+  assert.ok(extension, 'Expected Kigumi extension to be available in Extension Host');
+  await extension.activate();
+}
+
 describe('Kigumi extension flow', () => {
   it('renders milestone fixture and keeps panel healthy across rerender', async function () {
     this.timeout(40000);
+
+    await activateKigumiExtension();
 
     const fixturePath = path.resolve(__dirname, '..', '..', 'test-fixtures', 'milestone_joint_frame.py');
     const fixtureUri = vscode.Uri.file(fixturePath);
