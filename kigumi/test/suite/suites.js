@@ -7,6 +7,7 @@ const SUITE_FILES = {
   ],
   complex: [
     'extension-viewer-flow.test.js',
+    'extension-complex-validation.test.js',
   ],
 };
 
