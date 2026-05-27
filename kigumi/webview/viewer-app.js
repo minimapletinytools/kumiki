@@ -664,10 +664,6 @@ class KigumiViewerApp extends LitElement {
                         </table>
                     </div>
                 </div>
-                <div class="panel-box">
-                    <div class="panel-title">Raw Python Output</div>
-                    <pre id="raw-output"></pre>
-                </div>
                 <div id="log-panel-box" class="panel-box">
                     <div class="panel-title">
                         Log Output
@@ -678,6 +674,10 @@ class KigumiViewerApp extends LitElement {
                         </div>
                     </div>
                     <div id="log-output"></div>
+                </div>
+                <div class="panel-box">
+                    <div class="panel-title">Raw Python Output</div>
+                    <pre id="raw-output"></pre>
                 </div>
             </div>
         `;
