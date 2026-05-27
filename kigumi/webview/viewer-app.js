@@ -1259,7 +1259,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         if (this.mouseAction === 'orbit') {
-            this.cameraUpVector.set(0, 0, 1);
             this.theta -= (event.clientX - this.lastX) * 0.008;
             this.phi = this.clampPhi(this.phi - (event.clientY - this.lastY) * 0.008);
         } else if (this.mouseAction === 'pan') {
@@ -1868,7 +1867,6 @@ class KigumiViewerApp extends LitElement {
         if (Math.abs(dx) + Math.abs(dy) > 1) {
             this.gizmoMoved = true;
         }
-        this.cameraUpVector.set(0, 0, 1);
         this.theta -= dx * 0.008;
         this.phi = this.clampPhi(this.phi - dy * 0.008);
         this.gizmoLastX = event.clientX;
