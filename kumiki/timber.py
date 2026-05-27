@@ -852,8 +852,7 @@ class PerfectTimberWithin(ABC):
             True if the timber can be extended when cutting joints.
         """
         return True
-    
-    
+     
     @abstractmethod
     def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
         """
@@ -869,6 +868,19 @@ class PerfectTimberWithin(ABC):
               - height_halves: V2(front_half, back_half) — half-sizes in the height dimension
         """
         pass
+
+    def get_nominal_size(self) -> V2:
+        """
+        Returns the nominal cross sectional size of the timber.
+        
+        The nominal size is the total cross sectional size defined by the nominal half-sizes.
+        For a perfect timber, this matches the perfect size. For an imperfect timber, this
+        may differ and represents the intended bounding box for joint layout and intersection tests.
+        """
+        width_halves, height_halves = self.get_nominal_half_sizes()
+        total_w = width_halves[0] + width_halves[1]
+        total_h = height_halves[0] + height_halves[1]
+        return create_v2(total_w, total_h)
     
     def get_perfect_timber_within_CSG_local(self) -> RectangularPrism:
         """

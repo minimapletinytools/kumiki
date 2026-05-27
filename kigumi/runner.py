@@ -333,6 +333,8 @@ def _cut_timber_to_triangle_mesh_payload(
 
     timber = cut_timber.timber
     timber_tags = _normalize_ticket_tags(getattr(timber, "ticket", None))
+    perfect_size = timber.get_perfect_size()
+    nominal_size = timber.get_nominal_size()
     csg_nodes, csg_features = _count_csg_nodes_and_features(local_csg)
     timber_kumiki_id = int(timber.ticket.kumiki_id)
     timber_class = type(timber).__name__
@@ -360,6 +362,10 @@ def _cut_timber_to_triangle_mesh_payload(
         "prism_length": round(float(getattr(timber, "length", dims[2])), 6),
         "prism_width": round(float(getattr(timber, "size", [dims[0], dims[1]])[0]), 6),
         "prism_height": round(float(getattr(timber, "size", [dims[0], dims[1]])[1]), 6),
+        "perfect_width": round(float(perfect_size[0]), 6),
+        "perfect_height": round(float(perfect_size[1]), 6),
+        "nominal_width": round(float(nominal_size[0]), 6),
+        "nominal_height": round(float(nominal_size[1]), 6),
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
         "timberClass": timber_class,
@@ -426,6 +432,10 @@ def _accessory_to_triangle_mesh_payload(
         "prism_length": round(float(dims[2]), 6),
         "prism_width": round(float(dims[0]), 6),
         "prism_height": round(float(dims[1]), 6),
+        "perfect_width": round(float(dims[0]), 6),
+        "perfect_height": round(float(dims[1]), 6),
+        "nominal_width": round(float(dims[0]), 6),
+        "nominal_height": round(float(dims[1]), 6),
     }
 
 
@@ -442,6 +452,8 @@ def _cut_timber_to_bbox_mesh_payload(
     """
     timber = cut_timber.timber
     timber_tags = _normalize_ticket_tags(getattr(timber, "ticket", None))
+    perfect_size = timber.get_perfect_size()
+    nominal_size = timber.get_nominal_size()
     prism = cut_timber.get_bounding_box_prism()
     mesh = prism_to_mesh(prism)
 
@@ -462,6 +474,10 @@ def _cut_timber_to_bbox_mesh_payload(
         "prism_length": round(float(getattr(timber, "length", 0.0)), 6),
         "prism_width": round(float(getattr(timber, "size", [0.0, 0.0])[0]), 6),
         "prism_height": round(float(getattr(timber, "size", [0.0, 0.0])[1]), 6),
+        "perfect_width": round(float(perfect_size[0]), 6),
+        "perfect_height": round(float(perfect_size[1]), 6),
+        "nominal_width": round(float(nominal_size[0]), 6),
+        "nominal_height": round(float(nominal_size[1]), 6),
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
         "meshSource": "bounding-prism-fallback",

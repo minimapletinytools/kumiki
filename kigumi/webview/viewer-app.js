@@ -598,7 +598,7 @@ class KigumiViewerApp extends LitElement {
                         <summary>Legend</summary>
                         <div class="member-list-legend-body">
                             <p><strong>length</strong>: exact length of timber after making all joint cuts (add a bit to this for rough cut length) / rough cut length (depending on option)</p>
-                            <p><strong>nominal sizes</strong>: nominal timber width/height dimensions from the member definition.</p>
+                            <p><strong>size toggle</strong>: when enabled, width/height columns show nominal sizes (from get_nominal_size). when disabled, they show perfect sizes (from get_perfect_size).</p>
                             <p><strong>#CSGs</strong>: total constructive solid geometry nodes used for the member.</p>
                             <p><strong>#Features</strong>: number of named CSG features on that member.</p>
                             <p><strong>tags</strong>: all ticket tags attached to the member.</p>
@@ -884,7 +884,7 @@ class KigumiViewerApp extends LitElement {
         if (memberOptSizes) {
             memberOptSizes.addEventListener('change', (event) => {
                 this.memberListOptions.showNominalSizes = Boolean(event.target.checked);
-                this._applyMemberListOptionVisibility();
+                this._refreshMemberList();
             });
         }
         if (memberOptCsg) {
@@ -2831,18 +2831,37 @@ class KigumiViewerApp extends LitElement {
             const tagsLabel = tags.length > 0 ? tags.join(', ') : '—';
             const row = document.createElement('tr');
             const lengthValue = this._formatMemberLength(mesh);
+            const widthValue = this._formatMemberCrossSection(mesh, 'width');
+            const heightValue = this._formatMemberCrossSection(mesh, 'height');
             row.innerHTML = '<td>' + (index + 1) + '</td>' +
                 '<td>' + this._escapeHtml(typeLabel) + '</td>' +
                 '<td>' + this._escapeHtml(memberName) + '</td>' +
                 '<td data-col="tags" class="dim">' + this._escapeHtml(tagsLabel) + '</td>' +
                 '<td data-col="length" class="dim">' + lengthValue + '</td>' +
-                '<td data-col="width" class="dim">' + (mesh.prism_width  !== undefined ? this.fmt(mesh.prism_width)  : '—') + '</td>' +
-                '<td data-col="height" class="dim">' + (mesh.prism_height !== undefined ? this.fmt(mesh.prism_height) : '—') + '</td>' +
+                '<td data-col="width" class="dim">' + widthValue + '</td>' +
+                '<td data-col="height" class="dim">' + heightValue + '</td>' +
                 '<td data-col="csg" class="dim">' + (mesh.csg_nodes !== undefined ? mesh.csg_nodes : '—') + '</td>' +
                 '<td data-col="feature" class="dim">' + (mesh.csg_features !== undefined ? mesh.csg_features : '—') + '</td>';
             tbody.appendChild(row);
         }
         this._applyMemberListOptionVisibility();
+    }
+
+    _formatMemberCrossSection(mesh, axis) {
+        const nominalKey = axis === 'width' ? 'nominal_width' : 'nominal_height';
+        const perfectKey = axis === 'width' ? 'perfect_width' : 'perfect_height';
+        const legacyKey = axis === 'width' ? 'prism_width' : 'prism_height';
+
+        const selectedValue = this.memberListOptions.showNominalSizes
+            ? mesh[nominalKey]
+            : mesh[perfectKey];
+        const fallbackValue = mesh[legacyKey];
+        const value = selectedValue !== undefined ? selectedValue : fallbackValue;
+
+        if (value === undefined) {
+            return '—';
+        }
+        return this.fmt(value);
     }
 
     _formatMemberLength(mesh) {
@@ -2877,12 +2896,21 @@ class KigumiViewerApp extends LitElement {
         }
 
         table.classList.toggle('member-hide-tags', !this.memberListOptions.showTags);
-        table.classList.toggle('member-hide-sizes', !this.memberListOptions.showNominalSizes);
         table.classList.toggle('member-hide-csg', !this.memberListOptions.showCsgFeatureCount);
 
         const lengthHeader = table.querySelector('th[data-col="length"]');
         if (lengthHeader) {
             lengthHeader.textContent = this.memberListOptions.showRoughLength ? 'Length (Rough)' : 'Length (Exact)';
+        }
+
+        const widthHeader = table.querySelector('th[data-col="width"]');
+        if (widthHeader) {
+            widthHeader.textContent = this.memberListOptions.showNominalSizes ? 'Width (Nominal)' : 'Width (Perfect)';
+        }
+
+        const heightHeader = table.querySelector('th[data-col="height"]');
+        if (heightHeader) {
+            heightHeader.textContent = this.memberListOptions.showNominalSizes ? 'Height (Nominal)' : 'Height (Perfect)';
         }
     }
 
