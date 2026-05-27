@@ -332,6 +332,86 @@ class TestButtJoint:
             )
             cut_plain_butt_joint_on_face_aligned_timbers(arrangement)
 
+    # 🐪
+    def test_butt_joint_aabb_matches_rough_cut_length(self):
+        """Test that AABB bounding box length matches the rough cut length of the butt timber.
+        
+        Creates a butt joint with a random-length timber, renders the CSG,
+        gets its AABB bounding box, extracts the length dimension, and verifies
+        it matches the rough cut length of the butting timber.
+
+        This is really to test various length computation means are consistent, and not so much to test this particular joint.
+        """
+        import random
+        
+        # Create a random timber length between 50 and 150 units
+        random_length = Rational(random.randint(50, 150))
+        
+        # Create two perpendicular timbers
+        # timberA (receiving) extends along +X
+        timberA = create_standard_horizontal_timber(
+            direction='x', 
+            length=int(random_length) + 20,  # Slightly longer to receive the joint
+            size=(6, 6), 
+            position=(0, 0, 0)
+        )
+        
+        # timberB (butt timber) extends along +Y with our random length
+        timberB = create_standard_horizontal_timber(
+            direction='y', 
+            length=int(random_length), 
+            size=(6, 6), 
+            position=(0, 0, 0)
+        )
+        
+        # Create butt joint - timberB butts into timberA at timberB's BOTTOM end
+        arrangement = ButtJointTimberArrangement(
+            butt_timber=timberB,
+            receiving_timber=timberA,
+            butt_timber_end=TimberReferenceEnd.BOTTOM
+        )
+        joint = cut_plain_butt_joint_on_face_aligned_timbers(arrangement)
+        
+        # Get the cut butt timber
+        cut_butt_timber = joint.cut_timbers["butt_timber"]
+        
+        # Render the CSG with cuts applied
+        csg_local = cut_butt_timber.render_timber_with_cuts_csg_local()
+        
+        # Get the AABB bounding box
+        bbox = csg_local.get_aabb()
+        
+        # Verify bbox is valid (not unbounded)
+        assert bbox.min_x is not None, "AABB should be bounded in X"
+        assert bbox.min_y is not None, "AABB should be bounded in Y"
+        assert bbox.min_z is not None, "AABB should be bounded in Z"
+        assert bbox.max_x is not None, "AABB should be bounded in X"
+        assert bbox.max_y is not None, "AABB should be bounded in Y"
+        assert bbox.max_z is not None, "AABB should be bounded in Z"
+        
+        # The timber is oriented along Y, so in local coordinates the length is along Z
+        # Get the length dimension from AABB
+        aabb_length = bbox.max_z - bbox.min_z
+        
+        # Get the rough cut length from the cutting
+        # For a BOTTOM end cut, get the distance from bottom to cut plane
+        cutting = cut_butt_timber.cuts[0]
+        bottom_end_cut = cutting.get_maybe_bottom_end_cut()
+        
+        assert bottom_end_cut is not None, "Butt joint should have a bottom end cut"
+        
+        # The rough cut distance is the offset of the end cut plane from the bottom
+        rough_cut_distance = bottom_end_cut.offset
+        
+        # The AABB min_z should be 0 (bottom of timber in local coords)
+        # and max_z should equal the rough cut distance
+        assert bbox.min_z == Rational(0), "AABB should start at z=0 in local coordinates"
+        
+        # The AABB max_z should equal the rough cut distance
+        # (since the cut removes material above the plane)
+        assert aabb_length == rough_cut_distance, \
+            f"AABB length {aabb_length} should equal rough cut distance {rough_cut_distance}"
+
 
 class TestSpliceJoint:
     """Test cut_plain_butt_splice_joint_on_aligned_timbers function."""
