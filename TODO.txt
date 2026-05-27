@@ -192,6 +192,7 @@ DONE-lock and hide fetaures
 :: TODO
 
 
+
 -PATTERN VIEWER
   DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
   DONE-allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
