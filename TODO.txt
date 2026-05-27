@@ -131,7 +131,9 @@ DONE-ensure make pattern-index before each publish (maybe run as part of the bum
   -initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
 -camera controls should be absolute? use focus to reset
 -searching
-  -show layer tags is broken
+  DONE-show layer tags is broken
+  -maybe layer tags should show in the list view at the bottom instead?
+  -have a drop down list all tags thing that you can click + select rather than search?
   -searching should search for either tags or joint name (figure out a way to do this)
 -cleanup the bottom area for kigumi
   -remove the patternbook

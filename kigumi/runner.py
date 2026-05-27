@@ -700,6 +700,25 @@ def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
     return cuts_meta
 
 
+def _normalize_ticket_tags(ticket: Any) -> List[str]:
+    raw_tags = getattr(ticket, "tags", ())
+    if not isinstance(raw_tags, (list, tuple)):
+        return []
+
+    tags: List[str] = []
+    seen: set[str] = set()
+    for tag in raw_tags:
+        if not isinstance(tag, str):
+            continue
+        normalized = tag.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        tags.append(normalized)
+    tags.sort()
+    return tags
+
+
 def serialize_layers(frame: Any) -> Dict[str, Any]:
     """Build the data payload consumed by the viewer's Layers panel.
 
@@ -714,6 +733,11 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
     for entry in timber_entries:
         timber_id = id(entry["timber"])
         timber_to_kumiki_and_cut[timber_id] = (entry["kumikiId"], entry["cutTimber"])
+
+    timber_tags_by_kumiki_id: Dict[int, List[str]] = {}
+    for entry in timber_entries:
+        timber_ticket = getattr(entry.get("timber"), "ticket", None)
+        timber_tags_by_kumiki_id[entry["kumikiId"]] = _normalize_ticket_tags(timber_ticket)
 
     # Extract joint records from source_joints
     source_joints = list(getattr(frame, "source_joints", ()) or ())
@@ -731,6 +755,7 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             joint_name = None
         joint_type = getattr(joint_ticket, "joint_type", None)
         joint_name = joint_name or (joint_type or "joint")
+        joint_tags = _normalize_ticket_tags(joint_ticket)
         
         # Extract members (timbers) from cut_timbers
         members_list: List[Dict[str, Any]] = []
@@ -777,6 +802,7 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             "kumikiId": joint_kumiki_id,
             "name": joint_name,
             "jointType": joint_type,
+            "tags": joint_tags,
             "members": members_list,
             "accessoryKumikiIds": accessory_kumiki_ids,
         })
@@ -788,6 +814,7 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             "kumikiId": entry["kumikiId"],
             "memberKey": entry["memberKey"],
             "name": entry["displayName"],
+            "tags": list(timber_tags_by_kumiki_id.get(entry["kumikiId"], [])),
             "cuts": cuts_meta,
         })
 
