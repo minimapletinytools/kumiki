@@ -566,9 +566,6 @@ class KigumiViewerApp extends LitElement {
         this.activeTheme = 'forest';
         this.activeBackground = this.activeTheme;
 
-        this.availablePatterns = [];  // [{name, groups, source_file, source}]
-        this.patternsLoading = new Set();  // pattern names currently loading
-
         this.animationHandle = null;
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
@@ -670,18 +667,6 @@ class KigumiViewerApp extends LitElement {
                 <div class="panel-box">
                     <div class="panel-title">Raw Python Output</div>
                     <pre id="raw-output"></pre>
-                </div>
-                <div id="patterns-panel-box" class="panel-box">
-                    <div class="panel-title">
-                        Patterns
-                        <div id="patterns-toolbar">
-                            <button id="patterns-load-btn" type="button">load patterns</button>
-                        </div>
-                    </div>
-                    <div id="patterns-panel">
-                        <div id="patterns-empty" class="patterns-empty-msg">click “load patterns” to scan for available patterns</div>
-                        <div id="patterns-list"></div>
-                    </div>
                 </div>
                 <div id="log-panel-box" class="panel-box">
                     <div class="panel-title">
@@ -911,13 +896,6 @@ class KigumiViewerApp extends LitElement {
         logOpenOutputBtn.addEventListener('click', () => {
             if (vscode) { vscode.postMessage({ type: 'openOutputChannel' }); }
         });
-
-        const patternsLoadBtn = this.renderRoot.querySelector('#patterns-load-btn');
-        if (patternsLoadBtn) {
-            patternsLoadBtn.addEventListener('click', () => {
-                this.requestLoadPatterns();
-            });
-        }
 
         const memberOptRoughLength = this.renderRoot.querySelector('#member-opt-rough-length');
         const memberOptSizes = this.renderRoot.querySelector('#member-opt-sizes');
@@ -1233,11 +1211,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        if (message.type === 'patternsAvailable') {
-            this.handlePatternsAvailable(message);
-            return;
-        }
-
         if (message.type === 'layersTree') {
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
@@ -1249,11 +1222,6 @@ class KigumiViewerApp extends LitElement {
             if (this._layersView && typeof this._layersView.mergeCSGTreePayload === 'function') {
                 this._layersView.mergeCSGTreePayload(message.payload || {});
             }
-            return;
-        }
-
-        if (message.type === 'patternLoadResult') {
-            this.handlePatternLoadResult(message);
             return;
         }
 
@@ -1539,178 +1507,6 @@ class KigumiViewerApp extends LitElement {
         }
 
         this.updateInfo(this.currentFrameData);
-    }
-
-    handlePatternsAvailable(message) {
-        const sources = Array.isArray(message.sources) ? message.sources : [];
-        const flat = [];
-        for (const src of sources) {
-            const sourceLabel = src.source || 'unknown';
-            const patterns = Array.isArray(src.patterns) ? src.patterns : [];
-            for (const p of patterns) {
-                flat.push({
-                    name: p.name,
-                    groups: Array.isArray(p.groups) ? p.groups : [],
-                    source_file: p.source_file || '',
-                    source: sourceLabel,
-                });
-            }
-        }
-        this.availablePatterns = flat;
-        this.patternsLoading.clear();
-        const loadBtn = this.renderRoot.querySelector('#patterns-load-btn');
-        if (loadBtn) {
-            loadBtn.disabled = false;
-            loadBtn.textContent = 'reload patterns';
-        }
-        this.renderPatternsList();
-    }
-
-    handlePatternLoadResult(message) {
-        const patternName = message.patternName;
-        if (patternName) {
-            this.patternsLoading.delete(patternName);
-        }
-        const sourceFile = message.sourceFile;
-        if (sourceFile) {
-            this.patternsLoading.delete('book:' + sourceFile);
-        }
-        this.renderPatternsList();
-    }
-
-    onPatternClick(patternName, sourceFile) {
-        if (this.patternsLoading.has(patternName)) {
-            return;
-        }
-        this.patternsLoading.add(patternName);
-        this.renderPatternsList();
-        if (vscode) {
-            vscode.postMessage({
-                type: 'loadPattern',
-                patternName,
-                sourceFile,
-            });
-        }
-    }
-
-    onBookClick(sourceFile) {
-        // Use the source_file as a loading key for the book
-        const bookKey = 'book:' + sourceFile;
-        if (this.patternsLoading.has(bookKey)) {
-            return;
-        }
-        this.patternsLoading.add(bookKey);
-        this.renderPatternsList();
-        if (vscode) {
-            vscode.postMessage({
-                type: 'loadBook',
-                sourceFile,
-            });
-        }
-    }
-
-    requestLoadPatterns() {
-        const rescan = this.availablePatterns.length > 0;
-        const loadBtn = this.renderRoot.querySelector('#patterns-load-btn');
-        if (loadBtn) {
-            loadBtn.disabled = true;
-            loadBtn.textContent = 'scanning…';
-        }
-        const emptyEl = this.renderRoot.querySelector('#patterns-empty');
-        if (emptyEl && this.availablePatterns.length === 0) {
-            emptyEl.textContent = 'scanning for patterns…';
-            emptyEl.style.display = 'block';
-        }
-        if (vscode) {
-            vscode.postMessage({ type: 'requestLoadPatterns', rescan });
-        }
-    }
-
-    renderPatternsList() {
-        const listEl = this.renderRoot.querySelector('#patterns-list');
-        const emptyEl = this.renderRoot.querySelector('#patterns-empty');
-        if (!listEl || !emptyEl) {
-            return;
-        }
-
-        if (this.availablePatterns.length === 0) {
-            emptyEl.style.display = 'block';
-            listEl.innerHTML = '';
-            return;
-        }
-        emptyEl.style.display = 'none';
-
-        // Group by source (shipped/local), then by book (source_file)
-        const bySource = new Map();
-        for (const p of this.availablePatterns) {
-            const sourceKey = p.source === 'shipped' ? 'Shipped Library' : p.source === 'local' ? 'Local Project' : p.source;
-            if (!bySource.has(sourceKey)) {
-                bySource.set(sourceKey, new Map());
-            }
-            const books = bySource.get(sourceKey);
-            if (!books.has(p.source_file)) {
-                books.set(p.source_file, []);
-            }
-            books.get(p.source_file).push(p);
-        }
-
-        let html = '';
-        let bookIdx = 0;
-        for (const [sourceLabel, books] of bySource) {
-            html += `<div class="patterns-source-label">${this._escapeHtml(sourceLabel)}</div>`;
-            for (const [sourceFile, patterns] of books) {
-                const bookName = sourceFile.replace(/\\/g, '/').split('/').pop().replace(/\.py$/, '');
-                const bookLoading = this.patternsLoading.has('book:' + sourceFile);
-                const anyPatternLoading = patterns.some(p => this.patternsLoading.has(p.name));
-                const bookClass = bookLoading ? ' patterns-book-loading' : '';
-                html += `<div class="patterns-book${bookClass}" data-book-idx="${bookIdx}">`;
-                html += `<button class="patterns-book-header" data-book-idx="${bookIdx}" data-source-file="${this._escapeAttr(sourceFile)}" ${bookLoading ? 'disabled' : ''}>`;
-                html += `<span class="patterns-book-name">${this._escapeHtml(bookName)}</span>`;
-                html += `<span class="patterns-book-count">${patterns.length}</span>`;
-                if (bookLoading || anyPatternLoading) {
-                    html += ' <span class="patterns-item-spinner">…</span>';
-                }
-                html += '</button>';
-                html += '<div class="patterns-book-items">';
-                for (const p of patterns) {
-                    const isLoading = this.patternsLoading.has(p.name);
-                    const loadingClass = isLoading ? ' patterns-item-loading' : '';
-                    html += `<button class="patterns-item${loadingClass}" data-pattern-name="${this._escapeAttr(p.name)}" data-source-file="${this._escapeAttr(p.source_file)}" ${isLoading ? 'disabled' : ''}>`;
-                    html += `<span class="patterns-item-name">${this._escapeHtml(p.name)}</span>`;
-                    if (isLoading) {
-                        html += ' <span class="patterns-item-spinner">…</span>';
-                    }
-                    html += '</button>';
-                }
-                html += '</div></div>';
-                bookIdx++;
-            }
-        }
-        listEl.innerHTML = html;
-
-        // Bind pattern click events
-        const buttons = listEl.querySelectorAll('.patterns-item');
-        for (const btn of buttons) {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const name = btn.getAttribute('data-pattern-name');
-                const file = btn.getAttribute('data-source-file');
-                if (name && file) {
-                    this.onPatternClick(name, file);
-                }
-            });
-        }
-
-        // Bind book header click events (open all patterns in book)
-        const bookHeaders = listEl.querySelectorAll('.patterns-book-header');
-        for (const header of bookHeaders) {
-            header.addEventListener('click', () => {
-                const sourceFile = header.getAttribute('data-source-file');
-                if (sourceFile) {
-                    this.onBookClick(sourceFile);
-                }
-            });
-        }
     }
 
     _escapeHtml(str) {

@@ -760,12 +760,6 @@ async function getOrCreateSession(filePath, context) {
         },
         { slotName: 'main', sessionType: 'main', openInSplitView }
     );
-    session.onLoadPattern = async (patternName, sourceFile) => {
-        await _openPatternFromWebview(session, patternName, sourceFile, context);
-    };
-    session.onLoadBook = async (sourceFile) => {
-        await _openBookFromWebview(session, sourceFile, context);
-    };
     frameSessions.set(filePath, session);
     await session.initialize();
     return session;
