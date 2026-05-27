@@ -131,10 +131,11 @@ def _should_collapse(expr, collapse_mode: CollapseMode) -> bool:
     # SMART mode — collapse only when expression is complex
     if is_complex_expr(expr):
         if not is_float_numeric_mode():
-            warnings.warn(
-                f"Expression exceeded complexity threshold and will be collapsed to Float: {repr(expr)[:120]}",
-                stacklevel=3,
-            )
+            #warnings.warn(
+            #    f"Expression exceeded complexity threshold and will be collapsed to Float: {repr(expr)[:120]}",
+            #    stacklevel=3,
+            #)
+            pass
         return True
     return False
 
