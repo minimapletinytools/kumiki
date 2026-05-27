@@ -69,11 +69,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "kigumi.refreshPatterns",
-        "title": "Kigumi: Refresh Patterns",
-        "icon": "$(refresh)"
-      },
-      {
         "command": "kigumi.toggleGroupByPatternbook",
         "title": "Kigumi: Toggle Patternbook Grouping",
         "icon": "$(list-tree)"
@@ -104,7 +99,7 @@
         {
           "command": "kigumi.refreshSidebar",
           "when": "view == kigumi.explorer",
-          "group": "navigation@4"
+          "group": "navigation@3"
         }
       ],
       "commandPalette": [
@@ -117,11 +112,11 @@
           "when": "false"
         },
         {
-          "command": "kigumi.refreshPatterns",
+          "command": "kigumi.toggleGroupByPatternbook",
           "when": "false"
         },
         {
-          "command": "kigumi.toggleGroupByPatternbook",
+          "command": "kigumi.openWebsite",
           "when": "false"
         }
       ]
