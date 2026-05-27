@@ -1290,6 +1290,8 @@ class TestFrameBoundingBox:
         # Get the bounding prisms for both timbers
         timberA_prism = cut_timberA.DEPRECATED_approximate_bounding_prism()
         timberB_prism = cut_timberB.DEPRECATED_approximate_bounding_prism()
+        assert timberA_prism.start_distance is not None and timberA_prism.end_distance is not None
+        assert timberB_prism.start_distance is not None and timberB_prism.end_distance is not None
         
         # TimberA should still be 20" long (uncut)
         timberA_length = abs(timberA_prism.end_distance - timberA_prism.start_distance)

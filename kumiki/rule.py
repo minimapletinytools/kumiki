@@ -512,7 +512,10 @@ def giraffe_dot_product(vec1: Matrix, vec2: Matrix, collapse_mode: CollapseMode 
     Compute dot product manually (bypasses SymPy's matrix multiplication).
     Optionally collapse result to Float.
     """
-    result = sum(v1 * v2 for v1, v2 in zip(vec1, vec2))  # type: ignore[arg-type]
+    vec1_values = [vec1[i, j] for i in range(vec1.rows) for j in range(vec1.cols)]
+    vec2_values = [vec2[i, j] for i in range(vec2.rows) for j in range(vec2.cols)]
+    assert len(vec1_values) == len(vec2_values), "Vectors must have the same number of elements"
+    result = sum(v1 * v2 for v1, v2 in zip(vec1_values, vec2_values))
     return _collapse_scalar(result, collapse_mode)
 
 

@@ -166,6 +166,7 @@ def main():
         if error:
             lines.append(f"{name:<25} {'FAILED':>10} {'':>10}  {error}")
         else:
+            assert wall_time is not None
             hash_col = f"{hash_time:.3f}" if hash_time is not None else "n/a"
             lines.append(f"{name:<25} {wall_time:>10.3f} {hash_col:>10}  {description}")
             total_time += wall_time
