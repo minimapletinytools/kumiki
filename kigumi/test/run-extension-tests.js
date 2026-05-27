@@ -45,6 +45,7 @@ async function main() {
       extensionTestsPath,
       extensionTestsEnv: {
         ...process.env,
+        KIGUMI_ENABLE_TEST_COMMANDS: '1',
         KIGUMI_EXT_TEST_SUITE: suite,
         KIGUMI_EXT_TEST_GREP: grep,
       },

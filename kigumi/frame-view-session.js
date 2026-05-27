@@ -521,6 +521,103 @@ class FrameViewSession {
         };
     }
 
+    async capturePanelSnapshot(options = {}) {
+        if (this.isDisposed || !this.panel) {
+            throw new Error(`Viewer panel is not available for ${this.filePath}`);
+        }
+
+        const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 3000;
+        const requestId = `panel-snapshot-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            let timeoutHandle = null;
+
+            const cleanup = () => {
+                if (timeoutHandle) {
+                    clearTimeout(timeoutHandle);
+                    timeoutHandle = null;
+                }
+                listener.dispose();
+            };
+
+            const listener = this.panel.webview.onDidReceiveMessage((message) => {
+                if (!message || message.type !== 'capturePanelSnapshotResult' || message.requestId !== requestId) {
+                    return;
+                }
+                if (settled) {
+                    return;
+                }
+
+                settled = true;
+                cleanup();
+                if (message.ok) {
+                    resolve(message.snapshot || {});
+                    return;
+                }
+                reject(new Error(message.error || 'Panel snapshot failed'));
+            });
+
+            timeoutHandle = setTimeout(() => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                cleanup();
+                reject(new Error(`Timed out waiting for panel snapshot (${timeoutMs}ms)`));
+            }, timeoutMs);
+
+            this.panel.webview.postMessage({
+                type: 'capturePanelSnapshotRequest',
+                requestId,
+            }).then((posted) => {
+                if (!posted && !settled) {
+                    settled = true;
+                    cleanup();
+                    reject(new Error('Failed to post panel snapshot request to webview'));
+                }
+            }, (error) => {
+                if (!settled) {
+                    settled = true;
+                    cleanup();
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    getTestSnapshot() {
+        const frameData = this._lastFrameData || null;
+        const geometryData = this._lastGeometryData || null;
+        const profilingData = this._lastProfiling || null;
+        return {
+            filePath: this.filePath,
+            isDisposed: this.isDisposed,
+            hasPanel: Boolean(this.panel),
+            panelTitle: this.panel ? this.panel.title : null,
+            sessionType: this.sessionType,
+            slotName: this.slotName,
+            refreshSequence: this.refreshSequence,
+            hasRunner: Boolean(this.runnerSession),
+            runnerAlive: Boolean(this.runnerSession && this.runnerSession.isAlive()),
+            frame: frameData ? {
+                name: frameData.name || null,
+                timberCount: Number.isFinite(frameData.timber_count) ? frameData.timber_count : 0,
+                accessoryCount: Number.isFinite(frameData.accessories_count) ? frameData.accessories_count : 0,
+            } : null,
+            geometry: geometryData ? {
+                meshCount: Array.isArray(geometryData.meshes) ? geometryData.meshes.length : 0,
+                changedCount: Array.isArray(geometryData.changedKeys) ? geometryData.changedKeys.length : 0,
+                removedCount: Array.isArray(geometryData.removedKeys) ? geometryData.removedKeys.length : 0,
+            } : null,
+            profiling: profilingData ? {
+                reloadSeconds: typeof profilingData.reload_s === 'number' ? profilingData.reload_s : null,
+                geometrySeconds: typeof profilingData.geometry_s === 'number' ? profilingData.geometry_s : null,
+                refreshTotalSeconds: typeof profilingData.refresh_total_s === 'number' ? profilingData.refresh_total_s : null,
+            } : null,
+        };
+    }
+
     async _handleFindCSGAtPoint(message) {
         if (!this.runnerSession) {
             return;

@@ -1195,6 +1195,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'capturePanelSnapshotRequest') {
+            this.handleCapturePanelSnapshotRequest(message);
+            return;
+        }
+
         if (message.type === 'logEntry') {
             const text = typeof message.text === 'string' ? message.text : String(message.text);
             this.appendLogLine(text);
@@ -1280,6 +1285,51 @@ class KigumiViewerApp extends LitElement {
                 requestId,
                 ok: false,
                 error: error && error.message ? error.message : 'Unknown screenshot capture error',
+            });
+        }
+    }
+
+    handleCapturePanelSnapshotRequest(message) {
+        const requestId = message && message.requestId;
+        if (!vscode || !requestId) {
+            return;
+        }
+
+        try {
+            const titles = Array.from(this.renderRoot.querySelectorAll('#panels .panel-title'))
+                .map((element) => (element.textContent || '').replace(/\s+/g, ' ').trim())
+                .filter((label) => label.length > 0);
+            const rawPanelIndex = titles.indexOf('Raw Python Output');
+            const memberRowsElement = this.renderRoot.querySelector('#timber-rows');
+            const memberRows = this.renderRoot.querySelectorAll('#timber-rows tr').length;
+            const logText = this.renderRoot.querySelector('#log-output')
+                ? this.renderRoot.querySelector('#log-output').textContent || ''
+                : '';
+
+            vscode.postMessage({
+                type: 'capturePanelSnapshotResult',
+                requestId,
+                ok: true,
+                snapshot: {
+                    panelTitles: titles,
+                    panelCount: titles.length,
+                    hasMemberListPanel: titles.includes('Member List'),
+                    hasMemberTableBody: Boolean(memberRowsElement),
+                    hasLogOutputPanel: titles.some((label) => label.startsWith('Log Output')),
+                    hasRawPythonOutputPanel: rawPanelIndex >= 0,
+                    rawPythonOutputPanelIndex: rawPanelIndex,
+                    isRawPythonOutputPanelLast: rawPanelIndex >= 0 && rawPanelIndex === titles.length - 1,
+                    hasRenderControls: Boolean(this.renderRoot.querySelector('#render-controls')),
+                    memberRowCount: memberRows,
+                    logTextLength: logText.length,
+                },
+            });
+        } catch (error) {
+            vscode.postMessage({
+                type: 'capturePanelSnapshotResult',
+                requestId,
+                ok: false,
+                error: error && error.message ? error.message : 'Unknown panel snapshot error',
             });
         }
     }

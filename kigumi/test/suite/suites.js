@@ -3,6 +3,7 @@ const path = require('path');
 const SUITE_FILES = {
   initial: [
     'extension-smoke.test.js',
+    'extension-initial-state.test.js',
   ],
   complex: [
     'extension-viewer-flow.test.js',

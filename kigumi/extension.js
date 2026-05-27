@@ -17,6 +17,7 @@ let patternSlotCounter = 0;
 let sidebarProvider = null;
 let openInSplitView = true;
 const BUILD_MARKER = '🧪 KIGUMI_BUILD_2026-05-17T02:45Z';
+const ENABLE_TEST_COMMANDS = process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1';
 
 /**
  * Main activation function for the Kigumi extension.
@@ -455,6 +456,58 @@ function activate(context) {
     );
 
     context.subscriptions.push(screenshotDisposable);
+
+    if (ENABLE_TEST_COMMANDS) {
+        const sidebarSnapshotDisposable = vscode.commands.registerCommand(
+            'kigumi.testGetSidebarSnapshot',
+            async (options = {}) => {
+                if (!sidebarProvider) {
+                    return null;
+                }
+                return sidebarProvider.getTestSnapshot(options);
+            }
+        );
+
+        const sessionSnapshotDisposable = vscode.commands.registerCommand(
+            'kigumi.testGetSessionSnapshot',
+            async (options = {}) => {
+                const targetFilePath =
+                    typeof options.filePath === 'string' && options.filePath
+                        ? options.filePath
+                        : vscode.window.activeTextEditor && vscode.window.activeTextEditor.document
+                            ? vscode.window.activeTextEditor.document.fileName
+                            : null;
+
+                if (!targetFilePath) {
+                    return { exists: false, reason: 'No file path was provided.' };
+                }
+
+                const session = frameSessions.get(targetFilePath);
+                if (!session || session.isDisposed) {
+                    return { exists: false, filePath: targetFilePath };
+                }
+
+                const snapshot = session.getTestSnapshot();
+                if (options.includePanelSnapshot) {
+                    try {
+                        snapshot.panelSnapshot = await session.capturePanelSnapshot({
+                            timeoutMs: Number.isFinite(options.timeoutMs) ? options.timeoutMs : 3000,
+                        });
+                    } catch (error) {
+                        snapshot.panelSnapshot = null;
+                        snapshot.panelSnapshotError = error && error.message ? error.message : String(error);
+                    }
+                }
+                return {
+                    exists: true,
+                    ...snapshot,
+                };
+            }
+        );
+
+        context.subscriptions.push(sidebarSnapshotDisposable, sessionSnapshotDisposable);
+    }
+
     context.subscriptions.push({
         dispose: async () => {
             const allSessions = [
