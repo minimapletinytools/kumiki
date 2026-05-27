@@ -1689,9 +1689,9 @@ class CutTimber:
                         z_intersect = (end_cut.offset - end_cut.normal[0]*corner_x - end_cut.normal[1]*corner_y) / end_cut.normal[2]
                         intersections.append(z_intersect)
                 
-                # For top end cut, take the maximum intersection (furthest extent)
+                # For top end cut, clamp the top bound down to the cut plane extent.
                 if intersections:
-                    max_z = Max(max_z, *intersections)
+                    max_z = Min(max_z, *intersections)
             
             # Handle bottom end cut
             if bottom_end_cut is not None:
@@ -1703,9 +1703,9 @@ class CutTimber:
                         z_intersect = (end_cut.offset - end_cut.normal[0]*corner_x - end_cut.normal[1]*corner_y) / end_cut.normal[2]
                         intersections.append(z_intersect)
                 
-                # For bottom end cut, take the minimum intersection (furthest extent)
+                # For bottom end cut, clamp the bottom bound up to the cut plane extent.
                 if intersections:
-                    min_z = Min(min_z, *intersections)
+                    min_z = Max(min_z, *intersections)
         
         return RectangularPrism(
             size=self.timber.size,

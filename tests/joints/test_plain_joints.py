@@ -375,11 +375,11 @@ class TestButtJoint:
         # Get the cut butt timber
         cut_butt_timber = joint.cut_timbers["butt_timber"]
         
-        # Render the CSG with cuts applied
-        csg_local = cut_butt_timber.render_timber_with_cuts_csg_local()
-        
-        # Get the AABB bounding box
-        bbox = csg_local.get_aabb()
+        # Use the analytical finite bounding prism for dimensional checks.
+        # render_timber_with_cuts_csg_local() starts from an intentionally
+        # extended (possibly infinite) base CSG when end-cuts are present.
+        bbox_prism = cut_butt_timber.get_bounding_box_prism()
+        bbox = bbox_prism.get_aabb()
         
         # Verify bbox is valid (not unbounded)
         assert bbox.min_x is not None, "AABB should be bounded in X"
@@ -389,9 +389,11 @@ class TestButtJoint:
         assert bbox.max_y is not None, "AABB should be bounded in Y"
         assert bbox.max_z is not None, "AABB should be bounded in Z"
         
-        # The timber is oriented along Y, so in local coordinates the length is along Z
-        # Get the length dimension from AABB
-        aabb_length = bbox.max_z - bbox.min_z
+        assert bbox_prism.start_distance is not None
+        assert bbox_prism.end_distance is not None
+
+        # Get length from the finite local z-extents.
+        aabb_length = bbox_prism.end_distance - bbox_prism.start_distance
         
         # Get the rough cut length from the cutting
         # For a BOTTOM end cut, get the distance from bottom to cut plane
@@ -400,17 +402,15 @@ class TestButtJoint:
         
         assert bottom_end_cut is not None, "Butt joint should have a bottom end cut"
         
-        # The rough cut distance is the offset of the end cut plane from the bottom
-        rough_cut_distance = bottom_end_cut.offset
-        
-        # The AABB min_z should be 0 (bottom of timber in local coords)
-        # and max_z should equal the rough cut distance
-        assert bbox.min_z == Rational(0), "AABB should start at z=0 in local coordinates"
-        
-        # The AABB max_z should equal the rough cut distance
-        # (since the cut removes material above the plane)
-        assert aabb_length == rough_cut_distance, \
-            f"AABB length {aabb_length} should equal rough cut distance {rough_cut_distance}"
+        # For a BOTTOM cut at distance d, remaining local z-range is [d, length],
+        # so rough-cut length is length - d.
+        rough_cut_distance = -bottom_end_cut.offset
+        expected_rough_cut_length = cut_butt_timber.timber.length - rough_cut_distance
+
+        assert bbox_prism.start_distance == rough_cut_distance, \
+            f"Bounding prism start {bbox_prism.start_distance} should match bottom cut distance {rough_cut_distance}"
+        assert aabb_length == expected_rough_cut_length, \
+            f"AABB length {aabb_length} should equal rough cut length {expected_rough_cut_length}"
 
 
 class TestSpliceJoint:
