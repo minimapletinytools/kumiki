@@ -218,6 +218,27 @@ class PythonRunnerSession {
             .filter((line) => line.length > 0);
     }
 
+    async isCadqueryOcpInstalled() {
+        await this.ensurePythonEnvironment();
+        const pythonCmd = this.getPythonCommand();
+        const snippet = [
+            'import importlib.util',
+            'has_ocp = importlib.util.find_spec("OCP") is not None',
+            'print("1" if has_ocp else "0")',
+        ].join('; ');
+        const { stdout } = await this.runCommand(pythonCmd, ['-c', snippet]);
+        return stdout.trim() === '1';
+    }
+
+    async installCadqueryOcp() {
+        await this.ensurePythonEnvironment();
+        const pythonCmd = this.getPythonCommand();
+        this.channel.appendLine('[env] Installing cadquery-ocp for STEP export...');
+        await this.ensurePipAvailable(pythonCmd);
+        await this.runCommand(pythonCmd, ['-m', 'pip', 'install', 'cadquery-ocp']);
+        this.channel.appendLine('[env] cadquery-ocp installation finished.');
+    }
+
     async ensurePipAvailable(pythonCmd) {
         try {
             await this.runCommand(pythonCmd, ['-m', 'pip', '--version']);

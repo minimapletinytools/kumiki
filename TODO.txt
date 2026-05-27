@@ -127,6 +127,8 @@ DONE-kigumi sidebar
 DONE-ensure make pattern-index before each publish (maybe run as part of the bump version job)
 DONE/IGNORE-BUG my_cute_frame no longer getting scanned
 -fix export
+  -add buttons
+  -add cadquery check and install button ugh
 -kigumi init
   DONE-initilaize project should also set .gitignore
   DONE-update kumiki should be grayed out if no project is initialized and it should just not show at all acutaly..
@@ -140,7 +142,8 @@ DONE/IGNORE-BUG my_cute_frame no longer getting scanned
   -searching should search for either tags or joint name (figure out a way to do this)
 -cleanup the bottom area for kigumi
   -remove the patternbook
-  -tighten the member list, dimenison + rought cut + add export button
+  -tighten the member list, dimenison + rought cut 
+  -add export button
 -do a design pass
   -better logo
   -stuff showing below the view should be cleaner/tighter 

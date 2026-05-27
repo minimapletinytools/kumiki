@@ -112,6 +112,7 @@ function ensureGitignore(workspaceRoot) {
     const gitignorePath = path.join(workspaceRoot, '.gitignore');
     const requiredEntries = [
         '.venv/',
+        'kigumi_exports/',
     ];
 
     if (!fs.existsSync(gitignorePath)) {

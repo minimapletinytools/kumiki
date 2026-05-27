@@ -277,7 +277,6 @@ class ViewerSettingsPanel {
     render() {
         return html`
             <section id="render-controls" aria-label="Viewer options">
-                <button id="refresh-btn" type="button" title="Reload pattern">↻ refresh</button>
                 <label>
                     <input id="center-gizmo-toggle" type="checkbox" ?checked=${this.app.showCenterGizmo}>
                     center gizmo
@@ -335,6 +334,51 @@ class ViewerSettingsPanel {
                         ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${theme.label}</option>`)}
                     </select>
                 </label>
+                <label>
+                    <input id="export-individual-toggle" type="checkbox" ?checked=${this.app.exportIndividualsEnabled}>
+                    also export individual files
+                </label>
+                <button
+                    id="refresh-btn"
+                    type="button"
+                    title="Reload pattern"
+                    @click=${() => {
+                        if (vscode) {
+                            vscode.postMessage({ type: 'requestRefresh' });
+                        }
+                    }}>↻ refresh</button>
+                <button
+                    id="export-stl-btn"
+                    type="button"
+                    title="Export frame members to STL files"
+                    @click=${() => {
+                        if (vscode) {
+                            vscode.postMessage({ type: 'requestExportStl', includeIndividuals: this.app.exportIndividualsEnabled });
+                        }
+                    }}>export STL</button>
+                ${this.app.cadqueryOcpInstalled === false
+                    ? html`<button
+                        id="install-cadquery-ocp-btn"
+                        type="button"
+                        title="Install cadquery-ocp for STEP export"
+                        ?disabled=${this.app.installingCadqueryOcp === true}
+                        @click=${() => {
+                            if (vscode) {
+                                vscode.postMessage({ type: 'requestInstallCadqueryOcp' });
+                            }
+                        }}>${this.app.installingCadqueryOcp === true
+                            ? 'installing cadquery...'
+                            : 'install cadquery, needed for STEP export'}</button>`
+                    : html`<button
+                        id="export-step-btn"
+                        type="button"
+                        title="Export frame members to STEP files"
+                        ?disabled=${this.app.cadqueryOcpInstalled === null}
+                        @click=${() => {
+                            if (vscode) {
+                                vscode.postMessage({ type: 'requestExportStep', includeIndividuals: this.app.exportIndividualsEnabled });
+                            }
+                        }}>export STEP</button>`}
             </section>
         `;
     }
@@ -348,7 +392,7 @@ class ViewerSettingsPanel {
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const debugToggle = renderRoot.querySelector('#debug-toggle');
         const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
-        const refreshButton = renderRoot.querySelector('#refresh-btn');
+        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
 
         centerGizmoToggle.addEventListener('change', (event) => {
@@ -387,18 +431,16 @@ class ViewerSettingsPanel {
             this.app.setReflectionsEnabled(event.target.checked);
         });
 
+        exportIndividualToggle.addEventListener('change', (event) => {
+            this.app.setExportIndividualsEnabled(event.target.checked);
+        });
+
         unselectedTransparencySlider.addEventListener('input', (event) => {
             const rawVisibility = Number(event.target.value);
             const normalizedVisibility = Number.isFinite(rawVisibility)
                 ? Math.max(5, Math.min(100, Math.round(rawVisibility / 5) * 5))
                 : 60;
             this.app.setUnselectedTransparencyPercent(100 - normalizedVisibility);
-        });
-
-        refreshButton.addEventListener('click', () => {
-            if (vscode) {
-                vscode.postMessage({ type: 'requestRefresh' });
-            }
         });
 
         themeSelect.addEventListener('change', (event) => {
@@ -417,6 +459,7 @@ class ViewerSettingsPanel {
         const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
+        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
         if (edgeVisibilitySlider) {
             edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
@@ -426,6 +469,9 @@ class ViewerSettingsPanel {
         }
         if (layerTagsToggle) {
             layerTagsToggle.checked = this.app.showLayerTags;
+        }
+        if (exportIndividualToggle) {
+            exportIndividualToggle.checked = this.app.exportIndividualsEnabled;
         }
         if (themeSelect) {
             themeSelect.value = this.app.activeTheme;
@@ -527,6 +573,9 @@ class KigumiViewerApp extends LitElement {
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
         this.viewerOptions = normalizeViewerOptions(INITIAL_PAYLOAD.viewerOptions);
+        this.cadqueryOcpInstalled = null;
+        this.installingCadqueryOcp = false;
+        this.exportIndividualsEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
         this.activeRefreshToken = 0;
         this.onWindowMessage = this.onWindowMessage.bind(this);
@@ -1065,6 +1114,15 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
+    setExportIndividualsEnabled(enabled) {
+        const normalized = Boolean(enabled);
+        if (this.exportIndividualsEnabled === normalized) {
+            return;
+        }
+        this.exportIndividualsEnabled = normalized;
+        this.requestUpdate();
+    }
+
     updateStructureScreenBounds() {
         if (!this.camera || !this.lastBounds) {
             this.structureScreenBounds = null;
@@ -1196,6 +1254,24 @@ class KigumiViewerApp extends LitElement {
 
         if (message.type === 'patternLoadResult') {
             this.handlePatternLoadResult(message);
+            return;
+        }
+
+        if (message.type === 'dependencyStatus') {
+            const payload = (message.payload && typeof message.payload === 'object') ? message.payload : {};
+            if (typeof payload.cadqueryOcpInstalled === 'boolean') {
+                this.cadqueryOcpInstalled = payload.cadqueryOcpInstalled;
+                this.requestUpdate();
+            }
+            return;
+        }
+
+        if (message.type === 'dependencyInstallStatus') {
+            const payload = (message.payload && typeof message.payload === 'object') ? message.payload : {};
+            if (typeof payload.installingCadqueryOcp === 'boolean') {
+                this.installingCadqueryOcp = payload.installingCadqueryOcp;
+                this.requestUpdate();
+            }
             return;
         }
     }

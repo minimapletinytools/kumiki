@@ -2203,6 +2203,58 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         log_stderr(f"[slot] Raised pattern '{pattern_name}' in slot '{slot_name}'")
         return state, make_success_response(request_id, command, result), False
 
+    if command == "export_frame":
+        ss = _resolve_slot(state, payload)
+        export_format = str(payload.get("format", "stl")).lower()
+        output_dir_raw = payload.get("outputDir")
+        include_individuals = bool(payload.get("includeIndividuals", True))
+
+        if export_format not in {"stl", "step"}:
+            raise ValueError("export_frame requires payload.format to be 'stl' or 'step'")
+        if not isinstance(output_dir_raw, str) or not output_dir_raw:
+            raise ValueError("export_frame requires payload.outputDir")
+
+        output_dir = Path(output_dir_raw).resolve()
+        if _project_root is not None:
+            allowed_root = (_project_root / "kigumi_exports").resolve()
+            try:
+                output_dir.relative_to(allowed_root)
+            except ValueError as exc:
+                raise ValueError("export_frame outputDir must be inside project kigumi_exports/") from exc
+
+        if export_format == "stl":
+            from kumiki.blueprint import export_frame_stl
+
+            written = export_frame_stl(ss.frame, output_dir, combined=True)
+            combined_name = "_combined.stl"
+            extension_glob = "*.stl"
+        else:
+            from kumiki.blueprint import export_frame_step
+
+            written = export_frame_step(ss.frame, output_dir, combined=True)
+            combined_name = "_combined.step"
+            extension_glob = "*.step"
+
+        if not include_individuals:
+            for candidate in output_dir.glob(extension_glob):
+                if candidate.name == combined_name:
+                    continue
+                try:
+                    candidate.unlink()
+                except OSError as exc:
+                    log_stderr(f"Warning: failed to remove individual export '{candidate}': {exc}")
+
+            combined_path = output_dir / combined_name
+            written = [combined_path] if combined_path.exists() else []
+
+        return state, make_success_response(request_id, command, {
+            "format": export_format,
+            "outputDir": str(output_dir),
+            "includeIndividuals": include_individuals,
+            "files": [str(path) for path in written],
+            "count": len(written),
+        }), False
+
     if command == "shutdown":
         return state, make_success_response(request_id, command, {"shutting_down": True}), True
 
