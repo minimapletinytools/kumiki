@@ -332,6 +332,7 @@ def _cut_timber_to_triangle_mesh_payload(
     dims = actual["bounds"][1] - actual["bounds"][0]
 
     timber = cut_timber.timber
+    timber_tags = _normalize_ticket_tags(getattr(timber, "ticket", None))
     csg_nodes, csg_features = _count_csg_nodes_and_features(local_csg)
     timber_kumiki_id = int(timber.ticket.kumiki_id)
     timber_class = type(timber).__name__
@@ -351,6 +352,7 @@ def _cut_timber_to_triangle_mesh_payload(
         "memberKey": timber_key,
         "timberKey": timber_key,
         "kumikiId": timber_kumiki_id,
+        "tags": timber_tags,
         # Top-level vertices/indices remain the actual-geometry mesh for
         # backwards compatibility with viewers that pre-date the dual mesh.
         "vertices": vertices,
@@ -410,6 +412,7 @@ def _accessory_to_triangle_mesh_payload(
     dims = bounds[1] - bounds[0]
 
     accessory_kumiki_id = int(accessory.ticket.kumiki_id) if getattr(accessory, "ticket", None) is not None else 0
+    accessory_tags = _normalize_ticket_tags(getattr(accessory, "ticket", None))
     return {
         "name": accessory_name,
         "memberName": accessory_name,
@@ -417,6 +420,7 @@ def _accessory_to_triangle_mesh_payload(
         "memberKey": accessory_key,
         "timberKey": accessory_key,
         "kumikiId": accessory_kumiki_id,
+        "tags": accessory_tags,
         "vertices": vertices,
         "indices": indices,
         "prism_length": round(float(dims[2]), 6),
@@ -437,6 +441,7 @@ def _cut_timber_to_bbox_mesh_payload(
     haven't tried this, not sure how well it works, I guess the bbox might not be oriented correctly in this version...
     """
     timber = cut_timber.timber
+    timber_tags = _normalize_ticket_tags(getattr(timber, "ticket", None))
     prism = cut_timber.get_bounding_box_prism()
     mesh = prism_to_mesh(prism)
 
@@ -451,6 +456,7 @@ def _cut_timber_to_bbox_mesh_payload(
         "memberKey": timber_key,
         "timberKey": timber_key,
         "kumikiId": timber_kumiki_id,
+        "tags": timber_tags,
         "vertices": mesh["vertices"],
         "indices": mesh["indices"],
         "prism_length": round(float(getattr(timber, "length", 0.0)), 6),

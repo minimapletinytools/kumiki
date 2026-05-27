@@ -574,8 +574,9 @@ class KigumiViewerApp extends LitElement {
                             <thead>
                                 <tr>
                                     <th>#</th><th>Type</th><th>Name</th>
+                                    <th>Tags</th>
                                     <th>Length</th><th>Width</th><th>Height</th>
-                                    <th>CSG</th><th>Feat</th>
+                                    <th>#CSGs</th><th>#Features</th>
                                 </tr>
                             </thead>
                             <tbody id="timber-rows"></tbody>
@@ -2757,10 +2758,15 @@ class KigumiViewerApp extends LitElement {
             const mesh = meshes[index];
             const typeLabel = mesh.memberType === 'accessory' ? 'Accessory' : 'Timber';
             const memberName = mesh.memberName || mesh.name || '?';
+            const tags = Array.isArray(mesh.tags)
+                ? mesh.tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0)
+                : [];
+            const tagsLabel = tags.length > 0 ? tags.join(', ') : '—';
             const row = document.createElement('tr');
             row.innerHTML = '<td>' + (index + 1) + '</td>' +
                 '<td>' + typeLabel + '</td>' +
                 '<td>' + memberName + '</td>' +
+                '<td class="dim">' + tagsLabel + '</td>' +
                 '<td class="dim">' + (mesh.prism_length !== undefined ? this.fmt(mesh.prism_length) : '—') + '</td>' +
                 '<td class="dim">' + (mesh.prism_width  !== undefined ? this.fmt(mesh.prism_width)  : '—') + '</td>' +
                 '<td class="dim">' + (mesh.prism_height !== undefined ? this.fmt(mesh.prism_height) : '—') + '</td>' +
