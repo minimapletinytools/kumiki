@@ -83,6 +83,7 @@ jest.mock('../pattern-source-utils', () => ({
 const { KigumiSidebarProvider, SidebarNode } = require('../sidebar-provider');
 const vscode = require('vscode');
 const { discoverDependencyContent } = require('../discovery-adapter');
+const { getInitializationStatus } = require('../project-initializer');
 
 describe('KigumiSidebarProvider', () => {
   let provider;
@@ -398,6 +399,23 @@ describe('KigumiSidebarProvider', () => {
   });
 
   describe('tree navigation', () => {
+    test('should hide kumiki version action rows when project is not initialized', async () => {
+      getInitializationStatus.mockReturnValueOnce({
+        projectStatus: 'uninitialized',
+        isInitialized: false,
+        hasExistingProject: false,
+      });
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: '/test/workspace' } },
+      ];
+
+      await provider.refresh(true);
+      const rootNodes = provider.getRootNodes();
+      const versionNodes = rootNodes.filter((node) => node.type === 'kumikiVersionAction');
+
+      expect(versionNodes).toHaveLength(0);
+    });
+
     test('should return root nodes when getChildren called with no element', async () => {
       vscode.workspace.workspaceFolders = undefined;
       provider.ensureLoaded();

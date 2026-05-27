@@ -125,9 +125,12 @@ DONE-kigumi sidebar
   DONE-add an update kumiki button to kigumi
   DONE-add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
 DONE-ensure make pattern-index before each publish (maybe run as part of the bump version job)
+DONE/IGNORE-BUG my_cute_frame no longer getting scanned
 -fix export
 -kigumi init
   DONE-initilaize project should also set .gitignore
+  DONE-update kumiki should be grayed out if no project is initialized and it should just not show at all acutaly..
+  -initialize kigumi project should disappear if iniatilaziotn is in progress
   -initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
 -camera controls should be absolute? use focus to reset
 -searching
