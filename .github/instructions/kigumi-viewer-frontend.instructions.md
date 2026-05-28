@@ -41,10 +41,29 @@ Keep frontend implementation migration-safe so Lit can be swapped to React later
 
 ## Running Tests
 
-Always run viewer tests after making changes:
+Always run the fast baseline tests after Kigumi changes:
 ```bash
-cd kigumi && npx jest && node ./test/run-extension-tests.js
+cd kigumi && npx jest && npm run test:ext:initial
 ```
 
 - `npx jest` — unit tests (file-watcher, runner-protocol, selection-store)
-- `node ./test/run-extension-tests.js` — VS Code extension host smoke tests (downloads a test VS Code instance, activates the extension, verifies commands register and execute)
+- `npm run test:ext:initial` — fast integration checks for initial sidebar/viewer/panel correctness
+
+If a touched feature has complex behavior, run targeted complex integration tests:
+```bash
+cd kigumi && npm run test:ext:complex:grep -- "<feature or test name>"
+```
+
+Examples:
+- Sidebar grouping behavior: `cd kigumi && npm run test:ext:complex:grep -- "toggles sidebar grouping"`
+- Multi-file viewer lifecycle: `cd kigumi && npm run test:ext:complex:grep -- "switches fixtures"`
+- Existing milestone flow behavior: `cd kigumi && npm run test:ext:complex:grep -- "milestone fixture"`
+
+Before merging broad Kigumi UI/session/protocol work, run the full complex suite:
+```bash
+cd kigumi && npm run test:ext:complex
+```
+
+Keep iteration fast:
+- Baseline tests are mandatory for all Kigumi edits.
+- Complex tests should be feature-targeted during active development and run fully before merge for high-impact changes.
