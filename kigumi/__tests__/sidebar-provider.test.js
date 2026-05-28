@@ -63,6 +63,7 @@ jest.mock('../project-initializer', () => ({
     projectStatus: 'ready',
     isInitialized: true,
   }),
+  isInitializationInProgress: jest.fn().mockReturnValue(false),
 }));
 
 // Mock pattern-source-utils
@@ -83,7 +84,7 @@ jest.mock('../pattern-source-utils', () => ({
 const { KigumiSidebarProvider, SidebarNode } = require('../sidebar-provider');
 const vscode = require('vscode');
 const { discoverDependencyContent } = require('../discovery-adapter');
-const { getInitializationStatus } = require('../project-initializer');
+const { getInitializationStatus, isInitializationInProgress } = require('../project-initializer');
 
 describe('KigumiSidebarProvider', () => {
   let provider;
@@ -93,6 +94,7 @@ describe('KigumiSidebarProvider', () => {
     jest.clearAllMocks();
     mockEventEmitter.dispose.mockClear();
     mockEventEmitter.fire.mockClear();
+    isInitializationInProgress.mockReturnValue(false);
 
     mockContext = {
       subscriptions: [],
@@ -414,6 +416,42 @@ describe('KigumiSidebarProvider', () => {
       const versionNodes = rootNodes.filter((node) => node.type === 'kumikiVersionAction');
 
       expect(versionNodes).toHaveLength(0);
+    });
+
+    test('should show initializing status row while initialization is in progress', async () => {
+      getInitializationStatus.mockReturnValueOnce({
+        projectStatus: 'uninitialized',
+        isInitialized: false,
+        hasExistingProject: false,
+      });
+      isInitializationInProgress.mockReturnValueOnce(true);
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: '/test/workspace' } },
+      ];
+
+      await provider.refresh(true);
+      const rootNodes = provider.getRootNodes();
+
+      expect(rootNodes.some((node) => node.label === 'Initializing project...')).toBe(true);
+      expect(rootNodes.some((node) => node.label === '[ Initialize Project ] 🖱️')).toBe(false);
+    });
+
+    test('should hide project-status row when project is already detected', async () => {
+      getInitializationStatus.mockReturnValueOnce({
+        projectStatus: 'existing-project',
+        isInitialized: true,
+        hasExistingProject: true,
+      });
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: '/test/workspace' } },
+      ];
+
+      await provider.refresh(true);
+      const rootNodes = provider.getRootNodes();
+      const projectStatusNodes = rootNodes.filter((node) => node.type === 'projectStatusAction');
+
+      expect(projectStatusNodes).toHaveLength(0);
+      expect(rootNodes.some((node) => node.label === 'Project Detected')).toBe(false);
     });
 
     test('should return root nodes when getChildren called with no element', async () => {

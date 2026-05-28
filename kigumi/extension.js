@@ -562,7 +562,13 @@ function activate(context) {
                 title: 'Initializing Kigumi project',
                 cancellable: false,
             }, async () => {
-                initializeResult = await initializeWorkspaceProject(rootHint, activeFilePath);
+                const initializePromise = initializeWorkspaceProject(rootHint, activeFilePath);
+                if (sidebarProvider) {
+                    // initializeWorkspaceProject flips in-progress state synchronously,
+                    // so this refresh exposes the transient "Initializing project..." row.
+                    await sidebarProvider.refresh(true);
+                }
+                initializeResult = await initializePromise;
                 logKumikiInstallResult('initialize', initializeResult);
             });
             if (initializeResult && Array.isArray(initializeResult.instructionWarnings)) {

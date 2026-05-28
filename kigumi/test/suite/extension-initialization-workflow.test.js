@@ -104,7 +104,23 @@ describe('Kigumi initialization workflow', () => {
         'Expected fresh workspace sidebar to show initialize action before project setup'
       );
 
-      await vscode.commands.executeCommand('kigumi.initializeProjectInWorkspace');
+      const initializationPromise = vscode.commands.executeCommand('kigumi.initializeProjectInWorkspace');
+
+      const initializingSidebar = await waitFor(async () => {
+        const snapshot = await vscode.commands.executeCommand('kigumi.testGetSidebarSnapshot', { forceRefresh: true });
+        if (!snapshot || !Array.isArray(snapshot.roots) || snapshot.roots.length === 0) {
+          return null;
+        }
+        const hasInitializingRow = snapshot.roots.some((root) => root.label === 'Initializing project...');
+        return hasInitializingRow ? snapshot : null;
+      }, 30000, 200);
+
+      assert.ok(
+        initializingSidebar.roots.some((root) => root.label === 'Initializing project...'),
+        'Expected sidebar to show initializing status while project setup is running'
+      );
+
+      await initializationPromise;
 
       const afterInitSidebar = await waitFor(async () => {
         const snapshot = await vscode.commands.executeCommand('kigumi.testGetSidebarSnapshot', { forceRefresh: true });
@@ -112,15 +128,15 @@ describe('Kigumi initialization workflow', () => {
           return null;
         }
 
-        const hasProjectDetected = snapshot.roots.some((root) => root.label === 'Project Detected');
         const hasFramesRoot = snapshot.roots.some((root) => typeof root.label === 'string' && root.label.startsWith('Frames'));
         const hasPatternsRoot = snapshot.roots.some((root) => typeof root.label === 'string' && root.label.startsWith('Patterns'));
-        return hasProjectDetected && hasFramesRoot && hasPatternsRoot ? snapshot : null;
+        const hasNoProjectStatusLine = snapshot.roots.every((root) => root.type !== 'projectStatusAction');
+        return hasNoProjectStatusLine && hasFramesRoot && hasPatternsRoot ? snapshot : null;
       }, 120000, 500);
 
       assert.ok(
-        afterInitSidebar.roots.some((root) => root.label === 'Project Detected'),
-        'Expected sidebar to report initialized project after setup'
+        afterInitSidebar.roots.every((root) => root.type !== 'projectStatusAction'),
+        'Expected sidebar to hide project-status row after project is detected'
       );
 
       const gitignorePath = path.join(tempWorkspaceRoot, '.gitignore');

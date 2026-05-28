@@ -2,7 +2,7 @@ const path = require('path');
 const vscode = require('vscode');
 const { scanWorkspaceForFrames } = require('./frame-scanner');
 const { discoverDependencyContent } = require('./discovery-adapter');
-const { getInitializationStatus } = require('./project-initializer');
+const { getInitializationStatus, isInitializationInProgress } = require('./project-initializer');
 const { groupPatternsByPatternbook } = require('./pattern-source-utils');
 
 class SidebarNode {
@@ -394,6 +394,7 @@ class KigumiSidebarProvider {
 
         const initStatus = this._state.initStatus;
         const isLocalDev = !!(initStatus && initStatus.projectStatus === 'local-dev');
+        const isInitializing = isInitializationInProgress();
         const hasProject = !!(initStatus && (initStatus.hasExistingProject || initStatus.isInitialized));
         if (isLocalDev) {
             nodes.push(new SidebarNode({
@@ -404,16 +405,16 @@ class KigumiSidebarProvider {
                 iconPath: new vscode.ThemeIcon('beaker'),
                 contextValue: 'projectStatusAction',
             }));
-        } else if (hasProject) {
+        } else if (isInitializing) {
             nodes.push(new SidebarNode({
-                key: 'project-status-detected',
+                key: 'project-status-initializing',
                 type: 'projectStatusAction',
-                label: 'Project Detected',
-                description: '.kigumi project is available',
-                iconPath: new vscode.ThemeIcon('pass'),
+                label: 'Initializing project...',
+                description: 'Setting up .venv and Kumiki',
+                iconPath: new vscode.ThemeIcon('loading~spin'),
                 contextValue: 'projectStatusAction',
             }));
-        } else {
+        } else if (!hasProject) {
             nodes.push(new SidebarNode({
                 key: 'project-status-initialize',
                 type: 'projectStatusAction',
