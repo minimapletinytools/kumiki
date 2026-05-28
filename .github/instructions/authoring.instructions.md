@@ -6,20 +6,30 @@ applyTo: "kumiki/**,tests/**"
 
 ## Running Tests
 
-Always run all tests after making changes:
+For Python library changes in `kumiki/**` or `tests/**`, always run:
 ```bash
 source .venv/bin/activate
 python3 -m pytest tests/ -v
 ```
 
-Always run the type checker after making changes:
+Then always run type checking:
 ```bash
 uv run ty check
 ```
 
-If making changes to the viewer, run viewer tests:
+For Kigumi changes in `kigumi/**`, always run the fast baseline tests:
 ```bash
-cd kigumi && npx jest && node ./test/run-extension-tests.js
+cd kigumi && npx jest && npm run test:ext:initial
+```
+
+If your Kigumi change touches a specific feature area, also run relevant complex tests (targeted when possible):
+```bash
+cd kigumi && npm run test:ext:complex:grep -- "<feature or test name>"
+```
+
+Run the full complex suite before merging broader Kigumi changes:
+```bash
+cd kigumi && npm run test:ext:complex
 ```
 
 ## Key Files
@@ -55,6 +65,7 @@ Measure/mark pattern for locating features on timbers and marking things relativ
 - Use math types in `rule.py`
 - ALWAYS run tests after making changes
 - ALWAYS run type checker after making changes
+- For Kigumi, ALWAYS run the fast baseline suite first, then add targeted complex tests when the touched feature requires it
 
 ## Coding Conventions when Implementing Joints
 
@@ -124,4 +135,4 @@ Additional tests (not required but encouraged):
 
 Do not write too many tests that aren't actually testing geometry. We want quality over quantity. Look for tests marked with `# 🐪` for examples of good tests. In particular, look at the ones in `test_plain_joints.py`
 
-Tests marked with a `# 🐪` have been hand verified to be relevant, never mark tests as `# 🐪` unless user gives the ok. Never delete tests marked with `# 🐪` and be a little more cautious when modifynig them. In contrasts, tests not morked with a `# 🐪` can be deleted and rewritten at will.
+Tests marked with a `# 🐪` have been hand verified to be relevant, never mark tests as `# 🐪` unless the user gives the ok. Never delete tests marked with `# 🐪` and be more cautious when modifying them. In contrast, tests not marked with a `# 🐪` can be deleted and rewritten.
