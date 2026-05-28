@@ -1,17 +1,18 @@
-const path = require('path');
 const Mocha = require('mocha');
+const { resolveSuiteFiles } = require('./suites');
 
 async function run() {
+  const selectedSuite = String(process.env.KIGUMI_EXT_TEST_SUITE || 'all').trim().toLowerCase();
+  const grepPattern = String(process.env.KIGUMI_EXT_TEST_GREP || '').trim();
+
   const mocha = new Mocha({
     ui: 'bdd',
     color: true,
     timeout: 30000,
+    grep: grepPattern || undefined,
   });
 
-  const testFiles = [
-    path.resolve(__dirname, 'extension-smoke.test.js'),
-    path.resolve(__dirname, 'extension-viewer-flow.test.js'),
-  ];
+  const testFiles = resolveSuiteFiles(selectedSuite);
   for (const testFile of testFiles) {
     mocha.addFile(testFile);
   }

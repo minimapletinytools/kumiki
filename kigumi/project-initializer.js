@@ -112,6 +112,7 @@ function ensureGitignore(workspaceRoot) {
     const gitignorePath = path.join(workspaceRoot, '.gitignore');
     const requiredEntries = [
         '.venv/',
+        'kigumi_exports/',
     ];
 
     if (!fs.existsSync(gitignorePath)) {
@@ -155,6 +156,24 @@ function getVenvPython(workspaceRoot) {
     return path.join(workspaceRoot, '.venv', 'bin', 'python3');
 }
 
+function getBootstrapPythonLaunchers() {
+    if (process.platform === 'win32') {
+        return [
+            { command: 'py', prefixArgs: ['-3.13'] },
+            { command: 'py', prefixArgs: ['-3'] },
+            { command: 'python3.13', prefixArgs: [] },
+            { command: 'python3', prefixArgs: [] },
+            { command: 'python', prefixArgs: [] },
+        ];
+    }
+
+    return [
+        { command: 'python3.13', prefixArgs: [] },
+        { command: 'python3', prefixArgs: [] },
+        { command: 'python', prefixArgs: [] },
+    ];
+}
+
 function runCommand(command, args, cwd) {
     return new Promise((resolve, reject) => {
         const child = spawn(command, args, {
@@ -185,6 +204,72 @@ function runCommand(command, args, cwd) {
             reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}: ${stderr.trim()}`));
         });
     });
+}
+
+async function canRunCommand(command, args, cwd) {
+    try {
+        await runCommand(command, args, cwd);
+        return true;
+    } catch (_error) {
+        return false;
+    }
+}
+
+async function findBootstrapPythonLauncher(workspaceRoot) {
+    for (const launcher of getBootstrapPythonLaunchers()) {
+        const probeArgs = [...launcher.prefixArgs, '--version'];
+        if (await canRunCommand(launcher.command, probeArgs, workspaceRoot)) {
+            return launcher;
+        }
+    }
+    return null;
+}
+
+async function ensureUvLauncher(workspaceRoot) {
+    if (await canRunCommand('uv', ['--version'], workspaceRoot)) {
+        return { command: 'uv', prefixArgs: [] };
+    }
+
+    const pythonLauncher = await findBootstrapPythonLauncher(workspaceRoot);
+    if (!pythonLauncher) {
+        throw new Error(
+            'uv was not found and Python was not found. Install uv (https://docs.astral.sh/uv/getting-started/installation/) or install Python 3.13+ and retry initialization.'
+        );
+    }
+
+    const pythonUvArgs = [...pythonLauncher.prefixArgs, '-m', 'uv', '--version'];
+    if (await canRunCommand(pythonLauncher.command, pythonUvArgs, workspaceRoot)) {
+        return { command: pythonLauncher.command, prefixArgs: [...pythonLauncher.prefixArgs, '-m', 'uv'] };
+    }
+
+    // Best-effort bootstrap path: install uv into the current user site-packages.
+    try {
+        await runCommand(
+            pythonLauncher.command,
+            [...pythonLauncher.prefixArgs, '-m', 'pip', 'install', '--user', '--upgrade', 'uv'],
+            workspaceRoot,
+        );
+    } catch (_error) {
+        // Some Python installs do not include pip by default.
+        await runCommand(
+            pythonLauncher.command,
+            [...pythonLauncher.prefixArgs, '-m', 'ensurepip', '--upgrade'],
+            workspaceRoot,
+        );
+        await runCommand(
+            pythonLauncher.command,
+            [...pythonLauncher.prefixArgs, '-m', 'pip', 'install', '--user', '--upgrade', 'uv'],
+            workspaceRoot,
+        );
+    }
+
+    if (await canRunCommand(pythonLauncher.command, pythonUvArgs, workspaceRoot)) {
+        return { command: pythonLauncher.command, prefixArgs: [...pythonLauncher.prefixArgs, '-m', 'uv'] };
+    }
+
+    throw new Error(
+        'Unable to bootstrap uv automatically. Install uv manually (https://docs.astral.sh/uv/getting-started/installation/) and retry initialization.'
+    );
 }
 
 function yamlQuote(value) {
@@ -353,27 +438,14 @@ async function createVenv(workspaceRoot) {
         return { createdVenv: false, pythonPath: venvPython };
     }
 
-    const launchers = process.platform === 'win32'
-        ? [
-            { command: 'py', args: ['-3', '-m', 'venv', '.venv'] },
-            { command: 'python', args: ['-m', 'venv', '.venv'] },
-        ]
-        : [
-            { command: 'python3', args: ['-m', 'venv', '.venv'] },
-            { command: 'python', args: ['-m', 'venv', '.venv'] },
-        ];
+    const uvLauncher = await ensureUvLauncher(workspaceRoot);
+    await runCommand(
+        uvLauncher.command,
+        [...uvLauncher.prefixArgs, 'venv', '--python', '3.13', '.venv'],
+        workspaceRoot,
+    );
 
-    let lastError = null;
-    for (const launcher of launchers) {
-        try {
-            await runCommand(launcher.command, launcher.args, workspaceRoot);
-            return { createdVenv: true, pythonPath: venvPython };
-        } catch (error) {
-            lastError = error;
-        }
-    }
-
-    throw lastError || new Error('Unable to create virtual environment');
+    return { createdVenv: true, pythonPath: venvPython };
 }
 
 async function getMissingViewerDependencies(workspaceRoot, pythonPath) {

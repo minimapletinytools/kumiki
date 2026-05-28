@@ -125,24 +125,36 @@ DONE-kigumi sidebar
   DONE-add an update kumiki button to kigumi
   DONE-add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
 DONE-ensure make pattern-index before each publish (maybe run as part of the bump version job)
--fix export
+DONE/IGNORE-BUG my_cute_frame no longer getting scanned
+DONE-fix export
+  DONE-add buttons
+  DONE-add cadquery check and install button ugh
+DONE-cleanup the bottom area for kigumi
+  DONE-tighten the member list, dimenison + rought cut 
+  DONE-add export button
+  DONE-remove the patternbook
 -kigumi init
   DONE-initilaize project should also set .gitignore
+  DONE-update kumiki should be grayed out if no project is initialized and it should just not show at all acutaly..
+  -initialize kigumi project should disappear if iniatilaziotn is in progress
   -initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
+-stuff to test
+  -test the install cadquery stuff 
+  -test export step and export STL combined/inidivdual again
+  -test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
 -camera controls should be absolute? use focus to reset
 -searching
   DONE-show layer tags is broken
   -maybe layer tags should show in the list view at the bottom instead?
   -have a drop down list all tags thing that you can click + select rather than search?
   -searching should search for either tags or joint name (figure out a way to do this)
--cleanup the bottom area for kigumi
-  -remove the patternbook
-  -tighten the member list, dimenison + rought cut + add export button
+  
 -do a design pass
   -better logo
   -stuff showing below the view should be cleaner/tighter 
-  -move focus button
-  -timber list view should actually be useful
+  -move focus button maybe
+  -make the gizmos slightly trasparent?
+  DONE-timber list view should actually be useful
 -make sure kigumi installs ltaest version of kumiki
 -test installation
   -raw installation of kigumi, installs deps
@@ -151,7 +163,7 @@ DONE-ensure make pattern-index before each publish (maybe run as part of the bum
 -finish docs
   DONE-finish README
   DONE-finish agents doc
-  -finish ond remove docs folder
+  -finish and remove docs folder?
 -new kigumi icon
 -marketing
   -make simple website
@@ -178,6 +190,7 @@ DONE-lock and hide fetaures
 
 
 :: TODO
+
 
 
 -PATTERN VIEWER

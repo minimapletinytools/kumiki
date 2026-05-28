@@ -4,10 +4,15 @@ Tests for the PatternBook module
 
 import pytest
 from sympy import Integer, Rational
-from kumiki.rule import create_v3, create_v2, inches, Transform, Orientation
+from kumiki.rule import V3, create_v3, create_v2, inches, Transform, Orientation
 from kumiki.timber import timber_from_directions, Frame, CutTimber, CSGAccessory
 from kumiki.cutcsg import RectangularPrism
 from kumiki.patternbook import PatternMetadata, PatternBook, PatternLambda
+
+
+def _dummy_pattern(center: V3) -> Frame:
+    _ = center
+    return Frame(cut_timbers=[])
 
 
 def test_pattern_metadata_creation():
@@ -116,7 +121,7 @@ def test_pattern_book_duplicate_names():
 
 def test_raise_pattern():
     """Test raising a single pattern."""
-    def make_frame(center):
+    def make_frame(center: V3) -> Frame:
         timber = timber_from_directions(
             length=inches(24),
             size=create_v2(inches(2), inches(4)),
@@ -223,7 +228,7 @@ def test_raise_pattern_group_csg():
 def test_raise_patternbook_as_frame_wraps_single_csg_pattern_as_accessory():
     """CSG-only patternbooks should still be viewable as a Frame."""
 
-    def make_box(center):
+    def make_box(center: V3) -> RectangularPrism:
         size = inches(2)
         return RectangularPrism(
             size=create_v2(size, size),
@@ -247,7 +252,7 @@ def test_raise_patternbook_as_frame_wraps_single_csg_pattern_as_accessory():
 def test_raise_patternbook_as_frame_combines_frame_and_csg_patterns():
     """Mixed frame/CSG patternbooks should combine into one viewable Frame."""
 
-    def make_frame(center):
+    def make_frame(center: V3) -> Frame:
         timber = timber_from_directions(
             length=inches(24),
             size=create_v2(inches(2), inches(4)),
@@ -258,7 +263,7 @@ def test_raise_patternbook_as_frame_combines_frame_and_csg_patterns():
         )
         return Frame(cut_timbers=[CutTimber(timber=timber, cuts=[])], name="simple_frame")
 
-    def make_box(center):
+    def make_box(center: V3) -> RectangularPrism:
         size = inches(2)
         return RectangularPrism(
             size=create_v2(size, size),
@@ -267,7 +272,7 @@ def test_raise_patternbook_as_frame_combines_frame_and_csg_patterns():
             end_distance=size / Integer(2)
         )
 
-    patterns = [
+    patterns: list[tuple[PatternMetadata, PatternLambda]] = [
         (PatternMetadata("frame1", [], "frame"), make_frame),
         (PatternMetadata("box1", [], "csg"), make_box),
     ]
@@ -303,7 +308,7 @@ def test_raise_pattern_group_mixed_types():
         )
     
     # Create pattern book with mixed types in same group
-    patterns = [
+    patterns: list[tuple[PatternMetadata, PatternLambda]] = [
         (PatternMetadata("frame1", ["mixed_group"], "frame"), make_frame),
         (PatternMetadata("box1", ["mixed_group"], "csg"), make_box),
     ]
@@ -324,13 +329,10 @@ def test_raise_pattern_group_not_found():
 
 def test_list_patterns():
     """Test listing all patterns."""
-    def dummy_func(center):
-        return None
-    
-    patterns = [
-        (PatternMetadata("pattern1", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern2", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern3", [], "csg"), dummy_func),
+    patterns: list[tuple[PatternMetadata, PatternLambda]] = [
+        (PatternMetadata("pattern1", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern2", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern3", [], "csg"), _dummy_pattern),
     ]
     book = PatternBook(patterns=patterns)
     
@@ -343,14 +345,11 @@ def test_list_patterns():
 
 def test_list_groups():
     """Test listing all groups."""
-    def dummy_func(center):
-        return None
-    
-    patterns = [
-        (PatternMetadata("pattern1", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern2", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern3", ["group_b"], "csg"), dummy_func),
-        (PatternMetadata("pattern4", [], "frame"), dummy_func),
+    patterns: list[tuple[PatternMetadata, PatternLambda]] = [
+        (PatternMetadata("pattern1", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern2", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern3", ["group_b"], "csg"), _dummy_pattern),
+        (PatternMetadata("pattern4", [], "frame"), _dummy_pattern),
     ]
     book = PatternBook(patterns=patterns)
     
@@ -362,13 +361,10 @@ def test_list_groups():
 
 def test_get_patterns_in_group():
     """Test getting patterns in a specific group."""
-    def dummy_func(center):
-        return None
-    
-    patterns = [
-        (PatternMetadata("pattern1", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern2", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern3", ["group_b"], "csg"), dummy_func),
+    patterns: list[tuple[PatternMetadata, PatternLambda]] = [
+        (PatternMetadata("pattern1", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern2", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern3", ["group_b"], "csg"), _dummy_pattern),
     ]
     book = PatternBook(patterns=patterns)
     
@@ -384,16 +380,13 @@ def test_get_patterns_in_group():
 
 def test_patterns_with_multiple_groups():
     """Test patterns belonging to multiple groups."""
-    def dummy_func(center):
-        return None
-    
     # Pattern1 is in both group_a and group_x
     # Pattern2 is only in group_a
     # Pattern3 is in both group_b and group_x
-    patterns = [
-        (PatternMetadata("pattern1", ["group_a", "group_x"], "frame"), dummy_func),
-        (PatternMetadata("pattern2", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern3", ["group_b", "group_x"], "frame"), dummy_func),
+    patterns: list[tuple[PatternMetadata, PatternLambda]] = [
+        (PatternMetadata("pattern1", ["group_a", "group_x"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern2", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern3", ["group_b", "group_x"], "frame"), _dummy_pattern),
     ]
     book = PatternBook(patterns=patterns)
     
@@ -422,20 +415,17 @@ def test_patterns_with_multiple_groups():
 
 def test_merge_pattern_books():
     """Test merging two PatternBooks."""
-    def dummy_func(center):
-        return None
-    
     # Create first book
-    patterns1 = [
-        (PatternMetadata("pattern1", ["group_a"], "frame"), dummy_func),
-        (PatternMetadata("pattern2", ["group_a"], "frame"), dummy_func),
+    patterns1: list[tuple[PatternMetadata, PatternLambda]] = [
+        (PatternMetadata("pattern1", ["group_a"], "frame"), _dummy_pattern),
+        (PatternMetadata("pattern2", ["group_a"], "frame"), _dummy_pattern),
     ]
     book1 = PatternBook(patterns=patterns1)
     
     # Create second book
-    patterns2 = [
-        (PatternMetadata("pattern3", ["group_b"], "csg"), dummy_func),
-        (PatternMetadata("pattern4", ["group_b"], "csg"), dummy_func),
+    patterns2: list[tuple[PatternMetadata, PatternLambda]] = [
+        (PatternMetadata("pattern3", ["group_b"], "csg"), _dummy_pattern),
+        (PatternMetadata("pattern4", ["group_b"], "csg"), _dummy_pattern),
     ]
     book2 = PatternBook(patterns=patterns2)
     
@@ -456,18 +446,15 @@ def test_merge_pattern_books():
 
 def test_merge_multiple_pattern_books():
     """Test merging multiple PatternBooks at once."""
-    def dummy_func(center):
-        return None
-    
     # Create three books
     book1 = PatternBook(patterns=[
-        (PatternMetadata("pattern1", ["group_a"], "frame"), dummy_func),
+        (PatternMetadata("pattern1", ["group_a"], "frame"), _dummy_pattern),
     ])
     book2 = PatternBook(patterns=[
-        (PatternMetadata("pattern2", ["group_b"], "frame"), dummy_func),
+        (PatternMetadata("pattern2", ["group_b"], "frame"), _dummy_pattern),
     ])
     book3 = PatternBook(patterns=[
-        (PatternMetadata("pattern3", ["group_c"], "csg"), dummy_func),
+        (PatternMetadata("pattern3", ["group_c"], "csg"), _dummy_pattern),
     ])
     
     # Merge all books
@@ -488,15 +475,12 @@ def test_merge_multiple_pattern_books():
 
 def test_merge_duplicate_names_raises_error():
     """Test that merging books with duplicate pattern names raises an error."""
-    def dummy_func(center):
-        return None
-    
     # Create two books with same pattern name
     book1 = PatternBook(patterns=[
-        (PatternMetadata("duplicate", ["group_a"], "frame"), dummy_func),
+        (PatternMetadata("duplicate", ["group_a"], "frame"), _dummy_pattern),
     ])
     book2 = PatternBook(patterns=[
-        (PatternMetadata("duplicate", ["group_b"], "frame"), dummy_func),
+        (PatternMetadata("duplicate", ["group_b"], "frame"), _dummy_pattern),
     ])
     
     # Should raise error when merging

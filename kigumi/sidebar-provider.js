@@ -149,6 +149,42 @@ class KigumiSidebarProvider {
         return this.refresh(forceRescan);
     }
 
+    async getTestSnapshot(options = {}) {
+        const forceRefresh = options.forceRefresh !== false;
+        if (forceRefresh) {
+            await this.refresh(true);
+        }
+
+        const roots = await this.getChildren(null);
+        const rootSnapshots = [];
+        for (const root of roots) {
+            const children = await this.getChildren(root);
+            rootSnapshots.push({
+                key: root.key,
+                type: root.type,
+                label: root.label,
+                description: root.description || '',
+                childCount: children.length,
+                childLabels: children.slice(0, 20).map((child) => child.label),
+            });
+        }
+
+        return {
+            groupByPatternbook: this._groupByPatternbook,
+            state: {
+                workspaceRoot: this._state.workspaceRoot,
+                frameCount: this._state.frames.length,
+                workspacePatternbookCount: this._state.workspacePatternbooks.length,
+                shippedPatternCount: this._state.shippedPatterns.length,
+                dependencyPatternCount: this._state.dependencyPatterns.length,
+                isScanning: this._state.isScanning,
+                scanErrorCount: this._state.scanErrors.length,
+                discoveryErrorCount: this._state.discoveryErrors.length,
+            },
+            roots: rootSnapshots,
+        };
+    }
+
     async _runFullScan(_forceRescan) {
         const workspaceFolder = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0];
         if (!workspaceFolder) {
@@ -393,30 +429,33 @@ class KigumiSidebarProvider {
             }));
         }
 
-        const installed = this._state.kumikiInstalledVersion || 'unknown';
-        const latest = this._state.kumikiLatestVersion || 'unknown';
-        if (installed !== 'unknown' && latest !== 'unknown' && installed === latest) {
-            nodes.push(new SidebarNode({
-                key: 'kumiki-version-up-to-date',
-                type: 'kumikiVersionAction',
-                label: `Kumiki up to date: v${installed}`,
-                description: 'latest from PyPI',
-                iconPath: new vscode.ThemeIcon('verified-filled'),
-                contextValue: 'kumikiVersionAction',
-            }));
-        } else {
-            nodes.push(new SidebarNode({
-                key: 'kumiki-version-update',
-                type: 'kumikiVersionAction',
-                label: `[ Update Kumiki from v${installed} -> v${latest} ] 🖱️`,
-                description: 'Install latest from PyPI',
-                command: {
-                    title: 'Update Kumiki',
-                    command: 'kigumi.updateKumiki',
-                },
-                iconPath: new vscode.ThemeIcon('cloud-download'),
-                contextValue: 'kumikiVersionAction',
-            }));
+        const canShowKumikiVersionActions = !!(initStatus && (initStatus.isInitialized || initStatus.projectStatus === 'local-dev'));
+        if (canShowKumikiVersionActions) {
+            const installed = this._state.kumikiInstalledVersion || 'unknown';
+            const latest = this._state.kumikiLatestVersion || 'unknown';
+            if (installed !== 'unknown' && latest !== 'unknown' && installed === latest) {
+                nodes.push(new SidebarNode({
+                    key: 'kumiki-version-up-to-date',
+                    type: 'kumikiVersionAction',
+                    label: `Kumiki up to date: v${installed}`,
+                    description: 'latest from PyPI',
+                    iconPath: new vscode.ThemeIcon('verified-filled'),
+                    contextValue: 'kumikiVersionAction',
+                }));
+            } else {
+                nodes.push(new SidebarNode({
+                    key: 'kumiki-version-update',
+                    type: 'kumikiVersionAction',
+                    label: `[ Update Kumiki from v${installed} -> v${latest} ] 🖱️`,
+                    description: 'Install latest from PyPI',
+                    command: {
+                        title: 'Update Kumiki',
+                        command: 'kigumi.updateKumiki',
+                    },
+                    iconPath: new vscode.ThemeIcon('cloud-download'),
+                    contextValue: 'kumikiVersionAction',
+                }));
+            }
         }
 
         nodes.push(new SidebarNode({

@@ -153,6 +153,7 @@ class FrameViewSession {
             throw startError;
         }
         this.profiler.markTiming(initTiming, 'initialize.runner.end');
+        await this._pushCadqueryStatus();
 
         // For shared-runner pattern sessions, load the slot now
         if (this.sessionType === 'pattern' && !this.ownsRunner) {
@@ -198,26 +199,6 @@ class FrameViewSession {
                 this.log(`[webview] setRefreshOptions: ${JSON.stringify(options)}`);
                 return;
             }
-            if (message.type === 'loadPattern') {
-                this._handleLoadPatternFromWebview(message).catch((err) => {
-                    this.log(`[patterns] loadPattern error: ${err.message || err}`);
-                });
-                return;
-            }
-            if (message.type === 'loadBook') {
-                this._handleLoadBookFromWebview(message).catch((err) => {
-                    this.log(`[patterns] loadBook error: ${err.message || err}`);
-                });
-                return;
-            }
-            if (message.type === 'requestLoadPatterns') {
-                const rescan = !!message.rescan;
-                this.log(`[webview] Load patterns requested from viewer (rescan=${rescan})`);
-                this._sendPatternsToWebview(rescan).catch((err) => {
-                    this.log(`[patterns] requestLoadPatterns error: ${err.message || err}`);
-                });
-                return;
-            }
             if (message.type === 'openOutputChannel') {
                 this.channel.show(true);
                 return;
@@ -250,6 +231,24 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'requestExportStl') {
+                this._handleExportRequest('stl', message.includeIndividuals !== false).catch((err) => {
+                    this.log(`[export] requestExportStl error: ${err.message || err}`);
+                });
+                return;
+            }
+            if (message.type === 'requestExportStep') {
+                this._handleExportRequest('step', message.includeIndividuals !== false).catch((err) => {
+                    this.log(`[export] requestExportStep error: ${err.message || err}`);
+                });
+                return;
+            }
+            if (message.type === 'requestInstallCadqueryOcp') {
+                this._handleInstallCadqueryOcp().catch((err) => {
+                    this.log(`[export] requestInstallCadqueryOcp error: ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type !== 'viewerLog') {
                 return;
             }
@@ -265,84 +264,6 @@ class FrameViewSession {
                 : '{}';
             this.log(`[webview:${source}:${level}] ${eventName} v${version} ${details}`);
         });
-    }
-
-    /**
-     * Ask runner for available patterns and send them to the webview.
-     * @param {boolean} [rescan=false] - Force re-import of all pattern modules
-     */
-    async _sendPatternsToWebview(rescan = false) {
-        if (!this.panel || !this.runnerSession || !this.runnerSession.isAlive()) {
-            return;
-        }
-        try {
-            const payload = rescan ? { rescan: true } : {};
-            const result = await this.runnerSession.request('list_available_patterns', payload);
-            if (!this.panel) {
-                return;
-            }
-            this.panel.webview.postMessage({
-                type: 'patternsAvailable',
-                sources: (result && result.sources) || [],
-            }).catch((err) => {
-                this.log(`[patterns] Failed to post patterns: ${err.message || err}`);
-            });
-        } catch (err) {
-            this.log(`[patterns] Error fetching patterns: ${err.message || err}`);
-        }
-    }
-
-    /**
-     * Handle a loadPattern message from the webview.
-     */
-    async _handleLoadPatternFromWebview(message) {
-        const patternName = typeof message.patternName === 'string' ? message.patternName : '';
-        const sourceFile = typeof message.sourceFile === 'string' ? message.sourceFile : '';
-        if (!patternName || !sourceFile) {
-            this.log('[patterns] loadPattern missing patternName or sourceFile');
-            return;
-        }
-
-        this.log(`[patterns] Webview requested pattern: ${patternName} from ${sourceFile}`);
-
-        // Delegate to the onLoadPattern callback (set by extension.js)
-        if (typeof this.onLoadPattern === 'function') {
-            await this.onLoadPattern(patternName, sourceFile);
-        }
-
-        // Notify the webview that loading is complete so it can remove the spinner
-        if (this.panel) {
-            this.panel.webview.postMessage({
-                type: 'patternLoadResult',
-                patternName,
-                ok: true,
-            }).catch(() => {});
-        }
-    }
-
-    /**
-     * Handle a loadBook message from the webview — opens whole book as one tab.
-     */
-    async _handleLoadBookFromWebview(message) {
-        const sourceFile = typeof message.sourceFile === 'string' ? message.sourceFile : '';
-        if (!sourceFile) {
-            this.log('[patterns] loadBook missing sourceFile');
-            return;
-        }
-
-        this.log(`[patterns] Webview requested book: ${sourceFile}`);
-
-        if (typeof this.onLoadBook === 'function') {
-            await this.onLoadBook(sourceFile);
-        }
-
-        if (this.panel) {
-            this.panel.webview.postMessage({
-                type: 'patternLoadResult',
-                sourceFile,
-                ok: true,
-            }).catch(() => {});
-        }
     }
 
     /**
@@ -543,6 +464,7 @@ class FrameViewSession {
             }
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
             this.profiler.markTiming(timing, 'refresh.end', { refresh_total_ms: Math.round(refresh_total_s * 1000) });
+            await this._pushCadqueryStatus();
             this.log(`[refresh] Reload complete for ${path.basename(this.filePath)}`);
         } catch (error) {
             refreshError = error;
@@ -596,6 +518,103 @@ class FrameViewSession {
             byteLength: imageBuffer.length,
             width: result.width,
             height: result.height,
+        };
+    }
+
+    async capturePanelSnapshot(options = {}) {
+        if (this.isDisposed || !this.panel) {
+            throw new Error(`Viewer panel is not available for ${this.filePath}`);
+        }
+
+        const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 3000;
+        const requestId = `panel-snapshot-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            let timeoutHandle = null;
+
+            const cleanup = () => {
+                if (timeoutHandle) {
+                    clearTimeout(timeoutHandle);
+                    timeoutHandle = null;
+                }
+                listener.dispose();
+            };
+
+            const listener = this.panel.webview.onDidReceiveMessage((message) => {
+                if (!message || message.type !== 'capturePanelSnapshotResult' || message.requestId !== requestId) {
+                    return;
+                }
+                if (settled) {
+                    return;
+                }
+
+                settled = true;
+                cleanup();
+                if (message.ok) {
+                    resolve(message.snapshot || {});
+                    return;
+                }
+                reject(new Error(message.error || 'Panel snapshot failed'));
+            });
+
+            timeoutHandle = setTimeout(() => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                cleanup();
+                reject(new Error(`Timed out waiting for panel snapshot (${timeoutMs}ms)`));
+            }, timeoutMs);
+
+            this.panel.webview.postMessage({
+                type: 'capturePanelSnapshotRequest',
+                requestId,
+            }).then((posted) => {
+                if (!posted && !settled) {
+                    settled = true;
+                    cleanup();
+                    reject(new Error('Failed to post panel snapshot request to webview'));
+                }
+            }, (error) => {
+                if (!settled) {
+                    settled = true;
+                    cleanup();
+                    reject(error);
+                }
+            });
+        });
+    }
+
+    getTestSnapshot() {
+        const frameData = this._lastFrameData || null;
+        const geometryData = this._lastGeometryData || null;
+        const profilingData = this._lastProfiling || null;
+        return {
+            filePath: this.filePath,
+            isDisposed: this.isDisposed,
+            hasPanel: Boolean(this.panel),
+            panelTitle: this.panel ? this.panel.title : null,
+            sessionType: this.sessionType,
+            slotName: this.slotName,
+            refreshSequence: this.refreshSequence,
+            hasRunner: Boolean(this.runnerSession),
+            runnerAlive: Boolean(this.runnerSession && this.runnerSession.isAlive()),
+            frame: frameData ? {
+                name: frameData.name || null,
+                timberCount: Number.isFinite(frameData.timber_count) ? frameData.timber_count : 0,
+                accessoryCount: Number.isFinite(frameData.accessories_count) ? frameData.accessories_count : 0,
+            } : null,
+            geometry: geometryData ? {
+                meshCount: Array.isArray(geometryData.meshes) ? geometryData.meshes.length : 0,
+                changedCount: Array.isArray(geometryData.changedKeys) ? geometryData.changedKeys.length : 0,
+                removedCount: Array.isArray(geometryData.removedKeys) ? geometryData.removedKeys.length : 0,
+            } : null,
+            profiling: profilingData ? {
+                reloadSeconds: typeof profilingData.reload_s === 'number' ? profilingData.reload_s : null,
+                geometrySeconds: typeof profilingData.geometry_s === 'number' ? profilingData.geometry_s : null,
+                refreshTotalSeconds: typeof profilingData.refresh_total_s === 'number' ? profilingData.refresh_total_s : null,
+            } : null,
         };
     }
 
@@ -656,6 +675,130 @@ class FrameViewSession {
         if (this.panel && !this.isDisposed) {
             this.panel.webview.postMessage({ type: 'layersTree', payload: result });
         }
+    }
+
+    getExportDirectory() {
+        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
+            ? this.runnerSession.projectRoot
+            : path.dirname(this.filePath);
+        const baseName = path.basename(this.filePath, path.extname(this.filePath));
+        const safeBaseName = (baseName || 'frame')
+            .replace(/[^a-zA-Z0-9._-]+/g, '_')
+            .replace(/^_+|_+$/g, '') || 'frame';
+        return path.join(projectRoot, 'kigumi_exports', safeBaseName);
+    }
+
+    async _handleExportRequest(format, includeIndividuals = true) {
+        if (!this.runnerSession) {
+            return;
+        }
+
+        await this.ensureRunnerSession();
+
+        const normalizedFormat = format === 'step' ? 'step' : 'stl';
+        const outputDir = this.getExportDirectory();
+        fs.mkdirSync(outputDir, { recursive: true });
+
+        try {
+            const result = await this.runnerSession.slotRequest('export_frame', this.slotName, {
+                format: normalizedFormat,
+                outputDir,
+                includeIndividuals: Boolean(includeIndividuals),
+            });
+
+            const writtenFiles = Array.isArray(result && result.files) ? result.files : [];
+            this.log(`[export] Wrote ${writtenFiles.length} ${normalizedFormat.toUpperCase()} file(s) to ${outputDir}`);
+            void vscode.window.showInformationMessage(
+                `Kigumi exported ${writtenFiles.length} ${normalizedFormat.toUpperCase()} file(s) to ${outputDir}`
+            );
+        } catch (error) {
+            const details = this.extractRunnerErrorDetails(error);
+            this.log(`[export] ${normalizedFormat.toUpperCase()} export failed: ${details.message}`);
+
+            const openOutputAction = 'Open Kigumi Output';
+            const installHint = normalizedFormat === 'step' && details.message.includes('cadquery-ocp')
+                ? ' Install STEP support with: pip install cadquery-ocp'
+                : '';
+            const choice = await vscode.window.showErrorMessage(
+                `Kigumi ${normalizedFormat.toUpperCase()} export failed: ${details.message}${installHint}`,
+                openOutputAction
+            );
+            if (choice === openOutputAction) {
+                this.channel.show(true);
+            }
+        }
+    }
+
+    async _pushCadqueryStatus() {
+        if (!this.panel || !this.runnerSession) {
+            return;
+        }
+
+        let installed = false;
+        try {
+            installed = await this.runnerSession.isCadqueryOcpInstalled();
+        } catch (error) {
+            this.log(`[export] Failed to detect cadquery-ocp: ${error.message || error}`);
+        }
+
+        this.panel.webview.postMessage({
+            type: 'dependencyStatus',
+            payload: {
+                cadqueryOcpInstalled: installed,
+            },
+        }).catch((error) => {
+            this.log(`[webview] Failed to post dependency status: ${error.message || error}`);
+        });
+    }
+
+    async _handleInstallCadqueryOcp() {
+        if (!this.runnerSession) {
+            return;
+        }
+
+        this._postCadqueryInstallStatus(true);
+        try {
+            await this.runnerSession.installCadqueryOcp();
+
+            if (this.ownsRunner) {
+                await this.runnerSession.dispose();
+                this.runnerSession = null;
+                await this.ensureRunnerSession();
+            } else {
+                this.log('[export] cadquery-ocp installed. Restart the main Kigumi viewer session if STEP export was attempted before install.');
+            }
+
+            await this._pushCadqueryStatus();
+            void vscode.window.showInformationMessage('Kigumi installed cadquery-ocp for STEP export.');
+        } catch (error) {
+            const details = this.extractRunnerErrorDetails(error);
+            this.log(`[export] cadquery-ocp install failed: ${details.message}`);
+            const openOutputAction = 'Open Kigumi Output';
+            const choice = await vscode.window.showErrorMessage(
+                `Failed to install cadquery-ocp: ${details.message}`,
+                openOutputAction
+            );
+            if (choice === openOutputAction) {
+                this.channel.show(true);
+            }
+        } finally {
+            this._postCadqueryInstallStatus(false);
+        }
+    }
+
+    _postCadqueryInstallStatus(isInstalling) {
+        if (!this.panel) {
+            return;
+        }
+
+        this.panel.webview.postMessage({
+            type: 'dependencyInstallStatus',
+            payload: {
+                installingCadqueryOcp: Boolean(isInstalling),
+            },
+        }).catch((error) => {
+            this.log(`[webview] Failed to post dependency install status: ${error.message || error}`);
+        });
     }
 
     async onFileChanged(source) {

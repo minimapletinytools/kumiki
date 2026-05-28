@@ -262,8 +262,8 @@ def generate_random_orientation() -> Orientation:
         [2*(q1*q2 + q0*q3), 1 - 2*(q1**2 + q3**2), 2*(q2*q3 - q0*q1)],
         [2*(q1*q3 - q0*q2), 2*(q2*q3 + q0*q1), 1 - 2*(q1**2 + q2**2)]
     ]
-    
-    return Orientation(matrix)  # type: ignore[arg-type]
+
+    return Orientation(Matrix(matrix))
 
 
 def create_test_footprint(width=4, height=3) -> Footprint:
@@ -277,13 +277,13 @@ def create_test_footprint(width=4, height=3) -> Footprint:
     Returns:
         Footprint: A rectangular footprint with corners at (0,0), (width,0), (width,height), (0,height)
     """
-    corners = [
+    corners = (
         create_v2(0, 0),
         create_v2(width, 0),
         create_v2(width, height),
         create_v2(0, height)
-    ]
-    return Footprint(corners)  # type: ignore[arg-type]
+    )
+    return Footprint(corners)
 
 
 # ============================================================================

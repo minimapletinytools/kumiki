@@ -277,7 +277,6 @@ class ViewerSettingsPanel {
     render() {
         return html`
             <section id="render-controls" aria-label="Viewer options">
-                <button id="refresh-btn" type="button" title="Reload pattern">↻ refresh</button>
                 <label>
                     <input id="center-gizmo-toggle" type="checkbox" ?checked=${this.app.showCenterGizmo}>
                     center gizmo
@@ -335,6 +334,51 @@ class ViewerSettingsPanel {
                         ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${theme.label}</option>`)}
                     </select>
                 </label>
+                <label>
+                    <input id="export-individual-toggle" type="checkbox" ?checked=${this.app.exportIndividualsEnabled}>
+                    also export individual files
+                </label>
+                <button
+                    id="refresh-btn"
+                    type="button"
+                    title="Reload pattern"
+                    @click=${() => {
+                        if (vscode) {
+                            vscode.postMessage({ type: 'requestRefresh' });
+                        }
+                    }}>↻ refresh</button>
+                <button
+                    id="export-stl-btn"
+                    type="button"
+                    title="Export frame members to STL files"
+                    @click=${() => {
+                        if (vscode) {
+                            vscode.postMessage({ type: 'requestExportStl', includeIndividuals: this.app.exportIndividualsEnabled });
+                        }
+                    }}>export STL</button>
+                ${this.app.cadqueryOcpInstalled === false
+                    ? html`<button
+                        id="install-cadquery-ocp-btn"
+                        type="button"
+                        title="Install cadquery-ocp for STEP export"
+                        ?disabled=${this.app.installingCadqueryOcp === true}
+                        @click=${() => {
+                            if (vscode) {
+                                vscode.postMessage({ type: 'requestInstallCadqueryOcp' });
+                            }
+                        }}>${this.app.installingCadqueryOcp === true
+                            ? 'installing cadquery...'
+                            : 'install cadquery, needed for STEP export'}</button>`
+                    : html`<button
+                        id="export-step-btn"
+                        type="button"
+                        title="Export frame members to STEP files"
+                        ?disabled=${this.app.cadqueryOcpInstalled === null}
+                        @click=${() => {
+                            if (vscode) {
+                                vscode.postMessage({ type: 'requestExportStep', includeIndividuals: this.app.exportIndividualsEnabled });
+                            }
+                        }}>export STEP</button>`}
             </section>
         `;
     }
@@ -348,7 +392,7 @@ class ViewerSettingsPanel {
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const debugToggle = renderRoot.querySelector('#debug-toggle');
         const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
-        const refreshButton = renderRoot.querySelector('#refresh-btn');
+        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
 
         centerGizmoToggle.addEventListener('change', (event) => {
@@ -387,18 +431,16 @@ class ViewerSettingsPanel {
             this.app.setReflectionsEnabled(event.target.checked);
         });
 
+        exportIndividualToggle.addEventListener('change', (event) => {
+            this.app.setExportIndividualsEnabled(event.target.checked);
+        });
+
         unselectedTransparencySlider.addEventListener('input', (event) => {
             const rawVisibility = Number(event.target.value);
             const normalizedVisibility = Number.isFinite(rawVisibility)
                 ? Math.max(5, Math.min(100, Math.round(rawVisibility / 5) * 5))
                 : 60;
             this.app.setUnselectedTransparencyPercent(100 - normalizedVisibility);
-        });
-
-        refreshButton.addEventListener('click', () => {
-            if (vscode) {
-                vscode.postMessage({ type: 'requestRefresh' });
-            }
         });
 
         themeSelect.addEventListener('change', (event) => {
@@ -417,6 +459,7 @@ class ViewerSettingsPanel {
         const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
+        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
         if (edgeVisibilitySlider) {
             edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
@@ -426,6 +469,9 @@ class ViewerSettingsPanel {
         }
         if (layerTagsToggle) {
             layerTagsToggle.checked = this.app.showLayerTags;
+        }
+        if (exportIndividualToggle) {
+            exportIndividualToggle.checked = this.app.exportIndividualsEnabled;
         }
         if (themeSelect) {
             themeSelect.value = this.app.activeTheme;
@@ -520,13 +566,13 @@ class KigumiViewerApp extends LitElement {
         this.activeTheme = 'forest';
         this.activeBackground = this.activeTheme;
 
-        this.availablePatterns = [];  // [{name, groups, source_file, source}]
-        this.patternsLoading = new Set();  // pattern names currently loading
-
         this.animationHandle = null;
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
         this.viewerOptions = normalizeViewerOptions(INITIAL_PAYLOAD.viewerOptions);
+        this.cadqueryOcpInstalled = null;
+        this.installingCadqueryOcp = false;
+        this.exportIndividualsEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
         this.activeRefreshToken = 0;
         this.onWindowMessage = this.onWindowMessage.bind(this);
@@ -618,22 +664,6 @@ class KigumiViewerApp extends LitElement {
                         </table>
                     </div>
                 </div>
-                <div class="panel-box">
-                    <div class="panel-title">Raw Python Output</div>
-                    <pre id="raw-output"></pre>
-                </div>
-                <div id="patterns-panel-box" class="panel-box">
-                    <div class="panel-title">
-                        Patterns
-                        <div id="patterns-toolbar">
-                            <button id="patterns-load-btn" type="button">load patterns</button>
-                        </div>
-                    </div>
-                    <div id="patterns-panel">
-                        <div id="patterns-empty" class="patterns-empty-msg">click “load patterns” to scan for available patterns</div>
-                        <div id="patterns-list"></div>
-                    </div>
-                </div>
                 <div id="log-panel-box" class="panel-box">
                     <div class="panel-title">
                         Log Output
@@ -644,6 +674,10 @@ class KigumiViewerApp extends LitElement {
                         </div>
                     </div>
                     <div id="log-output"></div>
+                </div>
+                <div class="panel-box">
+                    <div class="panel-title">Raw Python Output</div>
+                    <pre id="raw-output"></pre>
                 </div>
             </div>
         `;
@@ -863,13 +897,6 @@ class KigumiViewerApp extends LitElement {
             if (vscode) { vscode.postMessage({ type: 'openOutputChannel' }); }
         });
 
-        const patternsLoadBtn = this.renderRoot.querySelector('#patterns-load-btn');
-        if (patternsLoadBtn) {
-            patternsLoadBtn.addEventListener('click', () => {
-                this.requestLoadPatterns();
-            });
-        }
-
         const memberOptRoughLength = this.renderRoot.querySelector('#member-opt-rough-length');
         const memberOptSizes = this.renderRoot.querySelector('#member-opt-sizes');
         const memberOptCsg = this.renderRoot.querySelector('#member-opt-csg');
@@ -1065,6 +1092,15 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
+    setExportIndividualsEnabled(enabled) {
+        const normalized = Boolean(enabled);
+        if (this.exportIndividualsEnabled === normalized) {
+            return;
+        }
+        this.exportIndividualsEnabled = normalized;
+        this.requestUpdate();
+    }
+
     updateStructureScreenBounds() {
         if (!this.camera || !this.lastBounds) {
             this.structureScreenBounds = null;
@@ -1159,6 +1195,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'capturePanelSnapshotRequest') {
+            this.handleCapturePanelSnapshotRequest(message);
+            return;
+        }
+
         if (message.type === 'logEntry') {
             const text = typeof message.text === 'string' ? message.text : String(message.text);
             this.appendLogLine(text);
@@ -1172,11 +1213,6 @@ class KigumiViewerApp extends LitElement {
 
         if (message.type === 'csgSelectionResult') {
             this.handleCSGSelectionResult(message);
-            return;
-        }
-
-        if (message.type === 'patternsAvailable') {
-            this.handlePatternsAvailable(message);
             return;
         }
 
@@ -1194,8 +1230,21 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        if (message.type === 'patternLoadResult') {
-            this.handlePatternLoadResult(message);
+        if (message.type === 'dependencyStatus') {
+            const payload = (message.payload && typeof message.payload === 'object') ? message.payload : {};
+            if (typeof payload.cadqueryOcpInstalled === 'boolean') {
+                this.cadqueryOcpInstalled = payload.cadqueryOcpInstalled;
+                this.requestUpdate();
+            }
+            return;
+        }
+
+        if (message.type === 'dependencyInstallStatus') {
+            const payload = (message.payload && typeof message.payload === 'object') ? message.payload : {};
+            if (typeof payload.installingCadqueryOcp === 'boolean') {
+                this.installingCadqueryOcp = payload.installingCadqueryOcp;
+                this.requestUpdate();
+            }
             return;
         }
     }
@@ -1240,6 +1289,51 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    handleCapturePanelSnapshotRequest(message) {
+        const requestId = message && message.requestId;
+        if (!vscode || !requestId) {
+            return;
+        }
+
+        try {
+            const titles = Array.from(this.renderRoot.querySelectorAll('#panels .panel-title'))
+                .map((element) => (element.textContent || '').replace(/\s+/g, ' ').trim())
+                .filter((label) => label.length > 0);
+            const rawPanelIndex = titles.indexOf('Raw Python Output');
+            const memberRowsElement = this.renderRoot.querySelector('#timber-rows');
+            const memberRows = this.renderRoot.querySelectorAll('#timber-rows tr').length;
+            const logText = this.renderRoot.querySelector('#log-output')
+                ? this.renderRoot.querySelector('#log-output').textContent || ''
+                : '';
+
+            vscode.postMessage({
+                type: 'capturePanelSnapshotResult',
+                requestId,
+                ok: true,
+                snapshot: {
+                    panelTitles: titles,
+                    panelCount: titles.length,
+                    hasMemberListPanel: titles.includes('Member List'),
+                    hasMemberTableBody: Boolean(memberRowsElement),
+                    hasLogOutputPanel: titles.some((label) => label.startsWith('Log Output')),
+                    hasRawPythonOutputPanel: rawPanelIndex >= 0,
+                    rawPythonOutputPanelIndex: rawPanelIndex,
+                    isRawPythonOutputPanelLast: rawPanelIndex >= 0 && rawPanelIndex === titles.length - 1,
+                    hasRenderControls: Boolean(this.renderRoot.querySelector('#render-controls')),
+                    memberRowCount: memberRows,
+                    logTextLength: logText.length,
+                },
+            });
+        } catch (error) {
+            vscode.postMessage({
+                type: 'capturePanelSnapshotResult',
+                requestId,
+                ok: false,
+                error: error && error.message ? error.message : 'Unknown panel snapshot error',
+            });
+        }
+    }
+
     onWindowScroll() {
         const toV3d = this.renderRoot.querySelector('#to-v3d');
         toV3d.style.display = window.scrollY > 260 ? 'block' : 'none';
@@ -1259,7 +1353,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         if (this.mouseAction === 'orbit') {
-            this.cameraUpVector.set(0, 0, 1);
             this.theta -= (event.clientX - this.lastX) * 0.008;
             this.phi = this.clampPhi(this.phi - (event.clientY - this.lastY) * 0.008);
         } else if (this.mouseAction === 'pan') {
@@ -1464,178 +1557,6 @@ class KigumiViewerApp extends LitElement {
         }
 
         this.updateInfo(this.currentFrameData);
-    }
-
-    handlePatternsAvailable(message) {
-        const sources = Array.isArray(message.sources) ? message.sources : [];
-        const flat = [];
-        for (const src of sources) {
-            const sourceLabel = src.source || 'unknown';
-            const patterns = Array.isArray(src.patterns) ? src.patterns : [];
-            for (const p of patterns) {
-                flat.push({
-                    name: p.name,
-                    groups: Array.isArray(p.groups) ? p.groups : [],
-                    source_file: p.source_file || '',
-                    source: sourceLabel,
-                });
-            }
-        }
-        this.availablePatterns = flat;
-        this.patternsLoading.clear();
-        const loadBtn = this.renderRoot.querySelector('#patterns-load-btn');
-        if (loadBtn) {
-            loadBtn.disabled = false;
-            loadBtn.textContent = 'reload patterns';
-        }
-        this.renderPatternsList();
-    }
-
-    handlePatternLoadResult(message) {
-        const patternName = message.patternName;
-        if (patternName) {
-            this.patternsLoading.delete(patternName);
-        }
-        const sourceFile = message.sourceFile;
-        if (sourceFile) {
-            this.patternsLoading.delete('book:' + sourceFile);
-        }
-        this.renderPatternsList();
-    }
-
-    onPatternClick(patternName, sourceFile) {
-        if (this.patternsLoading.has(patternName)) {
-            return;
-        }
-        this.patternsLoading.add(patternName);
-        this.renderPatternsList();
-        if (vscode) {
-            vscode.postMessage({
-                type: 'loadPattern',
-                patternName,
-                sourceFile,
-            });
-        }
-    }
-
-    onBookClick(sourceFile) {
-        // Use the source_file as a loading key for the book
-        const bookKey = 'book:' + sourceFile;
-        if (this.patternsLoading.has(bookKey)) {
-            return;
-        }
-        this.patternsLoading.add(bookKey);
-        this.renderPatternsList();
-        if (vscode) {
-            vscode.postMessage({
-                type: 'loadBook',
-                sourceFile,
-            });
-        }
-    }
-
-    requestLoadPatterns() {
-        const rescan = this.availablePatterns.length > 0;
-        const loadBtn = this.renderRoot.querySelector('#patterns-load-btn');
-        if (loadBtn) {
-            loadBtn.disabled = true;
-            loadBtn.textContent = 'scanning…';
-        }
-        const emptyEl = this.renderRoot.querySelector('#patterns-empty');
-        if (emptyEl && this.availablePatterns.length === 0) {
-            emptyEl.textContent = 'scanning for patterns…';
-            emptyEl.style.display = 'block';
-        }
-        if (vscode) {
-            vscode.postMessage({ type: 'requestLoadPatterns', rescan });
-        }
-    }
-
-    renderPatternsList() {
-        const listEl = this.renderRoot.querySelector('#patterns-list');
-        const emptyEl = this.renderRoot.querySelector('#patterns-empty');
-        if (!listEl || !emptyEl) {
-            return;
-        }
-
-        if (this.availablePatterns.length === 0) {
-            emptyEl.style.display = 'block';
-            listEl.innerHTML = '';
-            return;
-        }
-        emptyEl.style.display = 'none';
-
-        // Group by source (shipped/local), then by book (source_file)
-        const bySource = new Map();
-        for (const p of this.availablePatterns) {
-            const sourceKey = p.source === 'shipped' ? 'Shipped Library' : p.source === 'local' ? 'Local Project' : p.source;
-            if (!bySource.has(sourceKey)) {
-                bySource.set(sourceKey, new Map());
-            }
-            const books = bySource.get(sourceKey);
-            if (!books.has(p.source_file)) {
-                books.set(p.source_file, []);
-            }
-            books.get(p.source_file).push(p);
-        }
-
-        let html = '';
-        let bookIdx = 0;
-        for (const [sourceLabel, books] of bySource) {
-            html += `<div class="patterns-source-label">${this._escapeHtml(sourceLabel)}</div>`;
-            for (const [sourceFile, patterns] of books) {
-                const bookName = sourceFile.replace(/\\/g, '/').split('/').pop().replace(/\.py$/, '');
-                const bookLoading = this.patternsLoading.has('book:' + sourceFile);
-                const anyPatternLoading = patterns.some(p => this.patternsLoading.has(p.name));
-                const bookClass = bookLoading ? ' patterns-book-loading' : '';
-                html += `<div class="patterns-book${bookClass}" data-book-idx="${bookIdx}">`;
-                html += `<button class="patterns-book-header" data-book-idx="${bookIdx}" data-source-file="${this._escapeAttr(sourceFile)}" ${bookLoading ? 'disabled' : ''}>`;
-                html += `<span class="patterns-book-name">${this._escapeHtml(bookName)}</span>`;
-                html += `<span class="patterns-book-count">${patterns.length}</span>`;
-                if (bookLoading || anyPatternLoading) {
-                    html += ' <span class="patterns-item-spinner">…</span>';
-                }
-                html += '</button>';
-                html += '<div class="patterns-book-items">';
-                for (const p of patterns) {
-                    const isLoading = this.patternsLoading.has(p.name);
-                    const loadingClass = isLoading ? ' patterns-item-loading' : '';
-                    html += `<button class="patterns-item${loadingClass}" data-pattern-name="${this._escapeAttr(p.name)}" data-source-file="${this._escapeAttr(p.source_file)}" ${isLoading ? 'disabled' : ''}>`;
-                    html += `<span class="patterns-item-name">${this._escapeHtml(p.name)}</span>`;
-                    if (isLoading) {
-                        html += ' <span class="patterns-item-spinner">…</span>';
-                    }
-                    html += '</button>';
-                }
-                html += '</div></div>';
-                bookIdx++;
-            }
-        }
-        listEl.innerHTML = html;
-
-        // Bind pattern click events
-        const buttons = listEl.querySelectorAll('.patterns-item');
-        for (const btn of buttons) {
-            btn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const name = btn.getAttribute('data-pattern-name');
-                const file = btn.getAttribute('data-source-file');
-                if (name && file) {
-                    this.onPatternClick(name, file);
-                }
-            });
-        }
-
-        // Bind book header click events (open all patterns in book)
-        const bookHeaders = listEl.querySelectorAll('.patterns-book-header');
-        for (const header of bookHeaders) {
-            header.addEventListener('click', () => {
-                const sourceFile = header.getAttribute('data-source-file');
-                if (sourceFile) {
-                    this.onBookClick(sourceFile);
-                }
-            });
-        }
     }
 
     _escapeHtml(str) {
@@ -1868,7 +1789,6 @@ class KigumiViewerApp extends LitElement {
         if (Math.abs(dx) + Math.abs(dy) > 1) {
             this.gizmoMoved = true;
         }
-        this.cameraUpVector.set(0, 0, 1);
         this.theta -= dx * 0.008;
         this.phi = this.clampPhi(this.phi - dy * 0.008);
         this.gizmoLastX = event.clientX;

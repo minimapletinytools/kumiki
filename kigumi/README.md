@@ -36,9 +36,9 @@ If no supported entry point exists, the viewer returns an error.
 To use Kigumi, you need:
 
 - **VS Code** with the Kigumi extension installed
-- **Python 3.10 or later** available on your system path
-  - On macOS/Linux: `python3` or `python`
-  - On Windows: `py`, `python`, or `python3`
+- **uv** available, or a bootstrap Python launcher available so Kigumi can install uv automatically
+  - Preferred: install `uv` ahead of time: https://docs.astral.sh/uv/getting-started/installation/
+  - Auto-bootstrap fallback: Kigumi tries `python3.13`, then `python3`/`python` (or `py -3.13`/`py -3` on Windows) to install uv
 
 Kigumi does NOT require pre-installed packages. It handles dependency setup automatically.
 
@@ -58,16 +58,17 @@ This lets you open a single Python file and still bootstrap a runnable Kigumi pr
 On first render in a project, Kumiki bootstraps a project-local environment automatically:
 
 1. Finds project root by walking upward from the target file
-2. Creates `.venv` using Python's built-in `venv` module if needed
-3. Installs required dependencies via `pip`:
+2. Ensures `uv` is available (uses installed `uv` when present, otherwise attempts to install it via Python)
+3. Creates `.venv` with `uv venv --python 3.13 .venv`
+4. Installs required dependencies via `pip`:
    - Local dev checkout: `pip install -e <projectRoot>` (editable kumiki)
    - Non-local project: `pip install kumiki` (from PyPI)
   - Core packages: `sympy`, `numpy`, `trimesh`, `manifold3d`
-4. Writes `.kigumi/project.yaml` with Python path and setup metadata
+5. Writes `.kigumi/project.yaml` with Python path and setup metadata
 
 On later runs, Kigumi reuses the configured interpreter from `.kigumi/project.yaml` when available.
 
-Note: If Python 3.10+ is not available or not on your system path, initialization will fail. Install it via your system package manager or [python.org](https://www.python.org).
+Note: If neither `uv` nor a working bootstrap Python launcher is available, initialization will fail with instructions to install `uv` manually.
 
 ## Commands
 

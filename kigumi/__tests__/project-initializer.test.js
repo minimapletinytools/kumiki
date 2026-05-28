@@ -86,6 +86,7 @@ describe('project-initializer', () => {
     expect(claudeContent).toContain('AGENTS.md');
     expect(cursorContent).toContain('AGENTS.md');
     expect(gitignoreContent).toContain('.venv/');
+    expect(gitignoreContent).toContain('kigumi_exports/');
     expect(gitignoreContent).not.toContain('.kigumi/');
     expect(gitignoreContent).not.toContain('.kigumi.yaml');
     expect(gitignoreContent).not.toContain('.kigumi_readonly_sources/');
@@ -94,7 +95,19 @@ describe('project-initializer', () => {
     expect(result.appendedToExistingAgentsFile).toBe(false);
     expect(result.instructionWarnings).toEqual([]);
     expect(result.createdGitignoreFile).toBe(true);
-    expect(result.addedGitignoreEntries).toEqual(['.venv/']);
+    expect(result.addedGitignoreEntries).toEqual(['.venv/', 'kigumi_exports/']);
+
+    const uvVersionProbe = spawn.mock.calls.some(
+      ([command, args]) => command === 'uv' && Array.isArray(args) && args.join(' ') === '--version'
+    );
+    const uvVenvCreate = spawn.mock.calls.some(
+      ([command, args]) => command === 'uv'
+        && Array.isArray(args)
+        && args.join(' ') === 'venv --python 3.13 .venv'
+    );
+
+    expect(uvVersionProbe).toBe(true);
+    expect(uvVenvCreate).toBe(true);
   });
 
   test('initializeWorkspaceProject appends to existing AGENTS.md and outputs warning', async () => {

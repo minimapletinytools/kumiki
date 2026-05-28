@@ -1047,7 +1047,7 @@ class TestJoinTimbers:
                 magnitude = float((diff.T * diff)[0, 0] ** Rational("0.5"))
                 
                 assert magnitude > 1e-6, \
-                    f"Beams {beam_i.name} and {beam_j.name} should be at different positions, " \
+                    f"Beams {beam_i.ticket.name} and {beam_j.ticket.name} should be at different positions, " \
                     f"but positions differ by only {magnitude}"
         
         # Verify specific geometric properties

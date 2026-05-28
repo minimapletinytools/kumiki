@@ -402,7 +402,7 @@ def cut_tongue_and_fork_corner_joint(
         AssertionError: If timbers are not plane aligned, are parallel, or tongue parameters
             are out of bounds.
     """
-    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, adopt_csg
+    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, CutCSG, adopt_csg
     from kumiki.rule import safe_dot_product, safe_compare, Comparison
 
     error = arrangement.check_plane_aligned()
@@ -586,8 +586,8 @@ def cut_tongue_and_fork_corner_joint(
         fork_timber.get_length_direction_global(),
     )
 
-    tongue_negative_parts = [tongue_negative_csg, tongue_end_cut]
-    fork_negative_parts = [fork_negative_csg, fork_end_cut]
+    tongue_negative_parts: list[CutCSG] = [tongue_negative_csg, tongue_end_cut]
+    fork_negative_parts: list[CutCSG] = [fork_negative_csg, fork_end_cut]
 
     # -------------------------------------------------------------------------
     # Assemble cuts and joint
@@ -657,7 +657,7 @@ def cut_tongue_and_fork_butt_joint(
         AssertionError: If timbers are not plane aligned, are parallel, or
             tongue parameters are out of bounds.
     """
-    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, adopt_csg
+    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, CutCSG, adopt_csg
     from kumiki.rule import safe_dot_product, safe_compare, Comparison
 
     error = arrangement.check_plane_aligned()
@@ -810,7 +810,7 @@ def cut_tongue_and_fork_butt_joint(
     # No fork end cut — fork timber continues through the joint
     # -------------------------------------------------------------------------
 
-    tongue_negative_parts = [tongue_negative_csg, tongue_end_cut]
+    tongue_negative_parts: list[CutCSG] = [tongue_negative_csg, tongue_end_cut]
 
     # -------------------------------------------------------------------------
     # Assemble cuts and joint
