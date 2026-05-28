@@ -136,8 +136,12 @@ DONE-cleanup the bottom area for kigumi
 -kigumi init
   DONE-initilaize project should also set .gitignore
   DONE-update kumiki should be grayed out if no project is initialized and it should just not show at all acutaly..
-  -initialize kigumi project should disappear if iniatilaziotn is in progress
-  -initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
+  DONE-initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
+  -initialize kigumi project button line should show "initailizing project..." while initialization is in project. so in summary it has the following stase:
+    -initialize project
+    -initializing
+    -kumiki dev mode
+    -don't show at all (if project is detected)
 -stuff to test
   -test the install cadquery stuff 
   -test export step and export STL combined/inidivdual again
@@ -224,7 +228,11 @@ DONE-lock and hide fetaures
   -lincoln log joints?
 
 TESTS
-  -fresh install test
+  DONE-fresh install test
+    -create a temp directory and open vscode test in that directory
+    -check for sidebar state before initializati
+    -initilialize kigumi
+    -check for sidebar state after initializati
     -check .gitignore
     -check for my frame
     -check venv is installde correctly

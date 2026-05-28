@@ -48,6 +48,11 @@ packages = ["kumiki"]
 # (see tools/build_pattern_index.py) and must be regenerated before
 # building a release wheel.
 
+[tool.hatch.build.targets.sdist.force-include]
+"patterns" = "kumiki/patterns"
+"docs" = "kumiki/docs"
+"kumiki/_pattern_index.json" = "kumiki/_pattern_index.json"
+
 [tool.pytest.ini_options]
 # Pytest configuration
 testpaths = ["tests"]

@@ -1,13 +1,3 @@
----
-applyTo: "patterns/**, experiments/**"
----
-
-Canonical source: `docs/agent_usage_instructions.md`. Keep this compatibility mirror in sync.
-
-Copy this file into your project's `.github/copilot-instructions.md` (or `.cursorrules`) to give your AI coding agent context for designing timber frames with Kumiki. Do not copy the applyTo field above.
-
-
-
 # Kumiki Usage Instructions
 
 ## Concepts
@@ -23,7 +13,7 @@ from kumiki import *
 
 ## Numeric Values
 
-- **Always use SymPy types (Rational or Float) — never Python floats.**
+- **Always use SymPy types (Rational or Float) -- never Python floats.**
 - Use the `inches()` and `feet()` helpers for imperial measurements:
   ```python
   inches(3)               # 3 inches
@@ -36,7 +26,7 @@ from kumiki import *
 
 ## Creating Timbers
 
-Timbers for a typical structure are usually defined 
+Timbers for a typical structure are usually defined
 
 - first create a `Footprint` for the footprint of the structure.
 - then use methods in `footprint.py` to define timbers directly on the footprint (touching the ground)
@@ -50,7 +40,7 @@ Timbers for a typical structure are usually defined
 
 ## Cutting Joints
 
-Once timbers have been laid out, use the various `cut_*` methods to cut joints joining the timbers. There are many types of joints. 
+Once timbers have been laid out, use the various `cut_*` methods to cut joints joining the timbers. There are many types of joints.
 
 Almost all joints have a `cut_basic_*` variation inside of basic_joints.py which take minimal parameters. Always use the basic variants until the user provides specific requirements.
 
@@ -73,11 +63,11 @@ If the user does not specify which joint, use the following (or one of its varia
 - for tie-beams or beams under substantial loads, consider using cut_wedged_half_dovetail_mortise_and_tenon_joint instead as it's much stronger
 - for rafter-to-rafter joints use cut_tongue_and_fork_corner_joint
 - for mudsill splice joints use cut_lapped_gooseneck_joint with the gooseneck facing upwards
-- for mudsill corner joints use either 
+- for mudsill corner joints use either
     - cut_plain_corner_lap_joint (simplest)
     - cut_mortise_and_tenon_joint (more complicated)
     - cut_mitered_and_keyed_lap_joint (most complicated, no end grain exposed)
-- for joist-to-beam or joist-to-mudsill joints use 
+- for joist-to-beam or joist-to-mudsill joints use
     - cut_dropin_housed_butt_joint (simplest)
     - cut_housed_dovetail_butt_joint (if joist needs to resist spreading forces)
 
@@ -85,14 +75,14 @@ If the user does not specify which joint, use the following (or one of its varia
 
 Your file should typically have some `example` function that returns a Frame
 
-Use `Frame.from_joints` to merge cuts on shared timbers across multiple joints. 
+Use `Frame.from_joints` to merge cuts on shared timbers across multiple joints.
 
 ```python
 def example():
     # establish footprint
     # create timbers
     # create joints
-    # merge into. aframe and return the results
+    # merge into a frame and return the results
     return Frame.from_joints([joint1, joint2, joint3], name="my_frame")
 ```
 
@@ -101,6 +91,3 @@ The `example` function name is special, it is what kigumi will scan for and rend
 # Creating new Patterns
 
 TODO
-
-
-

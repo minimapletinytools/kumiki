@@ -17,7 +17,7 @@ function stripLeadingYamlFrontmatter(content) {
 
 function main() {
   const extensionRoot = path.resolve(__dirname, '..');
-  const sourcePath = path.resolve(extensionRoot, '..', '.github', 'instructions', 'usage.instructions.md');
+  const sourcePath = path.resolve(extensionRoot, '..', 'docs', 'agent_usage_instructions.md');
   const generatedDir = path.resolve(extensionRoot, '.generated');
   const outputPath = path.resolve(generatedDir, 'bundled-usage-instructions.md');
 

@@ -5,7 +5,7 @@ const https = require('https');
 const { ensureKigumiYaml, resolveProjectEnvironment } = require('./project-root');
 
 const GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '.generated', 'bundled-usage-instructions.md');
-const CANONICAL_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '..', '.github', 'instructions', 'usage.instructions.md');
+const CANONICAL_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '..', 'docs', 'agent_usage_instructions.md');
 
 function stripLeadingYamlFrontmatter(content) {
     if (!content.startsWith('---')) {
@@ -22,9 +22,9 @@ function stripLeadingYamlFrontmatter(content) {
 }
 
 function getBundledAgentInstructionsContent() {
-    const sourcePath = fs.existsSync(GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH)
-        ? GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH
-        : CANONICAL_USAGE_INSTRUCTIONS_PATH;
+    const sourcePath = fs.existsSync(CANONICAL_USAGE_INSTRUCTIONS_PATH)
+        ? CANONICAL_USAGE_INSTRUCTIONS_PATH
+        : GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH;
 
     if (fs.existsSync(sourcePath)) {
         const rawContent = fs.readFileSync(sourcePath, 'utf8');
@@ -54,6 +54,20 @@ function writeFileIfMissing(filePath, content) {
     return true;
 }
 
+function copyFileContent(filePath, content) {
+    const nextContent = content;
+    if (fs.existsSync(filePath)) {
+        const currentContent = fs.readFileSync(filePath, 'utf8');
+        if (currentContent === nextContent) {
+            return false;
+        }
+    }
+
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    fs.writeFileSync(filePath, nextContent, 'utf8');
+    return true;
+}
+
 function ensureAgentsInstructionsFile(agentsPath, bundledInstructionsContent) {
     const normalizedContent = bundledInstructionsContent.trimEnd() + '\n';
     fs.mkdirSync(path.dirname(agentsPath), { recursive: true });
@@ -78,11 +92,13 @@ function ensureAgentsInstructionsFile(agentsPath, bundledInstructionsContent) {
     };
 }
 
-function ensureAgentInstructionFiles(workspaceRoot) {
+function ensureAgentInstructionFiles(workspaceRoot, options = {}) {
+    const forceRefreshUsageInstructions = options.forceRefreshUsageInstructions === true;
     const agentsPath = path.join(workspaceRoot, 'AGENTS.md');
     const copilotPath = path.join(workspaceRoot, '.github', 'copilot-instructions.md');
     const claudePath = path.join(workspaceRoot, 'CLAUDE.md');
     const cursorPath = path.join(workspaceRoot, '.cursorrules');
+    const workspaceUsagePath = path.join(workspaceRoot, 'docs', 'agent_usage_instructions.md');
 
     const pointerContent = [
         '# Agent Instructions',
@@ -95,11 +111,16 @@ function ensureAgentInstructionFiles(workspaceRoot) {
         '',
     ].join('\n');
 
-    const agentsResult = ensureAgentsInstructionsFile(agentsPath, getBundledAgentInstructionsContent());
+    const bundledInstructionsContent = getBundledAgentInstructionsContent();
+    const agentsResult = ensureAgentsInstructionsFile(agentsPath, bundledInstructionsContent);
+    const copiedWorkspaceUsageInstructionsFile = forceRefreshUsageInstructions
+        ? copyFileContent(workspaceUsagePath, bundledInstructionsContent)
+        : writeFileIfMissing(workspaceUsagePath, bundledInstructionsContent);
 
     return {
         createdAgentsFile: agentsResult.createdAgentsFile,
         appendedToExistingAgentsFile: agentsResult.appendedToExistingAgentsFile,
+        copiedWorkspaceUsageInstructionsFile,
         createdCopilotInstructionsFile: writeFileIfMissing(copilotPath, pointerContent),
         createdClaudeInstructionsFile: writeFileIfMissing(claudePath, pointerContent),
         createdCursorRulesFile: writeFileIfMissing(cursorPath, pointerContent),
@@ -705,6 +726,10 @@ async function updateWorkspaceKumiki(workspaceRoot, filePath) {
             isLocalDev: env.isLocalDev,
         });
 
+        const instructionsResult = ensureAgentInstructionFiles(resolvedRoot, {
+            forceRefreshUsageInstructions: true,
+        });
+
         return {
             projectRoot: resolvedRoot,
             isLocalDev: env.isLocalDev,
@@ -715,6 +740,7 @@ async function updateWorkspaceKumiki(workspaceRoot, filePath) {
             missingAfter: installResult.missingAfter,
             kumikiVersion: installResult.kumikiVersion,
             installSummary: installResult.summary,
+            ...instructionsResult,
         };
     } finally {
         _initializationInProgress = false;

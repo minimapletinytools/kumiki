@@ -52,6 +52,10 @@ Math types, units, and math-related utilities. All math code must use these type
 ### kumiki/measuring.py
 Measure/mark pattern for locating features on timbers and marking things relative to features.
 
+## Understanding Kumiki
+
+Please see docs/concepts.md to understand the core concepts and architecture of Kumiki.
+
 ## General Coding Philosophy
 
 - Simplicity over performance — straightforward code, minimal indirections through abstract classes
