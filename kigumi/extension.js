@@ -1,7 +1,9 @@
 const path = require('path');
+const fs = require('fs');
 const vscode = require('vscode');
 const { FrameViewSession } = require('./frame-view-session');
 const { KigumiSidebarProvider } = require('./sidebar-provider');
+const { normalizeRetentionDays, pruneOldLogFiles } = require('./log-retention');
 const {
     getInitializationStatus,
     initializeWorkspaceProject,
@@ -16,6 +18,8 @@ const patternSessions = new Map();     // slotName → FrameViewSession (pattern
 let patternSlotCounter = 0;
 let sidebarProvider = null;
 let openInSplitView = true;
+let autoRefreshOnFileChange = false;
+let logRetentionDays = 15;
 const BUILD_MARKER = '🧪 KIGUMI_BUILD_2026-05-17T02:45Z';
 const ENABLE_TEST_COMMANDS = process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1';
 
@@ -31,10 +35,28 @@ function activate(context) {
         : 'unknown';
     outputChannel.appendLine(`[kigumi] ${BUILD_MARKER} (extension v${extensionVersion})`);
     openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', true);
+    autoRefreshOnFileChange = vscode.workspace.getConfiguration('kigumi').get('viewer.autoRefreshOnFileChange', false);
+    logRetentionDays = normalizeRetentionDays(vscode.workspace.getConfiguration('kigumi').get('viewer.logRetentionDays', 15));
+    pruneWorkspaceLogs(outputChannel, logRetentionDays);
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('kigumi.viewer.openInSplitView')) {
             openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', true);
             void vscode.commands.executeCommand('setContext', 'kigumi.splitViewEnabled', openInSplitView);
+        }
+        if (event.affectsConfiguration('kigumi.viewer.autoRefreshOnFileChange')) {
+            autoRefreshOnFileChange = vscode.workspace.getConfiguration('kigumi').get('viewer.autoRefreshOnFileChange', false);
+            for (const session of frameSessions.values()) {
+                session.setWatcherEnabled(autoRefreshOnFileChange);
+            }
+            for (const session of patternSessions.values()) {
+                session.setWatcherEnabled(autoRefreshOnFileChange);
+            }
+            outputChannel.appendLine(`[kigumi] Auto refresh on file change: ${autoRefreshOnFileChange ? 'enabled' : 'disabled'}`);
+        }
+        if (event.affectsConfiguration('kigumi.viewer.logRetentionDays')) {
+            logRetentionDays = normalizeRetentionDays(vscode.workspace.getConfiguration('kigumi').get('viewer.logRetentionDays', 15));
+            pruneWorkspaceLogs(outputChannel, logRetentionDays);
+            outputChannel.appendLine(`[kigumi] Log retention days: ${logRetentionDays}`);
         }
     }));
 
@@ -130,6 +152,153 @@ function activate(context) {
         }
     });
     context.subscriptions.push(refreshPatterns);
+
+    const toggleAutoRefresh = vscode.commands.registerCommand('kigumi.toggleAutoRefreshOnFileChange', async () => {
+        const current = vscode.workspace.getConfiguration('kigumi').get('viewer.autoRefreshOnFileChange', false);
+        const nextValue = !current;
+        await vscode.workspace.getConfiguration('kigumi').update(
+            'viewer.autoRefreshOnFileChange',
+            nextValue,
+            vscode.ConfigurationTarget.Workspace
+        );
+        vscode.window.showInformationMessage(`Kigumi auto refresh on file change ${nextValue ? 'enabled' : 'disabled'}.`);
+        return { enabled: nextValue };
+    });
+    context.subscriptions.push(toggleAutoRefresh);
+
+    const automationListSessions = vscode.commands.registerCommand('kigumi.automationListSessions', async () => {
+        const sessions = [];
+        for (const session of frameSessions.values()) {
+            sessions.push(session.getTestSnapshot());
+        }
+        for (const session of patternSessions.values()) {
+            sessions.push(session.getTestSnapshot());
+        }
+        return {
+            total: sessions.length,
+            sessions,
+        };
+    });
+    context.subscriptions.push(automationListSessions);
+
+    const automationRefreshSession = vscode.commands.registerCommand('kigumi.automationRefreshSession', async (options = {}) => {
+        const session = findSessionFromOptions(options);
+        if (!session) {
+            return { ok: false, reason: 'session-not-found' };
+        }
+
+        if (options && options.dirtyOnce) {
+            const result = await session.refreshOnceIfDirty({
+                saveIfDirty: options.saveIfDirty !== false,
+                reason: options.reason || 'automation dirty refresh once',
+            });
+            return { ok: true, mode: 'dirtyOnce', result };
+        }
+
+        await session.refresh(options.reason || 'automation refresh');
+        return {
+            ok: true,
+            mode: 'refresh',
+            refreshSequence: session.refreshSequence,
+            lastRefreshReason: session.lastRefreshReason,
+        };
+    });
+    context.subscriptions.push(automationRefreshSession);
+
+    const automationReadSessionLogs = vscode.commands.registerCommand('kigumi.automationReadSessionLogs', async (options = {}) => {
+        const session = findSessionFromOptions(options);
+        if (!session) {
+            return { ok: false, reason: 'session-not-found', entries: [] };
+        }
+        const snapshot = session.getLogSnapshot({
+            minLevel: options.minLevel,
+            contains: options.contains,
+            clear: options.clear === true,
+        });
+        return {
+            ok: true,
+            filePath: session.filePath,
+            slotName: session.slotName,
+            ...snapshot,
+        };
+    });
+    context.subscriptions.push(automationReadSessionLogs);
+
+    const automationGetCameraState = vscode.commands.registerCommand('kigumi.automationGetCameraState', async (options = {}) => {
+        const session = findSessionFromOptions(options);
+        if (!session) {
+            return { ok: false, reason: 'session-not-found' };
+        }
+        const payload = await session.getCameraState();
+        return { ok: true, payload };
+    });
+    context.subscriptions.push(automationGetCameraState);
+
+    const automationSetCameraState = vscode.commands.registerCommand('kigumi.automationSetCameraState', async (options = {}) => {
+        const session = findSessionFromOptions(options);
+        if (!session) {
+            return { ok: false, reason: 'session-not-found' };
+        }
+        const payload = await session.setCameraState(options.cameraState || {}, {
+            timeoutMs: typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined,
+        });
+        return { ok: true, payload };
+    });
+    context.subscriptions.push(automationSetCameraState);
+
+    const captureScreenshotBundle = vscode.commands.registerCommand('kigumi.captureScreenshotBundle', async (options = {}) => {
+        const session = findSessionFromOptions(options);
+        if (!session) {
+            throw new Error('No active Kigumi session found for screenshot bundle');
+        }
+
+        if (options.preRefresh === true) {
+            if (options.preRefreshDirtyOnce === true) {
+                await session.refreshOnceIfDirty({
+                    saveIfDirty: options.saveIfDirty !== false,
+                    reason: 'automation screenshot bundle pre-refresh (dirty once)',
+                });
+            } else {
+                await session.refresh('automation screenshot bundle pre-refresh');
+            }
+        }
+
+        if (options.cameraState && typeof options.cameraState === 'object') {
+            await session.setCameraState(options.cameraState, {
+                timeoutMs: typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined,
+            });
+        }
+
+        const workspaceRoot = getWorkspaceRoot() || path.dirname(session.filePath);
+        const outputDir = typeof options.outputDir === 'string' && options.outputDir
+            ? options.outputDir
+            : path.join(workspaceRoot, '.kigumi', 'automation');
+        const basePrefix = typeof options.namePrefix === 'string' && options.namePrefix
+            ? options.namePrefix
+            : `${path.basename(session.filePath, path.extname(session.filePath))}-${Date.now()}`;
+        fs.mkdirSync(outputDir, { recursive: true });
+
+        const screenshotPath = path.join(outputDir, `${basePrefix}.png`);
+        const cameraPath = path.join(outputDir, `${basePrefix}.camera.json`);
+
+        const screenshotMeta = await session.captureScreenshot({
+            outputPath: screenshotPath,
+            timeoutMs: typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined,
+        });
+        const cameraState = await session.getCameraState();
+        fs.writeFileSync(cameraPath, `${JSON.stringify(cameraState, null, 2)}\n`, 'utf8');
+
+        return {
+            ok: true,
+            filePath: session.filePath,
+            slotName: session.slotName,
+            screenshotPath,
+            cameraPath,
+            cameraState,
+            screenshot: screenshotMeta,
+        };
+    });
+    context.subscriptions.push(captureScreenshotBundle);
 
     // Split-view toggle now handled via Settings panel only (kigumi.viewer.openInSplitView setting)
 
@@ -383,6 +552,7 @@ function activate(context) {
                     sharedRunner: runner,
                     patternName: picked._patternName,
                     openInSplitView,
+                    autoRefreshOnFileChange,
                 }
             );
             patternSessions.set(slotName, patternSession);
@@ -747,6 +917,7 @@ async function _openPatternFromWebview(mainSession, patternName, sourceFile, con
             sharedRunner: runner,
             patternName,
             openInSplitView,
+            autoRefreshOnFileChange,
         }
     );
     patternSessions.set(slotName, patternSession);
@@ -790,6 +961,7 @@ async function _openBookFromWebview(mainSession, sourceFile, context) {
             sharedRunner: runner,
             patternName: bookName,
             openInSplitView,
+            autoRefreshOnFileChange,
         }
     );
     patternSessions.set(slotName, patternSession);
@@ -817,11 +989,46 @@ async function getOrCreateSession(filePath, context) {
                 frameSessions.delete(disposedFilePath);
             }
         },
-        { slotName: 'main', sessionType: 'main', openInSplitView }
+        { slotName: 'main', sessionType: 'main', openInSplitView, autoRefreshOnFileChange }
     );
     frameSessions.set(filePath, session);
     await session.initialize();
     return session;
+}
+
+function findSessionFromOptions(options = {}) {
+    if (options && typeof options.slotName === 'string' && options.slotName.length > 0) {
+        const patternSession = patternSessions.get(options.slotName);
+        if (patternSession && !patternSession.isDisposed) {
+            return patternSession;
+        }
+    }
+
+    const targetFilePath =
+        typeof options.filePath === 'string' && options.filePath
+            ? options.filePath
+            : vscode.window.activeTextEditor && vscode.window.activeTextEditor.document
+                ? vscode.window.activeTextEditor.document.fileName
+                : null;
+
+    if (targetFilePath) {
+        const frameSession = frameSessions.get(targetFilePath);
+        if (frameSession && !frameSession.isDisposed) {
+            return frameSession;
+        }
+    }
+
+    for (const session of frameSessions.values()) {
+        if (!session.isDisposed) {
+            return session;
+        }
+    }
+    for (const session of patternSessions.values()) {
+        if (!session.isDisposed) {
+            return session;
+        }
+    }
+    return null;
 }
 
 async function deactivate() {
@@ -832,6 +1039,22 @@ async function deactivate() {
     frameSessions.clear();
     patternSessions.clear();
     await Promise.allSettled(allSessions.map((session) => session.dispose()));
+}
+
+function pruneWorkspaceLogs(channel, retentionDays) {
+    const folders = vscode.workspace.workspaceFolders || [];
+    for (const folder of folders) {
+        try {
+            const result = pruneOldLogFiles(folder.uri.fsPath, retentionDays);
+            if (channel && result.removedFiles.length > 0) {
+                channel.appendLine(`[kigumi] Removed ${result.removedFiles.length} old log file(s) from ${result.logsDir}`);
+            }
+        } catch (error) {
+            if (channel) {
+                channel.appendLine(`[kigumi] Failed to prune old logs in ${folder.uri.fsPath}: ${error.message || error}`);
+            }
+        }
+    }
 }
 
 module.exports = {

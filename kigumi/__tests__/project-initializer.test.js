@@ -98,7 +98,8 @@ describe('project-initializer', () => {
     expect(workspaceUsageContent).toContain('# Kumiki Usage Instructions');
     expect(gitignoreContent).toContain('.venv/');
     expect(gitignoreContent).toContain('kigumi_exports/');
-    expect(gitignoreContent).not.toContain('.kigumi/');
+    expect(gitignoreContent).toContain('.kigumi/logs/');
+    expect(gitignoreContent).not.toMatch(/^\.kigumi\/$/m);
     expect(gitignoreContent).not.toContain('.kigumi.yaml');
     expect(gitignoreContent).not.toContain('.kigumi_readonly_sources/');
 
@@ -107,7 +108,7 @@ describe('project-initializer', () => {
     expect(result.copiedWorkspaceUsageInstructionsFile).toBe(true);
     expect(result.instructionWarnings).toEqual([]);
     expect(result.createdGitignoreFile).toBe(true);
-    expect(result.addedGitignoreEntries).toEqual(['.venv/', 'kigumi_exports/']);
+    expect(result.addedGitignoreEntries).toEqual(['.venv/', 'kigumi_exports/', '.kigumi/logs/']);
 
     const uvVersionProbe = spawn.mock.calls.some(
       ([command, args]) => command === 'uv' && Array.isArray(args) && args.join(' ') === '--version'

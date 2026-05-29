@@ -144,6 +144,7 @@ describe('Kigumi initialization workflow', () => {
       const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
       assert.ok(gitignoreContent.includes('.venv/'), 'Expected .gitignore to include .venv/');
       assert.ok(gitignoreContent.includes('kigumi_exports/'), 'Expected .gitignore to include kigumi_exports/');
+      assert.ok(gitignoreContent.includes('.kigumi/logs/'), 'Expected .gitignore to include .kigumi/logs/');
 
       const framePath = path.join(tempWorkspaceRoot, 'my_cute_frame.py');
       assert.ok(fs.existsSync(framePath), 'Expected my_cute_frame.py to be created');

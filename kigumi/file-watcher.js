@@ -22,15 +22,30 @@ class FileWatcher {
         this.debounceTimer = null;
         this.debounceDelay = 300; // ms
         this.isDisposed = false;
+        this.isStarted = false;
+        this.isEnabled = true;
     }
 
     /**
      * Start watching the example file and optionally the kumiki library.
      */
-    start() {
+    start(options = {}) {
         if (this.isDisposed) {
             return;
         }
+
+        if (this.isStarted) {
+            if (Object.prototype.hasOwnProperty.call(options, 'enabled')) {
+                this.setEnabled(options.enabled);
+            }
+            return;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(options, 'enabled')) {
+            this.isEnabled = Boolean(options.enabled);
+        }
+
+        this.isStarted = true;
 
         this.logChange(`File watcher started for example: ${this.exampleFilePath}`);
 
@@ -45,6 +60,26 @@ class FileWatcher {
         }
 
         this.logChange('Library watcher disabled: no local kumiki checkout detected');
+    }
+
+    setEnabled(enabled) {
+        if (this.isDisposed) {
+            return;
+        }
+        const normalized = Boolean(enabled);
+        if (this.isEnabled === normalized) {
+            return;
+        }
+        this.isEnabled = normalized;
+        this.logChange(`Auto refresh ${this.isEnabled ? 'enabled' : 'disabled'}`);
+    }
+
+    pause() {
+        this.setEnabled(false);
+    }
+
+    resume() {
+        this.setEnabled(true);
     }
 
     /**
@@ -115,6 +150,11 @@ class FileWatcher {
      */
     debounceReload(source) {
         if (this.isDisposed) {
+            return;
+        }
+
+        if (!this.isEnabled) {
+            this.logChange(`Ignoring ${source} event because auto refresh is disabled`);
             return;
         }
 

@@ -35,6 +35,13 @@ function shouldSuppressViewerLog(source, level) {
     return VIEWER_LOG_LEVEL_ORDER[incomingLevel] < VIEWER_LOG_LEVEL_ORDER[minLevel];
 }
 
+function sanitizeLogPathSegment(value, fallback) {
+    const normalized = String(value || fallback || 'session')
+        .replace(/[^a-zA-Z0-9._-]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+    return normalized || fallback || 'session';
+}
+
 class FrameViewSession {
     /**
      * @param {string} filePath
@@ -67,6 +74,10 @@ class FrameViewSession {
         this.sessionType = options.sessionType || 'main';
         this.patternName = options.patternName || null;
         this.openInSplitView = options.openInSplitView !== false;
+        this.autoRefreshOnFileChange = options.autoRefreshOnFileChange === true;
+        this.lastDirtyRefreshVersion = null;
+        this.lastRefreshReason = null;
+        this.lastRefreshAt = null;
         // Cached payloads for potential panel re-open flows
         this._lastFrameData = null;
         this._lastGeometryData = null;
@@ -78,6 +89,19 @@ class FrameViewSession {
             ? this.runnerSession.projectRoot
             : path.dirname(this.filePath);
         return path.join(projectRoot, '.kigumi', 'refresh-stats.json');
+    }
+
+    getLogsDirectoryPath() {
+        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
+            ? this.runnerSession.projectRoot
+            : path.dirname(this.filePath);
+        return path.join(projectRoot, '.kigumi', 'logs');
+    }
+
+    getSessionLogPath() {
+        const baseFileName = sanitizeLogPathSegment(path.basename(this.filePath, path.extname(this.filePath)), 'frame');
+        const slotName = sanitizeLogPathSegment(this.slotName, 'main');
+        return path.join(this.getLogsDirectoryPath(), `${baseFileName}.${slotName}.jsonl`);
     }
 
     postLoadingStatus(stage, details = {}) {
@@ -168,7 +192,7 @@ class FrameViewSession {
             (source) => this.onFileChanged(source),
             (message) => this.log(`[watcher] ${message}`)
         );
-        this.fileWatcher.start();
+        this.fileWatcher.start({ enabled: this.autoRefreshOnFileChange });
         this.profiler.markTiming(initTiming, 'initialize.watcher.end');
 
         this.profiler.markTiming(initTiming, 'initialize.end');
@@ -272,6 +296,179 @@ class FrameViewSession {
         });
     }
 
+    getLogSnapshot(options = {}) {
+        const minLevel = normalizeViewerLogLevel(options.minLevel || 'debug');
+        const containsText = typeof options.contains === 'string' ? options.contains.trim().toLowerCase() : '';
+        const logPath = this.getSessionLogPath();
+        const allEntries = [];
+
+        if (fs.existsSync(logPath)) {
+            const rawLines = fs.readFileSync(logPath, 'utf8')
+                .split('\n')
+                .map((line) => line.trim())
+                .filter((line) => line.length > 0);
+            for (const line of rawLines) {
+                try {
+                    const parsed = JSON.parse(line);
+                    if (parsed && typeof parsed === 'object') {
+                        allEntries.push(parsed);
+                    }
+                } catch (_error) {
+                    // Ignore malformed trailing or partial log lines.
+                }
+            }
+        }
+
+        const entries = allEntries.filter((entry) => {
+            if (VIEWER_LOG_LEVEL_ORDER[entry.level] < VIEWER_LOG_LEVEL_ORDER[minLevel]) {
+                return false;
+            }
+            if (containsText && !String(entry.message).toLowerCase().includes(containsText)) {
+                return false;
+            }
+            return true;
+        });
+        if (options.clear === true) {
+            fs.mkdirSync(path.dirname(logPath), { recursive: true });
+            fs.writeFileSync(logPath, '', 'utf8');
+        }
+        return {
+            logPath,
+            totalEntries: allEntries.length,
+            returnedEntries: entries.length,
+            entries,
+        };
+    }
+
+    async refreshOnceIfDirty(options = {}) {
+        const textDocument = await vscode.workspace.openTextDocument(vscode.Uri.file(this.filePath));
+        if (!textDocument.isDirty) {
+            this.lastDirtyRefreshVersion = null;
+            return {
+                refreshed: false,
+                reason: 'not-dirty',
+                filePath: this.filePath,
+                version: textDocument.version,
+            };
+        }
+
+        const targetVersion = textDocument.version;
+        if (this.lastDirtyRefreshVersion === targetVersion) {
+            return {
+                refreshed: false,
+                reason: 'already-refreshed-for-version',
+                filePath: this.filePath,
+                version: targetVersion,
+            };
+        }
+
+        const saveIfDirty = options.saveIfDirty !== false;
+        if (saveIfDirty) {
+            await textDocument.save();
+        }
+
+        await this.refresh(options.reason || 'automation dirty refresh once');
+        this.lastDirtyRefreshVersion = targetVersion;
+        return {
+            refreshed: true,
+            reason: saveIfDirty ? 'dirty-save-and-refresh' : 'dirty-refresh',
+            filePath: this.filePath,
+            version: targetVersion,
+        };
+    }
+
+    setWatcherEnabled(enabled) {
+        this.autoRefreshOnFileChange = Boolean(enabled);
+        if (this.fileWatcher) {
+            this.fileWatcher.setEnabled(this.autoRefreshOnFileChange);
+        }
+    }
+
+    isWatcherEnabled() {
+        if (!this.fileWatcher) {
+            return this.autoRefreshOnFileChange;
+        }
+        return this.fileWatcher.isEnabled;
+    }
+
+    getCameraState() {
+        return this._requestWebviewAction('getCameraState', 'get-camera-state');
+    }
+
+    setCameraState(cameraState, options = {}) {
+        return this._requestWebviewAction('setCameraState', 'set-camera-state', {
+            cameraState,
+            options,
+        });
+    }
+
+    _requestWebviewAction(type, requestPrefix, payload = {}, options = {}) {
+        if (this.isDisposed || !this.panel) {
+            return Promise.reject(new Error(`Viewer panel is not available for ${this.filePath}`));
+        }
+
+        const timeoutMs = Number.isFinite(options.timeoutMs) ? Number(options.timeoutMs) : 6000;
+        const requestId = `${requestPrefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
+        const requestType = `${type}Request`;
+        const resultType = `${type}Result`;
+
+        return new Promise((resolve, reject) => {
+            let settled = false;
+            let timeoutHandle = null;
+
+            const cleanup = () => {
+                if (timeoutHandle) {
+                    clearTimeout(timeoutHandle);
+                    timeoutHandle = null;
+                }
+                listener.dispose();
+            };
+
+            const listener = this.panel.webview.onDidReceiveMessage((message) => {
+                if (!message || message.type !== resultType || message.requestId !== requestId) {
+                    return;
+                }
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                cleanup();
+                if (message.ok) {
+                    resolve(message.payload || {});
+                    return;
+                }
+                reject(new Error(message.error || `${type} failed`));
+            });
+
+            timeoutHandle = setTimeout(() => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                cleanup();
+                reject(new Error(`Timed out waiting for ${type} (${timeoutMs}ms)`));
+            }, timeoutMs);
+
+            this.panel.webview.postMessage({
+                type: requestType,
+                requestId,
+                ...payload,
+            }).then((posted) => {
+                if (!posted && !settled) {
+                    settled = true;
+                    cleanup();
+                    reject(new Error(`Failed to post ${requestType} to webview`));
+                }
+            }, (error) => {
+                if (!settled) {
+                    settled = true;
+                    cleanup();
+                    reject(error);
+                }
+            });
+        });
+    }
+
     /**
      * Re-create the webview panel for a pattern session whose runner is still alive.
      */
@@ -361,6 +558,8 @@ class FrameViewSession {
         this.pendingRefreshReason = null;
         this.refreshSequence += 1;
         const refreshToken = this.refreshSequence;
+        this.lastRefreshReason = reason;
+        this.lastRefreshAt = new Date().toISOString();
         this.log(`[refresh] Reloading ${path.basename(this.filePath)} (${reason})`);
         this.postLoadingStatus('raising frame', { reason, refreshToken });
         let refreshError = null;
@@ -613,6 +812,11 @@ class FrameViewSession {
             sessionType: this.sessionType,
             slotName: this.slotName,
             refreshSequence: this.refreshSequence,
+            lastRefreshReason: this.lastRefreshReason,
+            lastRefreshAt: this.lastRefreshAt,
+            lastDirtyRefreshVersion: this.lastDirtyRefreshVersion,
+            watcherEnabled: this.isWatcherEnabled(),
+            logPath: this.getSessionLogPath(),
             hasRunner: Boolean(this.runnerSession),
             runnerAlive: Boolean(this.runnerSession && this.runnerSession.isAlive()),
             frame: frameData ? {
@@ -1022,6 +1226,23 @@ class FrameViewSession {
 
     log(message) {
         const formatted = `[${path.basename(this.filePath)}] ${message}`;
+        const match = /\[(debug|info|warn|error)\]/i.exec(String(message));
+        const level = normalizeViewerLogLevel(match ? match[1] : 'info');
+        const entry = {
+            timestamp: new Date().toISOString(),
+            level,
+            message: formatted,
+            filePath: this.filePath,
+            slotName: this.slotName,
+            sessionType: this.sessionType,
+        };
+        try {
+            const logPath = this.getSessionLogPath();
+            fs.mkdirSync(path.dirname(logPath), { recursive: true });
+            fs.appendFile(logPath, `${JSON.stringify(entry)}\n`, 'utf8', () => {});
+        } catch (_error) {
+            // Logging must not break the viewer session.
+        }
         this.channel.appendLine(formatted);
         if (this.panel) {
             this.panel.webview.postMessage({ type: 'logEntry', text: formatted }).catch(() => {});

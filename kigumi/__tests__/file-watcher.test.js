@@ -74,6 +74,11 @@ describe('FileWatcher', () => {
       expect(watcher.debounceDelay).toBe(300);
     });
 
+    test('should start in enabled state', () => {
+      const watcher = new FileWatcher('/path/to/example.py', '/path/to/project', null);
+      expect(watcher.isEnabled).toBe(true);
+    });
+
     test('should accept an optional log callback', () => {
       const logCallback = jest.fn();
       const watcher = new FileWatcher('/path/to/example.py', '/path/to/project', null, logCallback);
@@ -134,6 +139,14 @@ describe('FileWatcher', () => {
       watcher.start();
 
       expect(mockVscodeWorkspace.createFileSystemWatcher).toHaveBeenCalledTimes(1);
+    });
+
+    test('should allow starting with auto refresh disabled', () => {
+      const callback = jest.fn();
+      const watcher = new FileWatcher('/path/to/example.py', null, callback);
+      watcher.start({ enabled: false });
+
+      expect(watcher.isEnabled).toBe(false);
     });
   });
 
@@ -412,6 +425,33 @@ describe('FileWatcher', () => {
       expect(exampleWatcher.dispose).toHaveBeenCalled();
       expect(libraryWatcher.dispose).toHaveBeenCalled();
       expect(watcher.watchers).toEqual([]);
+    });
+  });
+
+  describe('enable/disable', () => {
+    test('should ignore file changes while disabled', () => {
+      const callback = jest.fn();
+      const watcher = new FileWatcher('/path/to/example.py', null, callback);
+      watcher.start({ enabled: false });
+
+      const exampleWatcher = mockWatcherSubscriptions[0];
+      exampleWatcher._onDidChange();
+      jest.advanceTimersByTime(300);
+
+      expect(callback).not.toHaveBeenCalled();
+    });
+
+    test('should process file changes after re-enabled', () => {
+      const callback = jest.fn();
+      const watcher = new FileWatcher('/path/to/example.py', null, callback);
+      watcher.start({ enabled: false });
+      watcher.resume();
+
+      const exampleWatcher = mockWatcherSubscriptions[0];
+      exampleWatcher._onDidChange();
+      jest.advanceTimersByTime(300);
+
+      expect(callback).toHaveBeenCalledWith('example file');
     });
   });
 });

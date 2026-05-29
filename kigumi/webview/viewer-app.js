@@ -1321,6 +1321,16 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'getCameraStateRequest') {
+            this.handleGetCameraStateRequest(message);
+            return;
+        }
+
+        if (message.type === 'setCameraStateRequest') {
+            this.handleSetCameraStateRequest(message);
+            return;
+        }
+
         if (message.type === 'logEntry') {
             const text = typeof message.text === 'string' ? message.text : String(message.text);
             this.appendLogLine(text);
@@ -1451,6 +1461,132 @@ class KigumiViewerApp extends LitElement {
                 requestId,
                 ok: false,
                 error: error && error.message ? error.message : 'Unknown panel snapshot error',
+            });
+        }
+    }
+
+    buildCameraStatePayload() {
+        const cameraPosition = this.camera && this.camera.position
+            ? {
+                x: this.camera.position.x,
+                y: this.camera.position.y,
+                z: this.camera.position.z,
+            }
+            : null;
+        return {
+            orbitCenter: {
+                x: this.cx,
+                y: this.cy,
+                z: this.cz,
+            },
+            focusCenter: {
+                x: this.focusedCx,
+                y: this.focusedCy,
+                z: this.focusedCz,
+            },
+            orbit: {
+                theta: this.theta,
+                phi: this.phi,
+                distance: this.orbitDist,
+            },
+            up: {
+                x: this.cameraUpVector.x,
+                y: this.cameraUpVector.y,
+                z: this.cameraUpVector.z,
+            },
+            cameraPosition,
+        };
+    }
+
+    handleGetCameraStateRequest(message) {
+        const requestId = message && message.requestId;
+        if (!vscode || !requestId) {
+            return;
+        }
+        try {
+            vscode.postMessage({
+                type: 'getCameraStateResult',
+                requestId,
+                ok: true,
+                payload: this.buildCameraStatePayload(),
+            });
+        } catch (error) {
+            vscode.postMessage({
+                type: 'getCameraStateResult',
+                requestId,
+                ok: false,
+                error: error && error.message ? error.message : 'Failed to read camera state',
+            });
+        }
+    }
+
+    handleSetCameraStateRequest(message) {
+        const requestId = message && message.requestId;
+        if (!vscode || !requestId) {
+            return;
+        }
+        try {
+            const cameraState = message && message.cameraState && typeof message.cameraState === 'object'
+                ? message.cameraState
+                : {};
+            const orbitCenter = cameraState.orbitCenter && typeof cameraState.orbitCenter === 'object'
+                ? cameraState.orbitCenter
+                : {};
+            const orbit = cameraState.orbit && typeof cameraState.orbit === 'object'
+                ? cameraState.orbit
+                : {};
+            const up = cameraState.up && typeof cameraState.up === 'object'
+                ? cameraState.up
+                : {};
+
+            const nextCx = Number(orbitCenter.x);
+            const nextCy = Number(orbitCenter.y);
+            const nextCz = Number(orbitCenter.z);
+            if (Number.isFinite(nextCx) && Number.isFinite(nextCy) && Number.isFinite(nextCz)) {
+                this.cx = nextCx;
+                this.cy = nextCy;
+                this.cz = nextCz;
+            }
+
+            const nextTheta = Number(orbit.theta);
+            const nextPhi = Number(orbit.phi);
+            const nextDist = Number(orbit.distance);
+            if (Number.isFinite(nextTheta)) {
+                this.theta = nextTheta;
+            }
+            if (Number.isFinite(nextPhi)) {
+                this.phi = this.clampPhi(nextPhi);
+            }
+            if (Number.isFinite(nextDist) && nextDist > 0.01) {
+                this.orbitDist = nextDist;
+            }
+
+            const upX = Number(up.x);
+            const upY = Number(up.y);
+            const upZ = Number(up.z);
+            if (Number.isFinite(upX) && Number.isFinite(upY) && Number.isFinite(upZ)) {
+                const vector = new THREE.Vector3(upX, upY, upZ);
+                if (vector.lengthSq() > 0) {
+                    vector.normalize();
+                    this.cameraUpVector.copy(vector);
+                }
+            }
+
+            this.cameraAnimation = null;
+            this.updateCamera();
+
+            vscode.postMessage({
+                type: 'setCameraStateResult',
+                requestId,
+                ok: true,
+                payload: this.buildCameraStatePayload(),
+            });
+        } catch (error) {
+            vscode.postMessage({
+                type: 'setCameraStateResult',
+                requestId,
+                ok: false,
+                error: error && error.message ? error.message : 'Failed to set camera state',
             });
         }
     }

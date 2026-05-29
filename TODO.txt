@@ -205,13 +205,14 @@ DONE-lock and hide fetaures
     -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
 
 AUTOMATION
-  -allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
-  -allow agent to read kigumi console output
-  -allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
+  DONE-allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
+  DONE-allow agent to read kigumi console output
+  DONE-allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
+  DONE-make file watch refresh toggleable (off by default)
+  -try and run a full loop agent test on this to see if it all works
   -update instructions to
     -first test locally in a headless way to see that there are no errors
     -then do actula render and fetch output
-  -make file watch refresh toggleable (off by default)
   -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 

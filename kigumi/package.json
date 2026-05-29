@@ -84,6 +84,35 @@
         "icon": "$(link-external)"
       },
       {
+        "command": "kigumi.toggleAutoRefreshOnFileChange",
+        "title": "Kigumi: Toggle Auto Refresh On File Change",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "kigumi.automationListSessions",
+        "title": "Kigumi: Automation List Sessions"
+      },
+      {
+        "command": "kigumi.automationRefreshSession",
+        "title": "Kigumi: Automation Refresh Session"
+      },
+      {
+        "command": "kigumi.automationReadSessionLogs",
+        "title": "Kigumi: Automation Read Session Logs"
+      },
+      {
+        "command": "kigumi.automationGetCameraState",
+        "title": "Kigumi: Automation Get Camera State"
+      },
+      {
+        "command": "kigumi.automationSetCameraState",
+        "title": "Kigumi: Automation Set Camera State"
+      },
+      {
+        "command": "kigumi.captureScreenshotBundle",
+        "title": "Kigumi: Capture Screenshot Bundle"
+      },
+      {
         "command": "kigumi.explorer",
         "title": "Kigumi: Open Explorer",
         "icon": "$(file-directory)"
@@ -118,8 +147,48 @@
         {
           "command": "kigumi.openWebsite",
           "when": "false"
+        },
+        {
+          "command": "kigumi.automationListSessions",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.automationRefreshSession",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.automationReadSessionLogs",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.automationGetCameraState",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.automationSetCameraState",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.captureScreenshotBundle",
+          "when": "false"
         }
       ]
+    },
+    "configuration": {
+      "title": "Kigumi",
+      "properties": {
+        "kigumi.viewer.autoRefreshOnFileChange": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically refresh open Kigumi viewers when watched files change."
+        },
+        "kigumi.viewer.logRetentionDays": {
+          "type": "number",
+          "default": 15,
+          "minimum": 0,
+          "description": "Delete Kigumi log files in .kigumi/logs that are older than this many days when the extension starts or the setting changes."
+        }
+      }
     }
   },
   "scripts": {
