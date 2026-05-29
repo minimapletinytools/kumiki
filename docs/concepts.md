@@ -71,14 +71,28 @@ class TimberFace(Enum):
     BACK = 6 # the face vector with normal vector in the -Y axis direction
 ```
 
-### measuring and marking
+## perfect timber within and non-perfect timbers
 
-Joint functions take measurents for its features relative to one of the features on one of the timbers in the joint arrangement. Often you may want to position the joint feature relative to some other feature perhaps on a different timber. Functions in `measuring.py` are designed to help you do this. TLDR; you `locate` a  feature you want to mesaure from, and then you `mark` that feature onto the feature that the joint function needs. If you don't understand what I mean by this no worries, because the AI does understand :|.
+Almost all joints in Kumiki work with the concept of the "perfect timber within" represented by the `PerfectTimberWithin` class with markings based on this perfect square timber that is contained within the actual timber. 
 
-## member names
+Visually speaking, Kumiki supports different types of timbers that are not "perfect" which all contain a `PerfectTimberWithin` both in the semantic sense and also in the sense of python class inheritance :p.
 
-When timbers are part of a structure, they may be referred to as members. Members have no logical distinction from each other as far as Kumiki is concerned, but the concepts are useful for explaining the intended use of various functions and you may also want to use these names to organize your projects. It is also useful to describe them as such as the AI will understand things like "beams" being horizontal members. The remainder of this doc will assume knowledge of various member names to elaborate certain concepts.
+Such timbers contain methods to obtain its "perfect" size as well as its "maximal" size which is a bounding box that contais the entirety of the actual timber. 
 
+### reference faces
+
+TODO
+
+### boards
+
+TODO
+
+
+# Measuring
+
+Joint functions take measurents for its features relative to one of the features on one of the timbers in the joint arrangement. Often you may want to position the joint feature relative to some other feature perhaps on a different timber. Functions in `measuring.py` are designed to help you do this. TLDR; you `locate` a  feature you want to mesaure from, and then you `mark` that feature onto the feature that the joint function needs. If you don't understand what I mean by this no worries, because the AI does understand :|. 
+
+All measuring/marking functions can only reference off of features of the `PerfectTimberWithin`.
 
 # Footprint
 
@@ -156,6 +170,12 @@ Otherwise, use `join_timbers` which will create a new timber connecting the cent
 - Use split_timber to split a timber in two. The input timber should be discarded. This is useful for splitting long timbers for splice joints.
 - Use stretch_timber to an extend a timber. The input timber should be discarded.
 
+## Naming Timbers
+
+When timbers are part of a structure, they may be referred to as members. Members have no logical distinction from each other as far as Kumiki is concerned, but the concepts are useful for explaining the intended use of various functions and you may also want to use these names to organize your projects. It is also useful to describe them as such as the AI will understand things like "beams" being horizontal members. The remainder of this doc will assume knowledge of various member names to elaborate certain concepts.
+
+
+
 # Joints 
 
 Once your timbers have been created, it's time to cut them to make joints. 
@@ -173,6 +193,10 @@ Another important detail. If a timber has an end cut on one of its ends, the "le
 ## Accesories
 
 Joints also contain a dictionary of `JointAccessory` which are additional *things* needed to complete the joint, such as pegs, nails, or other hardware.
+
+## Notching / Relief Cuts
+
+While basing joints are based on the `PerfectTimberWithin` ensures fits on the joint features themselves, there may be wood beyond the perfect timber within. In these cases, some of this wood extraneous to the joint may need to be removed for the joint to come together. Almost all joints will do additional "notching" or "relief cuts" to accomplish this. In most cases, the relief cuts needed can be fully determined from just the joint arrangement and can be made using the set of utility methods and classes provided in notching.py. Joint functions are still responsible to make their own relief cuts.
 
 ## Joint Organization
 TODO

@@ -86,8 +86,9 @@ Joints involve creating CSG cuts on one or more timbers. A typical joint impleme
     - it is often useful to convert back and forth from global and local coordinates. Make sure local coordinates are always clearly marked with the `<timber_name>_local` postfix to avoid confusion
     - there are many helper methods to do this, please see other joints for examples
 6. Repeat steps 3–5 until all cuts are done
-7. If the joint is at the end of any one of the timbers, set `maybe_top/bottom_end_cut_distance_from_bottom` for that timber to allow the proper rough end cuts to be generated
-8. Return a joint object containing the cuts
+7. Add notch cuts--in most casees, the standard notching pattern for the arrangement will be sufficient (see notching pattern below)
+8. If the joint is at the end of any one of the timbers, set `maybe_top/bottom_end_cut_distance_from_bottom` for that timber to allow the proper rough end cuts to be generated
+9. Return a joint object containing the cuts
 
 Variable naming rules:
 - ALWAYS postfix markings in global space with `_global`

@@ -196,6 +196,14 @@ DONE-lock and hide fetaures
 
 :: TODO
 
+-rename nominal -> maximal
+-decide on notching.py vs relief.py
+-modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
+  -0 degree notch up to insertion face
+  -afterwards do the regular notching with varibale relief angle
+  -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
+    -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
+
 AUTOMATION
   -allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
   -allow agent to read kigumi console output
