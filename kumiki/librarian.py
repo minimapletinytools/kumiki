@@ -20,18 +20,267 @@ populated when ``load_frame_examples=True``).
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import inspect
 from pathlib import Path
 import hashlib
 import importlib.util
 import sys
 import traceback
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple
+
+from sympy import Float, Rational
 
 from .librarian_analysis import ModuleStaticInfo, analyze_file
 from .patternbook import PatternBook
 
 
 _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
+
+_PARAM_KIND_VALUES: Tuple[str, ...] = ("number", "boolean", "string", "enum")
+
+
+@dataclass(frozen=True)
+class Param:
+    """Author-facing parameter declaration helper.
+
+    Use as a callable default value, e.g.:
+
+        def build_frame(width=Param(Rational(2), description="Timber width")):
+            ...
+    """
+
+    default: Any
+    description: str = ""
+    kind: Optional[Literal["number", "boolean", "string", "enum"]] = None
+    options: Optional[Tuple[str, ...]] = None
+    minimum: Optional[Any] = None
+    maximum: Optional[Any] = None
+
+
+@dataclass(frozen=True)
+class RenderParameterDescriptor:
+    name: str
+    default_value: Any
+    kind: Literal["number", "boolean", "string", "enum"]
+    description: str = ""
+    options: Tuple[str, ...] = ()
+    minimum: Optional[Any] = None
+    maximum: Optional[Any] = None
+
+    def to_protocol_dict(self) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "name": self.name,
+            "kind": self.kind,
+            "description": self.description,
+            "default": serialize_render_parameter_value(self.default_value),
+        }
+        if self.options:
+            payload["options"] = [str(option) for option in self.options]
+        if self.minimum is not None:
+            payload["minimum"] = serialize_render_parameter_value(self.minimum)
+        if self.maximum is not None:
+            payload["maximum"] = serialize_render_parameter_value(self.maximum)
+        return payload
+
+
+def _looks_like_sympy_number(value: Any) -> bool:
+    return hasattr(value, "is_real") and hasattr(value, "evalf")
+
+
+def _infer_parameter_kind(default_value: Any) -> Literal["number", "boolean", "string", "enum"]:
+    if isinstance(default_value, bool):
+        return "boolean"
+    if isinstance(default_value, str):
+        return "string"
+    if isinstance(default_value, (int, float, Rational, Float)):
+        return "number"
+    if _looks_like_sympy_number(default_value):
+        return "number"
+    return "string"
+
+
+def _normalize_param_options(options: Optional[Iterable[Any]]) -> Tuple[str, ...]:
+    if options is None:
+        return ()
+    return tuple(str(option) for option in options)
+
+
+def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Optional[RenderParameterDescriptor]:
+    if parameter.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
+        return None
+
+    if parameter.default is inspect.Parameter.empty:
+        # Only optional/defaulted parameters are currently exposed in the UI.
+        return None
+
+    if isinstance(parameter.default, Param):
+        declared = parameter.default
+        default_value = declared.default
+        declared_kind = declared.kind
+        if declared_kind is None:
+            kind = _infer_parameter_kind(default_value)
+        else:
+            kind = str(declared_kind)
+            if kind not in _PARAM_KIND_VALUES:
+                raise ValueError(
+                    f"Parameter '{parameter.name}' has invalid kind '{declared_kind}'. "
+                    f"Expected one of: {_PARAM_KIND_VALUES}"
+                )
+        options = _normalize_param_options(declared.options)
+        if kind == "enum" and not options:
+            raise ValueError(
+                f"Parameter '{parameter.name}' declared as enum must provide options"
+            )
+        return RenderParameterDescriptor(
+            name=parameter.name,
+            default_value=default_value,
+            kind=kind,  # type: ignore[arg-type]
+            description=declared.description,
+            options=options,
+            minimum=declared.minimum,
+            maximum=declared.maximum,
+        )
+
+    inferred_kind = _infer_parameter_kind(parameter.default)
+    return RenderParameterDescriptor(
+        name=parameter.name,
+        default_value=parameter.default,
+        kind=inferred_kind,
+        description="",
+        options=(),
+        minimum=None,
+        maximum=None,
+    )
+
+
+def discover_callable_render_parameters(
+    callable_obj: Any,
+    *,
+    skip_first_parameter: bool = False,
+) -> List[RenderParameterDescriptor]:
+    """Inspect a callable signature and return render-parameter descriptors."""
+    signature = inspect.signature(callable_obj)
+    discovered: List[RenderParameterDescriptor] = []
+    parameters = list(signature.parameters.values())
+
+    if skip_first_parameter and parameters:
+        parameters = parameters[1:]
+
+    for parameter in parameters:
+        descriptor = _descriptor_from_signature_parameter(parameter)
+        if descriptor is not None:
+            discovered.append(descriptor)
+    return discovered
+
+
+def _coerce_bool(value: Any, param_name: str) -> bool:
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        lowered = value.strip().lower()
+        if lowered in {"true", "1", "yes", "on"}:
+            return True
+        if lowered in {"false", "0", "no", "off"}:
+            return False
+    raise ValueError(f"Parameter '{param_name}' expects a boolean value")
+
+
+def _coerce_number(value: Any, param_name: str) -> Any:
+    if isinstance(value, bool):
+        return Rational(1 if value else 0)
+    if isinstance(value, int):
+        return Rational(value)
+    if isinstance(value, float):
+        return Rational(str(value))
+    if isinstance(value, (Rational, Float)):
+        return value
+    if _looks_like_sympy_number(value):
+        return value
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError(f"Parameter '{param_name}' expects a non-empty number")
+        try:
+            return Rational(stripped)
+        except Exception:
+            try:
+                return Float(stripped)
+            except Exception as exc:
+                raise ValueError(
+                    f"Parameter '{param_name}' expects a numeric value, got '{value}'"
+                ) from exc
+    raise ValueError(f"Parameter '{param_name}' expects a numeric value")
+
+
+def _coerce_parameter_value(value: Any, descriptor: RenderParameterDescriptor) -> Any:
+    if descriptor.kind == "boolean":
+        return _coerce_bool(value, descriptor.name)
+    if descriptor.kind == "number":
+        coerced = _coerce_number(value, descriptor.name)
+        if descriptor.minimum is not None and coerced < descriptor.minimum:
+            raise ValueError(
+                f"Parameter '{descriptor.name}' must be >= {descriptor.minimum}, got {coerced}"
+            )
+        if descriptor.maximum is not None and coerced > descriptor.maximum:
+            raise ValueError(
+                f"Parameter '{descriptor.name}' must be <= {descriptor.maximum}, got {coerced}"
+            )
+        return coerced
+    if descriptor.kind == "enum":
+        coerced = str(value)
+        if coerced not in descriptor.options:
+            raise ValueError(
+                f"Parameter '{descriptor.name}' must be one of {list(descriptor.options)}, got '{coerced}'"
+            )
+        return coerced
+    return str(value)
+
+
+def resolve_callable_render_parameters(
+    callable_obj: Any,
+    provided_values: Optional[Mapping[str, Any]],
+    *,
+    skip_first_parameter: bool = False,
+) -> Tuple[List[RenderParameterDescriptor], Dict[str, Any]]:
+    """Return (descriptors, resolved kwargs) for a callable.
+
+    Resolved kwargs include defaults plus any provided overrides.
+    """
+    descriptors = discover_callable_render_parameters(
+        callable_obj,
+        skip_first_parameter=skip_first_parameter,
+    )
+
+    provided = dict(provided_values or {})
+    resolved: Dict[str, Any] = {}
+    for descriptor in descriptors:
+        if descriptor.name in provided:
+            value = provided[descriptor.name]
+        else:
+            value = descriptor.default_value
+        resolved[descriptor.name] = _coerce_parameter_value(value, descriptor)
+
+    return descriptors, resolved
+
+
+def serialize_render_parameter_value(value: Any) -> Any:
+    """Convert render parameter values to JSON-friendly primitives."""
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    if isinstance(value, (Rational, Float)):
+        return str(value)
+    if _looks_like_sympy_number(value):
+        return str(value)
+    if isinstance(value, (list, tuple)):
+        return [serialize_render_parameter_value(item) for item in value]
+    if isinstance(value, dict):
+        return {
+            str(key): serialize_render_parameter_value(item)
+            for key, item in value.items()
+        }
+    return str(value)
 
 
 @dataclass

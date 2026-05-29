@@ -21,6 +21,7 @@ from .joints.workshop.japanese_joints import *
 from .joints.workshop.double_butt_joints import *
 from .measuring import *
 from .patternbook import *
+from .librarian import Param
 
 # Optional heavy mesh/export modules.
 # FreeCAD's bundled Python may not have trimesh installed; keep base imports usable.

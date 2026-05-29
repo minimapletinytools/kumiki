@@ -6,25 +6,54 @@ and raise them at different positions for visualization and testing.
 """
 
 from sympy import Rational
-from typing import List, Tuple, Optional, Callable, Union, Literal, Sequence
+import inspect
+from typing import Any, List, Tuple, Optional, Callable, Union, Literal, Sequence
 from dataclasses import dataclass, field, replace
 from .rule import V3, create_v3, Transform
 from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, JointAccessory
 from .cutcsg import CutCSG, translate_csg
 
 
-# Type alias for pattern functions
-PatternLambda = Callable[[V3], Union[Frame, CutCSG]]
+# Type alias for pattern functions.
+# The first positional argument is the pattern center (V3), followed by
+# optional keyword parameters for parameterized rendering.
+PatternLambda = Callable[..., Union[Frame, CutCSG]]
 
 
-def make_pattern_from_joint(joint_func: Callable[[], Joint]) -> PatternLambda:
+def _build_pattern_lambda_signature(source_func: Callable[..., Any]) -> inspect.Signature:
+    """Build a callable signature for pattern lambdas.
+
+    Pattern lambdas always take center as the first positional argument. Any
+    additional parameters are copied from source_func after dropping its first
+    parameter (the source position argument).
+    """
+    source_sig = inspect.signature(source_func)
+    source_params = list(source_sig.parameters.values())
+
+    center_param = inspect.Parameter(
+        "center",
+        kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
+        annotation=V3,
+    )
+
+    if not source_params:
+        return inspect.Signature(parameters=[center_param], return_annotation=source_sig.return_annotation)
+
+    trailing_params = source_params[1:]
+    return inspect.Signature(
+        parameters=[center_param, *trailing_params],
+        return_annotation=source_sig.return_annotation,
+    )
+
+
+def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
     """
     Convert a joint function (no args, returns a joint with cut_timbers and jointAccessories)
     to a pattern lambda that accepts center and returns a Frame with all timbers and
     accessories translated by center.
     """
-    def pattern_lambda(center: V3) -> Frame:
-        joint = joint_func()
+    def pattern_lambda(center: V3, **pattern_kwargs: Any) -> Frame:
+        joint = joint_func(**pattern_kwargs)
         translated_timbers: List[CutTimber] = []
         for timber in joint.cut_timbers.values():
             new_position = timber.timber.get_bottom_position_global() + center
@@ -80,16 +109,17 @@ def make_pattern_from_joint(joint_func: Callable[[], Joint]) -> PatternLambda:
 
         return Frame(cut_timbers=translated_timbers, accessories=translated_accessories)
 
+    setattr(pattern_lambda, "__signature__", _build_pattern_lambda_signature(joint_func))
     return pattern_lambda
 
 
-def make_pattern_from_frame(frame_func: Callable[[], Frame]) -> PatternLambda:
+def make_pattern_from_frame(frame_func: Callable[..., Frame]) -> PatternLambda:
     """
     Convert a Frame-returning function (no args) to a pattern lambda that accepts center
     and returns a Frame with all timbers and accessories translated by center.
     """
-    def pattern_lambda(center: V3) -> Frame:
-        frame = frame_func()
+    def pattern_lambda(center: V3, **pattern_kwargs: Any) -> Frame:
+        frame = frame_func(**pattern_kwargs)
         translated_timbers = []
         for cut_timber in frame.cut_timbers:
             new_position = cut_timber.timber.get_bottom_position_global() + center
@@ -145,18 +175,20 @@ def make_pattern_from_frame(frame_func: Callable[[], Frame]) -> PatternLambda:
 
         return Frame(cut_timbers=translated_timbers, accessories=translated_accessories)
 
+    setattr(pattern_lambda, "__signature__", _build_pattern_lambda_signature(frame_func))
     return pattern_lambda
 
 
-def make_pattern_from_csg(csg_func: Callable[[], CutCSG]) -> PatternLambda:
+def make_pattern_from_csg(csg_func: Callable[..., CutCSG]) -> PatternLambda:
     """
     Convert a CSG-returning function (no args) to a pattern lambda that accepts center
     and returns the CSG translated by center. Consistent with frame/joint patterns:
     the returned CSG is positioned at the given center.
     """
-    def pattern_lambda(center: V3) -> CutCSG:
-        return translate_csg(csg_func(), center)
+    def pattern_lambda(center: V3, **pattern_kwargs: Any) -> CutCSG:
+        return translate_csg(csg_func(**pattern_kwargs), center)
 
+    setattr(pattern_lambda, "__signature__", _build_pattern_lambda_signature(csg_func))
     return pattern_lambda
 
 
@@ -200,7 +232,12 @@ class PatternBook:
             duplicates = [name for name in names if names.count(name) > 1]
             raise ValueError(f"Duplicate pattern names found: {set(duplicates)}")
     
-    def raise_pattern(self, pattern_name: str, center: Optional[V3] = None) -> Union[Frame, CutCSG]:
+    def raise_pattern(
+        self,
+        pattern_name: str,
+        center: Optional[V3] = None,
+        **pattern_kwargs: Any,
+    ) -> Union[Frame, CutCSG]:
         """
         Raise a single pattern by name at the specified center location.
         
@@ -221,7 +258,7 @@ class PatternBook:
         # Find the pattern by name
         for metadata, pattern_lambda in self.patterns:
             if metadata.pattern_name == pattern_name:
-                return pattern_lambda(center)
+                return pattern_lambda(center, **pattern_kwargs)
         
         # Pattern not found
         available_names = [m.pattern_name for m, _ in self.patterns]

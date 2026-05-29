@@ -339,15 +339,6 @@ class ViewerSettingsPanel {
                     also export individual files
                 </label>
                 <button
-                    id="refresh-btn"
-                    type="button"
-                    title="Reload pattern"
-                    @click=${() => {
-                        if (vscode) {
-                            vscode.postMessage({ type: 'requestRefresh' });
-                        }
-                    }}>↻ refresh</button>
-                <button
                     id="export-stl-btn"
                     type="button"
                     title="Export frame members to STL files"
@@ -483,6 +474,81 @@ class ViewerSettingsPanel {
     }
 }
 
+class ViewerParameterPanel {
+    constructor(app) {
+        this.app = app;
+    }
+
+    renderParameterInput(param, index) {
+        const inputId = `render-param-${index}-${param.name}`;
+        const value = this.app.getPendingRenderParameterValue(param);
+
+        if (param.kind === 'boolean') {
+            return html`
+                <label class="parameter-toggle" for=${inputId}>
+                    <input
+                        id=${inputId}
+                        type="checkbox"
+                        ?checked=${Boolean(value)}
+                        @change=${(event) => this.app.setPendingRenderParameterValue(param.name, Boolean(event.target.checked))}>
+                    ${param.name}
+                </label>
+            `;
+        }
+
+        if (param.kind === 'enum') {
+            const options = Array.isArray(param.options) ? param.options : [];
+            return html`
+                <label for=${inputId}>${param.name}</label>
+                <select
+                    id=${inputId}
+                    .value=${String(value ?? '')}
+                    @change=${(event) => this.app.setPendingRenderParameterValue(param.name, String(event.target.value))}>
+                    ${options.map((option) => html`<option value=${option}>${option}</option>`)}
+                </select>
+            `;
+        }
+
+        const inputType = param.kind === 'number' ? 'text' : 'text';
+        return html`
+            <label for=${inputId}>${param.name}</label>
+            <input
+                id=${inputId}
+                type=${inputType}
+                .value=${String(value ?? '')}
+                @input=${(event) => this.app.setPendingRenderParameterValue(param.name, event.target.value)}>
+        `;
+    }
+
+    render() {
+        const params = this.app.renderParameterSchema;
+        return html`
+            <section id="parameter-controls" aria-label="Render parameters">
+                <div class="parameter-controls-title">render parameters</div>
+                ${params.length === 0
+                    ? html`<div class="parameter-empty">No parameters exposed by this frame or pattern.</div>`
+                    : html`
+                        <div class="parameter-grid">
+                            ${params.map((param, index) => html`
+                                <div class="parameter-item">
+                                    ${this.renderParameterInput(param, index)}
+                                    ${param.description
+                                        ? html`<div class="parameter-description">${param.description}</div>`
+                                        : ''}
+                                </div>
+                            `)}
+                        </div>
+                    `}
+                <button
+                    id="refresh-btn"
+                    type="button"
+                    title="Refresh using current parameter values"
+                    @click=${() => this.app.requestRefreshWithPendingParameters()}>refresh</button>
+            </section>
+        `;
+    }
+}
+
 class KigumiViewerApp extends LitElement {
     constructor() {
         super();
@@ -569,11 +635,15 @@ class KigumiViewerApp extends LitElement {
         this.animationHandle = null;
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
+        this.renderParameterSchema = [];
+        this.appliedRenderParameters = {};
+        this.pendingRenderParameters = {};
         this.viewerOptions = normalizeViewerOptions(INITIAL_PAYLOAD.viewerOptions);
         this.cadqueryOcpInstalled = null;
         this.installingCadqueryOcp = false;
         this.exportIndividualsEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
+        this.parameterPanel = new ViewerParameterPanel(this);
         this.activeRefreshToken = 0;
         this.onWindowMessage = this.onWindowMessage.bind(this);
         this.onWindowScroll = this.onWindowScroll.bind(this);
@@ -619,6 +689,7 @@ class KigumiViewerApp extends LitElement {
                 <div id="hint">right drag orbit • middle drag pan • scroll zoom • F focus</div>
             </div>
             ${this.settingsPanel.render()}
+            ${this.parameterPanel.render()}
             <div id="panels">
                 <div class="panel-box">
                     <div class="panel-title">Member List</div>
@@ -1099,6 +1170,56 @@ class KigumiViewerApp extends LitElement {
         }
         this.exportIndividualsEnabled = normalized;
         this.requestUpdate();
+    }
+
+    setRenderParametersFromFrame(frameData) {
+        const contract = frameData && frameData.renderParameters && typeof frameData.renderParameters === 'object'
+            ? frameData.renderParameters
+            : null;
+        if (!contract) {
+            return;
+        }
+
+        const schema = Array.isArray(contract.schema) ? contract.schema : [];
+        this.renderParameterSchema = schema
+            .filter((entry) => entry && typeof entry === 'object' && typeof entry.name === 'string' && entry.name.length > 0)
+            .map((entry) => ({
+                name: entry.name,
+                kind: typeof entry.kind === 'string' ? entry.kind : 'string',
+                description: typeof entry.description === 'string' ? entry.description : '',
+                default: Object.prototype.hasOwnProperty.call(entry, 'default') ? entry.default : '',
+                options: Array.isArray(entry.options) ? entry.options.map((option) => String(option)) : [],
+            }));
+
+        const applied = contract.applied && typeof contract.applied === 'object' ? contract.applied : {};
+        this.appliedRenderParameters = { ...applied };
+        this.pendingRenderParameters = { ...applied };
+        this.requestUpdate();
+    }
+
+    getPendingRenderParameterValue(parameter) {
+        if (Object.prototype.hasOwnProperty.call(this.pendingRenderParameters, parameter.name)) {
+            return this.pendingRenderParameters[parameter.name];
+        }
+        return parameter.default;
+    }
+
+    setPendingRenderParameterValue(name, value) {
+        this.pendingRenderParameters = {
+            ...this.pendingRenderParameters,
+            [name]: value,
+        };
+        this.requestUpdate();
+    }
+
+    requestRefreshWithPendingParameters() {
+        if (!vscode) {
+            return;
+        }
+        vscode.postMessage({
+            type: 'requestRefresh',
+            renderParameters: { ...this.pendingRenderParameters },
+        });
     }
 
     updateStructureScreenBounds() {
@@ -3217,6 +3338,8 @@ class KigumiViewerApp extends LitElement {
         const profiling = payload.profiling || null;
         const uiState = this.normalizeUiState(payload.uiState || null);
         const hadExistingScene = this.meshObjectsByKey.size > 0;
+
+        this.setRenderParametersFromFrame(frameData);
 
         if (uiState.keepLoading) {
             this.setViewPhase(uiState.phase, uiState.loadingText, { refreshToken, error: uiState.error });

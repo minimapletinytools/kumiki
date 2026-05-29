@@ -588,6 +588,7 @@ def cut_mortise_and_tenon_joint_on_FAT(
 # ============================================================================
 
 
+# TODO notching on this function works however the wedge won't fit so the wedge hole needs to be made bigger
 def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     arrangement: ButtJointTimberArrangement,
     dovetail_top_side_on_butt_timber: TimberLongFace,

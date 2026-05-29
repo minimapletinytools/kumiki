@@ -209,6 +209,62 @@ canvas { display: block; width: 100%; height: 100%; }
     flex-wrap: wrap;
     backdrop-filter: blur(4px);
 }
+.parameter-controls-title {
+    color: var(--hv-title);
+    font: 600 12px 'Segoe UI', sans-serif;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+}
+#parameter-controls {
+    width: 100%;
+    max-width: none;
+    margin: 10px 0 0;
+    padding: 10px 14px;
+    background: var(--hv-panel-bg);
+    color: var(--hv-text);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 10px;
+    font: 12px/1.5 'Segoe UI', sans-serif;
+    display: grid;
+    gap: 10px;
+    backdrop-filter: blur(4px);
+}
+.parameter-empty {
+    color: var(--hv-dim);
+}
+.parameter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+.parameter-item {
+    border: 1px solid var(--hv-control-border);
+    border-radius: 8px;
+    padding: 8px;
+    background: var(--hv-control-bg);
+    display: grid;
+    gap: 6px;
+}
+.parameter-item label {
+    color: var(--hv-text);
+}
+.parameter-item input,
+.parameter-item select {
+    background: var(--hv-input-bg);
+    color: var(--hv-text);
+    border: 1px solid var(--hv-input-border);
+    border-radius: 6px;
+    padding: 4px 6px;
+}
+.parameter-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.parameter-description {
+    color: var(--hv-dim);
+    font-size: 11px;
+}
 .render-controls-title {
     color: var(--hv-title);
     font: 600 12px 'Segoe UI', sans-serif;

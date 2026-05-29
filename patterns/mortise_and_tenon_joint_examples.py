@@ -2,7 +2,7 @@
 Example usage of mortise and tenon joint functions
 """
 
-from sympy import Matrix, Rational, Integer
+from sympy import Matrix, Rational, Integer, sqrt
 from kumiki.rule import inches, Transform, degrees
 from kumiki.timber import (
     Timber, RoundTimber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
@@ -83,9 +83,20 @@ def example_basic_mortise_and_tenon_on_FAT_two_round_timbers(position=None):
     if position is None:
         position = create_v3(0, 0, 0)
 
+    round_arrangement = _create_canonical_example_butt_joint_round_timber_arrangement(position)
+
+    return cut_mortise_and_tenon_joint_on_FAT(
+        arrangement=round_arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length=inches(3),
+        mortise_depth=inches(7, 2),
+    )
+
+
+def _create_canonical_example_butt_joint_round_timber_arrangement(position):
     arrangement = create_canonical_example_butt_joint_timbers(position)
     size = arrangement.butt_timber.size
-    diameter = max(size[0], size[1]) * 2/sqrt(2)  # Use the same width as the original timbers for the round diameter
+    diameter = max(size[0], size[1]) * 2 / sqrt(2)
 
     round_receiving_timber = RoundTimber(
         length=arrangement.receiving_timber.length,
@@ -102,18 +113,11 @@ def example_basic_mortise_and_tenon_on_FAT_two_round_timbers(position=None):
         diameter=diameter,
     )
 
-    round_arrangement = ButtJointTimberArrangement(
+    return ButtJointTimberArrangement(
         butt_timber=round_butt_timber,
         receiving_timber=round_receiving_timber,
         butt_timber_end=arrangement.butt_timber_end,
         front_face_on_butt_timber=arrangement.front_face_on_butt_timber,
-    )
-
-    return cut_mortise_and_tenon_joint_on_FAT(
-        arrangement=round_arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
-        tenon_length=inches(3),
-        mortise_depth=inches(7, 2),
     )
 
 
@@ -335,7 +339,7 @@ def example_double_angled_mortise_and_tenon(position=None):
 
 
 
-def example_wedged_half_dovetail_mortise_and_tenon(position=None):
+def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timbers=False):
     """
     Wedged half-dovetail mortise and tenon joint on the canonical 4"x5"x4'
     butt joint timbers. The dovetail's flat (top) side sits on the FRONT face
@@ -345,7 +349,10 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None):
     if position is None:
         position = create_v3(0, 0, 0)
 
-    arrangement = create_canonical_example_butt_joint_timbers(position)
+    if use_round_timbers:
+        arrangement = _create_canonical_example_butt_joint_round_timber_arrangement(position)
+    else:
+        arrangement = create_canonical_example_butt_joint_timbers(position)
     return cut_wedged_half_dovetail_mortise_and_tenon_joint(
         arrangement=arrangement,
         dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,

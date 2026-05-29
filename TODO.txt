@@ -133,46 +133,47 @@ DONE-cleanup the bottom area for kigumi
   DONE-tighten the member list, dimenison + rought cut 
   DONE-add export button
   DONE-remove the patternbook
--kigumi init
-  DONE-initilaize project should also set .gitignore
+DONE-kigumi init
+  DONE-initilaize project should also set .gitignor
   DONE-update kumiki should be grayed out if no project is initialized and it should just not show at all acutaly..
   DONE-initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
-  -initialize kigumi project button line should show "initailizing project..." while initialization is in project. so in summary it has the following stase:
+  DONE-initialize kigumi project button line should show "initailizing project..." while initialization is in project. so in summary it has the following stase:
     -initialize project
     -initializing
     -kumiki dev mode
     -don't show at all (if project is detected)
--stuff to test
-  -test the install cadquery stuff 
-  -test export step and export STL combined/inidivdual again
-  -test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
+DONE-make sure kigumi installs ltaest version of kumiki
+DONE-finish docs
+  DONE-finish README
+  DONE-finish agents doc
+  DONE/IGNORE-finish and remove docs folder?
 -camera controls should be absolute? use focus to reset
 -searching
   DONE-show layer tags is broken
   -maybe layer tags should show in the list view at the bottom instead?
   -have a drop down list all tags thing that you can click + select rather than search?
   -searching should search for either tags or joint name (figure out a way to do this)
-  
 -do a design pass
   -better logo
   -stuff showing below the view should be cleaner/tighter 
   -move focus button maybe
   -make the gizmos slightly trasparent?
   DONE-timber list view should actually be useful
--make sure kigumi installs ltaest version of kumiki
 -test installation
   -raw installation of kigumi, installs deps
   -create new project/design
   -able to open patterns and copy them into self workspace
--finish docs
-  DONE-finish README
-  DONE-finish agents doc
-  -finish and remove docs folder?
 -new kigumi icon
 -marketing
+  -make basic exampl ecase
+  -make program castle joint video
+    -make the awful thuma bed video
   -make simple website
   -make some content drip
-
+-stuff to test
+  -test the install cadquery stuff 
+  -test export step and export STL combined/inidivdual again
+  -test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
 
 
 ::layers TODO
@@ -195,6 +196,15 @@ DONE-lock and hide fetaures
 
 :: TODO
 
+AUTOMATION
+  -allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
+  -allow agent to read kigumi console output
+  -allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
+  -update instructions to
+    -first test locally in a headless way to see that there are no errors
+    -then do actula render and fetch output
+  -make file watch refresh toggleable (off by default)
+  -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 
 -PATTERN VIEWER
@@ -226,23 +236,18 @@ DONE-lock and hide fetaures
   -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap
     -# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
   -lincoln log joints?
-
-TESTS
-  DONE-fresh install test
-    -create a temp directory and open vscode test in that directory
-    -check for sidebar state before initializati
-    -initilialize kigumi
-    -check for sidebar state after initializati
-    -check .gitignore
-    -check for my frame
-    -check venv is installde correctly
-    -check kumiki version
-    -check kumiki has correct pattern index (technically this is a kumiki publish test)
-    
+  -difference joint 
+    -where 1 CutTimber is just substracted from another timber, useful for making modifications not readily supported... 
+    -may as well do a union joint then? (these would really be decorative joints...)
+    -or would it be better just to have folsk make custom joints
 
 
 -PARAMETERIZATION
-  -do create_frame(paremteers) thing so that parameters can be tuned in UI
+  DONE-do create_frame(paremteers) thing so that parameters can be tuned in UI
+  -do we want update generic timber creation function to take more optional parameters? could be one generic struct
+    -size
+    -length
+    -type (round + diameter, square + nominal extra, perfect)
   -pattern parameterization
     -then you can add notch variations to patterns I guess?
     -update example_shaving ctors to take some additional parameters
@@ -250,7 +255,9 @@ TESTS
 -NOTCHING
   DONE-I think receiving timber notching is mostly good?
   DONE-notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
-  -test notching you just added to the half dovetail joint
+  DONE-test notching you just added to the half dovetail joint
+  -fix notchingon half dovetail joint # TODO notching on this function works however the wedge won't fit so the wedge hole needs to be made bigger
+    -you just need to clear out the receiving timber, the butting timber can block the wedge entry but TBH not ym problem but at least add a comment indicating this is the case
   -make notching more generic
     -when to notch: 
       -when there is a shoulder
@@ -382,9 +389,9 @@ EXEMPLIFY
   DONE/IGNORE-create all_joints.py 
     -exports all joints
   IGNORE-make examples of how to use measure/mark to set parameters in cutting functions
+  DONE-make sawhores example nice (eh, maybe you need to wedged dovetail mortise and tenons... or nuki joints or whatever)
   -write docs for at least one joint function to use as reference for the rest
   -agent prompt examples
-  -make sawhores example nice (eh, maybe you need to wedged dovetail mortise and tenons... or nuki joints or whatever)
   -examplify 
     DONE-create some map of example name to example function map so you can dynamiaclly get to all examples
     -would be cool do deep link by into functions/docs in the future...
@@ -525,6 +532,16 @@ M3.5
 
 
 :: TODONE 
+DONE-fresh install test
+    -create a temp directory and open vscode test in that directory
+    -check for sidebar state before initializati
+    -initilialize kigumi
+    -check for sidebar state after initializati
+    -check .gitignore
+    -check for my frame
+    -check venv is installde correctly
+    -check kumiki version
+    -check kumiki has correct pattern index (technically this is a kumiki publish test)
 DONE-improve librarian
   -generate pattern index file for kumiki before pubishing
   -search order
