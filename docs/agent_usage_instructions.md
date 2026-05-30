@@ -88,6 +88,50 @@ def example():
 
 The `example` function name is special, it is what kigumi will scan for and render when opening your file.
 
+# Validation Workflow
+
+When authoring a frame for the user, always test locally first just by running the python script directly to confirm there are no errors and the logging looks accurate.
+
+Afterwards, if the user is wanting a full agentic development loop, test the frame by actually opening it in Kigumi
+
+## VS Code Commands for Full Agentic Development Loop
+
+Use this sequence after headless local validation passes.
+
+1. Open the frame in viewer
+    - Command Palette: `Kigumi: Open Current File In Viewer`
+    - Command id: `kigumi.openCurrentFileInViewer`
+2. Open Kigumi explorer (optional but useful for pattern workflows)
+    - Command Palette: `Kigumi: Open Explorer`
+    - Command id: `kigumi.explorer`
+3. Toggle auto refresh on file change as needed for the current task
+    - Command Palette: `Kigumi: Toggle Auto Refresh On File Change`
+    - Command id: `kigumi.toggleAutoRefreshOnFileChange`
+
+For automation-driven checks (agent/testing flows), call these command ids directly:
+
+1. Open a specific file in viewer: `kigumi.automationOpenFileInViewer` (with `filePath`)
+2. List active sessions: `kigumi.automationListSessions`
+3. Refresh a specific session: `kigumi.automationRefreshSession`
+4. Read disk-backed JSONL logs: `kigumi.automationReadSessionLogs`
+5. Read camera state: `kigumi.automationGetCameraState`
+6. Set camera state: `kigumi.automationSetCameraState`
+7. Capture screenshot + camera bundle: `kigumi.captureScreenshotBundle`
+
+Expected artifacts from the automated loop:
+
+- Session logs in `.kigumi/logs/*.jsonl`
+- Screenshot bundles in `.kigumi/automation/`
+
+Common automation loop example:
+
+1. `kigumi.automationOpenFileInViewer` with `filePath: "/absolute/path/to/frame.py"`
+2. `kigumi.automationListSessions`
+3. `kigumi.automationRefreshSession` with `dirtyOnce: true`
+4. `kigumi.automationReadSessionLogs` filtering for warnings/errors
+5. `kigumi.automationGetCameraState`
+6. `kigumi.captureScreenshotBundle`
+
 # Creating new Patterns
 
 TODO

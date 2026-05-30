@@ -209,10 +209,13 @@ AUTOMATION
   DONE-allow agent to read kigumi console output
   DONE-allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
   DONE-make file watch refresh toggleable (off by default)
-  -try and run a full loop agent test on this to see if it all works
-  -update instructions to
+  DONE-update instructions to
     -first test locally in a headless way to see that there are no errors
     -then do actula render and fetch output
+  -create headless runner and adress the following in instructions
+    - first test locally just by running the python script directly to confirm there are no errors and the logging looks accurate
+  -try and run a full loop agent test on this to see if it all works
+  
   -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 

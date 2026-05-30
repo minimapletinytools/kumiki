@@ -181,6 +181,27 @@ function activate(context) {
     });
     context.subscriptions.push(automationListSessions);
 
+    const automationOpenFileInViewer = vscode.commands.registerCommand('kigumi.automationOpenFileInViewer', async (options = {}) => {
+        const targetFilePath = typeof options === 'string'
+            ? options
+            : (options && typeof options.filePath === 'string' ? options.filePath : null);
+        if (!targetFilePath) {
+            return { ok: false, reason: 'missing-file-path' };
+        }
+
+        const resolvedFilePath = path.resolve(targetFilePath);
+        if (!fs.existsSync(resolvedFilePath)) {
+            return { ok: false, reason: 'file-not-found', filePath: resolvedFilePath };
+        }
+        if (path.extname(resolvedFilePath).toLowerCase() !== '.py') {
+            return { ok: false, reason: 'not-python-file', filePath: resolvedFilePath };
+        }
+
+        await openFileInViewer(resolvedFilePath, context);
+        return { ok: true, filePath: resolvedFilePath };
+    });
+    context.subscriptions.push(automationOpenFileInViewer);
+
     const automationRefreshSession = vscode.commands.registerCommand('kigumi.automationRefreshSession', async (options = {}) => {
         const session = findSessionFromOptions(options);
         if (!session) {
