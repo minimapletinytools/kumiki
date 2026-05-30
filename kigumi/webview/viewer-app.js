@@ -522,15 +522,21 @@ class ViewerParameterPanel {
 
     render() {
         const params = this.app.renderParameterSchema;
+        const hasPendingChanges = this.app.hasPendingRenderParameterChanges();
         return html`
             <section id="parameter-controls" aria-label="Render parameters">
                 <div class="parameter-header">
                     <div class="parameter-controls-title">render parameters</div>
-                    <button
-                        id="refresh-btn"
-                        type="button"
-                        title="Refresh using current parameter values"
-                        @click=${() => this.app.requestRefreshWithPendingParameters()}>refresh</button>
+                    <div class="parameter-refresh-controls">
+                        ${hasPendingChanges
+                            ? html`<span class="parameter-changes-indicator">changes detected</span>`
+                            : ''}
+                        <button
+                            id="refresh-btn"
+                            type="button"
+                            title="Refresh using current parameter values"
+                            @click=${() => this.app.requestRefreshWithPendingParameters()}>refresh</button>
+                    </div>
                 </div>
                 ${params.length === 0
                     ? html`<div class="parameter-empty">No parameters exposed by this frame or pattern.</div>`
@@ -1214,6 +1220,20 @@ class KigumiViewerApp extends LitElement {
             [name]: value,
         };
         this.requestUpdate();
+    }
+
+    hasPendingRenderParameterChanges() {
+        const schema = Array.isArray(this.renderParameterSchema) ? this.renderParameterSchema : [];
+        for (const parameter of schema) {
+            const pendingValue = this.getPendingRenderParameterValue(parameter);
+            const appliedValue = Object.prototype.hasOwnProperty.call(this.appliedRenderParameters, parameter.name)
+                ? this.appliedRenderParameters[parameter.name]
+                : parameter.default;
+            if (String(pendingValue ?? '') !== String(appliedValue ?? '')) {
+                return true;
+            }
+        }
+        return false;
     }
 
     requestRefreshWithPendingParameters() {

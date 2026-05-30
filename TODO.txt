@@ -179,8 +179,8 @@ DONE-finish docs
   DONE-finish README
   DONE-finish agents doc
   DONE/IGNORE-finish and remove docs folder?
--viewer should show *changes detected" in teh webview and maybe offer ar efresh button, or just move the parmeters refresh thing to be more prominent
--come up with better names fro command so its easier to find the important ones
+DONE-viewer should show *changes detected" in teh webview and maybe offer ar efresh button, or just move the parmeters refresh thing to be more prominent
+IGNORE-come up with better names fro command so its easier to find the important ones
 -camera controls should be absolute? use focus to reset
 -searching
   DONE-show layer tags is broken
@@ -258,15 +258,13 @@ DONE-AUTOMATION
     -then do actula render and fetch output
   DONE-create headless runner and adress the following in instructions
     - first test locally just by running the python script directly to confirm there are no errors and the logging looks accurate
+DONE-view sourec and duplicate to workspace is broken again... note that view source should show up on all frames and patterns, the duplicate to workspace option should ONLY show up on patterns found in libraries
 
-
--view sourec and duplicate to workspace is broken again... note that view source should show up on all frames and patterns, the duplicate to workspace option should ONLY show up on patterns found in libraries
 -modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
   -0 degree notch up to insertion face
   -afterwards do the regular notching with varibale relief angle
   -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
     -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
-
 -try and run a full loop agent test on this to see if it all works
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 

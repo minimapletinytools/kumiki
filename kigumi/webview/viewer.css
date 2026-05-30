@@ -301,18 +301,29 @@ canvas { display: block; width: 100%; height: 100%; }
 #render-controls input {
     accent-color: var(--hv-accent);
 }
+.parameter-refresh-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+.parameter-changes-indicator {
+    color: var(--hv-warning);
+    font: 600 11px 'Segoe UI', sans-serif;
+    letter-spacing: 0.01em;
+    text-transform: lowercase;
+}
 #refresh-btn {
     padding: 4px 12px;
     border-radius: 999px;
-    background: var(--hv-control-bg);
-    border: 1px solid var(--hv-control-border);
+    background: #2c313a;
+    border: 1px solid #505766;
     color: var(--hv-text);
-    font: 12px/1.5 'Segoe UI', sans-serif;
+    font: 600 12px/1.5 'Segoe UI', sans-serif;
     cursor: pointer;
     user-select: none;
 }
 #refresh-btn:hover {
-    background: var(--hv-control-bg-hover);
+    background: #383e49;
 }
 @media (max-width: 980px) {
     #top-controls {
