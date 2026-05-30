@@ -57,11 +57,6 @@ for i in "${!TARGETS[@]}"; do
         mkdir -p "$EXT_DIR/.kigumi/docs"
         rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/.kigumi/docs/"
     fi
-
-    if [ -f "$REPO_ROOT/.github/instructions/authoring.instructions.md" ]; then
-        mkdir -p "$EXT_DIR/.kigumi/docs"
-        cp "$REPO_ROOT/.github/instructions/authoring.instructions.md" "$EXT_DIR/.kigumi/docs/authoring.instructions.md"
-    fi
 done
 
 echo "✅ Kigumi installed successfully in VSCode and Cursor!"

@@ -68,11 +68,10 @@ jobs:
       - name: Install Node.js dependencies
         run: npm install
 
-      - name: Stage bundled docs and authoring instructions
+      - name: Stage bundled docs
         run: |
           mkdir -p .kigumi/docs
           rsync -a --delete ../docs/ .kigumi/docs/
-          cp ../.github/instructions/authoring.instructions.md .kigumi/docs/authoring.instructions.md
 
       - name: Run unit tests
         run: npm run test:unit

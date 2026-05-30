@@ -6,7 +6,6 @@ const { ensureKigumiYaml, resolveProjectEnvironment } = require('./project-root'
 
 const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
 const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
-const CANONICAL_AUTHORING_INSTRUCTIONS_PATH = path.resolve(__dirname, '..', '.github', 'instructions', 'authoring.instructions.md');
 
 function stripLeadingYamlFrontmatter(content) {
     if (!content.startsWith('---')) {
@@ -62,7 +61,7 @@ function ensureAgentsInstructionsFile(agentsPath) {
         '',
         'Always read and follow:',
         '',
-        '- .kigumi/docs/authoring.instructions.md',
+        '- docs/agent_usage_instructions.md',
         '',
     ].join('\n');
     fs.mkdirSync(path.dirname(agentsPath), { recursive: true });
@@ -77,7 +76,7 @@ function ensureAgentsInstructionsFile(agentsPath) {
     }
 
     const currentContent = fs.readFileSync(agentsPath, 'utf8');
-    if (currentContent.includes('.kigumi/docs/authoring.instructions.md')) {
+    if (currentContent.includes('docs/agent_usage_instructions.md')) {
         return {
             createdAgentsFile: false,
             appendedToExistingAgentsFile: false,
@@ -98,23 +97,11 @@ function ensureAgentsInstructionsFile(agentsPath) {
 
 function copyBundledDocsIntoWorkspace(workspaceRoot) {
     const sourcePath = getBundledDocsSourcePath();
-    const targetPath = path.join(workspaceRoot, '.kigumi', 'docs');
+    const targetPath = path.join(workspaceRoot, 'docs');
     fs.mkdirSync(targetPath, { recursive: true });
 
     if (sourcePath) {
         fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
-    }
-
-    const authoringTargetPath = path.join(targetPath, 'authoring.instructions.md');
-    if (fs.existsSync(CANONICAL_AUTHORING_INSTRUCTIONS_PATH)) {
-        fs.copyFileSync(CANONICAL_AUTHORING_INSTRUCTIONS_PATH, authoringTargetPath);
-    } else if (!fs.existsSync(authoringTargetPath)) {
-        fs.writeFileSync(authoringTargetPath, [
-            '# Authoring Instructions',
-            '',
-            'If this file is missing in your distribution, consult the repository authoring instructions.',
-            '',
-        ].join('\n'), 'utf8');
     }
 
     return sourcePath !== null;
