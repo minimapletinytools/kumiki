@@ -4,6 +4,15 @@
 echo "🐴 Installing Kigumi extension..."
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+echo "Preparing bundled agent instructions..."
+if command -v node >/dev/null 2>&1; then
+    node "$SCRIPT_DIR/scripts/prepare-bundled-instructions.js"
+else
+    echo "❌ Node.js is required to prepare bundled instructions."
+    exit 1
+fi
 
 VSCODE_EXT_DIR="$HOME/.vscode/extensions/kigumi"
 CURSOR_EXT_DIR="$HOME/.cursor/extensions/kigumi"
@@ -43,6 +52,11 @@ for i in "${!TARGETS[@]}"; do
         --exclude INSTALL.md \
         --exclude .git \
         "$SCRIPT_DIR/" "$EXT_DIR/"
+
+    if [ -d "$REPO_ROOT/docs" ]; then
+        mkdir -p "$EXT_DIR/docs"
+        rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/docs/"
+    fi
 done
 
 echo "✅ Kigumi installed successfully in VSCode and Cursor!"

@@ -196,6 +196,11 @@ DONE-lock and hide fetaures
 
 :: TODO
 
+BUGS
+  -initialize project button no longer showing
+  
+
+
 -rename nominal -> maximal
   -ignore for now
 -decide on notching.py vs relief.py
@@ -205,7 +210,7 @@ DONE-lock and hide fetaures
   -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
     -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
 
-AUTOMATION
+-AUTOMATION
   DONE-allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
   DONE-allow agent to read kigumi console output
   DONE-allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
@@ -213,7 +218,7 @@ AUTOMATION
   DONE-update instructions to
     -first test locally in a headless way to see that there are no errors
     -then do actula render and fetch output
-  -create headless runner and adress the following in instructions
+  DONE-create headless runner and adress the following in instructions
     - first test locally just by running the python script directly to confirm there are no errors and the logging looks accurate
   -try and run a full loop agent test on this to see if it all works
   -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
@@ -223,6 +228,8 @@ AUTOMATION
   DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
   DONE-allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
   -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
+    lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
+    Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
 
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon
