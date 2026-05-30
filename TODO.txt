@@ -1,4 +1,36 @@
 
+:: 5/30 kumiki intro script
+
+hello in this video I will demo the kumiki timber frame code aided design library and the kigumi design viewer.
+and since kumiki designs are written in code, we will be relying AI agents to write our designs, but this is not mandatory.
+
+
+:: 5/30
+hello in this video I will show you how to get started with the kumiki timber frame design library and the kigumi viewer.
+to get stared with kumiki, all you need to install vscode and the kigumi vscode extension.
+lets create a folder for our project and open it in vscode, then you'll go to the kigumi sidebar and hit the initialize project button.
+this will setup all project requirements for you as well as create an example designa to get you started.
+In the kigumi sidebar you can see all your kumiki designs, or frames, as well as patterns that ship with kumiki 
+lets open up the eaxmple frame that got created for us, this will launch the kigumi viewer 
+here you can move the camera around
+select timbers
+look at the list of timbers and joints
+and so on
+if you scroll down, you'll see some options for the viewer, and you'll also see the frame parameter section which we're not using for this frame
+further down, you'll see a rough cut list
+and then further down youll see some logging and python raw output which is sometimes useful for debugging 
+now lets go take a look the patterns thot ship with kumiki in the sidebar
+you can see patterns are currently organized in different patternbooks, which correspond to different types of joints (these will be reorganized soon)
+if you just want to see a list of pattens intead, hit the patternbook grouping toggle at the top
+lets click through a few patterns to see what they do
+here's asimple butt splice joint, not very exciting
+and here's a goosenceck splice joint, a little more fun
+I'll let you explore here. Kumiki is being activel ydeveloped on so there will be many more patterns (and hence joints) to come
+if you want to play around with one of these pattern,s you can hit duplicate to workspace
+
+
+
+
 :: 3/17/2026 selection / layer view
 
 Lets add a layout view.... We want a menu in the webview part of the viewer that spans the entire left side that has an option >> expansion thingy to collapse it.
@@ -212,22 +244,11 @@ DONE-WTF? can't run automation commands
   The current file is recognized as a renderable Kigumi pattern.
   Automation/session services are initialized for that workspace window.
   When those checks fail, VS Code reports exactly what I saw: command exists, but preconditions are not met.
-
-
-
-
 DONE-restyle kigumi viewer so that there are 2 collumns for the options and the parameters panel. The refresh button on the parameters view should be at the top as well so it's easier to see.
-
--rename nominal -> maximal
+IGNORE-rename nominal -> maximal
   -ignore for now
--decide on notching.py vs relief.py
--modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
-  -0 degree notch up to insertion face
-  -afterwards do the regular notching with varibale relief angle
-  -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
-    -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
-
--AUTOMATION
+IGNORE-decide on notching.py vs relief.py
+DONE-AUTOMATION
   DONE-allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
   DONE-allow agent to read kigumi console output
   DONE-allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
@@ -237,9 +258,17 @@ DONE-restyle kigumi viewer so that there are 2 collumns for the options and the 
     -then do actula render and fetch output
   DONE-create headless runner and adress the following in instructions
     - first test locally just by running the python script directly to confirm there are no errors and the logging looks accurate
-  -try and run a full loop agent test on this to see if it all works
-  -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
+
+-view sourec and duplicate to workspace is broken again... note that view source should show up on all frames and patterns, the duplicate to workspace option should ONLY show up on patterns found in libraries
+-modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
+  -0 degree notch up to insertion face
+  -afterwards do the regular notching with varibale relief angle
+  -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
+    -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
+
+-try and run a full loop agent test on this to see if it all works
+-maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 -PATTERN VIEWER
   DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples

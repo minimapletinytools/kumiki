@@ -23,6 +23,37 @@ let logRetentionDays = 15;
 const BUILD_MARKER = '🧪 KIGUMI_BUILD_2026-05-17T02:45Z';
 const ENABLE_TEST_COMMANDS = process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1';
 
+function _extractSourcePathFromSidebarElement(element) {
+    if (!element || !element.data) {
+        return null;
+    }
+    const data = element.data;
+    if (typeof data.sourceFile === 'string' && data.sourceFile) {
+        return data.sourceFile;
+    }
+    if (typeof data.filePath === 'string' && data.filePath) {
+        return data.filePath;
+    }
+    if (data.patternbook && typeof data.patternbook.filePath === 'string' && data.patternbook.filePath) {
+        return data.patternbook.filePath;
+    }
+    if (Array.isArray(data.patterns) && data.patterns.length > 0) {
+        const firstPattern = data.patterns[0];
+        if (firstPattern && typeof firstPattern.sourceFile === 'string' && firstPattern.sourceFile) {
+            return firstPattern.sourceFile;
+        }
+    }
+    return null;
+}
+
+function _isLibraryPatternLeafElement(element) {
+    if (!element || element.type !== 'patternItem' || !element.data) {
+        return false;
+    }
+    const sectionKey = element.data.sectionKey;
+    return sectionKey === 'shipped-patterns' || sectionKey === 'dependency-patterns';
+}
+
 /**
  * Main activation function for the Kigumi extension.
  * @param {vscode.ExtensionContext} context
@@ -412,11 +443,9 @@ function activate(context) {
     // --- View Pattern Source ---
     const viewPatternSource = vscode.commands.registerCommand('kigumi.viewPatternSource', async (elementArg) => {
         const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
-        const sourcePath = selectedElement && selectedElement.data
-            ? (selectedElement.data.sourceFile || selectedElement.data.filePath)
-            : null;
+        const sourcePath = _extractSourcePathFromSidebarElement(selectedElement);
 
-        if (!selectedElement || !selectedElement.data || !sourcePath) {
+        if (!selectedElement || !sourcePath) {
             vscode.window.showErrorMessage('Please select a pattern or frame first.');
             return;
         }
@@ -456,8 +485,8 @@ function activate(context) {
     // --- Duplicate Pattern to Workspace ---
     const duplicatePatternToWorkspace = vscode.commands.registerCommand('kigumi.duplicatePatternToWorkspace', async (elementArg) => {
         const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
-        if (!selectedElement || !selectedElement.data || !selectedElement.data.sourceFile) {
-            vscode.window.showErrorMessage('Please select a pattern first.');
+        if (!_isLibraryPatternLeafElement(selectedElement)) {
+            vscode.window.showErrorMessage('Duplicate to workspace is only available for library patterns.');
             return;
         }
 

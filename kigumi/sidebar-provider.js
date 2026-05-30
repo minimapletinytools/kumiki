@@ -759,7 +759,7 @@ class KigumiSidebarProvider {
             iconPath: new vscode.ThemeIcon('book'),
             tooltip: pb.filePath,
             data: { patternbook: pb },
-            contextValue: 'patternItemWorkspace',
+            contextValue: 'workspacePatternbook',
         }));
     }
 
@@ -878,7 +878,7 @@ class KigumiSidebarProvider {
                 },
                 iconPath: new vscode.ThemeIcon('folder'),
                 data: { sectionKey, patternbookName, patterns: items },
-                contextValue: 'patternItem',
+                contextValue: 'patternbookGroupItem',
             }));
         }
 

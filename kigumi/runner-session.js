@@ -30,8 +30,15 @@ class PythonRunnerSession {
 
 
     resolveEnvironment(filePath) {
+        const vscode = require('vscode');
+        const workspaceFolders = vscode.workspace.workspaceFolders;
+        const workspaceRoot = workspaceFolders && workspaceFolders.length > 0
+            ? workspaceFolders[0].uri.fsPath
+            : null;
+
         const resolved = resolveProjectEnvironment({
             filePath,
+            workspaceRoot,
             createMarkerIfMissing: true,
         });
 
@@ -207,7 +214,7 @@ class PythonRunnerSession {
     async getMissingViewerDependencies(pythonCmd) {
         const snippet = [
             'import importlib.util',
-            'required = ["sympy", "numpy", "trimesh", "manifold3d"]',
+            'required = ["kumiki", "sympy", "numpy", "trimesh", "manifold3d"]',
             'missing = [name for name in required if importlib.util.find_spec(name) is None]',
             'print("\\n".join(missing))',
         ].join('; ');
@@ -374,7 +381,8 @@ class PythonRunnerSession {
                 const pythonCmd = this.getPythonCommand();
                 this.channel.appendLine(`Starting runner: ${pythonCmd} ${this.runnerScriptPath} ${this.filePath}`);
 
-                this.process = spawn(pythonCmd, [this.runnerScriptPath, this.filePath], {
+                const runnerArgs = [this.runnerScriptPath, this.filePath, this.projectRoot || ''];
+                this.process = spawn(pythonCmd, runnerArgs, {
                     cwd: this.projectRoot,
                     stdio: ['pipe', 'pipe', 'pipe'],
                 });

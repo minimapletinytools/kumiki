@@ -30,13 +30,32 @@ from kumiki.librarian import (
 
 
 def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
-    """Walk up from the target file path (argv[1]) to find the project root and type.
-    Returns (root_path, is_local_dev) or (None, False)."""
+    """Resolve project root and mode.
+
+    Priority:
+    1) argv[2] explicit project root from extension (if provided)
+    2) walk up from argv[1] target file path
+
+    Returns (root_path, is_local_dev) or (None, False).
+    """
+    explicit_root: Path | None = None
+    if len(sys.argv) >= 3 and sys.argv[2]:
+        candidate_root = Path(sys.argv[2]).resolve()
+        if candidate_root.exists():
+            explicit_root = candidate_root
+
+    if explicit_root is not None:
+        if (explicit_root / "kumiki").is_dir() and (explicit_root / "pyproject.toml").is_file():
+            return explicit_root, True
+        return explicit_root, False
+
     if len(sys.argv) < 2:
         return None, False
+
     candidate = Path(sys.argv[1]).resolve().parent
     while True:
-        if (candidate / "kumiki").is_dir():
+        # Local-dev should only match an actual kumiki repo root.
+        if (candidate / "kumiki").is_dir() and (candidate / "pyproject.toml").is_file():
             return candidate, True
         if (candidate / ".kigumi.yaml").is_file():
             return candidate, False
