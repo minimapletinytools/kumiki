@@ -197,6 +197,7 @@ DONE-lock and hide fetaures
 :: TODO
 
 -rename nominal -> maximal
+  -ignore for now
 -decide on notching.py vs relief.py
 -modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
   -0 degree notch up to insertion face
@@ -215,14 +216,13 @@ AUTOMATION
   -create headless runner and adress the following in instructions
     - first test locally just by running the python script directly to confirm there are no errors and the logging looks accurate
   -try and run a full loop agent test on this to see if it all works
-  
   -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 
 -PATTERN VIEWER
   DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
   DONE-allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
-  -add searching + tag searching functionality on top of the patternbook/frames/examples
+  -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
 
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon

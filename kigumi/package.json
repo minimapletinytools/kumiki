@@ -55,11 +55,6 @@
         "icon": "$(play)"
       },
       {
-        "command": "kigumi.projectHeaderAction",
-        "title": "Kigumi: Initialize Project",
-        "icon": "$(rocket)"
-      },
-      {
         "command": "kigumi.initializeProjectInWorkspace",
         "title": "Kigumi: Initialize Project",
         "icon": "$(rocket)"
@@ -138,10 +133,6 @@
       ],
       "commandPalette": [
         {
-          "command": "kigumi.projectHeaderAction",
-          "when": "false"
-        },
-        {
           "command": "kigumi.refreshSidebar",
           "when": "false"
         },
@@ -150,7 +141,15 @@
           "when": "false"
         },
         {
+          "command": "kigumi.updateKumiki",
+          "when": "false"
+        },
+        {
           "command": "kigumi.openWebsite",
+          "when": "false"
+        },
+        {
+          "command": "kigumi.toggleAutoRefreshOnFileChange",
           "when": "false"
         },
         {
