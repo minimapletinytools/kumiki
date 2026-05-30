@@ -53,8 +53,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          if [ ! -f kumiki/_pattern_index.json ]; then
-            echo '{"schema_version":1,"entries":{}}' > kumiki/_pattern_index.json
+          if [ ! -f ../kumiki/_pattern_index.json ]; then
+            echo '{"schema_version":1,"entries":{}}' > ../kumiki/_pattern_index.json
           fi
           uv sync --group dev
 
