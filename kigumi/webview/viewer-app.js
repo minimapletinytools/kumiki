@@ -524,7 +524,14 @@ class ViewerParameterPanel {
         const params = this.app.renderParameterSchema;
         return html`
             <section id="parameter-controls" aria-label="Render parameters">
-                <div class="parameter-controls-title">render parameters</div>
+                <div class="parameter-header">
+                    <div class="parameter-controls-title">render parameters</div>
+                    <button
+                        id="refresh-btn"
+                        type="button"
+                        title="Refresh using current parameter values"
+                        @click=${() => this.app.requestRefreshWithPendingParameters()}>refresh</button>
+                </div>
                 ${params.length === 0
                     ? html`<div class="parameter-empty">No parameters exposed by this frame or pattern.</div>`
                     : html`
@@ -539,11 +546,6 @@ class ViewerParameterPanel {
                             `)}
                         </div>
                     `}
-                <button
-                    id="refresh-btn"
-                    type="button"
-                    title="Refresh using current parameter values"
-                    @click=${() => this.app.requestRefreshWithPendingParameters()}>refresh</button>
             </section>
         `;
     }
@@ -688,8 +690,10 @@ class KigumiViewerApp extends LitElement {
                 <div id="debug"></div>
                 <div id="hint">right drag orbit • middle drag pan • scroll zoom • F focus</div>
             </div>
-            ${this.settingsPanel.render()}
-            ${this.parameterPanel.render()}
+            <div id="top-controls">
+                ${this.settingsPanel.render()}
+                ${this.parameterPanel.render()}
+            </div>
             <div id="panels">
                 <div class="panel-box">
                     <div class="panel-title">Member List</div>

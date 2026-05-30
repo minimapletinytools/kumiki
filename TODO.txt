@@ -216,6 +216,7 @@ DONE-WTF? can't run automation commands
 
 
 
+DONE-restyle kigumi viewer so that there are 2 collumns for the options and the parameters panel. The refresh button on the parameters view should be at the top as well so it's easier to see.
 
 -rename nominal -> maximal
   -ignore for now
