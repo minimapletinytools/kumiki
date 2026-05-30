@@ -24,7 +24,20 @@ from kumiki.cutcsg import (
 from kumiki.measuring import Plane, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
 from kumiki.timber import TimberCenterline, TimberFace, TimberLike, TimberReferenceEnd
-from kumiki.timber_shavings import are_timbers_plane_aligned
+from kumiki.timber_shavings import (
+    are_timbers_plane_aligned,
+    get_perfect_support_distance_from_centerline,
+)
+
+
+def _projected_perfect_cross_section_span_along_global_direction(
+    timber: TimberLike,
+    direction_global: V3,
+) -> Numeric:
+    """Projected full cross-section span of a timber along a global direction."""
+    direction_local = safe_transform_vector(timber.orientation.matrix.T, direction_global)
+    direction_local_2d = create_v2(direction_local[0], direction_local[1])
+    return Integer(2) * get_perfect_support_distance_from_centerline(timber, direction_local_2d)
 
 
 def does_shoulder_plane_need_notching(
@@ -128,12 +141,9 @@ def chop_shoulder_notch_aligned_with_timber(
     notch_span = max_size * sqrt(Integer(2))
     notch_depth = max_size * sqrt(Integer(2)) / Integer(2)
 
-    w_dir = butting_timber.get_width_direction_global()
-    h_dir = butting_timber.get_height_direction_global()
-
-    cross_section_span_on_notch_length = (
-        Abs(safe_dot_product(w_dir, notch_length_dir_global)) * butting_timber.size[0]
-        + Abs(safe_dot_product(h_dir, notch_length_dir_global)) * butting_timber.size[1]
+    cross_section_span_on_notch_length = _projected_perfect_cross_section_span_along_global_direction(
+        butting_timber,
+        notch_length_dir_global,
     )
 
     approach_dot_depth = safe_dot_product(raw_approach, approach_direction_global)
@@ -436,11 +446,9 @@ def chop_notch_for_butt_joint_arrangement(
 
     # Notch width: butt cross-section projected onto receiving timber length axis,
     # plus extra width to absorb the tilt of an angled butt timber.
-    butt_w_dir = butt_timber.get_width_direction_global()
-    butt_h_dir = butt_timber.get_height_direction_global()
-    cross_section_span_on_receiver_length = (
-        Abs(safe_dot_product(butt_w_dir, receiving_length_dir)) * butt_timber.size[0]
-        + Abs(safe_dot_product(butt_h_dir, receiving_length_dir)) * butt_timber.size[1]
+    cross_section_span_on_receiver_length = _projected_perfect_cross_section_span_along_global_direction(
+        butt_timber,
+        receiving_length_dir,
     )
     if zero_test(cos_butt_dev):
         shift_along_length = Integer(0)
