@@ -147,6 +147,8 @@ DONE-finish docs
   DONE-finish README
   DONE-finish agents doc
   DONE/IGNORE-finish and remove docs folder?
+-viewer should show *changes detected" in teh webview and maybe offer ar efresh button, or just move the parmeters refresh thing to be more prominent
+-come up with better names fro command so its easier to find the important ones
 -camera controls should be absolute? use focus to reset
 -searching
   DONE-show layer tags is broken
@@ -196,9 +198,23 @@ DONE-lock and hide fetaures
 
 :: TODO
 
-BUGS
-  -initialize project button no longer showing
-  
+DONE-initialize project button no longer showing
+DONE-WTF? can't run automation commands
+  Kigumi automation loop: partially blocked
+  I could run the viewer command, but automation commands reported unmet preconditions:
+  kigumi.automationOpenFileInViewer
+  kigumi.automationListSessions
+  Also, there is no .kigumi/logs directory yet in this workspace, so there are no automation JSONL logs to inspect from the agent side.
+  In practical terms, Kigumi checks some internal prerequisites before running automation commands like automationOpenFileInViewer, automationListSessions, and automationRefreshSession. Typical prerequisites are:
+
+  Kigumi extension is fully activated.
+  A viewer session is open in the right mode.
+  The current file is recognized as a renderable Kigumi pattern.
+  Automation/session services are initialized for that workspace window.
+  When those checks fail, VS Code reports exactly what I saw: command exists, but preconditions are not met.
+
+
+
 
 
 -rename nominal -> maximal

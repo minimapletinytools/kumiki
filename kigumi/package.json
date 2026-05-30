@@ -22,6 +22,7 @@
     "Visualization"
   ],
   "activationEvents": [
+    "onStartupFinished",
     "onCommand:kigumi.openCurrentFileInViewer",
     "onCommand:kigumi.automationOpenFileInViewer",
     "onCommand:kigumi.initializeProjectInWorkspace",
@@ -150,30 +151,6 @@
         },
         {
           "command": "kigumi.toggleAutoRefreshOnFileChange",
-          "when": "false"
-        },
-        {
-          "command": "kigumi.automationListSessions",
-          "when": "false"
-        },
-        {
-          "command": "kigumi.automationOpenFileInViewer",
-          "when": "false"
-        },
-        {
-          "command": "kigumi.automationRefreshSession",
-          "when": "false"
-        },
-        {
-          "command": "kigumi.automationReadSessionLogs",
-          "when": "false"
-        },
-        {
-          "command": "kigumi.automationGetCameraState",
-          "when": "false"
-        },
-        {
-          "command": "kigumi.automationSetCameraState",
           "when": "false"
         },
         {
