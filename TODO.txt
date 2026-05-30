@@ -181,12 +181,12 @@ DONE-finish docs
   DONE/IGNORE-finish and remove docs folder?
 DONE-viewer should show *changes detected" in teh webview and maybe offer ar efresh button, or just move the parmeters refresh thing to be more prominent
 IGNORE-come up with better names fro command so its easier to find the important ones
--camera controls should be absolute? use focus to reset
--searching
+IGNORE/DONE-searching
   DONE-show layer tags is broken
   -maybe layer tags should show in the list view at the bottom instead?
   -have a drop down list all tags thing that you can click + select rather than search?
   -searching should search for either tags or joint name (figure out a way to do this)
+-camera controls should be absolute? use focus to reset
 -do a design pass
   -better logo
   -stuff showing below the view should be cleaner/tighter 

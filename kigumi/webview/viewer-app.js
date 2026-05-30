@@ -308,10 +308,6 @@ class ViewerSettingsPanel {
                     debug info
                 </label>
                 <label>
-                    <input id="layer-tags-toggle" type="checkbox" ?checked=${this.app.showLayerTags}>
-                    show layer tags
-                </label>
-                <label>
                     geometry
                     <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
                         <option value="actual">actual</option>
@@ -382,7 +378,6 @@ class ViewerSettingsPanel {
         const reflectionsToggle = renderRoot.querySelector('#reflections-toggle');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const debugToggle = renderRoot.querySelector('#debug-toggle');
-        const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
         const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
 
@@ -408,10 +403,6 @@ class ViewerSettingsPanel {
             if (debugEl) {
                 debugEl.style.display = this.app.debugEnabled ? 'block' : 'none';
             }
-        });
-
-        layerTagsToggle.addEventListener('change', (event) => {
-            this.app.setLayerTagPillsVisible(event.target.checked);
         });
 
         shadowsToggle.addEventListener('change', (event) => {
@@ -449,7 +440,6 @@ class ViewerSettingsPanel {
     syncControls(renderRoot) {
         const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
-        const layerTagsToggle = renderRoot.querySelector('#layer-tags-toggle');
         const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
         if (edgeVisibilitySlider) {
@@ -457,9 +447,6 @@ class ViewerSettingsPanel {
         }
         if (unselectedTransparencySlider) {
             unselectedTransparencySlider.value = String(100 - this.app.unselectedTransparencyPercent);
-        }
-        if (layerTagsToggle) {
-            layerTagsToggle.checked = this.app.showLayerTags;
         }
         if (exportIndividualToggle) {
             exportIndividualToggle.checked = this.app.exportIndividualsEnabled;
@@ -585,7 +572,6 @@ class KigumiViewerApp extends LitElement {
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
         this.debugEnabled = false;
-        this.showLayerTags = true;
         this.logFilterText = '';
         this.memberListRoughLengthAllowanceMm = 30;
         this.memberListOptions = {
@@ -795,9 +781,6 @@ class KigumiViewerApp extends LitElement {
         if (this._layersView) {
             this._layersView.addEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.addEventListener('layer-state-sync', this.onLayerStateSync);
-        }
-        if (this._layersView && typeof this._layersView.setShowTagPills === 'function') {
-            this._layersView.setShowTagPills(this.showLayerTags);
         }
         if (vscode) {
             vscode.postMessage({ type: 'requestLayersTree' });
@@ -1159,18 +1142,6 @@ class KigumiViewerApp extends LitElement {
         this.edgeLineVisibilityPercent = normalizedPercent;
         this.requestUpdate();
         this.applySelectionOpacity();
-    }
-
-    setLayerTagPillsVisible(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.showLayerTags === normalized) {
-            return;
-        }
-        this.showLayerTags = normalized;
-        if (this._layersView && typeof this._layersView.setShowTagPills === 'function') {
-            this._layersView.setShowTagPills(normalized);
-        }
-        this.requestUpdate();
     }
 
     setExportIndividualsEnabled(enabled) {
