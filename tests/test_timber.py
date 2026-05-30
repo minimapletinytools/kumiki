@@ -1512,6 +1512,7 @@ class TestGetNominalHalfSizes:
         assert t.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT) == Rational(4)
         assert t.get_nominal_size_in_face_normal_axis(TimberFace.FRONT) == Rational(6)
 
+
     # -- get_half_nominal_size_in_face_normal_axis per-face --
 
     def test_half_nominal_size_symmetric(self):

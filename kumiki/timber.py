@@ -881,7 +881,7 @@ class PerfectTimberWithin(ABC):
         total_w = width_halves[0] + width_halves[1]
         total_h = height_halves[0] + height_halves[1]
         return create_v2(total_w, total_h)
-    
+        
     def get_perfect_timber_within_CSG_local(self) -> RectangularPrism:
         """
         Returns the perfect rectangular prism CSG in local coordinates.

@@ -8,6 +8,115 @@ from .rule import *
 from .timber import *
 
 
+def _support_value_local(
+    direction_local: V3,
+    x_pos: Numeric,
+    x_neg: Numeric,
+    y_pos: Numeric,
+    y_neg: Numeric,
+    z_min: Numeric,
+    z_max: Numeric,
+) -> Numeric:
+    """Support value max(dot(direction_local, p)) over an axis-aligned local box."""
+    dx = direction_local[0]
+    dy = direction_local[1]
+    dz = direction_local[2]
+    return (
+        x_pos * Max(dx, Integer(0))
+        + x_neg * Max(-dx, Integer(0))
+        + y_pos * Max(dy, Integer(0))
+        + y_neg * Max(-dy, Integer(0))
+        + z_max * Max(dz, Integer(0))
+        + z_min * Max(-dz, Integer(0))
+    )
+
+
+def _support_distance_local(
+    position_local: V3,
+    direction_local: V3,
+    x_pos: Numeric,
+    x_neg: Numeric,
+    y_pos: Numeric,
+    y_neg: Numeric,
+    z_min: Numeric,
+    z_max: Numeric,
+) -> Numeric:
+    """Distance from position_local to the furthest support plane normal to direction_local."""
+    d = normalize_vector(direction_local)
+    support_value = _support_value_local(
+        direction_local=d,
+        x_pos=x_pos,
+        x_neg=x_neg,
+        y_pos=y_pos,
+        y_neg=y_neg,
+        z_min=z_min,
+        z_max=z_max,
+    )
+    return support_value - safe_dot_product(d, position_local)
+
+
+def get_nominal_support_distance_from_centerline(timber: PerfectTimberWithin, direction: V2) -> Numeric:
+    """Support distance from cross-section centerline to nominal support plane."""
+    width_halves, height_halves = timber.get_nominal_half_sizes()
+    return _support_distance_local(
+        position_local=create_v3(Integer(0), Integer(0), Integer(0)),
+        direction_local=create_v3(direction[0], direction[1], Integer(0)),
+        x_pos=width_halves[0],
+        x_neg=width_halves[1],
+        y_pos=height_halves[0],
+        y_neg=height_halves[1],
+        z_min=Integer(0),
+        z_max=Integer(0),
+    )
+
+
+def get_perfect_support_distance_from_centerline(timber: PerfectTimberWithin, direction: V2) -> Numeric:
+    """Support distance from cross-section centerline to perfect support plane."""
+    w_half = timber.size[0] / Integer(2)
+    h_half = timber.size[1] / Integer(2)
+    return _support_distance_local(
+        position_local=create_v3(Integer(0), Integer(0), Integer(0)),
+        direction_local=create_v3(direction[0], direction[1], Integer(0)),
+        x_pos=w_half,
+        x_neg=w_half,
+        y_pos=h_half,
+        y_neg=h_half,
+        z_min=Integer(0),
+        z_max=Integer(0),
+    )
+
+
+def get_nominal_support_distance(timber: PerfectTimberWithin, position_from_bottom: V3, direction: V3) -> Numeric:
+    """Support distance from a 3D local position to nominal support plane."""
+    width_halves, height_halves = timber.get_nominal_half_sizes()
+    return _support_distance_local(
+        position_local=position_from_bottom,
+        direction_local=direction,
+        x_pos=width_halves[0],
+        x_neg=width_halves[1],
+        y_pos=height_halves[0],
+        y_neg=height_halves[1],
+        z_min=Integer(0),
+        z_max=timber.length,
+    )
+
+
+def get_perfect_support_distance(timber: PerfectTimberWithin, position_from_bottom: V3, direction: V3) -> Numeric:
+    """Support distance from a 3D local position to perfect support plane."""
+    w_half = timber.size[0] / Integer(2)
+    h_half = timber.size[1] / Integer(2)
+    return _support_distance_local(
+        position_local=position_from_bottom,
+        direction_local=direction,
+        x_pos=w_half,
+        x_neg=w_half,
+        y_pos=h_half,
+        y_neg=h_half,
+        z_min=Integer(0),
+        z_max=timber.length,
+    )
+
+
 
 # ============================================================================
 # Various geometric helper functions that should all be replaced with marking/measuring functions

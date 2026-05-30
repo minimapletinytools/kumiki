@@ -11,7 +11,7 @@ from tests.testing_shavings import (
     create_standard_horizontal_timber,
     create_centered_horizontal_timber,
 )
-from sympy import Rational
+from sympy import Rational, sqrt, simplify
 
 
 class TestFindOpposingFaceOnAnotherTimber:
@@ -196,6 +196,73 @@ class TestFindOpposingFaceOnAnotherTimber:
         
         # Check that the error message mentions parallel
         assert "parallel" in str(excinfo.value).lower()
+
+
+class TestSupportDistance:
+    """Tests for support-plane distance helpers in timber_shavings."""
+
+    def test_perfect_support_distance_from_centerline_axis(self):
+        t = create_standard_vertical_timber(size=(Rational(4), Rational(6)))
+        assert get_perfect_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(2)
+        assert get_perfect_support_distance_from_centerline(t, create_v2(0, 1)) == Rational(3)
+        assert get_perfect_support_distance_from_centerline(t, create_v2(-1, 0)) == Rational(2)
+
+    def test_perfect_support_distance_from_centerline_diagonal(self):
+        t = create_standard_vertical_timber(size=(Rational(4), Rational(6)))
+        result = get_perfect_support_distance_from_centerline(t, create_v2(1, 1))
+        expected = Rational(5) / sqrt(2)
+        assert simplify(result - expected) == 0
+
+    def test_nominal_support_distance_from_centerline_asymmetric(self):
+        t = Timber(
+            length=Rational(100),
+            size=create_v2(Rational(4), Rational(6)),
+            transform=Transform.identity(),
+            nominal_half_sizes=(
+                create_v2(Rational(3), Rational(1)),
+                create_v2(Rational(4), Rational(2)),
+            ),
+        )
+        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(3)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(-1, 0)) == Rational(1)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(0, 1)) == Rational(4)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(0, -1)) == Rational(2)
+
+    def test_nominal_and_perfect_from_centerline_differ_when_asymmetric(self):
+        t = Timber(
+            length=Rational(100),
+            size=create_v2(Rational(4), Rational(6)),
+            transform=Transform.identity(),
+            nominal_half_sizes=(
+                create_v2(Rational(3), Rational(1)),
+                create_v2(Rational(4), Rational(2)),
+            ),
+        )
+        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(3)
+        assert get_perfect_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(2)
+
+    def test_perfect_support_distance_from_position_3d(self):
+        t = create_standard_vertical_timber(height=Rational(100), size=(Rational(4), Rational(6)))
+        assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, 1)) == Rational(90)
+        assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, -1)) == Rational(10)
+
+    def test_nominal_support_distance_from_position_3d_asymmetric(self):
+        t = Timber(
+            length=Rational(100),
+            size=create_v2(Rational(4), Rational(6)),
+            transform=Transform.identity(),
+            nominal_half_sizes=(
+                create_v2(Rational(3), Rational(1)),
+                create_v2(Rational(4), Rational(2)),
+            ),
+        )
+        # Along +x, support plane is at x=+3; from x=-1 distance is 4.
+        result = get_nominal_support_distance(
+            t,
+            position_from_bottom=create_v3(-1, 0, 0),
+            direction=create_v3(1, 0, 0),
+        )
+        assert result == Rational(4)
         
 
 
