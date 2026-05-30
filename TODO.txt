@@ -292,7 +292,7 @@ DONE-restyle kigumi viewer so that there are 2 collumns for the options and the 
   DONE-I think receiving timber notching is mostly good?
   DONE-notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
   DONE-test notching you just added to the half dovetail joint
-  -fix notchingon half dovetail joint # TODO notching on this function works however the wedge won't fit so the wedge hole needs to be made bigger
+  DONE-fix notchingon half dovetail joint # TODO notching on this function works however the wedge won't fit so the wedge hole needs to be made bigger
     -you just need to clear out the receiving timber, the butting timber can block the wedge entry but TBH not ym problem but at least add a comment indicating this is the case
   -make notching more generic
     -when to notch: 

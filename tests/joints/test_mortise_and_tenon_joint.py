@@ -4,8 +4,8 @@ Tests for mortise and tenon joint construction functions
 
 import pytest
 from typing import List
-from sympy import Matrix, Rational, simplify, sin, cos, pi
-from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector
+from sympy import Matrix, Rational, Integer, simplify, sin, cos, pi
+from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, zero_test, safe_compare, Comparison, safe_dot_product, safe_normalize_vector as normalize_vector
 from kumiki.timber import (
     Timber, TimberReferenceEnd, TimberFace, TimberLongFace,
     V2, V3, Numeric, PegShape, WedgeShape, Peg,
@@ -602,9 +602,12 @@ from kumiki.joints.workshop.mortise_and_tenon_joint import (
 )
 from kumiki.joints.workshop.build_a_butt import (
     DovetailTenonWedgeAccessoryParameters,
+    compute_butt_joint_shoulder,
+    dovetail_tenon_geometry,
 )
 from kumiki.rule import degrees as _degrees
 from kumiki.timber import CSGAccessory
+from kumiki.cutcsg import ConvexPolygonExtrusion, SolidUnion
 
 
 class TestWedgedHalfDovetailMortiseAndTenonJoint:
@@ -716,3 +719,56 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         # Both timbers still render to valid CSGs.
         joint.cut_timbers["tenon_timber"].render_timber_with_cuts_csg_local()
         joint.cut_timbers["mortise_timber"].render_timber_with_cuts_csg_local()
+
+    def test_wedge_size_unchanged_and_slot_extends_to_nominal_boundary(self, simple_T_configuration):
+        """Keep wedge size unchanged while extending only the mortise slot base to nominal boundary."""
+        arrangement = self._make_arrangement(simple_T_configuration)
+        receiving_timber = arrangement.receiving_timber
+
+        tenon_depth = Rational(4)
+        base_extra = Rational(1, 2)
+        dovetail_depth = Rational(1)
+
+        shoulder_result = compute_butt_joint_shoulder(
+            arrangement=arrangement,
+            distance_from_centerline=Integer(0),
+            up_direction=arrangement.butt_timber.get_height_direction_global(),
+        )
+
+        geo = dovetail_tenon_geometry(
+            arrangement=arrangement,
+            shoulder_result=shoulder_result,
+            dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
+            tenon_size=Matrix([Rational(2), Rational(2)]),
+            tenon_depth=tenon_depth,
+            dovetail_depth=dovetail_depth,
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+                wedge_angle=_degrees(8),
+                wedge_base_extra_length=base_extra,
+            ),
+        )
+
+        wedge = geo.wedge_accessory_csg
+        assert isinstance(wedge, CSGAccessory)
+        assert isinstance(wedge.positive_csg, ConvexPolygonExtrusion)
+        wedge_x_values = [p[0] for p in wedge.positive_csg.points]
+
+        # Wedge geometry should remain unchanged (base side = -wedge_base_extra).
+        assert min(wedge_x_values) == -base_extra
+
+        assert isinstance(geo.mortise_negative_csg, SolidUnion)
+        slot_candidates = [
+            child for child in geo.mortise_negative_csg.children
+            if isinstance(child, ConvexPolygonExtrusion)
+            and all(safe_compare(p[1], Integer(0), Comparison.GE) for p in child.points)
+        ]
+        assert len(slot_candidates) == 1
+
+        wedge_slot = slot_candidates[0]
+        wedge_slot_x_values = [p[0] for p in wedge_slot.points]
+
+        into_mortise_dir = shoulder_result.butt_direction
+        receiving_nominal_boundary = -receiving_timber.get_size_in_direction_3d(into_mortise_dir)
+        expected_slot_x_base = min(-base_extra, receiving_nominal_boundary)
+
+        assert min(wedge_slot_x_values) == expected_slot_x_base
