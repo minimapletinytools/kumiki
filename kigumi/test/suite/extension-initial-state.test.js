@@ -53,8 +53,8 @@ describe('Kigumi initial state validation', () => {
     const patternsRoot = snapshot.roots.find((root) => typeof root.label === 'string' && root.label.startsWith('Patterns'));
     assert.ok(patternsRoot, 'Expected Patterns root snapshot');
     assert.ok(
-      patternsRoot.childCount >= 2,
-      `Expected Patterns root to include workspace/shipped sections, got ${patternsRoot.childCount}`
+      patternsRoot.childCount >= 1,
+      `Expected Patterns root to include at least the workspace section, got ${patternsRoot.childCount}`
     );
   });
 

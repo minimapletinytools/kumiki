@@ -31,15 +31,15 @@ function createMockChildProcess({ stdoutText = '', stderrText = '', exitCode = 0
 describe('project-initializer', () => {
   let tmpRoot;
   let consoleWarnSpy;
-  let canonicalUsageSourcePath;
-  let canonicalUsageOriginalContent;
+  let canonicalAuthoringSourcePath;
+  let canonicalAuthoringOriginalContent;
 
   beforeEach(() => {
     jest.clearAllMocks();
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-init-test-'));
-    canonicalUsageSourcePath = path.resolve(__dirname, '..', '..', 'docs', 'agent_usage_instructions.md');
-    canonicalUsageOriginalContent = fs.readFileSync(canonicalUsageSourcePath, 'utf8');
+    canonicalAuthoringSourcePath = path.resolve(__dirname, '..', '..', '.github', 'instructions', 'authoring.instructions.md');
+    canonicalAuthoringOriginalContent = fs.readFileSync(canonicalAuthoringSourcePath, 'utf8');
 
     spawn.mockImplementation((command, args) => {
       const snippet = Array.isArray(args) && args[0] === '-c' ? String(args[1] || '') : '';
@@ -57,8 +57,8 @@ describe('project-initializer', () => {
     if (consoleWarnSpy) {
       consoleWarnSpy.mockRestore();
     }
-    if (canonicalUsageSourcePath && canonicalUsageOriginalContent != null) {
-      fs.writeFileSync(canonicalUsageSourcePath, canonicalUsageOriginalContent, 'utf8');
+    if (canonicalAuthoringSourcePath && canonicalAuthoringOriginalContent != null) {
+      fs.writeFileSync(canonicalAuthoringSourcePath, canonicalAuthoringOriginalContent, 'utf8');
     }
     if (tmpRoot && fs.existsSync(tmpRoot)) {
       fs.rmSync(tmpRoot, { recursive: true, force: true });
@@ -72,30 +72,32 @@ describe('project-initializer', () => {
     const copilotPath = path.join(tmpRoot, '.github', 'copilot-instructions.md');
     const claudePath = path.join(tmpRoot, 'CLAUDE.md');
     const cursorPath = path.join(tmpRoot, '.cursorrules');
-    const workspaceUsagePath = path.join(tmpRoot, 'docs', 'agent_usage_instructions.md');
+    const workspaceDocsPath = path.join(tmpRoot, '.kigumi', 'docs');
+    const workspaceAuthoringPath = path.join(workspaceDocsPath, 'authoring.instructions.md');
     const gitignorePath = path.join(tmpRoot, '.gitignore');
 
     expect(fs.existsSync(agentsPath)).toBe(true);
     expect(fs.existsSync(copilotPath)).toBe(true);
     expect(fs.existsSync(claudePath)).toBe(true);
     expect(fs.existsSync(cursorPath)).toBe(true);
-    expect(fs.existsSync(workspaceUsagePath)).toBe(true);
+    expect(fs.existsSync(workspaceDocsPath)).toBe(true);
+    expect(fs.existsSync(workspaceAuthoringPath)).toBe(true);
     expect(fs.existsSync(gitignorePath)).toBe(true);
 
     const agentsContent = fs.readFileSync(agentsPath, 'utf8');
     expect(agentsContent.startsWith('---')).toBe(false);
-    expect(agentsContent).toContain('# Kumiki Usage Instructions');
+    expect(agentsContent).toContain('.kigumi/docs/authoring.instructions.md');
 
     const copilotContent = fs.readFileSync(copilotPath, 'utf8');
     const claudeContent = fs.readFileSync(claudePath, 'utf8');
     const cursorContent = fs.readFileSync(cursorPath, 'utf8');
-    const workspaceUsageContent = fs.readFileSync(workspaceUsagePath, 'utf8');
+    const workspaceAuthoringContent = fs.readFileSync(workspaceAuthoringPath, 'utf8');
     const gitignoreContent = fs.readFileSync(gitignorePath, 'utf8');
 
     expect(copilotContent).toContain('AGENTS.md');
     expect(claudeContent).toContain('AGENTS.md');
     expect(cursorContent).toContain('AGENTS.md');
-    expect(workspaceUsageContent).toContain('# Kumiki Usage Instructions');
+    expect(workspaceAuthoringContent).toContain('applyTo: "kumiki/**,tests/**"');
     expect(gitignoreContent).toContain('.venv/');
     expect(gitignoreContent).toContain('kigumi_exports/');
     expect(gitignoreContent).toContain('.kigumi/logs/');
@@ -132,7 +134,7 @@ describe('project-initializer', () => {
 
     const agentsContentAfterInit = fs.readFileSync(customAgentsPath, 'utf8');
     expect(agentsContentAfterInit).toContain(customAgentsContent);
-    expect(agentsContentAfterInit).toContain('# Kumiki Usage Instructions');
+    expect(agentsContentAfterInit).toContain('.kigumi/docs/authoring.instructions.md');
 
     expect(result.createdAgentsFile).toBe(false);
     expect(result.appendedToExistingAgentsFile).toBe(true);
@@ -142,19 +144,28 @@ describe('project-initializer', () => {
     expect(consoleWarnSpy).toHaveBeenCalled();
   });
 
-  test('updateWorkspaceKumiki refreshes workspace usage instructions', async () => {
+  test('updateWorkspaceKumiki refreshes workspace authoring instructions', async () => {
     const { updateWorkspaceKumiki } = require('../project-initializer');
 
     await initializeWorkspaceProject(tmpRoot, null);
 
-    const canonicalUpdatedContent = '# Kumiki Usage Instructions\n\nUpdated during test.\n';
-    fs.writeFileSync(canonicalUsageSourcePath, canonicalUpdatedContent, 'utf8');
+    const canonicalUpdatedContent = [
+      '---',
+      'applyTo: "kumiki/**,tests/**"',
+      '---',
+      '',
+      '# Authoring Instructions',
+      '',
+      'Updated during test.',
+      '',
+    ].join('\n');
+    fs.writeFileSync(canonicalAuthoringSourcePath, canonicalUpdatedContent, 'utf8');
 
-    const workspaceUsagePath = path.join(tmpRoot, 'docs', 'agent_usage_instructions.md');
-    fs.writeFileSync(workspaceUsagePath, 'stale content', 'utf8');
+    const workspaceAuthoringPath = path.join(tmpRoot, '.kigumi', 'docs', 'authoring.instructions.md');
+    fs.writeFileSync(workspaceAuthoringPath, 'stale content', 'utf8');
 
     const result = await updateWorkspaceKumiki(tmpRoot, null);
-    const refreshedWorkspaceContent = fs.readFileSync(workspaceUsagePath, 'utf8');
+    const refreshedWorkspaceContent = fs.readFileSync(workspaceAuthoringPath, 'utf8');
 
     expect(refreshedWorkspaceContent).toContain('Updated during test.');
     expect(result.copiedWorkspaceUsageInstructionsFile).toBe(true);
@@ -182,14 +193,23 @@ describe('project-initializer', () => {
     const initResult = await initializeWorkspaceProject(tmpRoot, null);
     expect(initResult.kumikiVersion).toBe('0.1.0');
 
-    const canonicalUpdatedContent = '# Kumiki Usage Instructions\n\nRefreshed by update flow.\n';
-    fs.writeFileSync(canonicalUsageSourcePath, canonicalUpdatedContent, 'utf8');
+    const canonicalUpdatedContent = [
+      '---',
+      'applyTo: "kumiki/**,tests/**"',
+      '---',
+      '',
+      '# Authoring Instructions',
+      '',
+      'Refreshed by update flow.',
+      '',
+    ].join('\n');
+    fs.writeFileSync(canonicalAuthoringSourcePath, canonicalUpdatedContent, 'utf8');
 
-    const workspaceUsagePath = path.join(tmpRoot, 'docs', 'agent_usage_instructions.md');
-    fs.writeFileSync(workspaceUsagePath, 'stale instructions', 'utf8');
+    const workspaceAuthoringPath = path.join(tmpRoot, '.kigumi', 'docs', 'authoring.instructions.md');
+    fs.writeFileSync(workspaceAuthoringPath, 'stale instructions', 'utf8');
 
     const updateResult = await updateWorkspaceKumiki(tmpRoot, null);
-    const refreshedWorkspaceContent = fs.readFileSync(workspaceUsagePath, 'utf8');
+    const refreshedWorkspaceContent = fs.readFileSync(workspaceAuthoringPath, 'utf8');
 
     expect(updateResult.kumikiVersion).toBe('0.2.2');
     expect(updateResult.copiedWorkspaceUsageInstructionsFile).toBe(true);

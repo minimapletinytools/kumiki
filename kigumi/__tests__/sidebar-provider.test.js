@@ -83,6 +83,7 @@ jest.mock('../pattern-source-utils', () => ({
 
 const { KigumiSidebarProvider, SidebarNode } = require('../sidebar-provider');
 const vscode = require('vscode');
+const { scanWorkspaceForFrames } = require('../frame-scanner');
 const { discoverDependencyContent } = require('../discovery-adapter');
 const { getInitializationStatus, isInitializationInProgress } = require('../project-initializer');
 
@@ -401,6 +402,26 @@ describe('KigumiSidebarProvider', () => {
   });
 
   describe('tree navigation', () => {
+    test('should skip workspace and dependency scans when project is not initialized', async () => {
+      getInitializationStatus.mockReturnValueOnce({
+        projectStatus: 'uninitialized',
+        isInitialized: false,
+        hasExistingProject: false,
+      });
+      vscode.workspace.workspaceFolders = [
+        { uri: { fsPath: '/test/workspace' } },
+      ];
+
+      await provider.refresh(true);
+
+      expect(scanWorkspaceForFrames).not.toHaveBeenCalled();
+      expect(discoverDependencyContent).not.toHaveBeenCalled();
+      expect(provider._state.scanErrors).toEqual([]);
+      expect(provider._state.discoveryErrors).toEqual([]);
+      expect(provider._state.frames).toEqual([]);
+      expect(provider._state.workspacePatternbooks).toEqual([]);
+    });
+
     test('should hide kumiki version action rows when project is not initialized', async () => {
       getInitializationStatus.mockReturnValueOnce({
         projectStatus: 'uninitialized',
@@ -436,7 +457,7 @@ describe('KigumiSidebarProvider', () => {
       expect(rootNodes.some((node) => node.label === '[ Initialize Project ] 🖱️')).toBe(false);
     });
 
-    test('should hide project-status row when project is already detected', async () => {
+    test('should show project-status row when project is already detected', async () => {
       getInitializationStatus.mockReturnValueOnce({
         projectStatus: 'existing-project',
         isInitialized: true,
@@ -450,8 +471,12 @@ describe('KigumiSidebarProvider', () => {
       const rootNodes = provider.getRootNodes();
       const projectStatusNodes = rootNodes.filter((node) => node.type === 'projectStatusAction');
 
-      expect(projectStatusNodes).toHaveLength(0);
-      expect(rootNodes.some((node) => node.label === 'Project Detected')).toBe(false);
+      expect(projectStatusNodes).toHaveLength(1);
+      expect(projectStatusNodes[0].label).toBe('Project Initialized');
+      expect(projectStatusNodes[0].command).toEqual({
+        title: 'Project status',
+        command: 'kigumi.initializeProjectInWorkspace',
+      });
     });
 
     test('should return root nodes when getChildren called with no element', async () => {

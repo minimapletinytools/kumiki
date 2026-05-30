@@ -4,8 +4,9 @@ const { spawn } = require('child_process');
 const https = require('https');
 const { ensureKigumiYaml, resolveProjectEnvironment } = require('./project-root');
 
-const GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '.generated', 'bundled-usage-instructions.md');
-const CANONICAL_USAGE_INSTRUCTIONS_PATH = path.resolve(__dirname, '..', 'docs', 'agent_usage_instructions.md');
+const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
+const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
+const CANONICAL_AUTHORING_INSTRUCTIONS_PATH = path.resolve(__dirname, '..', '.github', 'instructions', 'authoring.instructions.md');
 
 function stripLeadingYamlFrontmatter(content) {
     if (!content.startsWith('---')) {
@@ -21,27 +22,14 @@ function stripLeadingYamlFrontmatter(content) {
     return content.slice(afterFrontmatterIndex).replace(/^\s+/, '');
 }
 
-function getBundledAgentInstructionsContent() {
-    const sourcePath = fs.existsSync(CANONICAL_USAGE_INSTRUCTIONS_PATH)
-        ? CANONICAL_USAGE_INSTRUCTIONS_PATH
-        : GENERATED_BUNDLED_USAGE_INSTRUCTIONS_PATH;
-
-    if (fs.existsSync(sourcePath)) {
-        const rawContent = fs.readFileSync(sourcePath, 'utf8');
-        return stripLeadingYamlFrontmatter(rawContent).trimEnd() + '\n';
+function getBundledDocsSourcePath() {
+    if (fs.existsSync(BUNDLED_DOCS_SOURCE_PATH)) {
+        return BUNDLED_DOCS_SOURCE_PATH;
     }
-
-    return [
-        '# Kumiki Agent Instructions',
-        '',
-        'Always read and follow the project root AGENTS.md instructions.',
-        '',
-        '## Numeric Values',
-        '',
-        '- Always use SymPy types (Rational or Float) for numeric values.',
-        '- Never use Python floats.',
-        '',
-    ].join('\n');
+    if (fs.existsSync(CANONICAL_DOCS_SOURCE_PATH)) {
+        return CANONICAL_DOCS_SOURCE_PATH;
+    }
+    return null;
 }
 
 function writeFileIfMissing(filePath, content) {
@@ -68,14 +56,30 @@ function copyFileContent(filePath, content) {
     return true;
 }
 
-function ensureAgentsInstructionsFile(agentsPath, bundledInstructionsContent) {
-    const normalizedContent = bundledInstructionsContent.trimEnd() + '\n';
+function ensureAgentsInstructionsFile(agentsPath) {
+    const normalizedContent = [
+        '# Agent Instructions',
+        '',
+        'Always read and follow:',
+        '',
+        '- .kigumi/docs/authoring.instructions.md',
+        '',
+    ].join('\n');
     fs.mkdirSync(path.dirname(agentsPath), { recursive: true });
 
     if (!fs.existsSync(agentsPath)) {
         fs.writeFileSync(agentsPath, normalizedContent, 'utf8');
         return {
             createdAgentsFile: true,
+            appendedToExistingAgentsFile: false,
+            warning: null,
+        };
+    }
+
+    const currentContent = fs.readFileSync(agentsPath, 'utf8');
+    if (currentContent.includes('.kigumi/docs/authoring.instructions.md')) {
+        return {
+            createdAgentsFile: false,
             appendedToExistingAgentsFile: false,
             warning: null,
         };
@@ -92,13 +96,35 @@ function ensureAgentsInstructionsFile(agentsPath, bundledInstructionsContent) {
     };
 }
 
+function copyBundledDocsIntoWorkspace(workspaceRoot) {
+    const sourcePath = getBundledDocsSourcePath();
+    const targetPath = path.join(workspaceRoot, '.kigumi', 'docs');
+    fs.mkdirSync(targetPath, { recursive: true });
+
+    if (sourcePath) {
+        fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
+    }
+
+    const authoringTargetPath = path.join(targetPath, 'authoring.instructions.md');
+    if (fs.existsSync(CANONICAL_AUTHORING_INSTRUCTIONS_PATH)) {
+        fs.copyFileSync(CANONICAL_AUTHORING_INSTRUCTIONS_PATH, authoringTargetPath);
+    } else if (!fs.existsSync(authoringTargetPath)) {
+        fs.writeFileSync(authoringTargetPath, [
+            '# Authoring Instructions',
+            '',
+            'If this file is missing in your distribution, consult the repository authoring instructions.',
+            '',
+        ].join('\n'), 'utf8');
+    }
+
+    return sourcePath !== null;
+}
+
 function ensureAgentInstructionFiles(workspaceRoot, options = {}) {
-    const forceRefreshUsageInstructions = options.forceRefreshUsageInstructions === true;
     const agentsPath = path.join(workspaceRoot, 'AGENTS.md');
     const copilotPath = path.join(workspaceRoot, '.github', 'copilot-instructions.md');
     const claudePath = path.join(workspaceRoot, 'CLAUDE.md');
     const cursorPath = path.join(workspaceRoot, '.cursorrules');
-    const workspaceUsagePath = path.join(workspaceRoot, 'docs', 'agent_usage_instructions.md');
 
     const pointerContent = [
         '# Agent Instructions',
@@ -111,11 +137,8 @@ function ensureAgentInstructionFiles(workspaceRoot, options = {}) {
         '',
     ].join('\n');
 
-    const bundledInstructionsContent = getBundledAgentInstructionsContent();
-    const agentsResult = ensureAgentsInstructionsFile(agentsPath, bundledInstructionsContent);
-    const copiedWorkspaceUsageInstructionsFile = forceRefreshUsageInstructions
-        ? copyFileContent(workspaceUsagePath, bundledInstructionsContent)
-        : writeFileIfMissing(workspaceUsagePath, bundledInstructionsContent);
+    const agentsResult = ensureAgentsInstructionsFile(agentsPath);
+    const copiedWorkspaceUsageInstructionsFile = copyBundledDocsIntoWorkspace(workspaceRoot);
 
     return {
         createdAgentsFile: agentsResult.createdAgentsFile,

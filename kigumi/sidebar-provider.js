@@ -209,10 +209,33 @@ class KigumiSidebarProvider {
 
         const workspaceRoot = workspaceFolder.uri.fsPath;
         const initStatus = getInitializationStatus(workspaceRoot);
+        const isLocalDev = initStatus.projectStatus === 'local-dev';
+        const canRunScans = !!(isLocalDev || initStatus.isInitialized);
+
+        if (!canRunScans) {
+            this._state = {
+                ...this._state,
+                workspaceRoot,
+                initStatus,
+                kumikiInstalledVersion: 'unknown',
+                kumikiLatestVersion: 'unknown',
+                frames: [],
+                workspacePatternbooks: [],
+                shippedPatterns: [],
+                dependencyPatterns: [],
+                shippedExamples: [],
+                dependencyExamples: [],
+                scanErrors: [],
+                discoveryErrors: [],
+                isScanning: false,
+            };
+            this._onDidChangeTreeData.fire();
+            return;
+        }
+
         const versionInfoPromise = this.options.getKumikiVersionInfo
             ? this.options.getKumikiVersionInfo(workspaceRoot)
             : Promise.resolve({ installedVersion: 'unknown', latestVersion: 'unknown' });
-        const isLocalDev = initStatus.projectStatus === 'local-dev';
         const timeoutSeconds = vscode.workspace.getConfiguration('kigumi').get('explorer.scanTimeoutSeconds', 15);
         const timeoutMs = Math.max(1000, Number(timeoutSeconds) * 1000);
 
@@ -404,6 +427,10 @@ class KigumiSidebarProvider {
                 description: 'kumiki repo detected',
                 iconPath: new vscode.ThemeIcon('beaker'),
                 contextValue: 'projectStatusAction',
+                command: {
+                    title: 'Project status',
+                    command: 'kigumi.initializeProjectInWorkspace',
+                },
             }));
         } else if (isInitializing) {
             nodes.push(new SidebarNode({
@@ -423,10 +450,26 @@ class KigumiSidebarProvider {
                 collapsibleState: vscode.TreeItemCollapsibleState.None,
                 command: {
                     title: 'Initialize project',
-                    command: 'kigumi.projectHeaderAction',
+                    command: 'kigumi.initializeProjectInWorkspace',
                 },
                 iconPath: new vscode.ThemeIcon('rocket'),
                 contextValue: 'projectStatusAction',
+            }));
+        } else {
+            const projectLabel = initStatus && initStatus.projectRoot
+                ? path.basename(initStatus.projectRoot)
+                : 'current workspace';
+            nodes.push(new SidebarNode({
+                key: 'project-status-initialized',
+                type: 'projectStatusAction',
+                label: 'Project Initialized',
+                description: projectLabel,
+                iconPath: new vscode.ThemeIcon('pass'),
+                contextValue: 'projectStatusAction',
+                command: {
+                    title: 'Project status',
+                    command: 'kigumi.initializeProjectInWorkspace',
+                },
             }));
         }
 
@@ -530,7 +573,7 @@ class KigumiSidebarProvider {
                 contextValue: 'projectHeaderAction',
                 command: {
                     title: 'Show project status',
-                    command: 'kigumi.projectHeaderAction',
+                    command: 'kigumi.initializeProjectInWorkspace',
                 },
             })];
         }
@@ -545,7 +588,7 @@ class KigumiSidebarProvider {
                 contextValue: 'projectHeaderAction',
                 command: {
                     title: 'Show project status',
-                    command: 'kigumi.projectHeaderAction',
+                    command: 'kigumi.initializeProjectInWorkspace',
                 },
             })];
         }
@@ -560,7 +603,7 @@ class KigumiSidebarProvider {
                 contextValue: 'projectHeaderAction',
                 command: {
                     title: 'Initialize project',
-                    command: 'kigumi.projectHeaderAction',
+                    command: 'kigumi.initializeProjectInWorkspace',
                 },
             })];
         }
@@ -574,7 +617,7 @@ class KigumiSidebarProvider {
             contextValue: 'projectHeaderAction',
             command: {
                 title: 'Initialize project',
-                command: 'kigumi.projectHeaderAction',
+                command: 'kigumi.initializeProjectInWorkspace',
             },
         })];
     }

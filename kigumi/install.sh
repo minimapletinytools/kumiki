@@ -54,8 +54,13 @@ for i in "${!TARGETS[@]}"; do
         "$SCRIPT_DIR/" "$EXT_DIR/"
 
     if [ -d "$REPO_ROOT/docs" ]; then
-        mkdir -p "$EXT_DIR/docs"
-        rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/docs/"
+        mkdir -p "$EXT_DIR/.kigumi/docs"
+        rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/.kigumi/docs/"
+    fi
+
+    if [ -f "$REPO_ROOT/.github/instructions/authoring.instructions.md" ]; then
+        mkdir -p "$EXT_DIR/.kigumi/docs"
+        cp "$REPO_ROOT/.github/instructions/authoring.instructions.md" "$EXT_DIR/.kigumi/docs/authoring.instructions.md"
     fi
 done
 
