@@ -24,6 +24,32 @@ async function activateKigumiExtension() {
 }
 
 describe('Kigumi automation flow', () => {
+  it('opens a specific file in the viewer via automation command', async function () {
+    this.timeout(60000);
+
+    await activateKigumiExtension();
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+
+    const fixturePath = path.resolve(__dirname, '..', '..', 'test-fixtures', 'minimal_frame.py');
+
+    const openResult = await vscode.commands.executeCommand('kigumi.automationOpenFileInViewer', {
+      filePath: fixturePath,
+    });
+
+    assert.ok(openResult && openResult.ok, 'Expected automation open file command to succeed');
+    assert.strictEqual(openResult.filePath, fixturePath, 'Expected automation open file command to report the opened path');
+
+    const snapshot = await waitFor(async () => {
+      const candidate = await vscode.commands.executeCommand('kigumi.testGetSessionSnapshot', { filePath: fixturePath });
+      if (!candidate || !candidate.exists || !candidate.runnerAlive || !candidate.frame || !candidate.geometry) {
+        return null;
+      }
+      return candidate;
+    }, 25000, 180);
+
+    assert.strictEqual(snapshot.filePath, fixturePath, 'Expected session snapshot to match opened fixture');
+  });
+
   it('supports session refresh/log/camera/screenshot automation commands', async function () {
     this.timeout(90000);
 
