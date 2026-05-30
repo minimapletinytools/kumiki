@@ -128,4 +128,45 @@ describe('Kigumi complex validation', () => {
       'Expected Patterns root to remain available after toggle round-trip'
     );
   });
+
+  it('opens a pattern from sidebar command path', async function () {
+    this.timeout(70000);
+
+    await activateKigumiExtension();
+    await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+
+    const sourceFile = path.resolve(__dirname, '..', '..', 'test-fixtures', 'patternbook_frame.py');
+
+    await vscode.commands.executeCommand('kigumi.openPatternFromSidebar', {
+      sourceFile,
+      patternName: 'small_post_pattern',
+    });
+
+    const patternSession = await waitFor(async () => {
+      const payload = await vscode.commands.executeCommand('kigumi.automationListSessions');
+      if (!payload || !Array.isArray(payload.sessions)) {
+        return null;
+      }
+
+      const match = payload.sessions.find((session) => (
+        session
+        && session.sessionType === 'pattern'
+        && session.filePath === sourceFile
+        && session.runnerAlive
+        && session.frame
+        && session.geometry
+      ));
+      return match || null;
+    }, 30000, 180);
+
+    assert.ok(patternSession, 'Expected sidebar pattern-open command to create a healthy pattern session');
+    assert.ok(
+      typeof patternSession.slotName === 'string' && patternSession.slotName.startsWith('pattern_'),
+      `Expected pattern session slotName to use pattern_* format, got '${patternSession.slotName}'`
+    );
+    assert.ok(
+      Number.isFinite(patternSession.frame.timberCount) && patternSession.frame.timberCount > 0,
+      `Expected opened pattern to render timbers, got ${patternSession.frame && patternSession.frame.timberCount}`
+    );
+  });
 });

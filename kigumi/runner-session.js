@@ -32,9 +32,10 @@ class PythonRunnerSession {
     resolveEnvironment(filePath) {
         const vscode = require('vscode');
         const workspaceFolders = vscode.workspace.workspaceFolders;
-        const workspaceRoot = workspaceFolders && workspaceFolders.length > 0
-            ? workspaceFolders[0].uri.fsPath
+        const existingWorkspaceFolder = workspaceFolders && workspaceFolders.length > 0
+            ? workspaceFolders.find((folder) => folder && folder.uri && fs.existsSync(folder.uri.fsPath))
             : null;
+        const workspaceRoot = existingWorkspaceFolder ? existingWorkspaceFolder.uri.fsPath : null;
 
         const resolved = resolveProjectEnvironment({
             filePath,
