@@ -54,6 +54,18 @@ function _isLibraryPatternLeafElement(element) {
     return sectionKey === 'shipped-patterns' || sectionKey === 'dependency-patterns';
 }
 
+function _isLibraryPatternbookGroupElement(element) {
+    if (!element || element.type !== 'patternbookGroup' || !element.data) {
+        return false;
+    }
+    const sectionKey = element.data.sectionKey;
+    return sectionKey === 'shipped-patterns' || sectionKey === 'dependency-patterns';
+}
+
+function _isDuplicableLibraryElement(element) {
+    return _isLibraryPatternLeafElement(element) || _isLibraryPatternbookGroupElement(element);
+}
+
 /**
  * Main activation function for the Kigumi extension.
  * @param {vscode.ExtensionContext} context
@@ -485,12 +497,17 @@ function activate(context) {
     // --- Duplicate Pattern to Workspace ---
     const duplicatePatternToWorkspace = vscode.commands.registerCommand('kigumi.duplicatePatternToWorkspace', async (elementArg) => {
         const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
-        if (!_isLibraryPatternLeafElement(selectedElement)) {
-            vscode.window.showErrorMessage('Duplicate to workspace is only available for library patterns.');
+        if (!_isDuplicableLibraryElement(selectedElement)) {
+            vscode.window.showErrorMessage('Duplicate to workspace is only available for library patterns and patternbooks.');
             return;
         }
 
-        const patternData = selectedElement.data;
+        const sourcePath = _extractSourcePathFromSidebarElement(selectedElement);
+        if (!sourcePath) {
+            vscode.window.showErrorMessage('Cannot determine source file for selected item.');
+            return;
+        }
+
         const workspaceRoot = getWorkspaceRoot();
         if (!workspaceRoot) {
             vscode.window.showErrorMessage('Open a workspace folder first.');
@@ -499,7 +516,7 @@ function activate(context) {
 
         try {
             const { duplicatePatternToWorkspace: duplicateFn } = require('./pattern-source-utils');
-            const newPath = await duplicateFn(patternData.sourceFile, workspaceRoot);
+            const newPath = await duplicateFn(sourcePath, workspaceRoot);
             
             const uri = vscode.Uri.file(newPath);
             const doc = await vscode.workspace.openTextDocument(uri);

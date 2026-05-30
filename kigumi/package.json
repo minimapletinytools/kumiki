@@ -120,12 +120,14 @@
       },
       {
         "command": "kigumi.viewPatternSource",
-        "title": "Kigumi: View Source",
+        "title": "View Source",
+        "category": "Kigumi",
         "icon": "$(go-to-file)"
       },
       {
         "command": "kigumi.duplicatePatternToWorkspace",
-        "title": "Kigumi: Duplicate To Workspace",
+        "title": "Duplicate To Workspace",
+        "category": "Kigumi",
         "icon": "$(copy)"
       }
     ],
@@ -184,7 +186,7 @@
         },
         {
           "command": "kigumi.duplicatePatternToWorkspace",
-          "when": "view == kigumi.explorer && viewItem == patternItem",
+          "when": "view == kigumi.explorer && (viewItem == patternItem || viewItem == patternbookGroupItem)",
           "group": "inline@2"
         }
       ]

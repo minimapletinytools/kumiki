@@ -194,9 +194,9 @@ IGNORE/DONE-searching
   -make the gizmos slightly trasparent?
   DONE-timber list view should actually be useful
 -test installation
-  -raw installation of kigumi, installs deps
-  -create new project/design
-  -able to open patterns and copy them into self workspace
+  DONE-raw installation of kigumi, installs deps
+  DONE-create new project/design
+  DONE-able to open patterns and copy them into self workspace
 -new kigumi icon
 -marketing
   -make basic exampl ecase
