@@ -186,17 +186,16 @@ IGNORE/DONE-searching
   -maybe layer tags should show in the list view at the bottom instead?
   -have a drop down list all tags thing that you can click + select rather than search?
   -searching should search for either tags or joint name (figure out a way to do this)
--camera controls should be absolute? use focus to reset
--do a design pass
-  -better logo
-  -stuff showing below the view should be cleaner/tighter 
-  -move focus button maybe
-  -make the gizmos slightly trasparent?
-  DONE-timber list view should actually be useful
--test installation
+DONE-test installation
   DONE-raw installation of kigumi, installs deps
   DONE-create new project/design
   DONE-able to open patterns and copy them into self workspace
+DONE-do a design pass
+  DONE-timber list view should actually be useful
+  DONE-stuff showing below the view should be cleaner/tighter 
+  IGNORE-move focus button maybe
+  IGNORE-make the gizmos slightly trasparent?
+-camera controls should be absolute? use focus to reset
 -new kigumi icon
 -marketing
   -make basic exampl ecase
@@ -210,55 +209,10 @@ IGNORE/DONE-searching
   -test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
 
 
-::layers TODO
-DONE-add tags to timbers and joints, as a 1 tier overlapping folder system
-DONE-lock and hide fetaures
--search bar, autocompletes both names and tags
--tag selection bar
-  -has option to choose how many tags to show
-  -unselected tags are grayed out, if all grayed out then show everything
-  -when one tag is selected, unavaialble tags dissapear
--timbers/joints
-  -allow foldering by first tag option
-  -clicknig on fol
--joints (separate group, shows up below timbers)
-  -allow foldering by first tag option?
-  -clicking on joint selects all timbers and accesories contained in it
-  -accessories only viewable as children of joints
 
 
 
 :: TODO
-
-DONE-initialize project button no longer showing
-DONE-WTF? can't run automation commands
-  Kigumi automation loop: partially blocked
-  I could run the viewer command, but automation commands reported unmet preconditions:
-  kigumi.automationOpenFileInViewer
-  kigumi.automationListSessions
-  Also, there is no .kigumi/logs directory yet in this workspace, so there are no automation JSONL logs to inspect from the agent side.
-  In practical terms, Kigumi checks some internal prerequisites before running automation commands like automationOpenFileInViewer, automationListSessions, and automationRefreshSession. Typical prerequisites are:
-
-  Kigumi extension is fully activated.
-  A viewer session is open in the right mode.
-  The current file is recognized as a renderable Kigumi pattern.
-  Automation/session services are initialized for that workspace window.
-  When those checks fail, VS Code reports exactly what I saw: command exists, but preconditions are not met.
-DONE-restyle kigumi viewer so that there are 2 collumns for the options and the parameters panel. The refresh button on the parameters view should be at the top as well so it's easier to see.
-IGNORE-rename nominal -> maximal
-  -ignore for now
-IGNORE-decide on notching.py vs relief.py
-DONE-AUTOMATION
-  DONE-allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
-  DONE-allow agent to read kigumi console output
-  DONE-allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
-  DONE-make file watch refresh toggleable (off by default)
-  DONE-update instructions to
-    -first test locally in a headless way to see that there are no errors
-    -then do actula render and fetch output
-  DONE-create headless runner and adress the following in instructions
-    - first test locally just by running the python script directly to confirm there are no errors and the logging looks accurate
-DONE-view sourec and duplicate to workspace is broken again... note that view source should show up on all frames and patterns, the duplicate to workspace option should ONLY show up on patterns found in libraries
 
 -modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
   -0 degree notch up to insertion face
@@ -267,6 +221,23 @@ DONE-view sourec and duplicate to workspace is broken again... note that view so
     -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
 -try and run a full loop agent test on this to see if it all works
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
+
+-LAYERS
+  DONE-add tags to timbers and joints, as a 1 tier overlapping folder system
+  DONE-lock and hide fetaures
+  -search bar, autocompletes both names and tags
+  -tag selection bar
+    -has option to choose how many tags to show
+    -unselected tags are grayed out, if all grayed out then show everything
+    -when one tag is selected, unavaialble tags dissapear
+  -timbers/joints
+    -allow foldering by first tag option
+    -clicknig on fol
+  -joints (separate group, shows up below timbers)
+    -allow foldering by first tag option?
+    -clicking on joint selects all timbers and accesories contained in it
+    -accessories only viewable as children of joints
+
 
 -PATTERN VIEWER
   DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
@@ -340,9 +311,10 @@ DONE-view sourec and duplicate to workspace is broken again... note that view so
 
 -NON PERFECT TIMBER
   DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
+  DONE-add round timber stuff
   -add annotations to joint functions to indicate if they can support non perfect timbers
   -add regular timber stuff
-  -add round timber stuff
+  
   
 
 -BOARDS
@@ -461,27 +433,6 @@ EXEMPLIFY
 
 
 RENAMEIFY
-  DONE-rename measure to locate
-    -then you can use measure to measure between two located features (which we don't actually care about, we need to measure between 2 CSG features...)
-  DONE-do the horseCoAD rename
-    -rename code_goes_here to horse
-    -change cut_ to layout_? or plan_?
-    -rename create_timber to hew?
-      -make sure to rename the ones in helperonis as well
-      -then boards/panels can be mill_board
-      -what about join/stretch/split?
-        -join -> glue?
-    -add from_joints -> raise function to Frame
-      -have an on class member version of it to cuz its cutre that way
-    -oscar shed -> tiny snack house
-    -kumiki viewer -> horse watcher or barn raising? or 建前 or tatemae
-  IGONRE-consider doing a rename pass on validitiy checkers  
-    -assert
-    -check
-    -is
-    -does
-    -contains (specific to cutcsg...)
-    -are
   -be consistent about function local/golbal naming
     -local input vars should have the suffix  _local
       -some things must be interpreted locally such as "face" or "distance", these d onot have the suffix
@@ -495,19 +446,6 @@ RENAMEIFY
   
 
 
-VIEWER PREP
-  -BIG QUESTION, how to "highlight" a feature...
-    -seems like you can flag meshes... but you noly want to flag part of the mesh?
-  -consider doing csg feature tree thingy
-    -face: convex polygon, union (face), difference(face, face), infiniteplane?, rectangularface?
-      -is_valid (checks all points are coplanar)
-      -get_normal (based on dircetion of polygon points I guess)
-    -linesegment: point pair, face intersection?
-  -add hash function
-  -I think tickets can be done as dictionary... or maybe there are compositoin fo classes?
-    -e.g. material ticket, grain direction ticket?
-  -is there some way to make orientation/direction generic more like a measuring function?
-
 TESTIFY
   -setup one test template so it can be used as an agent template for everything else
   -add test timber construction thingies on top of the example ones
@@ -515,17 +453,6 @@ TESTIFY
   -do better testing on join_face_aligned_on_face_aligned_timbers to make sure it's right....
   -create test runner for examples so the exmaples are also tests :O
   -add test for finger miter joint thingy
-
-
-
-DONE-M2 (reward: reimburse camera)
-  DONE-VIEWER
-
--M2.5 V0 release
-  -improve ticket class
-  -features but no sub features
-    -allow clicknig on joint parts
-    -allow clicking onfaces to display which face yo uclicked on
 
 -M2.75
   -add panel/board support 
@@ -595,6 +522,80 @@ M3.5
 
 
 :: TODONE 
+DONE-rename measure to locate
+  -then you can use measure to measure between two located features (which we don't actually care about, we need to measure between 2 CSG features...)
+DONE-do the horseCoAD rename
+  -rename code_goes_here to horse
+  -change cut_ to layout_? or plan_?
+  -rename create_timber to hew?
+    -make sure to rename the ones in helperonis as well
+    -then boards/panels can be mill_board
+    -what about join/stretch/split?
+      -join -> glue?
+  -add from_joints -> raise function to Frame
+    -have an on class member version of it to cuz its cutre that way
+  -oscar shed -> tiny snack house
+  -kumiki viewer -> horse watcher or barn raising? or 建前 or tatemae
+IGONRE-consider doing a rename pass on validitiy checkers  
+  -assert
+  -check
+  -is
+  -does
+  -contains (specific to cutcsg...)
+  -are
+
+VIEWER PREP
+  DONE-BIG QUESTION, how to "highlight" a feature...
+    -seems like you can flag meshes... but you noly want to flag part of the mesh?
+  DONE-consider doing csg feature tree thingy
+    -face: convex polygon, union (face), difference(face, face), infiniteplane?, rectangularface?
+      -is_valid (checks all points are coplanar)
+      -get_normal (based on dircetion of polygon points I guess)
+    -linesegment: point pair, face intersection?
+  DONE/IGNORE-add hash function
+  DONE/IGNORE-I think tickets can be done as dictionary... or maybe there are compositoin fo classes?
+    -e.g. material ticket, grain direction ticket?
+  IGNORE-is there some way to make orientation/direction generic more like a measuring function?
+  
+DONE-M2 (reward: reimburse camera)
+  DONE-VIEWER
+
+DONE-M2.5 V0 release
+  DONE-improve ticket class
+  -features but no sub features
+    -allow clicknig on joint parts
+    -allow clicking onfaces to display which face yo uclicked on
+
+DONE-initialize project button no longer showing
+DONE-WTF? can't run automation commands
+  Kigumi automation loop: partially blocked
+  I could run the viewer command, but automation commands reported unmet preconditions:
+  kigumi.automationOpenFileInViewer
+  kigumi.automationListSessions
+  Also, there is no .kigumi/logs directory yet in this workspace, so there are no automation JSONL logs to inspect from the agent side.
+  In practical terms, Kigumi checks some internal prerequisites before running automation commands like automationOpenFileInViewer, automationListSessions, and automationRefreshSession. Typical prerequisites are:
+
+  Kigumi extension is fully activated.
+  A viewer session is open in the right mode.
+  The current file is recognized as a renderable Kigumi pattern.
+  Automation/session services are initialized for that workspace window.
+  When those checks fail, VS Code reports exactly what I saw: command exists, but preconditions are not met.
+DONE-restyle kigumi viewer so that there are 2 collumns for the options and the parameters panel. The refresh button on the parameters view should be at the top as well so it's easier to see.
+IGNORE-rename nominal -> maximal
+  -ignore for now
+IGNORE-decide on notching.py vs relief.py
+DONE-AUTOMATION
+  DONE-allow it to scan for open kiguim windows and force refresh once changes are complete if no refresh had happened yet
+  DONE-allow agent to read kigumi console output
+  DONE-allow agent to take screenshot after refreshing (also allow agent to change camera angle for the screenshot)
+  DONE-make file watch refresh toggleable (off by default)
+  DONE-update instructions to
+    -first test locally in a headless way to see that there are no errors
+    -then do actula render and fetch output
+  DONE-create headless runner and adress the following in instructions
+    - first test locally just by running the python script directly to confirm there are no errors and the logging looks accurate
+DONE-view sourec and duplicate to workspace is broken again... note that view source should show up on all frames and patterns, the duplicate to workspace option should ONLY show up on patterns found in libraries
+
 DONE-fresh install test
     -create a temp directory and open vscode test in that directory
     -check for sidebar state before initializati
