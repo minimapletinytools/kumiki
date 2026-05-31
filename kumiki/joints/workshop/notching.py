@@ -400,15 +400,6 @@ def chop_notch_for_butt_joint_arrangement(
     )
     butt_end_direction_global = butt_timber.get_face_direction_global(butt_end_face)
 
-    # Receiving timber's entry face (the face nearest the butt timber).
-    receiving_entry_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(
-        -butt_end_direction_global
-    ).to.face()
-    receiving_entry_face_half_size = receiving_timber.get_half_nominal_size_in_face_normal_axis(
-        receiving_entry_face
-    )
-    notch_depth = receiving_entry_face_half_size - mortise_shoulder_distance_from_centerline
-
     # Approach direction projected perpendicular to receiving timber's length axis.
     receiving_length_dir = receiving_timber.get_length_direction_global()
     projected = butt_end_direction_global - receiving_length_dir * safe_dot_product(
@@ -444,28 +435,15 @@ def chop_notch_for_butt_joint_arrangement(
     )
     distance_along_receiver = joint_center_in_receiver_local[2]
 
-    # Notch width: butt cross-section projected onto receiving timber length axis,
-    # plus extra width to absorb the tilt of an angled butt timber.
-    cross_section_span_on_receiver_length = _projected_perfect_cross_section_span_along_global_direction(
-        butt_timber,
-        receiving_length_dir,
-    )
-    if zero_test(cos_butt_dev):
-        shift_along_length = Integer(0)
-    else:
-        sin_sq = Integer(1) - cos_butt_dev * cos_butt_dev
-        sin_dev = sqrt(Abs(sin_sq)) if not zero_test(sin_sq) else Integer(0)
-        shift_along_length = notch_depth * sin_dev / Abs(cos_butt_dev)
-    notch_width = cross_section_span_on_receiver_length + shift_along_length
-
-    receiving_timber_notch_local = chop_shoulder_notch_on_timber_face(
-        timber=receiving_timber,
-        notch_face=receiving_entry_face,
-        distance_along_timber=distance_along_receiver,
-        notch_width=notch_width,
-        notch_depth=notch_depth,
-        # the helper expects DEGREES, our parameter is in radians
-        notch_wall_relief_cut_angle=relief_angle_radians * Rational(180) / pi,
+    # Receiving timber notch: keep the original alignment-based shoulder notch
+    # behavior so the notch is oriented by the butt approach direction rather
+    # than locked to a single face.
+    receiving_timber_notch_local = chop_shoulder_notch_aligned_with_timber(
+        notch_timber=receiving_timber,
+        butting_timber=butt_timber,
+        butting_timber_end=butt_timber_end,
+        distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        notch_wall_relief_cut_angle_radians=relief_angle_radians,
     )
 
     # ------------------------------------------------------------------
