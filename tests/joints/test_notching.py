@@ -4,10 +4,12 @@ Tests for shoulder notching helpers in kumiki.joints.workshop.notching.
 
 from sympy import Rational
 
+from kumiki.cutcsg import Difference
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.notching import (
     ShoulderNotchCSGGeometry,
     chop_notch_for_butt_joint_arrangement,
+    chop_scribe_notch,
     does_shoulder_plane_need_notching,
 )
 from kumiki.rule import create_v2, safe_normalize_vector as normalize_vector
@@ -20,6 +22,7 @@ from kumiki.timber import (
 from kumiki.timber_shavings import are_timbers_plane_aligned
 from tests.testing_shavings import (
     create_centered_horizontal_timber,
+    create_standard_horizontal_timber,
     create_standard_vertical_timber,
 )
 
@@ -147,3 +150,29 @@ class TestChopNotchForButtJointArrangement:
             chop_notch_for_butt_joint_arrangement(arrangement, face_half_size)
             is None
         )
+
+
+class TestChopScribeNotch:
+    def test_returns_difference_in_cut_timber_local_space(self):
+        timber_to_be_cut = create_standard_vertical_timber(
+            height=Rational(20),
+            size=(Rational(4), Rational(6)),
+            position=(Rational(0), Rational(0), Rational(0)),
+            ticket="timber_to_be_cut",
+        )
+        timber_to_be_scribed = create_standard_horizontal_timber(
+            direction='x',
+            length=Rational(20),
+            size=(Rational(4), Rational(6)),
+            position=(Rational(-10), Rational(0), Rational(5)),
+            ticket="timber_to_be_scribed",
+        )
+
+        scribe_notch_csg_local = chop_scribe_notch(
+            timber_to_be_scribed=timber_to_be_scribed,
+            timber_to_be_cut=timber_to_be_cut,
+        )
+
+        assert isinstance(scribe_notch_csg_local, Difference)
+        assert scribe_notch_csg_local.contains_point(create_v3(Rational(5), Rational(0), Rational(5)))
+        assert not scribe_notch_csg_local.contains_point(create_v3(Rational(0), Rational(0), Rational(5)))

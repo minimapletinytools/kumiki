@@ -514,3 +514,29 @@ def chop_notch_for_butt_joint_arrangement(
         receiving_timber_notch_negative_CSG=receiving_timber_notch_local,
         butting_timber_relief_negative_CSG=relief_in_butt_local,
     )
+
+
+def chop_scribe_notch(
+    timber_to_be_scribed: TimberLike,
+    timber_to_be_cut: TimberLike,
+) -> CutCSG:
+    """
+    scribes timber_to_be_scribed onto timber_to_be_cut such that the entirety of timber_to_be_scribed is cut out of timber_to_be_cut excluding the perfect timber within portion of timber_to_be_cut
+
+    returns the CSG geometery in timber_to_be_cut's local space!
+    """
+    timber_to_be_scribed_actual_csg_local = timber_to_be_scribed.get_extended_actual_csg_local(
+        extend_bot=False,
+        extend_top=False,
+    )
+    timber_to_be_scribed_actual_csg_in_timber_to_be_cut_local = adopt_csg(
+        timber_to_be_scribed.transform,
+        timber_to_be_cut.transform,
+        timber_to_be_scribed_actual_csg_local,
+    )
+    timber_to_be_cut_perfect_csg_local = timber_to_be_cut.get_perfect_timber_within_CSG_local()
+    scribe_notch_csg_local = Difference(
+        base=timber_to_be_scribed_actual_csg_in_timber_to_be_cut_local,
+        subtract=[timber_to_be_cut_perfect_csg_local],
+    )
+    return scribe_notch_csg_local
