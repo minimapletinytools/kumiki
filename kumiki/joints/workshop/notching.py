@@ -11,7 +11,7 @@ from typing import Union
 
 from sympy import Abs, Max, Min, Rational, acos
 
-from kumiki.construction import ButtJointTimberArrangement
+from kumiki.construction import ButtJointTimberArrangement, ArrangementNames
 from kumiki.cutcsg import (
     CutCSG,
     Difference,
@@ -28,6 +28,12 @@ from kumiki.timber_shavings import (
     are_timbers_plane_aligned,
     get_perfect_support_distance_from_centerline,
 )
+
+class CrossJointNotchingConfig:
+    """
+    Configuration for cross joint notching
+    """
+    timber_to_be_notched: ArrangementNames
 
 
 def _projected_perfect_cross_section_span_along_global_direction(

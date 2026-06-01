@@ -1022,6 +1022,22 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
 # ============================================================================
 
 
+
+# this class names each of the timbers 
+class ArrangementNames(Enum):
+    '''
+    identifies each of the timbers in the various arrangements, we just use one enum for convenience but we really only want to refer to timbers specific to a certain arrangement when using this class
+    '''
+    timber1 = "timber1",
+    timber2 = "timber2",
+    receiving_timber = "receiving_timber",
+    butt_timber = "butt_timber",
+    butt_timber_1 = "butt_timber_1",
+    butt_timber_2 = "butt_timber_2",
+    post_timber = "post_timber",
+    cross_timber_1 = "cross_timber_1",
+    cross_timber_2 = "cross_timber_2",
+
 @dataclass(frozen=True)
 class ButtJointTimberArrangement:
     butt_timber: TimberLike
