@@ -30,22 +30,22 @@ def create_japanese_joints_patternbook() -> PatternBook:
     """
     Create a PatternBook with Japanese joint patterns.
     
-    Each pattern has groups: ["japanese_joints", "{joint_type}"]
+    Each pattern has groups: ["japanese_joints", "{joint_type}", "{arrangement_type}"]
     
     Returns:
         PatternBook: PatternBook containing Japanese joint patterns
     """
     patterns = [
-        (PatternMetadata("gooseneck_simple", ["japanese_joints", "gooseneck"], "frame"),
+        (PatternMetadata("gooseneck_simple", ["japanese_joints", "gooseneck", "end"], "frame"),
          lambda center: create_simple_gooseneck_example(position=center)),
         
-        (PatternMetadata("dovetail_butt", ["japanese_joints", "dovetail"], "frame"),
+        (PatternMetadata("dovetail_butt", ["japanese_joints", "dovetail", "butt"], "frame"),
          lambda center: create_dovetail_butt_joint_example(position=center)),
         
-        (PatternMetadata("mitered_keyed_lap", ["japanese_joints", "miter"], "frame"),
+        (PatternMetadata("mitered_keyed_lap", ["japanese_joints", "miter", "corner"], "frame"),
          lambda center: create_mitered_and_keyed_lap_joint_example(position=center)),
         
-        (PatternMetadata("mitered_keyed_lap_130deg", ["japanese_joints", "miter"], "frame"),
+        (PatternMetadata("mitered_keyed_lap_130deg", ["japanese_joints", "miter", "corner"], "frame"),
          lambda center: create_mitered_and_keyed_lap_joint_130deg_example(position=center)),
     ]
     

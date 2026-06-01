@@ -266,53 +266,53 @@ def create_basic_joints_patternbook() -> PatternBook:
     """
     Create a PatternBook with all basic joint patterns.
     
-    Each pattern has groups: ["basic_joints", "{variant}"]
-    For example: ["basic_joints", "miter"] or ["basic_joints", "butt"]
+    Each pattern has groups: ["basic_joints", "{variant}", "{arrangement_type}"]
+    For example: ["basic_joints", "miter", "corner"] or ["basic_joints", "butt", "butt"]
     
     Returns:
         PatternBook: PatternBook containing all basic joint patterns
     """
     patterns = [
-        (PatternMetadata("basic_miter", ["basic_joints", "miter"], "frame"),
+        (PatternMetadata("basic_miter", ["basic_joints", "miter", "corner"], "frame"),
          make_pattern_from_joint(example_basic_miter_joint)),
         
-        (PatternMetadata("basic_miter_face_aligned", ["basic_joints", "miter"], "frame"),
+        (PatternMetadata("basic_miter_face_aligned", ["basic_joints", "miter", "corner"], "frame"),
          make_pattern_from_joint(example_basic_miter_joint_face_aligned)),
 
-        (PatternMetadata("basic_tongue_fork", ["basic_joints", "corner"], "frame"),
+        (PatternMetadata("basic_tongue_fork", ["basic_joints", "corner", "corner"], "frame"),
          make_pattern_from_joint(example_basic_tongue_and_fork_joint)),
         
-        (PatternMetadata("basic_butt", ["basic_joints", "butt"], "frame"),
+        (PatternMetadata("basic_butt", ["basic_joints", "butt", "butt"], "frame"),
          make_pattern_from_joint(example_basic_butt_joint)),
         
-        (PatternMetadata("basic_butt_splice", ["basic_joints", "splice"], "frame"),
+        (PatternMetadata("basic_butt_splice", ["basic_joints", "splice", "end"], "frame"),
          make_pattern_from_joint(example_basic_butt_splice_joint)),
         
-        (PatternMetadata("basic_cross_lap", ["basic_joints", "lap"], "frame"),
+        (PatternMetadata("basic_cross_lap", ["basic_joints", "lap", "cross"], "frame"),
          make_pattern_from_joint(example_basic_cross_lap_joint)),
         
-        (PatternMetadata("basic_house", ["basic_joints", "house"], "frame"),
+        (PatternMetadata("basic_house", ["basic_joints", "house", "cross"], "frame"),
          make_pattern_from_joint(example_basic_house_joint)),
 
-        (PatternMetadata("basic_splined_double_butt", ["basic_joints", "butt"], "frame"),
+        (PatternMetadata("basic_splined_double_butt", ["basic_joints", "butt", "butt"], "frame"),
          make_pattern_from_joint(example_basic_splined_opposing_double_butt_joint)),
         
-        (PatternMetadata("basic_splice_lap", ["basic_joints", "lap"], "frame"),
+        (PatternMetadata("basic_splice_lap", ["basic_joints", "lap", "end"], "frame"),
          make_pattern_from_joint(example_basic_splice_lap_joint)),
         
-        (PatternMetadata("basic_mortise_tenon", ["basic_joints", "mortise_tenon"], "frame"),
+        (PatternMetadata("basic_mortise_tenon", ["basic_joints", "mortise_tenon", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_joint)),
         
-        (PatternMetadata("basic_mortise_tenon_peg", ["basic_joints", "mortise_tenon"], "frame"),
+        (PatternMetadata("basic_mortise_tenon_peg", ["basic_joints", "mortise_tenon", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_joint_with_peg)),
         
-        (PatternMetadata("basic_gooseneck", ["basic_joints", "japanese"], "frame"),
+        (PatternMetadata("basic_gooseneck", ["basic_joints", "japanese", "end"], "frame"),
          make_pattern_from_joint(example_basic_lapped_gooseneck_joint)),
         
-        (PatternMetadata("basic_dovetail", ["basic_joints", "japanese"], "frame"),
+        (PatternMetadata("basic_dovetail", ["basic_joints", "japanese", "butt"], "frame"),
          make_pattern_from_joint(example_basic_housed_dovetail_butt_joint)),
         
-        (PatternMetadata("basic_mitered_keyed_lap", ["basic_joints", "japanese"], "frame"),
+        (PatternMetadata("basic_mitered_keyed_lap", ["basic_joints", "japanese", "corner"], "frame"),
          make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint)),
     ]
     

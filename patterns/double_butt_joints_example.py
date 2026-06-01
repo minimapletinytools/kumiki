@@ -61,7 +61,7 @@ def create_double_butt_joints_patternbook() -> PatternBook:
         PatternBook containing all double butt joint patterns
     """
     patterns = [
-        (PatternMetadata("splined_opposing_double_butt_joint", ["double_butt_joints", "splined_opposing"], "frame"),
+        (PatternMetadata("splined_opposing_double_butt_joint", ["double_butt_joints", "splined_opposing", "butt"], "frame"),
          lambda center: make_splined_opposing_double_butt_joint_example(center)),
     ]
 

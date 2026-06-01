@@ -397,38 +397,38 @@ def create_mortise_and_tenon_patternbook() -> PatternBook:
     """
     Create a PatternBook with all mortise and tenon joint patterns.
 
-    Each pattern has groups: ["mortise_tenon", "{variant}"]
-    For example: ["mortise_tenon", "basic"] or ["mortise_tenon", "with_pegs"]
+    Each pattern has groups: ["mortise_tenon", "{variant}", "{arrangement_type}"]
+    For example: ["mortise_tenon", "basic", "butt"] or ["mortise_tenon", "brace", "corner"]
 
     Returns:
         PatternBook: PatternBook containing all mortise and tenon joint patterns
     """
     patterns = [
-        (PatternMetadata("basic_4x4", ["mortise_tenon", "basic"], "frame"),
+        (PatternMetadata("basic_4x4", ["mortise_tenon", "basic", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon)),
 
-        (PatternMetadata("basic_FAT", ["mortise_tenon", "basic_fat"], "frame"),
+        (PatternMetadata("basic_FAT", ["mortise_tenon", "basic_fat", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT)),
 
-        (PatternMetadata("basic_FAT_two_round_timbers", ["mortise_tenon", "basic_fat_round"], "frame"),
+        (PatternMetadata("basic_FAT_two_round_timbers", ["mortise_tenon", "basic_fat_round", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT_two_round_timbers)),
 
-        (PatternMetadata("through_tenon_FAT", ["mortise_tenon", "through_fat"], "frame"),
+        (PatternMetadata("through_tenon_FAT", ["mortise_tenon", "through_fat", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT_with_through_tenon)),
 
-        (PatternMetadata("inset_shoulder_FAT", ["mortise_tenon", "inset_shoulder_fat"], "frame"),
+        (PatternMetadata("inset_shoulder_FAT", ["mortise_tenon", "inset_shoulder_fat", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT_with_inset_mortise_shoulder)),
 
-        (PatternMetadata("brace_joint", ["mortise_tenon", "brace"], "frame"),
+        (PatternMetadata("brace_joint", ["mortise_tenon", "brace", "corner"], "frame"),
          make_pattern_from_frame(example_brace_joint)),
 
-        (PatternMetadata("double_angled", ["mortise_tenon", "double_angled"], "frame"),
+        (PatternMetadata("double_angled", ["mortise_tenon", "double_angled", "corner"], "frame"),
          make_pattern_from_joint(example_double_angled_mortise_and_tenon)),
 
-        (PatternMetadata("wedged_half_dovetail", ["mortise_tenon", "wedged_half_dovetail"], "frame"),
+        (PatternMetadata("wedged_half_dovetail", ["mortise_tenon", "wedged_half_dovetail", "butt"], "frame"),
          make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon)),
 
-        (PatternMetadata("half_dovetail_no_wedge", ["mortise_tenon", "wedged_half_dovetail"], "frame"),
+        (PatternMetadata("half_dovetail_no_wedge", ["mortise_tenon", "wedged_half_dovetail", "butt"], "frame"),
          make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge)),
     ]
 

@@ -505,53 +505,53 @@ def create_plain_joints_patternbook() -> PatternBook:
     """
     Create a PatternBook with all plain joint patterns.
 
-    Each pattern has groups: ["plain_joints", "{joint_type}"]
-    For example: ["plain_joints", "miter"] or ["plain_joints", "butt"]
+    Each pattern has groups: ["plain_joints", "{joint_type}", "{arrangement_type}"]
+    For example: ["plain_joints", "miter", "corner"] or ["plain_joints", "butt", "butt"]
 
     Returns:
         PatternBook: PatternBook containing all plain joint patterns
     """
     patterns = [
-        (PatternMetadata("miter_joint", ["plain_joints", "miter"], "frame"),
+        (PatternMetadata("miter_joint", ["plain_joints", "miter", "corner"], "frame"),
          lambda center: Frame(cut_timbers=make_miter_joint_example(center), name="Miter Joint (67°)")),
 
-        (PatternMetadata("miter_joint_face_aligned", ["plain_joints", "miter"], "frame"),
+        (PatternMetadata("miter_joint_face_aligned", ["plain_joints", "miter", "corner"], "frame"),
          lambda center: Frame(cut_timbers=make_miter_joint_face_aligned_example(center), name="Miter Joint (Face Aligned)")),
 
-        (PatternMetadata("miter_joint_3d_angles", ["plain_joints", "miter"], "frame"),
+        (PatternMetadata("miter_joint_3d_angles", ["plain_joints", "miter", "corner"], "frame"),
          lambda center: Frame(cut_timbers=make_miter_joint_3d_angles_example(center), name="Miter Joint (3D Angles)")),
 
-        (PatternMetadata("butt_joint", ["plain_joints", "butt"], "frame"),
+        (PatternMetadata("butt_joint", ["plain_joints", "butt", "butt"], "frame"),
          lambda center: Frame(cut_timbers=make_butt_joint_example(center), name="Butt Joint")),
 
-        (PatternMetadata("butt_joint_3d_angles", ["plain_joints", "butt"], "frame"),
+        (PatternMetadata("butt_joint_3d_angles", ["plain_joints", "butt", "butt"], "frame"),
          lambda center: Frame(cut_timbers=make_butt_joint_3d_angles_example(center), name="Butt Joint (3D Angles)")),
 
-        (PatternMetadata("tongue_and_fork_corner_joint_90", ["plain_joints", "tongue_and_fork"], "frame"),
+        (PatternMetadata("tongue_and_fork_corner_joint_90", ["plain_joints", "tongue_and_fork", "corner"], "frame"),
          lambda center: Frame(cut_timbers=make_tongue_and_fork_corner_joint_90_example(center), name="Tongue and Fork Corner (90°)")),
 
-        (PatternMetadata("tongue_and_fork_corner_joint_135", ["plain_joints", "tongue_and_fork"], "frame"),
+        (PatternMetadata("tongue_and_fork_corner_joint_135", ["plain_joints", "tongue_and_fork", "corner"], "frame"),
          lambda center: Frame(cut_timbers=make_tongue_and_fork_corner_joint_135_example(center), name="Tongue and Fork Corner (135°)")),
 
-        (PatternMetadata("tongue_and_fork_butt_joint_90", ["plain_joints", "tongue_and_fork"], "frame"),
+        (PatternMetadata("tongue_and_fork_butt_joint_90", ["plain_joints", "tongue_and_fork", "butt"], "frame"),
          lambda center: Frame(cut_timbers=make_tongue_and_fork_butt_joint_90_example(center), name="Tongue and Fork Butt (90°)")),
 
-        (PatternMetadata("tongue_and_fork_butt_joint_138", ["plain_joints", "tongue_and_fork"], "frame"),
+        (PatternMetadata("tongue_and_fork_butt_joint_138", ["plain_joints", "tongue_and_fork", "butt"], "frame"),
          lambda center: Frame(cut_timbers=make_tongue_and_fork_butt_joint_angled_example(center), name="Tongue and Fork Butt (138°)")),
 
-        (PatternMetadata("splice_joint", ["plain_joints", "splice"], "frame"),
+        (PatternMetadata("splice_joint", ["plain_joints", "splice", "end"], "frame"),
          lambda center: Frame(cut_timbers=make_splice_joint_example(center), name="Splice Joint")),
 
-        (PatternMetadata("splice_lap_joint", ["plain_joints", "splice_lap"], "frame"),
+        (PatternMetadata("splice_lap_joint", ["plain_joints", "splice_lap", "end"], "frame"),
          lambda center: Frame(cut_timbers=make_splice_lap_joint_example(center), name="Splice Lap Joint")),
 
-        (PatternMetadata("house_joint", ["plain_joints", "house"], "frame"),
+        (PatternMetadata("house_joint", ["plain_joints", "house", "cross"], "frame"),
          lambda center: Frame(cut_timbers=make_house_joint_example(center), name="House Joint")),
 
-        (PatternMetadata("cross_lap_joint", ["plain_joints", "cross_lap"], "frame"),
+        (PatternMetadata("cross_lap_joint", ["plain_joints", "cross_lap", "cross"], "frame"),
          lambda center: Frame(cut_timbers=make_cross_lap_joint_example(center), name="Cross Lap Joint")),
 
-        (PatternMetadata("corner_lap_joint", ["plain_joints", "corner_lap"], "frame"),
+        (PatternMetadata("corner_lap_joint", ["plain_joints", "corner_lap", "corner"], "frame"),
          lambda center: Frame(cut_timbers=make_corner_lap_joint_example(center), name="Corner Lap Joint")),
     ]
 
