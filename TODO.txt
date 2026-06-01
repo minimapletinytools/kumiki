@@ -233,6 +233,13 @@ DONE-do a design pass
 
 :: TODO
 
+-cuttimber/cuttnig is wrong
+  -each timber in a joint has ONE cutting
+  -a cut timber is made from several joints by combining their cuttings
+
+-fix scribe notcihng algorithm (see todo in notching.py)
+  -update cross lap joint to test it out again
+
 -modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
   -0 degree notch up to insertion face
   -afterwards do the regular notching with varibale relief angle
@@ -240,6 +247,7 @@ DONE-do a design pass
     -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
 -try and run a full loop agent test on this to see if it all works
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
+
 
 -LAYERS
   DONE-add tags to timbers and joints, as a 1 tier overlapping folder system
@@ -261,8 +269,10 @@ DONE-do a design pass
 -PATTERN VIEWER
   DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
   DONE-allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
+  -default shows patterns rather than pattern books
   -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
-    lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
+    - joint type tags should be prioritized, or instead sort by tags that show up most often
+    - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
     Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
 
 -JOINTS
@@ -302,8 +312,9 @@ DONE-do a design pass
     -length
     -type (round + diameter, square + nominal extra, perfect)
   -pattern parameterization
+    DONE-update example_shaving ctors to take some additional parameters
     -then you can add notch variations to patterns I guess?
-    -update example_shaving ctors to take some additional parameters
+    
 
 -NOTCHING
   DONE-I think receiving timber notching is mostly good?

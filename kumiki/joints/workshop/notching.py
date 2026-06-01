@@ -29,6 +29,7 @@ from kumiki.timber_shavings import (
     get_perfect_support_distance_from_centerline,
 )
 
+@dataclass(frozen=True)
 class CrossJointNotchingConfig:
     """
     Configuration for cross joint notching
@@ -522,6 +523,9 @@ def chop_notch_for_butt_joint_arrangement(
     )
 
 
+# TODO this is wrong
+# we need to remove the timber_to_be_cut's perfect timber within portion from the timber_to_be_scribed's (actual timber - perfect timber within) portion
+# TODO rename the 2 variables and return a pair of CutCSGs
 def chop_scribe_notch(
     timber_to_be_scribed: TimberLike,
     timber_to_be_cut: TimberLike,
