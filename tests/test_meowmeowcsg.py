@@ -1931,6 +1931,27 @@ class TestAdoptCsg:
         # In global, point (11,0,0) is inside (x >= 10). In local same coords.
         assert adopted.contains_point(Matrix([Rational(11), Integer(0), Integer(0)])) == True
 
+    def test_adopt_csg_local_to_global_when_adopting_transform_is_none(self):
+        local_prism = RectangularPrism(
+            size=Matrix([Rational(4), Rational(6)]),
+            transform=Transform.identity(),
+            start_distance=Rational(0),
+            end_distance=Rational(10),
+        )
+        orig_transform = Transform(
+            position=Matrix([Rational(3), Rational(4), Rational(5)]),
+            orientation=Orientation.rotate_left(),
+        )
+
+        adopted = adopt_csg(orig_transform, None, local_prism)
+
+        assert isinstance(adopted, RectangularPrism)
+        for axis in range(3):
+            assert adopted.transform.position[axis].equals(orig_transform.position[axis])
+        assert adopted.transform.orientation.matrix == orig_transform.orientation.matrix
+        assert adopted.start_distance == local_prism.start_distance
+        assert adopted.end_distance == local_prism.end_distance
+
 
 # ============================================================================
 # TestGetAABB

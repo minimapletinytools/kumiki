@@ -1658,28 +1658,34 @@ def translate_csg(csg: CutCSG, translation: V3) -> CutCSG:
 
 def adopt_csg(
     orig_transform: Optional[Transform],
-    adopting_transform: Transform,
+    adopting_transform: Optional[Transform],
     csg_in_orig_space: CutCSG,
 ) -> CutCSG:
     """
-    Transform a CSG object into adopting_transform's local coordinate system.
+    Transform a CSG object into another coordinate system.
 
     If orig_transform is provided, the CSG is treated as being in that transform's local
     coordinates. If orig_transform is None, the CSG is treated as being in global coordinates.
+    If adopting_transform is provided, the result is expressed in that transform's local
+    coordinates. If adopting_transform is None, the result is expressed in global coordinates.
 
     Args:
         orig_transform: The transform whose local space the CSG is in, or None for global
-        adopting_transform: The transform whose local space we want the CSG in
+        adopting_transform: The transform whose local space we want the CSG in,
+            or None to return the CSG in global coordinates
         csg_in_orig_space: The CSG object (in orig_transform local, or global if orig_transform is None)
 
     Returns:
-        A new CSG object in adopting_transform's local coordinates
+        A new CSG object in adopting_transform's local coordinates, or in global
+        coordinates if adopting_transform is None
 
     Example:
         >>> cut_on_b = adopt_csg(timber_a.transform, timber_b.transform, cut_csg)
         >>> csg_in_tenon_local = adopt_csg(None, tenon_timber.transform, csg_global)
+        >>> csg_in_global = adopt_csg(timber_a.transform, None, cut_csg)
     """
-    # Helper: Transform from orig (or global) to adopting local
+    # Helper: Transform from orig (or global) to adopting local, or to global
+    # coordinates when adopting_transform is None.
     def transform_transform(trans: Transform) -> Transform:
         if orig_transform is not None:
             global_position = orig_transform.numeric_local_to_global(trans.position)
@@ -1688,24 +1694,31 @@ def adopt_csg(
             global_position = trans.position
             global_orientation = trans.orientation
 
+        if adopting_transform is None:
+            return Transform(position=global_position, orientation=global_orientation)
+
         local_position = adopting_transform.numeric_global_to_local(global_position)
         local_orientation = adopting_transform.orientation.invert() * global_orientation
         return Transform(position=local_position, orientation=local_orientation)
 
-    # Helper: HalfSpace from orig (or global) to adopting local
+    # Helper: HalfSpace from orig (or global) to adopting local, or to global
+    # coordinates when adopting_transform is None.
     def transform_halfspace(hp: HalfSpace) -> HalfSpace:
         if orig_transform is not None:
             global_normal = numeric_transform_vector(orig_transform.orientation.matrix, hp.normal)
         else:
             global_normal = hp.normal
 
-        new_local_normal = numeric_transform_vector(
-            adopting_transform.orientation.matrix.T, global_normal
-        )
+        if adopting_transform is None:
+            new_normal = global_normal
+        else:
+            new_normal = numeric_transform_vector(
+                adopting_transform.orientation.matrix.T, global_normal
+            )
 
         normal_length_sq = numeric_dot_product(hp.normal, hp.normal)
         if normal_length_sq == Integer(0):
-            return replace(hp, normal=new_local_normal, offset=hp.offset)
+            return replace(hp, normal=new_normal, offset=hp.offset)
 
         point_on_plane_in_orig = hp.normal * (hp.offset / normal_length_sq)
         if orig_transform is not None:
@@ -1713,9 +1726,12 @@ def adopt_csg(
         else:
             point_on_plane_global = point_on_plane_in_orig
 
-        point_on_plane_new_local = adopting_transform.numeric_global_to_local(point_on_plane_global)
-        new_offset = numeric_dot_product(new_local_normal, point_on_plane_new_local)
-        return replace(hp, normal=new_local_normal, offset=new_offset)
+        if adopting_transform is None:
+            new_offset = numeric_dot_product(new_normal, point_on_plane_global)
+        else:
+            point_on_plane_new_local = adopting_transform.numeric_global_to_local(point_on_plane_global)
+            new_offset = numeric_dot_product(new_normal, point_on_plane_new_local)
+        return replace(hp, normal=new_normal, offset=new_offset)
 
     # Recursively transform based on CSG type
     if isinstance(csg_in_orig_space, SolidUnion):
@@ -1744,6 +1760,9 @@ def adopt_csg(
         else:
             global_position = cyl.position
             global_axis = cyl.axis_direction
+
+        if adopting_transform is None:
+            return replace(cyl, position=global_position, axis_direction=global_axis)
 
         new_local_position = adopting_transform.numeric_global_to_local(global_position)
         new_local_axis = numeric_transform_vector(
