@@ -5,6 +5,7 @@ from kumiki import (
     ConvexPolygonExtrusion,
     Cylinder,
     Difference,
+    EmptyCSG,
     HalfSpace,
     Orientation,
     RectangularPrism,
@@ -20,6 +21,13 @@ from kumiki import (
 
 
 class TestTriangles:
+    def test_triangulate_empty_csg_returns_empty_mesh(self):
+        triangle_mesh = triangulate_cutcsg(EmptyCSG())
+
+        assert len(triangle_mesh.mesh.vertices) == 0
+        assert len(triangle_mesh.mesh.faces) == 0
+        assert triangle_mesh.face_sources == ()
+
     def test_triangulate_rectangular_prism_bounds(self):
         prism = RectangularPrism(
             size=create_v2(Rational(2), Rational(4)),

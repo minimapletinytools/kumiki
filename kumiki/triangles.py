@@ -20,6 +20,7 @@ from .cutcsg import (
     ConvexPolygonExtrusion,
     CutCSG,
     Cylinder,
+    EmptyCSG,
     Difference,
     HalfSpace,
     RectangularPrism,
@@ -127,6 +128,9 @@ def raw_raycast_all(target: MeshableTarget, origin: V3, direction: V3) -> list[R
 
 
 def _triangulate_with_label(csg: CutCSG, label: str) -> TriangleMesh:
+    if isinstance(csg, EmptyCSG):
+        mesh = trimesh.Trimesh(vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64))
+        return TriangleMesh(mesh=mesh, face_sources=tuple())
     if isinstance(csg, RectangularPrism):
         mesh = _mesh_rectangular_prism(csg)
         return TriangleMesh(mesh=mesh, face_sources=tuple(label for _ in range(len(mesh.faces))))
