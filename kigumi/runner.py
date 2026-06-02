@@ -806,11 +806,11 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
         joint_name = joint_name or (joint_type or "joint")
         joint_tags = _normalize_ticket_tags(joint_ticket)
         
-        # Extract members (timbers) from cut_timbers
+        # Extract members (timbers) from cuttings
         members_list: List[Dict[str, Any]] = []
-        cut_timbers_dict = getattr(joint, "cut_timbers", {})
-        for cut_timber in cut_timbers_dict.values():
-            timber = getattr(cut_timber, "timber", None)
+        cuttings_dict = getattr(joint, "cuttings", {})
+        for cutting in cuttings_dict.values():
+            timber = getattr(cutting, "timber", None)
             if timber is None:
                 continue
             timber_id = id(timber)
@@ -820,7 +820,7 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             
             # Find which cuts from this timber (in the joint) appear in the frame's merged CutTimber
             # by comparing object identity
-            joint_cuts = getattr(cut_timber, "cuts", [])
+            joint_cuts = [cutting]
             frame_cuts = getattr(frame_cut_timber, "cuts", [])
             
             cut_indices = []

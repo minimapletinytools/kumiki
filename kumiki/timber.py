@@ -2105,23 +2105,6 @@ class Joint:
     cuttings: Dict[str, Cutting]
     ticket: JointTicket
     jointAccessories: Dict[str, JointAccessory] = field(default_factory=dict)
-    
-    # TODO DELETE THIS
-    @property
-    def cut_timbers(self) -> Dict[str, 'CutTimber']:
-        """
-        Backward compatibility property: provides cut_timbers as a dict of CutTimber objects.
-        
-        This property wraps each Cutting in a CutTimber for compatibility with code
-        that expects the old Joint.cut_timbers structure.
-        
-        Returns:
-            Dict[str, CutTimber]: Maps timber names to CutTimber objects
-        """
-        result: Dict[str, CutTimber] = {}
-        for name, cutting in self.cuttings.items():
-            result[name] = CutTimber(timber=cutting.timber, cuts=[cutting])
-        return result
 
 
 @dataclass(frozen=True)
