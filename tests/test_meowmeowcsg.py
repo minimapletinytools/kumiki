@@ -13,6 +13,7 @@ from kumiki.cutcsg import (
     Cylinder,
     SolidUnion,
     Difference,
+    intersect,
     ConvexPolygonExtrusion,
     BoundingBox,
     PrismFace,
@@ -1062,6 +1063,49 @@ class TestDifferenceContainsPoint:
         for point in exterior_points:
             assert empty_diff.contains_point(point) == False, \
                 f"Exterior point {point.T} should NOT be in empty difference"
+
+
+class TestIntersectHelper:
+    """Tests for intersect(csg1, csg2) boolean helper."""
+
+    def test_intersect_contains_overlap_only(self):
+        prism_a = RectangularPrism(
+            size=Matrix([Integer(10), Integer(10)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+        )
+        prism_b = RectangularPrism(
+            size=Matrix([Integer(10), Integer(10)]),
+            transform=Transform(position=create_v3(Integer(4), Integer(0), Integer(0)), orientation=Orientation()),
+            start_distance=Integer(0),
+            end_distance=Integer(10),
+        )
+
+        overlap = intersect(prism_a, prism_b)
+
+        assert overlap.contains_point(create_v3(Integer(0), Integer(0), Integer(5)))
+        assert not overlap.contains_point(create_v3(Integer(-4), Integer(0), Integer(5)))
+        assert not overlap.contains_point(create_v3(Integer(8), Integer(0), Integer(5)))
+
+    def test_intersect_disjoint_solids_is_empty(self):
+        prism_a = RectangularPrism(
+            size=Matrix([Integer(4), Integer(4)]),
+            transform=Transform.identity(),
+            start_distance=Integer(0),
+            end_distance=Integer(4),
+        )
+        prism_b = RectangularPrism(
+            size=Matrix([Integer(4), Integer(4)]),
+            transform=Transform(position=create_v3(Integer(20), Integer(0), Integer(0)), orientation=Orientation()),
+            start_distance=Integer(0),
+            end_distance=Integer(4),
+        )
+
+        overlap = intersect(prism_a, prism_b)
+
+        assert not overlap.contains_point(create_v3(Integer(0), Integer(0), Integer(2)))
+        assert not overlap.contains_point(create_v3(Integer(20), Integer(0), Integer(2)))
     
     def test_difference_two_prisms_sharing_one_plane_no_overlap(self, symbolic_mode):
         """Test difference with two prisms that share one plane but don't overlap.

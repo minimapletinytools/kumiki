@@ -1190,6 +1190,22 @@ class Difference(CutCSG):
         return bbox
 
 
+def intersect(csg1: CutCSG, csg2: CutCSG) -> CutCSG:
+    """
+    Build intersection of two CSG solids using only Difference and SolidUnion.
+
+    Identity used:
+      A ∩ B = (A ∪ B) - ((A - B) ∪ (B - A))
+    """
+    a_minus_b = Difference(base=csg1, subtract=[csg2])
+    b_minus_a = Difference(base=csg2, subtract=[csg1])
+    symmetric_difference = SolidUnion(children=[a_minus_b, b_minus_a])
+    return Difference(
+        base=SolidUnion(children=[csg1, csg2]),
+        subtract=[symmetric_difference],
+    )
+
+
 # TODO come upw ith a cuter/better name for these
 Profile = List[V2]
 Profiles = List[Profile]

@@ -30,11 +30,24 @@ from kumiki.timber_shavings import (
 )
 
 @dataclass(frozen=True)
-class CrossJointNotchingConfig:
+class CrossJointScribeNotchingConfig:
     """
     Configuration for cross joint notching
+    "Scribe" here means one timber is scribed onto the other and completely cut away
     """
-    timber_to_be_notched: ArrangementNames
+    timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def cross_timber_1():
+        return CrossJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.cross_timber_1,
+        )
+
+    @staticmethod
+    def cross_timber_2():
+        return CrossJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.cross_timber_2,
+        )
 
 
 def _projected_perfect_cross_section_span_along_global_direction(
