@@ -110,7 +110,7 @@ def make_miter_joint_example(position: V3, use_round_timbers=False) -> list[CutT
         timber2_end=arrangement.timber2_end
     )
     joint = cut_plain_miter_joint(miter_arrangement)
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_miter_joint_face_aligned_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -143,7 +143,7 @@ def make_miter_joint_face_aligned_example(position: V3, use_round_timbers=False)
     )
     joint = cut_plain_miter_joint_on_face_aligned_timbers(miter_arrangement)
 
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -192,7 +192,7 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
         timber2_end=TimberReferenceEnd.BOTTOM,
     )
     joint = cut_plain_miter_joint(arrangement)
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_tongue_and_fork_corner_joint_90_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -204,7 +204,7 @@ def make_tongue_and_fork_corner_joint_90_example(position: V3, use_round_timbers
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
     joint = cut_tongue_and_fork_corner_joint(arrangement)
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_tongue_and_fork_corner_joint_135_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -218,7 +218,7 @@ def make_tongue_and_fork_corner_joint_135_example(position: V3, use_round_timber
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
     joint = cut_tongue_and_fork_corner_joint(arrangement)
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_tongue_and_fork_butt_joint_90_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -230,7 +230,7 @@ def make_tongue_and_fork_butt_joint_90_example(position: V3, use_round_timbers=F
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
     joint = cut_tongue_and_fork_butt_joint(arrangement)
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -269,7 +269,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
         butt_timber_end=TimberReferenceEnd.BOTTOM,
     )
     joint = cut_tongue_and_fork_butt_joint(arrangement)
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_butt_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -301,7 +301,7 @@ def make_butt_joint_example(position: V3, use_round_timbers=False) -> list[CutTi
     )
     joint = cut_plain_butt_joint_on_face_aligned_timbers(butt_arrangement)
 
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -352,7 +352,7 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
         butt_timber=butt,
         butt_timber_end=TimberReferenceEnd.TOP,
     ))
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_splice_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -388,7 +388,7 @@ def make_splice_joint_example(position: V3, use_round_timbers=False) -> list[Cut
         splice_point=position  # Meet at the specified position
     )
 
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -438,7 +438,7 @@ def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutT
     )
     joint = cut_plain_house_joint(house_arrangement)
 
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -489,7 +489,7 @@ def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[
         cut_ratio=Rational(1, 2),
     )
 
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_corner_lap_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -510,7 +510,7 @@ def make_corner_lap_joint_example(position: V3, use_round_timbers=False) -> list
         ),
         cut_ratio=Rational(1, 2),
     )
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def make_splice_lap_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -551,7 +551,7 @@ def make_splice_lap_joint_example(position: V3, use_round_timbers=False) -> list
         lap_depth=None  # Use default (half thickness)
     )
 
-    return list(joint.cut_timbers.values())
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def create_plain_joints_patternbook() -> PatternBook:

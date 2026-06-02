@@ -427,8 +427,8 @@ def cut_mortise_and_tenon_joint(
                 label="mortise_and_tenon",
             )
 
-    tenon_cut_timber = CutTimber(timber=tenon_timber, cuts=[tenon_cut])
-    mortise_cut_timber = CutTimber(mortise_timber, cuts=[mortise_cut])
+    tenon_cut_timber = tenon_cut
+    mortise_cut_timber = mortise_cut
 
 
     #joint_accessories["debug"] = CSGAccessory(
@@ -439,7 +439,7 @@ def cut_mortise_and_tenon_joint(
 
 
     return Joint(
-        cut_timbers={
+        cuttings={
             tenon_timber.ticket.name: tenon_cut_timber,
             mortise_timber.ticket.name: mortise_cut_timber,
         },
@@ -726,9 +726,9 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
         joint_accessories["wedge"] = geo.wedge_accessory_csg
 
     return Joint(
-        cut_timbers={
-            tenon_timber.ticket.name: CutTimber(timber=tenon_timber, cuts=[tenon_cut]),
-            mortise_timber.ticket.name: CutTimber(timber=mortise_timber, cuts=[mortise_cut]),
+        cuttings={
+            tenon_timber.ticket.name: tenon_cut,
+            mortise_timber.ticket.name: mortise_cut,
         },
         ticket=JointTicket(joint_type="wedged_half_dovetail_mortise_and_tenon"),
         jointAccessories=joint_accessories,

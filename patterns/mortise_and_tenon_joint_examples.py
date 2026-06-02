@@ -475,16 +475,16 @@ if __name__ == "__main__":
         print('='*60)
         
         joint = example_func()
-        print(f"✅ Created joint with {len(joint.cut_timbers)} timbers")
+        print(f"✅ Created joint with {len(joint.cuttings)} timbers")
         
         # Display timber details
-        for i, cut_timber in enumerate(joint.cut_timbers.values()):
-            timber = cut_timber.timber
+        for i, cutting in enumerate(joint.cuttings.values()):
+            timber = cutting.timber
             print(f"\n  Timber {i+1}: {timber.ticket.name}")
             print(f"    Position: ({float(timber.get_bottom_position_global()[0]):.1f}, {float(timber.get_bottom_position_global()[1]):.1f}, {float(timber.get_bottom_position_global()[2]):.1f})")
             print(f"    Length: {float(timber.length):.1f} inches")
             print(f"    Size: {float(timber.size[0]):.1f} x {float(timber.size[1]):.1f} inches")
-            print(f"    Cuts: {len(cut_timber.cuts)}")
+            print("    Cuts: 1")
     
     print(f"\n{'='*60}")
     print("✅ All examples completed successfully!")

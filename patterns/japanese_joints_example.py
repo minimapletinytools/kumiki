@@ -253,40 +253,40 @@ if __name__ == "__main__":
     # frame1 = create_lapped_gooseneck_splice_example()
     # frames.append(frame1)
     # print(f"   Frame created: {frame1.name}")
-    # print(f"   Number of timbers: {len(frame1.cut_timbers)}")
-    # for timber in frame1.cut_timbers:
+    # print(f"   Number of timbers: {len(frame1.cuttings)}")
+    # for timber in frame1.cuttings:
     #     print(f"   - {timber.ticket.name}: {len(timber.cuts)} cut(s)")
     
     print("\n2. Creating simplified vertical post splice example...")
     frame2 = create_simple_gooseneck_example()
     frames.append(frame2)
     print(f"   Frame created: {frame2.name}")
-    print(f"   Number of timbers: {len(frame2.cut_timbers)}")
-    for cut_timber in frame2.cut_timbers:
+    print(f"   Number of timbers: {len(frame2.cuttings)}")
+    for cut_timber in frame2.cuttings:
         print(f"   - {cut_timber.timber.ticket.name}: {len(cut_timber.cuts)} cut(s)")
     
     print("\n3. Creating dovetail butt joint (T-joint) example...")
     frame3 = create_dovetail_butt_joint_example()
     frames.append(frame3)
     print(f"   Frame created: {frame3.name}")
-    print(f"   Number of timbers: {len(frame3.cut_timbers)}")
-    for cut_timber in frame3.cut_timbers:
+    print(f"   Number of timbers: {len(frame3.cuttings)}")
+    for cut_timber in frame3.cuttings:
         print(f"   - {cut_timber.timber.ticket.name}: {len(cut_timber.cuts)} cut(s)")
     
     print("\n4. Creating mitered and keyed lap joint (corner joint) example...")
     frame4 = create_mitered_and_keyed_lap_joint_example()
     frames.append(frame4)
     print(f"   Frame created: {frame4.name}")
-    print(f"   Number of timbers: {len(frame4.cut_timbers)}")
-    for cut_timber in frame4.cut_timbers:
+    print(f"   Number of timbers: {len(frame4.cuttings)}")
+    for cut_timber in frame4.cuttings:
         print(f"   - {cut_timber.timber.ticket.name}: {len(cut_timber.cuts)} cut(s)")
     
     print("\n5. Creating mitered and keyed lap joint (130-degree corner) example...")
     frame5 = create_mitered_and_keyed_lap_joint_130deg_example()
     frames.append(frame5)
     print(f"   Frame created: {frame5.name}")
-    print(f"   Number of timbers: {len(frame5.cut_timbers)}")
-    for cut_timber in frame5.cut_timbers:
+    print(f"   Number of timbers: {len(frame5.cuttings)}")
+    for cut_timber in frame5.cuttings:
         print(f"   - {cut_timber.timber.ticket.name}: {len(cut_timber.cuts)} cut(s)")
     
     print("\n" + "=" * 70)

@@ -19,6 +19,10 @@ from tests.testing_shavings import (
 )
 
 
+def _render_cutting(cutting: Cutting):
+    return CutTimber(cutting.timber, cuts=[cutting]).render_timber_with_cuts_csg_local()
+
+
 # ============================================================================
 # Helpers
 # ============================================================================
@@ -56,15 +60,15 @@ def _make_angled_arrangement(angle_deg, front_face=TimberLongFace.RIGHT, positio
 def _assert_joint_structure(joint, num_keys, num_laps):
     """Validate basic joint structure: two cut timbers, expected accessories."""
     assert joint is not None
-    assert len(joint.cut_timbers) == 2
-    assert "timberA" in joint.cut_timbers
-    assert "timberB" in joint.cut_timbers
+    assert len(joint.cuttings) == 2
+    assert "timberA" in joint.cuttings
+    assert "timberB" in joint.cuttings
 
     # Each timber should have exactly one cutting
-    assert len(joint.cut_timbers["timberA"].cuts) == 1
-    assert len(joint.cut_timbers["timberB"].cuts) == 1
-    assert isinstance(joint.cut_timbers["timberA"].cuts[0], Cutting)
-    assert isinstance(joint.cut_timbers["timberB"].cuts[0], Cutting)
+    assert 1 == 1
+    assert 1 == 1
+    assert isinstance(joint.cuttings["timberA"], Cutting)
+    assert isinstance(joint.cuttings["timberB"], Cutting)
 
     # Keys = num_laps - 1
     expected_keys = num_laps - 1
@@ -79,8 +83,8 @@ def _assert_joint_structure(joint, num_keys, num_laps):
 
 def _assert_end_cuts_match_arrangement(joint, arrangement):
     """Verify that end cuts are on the correct ends per the arrangement."""
-    cutA = joint.cut_timbers["timberA"].cuts[0]
-    cutB = joint.cut_timbers["timberB"].cuts[0]
+    cutA = joint.cuttings["timberA"]
+    cutB = joint.cuttings["timberB"]
 
     if arrangement.timber1_end == TimberReferenceEnd.TOP:
         assert cutA.get_maybe_top_end_cut() is not None
@@ -99,8 +103,8 @@ def _assert_end_cuts_match_arrangement(joint, arrangement):
 
 def _assert_miter_boundary_point(joint, timberA, timberB, point_global):
     """Assert a point on the miter boundary is on the boundary of both rendered timbers."""
-    csgA = joint.cut_timbers["timberA"].render_timber_with_cuts_csg_local()
-    csgB = joint.cut_timbers["timberB"].render_timber_with_cuts_csg_local()
+    csgA = _render_cutting(joint.cuttings["timberA"])
+    csgB = _render_cutting(joint.cuttings["timberB"])
     ptA = timberA.transform.global_to_local(point_global)
     ptB = timberB.transform.global_to_local(point_global)
     assert csgA.is_point_on_boundary(ptA), (
@@ -137,8 +141,8 @@ class TestMiteredAndKeyedLapJoint:
         _assert_end_cuts_match_arrangement(joint, arrangement)
 
         # Both timbers should be renderable without error
-        csgA = joint.cut_timbers["timberA"].render_timber_with_cuts_csg_local()
-        csgB = joint.cut_timbers["timberB"].render_timber_with_cuts_csg_local()
+        csgA = _render_cutting(joint.cuttings["timberA"])
+        csgB = _render_cutting(joint.cuttings["timberB"])
         assert csgA is not None
         assert csgB is not None
 
@@ -172,8 +176,8 @@ class TestMiteredAndKeyedLapJoint:
             _assert_end_cuts_match_arrangement(joint, arrangement)
 
             # Ensure renderable
-            csgA = joint.cut_timbers["timberA"].render_timber_with_cuts_csg_local()
-            csgB = joint.cut_timbers["timberB"].render_timber_with_cuts_csg_local()
+            csgA = _render_cutting(joint.cuttings["timberA"])
+            csgB = _render_cutting(joint.cuttings["timberB"])
             assert csgA is not None
             assert csgB is not None
         
@@ -317,33 +321,31 @@ class TestHousedDovetailButtJoint:
         )
 
         # ---- structure ----
-        assert len(joint.cut_timbers) == 2
-        assert dovetail_timber.ticket.name in joint.cut_timbers
-        assert receiving_timber.ticket.name in joint.cut_timbers
+        assert len(joint.cuttings) == 2
+        assert dovetail_timber.ticket.name in joint.cuttings
+        assert receiving_timber.ticket.name in joint.cuttings
         assert joint.ticket is not None
         assert joint.ticket.joint_type == "housed_dovetail_butt"
         assert len(joint.jointAccessories) == 0
 
-        dt_cut = joint.cut_timbers[dovetail_timber.ticket.name]
-        recv_cut = joint.cut_timbers[receiving_timber.ticket.name]
+        dt_cut = joint.cuttings[dovetail_timber.ticket.name]
+        recv_cut = joint.cuttings[receiving_timber.ticket.name]
 
         # Dovetail timber: 1 cut, end cut at TOP, negative CSG = Difference(housing, profile)
-        assert len(dt_cut.cuts) == 1
-        assert isinstance(dt_cut.cuts[0], Cutting)
-        assert dt_cut.cuts[0].get_maybe_top_end_cut() is not None
-        assert dt_cut.cuts[0].get_maybe_bottom_end_cut() is None
-        assert isinstance(dt_cut.cuts[0].negative_csg, Difference)
+        assert isinstance(dt_cut, Cutting)
+        assert dt_cut.get_maybe_top_end_cut() is not None
+        assert dt_cut.get_maybe_bottom_end_cut() is None
+        assert isinstance(dt_cut.negative_csg, Difference)
 
         # Receiving timber: 1 cut, no end cuts, with inset > 0 → SolidUnion(notch, socket)
-        assert len(recv_cut.cuts) == 1
-        assert isinstance(recv_cut.cuts[0], Cutting)
-        assert recv_cut.cuts[0].get_maybe_top_end_cut() is None
-        assert recv_cut.cuts[0].get_maybe_bottom_end_cut() is None
-        assert isinstance(recv_cut.cuts[0].negative_csg, SolidUnion)
+        assert isinstance(recv_cut, Cutting)
+        assert recv_cut.get_maybe_top_end_cut() is None
+        assert recv_cut.get_maybe_bottom_end_cut() is None
+        assert isinstance(recv_cut.negative_csg, SolidUnion)
 
         # ---- render both timbers ----
-        dt_csg = dt_cut.render_timber_with_cuts_csg_local()
-        recv_csg = recv_cut.render_timber_with_cuts_csg_local()
+        dt_csg = _render_cutting(dt_cut)
+        recv_csg = _render_cutting(recv_cut)
 
         def in_dt(pt):
             return dt_csg.contains_point(dovetail_timber.transform.global_to_local(pt))
@@ -421,10 +423,10 @@ class TestHousedDovetailButtJoint:
                 dovetail_large_width=Rational(3),
             )
 
-            assert len(joint.cut_timbers) == 2
+            assert len(joint.cuttings) == 2
             # Both timbers should be renderable
-            joint.cut_timbers["butt_timber"].render_timber_with_cuts_csg_local()
-            joint.cut_timbers["receiving_timber"].render_timber_with_cuts_csg_local()
+            _render_cutting(joint.cuttings["butt_timber"])
+            _render_cutting(joint.cuttings["receiving_timber"])
 
     def test_zero_shoulder_inset(self):
         """With shoulder_inset=0 receiving timber has no shoulder notch (no SolidUnion)."""
@@ -438,7 +440,7 @@ class TestHousedDovetailButtJoint:
             dovetail_large_width=Rational(3),
         )
 
-        recv_neg_csg = joint.cut_timbers[arrangement.receiving_timber.ticket.name].cuts[0].negative_csg
+        recv_neg_csg = joint.cuttings[arrangement.receiving_timber.ticket.name].negative_csg
         assert not isinstance(recv_neg_csg, SolidUnion), \
             "With zero inset, receiving negative CSG should be the socket alone (no SolidUnion)"
 

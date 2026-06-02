@@ -113,6 +113,13 @@ def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Option
         # Only optional/defaulted parameters are currently exposed in the UI.
         return None
 
+    if parameter.default is None:
+        # Plain optional parameters like ``center=None`` are usually internal
+        # placement hooks, not viewer-facing controls. Exposing them as string
+        # params causes the default ``None`` to be passed back as the literal
+        # string "None".
+        return None
+
     if isinstance(parameter.default, Param):
         declared = parameter.default
         default_value = declared.default
@@ -260,6 +267,9 @@ def resolve_callable_render_parameters(
             value = provided[descriptor.name]
         else:
             value = descriptor.default_value
+        if value is None:
+            resolved[descriptor.name] = None
+            continue
         resolved[descriptor.name] = _coerce_parameter_value(value, descriptor)
 
     return descriptors, resolved

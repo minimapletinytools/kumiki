@@ -460,10 +460,10 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     joint_accessories["spline"] = spline
     
     return Joint(
-        cut_timbers={
-            "receiving_timber": CutTimber(receiving_timber, cuts=[receiving_cut]),
-            "butt_timber_1": CutTimber(butt_timber_1, cuts=[butt_1_cut]),
-            "butt_timber_2": CutTimber(butt_timber_2, cuts=[butt_2_cut]),
+        cuttings={
+            "receiving_timber": receiving_cut,
+            "butt_timber_1": butt_1_cut,
+            "butt_timber_2": butt_2_cut,
         },
         ticket=JointTicket(joint_type="splined_opposing_double_butt"),
         jointAccessories=joint_accessories,

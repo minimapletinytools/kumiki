@@ -213,7 +213,7 @@ def example_raise_single_pattern():
     center = create_v3(feet(10), feet(5), 0)
     frame2 = book.raise_pattern("wide_post", center=center)
     print(f"\nRaised pattern at custom location: {frame2.tag}")
-    print(f"  Position: {frame2.cut_timbers[0].timber.transform.position.T}")
+    print(f"  Position: {frame2.cuttings[0].timber.transform.position.T}")
     
     return frame
 

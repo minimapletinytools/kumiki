@@ -177,12 +177,12 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     )
     
     # Create CutTimbers with cuts passed at construction
-    cut_timberA = CutTimber(timberA, cuts=[cutA])
-    cut_timberB = CutTimber(timberB, cuts=[cutB])
+    cut_timberA = cutA
+    cut_timberB = cutB
     
     # Create and return the Joint with all data at construction
     joint = Joint(
-        cut_timbers={"timberA": cut_timberA, "timberB": cut_timberB},
+        cuttings={"timberA": cut_timberA, "timberB": cut_timberB},
         ticket=JointTicket(joint_type="plain_miter"),
         jointAccessories={},
     )
@@ -289,9 +289,9 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
     )
 
     joint = Joint(
-        cut_timbers={
-            "receiving_timber": CutTimber(receiving_timber, cuts=[]),
-            "butt_timber": CutTimber(butt_timber, cuts=[cut]),
+        cuttings={
+            "receiving_timber": Cutting(timber=receiving_timber),
+            "butt_timber": cut,
         },
         ticket=JointTicket(joint_type="plain_butt"),
         jointAccessories={},
@@ -361,7 +361,7 @@ def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJoi
     )
 
     joint = Joint(
-        cut_timbers={"receiving_timber": CutTimber(receiving_timber, cuts=[]), "butt_timber": CutTimber(butt_timber, cuts=[cut])},
+        cuttings={"receiving_timber": Cutting(timber=receiving_timber), "butt_timber": cut},
         ticket=JointTicket(joint_type="plain_butt"),
         jointAccessories={},
     )
@@ -607,9 +607,9 @@ def cut_tongue_and_fork_corner_joint(
     )
 
     return Joint(
-        cut_timbers={
-            "tongue_timber": CutTimber(tongue_timber, cuts=[tongue_cut]),
-            "fork_timber": CutTimber(fork_timber, cuts=[fork_cut]),
+        cuttings={
+            "tongue_timber": tongue_cut,
+            "fork_timber": fork_cut,
         },
         ticket=JointTicket(joint_type="tongue_and_fork_corner"),
         jointAccessories={},
@@ -828,9 +828,9 @@ def cut_tongue_and_fork_butt_joint(
     )
 
     return Joint(
-        cut_timbers={
-            "tongue_timber": CutTimber(tongue_timber, cuts=[tongue_cut]),
-            "fork_timber": CutTimber(fork_timber, cuts=[fork_cut]),
+        cuttings={
+            "tongue_timber": tongue_cut,
+            "fork_timber": fork_cut,
         },
         ticket=JointTicket(joint_type="tongue_and_fork_butt"),
         jointAccessories={},
@@ -945,12 +945,12 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     )
     
     # Create CutTimbers with cuts passed at construction
-    cut_timberA = CutTimber(timberA, cuts=[cutA])
-    cut_timberB = CutTimber(timberB, cuts=[cutB])
+    cut_timberA = cutA
+    cut_timberB = cutB
     
     # Create and return the Joint with all data at construction
     joint = Joint(
-        cut_timbers={"timberA": cut_timberA, "timberB": cut_timberB},
+        cuttings={"timberA": cut_timberA, "timberB": cut_timberB},
         ticket=JointTicket(joint_type="plain_butt_splice"),
         jointAccessories={},
     )
@@ -1254,13 +1254,12 @@ def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_rati
         )
         cuts_B.append(cut_B)
     
-    # Create CutTimbers
-    cut_timberA = CutTimber(timberA, cuts=cuts_A)
-    cut_timberB = CutTimber(timberB, cuts=cuts_B)
+    cut_timberA = cuts_A[0] if len(cuts_A) > 0 else Cutting(timber=timberA)
+    cut_timberB = cuts_B[0] if len(cuts_B) > 0 else Cutting(timber=timberB)
     
     # Create and return the Joint
     joint = Joint(
-        cut_timbers={"timberA": cut_timberA, "timberB": cut_timberB},
+        cuttings={"timberA": cut_timberA, "timberB": cut_timberB},
         ticket=JointTicket(joint_type="plain_cross_lap"),
         jointAccessories={},
     )
@@ -1329,16 +1328,8 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
     )
 
     # LOL so smart, whatever
-    cross_lap_cutA = (
-        cross_lap_joint.cut_timbers["timberA"].cuts[0]
-        if len(cross_lap_joint.cut_timbers["timberA"].cuts) > 0
-        else Cutting(timber=timberA)
-    )
-    cross_lap_cutB = (
-        cross_lap_joint.cut_timbers["timberB"].cuts[0]
-        if len(cross_lap_joint.cut_timbers["timberB"].cuts) > 0
-        else Cutting(timber=timberB)
-    )
+    cross_lap_cutA = cross_lap_joint.cuttings["timberA"]
+    cross_lap_cutB = cross_lap_joint.cuttings["timberB"]
 
     cutA = Cutting(
         timber=timberA,
@@ -1372,9 +1363,9 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
     )
 
     return Joint(
-        cut_timbers={
-            "timberA": CutTimber(timberA, cuts=[cutA]),
-            "timberB": CutTimber(timberB, cuts=[cutB]),
+        cuttings={
+            "timberA": cutA,
+            "timberB": cutB,
         },
         ticket=JointTicket(joint_type="plain_corner_lap"),
         jointAccessories={},
@@ -1593,14 +1584,14 @@ def cut_plain_house_joint_DEPRECATED(housing_timber: TimberLike, housed_timber: 
     )
     
     # Create CutTimber for the housing timber (with cut)
-    cut_housing = CutTimber(housing_timber, cuts=[cut])
+    cut_housing = cut
     
     # Create CutTimber for the housed timber (no cuts)
-    cut_housed = CutTimber(housed_timber, cuts=[])
+    cut_housed = Cutting(timber=housed_timber)
     
     # Create and return the Joint
     joint = Joint(
-        cut_timbers={"housing_timber": cut_housing, "housed_timber": cut_housed},
+        cuttings={"housing_timber": cut_housing, "housed_timber": cut_housed},
         ticket=JointTicket(joint_type="plain_housing"),
         jointAccessories={},
     )
@@ -1702,12 +1693,12 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
     )
     
     # Create CutTimbers
-    cut_top_timber = CutTimber(top_lap_timber, cuts=[cut_top])
-    cut_bottom_timber = CutTimber(bottom_lap_timber, cuts=[cut_bottom])
+    cut_top_timber = cut_top
+    cut_bottom_timber = cut_bottom
     
     # Create and return the Joint
     joint = Joint(
-        cut_timbers={"top_lap_timber": cut_top_timber, "bottom_lap_timber": cut_bottom_timber},
+        cuttings={"top_lap_timber": cut_top_timber, "bottom_lap_timber": cut_bottom_timber},
         ticket=JointTicket(joint_type="plain_splice_lap"),
         jointAccessories={},
     )

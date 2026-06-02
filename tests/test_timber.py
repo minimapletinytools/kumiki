@@ -923,17 +923,13 @@ class TestFrameFromJoints:
             ticket="Timber 2"
         )
         
-        # Create mock cuts for each timber
-        cut1 = MockCutting(timber1, create_v3(Integer(0), Integer(0), Integer(0)))
-        cut2 = MockCutting(timber2, create_v3(Integer(0), Integer(0), Integer(0)))
-        
-        # Create CutTimbers
-        cut_timber1 = CutTimber(timber1, cuts=[cut1])  # type: ignore
-        cut_timber2 = CutTimber(timber2, cuts=[cut2])  # type: ignore
+        # Create cuts for each timber
+        cut1 = Cutting(timber=timber1)
+        cut2 = Cutting(timber=timber2)
         
         # Create a joint
         joint = Joint(
-            cut_timbers={"timber1": cut_timber1, "timber2": cut_timber2},
+            cuttings={"timber1": cut1, "timber2": cut2},
             ticket=JointTicket(joint_type="test_simple_joint"),
             jointAccessories={}
         )
@@ -964,29 +960,31 @@ class TestFrameFromJoints:
         )
         
         # Create different cuts for the same timber
-        cut1 = MockCutting(timber, create_v3(Integer(0), Integer(0), Integer(0)))
-        cut2 = MockCutting(timber, create_v3(Integer(0), Integer(0), Integer(0)))
-        cut3 = MockCutting(timber, create_v3(Integer(0), Integer(0), Integer(0)))
+        cut1 = Cutting(timber=timber)
+        cut2 = Cutting(timber=timber)
+        cut3 = Cutting(timber=timber)
         
-        # Create multiple CutTimber instances for the same timber
-        cut_timber1 = CutTimber(timber, cuts=[cut1])  # type: ignore
-        cut_timber2 = CutTimber(timber, cuts=[cut2, cut3])  # type: ignore
-        
-        # Create two joints that both reference the same timber
+        # Create joints that all reference the same timber
         joint1 = Joint(
-            cut_timbers={"timber": cut_timber1},
+            cuttings={"timber": cut1},
             ticket=JointTicket(joint_type="test_merge_shared_1"),
             jointAccessories={}
         )
         
         joint2 = Joint(
-            cut_timbers={"timber": cut_timber2},
+            cuttings={"timber": cut2},
             ticket=JointTicket(joint_type="test_merge_shared_2"),
+            jointAccessories={}
+        )
+
+        joint3 = Joint(
+            cuttings={"timber": cut3},
+            ticket=JointTicket(joint_type="test_merge_shared_3"),
             jointAccessories={}
         )
         
         # Create frame from joints
-        frame = Frame.from_joints([joint1, joint2])
+        frame = Frame.from_joints([joint1, joint2, joint3])
         
         # Verify only one cut timber in the frame (merged)
         assert len(frame.cut_timbers) == 1
@@ -1035,13 +1033,13 @@ class TestFrameFromJoints:
         
         # Create joints with accessories
         joint1 = Joint(
-            cut_timbers={"timber": CutTimber(timber, cuts=[])},
+            cuttings={"timber": Cutting(timber=timber)},
             ticket=JointTicket(joint_type="test_accessories_peg"),
             jointAccessories={"peg": peg}
         )
         
         joint2 = Joint(
-            cut_timbers={"timber": CutTimber(timber, cuts=[])},
+            cuttings={"timber": Cutting(timber=timber)},
             ticket=JointTicket(joint_type="test_accessories_wedge"),
             jointAccessories={"wedge": wedge}
         )
@@ -1078,7 +1076,7 @@ class TestFrameFromJoints:
         
         # Create a joint with timber1
         joint = Joint(
-            cut_timbers={"timber1": CutTimber(timber1, cuts=[MockCutting(timber1, create_v3(Integer(0), Integer(0), Integer(0)))])},  # type: ignore
+            cuttings={"timber1": MockCutting(timber1, create_v3(Integer(0), Integer(0), Integer(0)))},  # type: ignore[arg-type]
             ticket=JointTicket(joint_type="test_with_unjointed"),
             jointAccessories={}
         )
@@ -1120,13 +1118,13 @@ class TestFrameFromJoints:
         
         # Create joints
         joint1 = Joint(
-            cut_timbers={"timber1": CutTimber(timber1, cuts=[])},
+            cuttings={"timber1": Cutting(timber=timber1)},
             ticket=JointTicket(joint_type="test_same_name_warn_1"),
             jointAccessories={}
         )
         
         joint2 = Joint(
-            cut_timbers={"timber2": CutTimber(timber2, cuts=[])},
+            cuttings={"timber2": Cutting(timber=timber2)},
             ticket=JointTicket(joint_type="test_same_name_warn_2"),
             jointAccessories={}
         )
@@ -1170,13 +1168,13 @@ class TestFrameFromJoints:
         
         # Create joints
         joint1 = Joint(
-            cut_timbers={"timber1": CutTimber(timber1, cuts=[])},
+            cuttings={"timber1": Cutting(timber=timber1)},
             ticket=JointTicket(joint_type="test_dup_data_1"),
             jointAccessories={}
         )
         
         joint2 = Joint(
-            cut_timbers={"timber2": CutTimber(timber2, cuts=[])},
+            cuttings={"timber2": Cutting(timber=timber2)},
             ticket=JointTicket(joint_type="test_dup_data_2"),
             jointAccessories={}
         )
@@ -1283,9 +1281,10 @@ class TestFrameBoundingBox:
         cut_timberB = next(ct for ct in frame.cut_timbers if ct.timber.ticket.name == "TimberB")
         assert len(cut_timberB.cuts) > 0, "TimberB should have cuts applied"
         
-        # Verify that timberA is uncut
+        # Receiving timber carries a no-op cut in strict one-cut-per-member mode.
         cut_timberA = next(ct for ct in frame.cut_timbers if ct.timber.ticket.name == "TimberA")
-        assert len(cut_timberA.cuts) == 0, "TimberA should be uncut (receiving timber)"
+        assert len(cut_timberA.cuts) == 1, "TimberA should have one no-op cutting"
+        assert cut_timberA.cuts[0].negative_csg is None
         
         # Get the bounding prisms for both timbers
         timberA_prism = cut_timberA.DEPRECATED_approximate_bounding_prism()

@@ -1456,7 +1456,7 @@ def create_tinyhouse120(center: Optional[V3] = None):
             + rafter_house_joints
             + rafter_pair_joints
         )
-        for cut_timber in joint.cut_timbers.values()
+        for cut_timber in joint.cuttings.values()
     }
 
     unjointed_timbers = [

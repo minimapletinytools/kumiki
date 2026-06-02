@@ -2102,9 +2102,26 @@ class Sticker(JointAccessory):
         
 @dataclass(frozen=True)
 class Joint:
-    cut_timbers: Dict[str, CutTimber]
+    cuttings: Dict[str, Cutting]
     ticket: JointTicket
     jointAccessories: Dict[str, JointAccessory] = field(default_factory=dict)
+    
+    # TODO DELETE THIS
+    @property
+    def cut_timbers(self) -> Dict[str, 'CutTimber']:
+        """
+        Backward compatibility property: provides cut_timbers as a dict of CutTimber objects.
+        
+        This property wraps each Cutting in a CutTimber for compatibility with code
+        that expects the old Joint.cut_timbers structure.
+        
+        Returns:
+            Dict[str, CutTimber]: Maps timber names to CutTimber objects
+        """
+        result: Dict[str, CutTimber] = {}
+        for name, cutting in self.cuttings.items():
+            result[name] = CutTimber(timber=cutting.timber, cuts=[cutting])
+        return result
 
 
 @dataclass(frozen=True)
@@ -2158,23 +2175,24 @@ class Frame:
         if additional_unjointed_timbers is None:
             additional_unjointed_timbers = []
         
-        # Dictionary to group CutTimber objects by their underlying Timber reference (identity)
-        # Key: id(timber), Value: List of CutTimber objects
-        timber_ref_to_cut_timbers: Dict[int, List[CutTimber]] = {}
-        
-        # Extract cut timbers from all joints
+        # Dictionary to group Cutting objects by their underlying Timber reference (identity)
+        # Key: id(timber), Value: List of Cutting objects
+        timber_ref_to_cuttings: Dict[int, List[Cutting]] = {}
+        timber_ref_to_timber: Dict[int, PerfectTimberWithin] = {}
+
+        # Extract cuttings from all joints
         for joint in joints:
-            for cut_timber in joint.cut_timbers.values():
-                timber_id = id(cut_timber.timber)
-                if timber_id not in timber_ref_to_cut_timbers:
-                    timber_ref_to_cut_timbers[timber_id] = []
-                timber_ref_to_cut_timbers[timber_id].append(cut_timber)
+            for cutting in joint.cuttings.values():
+                timber_id = id(cutting.timber)
+                timber_ref_to_timber[timber_id] = cutting.timber
+                if timber_id not in timber_ref_to_cuttings:
+                    timber_ref_to_cuttings[timber_id] = []
+                timber_ref_to_cuttings[timber_id].append(cutting)
         
         # Check for name conflicts
         # Build a mapping from name to list of timber references
         name_to_timber_refs: Dict[str, List[PerfectTimberWithin]] = {}
-        for timber_id, cut_timber_list in timber_ref_to_cut_timbers.items():
-            timber = cut_timber_list[0].timber  # Get timber from first CutTimber
+        for timber_id, timber in timber_ref_to_timber.items():
             timber_name = timber.ticket.name
             if timber_name is not None:
                 if timber_name not in name_to_timber_refs:
@@ -2216,13 +2234,12 @@ class Frame:
         
         # Merge cut timbers with the same underlying timber reference
         merged_cut_timbers: List[CutTimber] = []
-        for timber_id, cut_timber_list in timber_ref_to_cut_timbers.items():
-            timber = cut_timber_list[0].timber
-            
-            # Collect all cuts from all CutTimber instances for this timber
+        for timber_id, cutting_list in timber_ref_to_cuttings.items():
+            timber = timber_ref_to_timber[timber_id]
+
+            # Collect all cuts from all joints for this timber
             all_cuts: List[Cutting] = []
-            for cut_timber in cut_timber_list:
-                all_cuts.extend(cut_timber.cuts)
+            all_cuts.extend(cutting_list)
             
             # Create a single merged CutTimber
             merged_cut_timber = CutTimber(timber, cuts=all_cuts)

@@ -412,21 +412,10 @@ def cut_lapped_gooseneck_joint(
         negative_csg=gooseneck_timber_combined_csg
     )
     
-    # Create CutTimber objects with the cuts
-    receiving_timber_cut = CutTimber(
-        timber=receiving_timber,
-        cuts=[receiving_timber_cut_obj]
-    )
-    
-    gooseneck_timber_cut = CutTimber(
-        timber=gooseneck_timber,
-        cuts=[gooseneck_timber_cut_obj]
-    )
-    
     return Joint(
-        cut_timbers={
-            receiving_timber.ticket.name: receiving_timber_cut,
-            gooseneck_timber.ticket.name: gooseneck_timber_cut
+        cuttings={
+            receiving_timber.ticket.name: receiving_timber_cut_obj,
+            gooseneck_timber.ticket.name: gooseneck_timber_cut_obj
         },
         ticket=JointTicket(joint_type="lapped_gooseneck"),
         jointAccessories={},
@@ -654,21 +643,10 @@ def cut_housed_dovetail_butt_joint(
         negative_csg=receiving_timber_negative_csg
     )
     
-    # Create CutTimber objects
-    dovetail_timber_cut = CutTimber(
-        timber=dovetail_timber,
-        cuts=[dovetail_timber_cut_obj]
-    )
-    
-    receiving_timber_cut = CutTimber(
-        timber=receiving_timber,
-        cuts=[receiving_timber_cut_obj]
-    )
-    
     return Joint(
-        cut_timbers={
-            dovetail_timber.ticket.name: dovetail_timber_cut,
-            receiving_timber.ticket.name: receiving_timber_cut
+        cuttings={
+            dovetail_timber.ticket.name: dovetail_timber_cut_obj,
+            receiving_timber.ticket.name: receiving_timber_cut_obj
         },
         ticket=JointTicket(joint_type="housed_dovetail_butt"),
         jointAccessories={},
@@ -1292,8 +1270,8 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
     )
     
     # Create CutTimber objects
-    cut_timberA = CutTimber(timberA, cuts=[cutA])
-    cut_timberB = CutTimber(timberB, cuts=[cutB])
+    cut_timberA = cutA
+    cut_timberB = cutB
 
 
     # Create jointAccessories dict with key wedges
@@ -1303,7 +1281,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
     
     # Return Joint
     return Joint(
-        cut_timbers={
+        cuttings={
             timberA.ticket.name: cut_timberA,
             timberB.ticket.name: cut_timberB
         },

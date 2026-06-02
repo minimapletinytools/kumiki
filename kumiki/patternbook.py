@@ -55,14 +55,15 @@ def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
     def pattern_lambda(center: V3, **pattern_kwargs: Any) -> Frame:
         joint = joint_func(**pattern_kwargs)
         translated_timbers: List[CutTimber] = []
-        for timber in joint.cut_timbers.values():
-            new_position = timber.timber.get_bottom_position_global() + center
+        for cutting in joint.cuttings.values():
+            new_position = cutting.timber.get_bottom_position_global() + center
             # Preserve the concrete timber subclass (RoundTimber, MeshTimber, etc.) — only override the transform.
             translated_timber = replace(
-                timber.timber,
-                transform=Transform(position=new_position, orientation=timber.timber.orientation),
+                cutting.timber,
+                transform=Transform(position=new_position, orientation=cutting.timber.orientation),
             )
-            translated_timbers.append(CutTimber(timber=translated_timber, cuts=timber.cuts))
+            translated_cut = replace(cutting, timber=translated_timber)
+            translated_timbers.append(CutTimber(timber=translated_timber, cuts=[translated_cut]))
 
         translated_accessories: List[JointAccessory] = []
         if joint.jointAccessories:

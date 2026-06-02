@@ -648,21 +648,21 @@ def create_oscarshed(center: Optional[V3] = None):
     
     # The left piece gets cuts from mortise & tenon joint and left gooseneck joint
     front_girt_left_cuts = []
-    front_girt_left_cuts.extend(joint_front_girt_left.cut_timbers[front_girt_left.ticket.name].cuts)  # Tenon cuts
-    front_girt_left_cuts.extend(front_girt_gooseneck_joint_left.cut_timbers[front_girt_left.ticket.name].cuts)  # Gooseneck cuts
+    front_girt_left_cuts.append(joint_front_girt_left.cuttings[front_girt_left.ticket.name])  # Tenon cuts
+    front_girt_left_cuts.append(front_girt_gooseneck_joint_left.cuttings[front_girt_left.ticket.name])  # Gooseneck cuts
     
     # The middle piece gets cuts from both gooseneck joints
     front_girt_middle_cuts = []
     # Middle piece is referenced in both joints, need to check which one has it
-    if front_girt_middle.ticket.name in front_girt_gooseneck_joint_left.cut_timbers:
-        front_girt_middle_cuts.extend(front_girt_gooseneck_joint_left.cut_timbers[front_girt_middle.ticket.name].cuts)
-    if front_girt_middle.ticket.name in front_girt_gooseneck_joint_right.cut_timbers:
-        front_girt_middle_cuts.extend(front_girt_gooseneck_joint_right.cut_timbers[front_girt_middle.ticket.name].cuts)
+    if front_girt_middle.ticket.name in front_girt_gooseneck_joint_left.cuttings:
+        front_girt_middle_cuts.append(front_girt_gooseneck_joint_left.cuttings[front_girt_middle.ticket.name])
+    if front_girt_middle.ticket.name in front_girt_gooseneck_joint_right.cuttings:
+        front_girt_middle_cuts.append(front_girt_gooseneck_joint_right.cuttings[front_girt_middle.ticket.name])
     
     # The right piece gets cuts from mortise & tenon joint and right gooseneck joint
     front_girt_right_cuts = []
-    front_girt_right_cuts.extend(joint_front_girt_right.cut_timbers[front_girt_right.ticket.name].cuts)  # Tenon cuts
-    front_girt_right_cuts.extend(front_girt_gooseneck_joint_right.cut_timbers[front_girt_right.ticket.name].cuts)  # Gooseneck cuts
+    front_girt_right_cuts.append(joint_front_girt_right.cuttings[front_girt_right.ticket.name])  # Tenon cuts
+    front_girt_right_cuts.append(front_girt_gooseneck_joint_right.cuttings[front_girt_right.ticket.name])  # Gooseneck cuts
     
     # Create CutTimbers for the split pieces with all their cuts
     pct_front_girt_left = CutTimber(front_girt_left, cuts=front_girt_left_cuts)
