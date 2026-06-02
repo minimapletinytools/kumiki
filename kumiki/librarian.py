@@ -19,14 +19,16 @@ populated when ``load_frame_examples=True``).
 
 from __future__ import annotations
 
+import ast
 from dataclasses import dataclass, field
 import inspect
 from pathlib import Path
 import hashlib
 import importlib.util
 import sys
+import textwrap
 import traceback
-from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple, get_args, get_origin
 
 from sympy import Float, Rational
 
@@ -36,7 +38,7 @@ from .patternbook import PatternBook
 
 _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
 
-_PARAM_KIND_VALUES: Tuple[str, ...] = ("number", "boolean", "string", "enum")
+_PARAM_KIND_VALUES: Tuple[str, ...] = ("number", "boolean", "string", "enum", "v3")
 
 
 @dataclass(frozen=True)
@@ -51,21 +53,23 @@ class Param:
 
     default: Any
     description: str = ""
-    kind: Optional[Literal["number", "boolean", "string", "enum"]] = None
+    kind: Optional[Literal["number", "boolean", "string", "enum", "v3"]] = None
     options: Optional[Tuple[str, ...]] = None
     minimum: Optional[Any] = None
     maximum: Optional[Any] = None
+    optional: Optional[bool] = None
 
 
 @dataclass(frozen=True)
 class RenderParameterDescriptor:
     name: str
     default_value: Any
-    kind: Literal["number", "boolean", "string", "enum"]
+    kind: Literal["number", "boolean", "string", "enum", "v3"]
     description: str = ""
     options: Tuple[str, ...] = ()
     minimum: Optional[Any] = None
     maximum: Optional[Any] = None
+    optional: bool = False
 
     def to_protocol_dict(self) -> Dict[str, Any]:
         payload: Dict[str, Any] = {
@@ -80,6 +84,8 @@ class RenderParameterDescriptor:
             payload["minimum"] = serialize_render_parameter_value(self.minimum)
         if self.maximum is not None:
             payload["maximum"] = serialize_render_parameter_value(self.maximum)
+        if self.optional:
+            payload["optional"] = True
         return payload
 
 
@@ -87,11 +93,34 @@ def _looks_like_sympy_number(value: Any) -> bool:
     return hasattr(value, "is_real") and hasattr(value, "evalf")
 
 
-def _infer_parameter_kind(default_value: Any) -> Literal["number", "boolean", "string", "enum"]:
+def _looks_like_v3_value(value: Any) -> bool:
+    shape = getattr(value, "shape", None)
+    return shape in ((3, 1), (1, 3))
+
+
+def _infer_parameter_kind_from_annotation(annotation: Any, annotation_text: Optional[str]) -> Optional[Literal["number", "boolean", "string", "enum", "v3"]]:
+    text = (annotation_text or "").replace(" ", "")
+    if "V3" in text:
+        return "v3"
+    if annotation is bool:
+        return "boolean"
+    if annotation is str:
+        return "string"
+    if annotation in (int, float, Rational, Float):
+        return "number"
+    return None
+
+
+def _infer_parameter_kind(default_value: Any, annotation: Any = None, annotation_text: Optional[str] = None) -> Literal["number", "boolean", "string", "enum", "v3"]:
+    annotation_kind = _infer_parameter_kind_from_annotation(annotation, annotation_text)
+    if annotation_kind is not None:
+        return annotation_kind
     if isinstance(default_value, bool):
         return "boolean"
     if isinstance(default_value, str):
         return "string"
+    if _looks_like_v3_value(default_value):
+        return "v3"
     if isinstance(default_value, (int, float, Rational, Float)):
         return "number"
     if _looks_like_sympy_number(default_value):
@@ -105,7 +134,67 @@ def _normalize_param_options(options: Optional[Iterable[Any]]) -> Tuple[str, ...
     return tuple(str(option) for option in options)
 
 
-def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Optional[RenderParameterDescriptor]:
+def _strip_optional_annotation_text(annotation_text: Optional[str]) -> Optional[str]:
+    if annotation_text is None:
+        return None
+    stripped = annotation_text.strip()
+    compact = stripped.replace(" ", "")
+    if compact.startswith("Optional[") and compact.endswith("]"):
+        return stripped[stripped.find("[") + 1:-1].strip()
+    return stripped
+
+
+def _unwrap_optional_annotation(annotation: Any, annotation_text: Optional[str]) -> Tuple[Any, bool, Optional[str]]:
+    optional = False
+    inner_annotation = annotation
+    inner_text = annotation_text
+
+    origin = get_origin(annotation)
+    args = get_args(annotation)
+    if origin is not None and args:
+        non_none_args = tuple(arg for arg in args if arg is not type(None))
+        if len(non_none_args) == len(args) - 1:
+            optional = True
+            inner_annotation = non_none_args[0]
+
+    compact = (annotation_text or "").replace(" ", "")
+    if "Optional[" in compact or "|None" in compact or "None|" in compact:
+        optional = True
+        inner_text = _strip_optional_annotation_text(annotation_text)
+
+    return inner_annotation, optional, inner_text
+
+
+def _extract_parameter_annotation_texts(callable_obj: Any) -> Dict[str, str]:
+    try:
+        source = textwrap.dedent(inspect.getsource(callable_obj))
+    except (OSError, TypeError):
+        return {}
+
+    try:
+        module = ast.parse(source)
+    except SyntaxError:
+        return {}
+
+    target_name = getattr(callable_obj, "__name__", None)
+    if not target_name:
+        return {}
+
+    for node in ast.walk(module):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == target_name:
+            parameters = [*node.args.posonlyargs, *node.args.args, *node.args.kwonlyargs]
+            result: Dict[str, str] = {}
+            for param in parameters:
+                if param.annotation is not None:
+                    result[param.arg] = ast.unparse(param.annotation)
+            return result
+    return {}
+
+
+def _descriptor_from_signature_parameter(
+    parameter: inspect.Parameter,
+    annotation_text: Optional[str] = None,
+) -> Optional[RenderParameterDescriptor]:
     if parameter.kind in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD):
         return None
 
@@ -113,11 +202,10 @@ def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Option
         # Only optional/defaulted parameters are currently exposed in the UI.
         return None
 
-    if parameter.default is None:
-        # Plain optional parameters like ``center=None`` are usually internal
-        # placement hooks, not viewer-facing controls. Exposing them as string
-        # params causes the default ``None`` to be passed back as the literal
-        # string "None".
+    annotation = parameter.annotation if parameter.annotation is not inspect.Parameter.empty else None
+    inner_annotation, annotation_is_optional, inner_annotation_text = _unwrap_optional_annotation(annotation, annotation_text)
+
+    if parameter.default is None and not annotation_is_optional:
         return None
 
     if isinstance(parameter.default, Param):
@@ -125,7 +213,7 @@ def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Option
         default_value = declared.default
         declared_kind = declared.kind
         if declared_kind is None:
-            kind = _infer_parameter_kind(default_value)
+            kind = _infer_parameter_kind(default_value, inner_annotation, inner_annotation_text)
         else:
             kind = str(declared_kind)
             if kind not in _PARAM_KIND_VALUES:
@@ -138,6 +226,7 @@ def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Option
             raise ValueError(
                 f"Parameter '{parameter.name}' declared as enum must provide options"
             )
+        optional = declared.optional if declared.optional is not None else (default_value is None or annotation_is_optional)
         return RenderParameterDescriptor(
             name=parameter.name,
             default_value=default_value,
@@ -146,9 +235,25 @@ def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Option
             options=options,
             minimum=declared.minimum,
             maximum=declared.maximum,
+            optional=optional,
         )
 
-    inferred_kind = _infer_parameter_kind(parameter.default)
+    if parameter.default is None:
+        kind = _infer_parameter_kind_from_annotation(inner_annotation, inner_annotation_text)
+        if kind is None:
+            return None
+        return RenderParameterDescriptor(
+            name=parameter.name,
+            default_value=None,
+            kind=kind,
+            description="",
+            options=(),
+            minimum=None,
+            maximum=None,
+            optional=True,
+        )
+
+    inferred_kind = _infer_parameter_kind(parameter.default, inner_annotation, inner_annotation_text)
     return RenderParameterDescriptor(
         name=parameter.name,
         default_value=parameter.default,
@@ -157,6 +262,7 @@ def _descriptor_from_signature_parameter(parameter: inspect.Parameter) -> Option
         options=(),
         minimum=None,
         maximum=None,
+        optional=annotation_is_optional,
     )
 
 
@@ -167,6 +273,7 @@ def discover_callable_render_parameters(
 ) -> List[RenderParameterDescriptor]:
     """Inspect a callable signature and return render-parameter descriptors."""
     signature = inspect.signature(callable_obj)
+    annotation_texts = _extract_parameter_annotation_texts(callable_obj)
     discovered: List[RenderParameterDescriptor] = []
     parameters = list(signature.parameters.values())
 
@@ -174,7 +281,10 @@ def discover_callable_render_parameters(
         parameters = parameters[1:]
 
     for parameter in parameters:
-        descriptor = _descriptor_from_signature_parameter(parameter)
+        descriptor = _descriptor_from_signature_parameter(
+            parameter,
+            annotation_text=annotation_texts.get(parameter.name),
+        )
         if descriptor is not None:
             discovered.append(descriptor)
     return discovered
@@ -221,6 +331,30 @@ def _coerce_number(value: Any, param_name: str) -> Any:
     raise ValueError(f"Parameter '{param_name}' expects a numeric value")
 
 
+def _coerce_v3(value: Any, param_name: str) -> Any:
+    from .rule import create_v3
+
+    if _looks_like_v3_value(value):
+        return create_v3(
+            _coerce_number(value[0], f"{param_name}.x"),
+            _coerce_number(value[1], f"{param_name}.y"),
+            _coerce_number(value[2], f"{param_name}.z"),
+        )
+    if isinstance(value, dict):
+        return create_v3(
+            _coerce_number(value.get("x"), f"{param_name}.x"),
+            _coerce_number(value.get("y"), f"{param_name}.y"),
+            _coerce_number(value.get("z"), f"{param_name}.z"),
+        )
+    if isinstance(value, (list, tuple)) and len(value) == 3:
+        return create_v3(
+            _coerce_number(value[0], f"{param_name}.x"),
+            _coerce_number(value[1], f"{param_name}.y"),
+            _coerce_number(value[2], f"{param_name}.z"),
+        )
+    raise ValueError(f"Parameter '{param_name}' expects a V3 value")
+
+
 def _coerce_parameter_value(value: Any, descriptor: RenderParameterDescriptor) -> Any:
     if descriptor.kind == "boolean":
         return _coerce_bool(value, descriptor.name)
@@ -235,6 +369,8 @@ def _coerce_parameter_value(value: Any, descriptor: RenderParameterDescriptor) -
                 f"Parameter '{descriptor.name}' must be <= {descriptor.maximum}, got {coerced}"
             )
         return coerced
+    if descriptor.kind == "v3":
+        return _coerce_v3(value, descriptor.name)
     if descriptor.kind == "enum":
         coerced = str(value)
         if coerced not in descriptor.options:
@@ -279,6 +415,12 @@ def serialize_render_parameter_value(value: Any) -> Any:
     """Convert render parameter values to JSON-friendly primitives."""
     if value is None or isinstance(value, (bool, int, float, str)):
         return value
+    if _looks_like_v3_value(value):
+        return {
+            "x": serialize_render_parameter_value(value[0]),
+            "y": serialize_render_parameter_value(value[1]),
+            "z": serialize_render_parameter_value(value[2]),
+        }
     if isinstance(value, (Rational, Float)):
         return str(value)
     if _looks_like_sympy_number(value):
