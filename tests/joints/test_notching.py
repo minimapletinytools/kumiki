@@ -2,6 +2,7 @@
 Tests for shoulder notching helpers in kumiki.joints.workshop.notching.
 """
 
+from dataclasses import replace
 from sympy import Rational
 
 from kumiki.cutcsg import Difference
@@ -153,26 +154,34 @@ class TestChopNotchForButtJointArrangement:
 
 
 class TestChopScribeNotch:
-    def test_returns_difference_in_cut_timber_local_space(self):
+    def test_returns_pair_in_cut_timber_local_space(self):
         timber_to_be_cut = create_standard_vertical_timber(
             height=Rational(20),
             size=(Rational(4), Rational(6)),
             position=(Rational(0), Rational(0), Rational(0)),
             ticket="timber_to_be_cut",
         )
-        timber_to_be_scribed = create_standard_horizontal_timber(
-            direction='x',
-            length=Rational(20),
-            size=(Rational(4), Rational(6)),
-            position=(Rational(-10), Rational(0), Rational(5)),
-            ticket="timber_to_be_scribed",
+        timber_to_be_scribed = replace(
+            timber_from_directions(
+                length=Rational(20),
+                size=create_v2(Rational(4), Rational(4)),
+                bottom_position=create_v3(Rational(0), Rational(0), Rational(0)),
+                length_direction=create_v3(Rational(0), Rational(0), Rational(1)),
+                width_direction=create_v3(Rational(1), Rational(0), Rational(0)),
+                ticket="timber_to_be_scribed",
+            ),
+            nominal_half_sizes=(
+                create_v2(Rational(3), Rational(3)),
+                create_v2(Rational(4), Rational(4)),
+            ),
         )
 
-        scribe_notch_csg_local = chop_scribe_notch(
+        scribed_overlap_csg_local, scribe_notch_csg_local = chop_scribe_notch(
             timber_to_be_scribed=timber_to_be_scribed,
             timber_to_be_cut=timber_to_be_cut,
         )
 
+        assert isinstance(scribed_overlap_csg_local, Difference)
         assert isinstance(scribe_notch_csg_local, Difference)
-        assert scribe_notch_csg_local.contains_point(create_v3(Rational(5), Rational(0), Rational(5)))
-        assert not scribe_notch_csg_local.contains_point(create_v3(Rational(0), Rational(0), Rational(5)))
+        assert scribed_overlap_csg_local.contains_point(create_v3(Rational(1), Rational(5, 2), Rational(10)))
+        assert scribe_notch_csg_local.contains_point(create_v3(Rational(5, 2), Rational(0), Rational(10)))

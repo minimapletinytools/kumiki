@@ -233,7 +233,7 @@ DONE-do a design pass
 
 :: TODO
 
--cuttimber/cuttnig is wrong
+DONE-cuttimber/cuttnig is wrong
   -each timber in a joint has ONE cutting
   -a cut timber is made from several joints by combining their cuttings
 
