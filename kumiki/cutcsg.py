@@ -1016,6 +1016,91 @@ class SolidUnion(CutCSG):
 
 
 @dataclass(frozen=True)
+class Intersection(CutCSG):
+    """
+    CSG intersection operation - keeps only points common to both child CSG objects.
+
+    Args:
+        left: First CSG object
+        right: Second CSG object
+    """
+    left: CutCSG
+    right: CutCSG
+
+    def __repr__(self) -> str:
+        return f"Intersection(left={self.left}, right={self.right})"
+
+    def contains_point(self, point: V3) -> bool:
+        return self.left.contains_point(point) and self.right.contains_point(point)
+
+    def is_point_on_boundary(self, point: V3) -> bool:
+        # Boundary of intersection = points in both solids that are on either boundary.
+        if not self.contains_point(point):
+            return False
+        return self.left.is_point_on_boundary(point) or self.right.is_point_on_boundary(point)
+
+    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+        left_on_boundary = self.left.is_point_on_boundary(point)
+        right_on_boundary = self.right.is_point_on_boundary(point)
+
+        if left_on_boundary and not right_on_boundary:
+            return self.left.get_outward_normal(point)
+        if right_on_boundary and not left_on_boundary:
+            return self.right.get_outward_normal(point)
+
+        if left_on_boundary and right_on_boundary:
+            left_normal = self.left.get_outward_normal(point)
+            right_normal = self.right.get_outward_normal(point)
+            if left_normal is None:
+                return right_normal
+            if right_normal is None:
+                return left_normal
+            avg_normal = left_normal + right_normal
+            norm = safe_norm(avg_normal)
+            if norm == Integer(0):
+                return left_normal
+            return avg_normal / norm
+
+        return None
+
+    def get_all_features(self, point: V3) -> List[CSGFeature]:
+        if not self.is_point_on_boundary(point):
+            return []
+        features: List[CSGFeature] = []
+        features.extend(self.left.get_all_features(point))
+        features.extend(self.right.get_all_features(point))
+        features.sort(key=lambda f: f.priority)
+        return features
+
+    def get_aabb(self) -> BoundingBox:
+        left_bbox = self.left.get_aabb()
+        right_bbox = self.right.get_aabb()
+
+        def intersect_min(a: Optional[Numeric], b: Optional[Numeric]) -> Optional[Numeric]:
+            if a is None:
+                return b
+            if b is None:
+                return a
+            return _numeric_max(a, b)
+
+        def intersect_max(a: Optional[Numeric], b: Optional[Numeric]) -> Optional[Numeric]:
+            if a is None:
+                return b
+            if b is None:
+                return a
+            return _numeric_min(a, b)
+
+        return BoundingBox(
+            intersect_min(left_bbox.min_x, right_bbox.min_x),
+            intersect_min(left_bbox.min_y, right_bbox.min_y),
+            intersect_min(left_bbox.min_z, right_bbox.min_z),
+            intersect_max(left_bbox.max_x, right_bbox.max_x),
+            intersect_max(left_bbox.max_y, right_bbox.max_y),
+            intersect_max(left_bbox.max_z, right_bbox.max_z),
+        )
+
+
+@dataclass(frozen=True)
 class Difference(CutCSG):
     """
     CSG difference operation - subtracts multiple CSG objects from a base object.
@@ -1192,18 +1277,12 @@ class Difference(CutCSG):
 
 def intersect(csg1: CutCSG, csg2: CutCSG) -> CutCSG:
     """
-    Build intersection of two CSG solids using only Difference and SolidUnion.
+    Build intersection of two CSG solids.
 
-    Identity used:
-      A ∩ B = (A ∪ B) - ((A - B) ∪ (B - A))
+    This returns an ``Intersection`` node directly rather than expanding
+    to deeper Difference/Union trees.
     """
-    a_minus_b = Difference(base=csg1, subtract=[csg2])
-    b_minus_a = Difference(base=csg2, subtract=[csg1])
-    symmetric_difference = SolidUnion(children=[a_minus_b, b_minus_a])
-    return Difference(
-        base=SolidUnion(children=[csg1, csg2]),
-        subtract=[symmetric_difference],
-    )
+    return Intersection(left=csg1, right=csg2)
 
 
 # TODO come upw ith a cuter/better name for these
@@ -1654,6 +1733,12 @@ def translate_csg(csg: CutCSG, translation: V3) -> CutCSG:
             subtract=[translate_csg(s, translation) for s in csg.subtract],
             label=csg.label,
         )
+    if isinstance(csg, Intersection):
+        return Intersection(
+            left=translate_csg(csg.left, translation),
+            right=translate_csg(csg.right, translation),
+            label=csg.label,
+        )
     if isinstance(csg, HalfSpace):
         # HalfSpace: normal·P >= offset. After translating by T: normal·(P - T) >= offset => normal·P >= offset + normal·T
         new_offset = csg.offset + safe_dot_product(csg.normal, translation)
@@ -1756,6 +1841,11 @@ def adopt_csg(
             for child in csg_in_orig_space.children
         ]
         return SolidUnion(transformed_children, label=csg_in_orig_space.label)
+
+    elif isinstance(csg_in_orig_space, Intersection):
+        transformed_left = adopt_csg(orig_transform, adopting_transform, csg_in_orig_space.left)
+        transformed_right = adopt_csg(orig_transform, adopting_transform, csg_in_orig_space.right)
+        return Intersection(left=transformed_left, right=transformed_right, label=csg_in_orig_space.label)
 
     elif isinstance(csg_in_orig_space, Difference):
         transformed_base = adopt_csg(orig_transform, adopting_transform, csg_in_orig_space.base)
