@@ -1274,17 +1274,6 @@ class Difference(CutCSG):
                 bbox = _clip_bbox_by_halfspace_complement(bbox, sub)
         return bbox
 
-
-def intersect(csg1: CutCSG, csg2: CutCSG) -> CutCSG:
-    """
-    Build intersection of two CSG solids.
-
-    This returns an ``Intersection`` node directly rather than expanding
-    to deeper Difference/Union trees.
-    """
-    return Intersection(left=csg1, right=csg2)
-
-
 # TODO come upw ith a cuter/better name for these
 Profile = List[V2]
 Profiles = List[Profile]
