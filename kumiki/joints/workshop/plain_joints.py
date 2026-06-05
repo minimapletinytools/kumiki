@@ -7,6 +7,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
+from .notching import CrossJointScribeNotchingConfig, chop_scribe_notch_and_apply
 from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, get_point_on_face_global, Space
 from .build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
 
@@ -958,7 +959,11 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     return joint
 
 
-def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_ratio: Numeric = Rational(1, 2)) -> Joint:
+def cut_plain_cross_lap_joint(
+    arrangement: CrossJointTimberArrangement,
+    cut_ratio: Numeric = Rational(1, 2),
+    notching: Optional[CrossJointScribeNotchingConfig] = CrossJointScribeNotchingConfig.cross_timber_1(),
+) -> Joint:
     """
     Creates a cross-lap joint between two intersecting timbers.
 
@@ -1256,10 +1261,33 @@ def cut_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement, cut_rati
     
     cut_timberA = cuts_A[0] if len(cuts_A) > 0 else Cutting(timber=timberA)
     cut_timberB = cuts_B[0] if len(cuts_B) > 0 else Cutting(timber=timberB)
-    
+
+    cuttings: dict[str, Cutting] = {"timberA": cut_timberA, "timberB": cut_timberB}
+
+    if notching is not None:
+        if notching.timber_to_be_scribed == ArrangementNames.cross_timber_1:
+            scribed_key, cut_key = "timberA", "timberB"
+            scribed_timber, cut_timber = timberA, timberB
+        elif notching.timber_to_be_scribed == ArrangementNames.cross_timber_2:
+            scribed_key, cut_key = "timberB", "timberA"
+            scribed_timber, cut_timber = timberB, timberA
+        else:
+            raise AssertionError(
+                f"Unsupported cross-joint notching target: {notching.timber_to_be_scribed}"
+            )
+
+        updated_cut_cutting, updated_scribed_cutting = chop_scribe_notch_and_apply(
+            timber_to_be_scribed=scribed_timber,
+            timber_to_be_scribed_cutting=cuttings[scribed_key],
+            timber_to_be_cut=cut_timber,
+            timber_to_be_cut_cutting=cuttings[cut_key],
+        )
+        cuttings[scribed_key] = updated_scribed_cutting
+        cuttings[cut_key] = updated_cut_cutting
+
     # Create and return the Joint
     joint = Joint(
-        cuttings={"timberA": cut_timberA, "timberB": cut_timberB},
+        cuttings=cuttings,
         ticket=JointTicket(joint_type="plain_cross_lap"),
         jointAccessories={},
     )

@@ -6,8 +6,8 @@ Shared helper functions for shoulder-plane calculations and notch CSG generation
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Union
+from dataclasses import dataclass, replace
+from typing import Optional, Union
 
 from sympy import Abs, Max, Min, Rational, acos
 
@@ -16,14 +16,16 @@ from kumiki.cutcsg import (
     CutCSG,
     Difference,
     HalfSpace,
+    Intersection,
     RectangularPrism,
     SolidUnion,
     adopt_csg,
     make_finite_rectangular_prism_from_half_space,
+    EmptyCSG,
 )
 from kumiki.measuring import Plane, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
-from kumiki.timber import TimberCenterline, TimberFace, TimberLike, TimberReferenceEnd
+from kumiki.timber import Cutting, TimberCenterline, TimberFace, TimberLike, TimberReferenceEnd
 from kumiki.timber_shavings import (
     are_timbers_plane_aligned,
     get_perfect_support_distance_from_centerline,
@@ -536,9 +538,6 @@ def chop_notch_for_butt_joint_arrangement(
     )
 
 
-# TODO this is wrong
-# we need to remove the timber_to_be_cut's perfect timber within portion from the timber_to_be_scribed's (actual timber - perfect timber within) portion
-# TODO rename the 2 variables and return a pair of CutCSGs
 def chop_scribe_notch(
     timber_to_be_scribed: TimberLike,
     timber_to_be_cut: TimberLike,
@@ -546,36 +545,89 @@ def chop_scribe_notch(
     """
     scribes timber_to_be_scribed onto timber_to_be_cut such that the entirety of timber_to_be_scribed is cut out of timber_to_be_cut excluding the perfect timber within portion of timber_to_be_cut
 
-    returns a pair of CSG geometries in timber_to_be_cut's local space!
+    returns a pair of CSG geometries, the first to be removed from timber_to_be_scribed and the second to be removed from timber_to_be_cut, both expressed in their respective local frames
     """
-    timber_to_be_scribed_actual_csg_local = timber_to_be_scribed.get_extended_actual_csg_local(
-        extend_bot=False,
-        extend_top=False,
-    )
-    timber_to_be_scribed_actual_csg_in_timber_to_be_cut_local = adopt_csg(
+    timber_to_be_scribed_actual_csg_global = adopt_csg(
         timber_to_be_scribed.transform,
-        timber_to_be_cut.transform,
-        timber_to_be_scribed_actual_csg_local,
+        None,
+        timber_to_be_scribed.get_extended_actual_csg_local(extend_bot=False, extend_top=False),
     )
-    timber_to_be_scribed_perfect_csg_in_timber_to_be_cut_local = adopt_csg(
+
+    timber_to_be_scribed_perfect_csg_global = adopt_csg(
         timber_to_be_scribed.transform,
-        timber_to_be_cut.transform,
+        None,
         timber_to_be_scribed.get_perfect_timber_within_CSG_local(),
     )
-    timber_to_be_cut_perfect_csg_local = timber_to_be_cut.get_perfect_timber_within_CSG_local()
-    timber_to_be_cut_perfect_minus_scribed_perfect_local = Difference(
-        base=timber_to_be_cut_perfect_csg_local,
-        subtract=[timber_to_be_scribed_perfect_csg_in_timber_to_be_cut_local],
+
+    timber_to_be_cut_perfect_csg_global = adopt_csg(
+        timber_to_be_cut.transform,
+        None,
+        timber_to_be_cut.get_perfect_timber_within_CSG_local(),
     )
-    timber_to_be_scribed_overlap_csg_local = Difference(
-        base=timber_to_be_scribed_actual_csg_in_timber_to_be_cut_local,
-        subtract=[Difference(
-            base=timber_to_be_scribed_actual_csg_in_timber_to_be_cut_local,
-            subtract=[timber_to_be_cut_perfect_minus_scribed_perfect_local],
-        )],
+
+    # seems to create triangulation artifacts when used on circular timbers with trimesh right now :(
+    scribed_notch_global = Intersection(
+        left=Difference(
+            timber_to_be_scribed_actual_csg_global,
+            subtract=[timber_to_be_scribed_perfect_csg_global],
+        ),
+        right=timber_to_be_cut_perfect_csg_global,
     )
-    scribe_notch_csg_local = Difference(
-        base=timber_to_be_scribed_actual_csg_in_timber_to_be_cut_local,
-        subtract=[timber_to_be_cut_perfect_csg_local],
+
+
+    cut_notch_global = Difference(
+        base=timber_to_be_scribed_actual_csg_global,
+        subtract=[timber_to_be_cut_perfect_csg_global],
     )
-    return timber_to_be_scribed_overlap_csg_local, scribe_notch_csg_local
+
+
+    scribed_notch_in_scribed_local = adopt_csg(
+        None, timber_to_be_scribed.transform, scribed_notch_global
+    )
+    cut_notch_in_cut_local = adopt_csg(
+        None, timber_to_be_cut.transform, cut_notch_global
+    )
+
+    return scribed_notch_in_scribed_local, cut_notch_in_cut_local
+
+
+def chop_scribe_notch_and_apply(
+    timber_to_be_scribed: TimberLike,
+    timber_to_be_scribed_cutting: Cutting,
+    timber_to_be_cut: TimberLike,
+    timber_to_be_cut_cutting: Cutting,
+) -> tuple[Cutting, Cutting]:
+    """
+    Apply scribe notches from ``chop_scribe_notch`` to the given cuttings, unioning the
+    new notch CSGs into each cutting's existing ``negative_csg``.
+
+    Returns ``(updated_cut_cutting, updated_scribed_cutting)`` (matching the order of
+    the early-return path when both timbers are perfect).
+    """
+    if timber_to_be_scribed.is_perfect_timber() and timber_to_be_cut.is_perfect_timber():
+        return timber_to_be_cut_cutting, timber_to_be_scribed_cutting
+
+    scribed_notch_csg_local, cut_notch_csg_local = chop_scribe_notch(
+        timber_to_be_scribed=timber_to_be_scribed,
+        timber_to_be_cut=timber_to_be_cut,
+    )
+
+    def _union_into(existing: Optional[CutCSG], new: CutCSG) -> CutCSG:
+        if existing is None:
+            return new
+        return SolidUnion([existing, new])
+
+    updated_scribed_cutting = replace(
+        timber_to_be_scribed_cutting,
+        negative_csg=_union_into(
+            timber_to_be_scribed_cutting.negative_csg, scribed_notch_csg_local
+        ),
+    )
+    updated_cut_cutting = replace(
+        timber_to_be_cut_cutting,
+        negative_csg=_union_into(
+            timber_to_be_cut_cutting.negative_csg, cut_notch_csg_local
+        ),
+    )
+
+    return updated_cut_cutting, updated_scribed_cutting

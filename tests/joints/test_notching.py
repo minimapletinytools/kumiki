@@ -5,7 +5,7 @@ Tests for shoulder notching helpers in kumiki.joints.workshop.notching.
 from dataclasses import replace
 from sympy import Rational
 
-from kumiki.cutcsg import Difference
+from kumiki.cutcsg import Difference, Intersection
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.notching import (
     ShoulderNotchCSGGeometry,
@@ -181,7 +181,7 @@ class TestChopScribeNotch:
             timber_to_be_cut=timber_to_be_cut,
         )
 
-        assert isinstance(scribed_overlap_csg_local, Difference)
+        assert isinstance(scribed_overlap_csg_local, Intersection)
         assert isinstance(scribe_notch_csg_local, Difference)
         assert scribed_overlap_csg_local.contains_point(create_v3(Rational(1), Rational(5, 2), Rational(10)))
         assert scribe_notch_csg_local.contains_point(create_v3(Rational(5, 2), Rational(0), Rational(10)))
