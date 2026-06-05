@@ -218,14 +218,15 @@ class EmptyCSG(CutCSG):
     def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
         return None
 
+    # TODO maybe better to add an empty flag to BoundingBox rather than returning a 0-size box which could be misinterpreted as a point
     def get_aabb(self) -> 'BoundingBox':
         return BoundingBox(
-            min_x=None,
-            min_y=None,
-            min_z=None,
-            max_x=None,
-            max_y=None,
-            max_z=None,
+            min_x=0,
+            min_y=0,
+            min_z=0,
+            max_x=0,
+            max_y=0,
+            max_z=0,
         )
 
 

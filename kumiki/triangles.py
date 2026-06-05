@@ -23,6 +23,7 @@ from .cutcsg import (
     EmptyCSG,
     Difference,
     HalfSpace,
+    Intersection,
     RectangularPrism,
     SolidUnion,
 )
@@ -147,19 +148,48 @@ def _triangulate_with_label(csg: CutCSG, label: str) -> TriangleMesh:
         return _mesh_union(csg)
     if isinstance(csg, Difference):
         return _mesh_difference(csg)
+    if isinstance(csg, Intersection):
+        return _mesh_intersection(csg)
     raise TypeError(f"Unsupported CutCSG type for triangulation: {type(csg).__name__}")
 
 
 def _mesh_union(csg: SolidUnion) -> TriangleMesh:
-    child_meshes = [triangulate_cutcsg(child).mesh for child in csg.children]
+    child_meshes = [
+        triangulate_cutcsg(child).mesh
+        for child in csg.children
+        if not isinstance(child, EmptyCSG)
+    ]
     result_mesh = _run_boolean("union", child_meshes)
     return TriangleMesh(mesh=result_mesh)
 
 
 def _mesh_difference(csg: Difference) -> TriangleMesh:
+    if isinstance(csg.base, EmptyCSG):
+        empty = trimesh.Trimesh(
+            vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64)
+        )
+        return TriangleMesh(mesh=empty, face_sources=tuple())
     meshes = [triangulate_cutcsg(csg.base).mesh]
-    meshes.extend(triangulate_cutcsg(child).mesh for child in csg.subtract)
+    meshes.extend(
+        triangulate_cutcsg(child).mesh
+        for child in csg.subtract
+        if not isinstance(child, EmptyCSG)
+    )
     result_mesh = _run_boolean("difference", meshes)
+    return TriangleMesh(mesh=result_mesh)
+
+
+def _mesh_intersection(csg: Intersection) -> TriangleMesh:
+    if isinstance(csg.left, EmptyCSG) or isinstance(csg.right, EmptyCSG):
+        empty = trimesh.Trimesh(
+            vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64)
+        )
+        return TriangleMesh(mesh=empty, face_sources=tuple())
+    meshes = [
+        triangulate_cutcsg(csg.left).mesh,
+        triangulate_cutcsg(csg.right).mesh,
+    ]
+    result_mesh = _run_boolean("intersection", meshes)
     return TriangleMesh(mesh=result_mesh)
 
 
@@ -186,6 +216,8 @@ def _run_boolean(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trimesh.T
             result = trimesh.boolean.union(copied_meshes, engine="manifold", check_volume=False)
         elif operation == "difference":
             result = trimesh.boolean.difference(copied_meshes, engine="manifold", check_volume=False)
+        elif operation == "intersection":
+            result = trimesh.boolean.intersection(copied_meshes, engine="manifold", check_volume=False)
         else:
             raise ValueError(f"Unsupported boolean operation: {operation}")
     except BaseException as exc:
