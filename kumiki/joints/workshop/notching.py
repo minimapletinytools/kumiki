@@ -52,6 +52,69 @@ class CrossJointScribeNotchingConfig:
         )
 
 
+@dataclass(frozen=True)
+class ButtJointScribeNotchingConfig:
+    """
+    Configuration for butt joint notching
+    "Scribe" here means one timber is scribed onto the other and completely cut away
+    """
+    timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def butt_timber():
+        return ButtJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.butt_timber,
+        )
+
+    @staticmethod
+    def receiving_timber():
+        return ButtJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.receiving_timber,
+        )
+
+
+@dataclass(frozen=True)
+class SpliceJointScribeNotchingConfig:
+    """
+    Configuration for splice joint notching
+    "Scribe" here means one timber is scribed onto the other and completely cut away
+    """
+    timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def timber1():
+        return SpliceJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.timber1,
+        )
+
+    @staticmethod
+    def timber2():
+        return SpliceJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.timber2,
+        )
+
+
+@dataclass(frozen=True)
+class CornerJointScribeNotchingConfig:
+    """
+    Configuration for corner joint notching
+    "Scribe" here means one timber is scribed onto the other and completely cut away
+    """
+    timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def timber1():
+        return CornerJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.timber1,
+        )
+
+    @staticmethod
+    def timber2():
+        return CornerJointScribeNotchingConfig(
+            timber_to_be_scribed=ArrangementNames.timber2,
+        )
+
+
 def _projected_perfect_cross_section_span_along_global_direction(
     timber: TimberLike,
     direction_global: V3,
