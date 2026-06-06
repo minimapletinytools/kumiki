@@ -232,6 +232,7 @@ DONE-camera controls should be absolute? use focus to reset
 
 
 :: TODO
+-oscare shed and tiny house not getting picked up by frame scanning
 -modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
   -0 degree notch up to insertion face
   -afterwards do the regular notching with varibale relief angle

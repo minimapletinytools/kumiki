@@ -136,6 +136,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const selectionStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-store.js'))).toString();
     const layerStateStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layer-state-store.js'))).toString();
     const layersPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layers-panel.js'))).toString();
+    const cameraControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'camera-controller.js'))).toString();
     const stylesCssUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer.css'))).toString();
     const threeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'three.min.js'))).toString();
     const reflectorJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'Reflector.js'))).toString();
@@ -157,6 +158,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__SELECTION_STORE_JS_URI__', selectionStoreJsUri)
         .replace('__LAYER_STATE_STORE_JS_URI__', layerStateStoreJsUri)
         .replace('__LAYERS_PANEL_JS_URI__', layersPanelJsUri)
+        .replace('__CAMERA_CONTROLLER_JS_URI__', cameraControllerJsUri)
         .replace('__APP_JS_URI__', appJsUri)
         .replace('__STYLES_CSS_URI__', stylesCssUri)
         .replace('__THREE_JS_URI__', threeJsUri)

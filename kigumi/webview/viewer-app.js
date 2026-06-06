@@ -107,6 +107,7 @@ const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
 const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
 const VIEWER_APP_VERSION = '2026.03.17.4';
 const SelectionStore = window.SelectionStore;
+const CameraController = window.CameraController;
 
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
     tagged: 0x4fc3f7,
@@ -336,6 +337,9 @@ const THEMES = Object.freeze({
 
 if (!SelectionStore) {
     throw new Error('SelectionStore is not loaded. Ensure selection-store.js is included before viewer-app.js.');
+}
+if (!CameraController) {
+    throw new Error('CameraController is not loaded. Ensure camera-controller.js is included before viewer-app.js.');
 }
 
 class ViewerSettingsPanel {
@@ -704,20 +708,26 @@ class KigumiViewerApp extends LitElement {
         this.focusedCx = 0;
         this.focusedCy = 0;
         this.focusedCz = 0;
-        this.cx = 0;
-        this.cy = 0;
-        this.cz = 0;
-        this.orbitDist = 10;
-        this.cameraOffsetDir = new THREE.Vector3();
-        this._setOffsetDirFromAngles(-Math.PI / 5, Math.PI / 3);
-        this.cameraUpVector = new THREE.Vector3(0, 0, 1);
+        this.cameraController = new CameraController({ THREE });
 
-        // Axes captured at orbit-drag start: rotation pivots around these for the
-        // entire drag, so the screen-Y direction is fixed for the duration of a drag.
-        this.dragOrbitUpAxis = null;
-        this.dragOrbitRightAxis = null;
-
-        this.cameraAnimation = null;
+        // Forward orbit-camera state from this.cameraController onto this for
+        // backwards compatibility with the rest of the viewer-app code that still
+        // reads/writes things like this.cx, this.orbitDist, etc.
+        const FORWARDED_CAMERA_FIELDS = [
+            'cx', 'cy', 'cz',
+            'orbitDist',
+            'cameraOffsetDir', 'cameraUpVector',
+            'cameraAnimation',
+            'dragOrbitUpAxis', 'dragOrbitRightAxis',
+        ];
+        for (const field of FORWARDED_CAMERA_FIELDS) {
+            Object.defineProperty(this, field, {
+                get() { return this.cameraController[field]; },
+                set(value) { this.cameraController[field] = value; },
+                configurable: true,
+                enumerable: true,
+            });
+        }
 
         this.mouseAction = null;
         this.lastX = 0;
@@ -1053,7 +1063,7 @@ class KigumiViewerApp extends LitElement {
         canvas.addEventListener('mousedown', (event) => {
             if (event.button === 2) {
                 this.mouseAction = 'orbit';
-                this._captureOrbitDragFrame();
+                this.cameraController.captureOrbitDragFrame();
             } else if (event.button === 1) {
                 this.mouseAction = 'pan';
             } else {
@@ -1062,7 +1072,7 @@ class KigumiViewerApp extends LitElement {
             event.preventDefault();
             this.lastX = event.clientX;
             this.lastY = event.clientY;
-            this.cameraAnimation = null;
+            this.cameraController.cancelAnimation();
         });
 
         canvas.addEventListener('contextmenu', (event) => {
@@ -1086,7 +1096,7 @@ class KigumiViewerApp extends LitElement {
             this.gizmoMoved = false;
             this.gizmoLastX = event.clientX;
             this.gizmoLastY = event.clientY;
-            this._captureOrbitDragFrame();
+            this.cameraController.captureOrbitDragFrame();
             gizmoCanvas.setPointerCapture(event.pointerId);
         });
 
@@ -1691,27 +1701,16 @@ class KigumiViewerApp extends LitElement {
                 z: this.camera.position.z,
             }
             : null;
+        const controllerPayload = this.cameraController.buildStatePayload();
         return {
-            orbitCenter: {
-                x: this.cx,
-                y: this.cy,
-                z: this.cz,
-            },
+            orbitCenter: controllerPayload.orbitCenter,
             focusCenter: {
                 x: this.focusedCx,
                 y: this.focusedCy,
                 z: this.focusedCz,
             },
-            orbit: {
-                theta: this._getOffsetAngles().theta,
-                phi: this._getOffsetAngles().phi,
-                distance: this.orbitDist,
-            },
-            up: {
-                x: this.cameraUpVector.x,
-                y: this.cameraUpVector.y,
-                z: this.cameraUpVector.z,
-            },
+            orbit: controllerPayload.orbit,
+            up: controllerPayload.up,
             cameraPosition,
         };
     }
@@ -1747,50 +1746,7 @@ class KigumiViewerApp extends LitElement {
             const cameraState = message && message.cameraState && typeof message.cameraState === 'object'
                 ? message.cameraState
                 : {};
-            const orbitCenter = cameraState.orbitCenter && typeof cameraState.orbitCenter === 'object'
-                ? cameraState.orbitCenter
-                : {};
-            const orbit = cameraState.orbit && typeof cameraState.orbit === 'object'
-                ? cameraState.orbit
-                : {};
-            const up = cameraState.up && typeof cameraState.up === 'object'
-                ? cameraState.up
-                : {};
-
-            const nextCx = Number(orbitCenter.x);
-            const nextCy = Number(orbitCenter.y);
-            const nextCz = Number(orbitCenter.z);
-            if (Number.isFinite(nextCx) && Number.isFinite(nextCy) && Number.isFinite(nextCz)) {
-                this.cx = nextCx;
-                this.cy = nextCy;
-                this.cz = nextCz;
-            }
-
-            const nextTheta = Number(orbit.theta);
-            const nextPhi = Number(orbit.phi);
-            const nextDist = Number(orbit.distance);
-            if (Number.isFinite(nextTheta) || Number.isFinite(nextPhi)) {
-                const current = this._getOffsetAngles();
-                const useTheta = Number.isFinite(nextTheta) ? nextTheta : current.theta;
-                const usePhi = Number.isFinite(nextPhi) ? this.clampPhi(nextPhi) : current.phi;
-                this._setOffsetDirFromAngles(useTheta, usePhi);
-            }
-            if (Number.isFinite(nextDist) && nextDist > 0.01) {
-                this.orbitDist = nextDist;
-            }
-
-            const upX = Number(up.x);
-            const upY = Number(up.y);
-            const upZ = Number(up.z);
-            if (Number.isFinite(upX) && Number.isFinite(upY) && Number.isFinite(upZ)) {
-                const vector = new THREE.Vector3(upX, upY, upZ);
-                if (vector.lengthSq() > 0) {
-                    vector.normalize();
-                    this.cameraUpVector.copy(vector);
-                }
-            }
-
-            this.cameraAnimation = null;
+            this.cameraController.applyStatePayload(cameraState);
             this.updateCamera();
 
             vscode.postMessage({
@@ -1828,13 +1784,16 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         if (this.mouseAction === 'orbit') {
-            this._applyOrbitDelta(event.clientX - this.lastX, event.clientY - this.lastY);
+            this.cameraController.applyOrbitDelta(
+                event.clientX - this.lastX,
+                event.clientY - this.lastY,
+            );
         } else if (this.mouseAction === 'pan') {
             this.panCameraInViewPlane(this.lastX, this.lastY, event.clientX, event.clientY);
         }
         this.lastX = event.clientX;
         this.lastY = event.clientY;
-        this.cameraAnimation = null;
+        this.cameraController.cancelAnimation();
         this.updateCamera();
     }
 
@@ -2263,10 +2222,10 @@ class KigumiViewerApp extends LitElement {
         if (Math.abs(dx) + Math.abs(dy) > 1) {
             this.gizmoMoved = true;
         }
-        this._applyOrbitDelta(dx, dy);
+        this.cameraController.applyOrbitDelta(dx, dy);
         this.gizmoLastX = event.clientX;
         this.gizmoLastY = event.clientY;
-        this.cameraAnimation = null;
+        this.cameraController.cancelAnimation();
         this.updateCamera();
     }
 
@@ -2301,85 +2260,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     clampPhi(value) {
-        return Math.max(0.05, Math.min(Math.PI - 0.05, value));
-    }
-
-    _setOffsetDirFromAngles(theta, phi) {
-        this.cameraOffsetDir.set(
-            Math.sin(phi) * Math.cos(theta),
-            Math.sin(phi) * Math.sin(theta),
-            Math.cos(phi),
-        );
-    }
-
-    _getOffsetAngles() {
-        const d = this.cameraOffsetDir;
-        const theta = Math.atan2(d.y, d.x);
-        const phi = Math.acos(Math.max(-1, Math.min(1, d.z)));
-        return { theta, phi };
-    }
-
-    _captureOrbitDragFrame() {
-        // Capture the screen-up axis (camera.up projected into world space) and the
-        // screen-right axis at the start of a drag. These remain fixed for the entire
-        // drag so the orbit pivots around the screen-Y axis as it was at drag start.
-        const up = this.cameraUpVector.clone();
-        if (up.lengthSq() === 0) {
-            up.set(0, 0, 1);
-        }
-        up.normalize();
-        // Forward = from camera to center = -offsetDir
-        const fwd = this.cameraOffsetDir.clone().multiplyScalar(-1);
-        let right = new THREE.Vector3().crossVectors(fwd, up);
-        if (right.lengthSq() < 1e-12) {
-            // Up is parallel to view direction; pick an arbitrary perpendicular.
-            const fallback = Math.abs(up.x) < 0.9
-                ? new THREE.Vector3(1, 0, 0)
-                : new THREE.Vector3(0, 1, 0);
-            right = new THREE.Vector3().crossVectors(fwd, fallback);
-        }
-        right.normalize();
-        this.dragOrbitUpAxis = up;
-        this.dragOrbitRightAxis = right;
-    }
-
-    _applyOrbitDelta(dx, dy) {
-        if (!this.dragOrbitUpAxis || !this.dragOrbitRightAxis) {
-            this._captureOrbitDragFrame();
-        }
-        const speed = 0.008;
-        const yawQ = new THREE.Quaternion().setFromAxisAngle(this.dragOrbitUpAxis, -dx * speed);
-        const pitchQ = new THREE.Quaternion().setFromAxisAngle(this.dragOrbitRightAxis, -dy * speed);
-        const rot = yawQ.multiply(pitchQ);
-        this.cameraOffsetDir.applyQuaternion(rot).normalize();
-        this.cameraUpVector.applyQuaternion(rot).normalize();
-    }
-
-    _slerpVec(out, a, b, t) {
-        const dot = Math.max(-1, Math.min(1, a.dot(b)));
-        if (dot > 0.9995 || dot < -0.9995) {
-            out.set(
-                a.x + (b.x - a.x) * t,
-                a.y + (b.y - a.y) * t,
-                a.z + (b.z - a.z) * t,
-            );
-            if (out.lengthSq() === 0) {
-                out.copy(b);
-            } else {
-                out.normalize();
-            }
-            return out;
-        }
-        const omega = Math.acos(dot);
-        const sinO = Math.sin(omega);
-        const wA = Math.sin((1 - t) * omega) / sinO;
-        const wB = Math.sin(t * omega) / sinO;
-        out.set(
-            a.x * wA + b.x * wB,
-            a.y * wA + b.y * wB,
-            a.z * wA + b.z * wB,
-        );
-        return out;
+        return this.cameraController.clampPhi(value);
     }
 
     normalizeAngle(value) {
@@ -2408,59 +2289,21 @@ class KigumiViewerApp extends LitElement {
     }
 
     animateCameraTo(targetOffsetDir, targetOrbitDist, durationMs = 260, targetUpVector = null, targetCenter = null) {
-        const targetDir = new THREE.Vector3(targetOffsetDir.x, targetOffsetDir.y, targetOffsetDir.z);
-        if (targetDir.lengthSq() === 0) {
-            return;
-        }
-        targetDir.normalize();
-        const targetUp = targetUpVector
-            ? new THREE.Vector3(targetUpVector.x, targetUpVector.y, targetUpVector.z)
-            : this.cameraUpVector.clone();
-        if (targetUp.lengthSq() === 0) {
-            targetUp.copy(this.cameraUpVector);
-        } else {
-            targetUp.normalize();
-        }
-        const nextCenter = targetCenter || { x: this.cx, y: this.cy, z: this.cz };
-        this.cameraAnimation = {
-            startedAt: performance.now(),
+        this.cameraController.animateTo({
+            offsetDir: targetOffsetDir,
+            distance: targetOrbitDist,
             durationMs,
-            startDir: this.cameraOffsetDir.clone(),
-            targetDir,
-            startUp: this.cameraUpVector.clone(),
-            targetUp,
-            startDist: this.orbitDist,
-            deltaDist: targetOrbitDist - this.orbitDist,
-            startCx: this.cx,
-            startCy: this.cy,
-            startCz: this.cz,
-            deltaCx: nextCenter.x - this.cx,
-            deltaCy: nextCenter.y - this.cy,
-            deltaCz: nextCenter.z - this.cz,
-        };
+            upVector: targetUpVector,
+            center: targetCenter,
+        });
     }
 
     stepCameraAnimation() {
-        if (!this.cameraAnimation) {
+        if (!this.cameraController.hasAnimation()) {
             return;
         }
-        const now = performance.now();
-        const elapsed = now - this.cameraAnimation.startedAt;
-        const t = Math.max(0, Math.min(1, elapsed / this.cameraAnimation.durationMs));
-        const eased = 1 - Math.pow(1 - t, 3);
-        const a = this.cameraAnimation;
-
-        this._slerpVec(this.cameraOffsetDir, a.startDir, a.targetDir, eased);
-        this._slerpVec(this.cameraUpVector, a.startUp, a.targetUp, eased);
-        this.orbitDist = Math.max(0.01, a.startDist + a.deltaDist * eased);
-        this.cx = a.startCx + a.deltaCx * eased;
-        this.cy = a.startCy + a.deltaCy * eased;
-        this.cz = a.startCz + a.deltaCz * eased;
+        this.cameraController.stepAnimation();
         this.updateCamera();
-
-        if (t >= 1) {
-            this.cameraAnimation = null;
-        }
     }
 
     getSelectionBounds() {
@@ -2760,24 +2603,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     getAdaptiveZoomFactor(isZoomingOut) {
-        // Calculate zoom speed that scales with current camera distance.
-        // This provides consistent zoom feel whether zoomed in close or far on large structures.
-        // 
-        // The formula uses a logarithmic scale: at small distances zoom is slow,
-        // at large distances zoom is proportionally faster to cover the scaled geometry.
-        const baseZoomFactor = isZoomingOut ? 0.8 : 1.2;
-        
-        if (this.orbitDist <= 0) {
-            return baseZoomFactor;
-        }
-        
-        // Calculate scale multiplier based on distance
-        // Log scale ensures zoom speed is proportional to visible size
-        const distanceScale = Math.max(0.8, Math.log(this.orbitDist + 1) / 3);
-        
-        // Apply adaptive scaling with 2x responsiveness by doubling the exponent.
-        // This preserves the same curve shape while making each wheel step stronger.
-        return Math.pow(baseZoomFactor, distanceScale * 2);
+        return this.cameraController.getAdaptiveZoomFactor(isZoomingOut);
     }
 
     zoomTowardPointer(clientX, clientY, zoomFactor) {
@@ -3098,13 +2924,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     getCameraSnapForDirection(direction) {
-        if (direction.z > 0) {
-            return { offsetDir: direction, upVector: { x: 0, y: 1, z: 0 } };
-        }
-        if (direction.z < 0) {
-            return { offsetDir: direction, upVector: { x: 0, y: -1, z: 0 } };
-        }
-        return { offsetDir: direction, upVector: { x: 0, y: 0, z: 1 } };
+        return this.cameraController.getCameraSnapForDirection(direction);
     }
 
     resizeGizmoRenderer() {
@@ -3847,13 +3667,7 @@ class KigumiViewerApp extends LitElement {
         if (!this.camera) {
             return;
         }
-        this.camera.position.set(
-            this.cx + this.cameraOffsetDir.x * this.orbitDist,
-            this.cy + this.cameraOffsetDir.y * this.orbitDist,
-            this.cz + this.cameraOffsetDir.z * this.orbitDist,
-        );
-        this.camera.up.copy(this.cameraUpVector);
-        this.camera.lookAt(this.cx, this.cy, this.cz);
+        this.cameraController.applyToCamera(this.camera);
         this.updateOrbitCenterGizmo();
         this.updateStructureScreenBounds();
     }
