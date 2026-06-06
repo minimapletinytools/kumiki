@@ -843,8 +843,8 @@ kigumi-layers-view:has(.lp-collapsed) {
 .lp-section-header {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 3px 8px;
+    gap: 2px;
+    padding: 2px 6px;
     cursor: pointer;
     user-select: none;
     color: var(--hv-title);
@@ -864,8 +864,8 @@ kigumi-layers-view:has(.lp-collapsed) {
 .lp-row {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 2px 6px 2px 8px;
+    gap: 2px;
+    padding: 1px 4px 1px 6px;
     user-select: none;
     line-height: 1.4;
     border-radius: 3px;
@@ -881,6 +881,10 @@ kigumi-layers-view:has(.lp-collapsed) {
     font-weight: 600;
 }
 
+.lp-depth-0 {
+    padding-left: 18px;
+}
+
 .lp-depth-1 {
     padding-left: 22px;
 }
@@ -891,10 +895,10 @@ kigumi-layers-view:has(.lp-collapsed) {
 
 .lp-chev {
     display: inline-block;
-    width: 12px;
+    width: 14px;
     text-align: center;
     color: var(--hv-dim);
-    font-size: 10px;
+    font-size: 12px;
 }
 
 .lp-chev.lp-leaf {

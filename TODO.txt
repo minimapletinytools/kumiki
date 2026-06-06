@@ -243,7 +243,7 @@ DONE-camera controls should be absolute? use focus to reset
   -do generic end joint notching config (no inset) + implement on joints + test
   -do generic splice joint noching config??
 DONE-remove tag pill box from search
--fix joint indentatino level
+DONE-fix joint indentatino level
 -agent prompt examples
 -figure out inset notching.... config
   -0 degree notch up to insertion face
