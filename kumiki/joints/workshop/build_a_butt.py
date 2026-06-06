@@ -78,12 +78,12 @@ def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
     d = safe_dot_product(w, mortise_centerline.direction)
     e = safe_dot_product(w, tenon_centerline.direction)
 
-    denom = a * c - b * b
+    denom = prune(a * c - b * b)
     denom_is_zero = safe_zero_test(denom)
     if denom_is_zero:
         M = mortise_centerline.point
     else:
-        t_mortise = (b * e - c * d) / denom
+        t_mortise = prune((b * e - c * d) / denom)
         M = mortise_centerline.point + mortise_centerline.direction * t_mortise
 
     # Find P = intersection of tenon centerline with cross-section plane at M
@@ -93,14 +93,14 @@ def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
         if denom_is_zero:
             P = tenon_centerline.point
         else:
-            s_tenon = (a * e - b * d) / denom
+            s_tenon = prune((a * e - b * d) / denom)
             P = tenon_centerline.point + tenon_centerline.direction * s_tenon
     else:
-        s = safe_dot_product(mortise_length_dir, M - tenon_centerline.point) / plane_dot_dir
+        s = prune(safe_dot_product(mortise_length_dir, M - tenon_centerline.point) / plane_dot_dir)
         P = tenon_centerline.point + tenon_centerline.direction * s
 
     tenon_dir = tenon_centerline.direction
-    proj = tenon_dir - mortise_length_dir * safe_dot_product(tenon_dir, mortise_length_dir)
+    proj = prune(tenon_dir - mortise_length_dir * safe_dot_product(tenon_dir, mortise_length_dir))
     proj_len_sq = safe_dot_product(proj, proj)
     if not safe_zero_test(proj_len_sq):
         direction_in_plane = normalize_vector(proj)

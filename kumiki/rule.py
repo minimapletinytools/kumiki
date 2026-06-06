@@ -197,7 +197,7 @@ def _collapse_matrix(mat: Matrix, collapse_mode: CollapseMode) -> Matrix:
         row = []
         for j in range(cols):
             elem = mat[i, j]
-            if is_complex_expr(elem):
+            if _should_collapse(elem, CollapseMode.SMART):
                 if not is_float_numeric_mode():
                     warnings.warn(
                         f"Matrix element exceeded complexity threshold and will be collapsed "
@@ -211,6 +211,28 @@ def _collapse_matrix(mat: Matrix, collapse_mode: CollapseMode) -> Matrix:
     if cols == 1:
         return Matrix([row[0] for row in collapsed])
     return Matrix(collapsed)
+
+
+def prune(value, collapse_mode: CollapseMode = CollapseMode.SMART):
+    """
+    Unified entry point for expression-tree pruning.
+
+    - Scalar values are routed through scalar collapse logic.
+    - Matrix values are routed through element-wise matrix collapse logic.
+    """
+    if isinstance(value, Matrix):
+        return _collapse_matrix(value, collapse_mode)
+    return _collapse_scalar(value, collapse_mode)
+
+
+def safe_prune(value):
+    """Prune using SMART collapse behavior."""
+    return prune(value, CollapseMode.SMART)
+
+
+def numeric_prune(value):
+    """Prune eagerly using ALWAYS collapse behavior."""
+    return prune(value, CollapseMode.ALWAYS)
 
 
 def is_complex_expr(expr, max_nodes: int = COMPLEX_NUM_NODES_THRESHOLD) -> bool:

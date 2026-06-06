@@ -31,6 +31,7 @@ from kumiki.rule import (
     degrees,
     are_vectors_perpendicular,
     giraffe_evalf,
+    prune,
     CollapseMode,
     giraffe_dot_product,
     giraffe_norm,
@@ -1244,6 +1245,41 @@ class TestSmartNodeGuardControls:
             expr = self._make_medium_complex_expr()
             result = _collapse_scalar(expr, CollapseMode.SMART)
             assert isinstance(result, sp.Float)
+        finally:
+            set_smart_node_guard_enabled(original_enabled)
+            set_smart_node_guard_max_nodes(original_threshold)
+
+
+class TestPrune:
+    @staticmethod
+    def _make_medium_complex_expr():
+        terms = [Rational(i, i + 1) * Rational(i + 2, i + 3) for i in range(1, 13)]
+        return sp.Add(*terms, evaluate=False)
+
+    def test_prune_scalar_respects_smart_mode(self, float_mode):
+        original_enabled = is_smart_node_guard_enabled()
+        original_threshold = get_smart_node_guard_max_nodes()
+        try:
+            set_smart_node_guard_enabled(True)
+            set_smart_node_guard_max_nodes(5)
+            expr = self._make_medium_complex_expr()
+            result = prune(expr)
+            assert isinstance(result, sp.Float)
+        finally:
+            set_smart_node_guard_enabled(original_enabled)
+            set_smart_node_guard_max_nodes(original_threshold)
+
+    def test_prune_matrix_prunes_complex_elements(self, float_mode):
+        original_enabled = is_smart_node_guard_enabled()
+        original_threshold = get_smart_node_guard_max_nodes()
+        try:
+            set_smart_node_guard_enabled(True)
+            set_smart_node_guard_max_nodes(5)
+            expr = self._make_medium_complex_expr()
+            mat = Matrix([[expr], [Rational(1, 2)]])
+            result = prune(mat)
+            assert isinstance(result[0], sp.Float)
+            assert result[1] == Rational(1, 2)
         finally:
             set_smart_node_guard_enabled(original_enabled)
             set_smart_node_guard_max_nodes(original_threshold)
