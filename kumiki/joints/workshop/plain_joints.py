@@ -74,28 +74,28 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # Line 1: P1 = endA_position + t * directionA
     # Line 2: P2 = endB_position + s * directionB
 
-    w0 = endA_position - endB_position
-    a = directionA.dot(directionA)  # always >= 0
-    b = directionA.dot(directionB)
-    c = directionB.dot(directionB)  # always >= 0
-    d = directionA.dot(w0)
-    e = directionB.dot(w0)
+    w0 = prune(endA_position - endB_position)
+    a = safe_dot_product(directionA, directionA)  # always >= 0
+    b = safe_dot_product(directionA, directionB)
+    c = safe_dot_product(directionB, directionB)  # always >= 0
+    d = safe_dot_product(directionA, w0)
+    e = safe_dot_product(directionB, w0)
 
-    denom = a * c - b * b
+    denom = prune(a * c - b * b)
     if zero_test(denom):
         # Parallel timbers: lines don't converge; bisect between the two end positions
-        intersection_point = (endA_position + endB_position) / 2
+        intersection_point = prune((endA_position + endB_position) / 2)
     else:
         # Parameters for closest points on each line
-        t = (b * e - c * d) / denom
-        s = (a * e - b * d) / denom
+        t = prune((b * e - c * d) / denom)
+        s = prune((a * e - b * d) / denom)
 
         # Get the closest points on each centerline
-        pointA = endA_position + directionA * t
-        pointB = endB_position + directionB * s
+        pointA = prune(endA_position + directionA * t)
+        pointB = prune(endB_position + directionB * s)
 
         # The intersection point is the midpoint between the two closest points
-        intersection_point = (pointA + pointB) / 2
+        intersection_point = prune((pointA + pointB) / 2)
 
     # Create the miter plane normal
     # Normalize the directions first
@@ -116,7 +116,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # Therefore, the miter plane's normal is perpendicular to both the bisector
     # and the plane_normal. This is the cross product: bisector × plane_normal
     # For parallel timbers plane_normal is zero, so fall back to a perpendicular end cut.
-    plane_normal_sq = plane_normal.dot(plane_normal)
+    plane_normal_sq = safe_dot_product(plane_normal, plane_normal)
     if zero_test(plane_normal_sq):
         miter_normal = normA
     else:
@@ -139,7 +139,6 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # so we use +miter_normal. Otherwise, we use -miter_normal.
     
     # For timberA: check if miter_normal points away from or towards the timber
-    from kumiki.rule import safe_compare, Comparison, safe_dot_product, safe_transform_vector
     dot_A = safe_dot_product(normA, miter_normal)
     if safe_compare(dot_A, 0, Comparison.GT):
         # Miter normal points away from timberA (in the direction of timberA's end)
