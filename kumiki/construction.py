@@ -1034,9 +1034,15 @@ class ArrangementNames(Enum):
     butt_timber = "butt_timber",
     butt_timber_1 = "butt_timber_1",
     butt_timber_2 = "butt_timber_2",
+    main_butt_timber_1 = "main_butt_timber_1",
+    main_butt_timber_2 = "main_butt_timber_2",
+    awk_timber = "awk_timber",
+    awk_1 = "awk_1",
+    awk_2 = "awk_2",
     post_timber = "post_timber",
     cross_timber_1 = "cross_timber_1",
     cross_timber_2 = "cross_timber_2",
+    brace_timber = "brace_timber",
 
 @dataclass(frozen=True)
 class ButtJointTimberArrangement:

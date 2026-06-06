@@ -115,6 +115,114 @@ class CornerJointScribeNotchingConfig:
         )
 
 
+@dataclass(frozen=True)
+class DoubleButtJointScribeNotchingConfig:
+    """
+    Configuration for double butt joint notching.
+
+    ``first_timber_to_be_scribed`` is scribed first, then
+    ``second_timber_to_be_scribed`` is scribed onto the remaining timber.
+    """
+    first_timber_to_be_scribed: ArrangementNames
+    second_timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def with_order(
+        first_timber_to_be_scribed: ArrangementNames,
+        second_timber_to_be_scribed: ArrangementNames,
+    ):
+        return DoubleButtJointScribeNotchingConfig(
+            first_timber_to_be_scribed=first_timber_to_be_scribed,
+            second_timber_to_be_scribed=second_timber_to_be_scribed,
+        )
+
+
+@dataclass(frozen=True)
+class TripleButtJointScribeNotchingConfig:
+    """
+    Configuration for triple butt joint notching.
+
+    ``first_timber_to_be_scribed`` is scribed first, then
+    ``second_timber_to_be_scribed``, then ``third_timber_to_be_scribed``.
+    """
+    first_timber_to_be_scribed: ArrangementNames
+    second_timber_to_be_scribed: ArrangementNames
+    third_timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def with_order(
+        first_timber_to_be_scribed: ArrangementNames,
+        second_timber_to_be_scribed: ArrangementNames,
+        third_timber_to_be_scribed: ArrangementNames,
+    ):
+        return TripleButtJointScribeNotchingConfig(
+            first_timber_to_be_scribed=first_timber_to_be_scribed,
+            second_timber_to_be_scribed=second_timber_to_be_scribed,
+            third_timber_to_be_scribed=third_timber_to_be_scribed,
+        )
+
+
+@dataclass(frozen=True)
+class QuadrupleButtJointScribeNotchingConfig:
+    """
+    Configuration for quadruple butt joint notching.
+
+    ``first_timber_to_be_scribed`` is scribed first, then
+    ``second_timber_to_be_scribed``, ``third_timber_to_be_scribed``, and
+    ``fourth_timber_to_be_scribed``.
+    """
+    first_timber_to_be_scribed: ArrangementNames
+    second_timber_to_be_scribed: ArrangementNames
+    third_timber_to_be_scribed: ArrangementNames
+    fourth_timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def with_order(
+        first_timber_to_be_scribed: ArrangementNames,
+        second_timber_to_be_scribed: ArrangementNames,
+        third_timber_to_be_scribed: ArrangementNames,
+        fourth_timber_to_be_scribed: ArrangementNames,
+    ):
+        return QuadrupleButtJointScribeNotchingConfig(
+            first_timber_to_be_scribed=first_timber_to_be_scribed,
+            second_timber_to_be_scribed=second_timber_to_be_scribed,
+            third_timber_to_be_scribed=third_timber_to_be_scribed,
+            fourth_timber_to_be_scribed=fourth_timber_to_be_scribed,
+        )
+
+
+@dataclass(frozen=True)
+class CrossCapJointScribeNotchingConfig:
+    """
+    Configuration for cross-cap joint notching.
+
+    ``first_timber_to_be_scribed`` is scribed first, then
+    ``second_timber_to_be_scribed`` is scribed onto the remaining timber.
+    """
+    first_timber_to_be_scribed: ArrangementNames
+    second_timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def with_order(
+        first_timber_to_be_scribed: ArrangementNames,
+        second_timber_to_be_scribed: ArrangementNames,
+    ):
+        return CrossCapJointScribeNotchingConfig(
+            first_timber_to_be_scribed=first_timber_to_be_scribed,
+            second_timber_to_be_scribed=second_timber_to_be_scribed,
+        )
+
+
+@dataclass(frozen=True)
+class BraceJointScribeNotchingConfig:
+    """
+    Configuration for brace joint notching.
+
+    The 2 braced timbers are always scribed onto the brace timber.
+    """
+    pass
+
+
 def _projected_perfect_cross_section_span_along_global_direction(
     timber: TimberLike,
     direction_global: V3,

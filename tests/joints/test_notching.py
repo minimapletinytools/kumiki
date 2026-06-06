@@ -6,9 +6,14 @@ from dataclasses import replace
 from sympy import Rational
 
 from kumiki.cutcsg import Difference, Intersection
-from kumiki.construction import ButtJointTimberArrangement
+from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
 from kumiki.joints.workshop.notching import (
+    BraceJointScribeNotchingConfig,
+    CrossCapJointScribeNotchingConfig,
+    DoubleButtJointScribeNotchingConfig,
+    QuadrupleButtJointScribeNotchingConfig,
     ShoulderNotchCSGGeometry,
+    TripleButtJointScribeNotchingConfig,
     chop_notch_for_butt_joint_arrangement,
     chop_scribe_notch,
     does_shoulder_plane_need_notching,
@@ -185,3 +190,56 @@ class TestChopScribeNotch:
         assert isinstance(scribe_notch_csg_local, Difference)
         assert scribed_overlap_csg_local.contains_point(create_v3(Rational(1), Rational(5, 2), Rational(10)))
         assert scribe_notch_csg_local.contains_point(create_v3(Rational(5, 2), Rational(0), Rational(10)))
+
+
+class TestMultiTimberScribeNotchingConfig:
+    def test_double_butt_uses_with_order(self):
+        config = DoubleButtJointScribeNotchingConfig.with_order(
+            ArrangementNames.butt_timber_1,
+            ArrangementNames.butt_timber_2,
+        )
+
+        assert config.first_timber_to_be_scribed == ArrangementNames.butt_timber_1
+        assert config.second_timber_to_be_scribed == ArrangementNames.butt_timber_2
+
+    def test_triple_butt_uses_with_order(self):
+        config = TripleButtJointScribeNotchingConfig.with_order(
+            ArrangementNames.main_butt_timber_1,
+            ArrangementNames.main_butt_timber_2,
+            ArrangementNames.awk_timber,
+        )
+
+        assert config.first_timber_to_be_scribed == ArrangementNames.main_butt_timber_1
+        assert config.second_timber_to_be_scribed == ArrangementNames.main_butt_timber_2
+        assert config.third_timber_to_be_scribed == ArrangementNames.awk_timber
+
+    def test_quadruple_butt_uses_with_order(self):
+        config = QuadrupleButtJointScribeNotchingConfig.with_order(
+            ArrangementNames.main_butt_timber_1,
+            ArrangementNames.main_butt_timber_2,
+            ArrangementNames.awk_1,
+            ArrangementNames.awk_2,
+        )
+
+        assert config.first_timber_to_be_scribed == ArrangementNames.main_butt_timber_1
+        assert config.second_timber_to_be_scribed == ArrangementNames.main_butt_timber_2
+        assert config.third_timber_to_be_scribed == ArrangementNames.awk_1
+        assert config.fourth_timber_to_be_scribed == ArrangementNames.awk_2
+
+    def test_cross_cap_uses_with_order(self):
+        config = CrossCapJointScribeNotchingConfig.with_order(
+            ArrangementNames.cross_timber_1,
+            ArrangementNames.cross_timber_2,
+        )
+
+        assert config.first_timber_to_be_scribed == ArrangementNames.cross_timber_1
+        assert config.second_timber_to_be_scribed == ArrangementNames.cross_timber_2
+
+    def test_brace_uses_with_order(self):
+        config = BraceJointScribeNotchingConfig.with_order(
+            ArrangementNames.timber1,
+            ArrangementNames.brace_timber,
+        )
+
+        assert config.first_timber_to_be_scribed == ArrangementNames.timber1
+        assert config.second_timber_to_be_scribed == ArrangementNames.brace_timber

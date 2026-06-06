@@ -232,15 +232,15 @@ DONE-camera controls should be absolute? use focus to reset
 
 
 :: TODO
-
--DOCS
-  -explain parameterization
-
--try and run a full loop agent test on this to see if it all works
-
 DONE-remove tag pill box from search
 DONE-fix joint indentatino level
 DONE-fix patternbook joints not showing
+DONE-do remaining ntoching config classes
+-DOCS
+  -explain parameterization
+-try and run a full loop agent test on this to see if it all works
+-do another perfermance pass on silly shed, still taking way too long
+-can you make meshing run in parallel?
 -remove trash structures (or ceraet a new spot for them so they don't ship with the library)
 -agent prompt examples
 -figure out inset notching.... config
@@ -250,7 +250,6 @@ DONE-fix patternbook joints not showing
     -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
       -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
 -add an optional scale ruler to the view and havei t default off
-
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 -NON PERFECT TIMBER
