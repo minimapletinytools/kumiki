@@ -46,7 +46,7 @@ stud_tenon_outside_offset = inches(1)
 
 
 
-def create_tinyhouse120(center: Optional[V3] = None):
+def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     """
     Create a 120 sqft tiny house frame (15' x 8').
     No joints yet — just timbers placed in position.

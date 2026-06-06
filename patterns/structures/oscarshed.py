@@ -38,7 +38,7 @@ med_timber_size = create_v2(inches(4), inches(4))                   # 4" x 4"
 big_timber_size = create_v2(inches(6), inches(4))                   # 6" vertical x 4" depth
 
 
-def create_oscarshed(center: Optional[V3] = None):
+def create_oscarshed(center: Optional[V3] = None) -> Frame:
     """
     Create Oscar's Shed structure.
     
