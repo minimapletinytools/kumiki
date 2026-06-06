@@ -11,8 +11,6 @@
             // Default: top-level sections open, individual nodes closed
             this.expandedNodes = new Set(['section:timbers', 'section:joints']);
             this.filterText = '';
-            this.activeTagFilters = new Set();
-            this.tagFilterMode = 'or'; // 'or' | 'and'
             this.showTagPills = true;
             this.el = null;
             this.viewport = null;
@@ -81,47 +79,12 @@
         // Filter helpers
         // ------------------------------------------------------------------
 
-        _getAllTags() {
-            const tags = new Set();
-            if (!this.hierarchy) return tags;
-            for (const t of this.hierarchy.timbers) for (const tag of (t.tags || [])) tags.add(tag);
-            for (const j of (this.hierarchy.joints || [])) for (const tag of (j.tags || [])) tags.add(tag);
-            return tags;
-        }
-
         _matchesFilter(name, tags) {
             const q = this.filterText.trim().toLowerCase();
-            const hasTagFilters = this.activeTagFilters.size > 0;
-
-            // If neither filter is active, show everything
-            if (!q && !hasTagFilters) return true;
-
-            // Text filter: substring match on name or any tag
-            const textMatch = q && (
-                (name && name.toLowerCase().includes(q)) ||
-                (tags && tags.some(t => t.toLowerCase().includes(q)))
-            );
-
-            // Active tag filter: OR = item has any active tag; AND = item has all active tags
-            const tagMatch = hasTagFilters && tags && (
-                this.tagFilterMode === 'and'
-                    ? [...this.activeTagFilters].every(af => tags.includes(af))
-                    : [...this.activeTagFilters].some(af => tags.includes(af))
-            );
-
-            // Show if either filter matches
-            return textMatch || tagMatch;
-        }
-
-        _toggleTagFilter(tag) {
-            if (this.activeTagFilters.has(tag)) {
-                this.activeTagFilters.delete(tag);
-            } else {
-                this.activeTagFilters.add(tag);
-            }
-            this._renderTree();
-            // Sync the active-filter chips row without full re-render
-            this._renderActiveFilters();
+            if (!q) return true;
+            if (name && name.toLowerCase().includes(q)) return true;
+            if (tags && tags.some(t => t.toLowerCase().includes(q))) return true;
+            return false;
         }
 
         // ------------------------------------------------------------------
@@ -163,32 +126,10 @@
             filterInput.value = this.filterText;
             filterInput.addEventListener('input', (e) => {
                 this.filterText = e.target.value;
-                this._renderActiveFilters();
                 this._renderTree();
-            });
-            filterInput.addEventListener('keydown', (e) => {
-                if (e.key !== 'Enter' && e.key !== ' ') return;
-                const q = this.filterText.trim().toLowerCase();
-                if (!q) return;
-                const allTags = this._getAllTags();
-                const match = [...allTags].find(t => t.toLowerCase() === q);
-                if (match) {
-                    e.preventDefault();
-                    this.activeTagFilters.add(match);
-                    this.filterText = '';
-                    filterInput.value = '';
-                    this._renderActiveFilters();
-                    this._renderTree();
-                }
             });
             filterBar.appendChild(filterInput);
             this.el.appendChild(filterBar);
-
-            // Active tag filter chips row
-            this._activeFiltersEl = document.createElement('div');
-            this._activeFiltersEl.className = 'lp-active-filters';
-            this.el.appendChild(this._activeFiltersEl);
-            this._renderActiveFilters();
 
             this._treeEl = document.createElement('div');
             this._treeEl.className = 'lp-tree';
@@ -200,73 +141,6 @@
 
             this._renderTree();
             this._renderFooter();
-        }
-
-        _renderActiveFilters() {
-            if (!this._activeFiltersEl) return;
-            this._activeFiltersEl.innerHTML = '';
-
-            const hasText = this.filterText.trim().length > 0;
-            const hasTagFilters = this.activeTagFilters.size > 0;
-            if (!hasText && !hasTagFilters) return;
-
-            // OR/AND toggle — only meaningful with 2+ tag filters
-            if (this.activeTagFilters.size >= 2) {
-                const modeToggle = document.createElement('button');
-                modeToggle.className = 'lp-mode-toggle lp-mode-' + this.tagFilterMode;
-                modeToggle.textContent = this.tagFilterMode.toUpperCase();
-                modeToggle.title = this.tagFilterMode === 'or'
-                    ? 'Showing items matching ANY tag — click to switch to ALL'
-                    : 'Showing items matching ALL tags — click to switch to ANY';
-                modeToggle.addEventListener('click', (e) => {
-                    e.stopPropagation();
-                    this.tagFilterMode = this.tagFilterMode === 'or' ? 'and' : 'or';
-                    this._renderActiveFilters();
-                    this._renderTree();
-                });
-                this._activeFiltersEl.appendChild(modeToggle);
-            }
-
-            if (hasText) {
-                const chip = this._makeActiveFilterChip(
-                    `"${this.filterText.trim()}"`,
-                    () => {
-                        this.filterText = '';
-                        const input = this.el && this.el.querySelector('.lp-filter-input');
-                        if (input) input.value = '';
-                        this._renderActiveFilters();
-                        this._renderTree();
-                    }
-                );
-                chip.classList.add('lp-active-chip-text');
-                this._activeFiltersEl.appendChild(chip);
-            }
-
-            for (const tag of this.activeTagFilters) {
-                const chip = this._makeActiveFilterChip(tag, () => {
-                    this._toggleTagFilter(tag);
-                });
-                this._activeFiltersEl.appendChild(chip);
-            }
-        }
-
-        _makeActiveFilterChip(label, onRemove) {
-            const chip = document.createElement('span');
-            chip.className = 'lp-active-chip';
-            const labelEl = document.createElement('span');
-            labelEl.className = 'lp-active-chip-label';
-            labelEl.textContent = label;
-            chip.appendChild(labelEl);
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'lp-active-chip-remove';
-            removeBtn.textContent = '×';
-            removeBtn.title = 'Remove filter';
-            removeBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                onRemove();
-            });
-            chip.appendChild(removeBtn);
-            return chip;
         }
 
         _renderTree() {
@@ -342,13 +216,8 @@
                 chipsEl.className = 'lp-chips';
                 for (const tag of tags) {
                     const chip = document.createElement('span');
-                    chip.className = 'lp-chip' + (this.activeTagFilters.has(tag) ? ' lp-chip-active' : '');
+                    chip.className = 'lp-chip';
                     chip.textContent = tag;
-                    chip.title = this.activeTagFilters.has(tag) ? `Remove filter: ${tag}` : `Filter by: ${tag}`;
-                    chip.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this._toggleTagFilter(tag);
-                    });
                     chipsEl.appendChild(chip);
                 }
                 row.appendChild(chipsEl);
