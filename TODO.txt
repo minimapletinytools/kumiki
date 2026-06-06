@@ -232,42 +232,49 @@ DONE-camera controls should be absolute? use focus to reset
 
 
 :: TODO
-DONE-oscare shed and tiny house not getting picked up by frame scanning
--modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
+
+-DOCS
+  -explain parameterization
+
+-try and run a full loop agent test on this to see if it all works
+-notching configs
+  -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
+  -do generic butt joint notching config (no inset) + implement on joints + test
+  -do generic end joint notching config (no inset) + implement on joints + test
+  -do generic splice joint noching config??
+-remove tag pill box from search
+-fix joint indentatino level
+-agent prompt examples
+-figure out inset notching.... config
   -0 degree notch up to insertion face
   -afterwards do the regular notching with varibale relief angle
   -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
     -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
       -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
--try and run a full loop agent test on this to see if it all works
+-add an optional scale ruler to the view and havei t default off
+
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
+-NON PERFECT TIMBER
+  DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
+  DONE-add round timber stuff
+  -add asserts to joint functions to indicate if they can support non perfect timbers
+  -add regular imperfect rectangular timber stuff
 
--LAYERS
-  DONE-add tags to timbers and joints, as a 1 tier overlapping folder system
-  DONE-lock and hide fetaures
-  -search bar, autocompletes both names and tags
-  -tag selection bar
-    -has option to choose how many tags to show
-    -unselected tags are grayed out, if all grayed out then show everything
-    -when one tag is selected, unavaialble tags dissapear
-  -timbers/joints
-    -allow foldering by first tag option
-    -clicknig on fol
-  -joints (separate group, shows up below timbers)
-    -allow foldering by first tag option?
-    -clicking on joint selects all timbers and accesories contained in it
-    -accessories only viewable as children of joints
+-make butt jonit with shoulder inset notching more generic
+    -notch_length, measured in the length direction of the receiving timber
+    -notch_width, always 100% the full dimension of the receiving timber
+    -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
+    -notch_style, straight walls only for now
+    -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
 
-
--PATTERN VIEWER
-  DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
-  DONE-allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
-  -default shows patterns rather than pattern books
-  -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
+-add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
     - joint type tags should be prioritized, or instead sort by tags that show up most often
     - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
     Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
+
+-outline final joint requirements
+  -you can probably at least promote the plain joints...
 
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon
@@ -299,45 +306,8 @@ DONE-oscare shed and tiny house not getting picked up by frame scanning
     -or would it be better just to have folsk make custom joints
 
 
--PARAMETERIZATION
-  DONE-do create_frame(paremteers) thing so that parameters can be tuned in UI
-  DONE-do we want update generic timber creation function to take more optional parameters? could be one generic struct
-    -size
-    -length
-    -type (round + diameter, square + nominal extra, perfect)
-  -pattern parameterization
-    DONE-update example_shaving ctors to take some additional parameters
-    -then you can add notch variations to patterns I guess?
+
     
-
--NOTCHING
-  DONE-I think receiving timber notching is mostly good?
-  DONE-notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
-  DONE-test notching you just added to the half dovetail joint
-  DONE-fix notchingon half dovetail joint # TODO notching on this function works however the wedge won't fit so the wedge hole needs to be made bigger
-    -you just need to clear out the receiving timber, the butting timber can block the wedge entry but TBH not ym problem but at least add a comment indicating this is the case
-  -make notching more generic
-    -when to notch: 
-      -when there is a shoulder
-      -entering into a non perfect timber face
-      -entering timber from a non face perpendicular angle
-    -notching should work off the shoulder geometery results
-      -needs notching (checks for condititions above)
-      -notch_length, measured in the length direction of the receiving timber
-      -notch_width, always 100% the full dimension of the receiving timber
-      -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
-      -notch_style, straight walls only for now
-    -notching in other situations?
-    -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
-    -build notching into build a butt joint somehow?
-  -make non PTW notching settings helper class allowing you to configure notching genericaly across all joints
-    -the only weird thing is that for inset shoulders you need notching on perfect timebrs too..
-
--NON PERFECT TIMBER
-  DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
-  DONE-add round timber stuff
-  -add annotations to joint functions to indicate if they can support non perfect timbers
-  -add regular timber stuff
   
   
 
@@ -347,17 +317,8 @@ DONE-oscare shed and tiny house not getting picked up by frame scanning
   -do tongue and groove joint
   -do the ita-kura joint (board in groove)
   
-DONE-maybe qualify get_size -> get_perfect_size
 
--add a new integration test that  creates a new kigumi projcet in some temp directory and initializes it and checks
-  -kumiki patterns load correctly
-  -workspace patterns load correctly
-  -workspace frames load correctly
-  -initialize button state is not init and then initi after initializing
--outline final joint requirements
-  -you can probably at least promote the plain joints...
 
--add an optional scale ruler to the view and havei t default off
 
 
 -do assembly metadata
@@ -382,9 +343,9 @@ DONE-maybe qualify get_size -> get_perfect_size
   DONE-adjust tenons so the are measured from the outside reference faces
   DONE-add new joints for floor beams
   DONE-add double buttj oint to floor beams
+  IGNORE-make rafter logic not suck lol...
   -lower rafters to be flush with ridge beam and then use housed dovetail joints on ridge beam
-  -use cross lap point on the other side (you may need ot update cross lap joint to work on non FAT timbers)
-  -make rafter logic not suck lol...
+    -use cross lap point on the other side (you may need ot update cross lap joint to work on non FAT timbers)
   -do yo uneed/want more rafters?
   
 
@@ -442,18 +403,6 @@ DONE-maybe qualify get_size -> get_perfect_size
 
     
 
-
-EXEMPLIFY
-  DONE-make a set of canonical joint configurations for each joint type to use ine xamples
-  DONE/IGNORE-create all_joints.py 
-    -exports all joints
-  IGNORE-make examples of how to use measure/mark to set parameters in cutting functions
-  DONE-make sawhores example nice (eh, maybe you need to wedged dovetail mortise and tenons... or nuki joints or whatever)
-  -write docs for at least one joint function to use as reference for the rest
-  -agent prompt examples
-  -examplify 
-    DONE-create some map of example name to example function map so you can dynamiaclly get to all examples
-    -would be cool do deep link by into functions/docs in the future...
 
 
 RENAMEIFY
@@ -546,6 +495,69 @@ M3.5
 
 
 :: TODONE 
+
+DONE-oscare shed and tiny house not getting picked up by frame scanning
+DONE-maybe qualify get_size -> get_perfect_size
+
+DONE-add a new integration test that  creates a new kigumi projcet in some temp directory and initializes it and checks
+  -kumiki patterns load correctly
+  -workspace patterns load correctly
+  -workspace frames load correctly
+  -initialize button state is not init and then initi after initializing
+
+DONE-PARAMETERIZATION
+  DONE-do create_frame(paremteers) thing so that parameters can be tuned in UI
+  DONE-do we want update generic timber creation function to take more optional parameters? could be one generic struct
+    -size
+    -length
+    -type (round + diameter, square + nominal extra, perfect)
+  DONE-pattern parameterization
+    DONE-update example_shaving ctors to take some additional parameters
+    -then you can add notch variations to patterns I guess?
+
+
+DONE-PATTERN VIEWER
+  DONE-pull out pattern scanning functionality into librarian.py (workspace, dependencies, and kumiki) and it should return a patternbook and list of frames / examples
+  DONE-allow opening groups of patterns hsaring the same tag as one unit (group by tag, instead of group by pattern book)
+  DONE-default shows patterns rather than pattern books
+  
+
+DONE-NOTCHING
+  DONE-I think receiving timber notching is mostly good?
+  DONE-notching alone not good enough, need to also chamfer out the sides of the butt timber as well 
+  DONE-test notching you just added to the half dovetail joint
+  DONE-fix notchingon half dovetail joint # TODO notching on this function works however the wedge won't fit so the wedge hole needs to be made bigger
+    -you just need to clear out the receiving timber, the butting timber can block the wedge entry but TBH not ym problem but at least add a comment indicating this is the case
+
+
+-EXEMPLIFY
+  DONE-make a set of canonical joint configurations for each joint type to use ine xamples
+  DONE/IGNORE-create all_joints.py 
+    -exports all joints
+  IGNORE-make examples of how to use measure/mark to set parameters in cutting functions
+  DONE-make sawhores example nice (eh, maybe you need to wedged dovetail mortise and tenons... or nuki joints or whatever)
+  IGNORE-write docs for at least one joint function to use as reference for the rest
+  DONE-examplify 
+    DONE-create some map of example name to example function map so you can dynamiaclly get to all examples
+    DONE-would be cool do deep link by into functions/docs in the future...
+
+
+
+DONE-LAYERS
+  DONE-add tags to timbers and joints, as a 1 tier overlapping folder system
+  DONE-lock and hide fetaures
+  IGNORE-search bar, autocompletes both names and tags
+  IGNORE-tag selection bar
+    -has option to choose how many tags to show
+    -unselected tags are grayed out, if all grayed out then show everything
+    -when one tag is selected, unavaialble tags dissapear
+  DONE-timbers/joints
+    IGNORE-allow foldering by first tag option
+    -clicknig on fol
+  DONE-joints (separate group, shows up below timbers)
+    IGNORE-allow foldering by first tag option?
+    DONE-clicking on joint selects all timbers and accesories contained in it
+    DONE-accessories only viewable as children of joints
 
 DONE-cuttimber/cuttnig is wrong
   -each timber in a joint has ONE cutting
