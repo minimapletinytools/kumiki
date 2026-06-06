@@ -31,6 +31,23 @@ from kumiki.timber_shavings import (
     get_perfect_support_distance_from_centerline,
 )
 
+
+_raw_safe_dot_product = safe_dot_product
+_raw_safe_norm = safe_norm
+_raw_safe_transform_vector = safe_transform_vector
+
+
+def safe_dot_product(*args, **kwargs):
+    return prune(_raw_safe_dot_product(*args, **kwargs))
+
+
+def safe_norm(*args, **kwargs):
+    return prune(_raw_safe_norm(*args, **kwargs))
+
+
+def safe_transform_vector(*args, **kwargs):
+    return prune(_raw_safe_transform_vector(*args, **kwargs))
+
 @dataclass(frozen=True)
 class CrossJointScribeNotchingConfig:
     """

@@ -34,6 +34,23 @@ from kumiki.rule import safe_dot_product, safe_transform_vector
 from kumiki.cutcsg import CutCSG
 
 
+_raw_safe_dot_product = safe_dot_product
+_raw_safe_norm = safe_norm
+_raw_safe_transform_vector = safe_transform_vector
+
+
+def safe_dot_product(*args, **kwargs):
+    return prune(_raw_safe_dot_product(*args, **kwargs))
+
+
+def safe_norm(*args, **kwargs):
+    return prune(_raw_safe_norm(*args, **kwargs))
+
+
+def safe_transform_vector(*args, **kwargs):
+    return prune(_raw_safe_transform_vector(*args, **kwargs))
+
+
 def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
     arrangement: ButtJointTimberArrangement,
     distance_from_centerline: Numeric,
