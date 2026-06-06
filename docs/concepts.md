@@ -71,11 +71,15 @@ class TimberFace(Enum):
     BACK = 6 # the face vector with normal vector in the -Y axis direction
 ```
 
-## perfect timber within and non-perfect timbers
+## perfect timber within and imperfect timbers
 
 Almost all joints in Kumiki work with the concept of the "perfect timber within" represented by the `PerfectTimberWithin` class with markings based on this perfect square timber that is contained within the actual timber. 
 
-Visually speaking, Kumiki supports different types of timbers that are not "perfect" which all contain a `PerfectTimberWithin` both in the semantic sense and also in the sense of python class inheritance :p.
+Timbers with cross sections exactly matching their perfect timber within are called *perfect* timbers.
+
+Timbers with cross sections that do not match their perfect timber within (typically extending beyond it) are called *imperfect* timbers.
+
+Visually speaking, Kumiki supports different types of imperfect timbers all which contain a `PerfectTimberWithin` both in the semantic sense and also in the sense of python class inheritance :p.
 
 Such timbers contain methods to obtain its "perfect" size as well as its "maximal" size which is a bounding box that contais the entirety of the actual timber. 
 
@@ -198,11 +202,13 @@ Joints also contain a dictionary of `JointAccessory` which are additional *thing
 
 While basing joints are based on the `PerfectTimberWithin` ensures fits on the joint features themselves, there may be wood beyond the perfect timber within. In these cases, some of this wood extraneous to the joint may need to be removed for the joint to come together. Almost all joints will do additional "notching" or "relief cuts" to accomplish this. In most cases, the relief cuts needed can be fully determined from just the joint arrangement and can be made using the set of utility methods and classes provided in notching.py. Joint functions are still responsible to make their own relief cuts.
 
+## Joint Tags
+
 ## Joint Organization
-TODO
-### joint folders
-#### workshop joints
-### joint tags
+
+See joints/README.md
+
+
 
 ### Basic Joints
 Almost every joint has a basic joint variation inside basic_joints.py. Basic joints take minimal parameters providing sensible default parameters for the rest of the joint. Basic joints are a also a great place to understand how to interpret joint parameters in practice.

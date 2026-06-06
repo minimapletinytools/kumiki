@@ -90,6 +90,13 @@ Joints involve creating CSG cuts on one or more timbers. A typical joint impleme
 8. If the joint is at the end of any one of the timbers, set `maybe_top/bottom_end_cut_distance_from_bottom` for that timber to allow the proper rough end cuts to be generated
 9. Return a joint object containing the cuts
 
+
+## Joint Style Guide
+
+TODO
+argument order/names
+return type
+
 Variable naming rules:
 - ALWAYS postfix markings in global space with `_global`
 - Postfix markings in local space with `_{timber_name}_local`, e.g. `some_feature_timberA_local`
@@ -101,11 +108,11 @@ Use nested functions to create local variable scopes where helpful (especially t
 
 A notch is a cutout timbers in a joint to create clearance. 
 
-Notching timbers is needed such that non-perfect timbers can be joined together consistently without collision. It is also used when insetting a timber into the face of another timber. Almost all joints will need notching.
+Notching timbers is needed such that timbers that extend beyond their perfect timber within (imperfect timbers) can be joined together consistently without collision. It is also used when insetting a timber into the face of another timber. Almost all joints will need notching.
 
-The `notching.py` file contains sets of notching utility methods based on arrangement type and other properties. 
+The `notching.py` file contains sets of notching utility methods including a set of scribe-based notching utilities that should work for almost all joints.
 
-Joints should only notch if necessary (i.e. input timber is non perfect or there is an inset) to avoid CSG bloat.
+Joints should only notch if necessary (i.e. input timber is imperfect or there is an inset) to avoid CSG bloat.
 
 ### the build-a-butt-joint-pattern
 
