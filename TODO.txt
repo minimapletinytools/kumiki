@@ -214,7 +214,7 @@ DONE-do a design pass
   DONE-stuff showing below the view should be cleaner/tighter 
   IGNORE-move focus button maybe
   IGNORE-make the gizmos slightly trasparent?
--camera controls should be absolute? use focus to reset
+DONE-camera controls should be absolute? use focus to reset
 -new kigumi icon
 -marketing
   -make basic exampl ecase
@@ -232,14 +232,6 @@ DONE-do a design pass
 
 
 :: TODO
-
-DONE-cuttimber/cuttnig is wrong
-  -each timber in a joint has ONE cutting
-  -a cut timber is made from several joints by combining their cuttings
-
--fix scribe notcihng algorithm (see todo in notching.py)
-  -update cross lap joint to test it out again
-
 -modify notching on inset shoulders??? maybe IDK inset and notching are 2 separate things
   -0 degree notch up to insertion face
   -afterwards do the regular notching with varibale relief angle
@@ -552,6 +544,14 @@ M3.5
 
 
 :: TODONE 
+
+DONE-cuttimber/cuttnig is wrong
+  -each timber in a joint has ONE cutting
+  -a cut timber is made from several joints by combining their cuttings
+
+DONE-fix scribe notcihng algorithm (see todo in notching.py)
+  -update cross lap joint to test it out again
+
 DONE-rename measure to locate
   -then you can use measure to measure between two located features (which we don't actually care about, we need to measure between 2 CSG features...)
 DONE-do the horseCoAD rename
