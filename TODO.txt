@@ -236,6 +236,7 @@ DONE-remove tag pill box from search
 DONE-fix joint indentatino level
 DONE-fix patternbook joints not showing
 DONE-do remaining ntoching config classes
+DONE-outline final joint requirements
 
 -DOCS
   DONE-explain parameterization
@@ -244,13 +245,17 @@ DONE-do remaining ntoching config classes
 -can you make meshing run in parallel?
 -remove trash structures (or ceraet a new spot for them so they don't ship with the library)
 -agent prompt examples
--figure out inset notching.... config
-  -0 degree notch up to insertion face
-  -afterwards do the regular notching with varibale relief angle
-  -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
-    -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
-      -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
+
 -add an optional scale ruler to the view and havei t default off
+
+
+
+
+
+
+
+
+
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 -NON PERFECT TIMBER
@@ -258,21 +263,27 @@ DONE-do remaining ntoching config classes
   DONE-add round timber stuff
   -add asserts to joint functions to indicate if they can support non perfect timbers
   -add regular imperfect rectangular timber stuff
-
+-do scribe notching on all joints (followup content yee)
 -make butt jonit with shoulder inset notching more generic
-    -notch_length, measured in the length direction of the receiving timber
-    -notch_width, always 100% the full dimension of the receiving timber
-    -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
-    -notch_style, straight walls only for now
-    -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
+  -notch_length, measured in the length direction of the receiving timber
+  -notch_width, always 100% the full dimension of the receiving timber
+  -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
+  -notch_style, straight walls only for now
+  -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
+-figure out inset notching.... config
+  -0 degree notch up to insertion face
+  -afterwards do the regular notching with varibale relief angle
+  -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
+    -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
+      -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
 
 -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
     - joint type tags should be prioritized, or instead sort by tags that show up most often
     - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
     Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
 
--outline final joint requirements
-  -you can probably at least promote the plain joints...
+-look into promoting some plain joints
+
 
 -notching configs
   -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt

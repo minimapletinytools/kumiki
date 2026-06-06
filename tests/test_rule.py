@@ -38,6 +38,10 @@ from kumiki.rule import (
     numeric_norm,
     numeric_normalize_vector,
     GIRAFFE_EVALF_PRECISION,
+    set_smart_node_guard_enabled,
+    is_smart_node_guard_enabled,
+    set_smart_node_guard_max_nodes,
+    get_smart_node_guard_max_nodes,
 )
 import random
 from tests.testing_shavings import generate_random_orientation, assert_is_valid_rotation_matrix
@@ -1187,6 +1191,62 @@ class TestCollapseMode:
         expr = sin(Integer(1)) + cos(Integer(2))
         result = _collapse_scalar(expr, CollapseMode.NEVER)
         assert result is expr  # unchanged
+
+
+class TestSmartNodeGuardControls:
+    @staticmethod
+    def _make_medium_complex_expr():
+        # Keep expression unevaluated so node-count heuristics can trigger in SMART mode.
+        terms = [Rational(i, i + 1) * Rational(i + 2, i + 3) for i in range(1, 13)]
+        return sp.Add(*terms, evaluate=False)
+
+    def test_can_toggle_guard(self):
+        original_enabled = is_smart_node_guard_enabled()
+        try:
+            set_smart_node_guard_enabled(False)
+            assert is_smart_node_guard_enabled() is False
+            set_smart_node_guard_enabled(True)
+            assert is_smart_node_guard_enabled() is True
+        finally:
+            set_smart_node_guard_enabled(original_enabled)
+
+    def test_can_set_guard_threshold(self):
+        original_threshold = get_smart_node_guard_max_nodes()
+        try:
+            set_smart_node_guard_max_nodes(7)
+            assert get_smart_node_guard_max_nodes() == 7
+        finally:
+            set_smart_node_guard_max_nodes(original_threshold)
+
+    def test_guard_off_keeps_large_expr_symbolic_in_smart_float_mode(self, float_mode):
+        from kumiki.rule import _collapse_scalar
+
+        original_enabled = is_smart_node_guard_enabled()
+        original_threshold = get_smart_node_guard_max_nodes()
+        try:
+            set_smart_node_guard_enabled(False)
+            set_smart_node_guard_max_nodes(5)
+            expr = self._make_medium_complex_expr()
+            result = _collapse_scalar(expr, CollapseMode.SMART)
+            assert not isinstance(result, sp.Float)
+        finally:
+            set_smart_node_guard_enabled(original_enabled)
+            set_smart_node_guard_max_nodes(original_threshold)
+
+    def test_guard_on_collapses_large_expr_in_smart_float_mode(self, float_mode):
+        from kumiki.rule import _collapse_scalar
+
+        original_enabled = is_smart_node_guard_enabled()
+        original_threshold = get_smart_node_guard_max_nodes()
+        try:
+            set_smart_node_guard_enabled(True)
+            set_smart_node_guard_max_nodes(5)
+            expr = self._make_medium_complex_expr()
+            result = _collapse_scalar(expr, CollapseMode.SMART)
+            assert isinstance(result, sp.Float)
+        finally:
+            set_smart_node_guard_enabled(original_enabled)
+            set_smart_node_guard_max_nodes(original_threshold)
 
 
 class TestNumericWrappers:

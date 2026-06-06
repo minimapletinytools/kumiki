@@ -91,6 +91,10 @@ GIRAFFE_EVALF_PRECISION = 10
 EPSILON_GENERIC = Float('1e-8')      # Generic epsilon threshold for float comparisons, make sure this is larger than GIRAFFE_EVALF_PRECISION to avoid false positives
 EPSILON_FLOAT = 1e-10                # Epsilon for plain Python float comparisons (used in safe_compare)
 COMPLEX_NUM_NODES_THRESHOLD = 50  # Max number of nodes in expression tree before considering it complex
+# In SMART mode, we can apply an explicit node budget guard while running in
+# float mode to prevent intermediate expression-tree blowups in hot paths.
+SMART_NODE_GUARD_ENABLED = True
+SMART_NODE_GUARD_MAX_NODES = COMPLEX_NUM_NODES_THRESHOLD
 
 
 class CollapseMode(Enum):
@@ -98,6 +102,35 @@ class CollapseMode(Enum):
     ALWAYS = "always"    # Eagerly collapse to Float via giraffe_evalf
     NEVER = "never"      # Keep symbolic form (for testing/debugging)
     SMART = "smart"      # Collapse only when expression complexity exceeds threshold
+
+
+def set_smart_node_guard_enabled(enabled: bool) -> None:
+    """Enable/disable SMART-mode node-guard short-circuiting."""
+    global SMART_NODE_GUARD_ENABLED
+    SMART_NODE_GUARD_ENABLED = bool(enabled)
+
+
+def is_smart_node_guard_enabled() -> bool:
+    """Return whether SMART-mode node-guard short-circuiting is enabled."""
+    return SMART_NODE_GUARD_ENABLED
+
+
+def set_smart_node_guard_max_nodes(max_nodes: int) -> None:
+    """Set node budget used by SMART-mode node-guard checks."""
+    global SMART_NODE_GUARD_MAX_NODES
+    if max_nodes <= 0:
+        raise ValueError("SMART node guard max_nodes must be > 0")
+    SMART_NODE_GUARD_MAX_NODES = max_nodes
+
+
+def get_smart_node_guard_max_nodes() -> int:
+    """Get current SMART-mode node-guard budget."""
+    return SMART_NODE_GUARD_MAX_NODES
+
+
+def _smart_node_guard_active() -> bool:
+    """Guard is only active in float mode so symbolic-focused tests can opt in/out easily."""
+    return is_float_numeric_mode() and SMART_NODE_GUARD_ENABLED
 
 
 def giraffe_evalf(expr):
@@ -129,7 +162,8 @@ def _should_collapse(expr, collapse_mode: CollapseMode) -> bool:
     if collapse_mode == CollapseMode.NEVER:
         return False
     # SMART mode — collapse only when expression is complex
-    if is_complex_expr(expr):
+    max_nodes = SMART_NODE_GUARD_MAX_NODES if SMART_NODE_GUARD_ENABLED else COMPLEX_NUM_NODES_THRESHOLD
+    if is_complex_expr(expr, max_nodes):
         if not is_float_numeric_mode():
             #warnings.warn(
             #    f"Expression exceeded complexity threshold and will be collapsed to Float: {repr(expr)[:120]}",
@@ -409,7 +443,16 @@ def giraffe_norm(vec: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART):
 
     # Manual sum of squares — avoids SymPy matrix .norm() which triggers
     # slow property checking on complex expressions.
-    sum_sq = sum(c * c for c in vec)
+    # In SMART+float mode, collapse partial sums when node budget is exceeded.
+    sum_sq = Integer(0)
+    if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
+        for c in vec:
+            sum_sq = sum_sq + c * c
+            if is_complex_expr(sum_sq, SMART_NODE_GUARD_MAX_NODES):
+                sum_sq = giraffe_evalf(sum_sq)
+    else:
+        sum_sq = sum(c * c for c in vec)
+
     result = sqrt(sum_sq)
     return _collapse_scalar(result, collapse_mode)
 
@@ -516,7 +559,16 @@ def giraffe_dot_product(vec1: Matrix, vec2: Matrix, collapse_mode: CollapseMode 
     vec1_values = [vec1[i, j] for i in range(vec1.rows) for j in range(vec1.cols)]
     vec2_values = [vec2[i, j] for i in range(vec2.rows) for j in range(vec2.cols)]
     assert len(vec1_values) == len(vec2_values), "Vectors must have the same number of elements"
-    result = sum(v1 * v2 for v1, v2 in zip(vec1_values, vec2_values))
+
+    if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
+        result = Integer(0)
+        for v1, v2 in zip(vec1_values, vec2_values):
+            result = result + v1 * v2
+            if is_complex_expr(result, SMART_NODE_GUARD_MAX_NODES):
+                result = giraffe_evalf(result)
+    else:
+        result = sum(v1 * v2 for v1, v2 in zip(vec1_values, vec2_values))
+
     return _collapse_scalar(result, collapse_mode)
 
 
@@ -532,10 +584,18 @@ def giraffe_transform_vector(matrix: Matrix, vector: Matrix, collapse_mode: Coll
     for i in range(len(mat_data)):
         row = []
         for k in range(len(vec_data[0])):
-            elem = sum(mat_data[i][j] * vec_data[j][k] for j in range(len(vec_data)))
+            if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
+                elem = Integer(0)
+                for j in range(len(vec_data)):
+                    elem = elem + mat_data[i][j] * vec_data[j][k]
+                    if is_complex_expr(elem, SMART_NODE_GUARD_MAX_NODES):
+                        elem = giraffe_evalf(elem)
+            else:
+                elem = sum(mat_data[i][j] * vec_data[j][k] for j in range(len(vec_data)))
+
             if collapse_mode == CollapseMode.ALWAYS:
                 elem = giraffe_evalf(elem)
-            elif collapse_mode == CollapseMode.SMART and is_complex_expr(elem):
+            elif collapse_mode == CollapseMode.SMART and is_complex_expr(elem, SMART_NODE_GUARD_MAX_NODES):
                 if not is_float_numeric_mode():
                     warnings.warn(
                         f"Matrix element exceeded complexity threshold and will be collapsed "
