@@ -447,11 +447,14 @@ class PatternBook:
     ) -> Frame:
         all_cut_timbers: List[CutTimber] = []
         all_accessories: List[JointAccessory] = []
+        all_source_joints: List = []
 
         for result in results:
             if isinstance(result, Frame):
                 all_cut_timbers.extend(result.cut_timbers)
                 all_accessories.extend(result.accessories)
+                if result.source_joints:
+                    all_source_joints.extend(result.source_joints)
                 continue
             if isinstance(result, CutCSG):
                 all_accessories.append(
@@ -469,6 +472,7 @@ class PatternBook:
             cut_timbers=all_cut_timbers,
             accessories=all_accessories,
             name=name,
+            source_joints=all_source_joints or None,
         )
     
     def _combine_frames(self, frames: List[Frame], group_name: str) -> Frame:
@@ -487,16 +491,20 @@ class PatternBook:
         """
         all_cut_timbers = []
         all_accessories = []
-        
+        all_source_joints: List = []
+
         for frame in frames:
             all_cut_timbers.extend(frame.cut_timbers)
             all_accessories.extend(frame.accessories)
-        
+            if frame.source_joints:
+                all_source_joints.extend(frame.source_joints)
+
         # Create megaframe
         megaframe = Frame(
             cut_timbers=all_cut_timbers,
             accessories=all_accessories,
-            name=f"{group_name}_combined"
+            name=f"{group_name}_combined",
+            source_joints=all_source_joints or None,
         )
         
         return megaframe
