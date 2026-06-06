@@ -236,8 +236,9 @@ DONE-remove tag pill box from search
 DONE-fix joint indentatino level
 DONE-fix patternbook joints not showing
 DONE-do remaining ntoching config classes
+
 -DOCS
-  -explain parameterization
+  DONE-explain parameterization
 -try and run a full loop agent test on this to see if it all works
 -do another perfermance pass on silly shed, still taking way too long
 -can you make meshing run in parallel?

@@ -73,12 +73,12 @@ If the user does not specify which joint, use the following (or one of its varia
 
 ## Combining everything into a Frame
 
-Your file should typically have some `example` function that returns a Frame
+Your file should typically have some `example` function that returns a Frame. The function must be explicity typed to return type `Frame` in order for it be to picked up by the project scanner.
 
 Use `Frame.from_joints` to merge cuts on shared timbers across multiple joints.
 
 ```python
-def example():
+def example() -> Frame:
     # establish footprint
     # create timbers
     # create joints
@@ -87,6 +87,8 @@ def example():
 ```
 
 The `example` function name is special, it is what kigumi will scan for and render when opening your file.
+
+Supported arguments types added to the `example` function will be displayed in the parametrization section in Kigumi. However remember that since the update flow is agentic, having constants in the example file is often better. All arguments to the `example` function must have default values.
 
 # Validation Workflow
 
