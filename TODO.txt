@@ -237,13 +237,11 @@ DONE-camera controls should be absolute? use focus to reset
   -explain parameterization
 
 -try and run a full loop agent test on this to see if it all works
--notching configs
-  -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
-  -do generic butt joint notching config (no inset) + implement on joints + test
-  -do generic end joint notching config (no inset) + implement on joints + test
-  -do generic splice joint noching config??
+
 DONE-remove tag pill box from search
 DONE-fix joint indentatino level
+DONE-fix patternbook joints not showing
+-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
 -agent prompt examples
 -figure out inset notching.... config
   -0 degree notch up to insertion face
@@ -275,6 +273,12 @@ DONE-fix joint indentatino level
 
 -outline final joint requirements
   -you can probably at least promote the plain joints...
+
+-notching configs
+  -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
+  -do generic butt joint notching config (no inset) + implement on joints + test
+  -do generic end joint notching config (no inset) + implement on joints + test
+  -do generic splice joint noching config??
 
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon
