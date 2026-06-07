@@ -237,7 +237,18 @@ class BraceJointScribeNotchingConfig:
 
     The 2 braced timbers are always scribed onto the brace timber.
     """
-    pass
+    first_timber_to_be_scribed: ArrangementNames
+    second_timber_to_be_scribed: ArrangementNames
+
+    @staticmethod
+    def with_order(
+        first_timber_to_be_scribed: ArrangementNames,
+        second_timber_to_be_scribed: ArrangementNames,
+    ):
+        return BraceJointScribeNotchingConfig(
+            first_timber_to_be_scribed=first_timber_to_be_scribed,
+            second_timber_to_be_scribed=second_timber_to_be_scribed,
+        )
 
 
 def _projected_perfect_cross_section_span_along_global_direction(

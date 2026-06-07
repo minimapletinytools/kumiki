@@ -12,7 +12,8 @@ Joinery used:
 from kumiki import *
 
 # Compatibility alias for watcher reloads that may still reference the old symbol name.
-cut_basic_mitered_and_keyed_lap_joint = cut_mitered_and_keyed_lap_joint
+def cut_basic_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement) -> Joint:
+    return cut_mitered_and_keyed_lap_joint(arrangement)
 
 
 # -----------------------------------------------------------------------------
