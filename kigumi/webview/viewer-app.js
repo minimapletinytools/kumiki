@@ -1561,6 +1561,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'collectPendingRenderParametersRequest') {
+            this.handleCollectPendingRenderParametersRequest(message);
+            return;
+        }
+
         if (message.type === 'getCameraStateRequest') {
             this.handleGetCameraStateRequest(message);
             return;
@@ -1725,6 +1730,31 @@ class KigumiViewerApp extends LitElement {
             up: controllerPayload.up,
             cameraPosition,
         };
+    }
+
+    handleCollectPendingRenderParametersRequest(message) {
+        const requestId = message && message.requestId;
+        if (!vscode || !requestId) {
+            return;
+        }
+
+        try {
+            vscode.postMessage({
+                type: 'collectPendingRenderParametersResult',
+                requestId,
+                ok: true,
+                payload: {
+                    renderParameters: { ...this.pendingRenderParameters },
+                },
+            });
+        } catch (error) {
+            vscode.postMessage({
+                type: 'collectPendingRenderParametersResult',
+                requestId,
+                ok: false,
+                error: error && error.message ? error.message : 'Failed to read pending render parameters',
+            });
+        }
     }
 
     handleGetCameraStateRequest(message) {

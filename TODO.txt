@@ -44,7 +44,9 @@ lets click through a few patterns to see what they do
 here's asimple butt splice joint, not very exciting
 and here's a goosenceck splice joint, a little more fun
 I'll let you explore here. Kumiki is being actively developed on so there will be many more patterns (and hence joints) to come
-if you want to play around with one of these pattern,s you can hit duplicate to workspace
+if you want to play around with one of these patterns you can hit duplicate to workspace to copy the pattern into your workspace and make changes to it yourself
+
+But let's jump into making our own design. 
 
 
 
@@ -244,7 +246,7 @@ DONE-remove trash structures (or ceraet a new spot for them so they don't ship w
 
 -improve erroring on initialize due to missing deps
 -screenshot capability broken
--open viewer works, but you also need a refresh after changes are made command for agent to use
+DONE-open viewer works, but you also need a refresh after changes are made command for agent to use
 -improve agent instructions
   DONE-create a TLDR; section at the top outlining general workflow
   -suggest what to do when 3 wood intersects

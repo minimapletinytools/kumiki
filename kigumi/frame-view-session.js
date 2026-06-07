@@ -391,6 +391,29 @@ class FrameViewSession {
         return this.fileWatcher.isEnabled;
     }
 
+    async syncRenderParametersFromPanel() {
+        if (this.isDisposed || !this.panel) {
+            return;
+        }
+
+        try {
+            const payload = await this._requestWebviewAction(
+                'collectPendingRenderParameters',
+                'collect-pending-render-parameters',
+            );
+            if (payload.renderParameters && typeof payload.renderParameters === 'object') {
+                this.renderParameters = { ...payload.renderParameters };
+            }
+        } catch (error) {
+            this.log(`[refresh] Could not sync panel parameters: ${error.message || error}`);
+        }
+    }
+
+    async refreshWithPanelParameters(reason = 'manual render') {
+        await this.syncRenderParametersFromPanel();
+        await this.refresh(reason);
+    }
+
     getCameraState() {
         return this._requestWebviewAction('getCameraState', 'get-camera-state');
     }

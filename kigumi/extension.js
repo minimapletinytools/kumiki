@@ -149,7 +149,10 @@ function activate(context) {
 
     const openCurrentFileInViewer = vscode.commands.registerCommand('kigumi.openCurrentFileInViewer', async () => {
         try {
-            await renderActiveEditor(context);
+            await renderActiveEditor(context, {
+                usePanelParameters: true,
+                reason: 'open current file in viewer',
+            });
         } catch (error) {
             outputChannel.show(true);
             vscode.window.showErrorMessage(`Open current file failed: ${error.message || error}`);
@@ -903,7 +906,7 @@ function getActivePythonFilePath() {
     return editor.document.fileName;
 }
 
-async function renderActiveEditor(context) {
+async function renderActiveEditor(context, options = {}) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         vscode.window.showErrorMessage('No active editor!');
@@ -923,7 +926,11 @@ async function renderActiveEditor(context) {
     const filePath = document.fileName;
     const session = await getOrCreateSession(filePath, context);
     session.reveal();
-    await session.refresh();
+    if (options.usePanelParameters) {
+        await session.refreshWithPanelParameters(options.reason || 'open current file in viewer');
+    } else {
+        await session.refresh();
+    }
 }
 
 async function openFileInViewer(filePath, context) {
