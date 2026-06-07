@@ -1,6 +1,6 @@
 [project]
 name = "kumiki"
-version = "0.2.3"
+version = "0.2.4"
 description = "A library for programmatic timber frame CAD design"
 requires-python = ">=3.10"
 license = "MIT"
