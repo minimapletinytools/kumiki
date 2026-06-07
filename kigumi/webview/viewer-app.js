@@ -1193,6 +1193,7 @@ class KigumiViewerApp extends LitElement {
             canvas: canvas,
             antialias: true,
             logarithmicDepthBuffer: true,
+            preserveDrawingBuffer: true,
         });
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(viewport.offsetWidth, viewport.offsetHeight, false);
@@ -1646,6 +1647,9 @@ class KigumiViewerApp extends LitElement {
         await new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
         try {
+            if (this.renderer && this.scene && this.camera) {
+                this.renderer.render(this.scene, this.camera);
+            }
             const dataUrl = canvas.toDataURL('image/png');
             vscode.postMessage({
                 type: 'captureScreenshotResult',

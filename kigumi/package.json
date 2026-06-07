@@ -25,6 +25,9 @@
     "onStartupFinished",
     "onCommand:kigumi.openCurrentFileInViewer",
     "onCommand:kigumi.automationOpenFileInViewer",
+    "onCommand:kigumi.automationListSessions",
+    "onCommand:kigumi.automationRefreshSession",
+    "onCommand:kigumi.captureScreenshot",
     "onCommand:kigumi.initializeProjectInWorkspace",
     "onView:kigumi.explorer"
   ],
@@ -110,8 +113,8 @@
         "title": "Kigumi: Automation Set Camera State"
       },
       {
-        "command": "kigumi.captureScreenshotBundle",
-        "title": "Kigumi: Capture Screenshot Bundle"
+        "command": "kigumi.captureScreenshot",
+        "title": "Kigumi: Capture Screenshot"
       },
       {
         "command": "kigumi.explorer",
@@ -166,7 +169,7 @@
           "when": "false"
         },
         {
-          "command": "kigumi.captureScreenshotBundle",
+          "command": "kigumi.captureScreenshot",
           "when": "false"
         },
         {

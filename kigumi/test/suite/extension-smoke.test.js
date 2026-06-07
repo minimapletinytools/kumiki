@@ -15,14 +15,14 @@ function screenshotArtifactsDir() {
 
 async function captureScreenshot(filePath, name) {
   const outputPath = path.join(screenshotArtifactsDir(), `${name}.png`);
-  const result = await vscode.commands.executeCommand('kigumi.captureRenderedScreenshot', {
+  const result = await vscode.commands.executeCommand('kigumi.captureScreenshot', {
     filePath,
     outputPath,
     timeoutMs: 10000,
   });
 
-  assert.ok(result, 'Expected screenshot command to return metadata');
-  assert.ok(result.byteLength > 0, 'Expected screenshot bytes to be non-empty');
+  assert.ok(result && result.ok, 'Expected screenshot command to succeed');
+  assert.ok(result.screenshot && result.screenshot.byteLength > 0, 'Expected screenshot bytes to be non-empty');
   assert.ok(fs.existsSync(outputPath), `Expected screenshot to be written: ${outputPath}`);
   return outputPath;
 }

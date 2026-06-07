@@ -130,12 +130,12 @@ For automation-driven checks (agent/testing flows), call these command ids direc
 4. Read disk-backed JSONL logs: `kigumi.automationReadSessionLogs`
 5. Read camera state: `kigumi.automationGetCameraState`
 6. Set camera state: `kigumi.automationSetCameraState`
-7. Capture screenshot + camera bundle: `kigumi.captureScreenshotBundle`
+7. Capture 3D viewport screenshot: `kigumi.captureScreenshot`
 
 Expected artifacts from the automated loop:
 
 - Session logs in `.kigumi/logs/*.jsonl`
-- Screenshot bundles in `.kigumi/automation/`
+- Screenshots in `.kigumi/automation/`
 
 Common automation loop example:
 
@@ -144,7 +144,7 @@ Common automation loop example:
 3. `kigumi.automationRefreshSession` with `dirtyOnce: true`
 4. `kigumi.automationReadSessionLogs` filtering for warnings/errors
 5. `kigumi.automationGetCameraState`
-6. `kigumi.captureScreenshotBundle`
+6. `kigumi.captureScreenshot`
 
 # Creating new Patterns
 

@@ -160,7 +160,7 @@ describe('Kigumi automation flow', () => {
     assert.ok(thetaDelta > 0.001, 'Expected camera theta to change after automation set');
 
     const artifactDir = path.resolve(__dirname, '..', '..', '.artifacts', 'automation');
-    const bundleResult = await vscode.commands.executeCommand('kigumi.captureScreenshotBundle', {
+    const screenshotResult = await vscode.commands.executeCommand('kigumi.captureScreenshot', {
       filePath: fixturePath,
       outputDir: artifactDir,
       namePrefix: `automation-${Date.now()}`,
@@ -169,9 +169,8 @@ describe('Kigumi automation flow', () => {
       timeoutMs: 0,
     });
 
-    assert.ok(bundleResult && bundleResult.ok, 'Expected screenshot bundle command to succeed');
-    assert.ok(fs.existsSync(bundleResult.screenshotPath), 'Expected screenshot artifact to be written');
-    assert.ok(fs.existsSync(bundleResult.cameraPath), 'Expected camera artifact to be written');
+    assert.ok(screenshotResult && screenshotResult.ok, 'Expected screenshot command to succeed');
+    assert.ok(fs.existsSync(screenshotResult.screenshotPath), 'Expected screenshot artifact to be written');
 
     const toggleResult = await vscode.commands.executeCommand('kigumi.toggleAutoRefreshOnFileChange');
     assert.ok(toggleResult && typeof toggleResult.enabled === 'boolean', 'Expected toggle command result');

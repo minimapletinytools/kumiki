@@ -245,7 +245,7 @@ DONE-remove trash structures (or ceraet a new spot for them so they don't ship w
 
 
 -improve erroring on initialize due to missing deps
--screenshot capability broken
+-screenshot capability broken (test the new one)
 DONE-open viewer works, but you also need a refresh after changes are made command for agent to use
 -improve agent instructions
   DONE-create a TLDR; section at the top outlining general workflow

@@ -313,20 +313,17 @@ function activate(context) {
     });
     context.subscriptions.push(automationSetCameraState);
 
-    const captureScreenshotBundle = vscode.commands.registerCommand('kigumi.captureScreenshotBundle', async (options = {}) => {
-        const session = findSessionFromOptions(options);
-        if (!session) {
-            throw new Error('No active Kigumi session found for screenshot bundle');
-        }
+    const captureScreenshot = vscode.commands.registerCommand('kigumi.captureScreenshot', async (options = {}) => {
+        const session = await ensureViewerSessionForScreenshot(options, context);
 
         if (options.preRefresh === true) {
             if (options.preRefreshDirtyOnce === true) {
                 await session.refreshOnceIfDirty({
                     saveIfDirty: options.saveIfDirty !== false,
-                    reason: 'automation screenshot bundle pre-refresh (dirty once)',
+                    reason: 'automation screenshot pre-refresh (dirty once)',
                 });
             } else {
-                await session.refresh('automation screenshot bundle pre-refresh');
+                await session.refresh('automation screenshot pre-refresh');
             }
         }
 
@@ -336,36 +333,37 @@ function activate(context) {
             });
         }
 
-        const workspaceRoot = getWorkspaceRoot() || path.dirname(session.filePath);
-        const outputDir = typeof options.outputDir === 'string' && options.outputDir
-            ? options.outputDir
-            : path.join(workspaceRoot, '.kigumi', 'automation');
-        const basePrefix = typeof options.namePrefix === 'string' && options.namePrefix
-            ? options.namePrefix
-            : `${path.basename(session.filePath, path.extname(session.filePath))}-${Date.now()}`;
-        fs.mkdirSync(outputDir, { recursive: true });
-
-        const screenshotPath = path.join(outputDir, `${basePrefix}.png`);
-        const cameraPath = path.join(outputDir, `${basePrefix}.camera.json`);
+        let screenshotPath = typeof options.outputPath === 'string' && options.outputPath
+            ? options.outputPath
+            : null;
+        if (!screenshotPath) {
+            const workspaceRoot = getWorkspaceRoot() || path.dirname(session.filePath);
+            const outputDir = typeof options.outputDir === 'string' && options.outputDir
+                ? options.outputDir
+                : path.join(workspaceRoot, '.kigumi', 'automation');
+            const basePrefix = typeof options.namePrefix === 'string' && options.namePrefix
+                ? options.namePrefix
+                : `${path.basename(session.filePath, path.extname(session.filePath))}-${Date.now()}`;
+            fs.mkdirSync(outputDir, { recursive: true });
+            screenshotPath = path.join(outputDir, `${basePrefix}.png`);
+        } else {
+            fs.mkdirSync(path.dirname(screenshotPath), { recursive: true });
+        }
 
         const screenshotMeta = await session.captureScreenshot({
             outputPath: screenshotPath,
             timeoutMs: typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined,
         });
-        const cameraState = await session.getCameraState();
-        fs.writeFileSync(cameraPath, `${JSON.stringify(cameraState, null, 2)}\n`, 'utf8');
 
         return {
             ok: true,
             filePath: session.filePath,
             slotName: session.slotName,
             screenshotPath,
-            cameraPath,
-            cameraState,
             screenshot: screenshotMeta,
         };
     });
-    context.subscriptions.push(captureScreenshotBundle);
+    context.subscriptions.push(captureScreenshot);
 
     // Split-view toggle now handled via Settings panel only (kigumi.viewer.openInSplitView setting)
 
@@ -667,36 +665,6 @@ function activate(context) {
 
     context.subscriptions.push(unloadPattern);
 
-    const screenshotDisposable = vscode.commands.registerCommand(
-        'kigumi.captureRenderedScreenshot',
-        async (options = {}) => {
-            const targetFilePath =
-                typeof options.filePath === 'string' && options.filePath
-                    ? options.filePath
-                    : vscode.window.activeTextEditor && vscode.window.activeTextEditor.document
-                        ? vscode.window.activeTextEditor.document.fileName
-                        : null;
-
-            if (!targetFilePath) {
-                throw new Error('No target file path available for screenshot capture');
-            }
-
-            const session = frameSessions.get(targetFilePath);
-            if (!session || session.isDisposed) {
-                throw new Error(`No active Kigumi session for ${targetFilePath}`);
-            }
-
-            const timeoutMs =
-                typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined;
-            const outputPath =
-                typeof options.outputPath === 'string' && options.outputPath ? options.outputPath : undefined;
-
-            return session.captureScreenshot({ timeoutMs, outputPath });
-        }
-    );
-
-    context.subscriptions.push(screenshotDisposable);
-
     if (ENABLE_TEST_COMMANDS) {
         const sidebarSnapshotDisposable = vscode.commands.registerCommand(
             'kigumi.testGetSidebarSnapshot',
@@ -722,7 +690,7 @@ function activate(context) {
                     return { exists: false, reason: 'No file path was provided.' };
                 }
 
-                const session = frameSessions.get(targetFilePath);
+                const session = getFrameSession(targetFilePath);
                 if (!session || session.isDisposed) {
                     return { exists: false, filePath: targetFilePath };
                 }
@@ -1049,13 +1017,14 @@ async function _openBookFromWebview(mainSession, sourceFile, context) {
  * Reuses an existing session for the same file or creates a new panel/session.
  */
 async function getOrCreateSession(filePath, context) {
-    const existingSession = frameSessions.get(filePath);
+    const normalizedFilePath = normalizeSessionFilePath(filePath);
+    const existingSession = getFrameSession(normalizedFilePath || filePath);
     if (existingSession && !existingSession.isDisposed) {
         return existingSession;
     }
 
     const session = new FrameViewSession(
-        filePath,
+        normalizedFilePath || filePath,
         context,
         outputChannel,
         (disposedFilePath) => {
@@ -1065,9 +1034,73 @@ async function getOrCreateSession(filePath, context) {
         },
         { slotName: 'main', sessionType: 'main', openInSplitView, autoRefreshOnFileChange }
     );
-    frameSessions.set(filePath, session);
+    frameSessions.set(normalizedFilePath || filePath, session);
     await session.initialize();
     return session;
+}
+
+function normalizeSessionFilePath(filePath) {
+    if (!filePath || typeof filePath !== 'string') {
+        return null;
+    }
+    try {
+        return fs.realpathSync.native(filePath);
+    } catch (_error) {
+        return path.resolve(filePath);
+    }
+}
+
+function getFrameSession(filePath) {
+    const normalizedTarget = normalizeSessionFilePath(filePath);
+    if (!normalizedTarget) {
+        return null;
+    }
+
+    for (const [key, session] of frameSessions.entries()) {
+        if (session.isDisposed) {
+            continue;
+        }
+        if (normalizeSessionFilePath(key) === normalizedTarget) {
+            return session;
+        }
+    }
+    return null;
+}
+
+function resolveScreenshotTargetFilePath(options = {}) {
+    if (typeof options.filePath === 'string' && options.filePath) {
+        return normalizeSessionFilePath(options.filePath);
+    }
+    const activeFilePath = getActivePythonFilePath();
+    return activeFilePath ? normalizeSessionFilePath(activeFilePath) : null;
+}
+
+async function ensureViewerSessionForScreenshot(options, context) {
+    const session = findSessionFromOptions(options);
+    if (session && !session.isDisposed) {
+        session.reveal();
+        return session;
+    }
+
+    const targetFilePath = resolveScreenshotTargetFilePath(options);
+    if (!targetFilePath) {
+        throw new Error(
+            'No Kigumi viewer is open. Open a Python frame file and run "Kigumi: Open Current File In Viewer", or pass filePath to the screenshot command.'
+        );
+    }
+
+    const existingSession = getFrameSession(targetFilePath);
+    if (existingSession && !existingSession.isDisposed) {
+        existingSession.reveal();
+        return existingSession;
+    }
+
+    await openFileInViewer(targetFilePath, context);
+    const openedSession = getFrameSession(targetFilePath);
+    if (!openedSession || openedSession.isDisposed) {
+        throw new Error(`Could not open Kigumi viewer for ${targetFilePath}`);
+    }
+    return openedSession;
 }
 
 function findSessionFromOptions(options = {}) {
@@ -1086,7 +1119,7 @@ function findSessionFromOptions(options = {}) {
                 : null;
 
     if (targetFilePath) {
-        const frameSession = frameSessions.get(targetFilePath);
+        const frameSession = getFrameSession(targetFilePath);
         if (frameSession && !frameSession.isDisposed) {
             return frameSession;
         }
