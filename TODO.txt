@@ -242,10 +242,11 @@ DONE-remove trash structures (or ceraet a new spot for them so they don't ship w
   DONE-explain parameterization
 
 
+-improve erroring on initialize due to missing deps
 -screenshot capability broken
 -open viewer works, but you also need a refresh after changes are made command for agent to use
 -improve agent instructions
-  -suggest making joints
+  DONE-create a TLDR; section at the top outlining general workflow
   -suggest what to do when 3 wood intersects
 
 

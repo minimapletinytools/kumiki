@@ -1,12 +1,24 @@
 # Kumiki Usage Instructions
 
-## Concepts
+## Background
 
 When a workspace is initialized with Kigumi, `kumiki` is installed into that workspace `.venv`. Resolve the installed package path with `.venv/bin/python3 -c "import kumiki, pathlib; print(pathlib.Path(kumiki.__file__).resolve().parent)"` (on Windows use `.venv\\Scripts\\python.exe`), then read `<that_path>/docs/concepts.md` first to understand Kumiki core concepts and architecture.
 
+## General Usage Pattern *START HERE*
+
+Unless the user is specific about what they want, always follow the following implementation pattern. Details on how to do these steps are later in this doc.
+
+- for structure, define a `Footprint` for the whole structure
+- create initial timbers by placing posts vertically on the footprint or place mudsilles horizontally on the footprint
+- for timbers spanning between existing timbers always use the join_timbers method
+- only create timbers manually if the above methods are insufficient
+- at this point, you can show the user the design and confirm it's what they are looking for
+- once all timbers are in place, create joints binding everything together
+- iterate with the user until they are satisfied
+
 ## Imports
 
-Always import via the top-level `kumiki` module:
+Import via the top-level `kumiki` module:
 ```python
 from kumiki import *
 ```
