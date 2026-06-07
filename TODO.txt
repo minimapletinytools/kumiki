@@ -36,15 +36,14 @@ select timbers
 look at the list of timbers and joints
 and so on
 if you scroll down, you'll see some options for the viewer, and you'll also see the frame parameter section which we're not using for this frame
-further down, you'll see a rough cut list
-and then further down youll see some logging and python raw output which is sometimes useful for debugging 
+further down, you'll see a rough cut list some logging and output which is sometimes useful for debugging 
 now lets go take a look the patterns thot ship with kumiki in the sidebar
 you can see patterns are currently organized in different patternbooks, which correspond to different types of joints (these will be reorganized soon)
 if you just want to see a list of pattens intead, hit the patternbook grouping toggle at the top
 lets click through a few patterns to see what they do
 here's asimple butt splice joint, not very exciting
 and here's a goosenceck splice joint, a little more fun
-I'll let you explore here. Kumiki is being activel ydeveloped on so there will be many more patterns (and hence joints) to come
+I'll let you explore here. Kumiki is being actively developed on so there will be many more patterns (and hence joints) to come
 if you want to play around with one of these pattern,s you can hit duplicate to workspace
 
 
@@ -243,6 +242,11 @@ DONE-remove trash structures (or ceraet a new spot for them so they don't ship w
   DONE-explain parameterization
 
 
+-screenshot capability broken
+-open viewer works, but you also need a refresh after changes are made command for agent to use
+-improve agent instructions
+  -suggest making joints
+  -suggest what to do when 3 wood intersects
 
 
 -can you make meshing run in parallel?
