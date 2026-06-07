@@ -144,6 +144,7 @@ describe('CameraController', () => {
                 Math.sin(p) * Math.sin(t),
                 Math.cos(p),
                 1e-12);
+            expect(c.getCameraMode()).toBe('standard');
         });
 
         test('accepts explicit center and distance', () => {
@@ -241,12 +242,52 @@ describe('CameraController', () => {
         });
     });
 
+    describe('setCameraMode', () => {
+        test('can switch to standard without snapping up vector immediately', () => {
+            const c = new CameraController({
+                THREE,
+                initialAngles: { theta: 0, phi: Math.PI / 2 },
+            });
+            c.setCameraMode('free');
+            c.captureOrbitDragFrame();
+            c.applyOrbitDelta(0, 100);
+            expect(Math.abs(c.cameraUpVector.x)).toBeGreaterThan(0.1);
+
+            c.setCameraMode('standard', { snapUp: false });
+            expect(c.getCameraMode()).toBe('standard');
+            expect(Math.abs(c.cameraUpVector.x)).toBeGreaterThan(0.1);
+        });
+    });
+
     describe('applyOrbitDelta', () => {
+        test('standard mode keeps camera up aligned to world Z', () => {
+            const c = new CameraController({
+                THREE,
+                initialAngles: { theta: 0, phi: Math.PI / 2 },
+            });
+            c.setCameraMode('standard');
+            c.applyOrbitDelta(0, 100);
+            expectVec(c.cameraUpVector, 0, 0, 1, 1e-12);
+        });
+
+        test('free mode rotates camera up during orbit drag', () => {
+            const c = new CameraController({
+                THREE,
+                initialAngles: { theta: 0, phi: Math.PI / 2 },
+            });
+            c.setCameraMode('free');
+            c.captureOrbitDragFrame();
+            c.applyOrbitDelta(0, 100);
+            expect(Math.abs(c.cameraUpVector.x)).toBeGreaterThan(0.1);
+            expect(c.cameraUpVector.z).toBeLessThan(1);
+        });
+
         test('horizontal delta rotates camera around captured screen-up axis', () => {
             const c = new CameraController({
                 THREE,
                 initialAngles: { theta: 0, phi: Math.PI / 2 }, // dir = +X, up = +Z
             });
+            c.setCameraMode('free');
             c.captureOrbitDragFrame();
             // dx > 0, dy = 0 → rotate offsetDir around +Z by -dx*speed (clockwise from above).
             const dx = 100;
@@ -268,6 +309,7 @@ describe('CameraController', () => {
                 THREE,
                 initialAngles: { theta: 0, phi: Math.PI / 2 }, // dir = +X, right = +Y, up = +Z
             });
+            c.setCameraMode('free');
             c.captureOrbitDragFrame();
             const dy = 100;
             const speed = 0.008;
@@ -293,6 +335,7 @@ describe('CameraController', () => {
                 THREE,
                 initialAngles: { theta: 0, phi: Math.PI / 2 },
             });
+            c.setCameraMode('free');
             // No explicit capture call.
             c.applyOrbitDelta(10, 0);
             expect(c.dragOrbitUpAxis).not.toBeNull();
@@ -304,6 +347,7 @@ describe('CameraController', () => {
                 THREE,
                 initialAngles: { theta: 0, phi: Math.PI / 2 }, // dir = +X
             });
+            c.setCameraMode('free');
             c.captureOrbitDragFrame();
             const capturedUp = c.dragOrbitUpAxis.clone();
             const capturedRight = c.dragOrbitRightAxis.clone();
@@ -451,8 +495,10 @@ describe('CameraController', () => {
                 initialDistance: 12.5,
                 initialAngles: { theta: 0.4, phi: 1.1 },
                 defaultUp: { x: 0, y: 0, z: 1 },
+                cameraMode: 'free',
             });
             const payload = c.buildStatePayload();
+            expect(payload.mode).toBe('free');
             expect(payload.orbitCenter).toEqual({ x: 1, y: 2, z: 3 });
             expect(payload.orbit.distance).toBe(12.5);
             expect(approxEqual(payload.orbit.theta, 0.4)).toBe(true);
@@ -465,6 +511,7 @@ describe('CameraController', () => {
             expect(round.orbit.distance).toBe(payload.orbit.distance);
             expect(approxEqual(round.orbit.theta, payload.orbit.theta, 1e-12)).toBe(true);
             expect(approxEqual(round.orbit.phi, payload.orbit.phi, 1e-12)).toBe(true);
+            expect(c2.getCameraMode()).toBe('free');
             expectVec(c2.cameraUpVector, 0, 0, 1, 1e-12);
         });
 

@@ -10,6 +10,8 @@
     const DEFAULT_INITIAL_DISTANCE = 10;
     const DEFAULT_ORBIT_SPEED = 0.008;
     const PHI_EPSILON = 0.05;
+    const CAMERA_MODE_STANDARD = 'standard';
+    const CAMERA_MODE_FREE = 'free';
 
     function defaultNow() {
         if (typeof performance !== 'undefined' && typeof performance.now === 'function') {
@@ -51,6 +53,23 @@
             this.dragOrbitRightAxis = null;
             this.cameraAnimation = null;
             this._nowFn = typeof options.now === 'function' ? options.now : defaultNow;
+            this.cameraMode = options.cameraMode === CAMERA_MODE_FREE
+                ? CAMERA_MODE_FREE
+                : CAMERA_MODE_STANDARD;
+        }
+
+        setCameraMode(mode, options = {}) {
+            const shouldSnapUp = options.snapUp !== false;
+            this.cameraMode = mode === CAMERA_MODE_FREE
+                ? CAMERA_MODE_FREE
+                : CAMERA_MODE_STANDARD;
+            if (this.cameraMode === CAMERA_MODE_STANDARD && shouldSnapUp) {
+                this.cameraUpVector.set(0, 0, 1);
+            }
+        }
+
+        getCameraMode() {
+            return this.cameraMode;
         }
 
         clampPhi(value) {
@@ -120,6 +139,15 @@
         }
 
         applyOrbitDelta(dx, dy, speed = DEFAULT_ORBIT_SPEED) {
+            if (this.cameraMode === CAMERA_MODE_STANDARD) {
+                const { theta, phi } = this.getOffsetAngles();
+                const nextTheta = theta - dx * speed;
+                const nextPhi = this.clampPhi(phi + dy * speed);
+                this.setOffsetDirFromAngles(nextTheta, nextPhi);
+                this.cameraUpVector.set(0, 0, 1);
+                return;
+            }
+
             if (!this.dragOrbitUpAxis || !this.dragOrbitRightAxis) {
                 this.captureOrbitDragFrame();
             }
@@ -271,6 +299,7 @@
         buildStatePayload() {
             const { theta, phi } = this.getOffsetAngles();
             return {
+                mode: this.cameraMode,
                 orbitCenter: { x: this.cx, y: this.cy, z: this.cz },
                 orbit: { theta, phi, distance: this.orbitDist },
                 up: {
@@ -285,6 +314,7 @@
             if (!state || typeof state !== 'object') {
                 return;
             }
+            this.setCameraMode(state.mode);
             const orbitCenter = (state.orbitCenter && typeof state.orbitCenter === 'object') ? state.orbitCenter : {};
             const orbit = (state.orbit && typeof state.orbit === 'object') ? state.orbit : {};
             const up = (state.up && typeof state.up === 'object') ? state.up : {};

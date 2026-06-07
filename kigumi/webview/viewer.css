@@ -193,6 +193,20 @@ canvas { display: block; width: 100%; height: 100%; }
 #focus-btn:hover {
     background: var(--hv-control-bg-solid-hover);
 }
+#camera-mode-btn {
+    width: 108px;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    background: var(--hv-control-bg-strong);
+    color: var(--hv-title);
+    font: 12px 'Segoe UI', sans-serif;
+    padding: 6px 10px;
+    cursor: pointer;
+    text-transform: lowercase;
+}
+#camera-mode-btn:hover {
+    background: var(--hv-control-bg-solid-hover);
+}
 #top-controls {
     width: 100%;
     max-width: none;

@@ -215,6 +215,11 @@ DONE-do a design pass
   IGNORE-move focus button maybe
   IGNORE-make the gizmos slightly trasparent?
 DONE-camera controls should be absolute? use focus to reset
+DONE-add camera mode toggle
+  -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
+-try and run a full loop agent test on this to see if it all works
+-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
+-agent prompt examples
 -new kigumi icon
 -marketing
   -make basic exampl ecase
@@ -232,32 +237,15 @@ DONE-camera controls should be absolute? use focus to reset
 
 
 :: TODO
-DONE-remove tag pill box from search
-DONE-fix joint indentatino level
-DONE-fix patternbook joints not showing
-DONE-do remaining ntoching config classes
-DONE-outline final joint requirements
-DONE-do another perfermance pass on silly shed, still taking way too long
--add camera mode toggle
-  -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
-DONE-BUG timbers getting renedred incorrectly
+
 -DOCS
   DONE-explain parameterization
--try and run a full loop agent test on this to see if it all works
+
+
+
+
 -can you make meshing run in parallel?
--remove trash structures (or ceraet a new spot for them so they don't ship with the library)
--agent prompt examples
-
 -add an optional scale ruler to the view and havei t default off
-
-
-
-
-
-
-
-
-
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
 -NON PERFECT TIMBER
@@ -512,7 +500,13 @@ M3.5
 
 
 :: TODONE 
-
+DONE-remove tag pill box from search
+DONE-fix joint indentatino level
+DONE-fix patternbook joints not showing
+DONE-do remaining ntoching config classes
+DONE-outline final joint requirements
+DONE-do another perfermance pass on silly shed, still taking way too long
+DONE-BUG timbers getting renedred incorrectly
 DONE-oscare shed and tiny house not getting picked up by frame scanning
 DONE-maybe qualify get_size -> get_perfect_size
 

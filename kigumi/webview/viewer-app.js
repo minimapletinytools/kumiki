@@ -825,6 +825,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     render() {
+        const cameraMode = this.cameraController.getCameraMode();
         return html`
             <button id="to-v3d" title="Jump back to 3D view">to v3d view</button>
             <div id="viewport">
@@ -841,6 +842,11 @@ class KigumiViewerApp extends LitElement {
                         <canvas id="gizmo-cube-c"></canvas>
                     </div>
                     <button id="focus-btn" type="button" title="Focus selection">focus</button>
+                    <button
+                        id="camera-mode-btn"
+                        type="button"
+                        title="Toggle camera mode: standard keeps camera up aligned to world Z"
+                    >📷 ${cameraMode === 'standard' ? 'standard' : 'free'}</button>
                     <div class="gizmo-block">
                         <div class="gizmo-title">light</div>
                         <canvas id="light-dial-c"></canvas>
@@ -1054,6 +1060,7 @@ class KigumiViewerApp extends LitElement {
         const viewport = this.renderRoot.querySelector('#viewport');
         const gizmoCanvas = this.renderRoot.querySelector('#gizmo-cube-c');
         const focusButton = this.renderRoot.querySelector('#focus-btn');
+        const cameraModeButton = this.renderRoot.querySelector('#camera-mode-btn');
         const lightDialCanvas = this.renderRoot.querySelector('#light-dial-c');
 
         toV3d.addEventListener('click', () => {
@@ -1102,6 +1109,11 @@ class KigumiViewerApp extends LitElement {
 
         focusButton.addEventListener('click', () => {
             this.focusSelection();
+        });
+
+        cameraModeButton.addEventListener('click', () => {
+            const nextMode = this.cameraController.getCameraMode() === 'standard' ? 'free' : 'standard';
+            this.setCameraMode(nextMode);
         });
 
         const outputBtn = this.renderRoot.querySelector('#output-btn');
@@ -1747,6 +1759,7 @@ class KigumiViewerApp extends LitElement {
                 ? message.cameraState
                 : {};
             this.cameraController.applyStatePayload(cameraState);
+            this.requestUpdate();
             this.updateCamera();
 
             vscode.postMessage({
@@ -2437,6 +2450,31 @@ class KigumiViewerApp extends LitElement {
         if (vscode) {
             vscode.postMessage({ type: 'setRefreshOptions', options: this.viewerOptions });
         }
+    }
+
+    setCameraMode(mode) {
+        const currentMode = this.cameraController.getCameraMode();
+        const nextMode = mode === 'free' ? 'free' : 'standard';
+        const shouldAnimateToStandard = currentMode === 'free' && nextMode === 'standard';
+
+        this.cameraController.cancelAnimation();
+        this.cameraController.setCameraMode(nextMode, { snapUp: !shouldAnimateToStandard });
+
+        if (shouldAnimateToStandard) {
+            const center = this.cameraController.getCenter();
+            const offset = this.cameraController.cameraOffsetDir;
+            this.cameraController.animateTo({
+                offsetDir: { x: offset.x, y: offset.y, z: offset.z },
+                upVector: { x: 0, y: 0, z: 1 },
+                distance: this.cameraController.orbitDist,
+                center: { x: center.x, y: center.y, z: center.z },
+                durationMs: 220,
+            });
+        }
+
+        this.cameraController.clearOrbitDragFrame();
+        this.requestUpdate();
+        this.updateCamera();
     }
 
     applyThemeUiTokens(theme) {
