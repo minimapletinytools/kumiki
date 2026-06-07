@@ -10,6 +10,16 @@ jest.mock('child_process', () => ({
 const { spawn } = require('child_process');
 const { initializeWorkspaceProject } = require('../project-initializer');
 
+const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '.kigumi', 'docs');
+const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '..', 'docs');
+
+function getUsageInstructionsSourcePath() {
+  if (fs.existsSync(BUNDLED_DOCS_SOURCE_PATH)) {
+    return path.join(BUNDLED_DOCS_SOURCE_PATH, 'agent_usage_instructions.md');
+  }
+  return path.join(CANONICAL_DOCS_SOURCE_PATH, 'agent_usage_instructions.md');
+}
+
 function createMockChildProcess({ stdoutText = '', stderrText = '', exitCode = 0 } = {}) {
   const child = new EventEmitter();
   child.stdout = new EventEmitter();
@@ -31,15 +41,15 @@ function createMockChildProcess({ stdoutText = '', stderrText = '', exitCode = 0
 describe('project-initializer', () => {
   let tmpRoot;
   let consoleWarnSpy;
-  let canonicalUsageSourcePath;
-  let canonicalUsageOriginalContent;
+  let usageInstructionsSourcePath;
+  let usageInstructionsOriginalContent;
 
   beforeEach(() => {
     jest.clearAllMocks();
     consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-init-test-'));
-    canonicalUsageSourcePath = path.resolve(__dirname, '..', '..', 'docs', 'agent_usage_instructions.md');
-    canonicalUsageOriginalContent = fs.readFileSync(canonicalUsageSourcePath, 'utf8');
+    usageInstructionsSourcePath = getUsageInstructionsSourcePath();
+    usageInstructionsOriginalContent = fs.readFileSync(usageInstructionsSourcePath, 'utf8');
 
     spawn.mockImplementation((command, args) => {
       const snippet = Array.isArray(args) && args[0] === '-c' ? String(args[1] || '') : '';
@@ -57,8 +67,8 @@ describe('project-initializer', () => {
     if (consoleWarnSpy) {
       consoleWarnSpy.mockRestore();
     }
-    if (canonicalUsageSourcePath && canonicalUsageOriginalContent != null) {
-      fs.writeFileSync(canonicalUsageSourcePath, canonicalUsageOriginalContent, 'utf8');
+    if (usageInstructionsSourcePath && usageInstructionsOriginalContent != null) {
+      fs.writeFileSync(usageInstructionsSourcePath, usageInstructionsOriginalContent, 'utf8');
     }
     if (tmpRoot && fs.existsSync(tmpRoot)) {
       fs.rmSync(tmpRoot, { recursive: true, force: true });
@@ -150,7 +160,7 @@ describe('project-initializer', () => {
     await initializeWorkspaceProject(tmpRoot, null);
 
     const canonicalUpdatedContent = '# Kumiki Usage Instructions\n\nUpdated during test.\n';
-    fs.writeFileSync(canonicalUsageSourcePath, canonicalUpdatedContent, 'utf8');
+    fs.writeFileSync(usageInstructionsSourcePath, canonicalUpdatedContent, 'utf8');
 
     const workspaceUsagePath = path.join(tmpRoot, 'docs', 'agent_usage_instructions.md');
     fs.writeFileSync(workspaceUsagePath, 'stale content', 'utf8');
@@ -185,7 +195,7 @@ describe('project-initializer', () => {
     expect(initResult.kumikiVersion).toBe('0.1.0');
 
     const canonicalUpdatedContent = '# Kumiki Usage Instructions\n\nRefreshed by update flow.\n';
-    fs.writeFileSync(canonicalUsageSourcePath, canonicalUpdatedContent, 'utf8');
+    fs.writeFileSync(usageInstructionsSourcePath, canonicalUpdatedContent, 'utf8');
 
     const workspaceUsagePath = path.join(tmpRoot, 'docs', 'agent_usage_instructions.md');
     fs.writeFileSync(workspaceUsagePath, 'stale instructions', 'utf8');
