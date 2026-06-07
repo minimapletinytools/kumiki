@@ -237,11 +237,13 @@ DONE-fix joint indentatino level
 DONE-fix patternbook joints not showing
 DONE-do remaining ntoching config classes
 DONE-outline final joint requirements
-
+DONE-do another perfermance pass on silly shed, still taking way too long
+-add camera mode toggle
+  -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
+DONE-BUG timbers getting renedred incorrectly
 -DOCS
   DONE-explain parameterization
 -try and run a full loop agent test on this to see if it all works
--do another perfermance pass on silly shed, still taking way too long
 -can you make meshing run in parallel?
 -remove trash structures (or ceraet a new spot for them so they don't ship with the library)
 -agent prompt examples

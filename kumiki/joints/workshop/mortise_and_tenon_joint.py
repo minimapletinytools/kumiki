@@ -318,16 +318,8 @@ def cut_mortise_and_tenon_joint(
     # make the final cut CSGs
     # -------------------------------------------------------------------------
 
-    # Base volume for the tenon cut: everything past the shoulder, plus the relief
-    # pocket on the butting timber (so the tenon clears the receiving timber's notch).
-    tenon_negative_base: CutCSG = shoulder_half_space_local
-    if notch_geom is not None and notch_geom.butting_timber_relief_negative_CSG is not None:
-        tenon_negative_base = SolidUnion(
-            children=[shoulder_half_space_local, notch_geom.butting_timber_relief_negative_CSG]
-        )
-
     tenon_cut_csg = Difference(
-        base=tenon_negative_base,
+        base=shoulder_half_space_local,
         subtract=[tenon_prism_local],
     )
 
