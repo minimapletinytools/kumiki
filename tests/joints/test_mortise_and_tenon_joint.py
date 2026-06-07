@@ -169,6 +169,53 @@ class TestMortiseAndTenonGeometry:
                 f"Point at z={z} should not be in tenon centerline"
             assert mortise_csg.contains_point(point_mortise_local), \
                 f"Point at z={z} should be in mortise centerline"
+
+    def test_tenon_negative_csg_has_no_cut_behind_shoulder(self, simple_T_configuration):
+        """Ensure the tenon cut volume does not extend past the shoulder into the timber body."""
+        from kumiki.cutcsg import Difference, HalfSpace, Intersection
+
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            front_face_on_butt_timber=None,
+        )
+        joint = cut_mortise_and_tenon_joint_on_FAT(
+            arrangement=arrangement,
+            tenon_size=Matrix([Rational(2), Rational(2)]),
+            tenon_length=Rational(4),
+            mortise_depth=Rational(5),
+        )
+
+        tenon_negative_csg = joint.cuttings["tenon_timber"].negative_csg
+        assert isinstance(tenon_negative_csg, Difference)
+        assert isinstance(tenon_negative_csg.base, HalfSpace)
+
+        shoulder_half_space_local = tenon_negative_csg.base
+        epsilon = Rational(1, 100)
+        behind_shoulder_half_space_local = HalfSpace(
+            normal=-shoulder_half_space_local.normal,
+            offset=-shoulder_half_space_local.offset + epsilon,
+        )
+
+        overlap_csg = Intersection(
+            left=behind_shoulder_half_space_local,
+            right=tenon_negative_csg,
+        )
+
+        # Probe a small grid of points behind the shoulder; none should lie in the
+        # overlap if nothing behind the shoulder is being removed.
+        x_values = [Rational(-2), Rational(0), Rational(2)]
+        y_values = [Rational(-2), Rational(0), Rational(2)]
+        z_values = [Rational(4), Rational(5), Rational(10)]
+        for x in x_values:
+            for y in y_values:
+                for z in z_values:
+                    point_local = create_v3(x, y, z)
+                    assert not overlap_csg.contains_point(point_local), (
+                        f"Found cut volume behind shoulder at local point {point_local.T}"
+                    )
     
 
 
