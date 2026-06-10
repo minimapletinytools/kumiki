@@ -219,8 +219,13 @@ DONE-camera controls should be absolute? use focus to reset
 DONE-add camera mode toggle
   -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
 DONE-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
+-do the big joint reorg 
+  - 3 pattern list modes
+    - sort by joint arrangement type and other major groups (default)
+    - 1 big list 
+    - by patternbook
+  - you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
 -try and run a full loop agent test on this to see if it all works
-
 -agent prompt examples
 -new kigumi icon
 -marketing
@@ -240,16 +245,16 @@ DONE-remove trash structures (or ceraet a new spot for them so they don't ship w
 
 :: TODO
 
--DOCS
+DONE-screenshot capability broken (test the new one)
+DONE-open viewer works, but you also need a refresh after changes are made command for agent to use
+DONE-improve agent instructions
+  DONE-create a TLDR; section at the top outlining general workflow
+  DONE-suggest what to do when 3 wood intersects
+DONE-DOCS
   DONE-explain parameterization
 
 
 -improve erroring on initialize due to missing deps
--screenshot capability broken (test the new one)
-DONE-open viewer works, but you also need a refresh after changes are made command for agent to use
--improve agent instructions
-  DONE-create a TLDR; section at the top outlining general workflow
-  -suggest what to do when 3 wood intersects
 
 
 -can you make meshing run in parallel?

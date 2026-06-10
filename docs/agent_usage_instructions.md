@@ -6,7 +6,7 @@ When a workspace is initialized with Kigumi, `kumiki` is installed into that wor
 
 ## General Usage Pattern *START HERE*
 
-Unless the user is specific about what they want, always follow the following implementation pattern. Details on how to do these steps are later in this doc.
+Unless the user is specific about what they want, always follow the following implementation pattern:
 
 - for structure, define a `Footprint` for the whole structure
 - create initial timbers by placing posts vertically on the footprint or place mudsilles horizontally on the footprint
@@ -15,6 +15,15 @@ Unless the user is specific about what they want, always follow the following im
 - at this point, you can show the user the design and confirm it's what they are looking for
 - once all timbers are in place, create joints binding everything together
 - iterate with the user until they are satisfied
+
+
+In addition, validate changes you make:
+
+- run the frame code using python to ensure there are no errors
+- use command `kigumi.automationOpenFileInViewer` with `filePath: "/absolute/path/to/frame.py"` to reload the frame after making changes
+- use command `kigumi.automationReadSessionLogs` to get logs filtering for errors and warnings to validate your changes
+- use command `kigumi.captureScreenshot` to get a screenshot of the rendered frame
+
 
 ## Imports
 
@@ -40,10 +49,11 @@ from kumiki import *
 
 Timbers for a typical structure are usually defined
 
-- first create a `Footprint` for the footprint of the structure.
+- first create a `Footprint` for the footprint of the structure
 - then use methods in `footprint.py` to define timbers directly on the footprint (touching the ground)
     - `create_horizontal_timber_on_footprint`
     - `create_vertical_timber_on_footprint`
+    - placing on the inside of the footprint should be the default behavior
 - use methods in `construction.py` to define remaining timbers based on existing timbers
     - `join_face_aligned_on_face_aligned_timbers` for connecting timbers at right angles
     - `join_timbers` for simple connections between two timbers
@@ -145,6 +155,77 @@ Common automation loop example:
 4. `kigumi.automationReadSessionLogs` filtering for warnings/errors
 5. `kigumi.automationGetCameraState`
 6. `kigumi.captureScreenshot`
+
+# Common Design Patterns
+
+## splicing patterns
+
+When members exceed a certain length it may be desireable to splice the member for the following reasons:
+
+- very long timbers are harder to work with physically
+- warping is more pronounced on very long timbers
+- it is harder to source very long timbers
+
+In these case, a splice joint is used. There are many types of splice joints. You will choose which splice joint to use based on the following:
+
+- directional load requirements of the joint
+- which direction the spliced timber will be typically seen from in the structure
+- size of the timber being joined
+- desired difficulty and complexity of the joint
+
+Here are some typical guidelines:
+
+- for mudsills which are usually bolted to the foundation and experience no loads except during disaster scenarios
+    - use `cut_plain_splice_lap_joint_on_aligned_timbers` for simple construction
+    - use `cut_lapped_gooseneck_joint` for premium construction
+    - you can even use `cut_plain_butt_splice_joint_on_aligned_timbers` 🫠
+- use `cut_plain_butt_splice_joint_on_aligned_timbers` as a placeholder in other scenarios until more splice joint types are added
+    - otherwise never use `cut_plain_butt_splice_joint_on_aligned_timbers` as it resists no loads whatsoever
+
+
+## structure patterns
+
+### posts on mudsills
+
+A very common pattern for a timber framed structure is to lay out mudsills on the perimeter of the footprint with posts on top. See `examples/oscarshed.py` for a structure built witth this pattern.
+
+Posts in the middle of mudsills are joined with mortise and tenon joints without pegs, the tenon size must be longer in the length direction of the mudsill and typically 1/3rd the width of the mudsill in the other dimension.
+
+For posts on top of a corner joint, you have a few options:
+
+- rather than place posts directly on the corner, move them inwards a little bit so there is more space to cut joiner (this is what we did in oscarshed)
+- use a 3 way corner joint (currently none exist)
+
+
+### posts on ground with floor beams into posts
+
+A less common and more complex pattern is to have posts directly touching the ground as if the house is on stilts. See `examples/tinyhouse120.py` for an example of this pattern
+
+Floor beams connecting into corner posts can be joined with mortise and tenon joints, offsetting the tennons on each beam by a bit so that they do not intersect each other (this is what we did in tinyhouse120)
+
+For beams connecting into non-corner posts, you have a few options:
+
+- let the beam be continuous and split the post in two connecting to the floating floor beam with mortise and tenon joints such that there is a tiny stub post below the beam to support it from below
+- use something like the `cut_splined_opposing_double_butt_joint` (complex) (this is what we did in tinyhouse120)
+
+### girts between vertical members
+
+`examples/tinyhouse120.py` uses this pattern
+
+### top plates on posts
+
+`examples/tinyhouse120.py` and `examples/oscarshed.py` use this pattern
+
+### studs go between horizontal members
+
+TODO 
+`examples/tinyhouse120.py` and `examples/oscarshed.py` use this pattern
+
+### braces go between vertical and horizontal members
+
+TODO
+
+
 
 # Creating new Patterns
 
