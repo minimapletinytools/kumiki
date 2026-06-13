@@ -1096,6 +1096,14 @@ class ButtJointTimberArrangement:
         if not are_timbers_orthogonal(self.butt_timber, self.receiving_timber):
             return "Timbers must be orthogonal"
         return None
+    
+    def check_perfection(self) -> Optional[str]:
+        """Return None if both timbers are perfect, else an error message."""
+        if not self.butt_timber.is_perfect_timber():
+            return "butt_timber must be perfect"
+        if not self.receiving_timber.is_perfect_timber():
+            return "receiving_timber must be perfect"
+        return None
 
 
 @dataclass(frozen=True)
@@ -1196,6 +1204,16 @@ class DoubleButtJointTimberArrangement:
             return "butt_timber_1 and butt_timber_2 must be orthogonal to each other"
         return None
 
+    def check_perfection(self) -> Optional[str]:
+        """Return None if all timbers are perfect, else an error message."""
+        if not self.butt_timber_1.is_perfect_timber():
+            return "butt_timber_1 must be perfect"
+        if not self.butt_timber_2.is_perfect_timber():
+            return "butt_timber_2 must be perfect"
+        if not self.receiving_timber.is_perfect_timber():
+            return "receiving_timber must be perfect"
+        return None
+
 
 @dataclass(frozen=True)
 class TripleButtJointTimberArrangement:
@@ -1274,6 +1292,18 @@ class TripleButtJointTimberArrangement:
         # Main pair must be antiparallel (pointing towards each other)
         if not equality_test(dir_main1.dot(dir_main2), -1):
             return "main_butt_timber_1 and main_butt_timber_2 must be antiparallel (pointing towards each other)"
+        return None
+
+    def check_perfection(self) -> Optional[str]:
+        """Return None if all timbers are perfect, else an error message."""
+        if not self.main_butt_timber_1.is_perfect_timber():
+            return "main_butt_timber_1 must be perfect"
+        if not self.main_butt_timber_2.is_perfect_timber():
+            return "main_butt_timber_2 must be perfect"
+        if not self.awk_timber.is_perfect_timber():
+            return "awk_timber must be perfect"
+        if not self.receiving_timber.is_perfect_timber():
+            return "receiving_timber must be perfect"
         return None
 
 
@@ -1369,6 +1399,20 @@ class QuadrupleButtJointTimberArrangement:
             return "awk_1 and awk_2 must be antiparallel (pointing towards each other)"
         return None
 
+    def check_perfection(self) -> Optional[str]:
+        """Return None if all timbers are perfect, else an error message."""
+        if not self.main_butt_timber_1.is_perfect_timber():
+            return "main_butt_timber_1 must be perfect"
+        if not self.main_butt_timber_2.is_perfect_timber():
+            return "main_butt_timber_2 must be perfect"
+        if not self.awk_1.is_perfect_timber():
+            return "awk_1 must be perfect"
+        if not self.awk_2.is_perfect_timber():
+            return "awk_2 must be perfect"
+        if not self.receiving_timber.is_perfect_timber():
+            return "receiving_timber must be perfect"
+        return None
+
 @dataclass(frozen=True)
 class CrossCapJointTimberArrangement:
     """A butting post timber "capped" by two crossed timbers.
@@ -1407,6 +1451,16 @@ class CrossCapJointTimberArrangement:
             return "cross_timber_2 must be orthogonal to post_timber"
         return None
 
+    def check_perfection(self) -> Optional[str]:
+        """Return None if all timbers are perfect, else an error message."""
+        if not self.post_timber.is_perfect_timber():
+            return "post_timber must be perfect"
+        if not self.cross_timber_1.is_perfect_timber():
+            return "cross_timber_1 must be perfect"
+        if not self.cross_timber_2.is_perfect_timber():
+            return "cross_timber_2 must be perfect"
+        return None
+
 @dataclass(frozen=True)
 class SpliceJointTimberArrangement:
     timber1: TimberLike
@@ -1438,6 +1492,14 @@ class SpliceJointTimberArrangement:
             return "Timbers must be face-aligned"
         if not are_timbers_parallel(self.timber1, self.timber2):
             return "Timbers must have parallel length axes"
+        return None
+
+    def check_perfection(self) -> Optional[str]:
+        """Return None if both timbers are perfect, else an error message."""
+        if not self.timber1.is_perfect_timber():
+            return "timber1 must be perfect"
+        if not self.timber2.is_perfect_timber():
+            return "timber2 must be perfect"
         return None
 
 
@@ -1489,6 +1551,14 @@ class CornerJointTimberArrangement:
             return "Timbers must be orthogonal"
         return None
 
+    def check_perfection(self) -> Optional[str]:
+        """Return None if both timbers are perfect, else an error message."""
+        if not self.timber1.is_perfect_timber():
+            return "timber1 must be perfect"
+        if not self.timber2.is_perfect_timber():
+            return "timber2 must be perfect"
+        return None
+
 
 @dataclass(frozen=True)
 class CrossJointTimberArrangement:
@@ -1532,6 +1602,14 @@ class CrossJointTimberArrangement:
             return "Timbers must be orthogonal"
         return None
 
+    def check_perfection(self) -> Optional[str]:
+        """Return None if both timbers are perfect, else an error message."""
+        if not self.timber1.is_perfect_timber():
+            return "timber1 must be perfect"
+        if not self.timber2.is_perfect_timber():
+            return "timber2 must be perfect"
+        return None
+
 
 @dataclass(frozen=True)
 class BraceJointTimberArrangement:
@@ -1560,6 +1638,16 @@ class BraceJointTimberArrangement:
 
     def __post_init__(self):
         require_check(self.check_types_valid())
+
+    def check_perfection(self) -> Optional[str]:
+        """Return None if all timbers are perfect, else an error message."""
+        if not self.timber1.is_perfect_timber():
+            return "timber1 must be perfect"
+        if not self.timber2.is_perfect_timber():
+            return "timber2 must be perfect"
+        if not self.brace_timber.is_perfect_timber():
+            return "brace_timber must be perfect"
+        return None
 
 
 # =========================================
