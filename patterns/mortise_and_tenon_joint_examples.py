@@ -90,6 +90,7 @@ def example_round_mortise_and_tenon_on_FAT(position=None, use_round_timbers=Fals
     """
     Round (cylindrical) mortise and tenon using cut_round_mortise_and_tenon_joint.
     Canonical 4"x5"x4' butt joint timbers, 1.5" diameter round tenon, 3" long, 3.5" deep mortise.
+    Shoulder is flush with the mortise entry face (0 inset).
     """
     if position is None:
         position = create_v3(0, 0, 0)
@@ -98,11 +99,25 @@ def example_round_mortise_and_tenon_on_FAT(position=None, use_round_timbers=Fals
         position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
+    
+    # Get mortise face and compute shoulder distance
+    tenon_end_direction = arrangement.butt_timber.get_face_direction_global(arrangement.butt_timber_end)
+    mortise_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(
+        -tenon_end_direction
+    ).to.face()
+    
+    mortise_shoulder_distance = convert_mortise_shoulder_inset_to_centerline_distance(
+        mortise_shoulder_inset=Rational(0),
+        mortise_face=mortise_face,
+        receiving_timber=arrangement.receiving_timber,
+    )
+    
     return cut_round_mortise_and_tenon_joint(
         arrangement=arrangement,
         diameter=inches(3, 2),
         tenon_length=inches(3),
         mortise_depth=inches(3.25),
+        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance,
     )
 
 

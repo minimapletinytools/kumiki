@@ -91,6 +91,37 @@ class WedgeParameters:
 
 
 # ============================================================================
+# Helper Functions
+# ============================================================================
+
+
+def convert_mortise_shoulder_inset_to_centerline_distance(
+    mortise_shoulder_inset: Numeric,
+    mortise_face: TimberFace,
+    receiving_timber: TimberLike,
+) -> Numeric:
+    """
+    Convert user-facing mortise shoulder inset parameter to centerline-relative distance.
+
+    Inset is measured from the mortise entry face surface toward the centerline (inward).
+    This function converts it to the signed distance from centerline (measured toward the tenon).
+
+    Args:
+        mortise_shoulder_inset: Distance from mortise entry face inward. 0 = shoulder flush
+            with the entry face. Positive = shoulder deeper into the timber.
+        mortise_face: The face of the receiving timber where the mortise enters.
+        receiving_timber: The receiving timber.
+
+    Returns:
+        Signed distance from the timber centerline to the shoulder plane, measured toward
+        the tenon side. 0 = shoulder at centerline.
+    """
+    inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, receiving_timber)
+    inset_marking = mark_plane_from_edge_in_direction(inset_plane, receiving_timber, TimberCenterline.CENTERLINE)
+    return inset_marking.distance
+
+
+# ============================================================================
 # Mortise and Tenon Joint Construction Functions
 # ============================================================================
 
@@ -569,13 +600,11 @@ def cut_mortise_and_tenon_joint_on_PAT(
         -tenon_end_direction
     ).to.face()
     
-    # Convert inset (measured from the face surface toward centerline) to distance
-    # from centerline (measured toward the tenon). The face surface sits at
-    # face_half_size from the centerline in the toward-tenon direction.
-    face_half_size = arrangement.receiving_timber.get_size_in_face_normal_axis(mortise_face) / Integer(2)
-    inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, arrangement.receiving_timber)
-    inset_marking = mark_plane_from_edge_in_direction(inset_plane, arrangement.receiving_timber, TimberCenterline.CENTERLINE)
-    mortise_shoulder_distance_from_centerline = inset_marking.distance
+    mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+        mortise_shoulder_inset=mortise_shoulder_inset,
+        mortise_face=mortise_face,
+        receiving_timber=arrangement.receiving_timber,
+    )
 
     return cut_mortise_and_tenon_joint(
         arrangement=arrangement,
@@ -647,7 +676,6 @@ def cut_mortise_and_tenon_joint_on_FAT(
         peg_parameters=peg_parameters,
         use_round_tenon=use_round_tenon,
     )
-
 
 def cut_round_mortise_and_tenon_joint(
     arrangement: ButtJointTimberArrangement,
@@ -721,11 +749,11 @@ def cut_round_mortise_and_tenon_joint_on_PAT(
         -tenon_end_direction
     ).to.face()
     
-    # Convert inset (measured from the face surface toward centerline) to distance
-    # from centerline (measured toward the tenon).
-    inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, arrangement.receiving_timber)
-    inset_marking = mark_plane_from_edge_in_direction(inset_plane, arrangement.receiving_timber, TimberCenterline.CENTERLINE)
-    mortise_shoulder_distance_from_centerline = inset_marking.distance
+    mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+        mortise_shoulder_inset=mortise_shoulder_inset,
+        mortise_face=mortise_face,
+        receiving_timber=arrangement.receiving_timber,
+    )
 
     return cut_mortise_and_tenon_joint(
         arrangement=arrangement,
@@ -795,11 +823,11 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction
     ).to.face()
-    inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, mortise_timber)
-    inset_marking = mark_plane_from_edge_in_direction(
-        inset_plane, mortise_timber, TimberCenterline.CENTERLINE
+    mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+        mortise_shoulder_inset=mortise_shoulder_inset,
+        mortise_face=mortise_face,
+        receiving_timber=mortise_timber,
     )
-    mortise_shoulder_distance_from_centerline = inset_marking.distance
 
     # The shoulder marking space's up_direction only orients the marking frame; the geometry
     # function derives its own frame from `dovetail_top_side_on_butt_timber`. Pick the butt
