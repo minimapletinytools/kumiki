@@ -473,7 +473,7 @@ class KigumiSidebarProvider {
             }));
         }
 
-        const canShowKumikiVersionActions = !!(initStatus && (initStatus.isInitialized || initStatus.projectStatus === 'local-dev'));
+        const canShowKumikiVersionActions = !!(initStatus && initStatus.isInitialized);
         if (canShowKumikiVersionActions) {
             const installed = this._state.kumikiInstalledVersion || 'unknown';
             const latest = this._state.kumikiLatestVersion || 'unknown';
