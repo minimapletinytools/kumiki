@@ -45,26 +45,38 @@ then we'll 2 create a hinges using a round mortise and tenon joint with the left
 :: 5/30
 hello in this video I will show you how to get started with the kumiki timber frame design library and the kigumi viewer.
 to get stared with kumiki, all you need to install vscode and the kigumi vscode extension.
-lets create a folder for our project and open it in vscode, then you'll go to the kigumi sidebar and hit the initialize project button.
-this will setup all project requirements for you as well as create an example designa to get you started.
-In the kigumi sidebar you can see all your kumiki designs, or frames, as well as patterns that ship with kumiki 
+Kigumi and vscode uses workspaces rather than just filse. Workspaces are just folders where your project files live. Lets create a workspace folder for our project files and open it in vscode, then you'll go to the kigumi sidebar and hit the initialize project button.
+this will setup all project requirements for you as well as create an example frame design to help you get started.
+Click on the kigumi icon to open the kigumi sidebar where you can see all your kumiki designs, AKA frames, as well as patterns that ship with kumiki 
 lets open up the eaxmple frame that got created for us, this will launch the kigumi viewer 
 here you can move the camera around
 select timbers
 look at the list of timbers and joints
 and so on
-if you scroll down, you'll see some options for the viewer, and you'll also see the frame parameter section which we're not using for this frame
-further down, you'll see a rough cut list some logging and output which is sometimes useful for debugging 
+if you scroll down, you'll see some options for the viewer, and some other less useful features 
 now lets go take a look the patterns thot ship with kumiki in the sidebar
+
+# TODO FIX PATTERN ORG FIRST 
 you can see patterns are currently organized in different patternbooks, which correspond to different types of joints (these will be reorganized soon)
 if you just want to see a list of pattens intead, hit the patternbook grouping toggle at the top
+
+
 lets click through a few patterns to see what they do
 here's asimple butt splice joint, not very exciting
 and here's a goosenceck splice joint, a little more fun
-I'll let you explore here. Kumiki is being actively developed on so there will be many more patterns (and hence joints) to come
 if you want to play around with one of these patterns you can hit duplicate to workspace to copy the pattern into your workspace and make changes to it yourself
+I'll let you explore here. Kumiki is being actively developed on so there will be many more patterns (and hence joints) to come
+If there's ever a new version of kumiki, it will detect it and you can update to the latest version directly in the kigumi sidebar
 
-But let's jump into making our own design. 
+Now let's make our own design. Kumiki is a code aided design library meaning all its designs are written as code. I'll make no speculations about our future here, but AI is really good at writing code so we'll use AI to generate our kumiki designs.
+
+VSCode ships with the copilot AI coding agent, and if you sign up for an account which gives you enough free tokens to make a few simple frame designs. You can also use any other coding agent you like!
+
+There's no need to be shy, let's ask the agent to build us a sawhorse. 
+
+"plesae make me a sawhorse out of 5"x5" timbers. it should have two 2' parallel feet resting lengthwise on the ground 4' apart. In the center of these feet, place two posts that are 2' tall. Then connect the top of the posts with a 6' beam that is the top surface of the saw horse. Lastly, connect the middle of the 2 posts with a stretcher"
+
+
 
 
 
@@ -237,6 +249,7 @@ DONE-camera controls should be absolute? use focus to reset
 DONE-add camera mode toggle
   -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
 DONE-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
+DONE-kigumi readme update
 -do the big joint reorg 
   - 3 pattern list modes
     - sort by joint arrangement type and other major groups (default)
@@ -246,6 +259,7 @@ DONE-remove trash structures (or ceraet a new spot for them so they don't ship w
 -try and run a full loop agent test on this to see if it all works
 -agent prompt examples
 -new kigumi icon
+  -make suer to update the sidebar icon as well
 -marketing
   -make basic exampl ecase
   -make program castle joint video
