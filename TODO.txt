@@ -1,3 +1,5 @@
+
+
 :: 6/9 adeline notes
 
 -installing uv is weird
@@ -299,8 +301,10 @@ DONE-improve agent instructions
 DONE-DOCS
   DONE-explain parameterization
 
-round mortise and tenon
-
+-you broke notching on mortise and tenon joint again
+-round mortise and tenon
+-do ticket refactor so that each timber type can have its own ticket?
+  -or do we do the derived ticket thing instead?
 -improve erroring on initialize due to missing deps
 
 

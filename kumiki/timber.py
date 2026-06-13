@@ -2113,6 +2113,20 @@ class Joint:
     ticket: JointTicket
     jointAccessories: Dict[str, JointAccessory] = field(default_factory=dict)
 
+def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
+    """
+    Create a compound joint that combines multiple joints together.
+    
+    The cuttings and accessories from all joints are merged into a single Joint object.
+    Numeric suffixes are added to accessory and cutting keys if there are conflicts.
+    The tickets of the input joints are ignored.
+    
+    Args:
+        joints: List of Joint objects to combine
+        ticket: JointTicket for the compound joint
+    """
+    # TODO finish
+    pass
 
 @dataclass(frozen=True)
 class Frame:
