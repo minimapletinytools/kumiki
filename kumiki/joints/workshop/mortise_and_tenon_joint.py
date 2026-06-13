@@ -107,6 +107,7 @@ def cut_mortise_and_tenon_joint(
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
 
+    # TODO rename this parameter, and also assert that mortise_depth is None if this is true
     crop_tenon_to_mortise_orientation_on_angled_joints: bool = False,
 ) -> Joint:
     """
