@@ -1,3 +1,21 @@
+:: 6/9 adeline notes
+
+-installing uv is weird
+  -didn't know about running in the terminal
+  -installing python is easy <- should support both python and uv
+    -was python needed? not sure
+  -open workspace step was confusing
+-names of joints and timbers is hard to understand, but figured it out over time yay
+-pattern book is hard to find
+-no way to update agent usage instructions
+-having better axis labels
+-layers menu is covering the info
+-very easy to confuse faces on timbers with faces on camera
+-agent is having hard time understanding what the inset shoulder
+-if you ask it to take a screenshot it wille xport as obj and then starts an http server LOL
+-board doing scissor joints need a good way to do this... (use timebr or boards?)
+
+
 
 :: 5/30 kumiki intro script
 
@@ -330,6 +348,7 @@ DONE-DOCS
   
 
 -BOARDS
+  -I thin kit might be better not to do boards... boards are grain orieted so they make more sense as timbers
   -decide if you even want boards..
   -convert_to_timberlike(board : Board, top_maps_to : TimberFace, right_maps_to : TimberFace) -> Timber (or maybe some temp Timber class)
   -do tongue and groove joint

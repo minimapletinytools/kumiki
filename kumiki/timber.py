@@ -1046,10 +1046,16 @@ class Timber(PerfectTimberWithin):
 class Board(PerfectTimberWithin):
     """Short perfect timber with board-specific semantics
     
-    Boards are structurally identical to perfect timbers but semantically different.
-    They tend to be big in size and stubby in lengeth.
-    """
+    Boards are structurally identical to perfect timbers but carry additional semantics:
+    - the "length" of the board runs in the Z direction so the TOP and BOTTOM faces are referred to as the "ends" of the board
+    - the "width" of the board runs in the X direction so the LEFT and RIGHT faces are referred to as the "sides" of the board
+    - the "thickness" of the board runs in the Y direction so the FRONT and BACK faces are the same as the "faces" of the board
 
+    Like timbers, we assume the grain is always running in the length direction.
+
+    Note that you can end cut along the length direction but not in the other directions so you must ensure the board dimensions are large enough to incorporate the cuts
+    """
+    
     def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
         """
         Returns the nominal half-sizes of the board.
