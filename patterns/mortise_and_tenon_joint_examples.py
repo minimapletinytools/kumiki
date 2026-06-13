@@ -86,6 +86,26 @@ def example_basic_mortise_and_tenon_on_FAT(position=None, use_round_timbers=Fals
     )
 
 
+def example_round_mortise_and_tenon_on_FAT(position=None, use_round_timbers=False):
+    """
+    Round (cylindrical) mortise and tenon using cut_round_mortise_and_tenon_joint.
+    Canonical 4"x5"x4' butt joint timbers, 1.5" diameter round tenon, 3" long, 3.5" deep mortise.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(
+        position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
+    )
+    return cut_round_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        diameter=inches(3, 2),
+        tenon_length=inches(3),
+        mortise_depth=inches(3.25),
+    )
+
+
 def example_basic_mortise_and_tenon_on_FAT_two_round_timbers(position=None, use_round_timbers=True):
     """
     Basic blind mortise and tenon on the canonical butt-joint layout,
@@ -409,6 +429,9 @@ def create_mortise_and_tenon_patternbook() -> PatternBook:
 
         (PatternMetadata("basic_FAT", ["mortise_tenon", "basic_fat", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT)),
+
+        (PatternMetadata("round_FAT", ["mortise_tenon", "round_fat", "butt"], "frame"),
+         make_pattern_from_joint(example_round_mortise_and_tenon_on_FAT)),
 
         (PatternMetadata("basic_FAT_two_round_timbers", ["mortise_tenon", "basic_fat_round", "butt"], "frame"),
          make_pattern_from_joint(example_basic_mortise_and_tenon_on_FAT_two_round_timbers)),

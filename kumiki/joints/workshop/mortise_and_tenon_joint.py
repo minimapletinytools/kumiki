@@ -109,6 +109,7 @@ def cut_mortise_and_tenon_joint(
 
     # TODO rename this parameter, and also assert that mortise_depth is None if this is true
     crop_tenon_to_mortise_orientation_on_angled_joints: bool = False,
+    use_round_tenon: bool = False,
 ) -> Joint:
     """
     Creates a mortise and tenon joint with full control over all parameters.
@@ -139,6 +140,9 @@ def cut_mortise_and_tenon_joint(
             so its depth along the mortise face axis equals mortise_depth and its tip is
             trimmed to the mortise hole boundary. If False, mortise depth is measured along
             the tenon axis from the shoulder.
+        use_round_tenon: If True, creates a round (cylindrical) tenon and mortise instead of
+            rectangular. When True, tenon_size[0] and tenon_size[1] must be equal (no ovals),
+            and peg_parameters must be None. Default is False.
 
     Returns:
         Joint object containing the two CutTimbers and any accessories, all in global space.
@@ -150,6 +154,15 @@ def cut_mortise_and_tenon_joint(
     # Default tenon_position to centered (0, 0)
     if tenon_position is None:
         tenon_position = Matrix([Rational(0), Rational(0)])
+
+    # Validation for round tenon mode
+    if use_round_tenon:
+        require_check(
+            None if tenon_size[0] == tenon_size[1] else "Round tenon requires tenon_size[0] == tenon_size[1]"
+        )
+        require_check(
+            None if peg_parameters is None else "Round tenon does not support pegs (peg_parameters must be None)"
+        )
 
     # TODO default mortise depth if mortise_depth is None
 
@@ -200,20 +213,34 @@ def cut_mortise_and_tenon_joint(
     back_extension = max(tenon_size[0], tenon_size[1]) / sin_angle_safe
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberReferenceEnd.TOP else "tenon_bot"
-    tenon_prism_global = RectangularPrism(
-        size=tenon_size,
-        transform=marking_space.transform,
-        start_distance=-back_extension,
-        end_distance=tenon_length,
-        named_features=[
-            ("tenon_right", PrismFace.RIGHT),
-            ("tenon_left", PrismFace.LEFT),
-            ("tenon_front", PrismFace.FRONT),
-            ("tenon_back", PrismFace.BACK),
-            (tenon_tip_name, PrismFace.TOP),
-        ],
-        label="tenon",
-    )
+    
+    if use_round_tenon:
+        # Round tenon: use cylinder with diameter = tenon_size[0]
+        tenon_radius = tenon_size[0] / Integer(2)
+        axis_direction_global = normalize_vector(tenon_end_direction)
+        tenon_prism_global = Cylinder(
+            axis_direction=axis_direction_global,
+            radius=tenon_radius,
+            position=marking_space.transform.position,
+            start_distance=-back_extension,
+            end_distance=tenon_length,
+            label="tenon",
+        )
+    else:
+        tenon_prism_global = RectangularPrism(
+            size=tenon_size,
+            transform=marking_space.transform,
+            start_distance=-back_extension,
+            end_distance=tenon_length,
+            named_features=[
+                ("tenon_right", PrismFace.RIGHT),
+                ("tenon_left", PrismFace.LEFT),
+                ("tenon_front", PrismFace.FRONT),
+                ("tenon_back", PrismFace.BACK),
+                (tenon_tip_name, PrismFace.TOP),
+            ],
+            label="tenon",
+        )
 
     tenon_prism_cropping_csgs: Optional[List[CutCSG]] = None
     do_cropping = crop_tenon_to_mortise_orientation_on_angled_joints and not zero_test(cos_angle)
@@ -270,36 +297,62 @@ def cut_mortise_and_tenon_joint(
     mortise_hole_prism_global = None
 
     if do_cropping:
-        mortise_hole_size = create_v2(0,0)
-        mortise_hole_size[1] = tenon_size[joint_angle_axis_index] / sin_angle_safe
-        opp_index = 1 if joint_angle_axis_index == 0 else 0
-        mortise_hole_size[0] = tenon_size[opp_index]
+        if use_round_tenon:
+            # Round mortise hole at an angle: use cylinder
+            mortise_radius = tenon_size[0] / Integer(2)
+            axis_direction_global = normalize_vector(-mortise_face_normal)
+            mortise_hole_prism_global = Cylinder(
+                axis_direction=axis_direction_global,
+                radius=mortise_radius,
+                position=marking_space.transform.position,
+                start_distance=-back_extension,
+                end_distance=mortise_depth,
+                label="mortise_hole",
+            )
+        else:
+            mortise_hole_size = create_v2(0,0)
+            mortise_hole_size[1] = tenon_size[joint_angle_axis_index] / sin_angle_safe
+            opp_index = 1 if joint_angle_axis_index == 0 else 0
+            mortise_hole_size[0] = tenon_size[opp_index]
 
-        mortise_hole_orientation = Orientation.from_z_and_y(
-            z_direction=-mortise_face_normal,
-            y_direction=mortise_hole_length_oblique_direction,
-        )
+            mortise_hole_orientation = Orientation.from_z_and_y(
+                z_direction=-mortise_face_normal,
+                y_direction=mortise_hole_length_oblique_direction,
+            )
 
-        mortise_hole_transform = Transform(
-            position=marking_space.transform.position,
-            orientation=mortise_hole_orientation,
-        )
-        
-        mortise_hole_prism_global = RectangularPrism(
-            size=mortise_hole_size,
-            transform=mortise_hole_transform,
-            start_distance=-back_extension,
-            end_distance=mortise_depth,
-            label="mortise_hole",
-        )
+            mortise_hole_transform = Transform(
+                position=marking_space.transform.position,
+                orientation=mortise_hole_orientation,
+            )
+            
+            mortise_hole_prism_global = RectangularPrism(
+                size=mortise_hole_size,
+                transform=mortise_hole_transform,
+                start_distance=-back_extension,
+                end_distance=mortise_depth,
+                label="mortise_hole",
+            )
     else:
-        mortise_hole_prism_global = RectangularPrism(
-            size=tenon_size,
-            transform=marking_space.transform,
-            start_distance=-back_extension,
-            end_distance=mortise_depth,
-            label="mortise_hole",
-        )
+        if use_round_tenon:
+            # Round mortise hole: use cylinder with same diameter as tenon
+            mortise_radius = tenon_size[0] / Integer(2)
+            axis_direction_global = normalize_vector(-mortise_face_normal)
+            mortise_hole_prism_global = Cylinder(
+                axis_direction=axis_direction_global,
+                radius=mortise_radius,
+                position=marking_space.transform.position,
+                start_distance=-back_extension,
+                end_distance=mortise_depth,
+                label="mortise_hole",
+            )
+        else:
+            mortise_hole_prism_global = RectangularPrism(
+                size=tenon_size,
+                transform=marking_space.transform,
+                start_distance=-back_extension,
+                end_distance=mortise_depth,
+                label="mortise_hole",
+            )
 
     # -------------------------------------------------------------------------
     # shoulder notch on mortise timber and matching relief on tenon timber
@@ -468,6 +521,7 @@ def cut_mortise_and_tenon_joint_on_PAT(
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
     crop_tenon_to_mortise_orientation_on_angled_joints = False,
+    use_round_tenon: bool = False,
 ) -> Joint:
     """
     Creates a mortise and tenon joint for plane-aligned timbers (PAT).
@@ -533,6 +587,7 @@ def cut_mortise_and_tenon_joint_on_PAT(
         wedge_parameters=wedge_parameters,
         peg_parameters=peg_parameters,
         crop_tenon_to_mortise_orientation_on_angled_joints=crop_tenon_to_mortise_orientation_on_angled_joints,
+        use_round_tenon=use_round_tenon,
     )
 
     
@@ -546,6 +601,7 @@ def cut_mortise_and_tenon_joint_on_FAT(
     mortise_shoulder_inset: Numeric = Rational(0),
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
+    use_round_tenon: bool = False,
 ) -> Joint:
     """
     Creates a mortise and tenon joint for face-aligned orthogonal timbers (FAT).
@@ -589,8 +645,96 @@ def cut_mortise_and_tenon_joint_on_FAT(
         mortise_shoulder_inset=mortise_shoulder_inset,
         wedge_parameters=wedge_parameters,
         peg_parameters=peg_parameters,
+        use_round_tenon=use_round_tenon,
     )
 
+
+def cut_round_mortise_and_tenon_joint(
+    arrangement: ButtJointTimberArrangement,
+    diameter: Numeric,
+    tenon_length: Numeric,
+    mortise_depth: Optional[Numeric] = None,
+    mortise_shoulder_distance_from_centerline: Numeric = Rational(0),
+) -> Joint:
+    """
+    Creates a simplified round mortise and tenon joint with any orientation.
+
+    This is a convenience wrapper around `cut_mortise_and_tenon_joint` for
+    common round tenon use cases with a single diameter parameter instead of V2 tenon_size.
+    Allows any timber arrangement orientation.
+
+    Args:
+        arrangement: Butt joint timber arrangement (butt_timber = tenon, receiving_timber = mortise).
+        diameter: Diameter of the round tenon and mortise.
+        tenon_length: Length of the tenon extending from the mortise entry face.
+        mortise_depth: Depth of the mortise (None = through mortise).
+        mortise_shoulder_distance_from_centerline: Signed distance from the mortise centerline
+            to the shoulder plane. 0 = shoulder at centerline.
+
+    Returns:
+        Joint object containing the two CutTimbers, all in global space.
+    """
+    return cut_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        tenon_size=Matrix([diameter, diameter]),
+        tenon_length=tenon_length,
+        mortise_depth=mortise_depth,
+        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        use_round_tenon=True,
+    )
+
+
+def cut_round_mortise_and_tenon_joint_on_PAT(
+    arrangement: ButtJointTimberArrangement,
+    diameter: Numeric,
+    tenon_length: Numeric,
+    mortise_depth: Optional[Numeric] = None,
+    mortise_shoulder_inset: Numeric = Rational(0),
+) -> Joint:
+    """
+    Creates a simplified round mortise and tenon joint for plane-aligned timbers (PAT).
+
+    This is a convenience wrapper around `cut_mortise_and_tenon_joint` for
+    round tenon use cases with a single diameter parameter.
+
+    Args:
+        arrangement: Butt joint timber arrangement (butt_timber = tenon, receiving_timber = mortise).
+                     Must satisfy arrangement.check_plane_aligned().
+        diameter: Diameter of the round tenon and mortise.
+        tenon_length: Length of the tenon extending from the mortise entry face.
+        mortise_depth: Depth of the mortise (None = through mortise).
+        mortise_shoulder_inset: Distance from the mortise entry face to the shoulder plane,
+            measured perpendicular to the face inward. 0 = shoulder flush with the entry face.
+
+    Returns:
+        Joint object containing the two CutTimbers, all in global space.
+    """
+    require_check(arrangement.check_plane_aligned())
+
+    # -------------------------------------------------------------------------
+    # Step 2: Determine which face of the mortise timber the tenon enters from
+    # -------------------------------------------------------------------------
+    tenon_end_direction = arrangement.butt_timber.get_face_direction_global(
+        TimberFace.TOP if arrangement.butt_timber_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
+    )
+    mortise_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(
+        -tenon_end_direction
+    ).to.face()
+    
+    # Convert inset (measured from the face surface toward centerline) to distance
+    # from centerline (measured toward the tenon).
+    inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, arrangement.receiving_timber)
+    inset_marking = mark_plane_from_edge_in_direction(inset_plane, arrangement.receiving_timber, TimberCenterline.CENTERLINE)
+    mortise_shoulder_distance_from_centerline = inset_marking.distance
+
+    return cut_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        tenon_size=Matrix([diameter, diameter]),
+        tenon_length=tenon_length,
+        mortise_depth=mortise_depth,
+        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        use_round_tenon=True,
+    )
 
 
 # ============================================================================
