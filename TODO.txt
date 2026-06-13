@@ -53,7 +53,9 @@ Kumiki can only create joints that it knows how to cut. To see a list of joints,
 
 we need to be little tricky to create hinges for the door
 
-"create a round mortise and tenon joint between the left vertical board and the top and bottom beams. The edge of the round tenon should touch the left front and back edge of the vertical board so that it acts like a hinge"
+"create a round mortise and tenon joint between the left vertical board and the top and bottom beams. The edge of the round tenon should touch the left front and back edge of the vertical board so that it acts like a hinge, there should be a 1/2" gap between the tenon shoulder and the frame so that there is clearance for the door to swing"
+
+"lastly, place several 1.5x1.5 timbers orthogonal to the top plates spaced 2" apart and sticking out by 2" on the top to act as a sun shade, use house joints to hold them in place on the top plates"
 
 
 
@@ -71,13 +73,6 @@ look at the list of timbers and joints
 and so on
 if you scroll down, you'll see some options for the viewer, and some other less useful features 
 now lets go take a look the patterns thot ship with kumiki in the sidebar
-
-# TODO FIX PATTERN ORG FIRST 
-you can see patterns are currently organized in different patternbooks, which correspond to different types of joints (these will be reorganized soon)
-if you just want to see a list of pattens intead, hit the patternbook grouping toggle at the top
-
-
-lets click through a few patterns to see what they do
 here's asimple butt splice joint, not very exciting
 and here's a goosenceck splice joint, a little more fun
 if you want to play around with one of these patterns you can hit duplicate to workspace to copy the pattern into your workspace and make changes to it yourself
@@ -269,9 +264,8 @@ DONE-kigumi readme update
 -do the big joint reorg 
   - 3 pattern list modes
     - sort by joint arrangement type and other major groups (default)
-    - 1 big list 
     - by patternbook
-  - you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
+    - 1 big list 
 -try and run a full loop agent test on this to see if it all works
 -agent prompt examples
 -new kigumi icon
@@ -338,7 +332,7 @@ DONE-DOCS
 
 -look into promoting some plain joints
 
-
+-you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
 -notching configs
   -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
   -do generic butt joint notching config (no inset) + implement on joints + test

@@ -71,7 +71,7 @@ Please see docs/concepts.md to understand the core concepts and architecture of 
 - ALWAYS run type checker after making changes
 - For Kigumi, ALWAYS run the fast baseline suite first, then add targeted complex tests when the touched feature requires it
 
-## Coding Conventions when Implementing Joints
+## Coding Conventions for Authoring Joints
 
 Joints involve creating CSG cuts on one or more timbers. A typical joint implementation:
 
@@ -90,12 +90,16 @@ Joints involve creating CSG cuts on one or more timbers. A typical joint impleme
 8. If the joint is at the end of any one of the timbers, set `maybe_top/bottom_end_cut_distance_from_bottom` for that timber to allow the proper rough end cuts to be generated
 9. Return a joint object containing the cuts
 
+### Joint Style Guide
 
-## Joint Style Guide
+Function naming rules:
+- all joint functions are prefixed with cut_*
+- TODO arrangement invariant naming rules
 
-TODO
-argument order/names
-return type
+Argument rules:
+- the retun type of all cut_ functions should be `Joint`
+- the first argument should always be an `arrangement: Arrangement` object containing all the timbers and parameters for the joint.
+- the last argument should alwasy be the notching configuration object IF notching is supported
 
 Variable naming rules:
 - ALWAYS postfix markings in global space with `_global`
@@ -103,6 +107,11 @@ Variable naming rules:
 - Omit the {timber_name} postfix only if there is exactly ONE timber in the current scope
 
 Use nested functions to create local variable scopes where helpful (especially to keep naming simple).
+
+### Assertions
+
+In general, any assumption or constraint on the input parameters should be asserted with an informative error message. 
+The arrangement classes have several built in checks to help with this. 
 
 ### the notching pattern
 
@@ -128,7 +137,7 @@ These can sometimes be interchanged. The `build-a-butt.py` file deconstructs the
 
 Pegs (AKA draw bores, komisen) are often used in mortise-and-tenon-like joints to tighten the joint. Pegs may be positioned generically for most butt joints based on where the tenon centerline meets joint shoulder using the `compute_peg_positions` function in `build_a_butt.py`.
 
-## Coding Conventions when Writing Tests for Joints
+### Testing Joints
 
 Each joint must have at least one "general" test that:
 

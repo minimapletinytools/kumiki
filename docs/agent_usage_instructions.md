@@ -225,8 +225,6 @@ TODO
 
 TODO
 
-
-
 # Creating new Patterns
 
 TODO
