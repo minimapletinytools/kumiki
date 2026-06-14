@@ -19,6 +19,7 @@ from .cutcsg import (
     CutCSG,
     Cylinder,
     Difference,
+    EmptyCSG,
     HalfSpace,
     RectangularPrism,
     SolidUnion,
@@ -52,8 +53,13 @@ TopoDS_Compound = cast(Any, None)
 BRep_Builder = cast(Any, None)
 STEPControl_Writer = cast(Any, None)
 STEPControl_AsIs = cast(Any, None)
+STEPCAFControl_Writer = cast(Any, None)
 Interface_Static = cast(Any, None)
 TopLoc_Location = cast(Any, None)
+TDocStd_Document = cast(Any, None)
+XCAFDoc_DocumentTool = cast(Any, None)
+TDataStd_Name = cast(Any, None)
+TCollection_ExtendedString = cast(Any, None)
 
 try:
     _BRepPrimAPI = importlib.import_module("OCP.BRepPrimAPI")
@@ -63,8 +69,13 @@ try:
     _TopoDS = importlib.import_module("OCP.TopoDS")
     _BRep = importlib.import_module("OCP.BRep")
     _STEPControl = importlib.import_module("OCP.STEPControl")
+    _STEPCAFControl = importlib.import_module("OCP.STEPCAFControl")
     _Interface = importlib.import_module("OCP.Interface")
     _TopLoc = importlib.import_module("OCP.TopLoc")
+    _TDocStd = importlib.import_module("OCP.TDocStd")
+    _XCAFDoc = importlib.import_module("OCP.XCAFDoc")
+    _TDataStd = importlib.import_module("OCP.TDataStd")
+    _TCollection = importlib.import_module("OCP.TCollection")
 
     BRepPrimAPI_MakeBox = getattr(_BRepPrimAPI, "BRepPrimAPI_MakeBox")
     BRepPrimAPI_MakeCylinder = getattr(_BRepPrimAPI, "BRepPrimAPI_MakeCylinder")
@@ -91,8 +102,13 @@ try:
     BRep_Builder = getattr(_BRep, "BRep_Builder")
     STEPControl_Writer = getattr(_STEPControl, "STEPControl_Writer")
     STEPControl_AsIs = getattr(_STEPControl, "STEPControl_AsIs")
+    STEPCAFControl_Writer = getattr(_STEPCAFControl, "STEPCAFControl_Writer")
     Interface_Static = getattr(_Interface, "Interface_Static")
     TopLoc_Location = getattr(_TopLoc, "TopLoc_Location")
+    TDocStd_Document = getattr(_TDocStd, "TDocStd_Document")
+    XCAFDoc_DocumentTool = getattr(_XCAFDoc, "XCAFDoc_DocumentTool")
+    TDataStd_Name = getattr(_TDataStd, "TDataStd_Name")
+    TCollection_ExtendedString = getattr(_TCollection, "TCollection_ExtendedString")
 
     _OCP_AVAILABLE = True
 except ImportError:
@@ -351,6 +367,8 @@ def _csg_to_ocp(csg: CutCSG) -> "TopoDS_Shape":
     """Recursively convert a CutCSG tree (in global coords) to an OCP shape."""
     import sys
     try:
+        if isinstance(csg, EmptyCSG):
+            return _empty_to_ocp()
         if isinstance(csg, RectangularPrism):
             return _prism_to_ocp(csg)
         if isinstance(csg, Cylinder):
@@ -551,9 +569,9 @@ def _halfspace_to_ocp(hs: HalfSpace) -> "TopoDS_Shape":
 
 
 def _union_to_ocp(union: SolidUnion) -> "TopoDS_Shape":
-    children = [_csg_to_ocp(c) for c in union.children]
+    children = [_csg_to_ocp(c) for c in union.children if not isinstance(c, EmptyCSG)]
     if not children:
-        raise ValueError("SolidUnion has no children")
+        return _empty_to_ocp()
     result = children[0]
     for child in children[1:]:
         result = BRepAlgoAPI_Fuse(result, child).Shape()
@@ -561,20 +579,86 @@ def _union_to_ocp(union: SolidUnion) -> "TopoDS_Shape":
 
 
 def _difference_to_ocp(diff: Difference) -> "TopoDS_Shape":
+    if isinstance(diff.base, EmptyCSG):
+        return _empty_to_ocp()
     result = _csg_to_ocp(diff.base)
     for sub in diff.subtract:
+        if isinstance(sub, EmptyCSG):
+            continue
         sub_shape = _csg_to_ocp(sub)
         result = BRepAlgoAPI_Cut(result, sub_shape).Shape()
     return result
 
 
-def _write_step(shape: "TopoDS_Shape", filepath: str) -> None:
-    """Write a TopoDS_Shape to a STEP file."""
-    writer = STEPControl_Writer()
+def _empty_to_ocp() -> "TopoDS_Shape":
+    compound = TopoDS_Compound()
+    builder = BRep_Builder()
+    builder.MakeCompound(compound)
+    return compound
+
+
+class _SilenceCStdout:
+    """Redirect OS-level stdout (fd 1) to /dev/null inside a ``with`` block.
+
+    OpenCascade prints "Statistics on Transfer" messages directly to fd 1
+    from C++, bypassing Python's ``sys.stdout``. The Kigumi runner uses
+    stdout for JSON IPC, so those prints corrupt the protocol stream.
+    Python-level redirection (``contextlib.redirect_stdout``) does not help;
+    we have to dup the underlying file descriptor.
+    """
+
+    def __enter__(self):
+        import sys
+        sys.stdout.flush()
+        self._saved_fd = os.dup(1)
+        self._devnull_fd = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(self._devnull_fd, 1)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        import sys
+        sys.stdout.flush()
+        os.dup2(self._saved_fd, 1)
+        os.close(self._saved_fd)
+        os.close(self._devnull_fd)
+        return False
+
+
+def _write_step(
+    shape: "TopoDS_Shape",
+    filepath: str,
+    name: Optional[str] = None,
+) -> None:
+    """Write a single TopoDS_Shape to a STEP file, optionally with a body name."""
+    label = name if name else Path(filepath).stem
+    _write_step_named([(label, shape)], filepath)
+
+
+def _write_step_named(
+    named_shapes: List[tuple],
+    filepath: str,
+) -> None:
+    """Write multiple named TopoDS_Shapes to a STEP file via XCAF.
+
+    Each (name, shape) becomes a separately named PRODUCT in the resulting
+    STEP file so downstream CAD tools (FreeCAD, Fusion 360, SolidWorks, etc.)
+    show the bodies under their original timber / accessory names.
+    """
+    doc = TDocStd_Document(TCollection_ExtendedString("XmlOcaf"))
+    shape_tool = XCAFDoc_DocumentTool.ShapeTool_s(doc.Main())
+    for raw_name, shape in named_shapes:
+        label = shape_tool.AddShape(shape, False)
+        TDataStd_Name.Set_s(label, TCollection_ExtendedString(str(raw_name)))
+
+    writer = STEPCAFControl_Writer()
     Interface_Static.SetIVal_s("write.surfacecurve.mode", 1)
-    writer.Transfer(shape, STEPControl_AsIs)
-    status = writer.Write(filepath)
-    if status != 1:  # IFSelect_RetDone = 1
+    Interface_Static.SetIVal_s(
+        "write.step.assembly", 1 if len(named_shapes) > 1 else 0
+    )
+    with _SilenceCStdout():
+        writer.Transfer(doc, STEPControl_AsIs)
+        status = writer.Write(filepath)
+    if int(status) != 1:  # IFSelect_RetDone = 1
         raise RuntimeError(f"STEP write failed with status {status}")
 
 
@@ -603,7 +687,8 @@ def export_cut_timber_step(cut_timber: CutTimber, filepath: Union[str, Path]) ->
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
     global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
     shape = _csg_to_ocp(global_csg)
-    _write_step(shape, str(filepath))
+    body_name = cut_timber.timber.ticket.name or filepath.stem
+    _write_step(shape, str(filepath), name=body_name)
 
 
 def export_frame_step(
@@ -640,6 +725,7 @@ def export_frame_step(
     written: List[Path] = []
 
     shapes: list[TopoDS_Shape] = []
+    named_shapes: list[tuple] = []
     used_names: set[str] = set()
 
     def _next_available_name(base_name: str) -> str:
@@ -657,8 +743,9 @@ def export_frame_step(
         global_csg = adopt_csg(ct.timber.transform, Transform.identity(), local_csg)
         shape = _csg_to_ocp(global_csg)
         shapes.append(shape)
+        named_shapes.append((name, shape))
         dest = output_dir / f"{name}.step"
-        _write_step(shape, str(dest))
+        _write_step(shape, str(dest), name=name)
         written.append(dest)
 
     if include_accessories:
@@ -678,18 +765,14 @@ def export_frame_step(
             global_csg = adopt_csg(transform, Transform.identity(), local_csg)
             shape = _csg_to_ocp(global_csg)
             shapes.append(shape)
+            named_shapes.append((name, shape))
             dest = output_dir / f"{name}.step"
-            _write_step(shape, str(dest))
+            _write_step(shape, str(dest), name=name)
             written.append(dest)
 
-    if combined and shapes:
-        builder = BRep_Builder()
-        compound = TopoDS_Compound()
-        builder.MakeCompound(compound)
-        for shape in shapes:
-            builder.Add(compound, shape)
+    if combined and named_shapes:
         dest = output_dir / "_combined.step"
-        _write_step(compound, str(dest))
+        _write_step_named(named_shapes, str(dest))
         written.append(dest)
 
     return written
