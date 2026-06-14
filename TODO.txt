@@ -304,20 +304,22 @@ DONE-add 3mf or some other format better than STL for combined
 DONE-add settings savigns
   -test it
 DONE-round mortise and tenon
-
+DONE-update kumiki should also recopy the docs folder
 
 -test these
   -clicking on patterns opens both the pattern and pattern book on my new mac...
   -click on patterns holud lawys open in existing collumn by default, not in an ew collumn ugh
   -2 kigumi version files
 
+  -fix layers view in kigumi covering title
+    the layers view (wher ethe joint and timber list is shown) should have the following changes:
+      1. it should show up below the "title/selection" bar at the top left corner, right now it overlaps it.
+      2. it should be default collapsed
+      3. in it collapsed state, it should look something like []> timber list]
 
--fix layers viwe covering title
-  the layers view (wher ethe joint and timber list is shown) should have the following changes:
-    1. it should show up below the "title/selection" bar at the top left corner, right now it overlaps it.
-    2. it should be default collapsed
-    3. in it collapsed state, it should look something like []> timber list]
-    
+-screenshot funcitonality still broken
+
+
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again
 -do ticket refactor so that each timber type can have its own ticket?

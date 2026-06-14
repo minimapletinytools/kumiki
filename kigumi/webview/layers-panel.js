@@ -7,7 +7,7 @@
             this.selectionManager = selectionManager;
             this.layerStateStore = layerStateStore;
             this.hierarchy = null;
-            this.collapsed = false;
+            this.collapsed = true;
             // Default: top-level sections open, individual nodes closed
             this.expandedNodes = new Set(['section:timbers', 'section:joints']);
             this.filterText = '';
@@ -100,9 +100,13 @@
             }
 
             const toggleBtn = document.createElement('button');
-            toggleBtn.className = 'lp-toggle-btn';
+            toggleBtn.className = 'lp-toggle-btn' + (this.collapsed ? ' lp-toggle-collapsed' : '');
             toggleBtn.title = this.collapsed ? 'Expand layers' : 'Collapse layers';
-            toggleBtn.textContent = this.collapsed ? '▷' : '◁';
+            if (this.collapsed) {
+                toggleBtn.innerHTML = '<span class="lp-toggle-chev">▸</span><span class="lp-toggle-label">timber list</span>';
+            } else {
+                toggleBtn.textContent = '◁';
+            }
             toggleBtn.addEventListener('click', () => {
                 this.collapsed = !this.collapsed;
                 this._render();
