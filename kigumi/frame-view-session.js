@@ -262,13 +262,21 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'requestExportStl') {
-                this._handleExportRequest('stl', message.includeIndividuals !== false).catch((err) => {
+                this._handleExportRequest(
+                    'stl',
+                    message.includeIndividuals !== false,
+                    message.includeAccessories !== false,
+                ).catch((err) => {
                     this.log(`[export] requestExportStl error: ${err.message || err}`);
                 });
                 return;
             }
             if (message.type === 'requestExportStep') {
-                this._handleExportRequest('step', message.includeIndividuals !== false).catch((err) => {
+                this._handleExportRequest(
+                    'step',
+                    message.includeIndividuals !== false,
+                    message.includeAccessories !== false,
+                ).catch((err) => {
                     this.log(`[export] requestExportStep error: ${err.message || err}`);
                 });
                 return;
@@ -930,7 +938,7 @@ class FrameViewSession {
         return path.join(projectRoot, 'kigumi_exports', safeBaseName);
     }
 
-    async _handleExportRequest(format, includeIndividuals = true) {
+    async _handleExportRequest(format, includeIndividuals = true, includeAccessories = true) {
         if (!this.runnerSession) {
             return;
         }
@@ -946,6 +954,7 @@ class FrameViewSession {
                 format: normalizedFormat,
                 outputDir,
                 includeIndividuals: Boolean(includeIndividuals),
+                includeAccessories: Boolean(includeAccessories),
             });
 
             const writtenFiles = Array.isArray(result && result.files) ? result.files : [];

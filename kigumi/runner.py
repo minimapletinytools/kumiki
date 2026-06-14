@@ -2321,6 +2321,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         export_format = str(payload.get("format", "stl")).lower()
         output_dir_raw = payload.get("outputDir")
         include_individuals = bool(payload.get("includeIndividuals", True))
+        include_accessories = bool(payload.get("includeAccessories", True))
 
         if export_format not in {"stl", "step"}:
             raise ValueError("export_frame requires payload.format to be 'stl' or 'step'")
@@ -2338,13 +2339,23 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         if export_format == "stl":
             from kumiki.blueprint import export_frame_stl
 
-            written = export_frame_stl(ss.frame, output_dir, combined=True)
+            written = export_frame_stl(
+                ss.frame,
+                output_dir,
+                combined=True,
+                include_accessories=include_accessories,
+            )
             combined_name = "_combined.stl"
             extension_glob = "*.stl"
         else:
             from kumiki.blueprint import export_frame_step
 
-            written = export_frame_step(ss.frame, output_dir, combined=True)
+            written = export_frame_step(
+                ss.frame,
+                output_dir,
+                combined=True,
+                include_accessories=include_accessories,
+            )
             combined_name = "_combined.step"
             extension_glob = "*.step"
 
@@ -2364,6 +2375,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             "format": export_format,
             "outputDir": str(output_dir),
             "includeIndividuals": include_individuals,
+            "includeAccessories": include_accessories,
             "files": [str(path) for path in written],
             "count": len(written),
         }), False

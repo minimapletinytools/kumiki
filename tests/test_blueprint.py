@@ -16,8 +16,8 @@ from kumiki.blueprint import (
     export_frame_stl,
     _OCP_AVAILABLE,
 )
-from kumiki.timber import CutTimber, Frame, Timber, timber_from_directions
-from kumiki.rule import create_v3, create_v2
+from kumiki.timber import CutTimber, Frame, Peg, PegShape, Timber, timber_from_directions
+from kumiki.rule import Transform, create_v3, create_v2
 
 
 # ---------------------------------------------------------------------------
@@ -51,6 +51,18 @@ def _simple_frame() -> Frame:
         ticket="post",
     )
     return Frame(cut_timbers=[CutTimber(t1), CutTimber(t2)], name="TestFrame")
+
+
+def _simple_frame_with_accessory() -> Frame:
+    frame = _simple_frame()
+    peg = Peg(
+        transform=Transform.identity(),
+        size=Integer(1),
+        shape=PegShape.ROUND,
+        forward_length=Integer(1),
+        stickout_length=Integer(0),
+    )
+    return Frame(cut_timbers=frame.cut_timbers, accessories=[peg], name="TestFrameWithAccessory")
 
 
 def _load_structure_factory(module_name: str, factory_name: str) -> Any:
@@ -141,6 +153,39 @@ class TestExportFrameStl:
             written = export_frame_stl(frame, out)
             assert out.is_dir()
             assert len(written) == 2
+
+    def test_exports_accessories_to_individual_files(self):
+        frame = _simple_frame_with_accessory()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_stl(frame, td)
+            names = sorted(p.stem for p in written)
+            assert names == ["accessory_0", "beam", "post"]
+
+    def test_combined_includes_accessories(self):
+        frame = _simple_frame_with_accessory()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_stl(frame, td, combined=True)
+            # 2 timbers + 1 accessory + 1 combined
+            assert len(written) == 4
+            combined = [p for p in written if p.stem == "_combined"]
+            assert len(combined) == 1
+            assert combined[0].stat().st_size > 0
+
+    def test_excludes_accessories_when_disabled(self):
+        frame = _simple_frame_with_accessory()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_stl(frame, td, include_accessories=False)
+            names = sorted(p.stem for p in written)
+            assert names == ["beam", "post"]
+
+    def test_combined_excludes_accessories_when_disabled(self):
+        frame = _simple_frame_with_accessory()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_stl(frame, td, combined=True, include_accessories=False)
+            # 2 timbers + 1 combined
+            assert len(written) == 3
+            names = sorted(p.stem for p in written)
+            assert names == ["_combined", "beam", "post"]
 
 
 # ---------------------------------------------------------------------------

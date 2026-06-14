@@ -26,7 +26,7 @@ from .cutcsg import (
 )
 from .rule import Transform
 from .rendering_utils import sympy_to_float
-from .timber import CutTimber, Frame
+from .timber import CutTimber, Frame, JointAccessory
 
 import numpy as np
 import trimesh
@@ -113,6 +113,20 @@ def _cut_timber_to_trimesh(cut_timber: CutTimber) -> "trimesh.Trimesh":
     return triangulate_cutcsg(global_csg).mesh
 
 
+def _joint_accessory_to_trimesh(accessory: JointAccessory) -> "trimesh.Trimesh":
+    """Return a trimesh in global coordinates for a single JointAccessory."""
+    from .triangles import triangulate_cutcsg
+
+    local_csg = accessory.render_csg_local()
+    transform = getattr(accessory, "transform", None)
+    if transform is None:
+        raise ValueError(
+            f"Accessory '{accessory.ticket.name}' does not define a global transform"
+        )
+    global_csg = adopt_csg(transform, Transform.identity(), local_csg)
+    return triangulate_cutcsg(global_csg).mesh
+
+
 def export_cut_timber_stl(cut_timber: CutTimber, filepath: Union[str, Path]) -> None:
     """Export a single CutTimber to an STL file (global coordinates, metres).
 
@@ -131,14 +145,17 @@ def export_frame_stl(
     output_dir: Union[str, Path],
     *,
     combined: bool = False,
+    include_accessories: bool = True,
 ) -> List[Path]:
-    """Export every timber in a Frame to STL files.
+    """Export every timber and accessory in a Frame to STL files.
 
     Args:
         frame: The frame to export.
         output_dir: Directory for the STL files.
         combined: If True, also write a single ``_combined.stl`` with all
-            timbers merged into one mesh.
+            timbers and accessories merged into one mesh.
+        include_accessories: If True, export accessory meshes. If False,
+            export only timbers.
 
     Returns:
         List of paths written.
@@ -146,15 +163,39 @@ def export_frame_stl(
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
+    used_names: set[str] = set()
+
+    def _next_available_name(base_name: str) -> str:
+        candidate = base_name
+        suffix = 2
+        while candidate in used_names:
+            candidate = f"{base_name}_{suffix}"
+            suffix += 1
+        used_names.add(candidate)
+        return candidate
 
     meshes: list[trimesh.Trimesh] = []
     for i, ct in enumerate(frame.cut_timbers):
-        name = ct.timber.ticket.name or f"timber_{i}"
+        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
         mesh = _cut_timber_to_trimesh(ct)
         meshes.append(mesh)
         dest = output_dir / f"{name}.stl"
         mesh.export(str(dest), file_type="stl")
         written.append(dest)
+
+    if include_accessories:
+        for i, accessory in enumerate(frame.accessories):
+            ticket_name = accessory.ticket.name
+            if ticket_name and ticket_name != "[no-name]":
+                base_name = ticket_name
+            else:
+                base_name = f"accessory_{i}"
+            name = _next_available_name(base_name)
+            mesh = _joint_accessory_to_trimesh(accessory)
+            meshes.append(mesh)
+            dest = output_dir / f"{name}.stl"
+            mesh.export(str(dest), file_type="stl")
+            written.append(dest)
 
     if combined and meshes:
         merged = trimesh.util.concatenate(meshes)
@@ -443,6 +484,7 @@ def export_frame_step(
     output_dir: Union[str, Path],
     *,
     combined: bool = False,
+    include_accessories: bool = True,
 ) -> List[Path]:
     """Export every timber in a Frame to individual STEP files.
 
@@ -455,6 +497,8 @@ def export_frame_step(
         output_dir: Directory for the STEP files.
         combined: If True, also write a single ``_combined.step`` containing
             all timbers as a compound shape.
+        include_accessories: If True, export accessory solids. If False,
+            export only timbers.
 
     Returns:
         List of paths written.
@@ -469,8 +513,19 @@ def export_frame_step(
     written: List[Path] = []
 
     shapes: list[TopoDS_Shape] = []
+    used_names: set[str] = set()
+
+    def _next_available_name(base_name: str) -> str:
+        candidate = base_name
+        suffix = 2
+        while candidate in used_names:
+            candidate = f"{base_name}_{suffix}"
+            suffix += 1
+        used_names.add(candidate)
+        return candidate
+
     for i, ct in enumerate(frame.cut_timbers):
-        name = ct.timber.ticket.name or f"timber_{i}"
+        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
         local_csg = ct.render_timber_with_cuts_csg_local()
         global_csg = adopt_csg(ct.timber.transform, Transform.identity(), local_csg)
         shape = _csg_to_ocp(global_csg)
@@ -478,6 +533,27 @@ def export_frame_step(
         dest = output_dir / f"{name}.step"
         _write_step(shape, str(dest))
         written.append(dest)
+
+    if include_accessories:
+        for i, accessory in enumerate(frame.accessories):
+            ticket_name = accessory.ticket.name
+            if ticket_name and ticket_name != "[no-name]":
+                base_name = ticket_name
+            else:
+                base_name = f"accessory_{i}"
+            name = _next_available_name(base_name)
+            transform = getattr(accessory, "transform", None)
+            if transform is None:
+                raise ValueError(
+                    f"Accessory '{accessory.ticket.name}' does not define a global transform"
+                )
+            local_csg = accessory.render_csg_local()
+            global_csg = adopt_csg(transform, Transform.identity(), local_csg)
+            shape = _csg_to_ocp(global_csg)
+            shapes.append(shape)
+            dest = output_dir / f"{name}.step"
+            _write_step(shape, str(dest))
+            written.append(dest)
 
     if combined and shapes:
         builder = BRep_Builder()

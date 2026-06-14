@@ -405,7 +405,11 @@ class ViewerSettingsPanel {
                 </label>
                 <label>
                     <input id="export-individual-toggle" type="checkbox" ?checked=${this.app.exportIndividualsEnabled}>
-                    also export individual files
+                    also export timbers as individual files
+                </label>
+                <label>
+                    <input id="export-accessories-toggle" type="checkbox" ?checked=${this.app.exportAccessoriesEnabled}>
+                    export accessories
                 </label>
                 <button
                     id="export-stl-btn"
@@ -413,7 +417,11 @@ class ViewerSettingsPanel {
                     title="Export frame members to STL files"
                     @click=${() => {
                         if (vscode) {
-                            vscode.postMessage({ type: 'requestExportStl', includeIndividuals: this.app.exportIndividualsEnabled });
+                            vscode.postMessage({
+                                type: 'requestExportStl',
+                                includeIndividuals: this.app.exportIndividualsEnabled,
+                                includeAccessories: this.app.exportAccessoriesEnabled,
+                            });
                         }
                     }}>export STL</button>
                 ${this.app.cadqueryOcpInstalled === false
@@ -436,7 +444,11 @@ class ViewerSettingsPanel {
                         ?disabled=${this.app.cadqueryOcpInstalled === null}
                         @click=${() => {
                             if (vscode) {
-                                vscode.postMessage({ type: 'requestExportStep', includeIndividuals: this.app.exportIndividualsEnabled });
+                                vscode.postMessage({
+                                    type: 'requestExportStep',
+                                    includeIndividuals: this.app.exportIndividualsEnabled,
+                                    includeAccessories: this.app.exportAccessoriesEnabled,
+                                });
                             }
                         }}>export STEP</button>`}
             </section>
@@ -452,6 +464,7 @@ class ViewerSettingsPanel {
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const debugToggle = renderRoot.querySelector('#debug-toggle');
         const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
+        const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
 
         centerGizmoToggle.addEventListener('change', (event) => {
@@ -490,6 +503,10 @@ class ViewerSettingsPanel {
             this.app.setExportIndividualsEnabled(event.target.checked);
         });
 
+        exportAccessoriesToggle.addEventListener('change', (event) => {
+            this.app.setExportAccessoriesEnabled(event.target.checked);
+        });
+
         unselectedTransparencySlider.addEventListener('input', (event) => {
             const rawVisibility = Number(event.target.value);
             const normalizedVisibility = Number.isFinite(rawVisibility)
@@ -514,6 +531,7 @@ class ViewerSettingsPanel {
         const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
+        const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
         if (edgeVisibilitySlider) {
             edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
@@ -523,6 +541,9 @@ class ViewerSettingsPanel {
         }
         if (exportIndividualToggle) {
             exportIndividualToggle.checked = this.app.exportIndividualsEnabled;
+        }
+        if (exportAccessoriesToggle) {
+            exportAccessoriesToggle.checked = this.app.exportAccessoriesEnabled;
         }
         if (themeSelect) {
             themeSelect.value = this.app.activeTheme;
@@ -802,7 +823,8 @@ class KigumiViewerApp extends LitElement {
         this.viewerOptions = normalizeViewerOptions(INITIAL_PAYLOAD.viewerOptions);
         this.cadqueryOcpInstalled = null;
         this.installingCadqueryOcp = false;
-        this.exportIndividualsEnabled = true;
+        this.exportIndividualsEnabled = false;
+        this.exportAccessoriesEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
         this.parameterPanel = new ViewerParameterPanel(this);
         this.activeRefreshToken = 0;
@@ -1332,6 +1354,15 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this.exportIndividualsEnabled = normalized;
+        this.requestUpdate();
+    }
+
+    setExportAccessoriesEnabled(enabled) {
+        const normalized = Boolean(enabled);
+        if (this.exportAccessoriesEnabled === normalized) {
+            return;
+        }
+        this.exportAccessoriesEnabled = normalized;
         this.requestUpdate();
     }
 

@@ -295,6 +295,12 @@ DONE-improve agent instructions
 DONE-DOCS
   DONE-explain parameterization
 
+DONE-NON PERFECT TIMBER
+  DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
+  DONE-add round timber stuff
+  DONE-add asserts to joint functions to indicate if they can support non perfect timbers
+
+-test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again
 -round mortise and tenon
 -do ticket refactor so that each timber type can have its own ticket?
@@ -306,11 +312,6 @@ DONE-DOCS
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 
--NON PERFECT TIMBER
-  DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
-  DONE-add round timber stuff
-  -add asserts to joint functions to indicate if they can support non perfect timbers
-  -add regular imperfect rectangular timber stuff
 -do scribe notching on all joints (followup content yee)
 -make butt jonit with shoulder inset notching more generic
   -notch_length, measured in the length direction of the receiving timber
