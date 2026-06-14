@@ -78,10 +78,43 @@ class FrameViewSession {
         this.lastDirtyRefreshVersion = null;
         this.lastRefreshReason = null;
         this.lastRefreshAt = null;
+        this.viewerSettings = null;
         // Cached payloads for potential panel re-open flows
         this._lastFrameData = null;
         this._lastGeometryData = null;
         this._lastProfiling = null;
+    }
+
+    getViewerSettingsPath() {
+        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
+            ? this.runnerSession.projectRoot
+            : path.dirname(this.filePath);
+        return path.join(projectRoot, '.kigumi', 'kigumi-settings.json');
+    }
+
+    loadViewerSettingsFromDisk() {
+        const settingsPath = this.getViewerSettingsPath();
+        if (!fs.existsSync(settingsPath)) {
+            return null;
+        }
+        try {
+            const raw = fs.readFileSync(settingsPath, 'utf8');
+            const parsed = JSON.parse(raw);
+            if (!parsed || typeof parsed !== 'object') {
+                return null;
+            }
+            return parsed;
+        } catch (error) {
+            this.log(`[settings] Failed to read ${settingsPath}: ${error.message || error}`);
+            return null;
+        }
+    }
+
+    async saveViewerSettingsToDisk(settings) {
+        const settingsPath = this.getViewerSettingsPath();
+        fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+        await fs.promises.writeFile(settingsPath, `${JSON.stringify(settings, null, 2)}\n`, 'utf8');
+        return settingsPath;
     }
 
     getRefreshStatsPath() {
@@ -141,6 +174,15 @@ class FrameViewSession {
             this.runnerSession = new PythonRunnerSession(this.filePath, this.context, this.channel);
             this.ownsRunner = true;
         }
+
+        this.viewerSettings = this.loadViewerSettingsFromDisk();
+        if (this.viewerSettings && this.viewerSettings.viewerOptions && typeof this.viewerSettings.viewerOptions === 'object') {
+            this.refreshOptions = {
+                ...this.refreshOptions,
+                ...this.viewerSettings.viewerOptions,
+            };
+        }
+
         this._setupRunnerMilestoneHandler();
 
         this.profiler.markTiming(initTiming, 'initialize.createPanel.start');
@@ -152,6 +194,7 @@ class FrameViewSession {
         initializeFrameViewer(this.panel, this.filePath, {
             loadingText: 'initial creation',
             viewerOptions: this.refreshOptions,
+            viewerSettings: this.viewerSettings,
         }, this.runnerSession.isLocalDev);
         this.profiler.markTiming(initTiming, 'initialize.webviewHtml.end');
         this.panel.onDidDispose(() => {
@@ -227,6 +270,12 @@ class FrameViewSession {
                 const options = (message.options && typeof message.options === 'object') ? message.options : {};
                 this.refreshOptions = { ...this.refreshOptions, ...options };
                 this.log(`[webview] setRefreshOptions: ${JSON.stringify(options)}`);
+                return;
+            }
+            if (message.type === 'requestSaveViewerSettings') {
+                this._handleSaveViewerSettingsRequest(message).catch((error) => {
+                    this.log(`[settings] requestSaveViewerSettings error: ${error.message || error}`);
+                });
                 return;
             }
             if (message.type === 'openOutputChannel') {
@@ -977,6 +1026,43 @@ class FrameViewSession {
             if (choice === openOutputAction) {
                 this.channel.show(true);
             }
+        }
+    }
+
+    async _handleSaveViewerSettingsRequest(message) {
+        const payload = (message && message.settings && typeof message.settings === 'object')
+            ? message.settings
+            : null;
+
+        if (!payload) {
+            throw new Error('requestSaveViewerSettings requires a settings payload');
+        }
+
+        const viewerOptions = (payload.viewerOptions && typeof payload.viewerOptions === 'object')
+            ? payload.viewerOptions
+            : {};
+        const ui = (payload.ui && typeof payload.ui === 'object') ? payload.ui : {};
+        const settings = {
+            version: Number.isFinite(payload.version) ? Number(payload.version) : 1,
+            savedAt: new Date().toISOString(),
+            viewerOptions,
+            ui,
+        };
+
+        const settingsPath = await this.saveViewerSettingsToDisk(settings);
+        this.viewerSettings = settings;
+        this.refreshOptions = { ...this.refreshOptions, ...viewerOptions };
+        this.log(`[settings] Saved viewer settings to ${settingsPath}`);
+
+        if (this.panel && !this.isDisposed) {
+            this.panel.webview.postMessage({
+                type: 'viewerSettingsSaved',
+                ok: true,
+                path: settingsPath,
+                savedAt: settings.savedAt,
+            }).catch((error) => {
+                this.log(`[settings] Failed to post viewerSettingsSaved: ${error.message || error}`);
+            });
         }
     }
 

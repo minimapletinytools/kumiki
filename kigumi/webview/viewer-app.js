@@ -103,6 +103,7 @@ const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
         refreshToken: 0,
     },
     viewerOptions: {},
+    viewerSettings: null,
 };
 const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
 const VIEWER_APP_VERSION = '2026.03.17.4';
@@ -411,6 +412,18 @@ class ViewerSettingsPanel {
                     <input id="export-accessories-toggle" type="checkbox" ?checked=${this.app.exportAccessoriesEnabled}>
                     export accessories
                 </label>
+                <button
+                    id="save-settings-btn"
+                    type="button"
+                    title="Save current viewer options to .kigumi/kigumi-settings.json"
+                    @click=${() => {
+                        if (vscode) {
+                            vscode.postMessage({
+                                type: 'requestSaveViewerSettings',
+                                settings: this.app.collectViewerSettingsPayload(),
+                            });
+                        }
+                    }}>save settings</button>
                 <button
                     id="export-stl-btn"
                     type="button"
@@ -949,6 +962,7 @@ class KigumiViewerApp extends LitElement {
         this.setupUiEvents();
         this.setupThreeScene();
         window.addEventListener('message', this.onWindowMessage);
+        this.applyPersistedViewerSettings(INITIAL_PAYLOAD.viewerSettings || null);
         this.setViewerOptions(INITIAL_PAYLOAD.viewerOptions);
         this.setViewPhase(ViewerPhase.WAITING_FOR_RUNNER, 'raising frame', { refreshToken: 0 });
         void this.beginPayloadApplication(INITIAL_PAYLOAD);
@@ -1366,6 +1380,87 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
+    collectViewerSettingsPayload() {
+        return {
+            version: 1,
+            viewerOptions: { ...this.viewerOptions },
+            ui: {
+                showCenterGizmo: Boolean(this.showCenterGizmo),
+                edgesEnabled: Boolean(this.edgesEnabled),
+                edgeLineVisibilityPercent: Number(this.edgeLineVisibilityPercent),
+                shadowsEnabled: Boolean(this.shadowsEnabled),
+                reflectionsEnabled: Boolean(this.reflectionsEnabled),
+                debugEnabled: Boolean(this.debugEnabled),
+                unselectedTransparencyPercent: Number(this.unselectedTransparencyPercent),
+                activeTheme: String(this.activeTheme || 'forest'),
+                exportIndividualsEnabled: Boolean(this.exportIndividualsEnabled),
+                exportAccessoriesEnabled: Boolean(this.exportAccessoriesEnabled),
+            },
+        };
+    }
+
+    applyPersistedViewerSettings(settingsPayload) {
+        if (!settingsPayload || typeof settingsPayload !== 'object') {
+            return;
+        }
+
+        const viewerOptions = (settingsPayload.viewerOptions && typeof settingsPayload.viewerOptions === 'object')
+            ? settingsPayload.viewerOptions
+            : null;
+        if (viewerOptions) {
+            this.setViewerOptions(viewerOptions);
+        }
+
+        const ui = (settingsPayload.ui && typeof settingsPayload.ui === 'object')
+            ? settingsPayload.ui
+            : null;
+        if (!ui) {
+            return;
+        }
+
+        if (typeof ui.showCenterGizmo === 'boolean') {
+            this.setCenterGizmoEnabled(ui.showCenterGizmo);
+        }
+        if (typeof ui.edgesEnabled === 'boolean') {
+            this.setEdgesEnabled(ui.edgesEnabled);
+        }
+        if (Number.isFinite(ui.edgeLineVisibilityPercent)) {
+            this.setEdgeLineVisibilityPercent(Number(ui.edgeLineVisibilityPercent));
+        }
+        if (typeof ui.shadowsEnabled === 'boolean') {
+            this.setShadowsEnabled(ui.shadowsEnabled);
+        }
+        if (typeof ui.reflectionsEnabled === 'boolean') {
+            this.setReflectionsEnabled(ui.reflectionsEnabled);
+        }
+        if (typeof ui.debugEnabled === 'boolean') {
+            this.debugEnabled = ui.debugEnabled;
+            const debugEl = this.renderRoot && this.renderRoot.querySelector
+                ? this.renderRoot.querySelector('#debug')
+                : null;
+            if (debugEl) {
+                debugEl.style.display = this.debugEnabled ? 'block' : 'none';
+            }
+        }
+        if (Number.isFinite(ui.unselectedTransparencyPercent)) {
+            this.setUnselectedTransparencyPercent(Number(ui.unselectedTransparencyPercent));
+        }
+        if (typeof ui.activeTheme === 'string') {
+            this.setTheme(ui.activeTheme);
+        }
+        if (typeof ui.exportIndividualsEnabled === 'boolean') {
+            this.setExportIndividualsEnabled(ui.exportIndividualsEnabled);
+        }
+        if (typeof ui.exportAccessoriesEnabled === 'boolean') {
+            this.setExportAccessoriesEnabled(ui.exportAccessoriesEnabled);
+        }
+
+        if (this.settingsPanel && this.renderRoot && this.renderRoot.querySelector) {
+            this.settingsPanel.syncControls(this.renderRoot);
+        }
+        this.requestUpdate();
+    }
+
     setRenderParametersFromFrame(frameData) {
         const contract = frameData && frameData.renderParameters && typeof frameData.renderParameters === 'object'
             ? frameData.renderParameters
@@ -1652,6 +1747,14 @@ class KigumiViewerApp extends LitElement {
             if (typeof payload.installingCadqueryOcp === 'boolean') {
                 this.installingCadqueryOcp = payload.installingCadqueryOcp;
                 this.requestUpdate();
+            }
+            return;
+        }
+
+        if (message.type === 'viewerSettingsSaved') {
+            if (message.ok !== false) {
+                const pathText = typeof message.path === 'string' ? ` (${message.path})` : '';
+                this.appendLogLine(`[settings] Saved viewer settings${pathText}`);
             }
             return;
         }

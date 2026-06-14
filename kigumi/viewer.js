@@ -60,6 +60,9 @@ function initializeFrameViewer(panel, filePath, options = {}, isLocalDev = false
         ? options.loadingText
         : 'initial creation';
     const viewerOptions = normalizeViewerOptions(options.viewerOptions);
+    const viewerSettings = (options.viewerSettings && typeof options.viewerSettings === 'object')
+        ? options.viewerSettings
+        : null;
 
     panel.title = getViewerTitle(filePath, null, isLocalDev);
     panel.webview.html = getWebviewContent(
@@ -90,7 +93,8 @@ function initializeFrameViewer(panel, filePath, options = {}, isLocalDev = false
             loadingText,
             emptyState: true,
         },
-        viewerOptions
+        viewerOptions,
+        viewerSettings
     );
     initializedPanels.add(panel);
 }
@@ -128,7 +132,7 @@ function getViewerTitle(filePath, frameName = null, isLocalDev = false) {
     return `Kigumi: ${fileName}${devTag} · v${VIEWER_APP_VERSION}`;
 }
 
-function getWebviewContent(webview, frameData, geometryData, profiling, uiState = null, viewerOptions = null) {
+function getWebviewContent(webview, frameData, geometryData, profiling, uiState = null, viewerOptions = null, viewerSettings = null) {
     const templatePath = path.join(webviewDir, 'viewer.html');
     const template = fs.readFileSync(templatePath, 'utf8');
 
@@ -149,6 +153,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         profiling: profiling || null,
         uiState: uiState || null,
         viewerOptions: normalizeViewerOptions(viewerOptions),
+        viewerSettings: (viewerSettings && typeof viewerSettings === 'object') ? viewerSettings : null,
     }));
 
     return template
