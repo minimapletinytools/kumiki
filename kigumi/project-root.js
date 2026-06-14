@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 
+const KUMIKI_YAML_RELATIVE_PATH = path.join('.kigumi', 'kumiki.yaml');
+const LEGACY_KIGUMI_YAML_NAME = '.kigumi.yaml';
+
 function findMarkerRoot(startDir) {
     let candidate = path.resolve(startDir);
 
@@ -12,8 +15,11 @@ function findMarkerRoot(startDir) {
         ) {
             return { projectRoot: candidate, isLocalDev: true, marker: 'kumiki' };
         }
-        if (fs.existsSync(path.join(candidate, '.kigumi.yaml'))) {
-            return { projectRoot: candidate, isLocalDev: false, marker: '.kigumi.yaml' };
+        if (fs.existsSync(path.join(candidate, KUMIKI_YAML_RELATIVE_PATH))) {
+            return { projectRoot: candidate, isLocalDev: false, marker: KUMIKI_YAML_RELATIVE_PATH };
+        }
+        if (fs.existsSync(path.join(candidate, LEGACY_KIGUMI_YAML_NAME))) {
+            return { projectRoot: candidate, isLocalDev: false, marker: LEGACY_KIGUMI_YAML_NAME };
         }
 
         const parent = path.dirname(candidate);
@@ -25,10 +31,16 @@ function findMarkerRoot(startDir) {
 }
 
 function ensureKigumiYaml(projectRoot) {
-    const envYamlPath = path.join(projectRoot, '.kigumi.yaml');
-    if (!fs.existsSync(envYamlPath)) {
-        fs.writeFileSync(envYamlPath, 'kumiki_version: latest\n', 'utf8');
+    const kumikiYamlPath = path.join(projectRoot, KUMIKI_YAML_RELATIVE_PATH);
+    if (fs.existsSync(kumikiYamlPath)) {
+        return;
     }
+    // Honor a legacy root-level .kigumi.yaml without rewriting it.
+    if (fs.existsSync(path.join(projectRoot, LEGACY_KIGUMI_YAML_NAME))) {
+        return;
+    }
+    fs.mkdirSync(path.dirname(kumikiYamlPath), { recursive: true });
+    fs.writeFileSync(kumikiYamlPath, 'kumiki_version: latest\n', 'utf8');
 }
 
 function resolveProjectEnvironment(options = {}) {
@@ -121,4 +133,6 @@ function resolveProjectEnvironment(options = {}) {
 module.exports = {
     ensureKigumiYaml,
     resolveProjectEnvironment,
+    KUMIKI_YAML_RELATIVE_PATH,
+    LEGACY_KIGUMI_YAML_NAME,
 };

@@ -2,7 +2,12 @@ const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 const https = require('https');
-const { ensureKigumiYaml, resolveProjectEnvironment } = require('./project-root');
+const {
+    ensureKigumiYaml,
+    resolveProjectEnvironment,
+    KUMIKI_YAML_RELATIVE_PATH,
+    LEGACY_KIGUMI_YAML_NAME,
+} = require('./project-root');
 
 const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
 const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
@@ -627,7 +632,8 @@ function getInitializationStatus(workspaceRoot, filePath) {
     });
     const resolvedRoot = env.projectRoot || workspaceRoot;
     const isLocalDev = !!env.isLocalDev;
-    const hasKigumiYaml = fs.existsSync(path.join(resolvedRoot, '.kigumi.yaml'));
+    const hasKigumiYaml = fs.existsSync(path.join(resolvedRoot, KUMIKI_YAML_RELATIVE_PATH))
+        || fs.existsSync(path.join(resolvedRoot, LEGACY_KIGUMI_YAML_NAME));
     const hasProjectYaml = fs.existsSync(path.join(resolvedRoot, '.kigumi', 'project.yaml'));
     const hasVenvPython = fs.existsSync(getVenvPython(resolvedRoot));
     const hasExampleFile = fs.existsSync(path.join(resolvedRoot, 'my_cute_frame.py'));

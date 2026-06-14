@@ -57,6 +57,8 @@ def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
         # Local-dev should only match an actual kumiki repo root.
         if (candidate / "kumiki").is_dir() and (candidate / "pyproject.toml").is_file():
             return candidate, True
+        if (candidate / ".kigumi" / "kumiki.yaml").is_file():
+            return candidate, False
         if (candidate / ".kigumi.yaml").is_file():
             return candidate, False
         parent = candidate.parent

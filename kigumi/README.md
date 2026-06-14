@@ -60,8 +60,8 @@ Kigumi resolves project roots the same way for both "Render Kigumi" and "Initial
 
 1. Start from the active Python file (when available) and walk upward.
 2. If a folder contains `kumiki/`, treat it as local development mode (not relevant unless you are developingon kumiki)
-3. If a folder contains `.kigumi.yaml`, treat it as a normal Kigumi project.
-4. If no marker is found, fall back to the workspace root (or file parent) and create `.kigumi.yaml`.
+3. If a folder contains `.kigumi/kumiki.yaml`, treat it as a normal Kigumi project.
+4. If no marker is found, fall back to the workspace root (or file parent) and create `.kigumi/kumiki.yaml`.
 
 This lets you open a single Python file and still bootstrap a runnable Kigumi project without manual setup first.
 
