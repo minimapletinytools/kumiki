@@ -183,6 +183,7 @@ def cut_mortise_and_tenon_joint(
     mortise_timber = arrangement.receiving_timber
     tenon_end = arrangement.butt_timber_end
 
+    # TODO fix notching, not sure why it broke again..
     warn_if_arrangement_timbers_imperfect(arrangement)
 
     # Default tenon_position to centered (0, 0)
@@ -772,8 +773,6 @@ def cut_round_mortise_and_tenon_joint_on_PAT(
 # Wedged Half-Dovetail Mortise and Tenon Joint
 # ============================================================================
 
-
-# TODO notching on this function works however the wedge won't fit so the wedge hole needs to be made bigger
 def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     arrangement: ButtJointTimberArrangement,
     dovetail_top_side_on_butt_timber: TimberLongFace,
@@ -818,8 +817,6 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
     tenon_end = arrangement.butt_timber_end
-
-    warn_if_arrangement_timbers_imperfect(arrangement)
 
     # Convert the user-facing `mortise_shoulder_inset` (measured inward from the mortise
     # entry face) into the signed-from-centerline distance that `compute_butt_joint_shoulder`
