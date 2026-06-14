@@ -98,6 +98,13 @@ try:
 except ImportError:
     _OCP_AVAILABLE = False
 
+try:
+    importlib.import_module("networkx")
+    importlib.import_module("lxml.etree")
+    _THREEMF_AVAILABLE = True
+except ImportError:
+    _THREEMF_AVAILABLE = False
+
 
 # ---------------------------------------------------------------------------
 # STL export
@@ -201,6 +208,72 @@ def export_frame_stl(
         merged = trimesh.util.concatenate(meshes)
         dest = output_dir / "_combined.stl"
         merged.export(str(dest), file_type="stl")
+        written.append(dest)
+
+    return written
+
+
+def _mesh_to_millimeters(mesh: "trimesh.Trimesh") -> "trimesh.Trimesh":
+    """Return a mesh copy scaled from Kumiki metres to 3MF millimetres."""
+    mesh_mm = mesh.copy()
+    mesh_mm.apply_scale(_M_TO_MM)
+    return mesh_mm
+
+
+def export_frame_3mf(
+    frame: Frame,
+    output_dir: Union[str, Path],
+    *,
+    combined: bool = False,
+    include_accessories: bool = True,
+) -> List[Path]:
+    """Export individual STL members plus an optional combined 3MF scene."""
+    if not _THREEMF_AVAILABLE:
+        raise ImportError(
+            "3MF export requires trimesh soft dependencies 'lxml' and 'networkx'. "
+            "Install them with: pip install lxml networkx"
+        )
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: List[Path] = []
+    used_names: set[str] = set()
+    scene = trimesh.Scene()
+
+    def _next_available_name(base_name: str) -> str:
+        candidate = base_name
+        suffix = 2
+        while candidate in used_names:
+            candidate = f"{base_name}_{suffix}"
+            suffix += 1
+        used_names.add(candidate)
+        return candidate
+
+    for i, ct in enumerate(frame.cut_timbers):
+        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
+        mesh = _cut_timber_to_trimesh(ct)
+        dest = output_dir / f"{name}.stl"
+        mesh.export(str(dest), file_type="stl")
+        written.append(dest)
+        scene.add_geometry(_mesh_to_millimeters(mesh), geom_name=name, node_name=name)
+
+    if include_accessories:
+        for i, accessory in enumerate(frame.accessories):
+            ticket_name = accessory.ticket.name
+            if ticket_name and ticket_name != "[no-name]":
+                base_name = ticket_name
+            else:
+                base_name = f"accessory_{i}"
+            name = _next_available_name(base_name)
+            mesh = _joint_accessory_to_trimesh(accessory)
+            dest = output_dir / f"{name}.stl"
+            mesh.export(str(dest), file_type="stl")
+            written.append(dest)
+            scene.add_geometry(_mesh_to_millimeters(mesh), geom_name=name, node_name=name)
+
+    if combined and len(scene.geometry) > 0:
+        dest = output_dir / "_combined.3mf"
+        scene.export(file_obj=str(dest), file_type="3mf")
         written.append(dest)
 
     return written

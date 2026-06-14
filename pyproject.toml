@@ -25,7 +25,9 @@ dependencies = [
     "sympy>=1.12.0",
     "numpy>=1.21.0",
     "trimesh>=4.7.0",
+    "lxml>=4.9.0",
     "manifold3d>=3.4.0",
+    "networkx>=3.0",
 ]
 
 [project.urls]

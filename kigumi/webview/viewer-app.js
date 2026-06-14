@@ -427,7 +427,7 @@ class ViewerSettingsPanel {
                 <button
                     id="export-stl-btn"
                     type="button"
-                    title="Export frame members to STL files"
+                    title="Export individual frame members as STL plus a combined 3MF"
                     @click=${() => {
                         if (vscode) {
                             vscode.postMessage({
@@ -436,7 +436,7 @@ class ViewerSettingsPanel {
                                 includeAccessories: this.app.exportAccessoriesEnabled,
                             });
                         }
-                    }}>export STL</button>
+                    }}>export STL/3MF</button>
                 ${this.app.cadqueryOcpInstalled === false
                     ? html`<button
                         id="install-cadquery-ocp-btn"

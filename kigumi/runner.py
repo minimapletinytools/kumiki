@@ -2323,8 +2323,8 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         include_individuals = bool(payload.get("includeIndividuals", True))
         include_accessories = bool(payload.get("includeAccessories", True))
 
-        if export_format not in {"stl", "step"}:
-            raise ValueError("export_frame requires payload.format to be 'stl' or 'step'")
+        if export_format not in {"stl", "step", "3mf"}:
+            raise ValueError("export_frame requires payload.format to be 'stl', 'step', or '3mf'")
         if not isinstance(output_dir_raw, str) or not output_dir_raw:
             raise ValueError("export_frame requires payload.outputDir")
 
@@ -2346,6 +2346,17 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 include_accessories=include_accessories,
             )
             combined_name = "_combined.stl"
+            extension_glob = "*.stl"
+        elif export_format == "3mf":
+            from kumiki.blueprint import export_frame_3mf
+
+            written = export_frame_3mf(
+                ss.frame,
+                output_dir,
+                combined=True,
+                include_accessories=include_accessories,
+            )
+            combined_name = "_combined.3mf"
             extension_glob = "*.stl"
         else:
             from kumiki.blueprint import export_frame_step

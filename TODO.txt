@@ -302,6 +302,7 @@ DONE-NON PERFECT TIMBER
 DONE-fix accessory export
 -add 3mf or some other format better than STL for combined
 -add settings savigns
+  -test it
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again
 -round mortise and tenon

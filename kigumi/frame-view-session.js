@@ -312,7 +312,7 @@ class FrameViewSession {
             }
             if (message.type === 'requestExportStl') {
                 this._handleExportRequest(
-                    'stl',
+                    '3mf',
                     message.includeIndividuals !== false,
                     message.includeAccessories !== false,
                 ).catch((err) => {
@@ -994,7 +994,11 @@ class FrameViewSession {
 
         await this.ensureRunnerSession();
 
-        const normalizedFormat = format === 'step' ? 'step' : 'stl';
+        const normalizedFormat = format === 'step'
+            ? 'step'
+            : format === '3mf'
+                ? '3mf'
+                : 'stl';
         const outputDir = this.getExportDirectory();
         fs.mkdirSync(outputDir, { recursive: true });
 
@@ -1007,20 +1011,24 @@ class FrameViewSession {
             });
 
             const writtenFiles = Array.isArray(result && result.files) ? result.files : [];
-            this.log(`[export] Wrote ${writtenFiles.length} ${normalizedFormat.toUpperCase()} file(s) to ${outputDir}`);
+            const formatLabel = normalizedFormat === '3mf' ? 'STL/3MF' : normalizedFormat.toUpperCase();
+            this.log(`[export] Wrote ${writtenFiles.length} ${formatLabel} file(s) to ${outputDir}`);
             void vscode.window.showInformationMessage(
-                `Kigumi exported ${writtenFiles.length} ${normalizedFormat.toUpperCase()} file(s) to ${outputDir}`
+                `Kigumi exported ${writtenFiles.length} ${formatLabel} file(s) to ${outputDir}`
             );
         } catch (error) {
             const details = this.extractRunnerErrorDetails(error);
-            this.log(`[export] ${normalizedFormat.toUpperCase()} export failed: ${details.message}`);
+            const formatLabel = normalizedFormat === '3mf' ? 'STL/3MF' : normalizedFormat.toUpperCase();
+            this.log(`[export] ${formatLabel} export failed: ${details.message}`);
 
             const openOutputAction = 'Open Kigumi Output';
             const installHint = normalizedFormat === 'step' && details.message.includes('cadquery-ocp')
                 ? ' Install STEP support with: pip install cadquery-ocp'
+                : normalizedFormat === '3mf' && details.message.includes('3MF export requires')
+                    ? ' Install 3MF support with: pip install lxml networkx'
                 : '';
             const choice = await vscode.window.showErrorMessage(
-                `Kigumi ${normalizedFormat.toUpperCase()} export failed: ${details.message}${installHint}`,
+                `Kigumi ${formatLabel} export failed: ${details.message}${installHint}`,
                 openOutputAction
             );
             if (choice === openOutputAction) {

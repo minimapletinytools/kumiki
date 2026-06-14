@@ -4,17 +4,21 @@ import importlib.util
 import os
 import sys
 import tempfile
+import zipfile
 from pathlib import Path
 import importlib
 from typing import Any, cast
+from xml.etree import ElementTree
 
 import pytest
 from sympy import Integer
 
 from kumiki.blueprint import (
     export_cut_timber_stl,
+    export_frame_3mf,
     export_frame_stl,
     _OCP_AVAILABLE,
+    _THREEMF_AVAILABLE,
 )
 from kumiki.timber import CutTimber, Frame, Peg, PegShape, Timber, timber_from_directions
 from kumiki.rule import Transform, create_v3, create_v2
@@ -186,6 +190,48 @@ class TestExportFrameStl:
             assert len(written) == 3
             names = sorted(p.stem for p in written)
             assert names == ["_combined", "beam", "post"]
+
+
+class TestExportFrame3mf:
+    @pytest.mark.skipif(not _THREEMF_AVAILABLE, reason="3MF dependencies are not installed")
+    def test_writes_individual_stl_and_combined_3mf(self):
+        frame = _simple_frame()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_3mf(frame, td, combined=True)
+            names = sorted(p.name for p in written)
+            assert names == ["_combined.3mf", "beam.stl", "post.stl"]
+
+    @pytest.mark.skipif(not _THREEMF_AVAILABLE, reason="3MF dependencies are not installed")
+    def test_combined_3mf_contains_member_names(self):
+        frame = _simple_frame_with_accessory()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_3mf(frame, td, combined=True)
+            combined = next(p for p in written if p.suffix == ".3mf")
+            with zipfile.ZipFile(combined, "r") as archive:
+                model_xml = archive.read("3D/3dmodel.model")
+            root = ElementTree.fromstring(model_xml)
+            object_names = sorted(
+                element.attrib["name"]
+                for element in root.findall("{*}resources/{*}object")
+                if "name" in element.attrib
+            )
+            assert object_names == ["accessory_0", "beam", "post"]
+
+    @pytest.mark.skipif(not _THREEMF_AVAILABLE, reason="3MF dependencies are not installed")
+    def test_combined_3mf_respects_accessory_toggle(self):
+        frame = _simple_frame_with_accessory()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_3mf(frame, td, combined=True, include_accessories=False)
+            names = sorted(p.name for p in written)
+            assert names == ["_combined.3mf", "beam.stl", "post.stl"]
+
+
+class TestThreeMfImportGuard:
+    @pytest.mark.skipif(_THREEMF_AVAILABLE, reason="3MF dependencies are installed")
+    def test_export_frame_3mf_raises(self):
+        frame = _simple_frame()
+        with pytest.raises(ImportError, match="3MF export requires"):
+            export_frame_3mf(frame, "/tmp/nope")
 
 
 # ---------------------------------------------------------------------------
