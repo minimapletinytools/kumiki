@@ -86,9 +86,12 @@ class FrameViewSession {
     }
 
     getViewerSettingsPath() {
+        const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.filePath));
         const projectRoot = this.runnerSession && this.runnerSession.projectRoot
             ? this.runnerSession.projectRoot
-            : path.dirname(this.filePath);
+            : workspaceFolder && workspaceFolder.uri && workspaceFolder.uri.fsPath
+                ? workspaceFolder.uri.fsPath
+                : path.dirname(this.filePath);
         return path.join(projectRoot, '.kigumi', 'kigumi-settings.json');
     }
 
@@ -143,6 +146,8 @@ class FrameViewSession {
         }
         this.panel.webview.postMessage({
             type: 'viewerState',
+            viewerOptions: this.refreshOptions,
+            viewerSettings: this.viewerSettings,
             uiState: {
                 phase: 'waiting_for_runner',
                 loadingText: stage,
@@ -579,12 +584,13 @@ class FrameViewSession {
                 refreshToken: this.refreshSequence,
                 loadingText: '',
                 keepLoading: false,
-            }, this.refreshOptions);
+            }, this.refreshOptions, this.viewerSettings);
             this.log(`[reopen] Re-rendered from cached data for slot '${this.slotName}'`);
         } else {
             initializeFrameViewer(this.panel, this.filePath, {
                 loadingText: 'reopening',
                 viewerOptions: this.refreshOptions,
+                viewerSettings: this.viewerSettings,
             }, isLocalDev);
             await this.refresh('panel reopen');
         }
@@ -742,7 +748,7 @@ class FrameViewSession {
                 refreshToken,
                 loadingText: '',
                 keepLoading: false,
-            }, this.refreshOptions);
+            }, this.refreshOptions, this.viewerSettings);
             // Cache payloads for panel re-open (pattern sessions)
             this._lastFrameData = frameData;
             this._lastGeometryData = geometryData;

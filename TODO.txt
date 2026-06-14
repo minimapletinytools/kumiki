@@ -300,8 +300,8 @@ DONE-NON PERFECT TIMBER
   DONE-add round timber stuff
   DONE-add asserts to joint functions to indicate if they can support non perfect timbers
 DONE-fix accessory export
--add 3mf or some other format better than STL for combined
--add settings savigns
+DONE-add 3mf or some other format better than STL for combined
+DONE-add settings savigns
   -test it
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again

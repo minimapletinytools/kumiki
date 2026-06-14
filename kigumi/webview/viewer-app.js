@@ -413,18 +413,6 @@ class ViewerSettingsPanel {
                     export accessories
                 </label>
                 <button
-                    id="save-settings-btn"
-                    type="button"
-                    title="Save current viewer options to .kigumi/kigumi-settings.json"
-                    @click=${() => {
-                        if (vscode) {
-                            vscode.postMessage({
-                                type: 'requestSaveViewerSettings',
-                                settings: this.app.collectViewerSettingsPayload(),
-                            });
-                        }
-                    }}>save settings</button>
-                <button
                     id="export-stl-btn"
                     type="button"
                     title="Export individual frame members as STL plus a combined 3MF"
@@ -464,6 +452,18 @@ class ViewerSettingsPanel {
                                 });
                             }
                         }}>export STEP</button>`}
+                    <button
+                        id="save-settings-btn"
+                        type="button"
+                        title="Save current viewer options to .kigumi/kigumi-settings.json"
+                        @click=${() => {
+                            if (vscode) {
+                                vscode.postMessage({
+                                    type: 'requestSaveViewerSettings',
+                                    settings: this.app.collectViewerSettingsPayload(),
+                                });
+                            }
+                        }}>save settings</button>
             </section>
         `;
     }
@@ -1655,6 +1655,9 @@ class KigumiViewerApp extends LitElement {
         const message = event.data || {};
         if (message.type === 'viewerState') {
             const uiState = this.normalizeUiState(message.uiState || null);
+            if (message.viewerSettings && typeof message.viewerSettings === 'object') {
+                this.applyPersistedViewerSettings(message.viewerSettings);
+            }
             this.setViewerOptions(message.viewerOptions || null);
             const hasPayload = Object.prototype.hasOwnProperty.call(message, 'frame') ||
                 Object.prototype.hasOwnProperty.call(message, 'geometry') ||

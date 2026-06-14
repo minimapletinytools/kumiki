@@ -99,7 +99,7 @@ function initializeFrameViewer(panel, filePath, options = {}, isLocalDev = false
     initializedPanels.add(panel);
 }
 
-function renderFrameViewer(panel, filePath, frameData, geometryData, profiling, uiState = null, viewerOptions = null, isLocalDev = false) {
+function renderFrameViewer(panel, filePath, frameData, geometryData, profiling, uiState = null, viewerOptions = null, viewerSettings = null, isLocalDev = false) {
     panel.title = getViewerTitle(filePath, frameData.name, isLocalDev);
     const nextUiState = uiState || {
         phase: ViewerPhase.READY,
@@ -109,7 +109,7 @@ function renderFrameViewer(panel, filePath, frameData, geometryData, profiling, 
     };
     const nextViewerOptions = normalizeViewerOptions(viewerOptions);
     if (!initializedPanels.has(panel)) {
-        panel.webview.html = getWebviewContent(panel.webview, frameData, geometryData, profiling, nextUiState, nextViewerOptions);
+        panel.webview.html = getWebviewContent(panel.webview, frameData, geometryData, profiling, nextUiState, nextViewerOptions, viewerSettings);
         initializedPanels.add(panel);
     } else {
         panel.webview.postMessage({
@@ -119,6 +119,7 @@ function renderFrameViewer(panel, filePath, frameData, geometryData, profiling, 
             profiling: profiling || null,
             uiState: nextUiState,
             viewerOptions: nextViewerOptions,
+            viewerSettings: (viewerSettings && typeof viewerSettings === 'object') ? viewerSettings : null,
         });
     }
 }
