@@ -7,7 +7,7 @@ import warnings
 from kumiki.timber import *
 from kumiki.construction import *
 from .shavings import *
-from .notching import chop_shoulder_notch_on_timber_face
+from .notching import chop_shoulder_notch_on_timber_face, warn_if_arrangement_timbers_imperfect
 from kumiki.measuring import locate_top_center_position, locate_centerline, mark_distance_from_end_along_centerline
 from kumiki.rule import *
 from kumiki.cutcsg import *
@@ -176,6 +176,7 @@ def cut_lapped_gooseneck_joint(
         - This joint is traditionally used for connecting beams end-to-end
     """
     require_check(arrangement.check_face_aligned_and_parallel_axis())
+    warn_if_arrangement_timbers_imperfect(arrangement)
     assert arrangement.front_face_on_timber1 is not None, (
         "arrangement.front_face_on_timber1 must be set to determine the gooseneck face"
     )
@@ -478,6 +479,7 @@ def cut_housed_dovetail_butt_joint(
     """
     
     require_check(arrangement.check_face_aligned_and_orthogonal())
+    warn_if_arrangement_timbers_imperfect(arrangement)
     assert arrangement.front_face_on_butt_timber is not None, (
         "arrangement.front_face_on_butt_timber must be set to determine the dovetail face"
     )
@@ -699,6 +701,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
         ValueError: If parameters are invalid or timbers are not properly positioned
     """
     require_check(arrangement.check_plane_aligned())
+    warn_if_arrangement_timbers_imperfect(arrangement)
     assert arrangement.front_face_on_timber1 is not None, (
         "arrangement.front_face_on_timber1 must be set to determine the reference miter face"
     )

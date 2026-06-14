@@ -15,6 +15,7 @@ from .build_a_butt import (
 )
 from .notching import (
     chop_shoulder_notch_aligned_with_timber,
+    warn_if_arrangement_timbers_imperfect,
 )
 
 
@@ -74,6 +75,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     """
     error = arrangement.check_face_aligned_cardinal_and_opposing_butts()
     assert error is None, error
+    warn_if_arrangement_timbers_imperfect(arrangement)
 
     assert isinstance(slot_facing_end_on_receiving_timber, TimberReferenceEnd), (
         f"slot_facing_end_on_receiving_timber must be TimberReferenceEnd, got "

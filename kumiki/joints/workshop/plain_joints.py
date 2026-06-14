@@ -7,7 +7,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .notching import CrossJointScribeNotchingConfig, chop_scribe_notch_and_apply
+from .notching import CrossJointScribeNotchingConfig, chop_scribe_notch_and_apply, warn_if_arrangement_timbers_imperfect
 from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, get_point_on_face_global, Space
 from .build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
 
@@ -53,6 +53,8 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     timberA_end = arrangement.timber1_end
     timberB = arrangement.timber2
     timberB_end = arrangement.timber2_end
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
     
     # Get the end directions for each timber (pointing outward from the timber)
     if timberA_end == TimberReferenceEnd.TOP:
@@ -256,6 +258,8 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
     butt_timber = arrangement.butt_timber
     butt_end = arrangement.butt_timber_end
 
+    warn_if_arrangement_timbers_imperfect(arrangement)
+
     assert not are_vectors_parallel(
         receiving_timber.get_length_direction_global(),
         butt_timber.get_length_direction_global(),
@@ -429,6 +433,8 @@ def cut_tongue_and_fork_corner_joint(
     fork_timber = arrangement.timber2
     tongue_end = arrangement.timber1_end
     fork_end = arrangement.timber2_end
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
 
     assert not are_vectors_parallel(
         tongue_timber.get_length_direction_global(),
@@ -683,6 +689,8 @@ def cut_tongue_and_fork_butt_joint(
     tongue_timber = arrangement.butt_timber
     fork_timber = arrangement.receiving_timber
     tongue_end = arrangement.butt_timber_end
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
 
     assert not are_vectors_parallel(
         tongue_timber.get_length_direction_global(),
@@ -1008,6 +1016,8 @@ def cut_plain_cross_lap_joint(
     timberA = arrangement.timber1
     timberB = arrangement.timber2
     timberA_cut_face = arrangement.front_face_on_timber1
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
     
     # Verify that cut_ratio is in valid range [0, 1]
     assert 0 <= cut_ratio <= 1, f"cut_ratio must be in range [0, 1], got {cut_ratio}"

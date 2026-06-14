@@ -32,6 +32,7 @@ from .notching import (
     chop_notch_for_butt_joint_arrangement,
     chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
+    warn_if_arrangement_timbers_imperfect,
 )
 from .build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
@@ -181,6 +182,8 @@ def cut_mortise_and_tenon_joint(
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
     tenon_end = arrangement.butt_timber_end
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
 
     # Default tenon_position to centered (0, 0)
     if tenon_position is None:
@@ -815,6 +818,8 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
     tenon_end = arrangement.butt_timber_end
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
 
     # Convert the user-facing `mortise_shoulder_inset` (measured inward from the mortise
     # entry face) into the signed-from-centerline distance that `compute_butt_joint_shoulder`

@@ -6,6 +6,7 @@ Shared helper functions for shoulder-plane calculations and notch CSG generation
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, replace
 from typing import Optional, Union
 
@@ -32,6 +33,11 @@ from kumiki.timber_shavings import (
 )
 
 
+IMPERFECT_TIMBER_WARNING = (
+    "timber is imperfect (does not match perfect timber within), this joint currently does not supporting maknig relief cuts beyond the perfect timber within so the joint may not actually fit"
+)
+
+
 _raw_safe_dot_product = safe_dot_product
 _raw_safe_norm = safe_norm
 _raw_safe_transform_vector = safe_transform_vector
@@ -47,6 +53,16 @@ def safe_norm(*args, **kwargs):
 
 def safe_transform_vector(*args, **kwargs):
     return prune(_raw_safe_transform_vector(*args, **kwargs))
+
+
+def warn_if_arrangement_timbers_imperfect(arrangement) -> None:
+    """Warn when a joint arrangement uses any timber that is not perfect."""
+    check_perfection = getattr(arrangement, "check_perfection", None)
+    if not callable(check_perfection):
+        return
+    error = check_perfection()
+    if error is not None:
+        warnings.warn(IMPERFECT_TIMBER_WARNING, stacklevel=2)
 
 @dataclass(frozen=True)
 class CrossJointScribeNotchingConfig:
