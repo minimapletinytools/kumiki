@@ -303,9 +303,11 @@ DONE-fix accessory export
 DONE-add 3mf or some other format better than STL for combined
 DONE-add settings savigns
   -test it
+DONE-round mortise and tenon
+
+
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again
--round mortise and tenon
 -do ticket refactor so that each timber type can have its own ticket?
   -or do we do the derived ticket thing instead?
 -improve erroring on initialize due to missing deps
