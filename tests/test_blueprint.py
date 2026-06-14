@@ -16,6 +16,7 @@ from sympy import Integer
 from kumiki.blueprint import (
     export_cut_timber_stl,
     export_frame_3mf,
+    export_frame_obj,
     export_frame_stl,
     _OCP_AVAILABLE,
     _THREEMF_AVAILABLE,
@@ -224,6 +225,22 @@ class TestExportFrame3mf:
             written = export_frame_3mf(frame, td, combined=True, include_accessories=False)
             names = sorted(p.name for p in written)
             assert names == ["_combined.3mf", "beam.stl", "post.stl"]
+
+
+class TestExportFrameObj:
+    def test_writes_individual_obj_and_combined_obj(self):
+        frame = _simple_frame()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_obj(frame, td, combined=True)
+            names = sorted(p.name for p in written)
+            assert names == ["_combined.obj", "beam.obj", "post.obj"]
+
+    def test_combined_obj_respects_accessory_toggle(self):
+        frame = _simple_frame_with_accessory()
+        with tempfile.TemporaryDirectory() as td:
+            written = export_frame_obj(frame, td, combined=True, include_accessories=False)
+            names = sorted(p.name for p in written)
+            assert names == ["_combined.obj", "beam.obj", "post.obj"]
 
 
 class TestThreeMfImportGuard:

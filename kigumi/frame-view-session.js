@@ -316,22 +316,30 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'requestExportStl') {
-                this._handleExportRequest(
-                    '3mf',
-                    message.includeIndividuals !== false,
-                    message.includeAccessories !== false,
-                ).catch((err) => {
+                this._handleExportBatchRequest({
+                    formats: ['stl', '3mf'],
+                    includeCombined: true,
+                    includeIndividuals: message.includeIndividuals !== false,
+                    includeAccessories: message.includeAccessories !== false,
+                }).catch((err) => {
                     this.log(`[export] requestExportStl error: ${err.message || err}`);
                 });
                 return;
             }
             if (message.type === 'requestExportStep') {
-                this._handleExportRequest(
-                    'step',
-                    message.includeIndividuals !== false,
-                    message.includeAccessories !== false,
-                ).catch((err) => {
+                this._handleExportBatchRequest({
+                    formats: ['step'],
+                    includeCombined: true,
+                    includeIndividuals: message.includeIndividuals !== false,
+                    includeAccessories: message.includeAccessories !== false,
+                }).catch((err) => {
                     this.log(`[export] requestExportStep error: ${err.message || err}`);
+                });
+                return;
+            }
+            if (message.type === 'requestExportFiles') {
+                this._handleExportBatchRequest(message).catch((err) => {
+                    this.log(`[export] requestExportFiles error: ${err.message || err}`);
                 });
                 return;
             }
@@ -993,7 +1001,7 @@ class FrameViewSession {
         return path.join(projectRoot, 'kigumi_exports', safeBaseName);
     }
 
-    async _handleExportRequest(format, includeIndividuals = true, includeAccessories = true) {
+    async _handleExportRequest(format, includeCombined = true, includeIndividuals = true, includeAccessories = true) {
         if (!this.runnerSession) {
             return;
         }
@@ -1004,7 +1012,9 @@ class FrameViewSession {
             ? 'step'
             : format === '3mf'
                 ? '3mf'
-                : 'stl';
+                : format === 'obj'
+                    ? 'obj'
+                    : 'stl';
         const outputDir = this.getExportDirectory();
         fs.mkdirSync(outputDir, { recursive: true });
 
@@ -1012,19 +1022,18 @@ class FrameViewSession {
             const result = await this.runnerSession.slotRequest('export_frame', this.slotName, {
                 format: normalizedFormat,
                 outputDir,
+                includeCombined: Boolean(includeCombined),
                 includeIndividuals: Boolean(includeIndividuals),
                 includeAccessories: Boolean(includeAccessories),
             });
 
             const writtenFiles = Array.isArray(result && result.files) ? result.files : [];
-            const formatLabel = normalizedFormat === '3mf' ? 'STL/3MF' : normalizedFormat.toUpperCase();
+            const formatLabel = normalizedFormat.toUpperCase();
             this.log(`[export] Wrote ${writtenFiles.length} ${formatLabel} file(s) to ${outputDir}`);
-            void vscode.window.showInformationMessage(
-                `Kigumi exported ${writtenFiles.length} ${formatLabel} file(s) to ${outputDir}`
-            );
+            return { format: normalizedFormat, writtenFiles, outputDir };
         } catch (error) {
             const details = this.extractRunnerErrorDetails(error);
-            const formatLabel = normalizedFormat === '3mf' ? 'STL/3MF' : normalizedFormat.toUpperCase();
+            const formatLabel = normalizedFormat.toUpperCase();
             this.log(`[export] ${formatLabel} export failed: ${details.message}`);
 
             const openOutputAction = 'Open Kigumi Output';
@@ -1040,6 +1049,59 @@ class FrameViewSession {
             if (choice === openOutputAction) {
                 this.channel.show(true);
             }
+            throw error;
+        }
+    }
+
+    async _handleExportBatchRequest(message) {
+        const formatsRaw = Array.isArray(message && message.formats) ? message.formats : [];
+        const formats = [...new Set(formatsRaw
+            .map((entry) => (typeof entry === 'string' ? entry.toLowerCase() : ''))
+            .filter((entry) => entry === 'stl' || entry === '3mf' || entry === 'obj' || entry === 'step'))];
+
+        if (formats.length === 0) {
+            void vscode.window.showWarningMessage('Select at least one export format.');
+            return;
+        }
+
+        const includeCombined = message.includeCombined !== false;
+        const includeIndividuals = message.includeIndividuals === true;
+        const includeAccessories = message.includeAccessories !== false;
+
+        if (!includeCombined && !includeIndividuals) {
+            void vscode.window.showWarningMessage('Enable combined and/or individual export.');
+            return;
+        }
+
+        const allWrittenFiles = [];
+        const failedFormats = [];
+        let outputDir = this.getExportDirectory();
+
+        for (const format of formats) {
+            try {
+                const result = await this._handleExportRequest(
+                    format,
+                    includeCombined,
+                    includeIndividuals,
+                    includeAccessories,
+                );
+                if (result && Array.isArray(result.writtenFiles)) {
+                    allWrittenFiles.push(...result.writtenFiles);
+                    outputDir = result.outputDir || outputDir;
+                }
+            } catch (_error) {
+                failedFormats.push(format.toUpperCase());
+            }
+        }
+
+        const formatLabel = formats.map((entry) => entry.toUpperCase()).join(', ');
+        const summary = `Kigumi exported ${allWrittenFiles.length} file(s) across ${formatLabel} to ${outputDir}`;
+        this.log(`[export] ${summary}`);
+
+        if (failedFormats.length > 0) {
+            void vscode.window.showWarningMessage(`${summary}. Failed: ${failedFormats.join(', ')}`);
+        } else {
+            void vscode.window.showInformationMessage(summary);
         }
     }
 

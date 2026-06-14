@@ -2320,11 +2320,12 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         ss = _resolve_slot(state, payload)
         export_format = str(payload.get("format", "stl")).lower()
         output_dir_raw = payload.get("outputDir")
+        include_combined = bool(payload.get("includeCombined", True))
         include_individuals = bool(payload.get("includeIndividuals", True))
         include_accessories = bool(payload.get("includeAccessories", True))
 
-        if export_format not in {"stl", "step", "3mf"}:
-            raise ValueError("export_frame requires payload.format to be 'stl', 'step', or '3mf'")
+        if export_format not in {"stl", "step", "3mf", "obj"}:
+            raise ValueError("export_frame requires payload.format to be 'stl', 'step', '3mf', or 'obj'")
         if not isinstance(output_dir_raw, str) or not output_dir_raw:
             raise ValueError("export_frame requires payload.outputDir")
 
@@ -2342,7 +2343,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             written = export_frame_stl(
                 ss.frame,
                 output_dir,
-                combined=True,
+                combined=include_combined,
                 include_accessories=include_accessories,
             )
             combined_name = "_combined.stl"
@@ -2353,18 +2354,29 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             written = export_frame_3mf(
                 ss.frame,
                 output_dir,
-                combined=True,
+                combined=include_combined,
                 include_accessories=include_accessories,
             )
             combined_name = "_combined.3mf"
             extension_glob = "*.stl"
+        elif export_format == "obj":
+            from kumiki.blueprint import export_frame_obj
+
+            written = export_frame_obj(
+                ss.frame,
+                output_dir,
+                combined=include_combined,
+                include_accessories=include_accessories,
+            )
+            combined_name = "_combined.obj"
+            extension_glob = "*.obj"
         else:
             from kumiki.blueprint import export_frame_step
 
             written = export_frame_step(
                 ss.frame,
                 output_dir,
-                combined=True,
+                combined=include_combined,
                 include_accessories=include_accessories,
             )
             combined_name = "_combined.step"
@@ -2385,6 +2397,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         return state, make_success_response(request_id, command, {
             "format": export_format,
             "outputDir": str(output_dir),
+            "includeCombined": include_combined,
             "includeIndividuals": include_individuals,
             "includeAccessories": include_accessories,
             "files": [str(path) for path in written],

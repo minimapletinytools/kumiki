@@ -213,6 +213,60 @@ def export_frame_stl(
     return written
 
 
+def export_frame_obj(
+    frame: Frame,
+    output_dir: Union[str, Path],
+    *,
+    combined: bool = False,
+    include_accessories: bool = True,
+) -> List[Path]:
+    """Export every timber and accessory in a Frame to OBJ files."""
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    written: List[Path] = []
+    used_names: set[str] = set()
+
+    def _next_available_name(base_name: str) -> str:
+        candidate = base_name
+        suffix = 2
+        while candidate in used_names:
+            candidate = f"{base_name}_{suffix}"
+            suffix += 1
+        used_names.add(candidate)
+        return candidate
+
+    meshes: list[trimesh.Trimesh] = []
+    for i, ct in enumerate(frame.cut_timbers):
+        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
+        mesh = _cut_timber_to_trimesh(ct)
+        meshes.append(mesh)
+        dest = output_dir / f"{name}.obj"
+        mesh.export(str(dest), file_type="obj")
+        written.append(dest)
+
+    if include_accessories:
+        for i, accessory in enumerate(frame.accessories):
+            ticket_name = accessory.ticket.name
+            if ticket_name and ticket_name != "[no-name]":
+                base_name = ticket_name
+            else:
+                base_name = f"accessory_{i}"
+            name = _next_available_name(base_name)
+            mesh = _joint_accessory_to_trimesh(accessory)
+            meshes.append(mesh)
+            dest = output_dir / f"{name}.obj"
+            mesh.export(str(dest), file_type="obj")
+            written.append(dest)
+
+    if combined and meshes:
+        merged = trimesh.util.concatenate(meshes)
+        dest = output_dir / "_combined.obj"
+        merged.export(str(dest), file_type="obj")
+        written.append(dest)
+
+    return written
+
+
 def _mesh_to_millimeters(mesh: "trimesh.Trimesh") -> "trimesh.Trimesh":
     """Return a mesh copy scaled from Kumiki metres to 3MF millimetres."""
     mesh_mm = mesh.copy()

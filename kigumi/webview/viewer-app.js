@@ -404,27 +404,63 @@ class ViewerSettingsPanel {
                         ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${theme.label}</option>`)}
                     </select>
                 </label>
-                <label>
-                    <input id="export-individual-toggle" type="checkbox" ?checked=${this.app.exportIndividualsEnabled}>
-                    also export timbers as individual files
-                </label>
-                <label>
-                    <input id="export-accessories-toggle" type="checkbox" ?checked=${this.app.exportAccessoriesEnabled}>
-                    export accessories
-                </label>
                 <button
-                    id="export-stl-btn"
+                    id="save-settings-btn"
                     type="button"
-                    title="Export individual frame members as STL plus a combined 3MF"
+                    title="Save current viewer options to .kigumi/kigumi-settings.json"
                     @click=${() => {
                         if (vscode) {
                             vscode.postMessage({
-                                type: 'requestExportStl',
+                                type: 'requestSaveViewerSettings',
+                                settings: this.app.collectViewerSettingsPayload(),
+                            });
+                        }
+                    }}>save settings</button>
+                <div class="viewer-settings-divider" role="separator" aria-label="Export options"></div>
+                <div class="viewer-settings-subtitle">export options</div>
+                <label>
+                    <input id="export-format-stl-toggle" type="checkbox" ?checked=${this.app.exportFormatStlEnabled}>
+                    stl
+                </label>
+                <label>
+                    <input id="export-format-3mf-toggle" type="checkbox" ?checked=${this.app.exportFormat3mfEnabled}>
+                    3mf
+                </label>
+                <label>
+                    <input id="export-format-obj-toggle" type="checkbox" ?checked=${this.app.exportFormatObjEnabled}>
+                    obj
+                </label>
+                <label>
+                    <input id="export-format-step-toggle" type="checkbox" ?checked=${this.app.exportFormatStepEnabled}>
+                    step
+                </label>
+                <label>
+                    <input id="export-combined-toggle" type="checkbox" ?checked=${this.app.exportCombinedEnabled}>
+                    combined file
+                </label>
+                <label>
+                    <input id="export-individual-toggle" type="checkbox" ?checked=${this.app.exportIndividualsEnabled}>
+                    individual files
+                </label>
+                <label>
+                    <input id="export-accessories-toggle" type="checkbox" ?checked=${this.app.exportAccessoriesEnabled}>
+                    include accessories
+                </label>
+                <button
+                    id="export-files-btn"
+                    type="button"
+                    title="Export all selected formats"
+                    @click=${() => {
+                        if (vscode) {
+                            vscode.postMessage({
+                                type: 'requestExportFiles',
+                                formats: this.app.getSelectedExportFormats(),
+                                includeCombined: this.app.exportCombinedEnabled,
                                 includeIndividuals: this.app.exportIndividualsEnabled,
                                 includeAccessories: this.app.exportAccessoriesEnabled,
                             });
                         }
-                    }}>export STL/3MF</button>
+                    }}>export</button>
                 ${this.app.cadqueryOcpInstalled === false
                     ? html`<button
                         id="install-cadquery-ocp-btn"
@@ -437,33 +473,8 @@ class ViewerSettingsPanel {
                             }
                         }}>${this.app.installingCadqueryOcp === true
                             ? 'installing cadquery...'
-                            : 'install cadquery, needed for STEP export'}</button>`
-                    : html`<button
-                        id="export-step-btn"
-                        type="button"
-                        title="Export frame members to STEP files"
-                        ?disabled=${this.app.cadqueryOcpInstalled === null}
-                        @click=${() => {
-                            if (vscode) {
-                                vscode.postMessage({
-                                    type: 'requestExportStep',
-                                    includeIndividuals: this.app.exportIndividualsEnabled,
-                                    includeAccessories: this.app.exportAccessoriesEnabled,
-                                });
-                            }
-                        }}>export STEP</button>`}
-                    <button
-                        id="save-settings-btn"
-                        type="button"
-                        title="Save current viewer options to .kigumi/kigumi-settings.json"
-                        @click=${() => {
-                            if (vscode) {
-                                vscode.postMessage({
-                                    type: 'requestSaveViewerSettings',
-                                    settings: this.app.collectViewerSettingsPayload(),
-                                });
-                            }
-                        }}>save settings</button>
+                            : 'install cadquery for step export'}</button>`
+                    : ''}
             </section>
         `;
     }
@@ -476,8 +487,13 @@ class ViewerSettingsPanel {
         const reflectionsToggle = renderRoot.querySelector('#reflections-toggle');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const debugToggle = renderRoot.querySelector('#debug-toggle');
+        const exportCombinedToggle = renderRoot.querySelector('#export-combined-toggle');
         const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
+        const exportFormatStlToggle = renderRoot.querySelector('#export-format-stl-toggle');
+        const exportFormat3mfToggle = renderRoot.querySelector('#export-format-3mf-toggle');
+        const exportFormatObjToggle = renderRoot.querySelector('#export-format-obj-toggle');
+        const exportFormatStepToggle = renderRoot.querySelector('#export-format-step-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
 
         centerGizmoToggle.addEventListener('change', (event) => {
@@ -512,13 +528,41 @@ class ViewerSettingsPanel {
             this.app.setReflectionsEnabled(event.target.checked);
         });
 
-        exportIndividualToggle.addEventListener('change', (event) => {
-            this.app.setExportIndividualsEnabled(event.target.checked);
-        });
-
-        exportAccessoriesToggle.addEventListener('change', (event) => {
-            this.app.setExportAccessoriesEnabled(event.target.checked);
-        });
+        if (exportCombinedToggle) {
+            exportCombinedToggle.addEventListener('change', (event) => {
+                this.app.setExportCombinedEnabled(event.target.checked);
+            });
+        }
+        if (exportIndividualToggle) {
+            exportIndividualToggle.addEventListener('change', (event) => {
+                this.app.setExportIndividualsEnabled(event.target.checked);
+            });
+        }
+        if (exportAccessoriesToggle) {
+            exportAccessoriesToggle.addEventListener('change', (event) => {
+                this.app.setExportAccessoriesEnabled(event.target.checked);
+            });
+        }
+        if (exportFormatStlToggle) {
+            exportFormatStlToggle.addEventListener('change', (event) => {
+                this.app.setExportFormatEnabled('stl', event.target.checked);
+            });
+        }
+        if (exportFormat3mfToggle) {
+            exportFormat3mfToggle.addEventListener('change', (event) => {
+                this.app.setExportFormatEnabled('3mf', event.target.checked);
+            });
+        }
+        if (exportFormatObjToggle) {
+            exportFormatObjToggle.addEventListener('change', (event) => {
+                this.app.setExportFormatEnabled('obj', event.target.checked);
+            });
+        }
+        if (exportFormatStepToggle) {
+            exportFormatStepToggle.addEventListener('change', (event) => {
+                this.app.setExportFormatEnabled('step', event.target.checked);
+            });
+        }
 
         unselectedTransparencySlider.addEventListener('input', (event) => {
             const rawVisibility = Number(event.target.value);
@@ -543,8 +587,13 @@ class ViewerSettingsPanel {
     syncControls(renderRoot) {
         const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
+        const exportCombinedToggle = renderRoot.querySelector('#export-combined-toggle');
         const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
+        const exportFormatStlToggle = renderRoot.querySelector('#export-format-stl-toggle');
+        const exportFormat3mfToggle = renderRoot.querySelector('#export-format-3mf-toggle');
+        const exportFormatObjToggle = renderRoot.querySelector('#export-format-obj-toggle');
+        const exportFormatStepToggle = renderRoot.querySelector('#export-format-step-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
         if (edgeVisibilitySlider) {
             edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
@@ -552,11 +601,26 @@ class ViewerSettingsPanel {
         if (unselectedTransparencySlider) {
             unselectedTransparencySlider.value = String(100 - this.app.unselectedTransparencyPercent);
         }
+        if (exportCombinedToggle) {
+            exportCombinedToggle.checked = this.app.exportCombinedEnabled;
+        }
         if (exportIndividualToggle) {
             exportIndividualToggle.checked = this.app.exportIndividualsEnabled;
         }
         if (exportAccessoriesToggle) {
             exportAccessoriesToggle.checked = this.app.exportAccessoriesEnabled;
+        }
+        if (exportFormatStlToggle) {
+            exportFormatStlToggle.checked = this.app.exportFormatStlEnabled;
+        }
+        if (exportFormat3mfToggle) {
+            exportFormat3mfToggle.checked = this.app.exportFormat3mfEnabled;
+        }
+        if (exportFormatObjToggle) {
+            exportFormatObjToggle.checked = this.app.exportFormatObjEnabled;
+        }
+        if (exportFormatStepToggle) {
+            exportFormatStepToggle.checked = this.app.exportFormatStepEnabled;
         }
         if (themeSelect) {
             themeSelect.value = this.app.activeTheme;
@@ -836,6 +900,11 @@ class KigumiViewerApp extends LitElement {
         this.viewerOptions = normalizeViewerOptions(INITIAL_PAYLOAD.viewerOptions);
         this.cadqueryOcpInstalled = null;
         this.installingCadqueryOcp = false;
+        this.exportFormatStlEnabled = true;
+        this.exportFormat3mfEnabled = false;
+        this.exportFormatObjEnabled = false;
+        this.exportFormatStepEnabled = false;
+        this.exportCombinedEnabled = true;
         this.exportIndividualsEnabled = false;
         this.exportAccessoriesEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
@@ -1362,6 +1431,50 @@ class KigumiViewerApp extends LitElement {
         this.applySelectionOpacity();
     }
 
+    setExportFormatEnabled(format, enabled) {
+        const normalized = Boolean(enabled);
+        if (format === 'stl') {
+            if (this.exportFormatStlEnabled === normalized) {
+                return;
+            }
+            this.exportFormatStlEnabled = normalized;
+            this.requestUpdate();
+            return;
+        }
+        if (format === '3mf') {
+            if (this.exportFormat3mfEnabled === normalized) {
+                return;
+            }
+            this.exportFormat3mfEnabled = normalized;
+            this.requestUpdate();
+            return;
+        }
+        if (format === 'obj') {
+            if (this.exportFormatObjEnabled === normalized) {
+                return;
+            }
+            this.exportFormatObjEnabled = normalized;
+            this.requestUpdate();
+            return;
+        }
+        if (format === 'step') {
+            if (this.exportFormatStepEnabled === normalized) {
+                return;
+            }
+            this.exportFormatStepEnabled = normalized;
+            this.requestUpdate();
+        }
+    }
+
+    setExportCombinedEnabled(enabled) {
+        const normalized = Boolean(enabled);
+        if (this.exportCombinedEnabled === normalized) {
+            return;
+        }
+        this.exportCombinedEnabled = normalized;
+        this.requestUpdate();
+    }
+
     setExportIndividualsEnabled(enabled) {
         const normalized = Boolean(enabled);
         if (this.exportIndividualsEnabled === normalized) {
@@ -1380,6 +1493,23 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
+    getSelectedExportFormats() {
+        const formats = [];
+        if (this.exportFormatStlEnabled) {
+            formats.push('stl');
+        }
+        if (this.exportFormat3mfEnabled) {
+            formats.push('3mf');
+        }
+        if (this.exportFormatObjEnabled) {
+            formats.push('obj');
+        }
+        if (this.exportFormatStepEnabled) {
+            formats.push('step');
+        }
+        return formats;
+    }
+
     collectViewerSettingsPayload() {
         return {
             version: 1,
@@ -1393,6 +1523,11 @@ class KigumiViewerApp extends LitElement {
                 debugEnabled: Boolean(this.debugEnabled),
                 unselectedTransparencyPercent: Number(this.unselectedTransparencyPercent),
                 activeTheme: String(this.activeTheme || 'forest'),
+                exportFormatStlEnabled: Boolean(this.exportFormatStlEnabled),
+                exportFormat3mfEnabled: Boolean(this.exportFormat3mfEnabled),
+                exportFormatObjEnabled: Boolean(this.exportFormatObjEnabled),
+                exportFormatStepEnabled: Boolean(this.exportFormatStepEnabled),
+                exportCombinedEnabled: Boolean(this.exportCombinedEnabled),
                 exportIndividualsEnabled: Boolean(this.exportIndividualsEnabled),
                 exportAccessoriesEnabled: Boolean(this.exportAccessoriesEnabled),
             },
@@ -1447,6 +1582,21 @@ class KigumiViewerApp extends LitElement {
         }
         if (typeof ui.activeTheme === 'string') {
             this.setTheme(ui.activeTheme);
+        }
+        if (typeof ui.exportFormatStlEnabled === 'boolean') {
+            this.setExportFormatEnabled('stl', ui.exportFormatStlEnabled);
+        }
+        if (typeof ui.exportFormat3mfEnabled === 'boolean') {
+            this.setExportFormatEnabled('3mf', ui.exportFormat3mfEnabled);
+        }
+        if (typeof ui.exportFormatObjEnabled === 'boolean') {
+            this.setExportFormatEnabled('obj', ui.exportFormatObjEnabled);
+        }
+        if (typeof ui.exportFormatStepEnabled === 'boolean') {
+            this.setExportFormatEnabled('step', ui.exportFormatStepEnabled);
+        }
+        if (typeof ui.exportCombinedEnabled === 'boolean') {
+            this.setExportCombinedEnabled(ui.exportCombinedEnabled);
         }
         if (typeof ui.exportIndividualsEnabled === 'boolean') {
             this.setExportIndividualsEnabled(ui.exportIndividualsEnabled);
