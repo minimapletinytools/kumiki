@@ -197,6 +197,11 @@
     "configuration": {
       "title": "Kigumi",
       "properties": {
+        "kigumi.viewer.openInSplitView": {
+          "type": "boolean",
+          "default": false,
+          "description": "Open the Kigumi viewer in a new editor column beside the active one. When off, the viewer opens in the active column."
+        },
         "kigumi.viewer.autoRefreshOnFileChange": {
           "type": "boolean",
           "default": false,

@@ -577,7 +577,7 @@ class FrameViewSession {
         }
 
         const isLocalDev = this.runnerSession.isLocalDev;
-        this.panel = createFrameViewer(this.filePath, this.patternName, isLocalDev);
+        this.panel = createFrameViewer(this.filePath, this.patternName, isLocalDev, this.openInSplitView);
         this.panel.onDidDispose(() => {
             this.panel = null;
             this.log(`[panel] Panel closed, disposing session for slot '${this.slotName}'`);

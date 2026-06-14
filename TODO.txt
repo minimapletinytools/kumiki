@@ -306,6 +306,9 @@ DONE-add settings savigns
 DONE-round mortise and tenon
 
 
+-clicking on patterns opens both the pattern and pattern book on my new mac...
+-click on patterns holud lawys open in existing collumn by default, not in an ew collumn ugh
+-fix layers viwe covering title
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again
 -do ticket refactor so that each timber type can have its own ticket?

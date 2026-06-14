@@ -2,6 +2,7 @@ const path = require('path');
 const fs = require('fs');
 const vscode = require('vscode');
 const { FrameViewSession } = require('./frame-view-session');
+const { PythonRunnerSession } = require('./runner-session');
 const { KigumiSidebarProvider } = require('./sidebar-provider');
 const { normalizeRetentionDays, pruneOldLogFiles } = require('./log-retention');
 const {
@@ -15,9 +16,10 @@ const {
 let outputChannel = null;
 const frameSessions = new Map();       // filePath → FrameViewSession (main sessions)
 const patternSessions = new Map();     // slotName → FrameViewSession (pattern sessions)
+const standaloneRunners = new Set();   // PythonRunnerSession instances not owned by any session
 let patternSlotCounter = 0;
 let sidebarProvider = null;
-let openInSplitView = true;
+let openInSplitView = false;
 let autoRefreshOnFileChange = false;
 let logRetentionDays = 15;
 const BUILD_MARKER = '🧪 KIGUMI_BUILD_2026-05-17T02:45Z';
@@ -77,13 +79,13 @@ function activate(context) {
         ? context.extension.packageJSON.version
         : 'unknown';
     outputChannel.appendLine(`[kigumi] ${BUILD_MARKER} (extension v${extensionVersion})`);
-    openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', true);
+    openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', false);
     autoRefreshOnFileChange = vscode.workspace.getConfiguration('kigumi').get('viewer.autoRefreshOnFileChange', false);
     logRetentionDays = normalizeRetentionDays(vscode.workspace.getConfiguration('kigumi').get('viewer.logRetentionDays', 15));
     pruneWorkspaceLogs(outputChannel, logRetentionDays);
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('kigumi.viewer.openInSplitView')) {
-            openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', true);
+            openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', false);
             void vscode.commands.executeCommand('setContext', 'kigumi.splitViewEnabled', openInSplitView);
         }
         if (event.affectsConfiguration('kigumi.viewer.autoRefreshOnFileChange')) {
@@ -380,27 +382,21 @@ function activate(context) {
             return;
         }
 
-        let mainSession = _findAnyAliveMainSession();
-        if (!mainSession) {
-            if (!patternName) {
-                await openFileInViewer(sourceFile, context);
-                return;
-            }
-            await openFileInViewer(sourceFile, context);
-            mainSession = frameSessions.get(sourceFile);
-        }
-
-        if (!mainSession || !mainSession.runnerSession || !mainSession.runnerSession.isAlive()) {
-            vscode.window.showErrorMessage('Kigumi runner is not available. Open a frame first.');
+        let runner;
+        try {
+            runner = await _getOrCreateBackgroundRunner(sourceFile, context);
+        } catch (error) {
+            outputChannel.appendLine(`Open pattern error: ${error.message}\n${error.stack}`);
+            vscode.window.showErrorMessage(`Failed to start Kigumi runner: ${error.message}`);
             return;
         }
 
         if (patternName) {
-            await _openPatternFromWebview(mainSession, patternName, sourceFile, context);
+            await _openPatternFromWebview(runner, patternName, sourceFile, context);
             return;
         }
 
-        await _openBookFromWebview(mainSession, sourceFile, context);
+        await _openBookFromWebview(runner, sourceFile, context);
     });
     context.subscriptions.push(openPatternFromSidebar);
 
@@ -432,20 +428,9 @@ function activate(context) {
         }
 
         try {
-            let mainSession = _findAnyAliveMainSession();
-            if (!mainSession) {
-                // Open the source file in the viewer first
-                await openFileInViewer(firstPattern.sourceFile, context);
-                mainSession = frameSessions.get(firstPattern.sourceFile);
-            }
-
-            if (!mainSession || !mainSession.runnerSession || !mainSession.runnerSession.isAlive()) {
-                vscode.window.showErrorMessage('Kigumi runner is not available. Open a frame first.');
-                return;
-            }
-
+            const runner = await _getOrCreateBackgroundRunner(firstPattern.sourceFile, context);
             // Open the entire patternbook by opening it without a specific pattern name
-            await _openBookFromWebview(mainSession, firstPattern.sourceFile, context);
+            await _openBookFromWebview(runner, firstPattern.sourceFile, context);
         } catch (error) {
             outputChannel.appendLine(`Open patternbook error: ${error.message}\n${error.stack}`);
             vscode.window.showErrorMessage(`Failed to open patternbook: ${error.message}`);
@@ -926,10 +911,32 @@ function _findAnyAliveMainSession() {
 }
 
 /**
+ * Get a runner for sidebar pattern/book opens without forcing a main viewer panel to open.
+ * Prefers (1) an alive main session's runner, then (2) any alive standalone runner,
+ * else spawns a new standalone PythonRunnerSession scoped to sourceFile.
+ */
+async function _getOrCreateBackgroundRunner(sourceFile, context) {
+    const mainSession = _findAnyAliveMainSession();
+    if (mainSession && mainSession.runnerSession && mainSession.runnerSession.isAlive()) {
+        return mainSession.runnerSession;
+    }
+    for (const existing of standaloneRunners) {
+        if (existing && existing.isAlive && existing.isAlive()) {
+            return existing;
+        } else {
+            standaloneRunners.delete(existing);
+        }
+    }
+    const runner = new PythonRunnerSession(sourceFile, context, outputChannel);
+    await runner.start();
+    standaloneRunners.add(runner);
+    return runner;
+}
+
+/**
  * Open a pattern viewer triggered from the webview pattern list.
  */
-async function _openPatternFromWebview(mainSession, patternName, sourceFile, context) {
-    const runner = mainSession.runnerSession;
+async function _openPatternFromWebview(runner, patternName, sourceFile, context) {
     if (!runner || !runner.isAlive()) {
         vscode.window.showErrorMessage('Kigumi runner is not running.');
         return;
@@ -971,8 +978,7 @@ async function _openPatternFromWebview(mainSession, patternName, sourceFile, con
 /**
  * Open a whole pattern book as one tab (renders the file's example/patternbook).
  */
-async function _openBookFromWebview(mainSession, sourceFile, context) {
-    const runner = mainSession.runnerSession;
+async function _openBookFromWebview(runner, sourceFile, context) {
     if (!runner || !runner.isAlive()) {
         vscode.window.showErrorMessage('Kigumi runner is not running.');
         return;
@@ -1146,6 +1152,9 @@ async function deactivate() {
     frameSessions.clear();
     patternSessions.clear();
     await Promise.allSettled(allSessions.map((session) => session.dispose()));
+    const runners = Array.from(standaloneRunners);
+    standaloneRunners.clear();
+    await Promise.allSettled(runners.map((runner) => runner.dispose()));
 }
 
 function pruneWorkspaceLogs(channel, retentionDays) {
