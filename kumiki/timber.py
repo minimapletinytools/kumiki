@@ -1044,7 +1044,7 @@ class Timber(PerfectTimberWithin):
 
 @dataclass(frozen=True)
 class Board(PerfectTimberWithin):
-    """Short perfect timber with board-specific semantics
+    """Boards are perfect timbers with board-specific semantics
     
     Boards are structurally identical to perfect timbers but carry additional semantics:
     - the "length" of the board runs in the Z direction so the TOP and BOTTOM faces are referred to as the "ends" of the board

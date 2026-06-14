@@ -89,7 +89,15 @@ TODO
 
 ### boards
 
-TODO
+Boards are identical to perfect timbers but carry additional semantics:
+- the "length" of the board runs in the Z direction so the TOP and BOTTOM faces are referred to as the "ends" of the board
+- the "width" of the board runs in the X direction so the LEFT and RIGHT faces are referred to as the "sides" of the board
+- the "thickness" of the board runs in the Y direction so the FRONT and BACK faces are the same as the "faces" of the board
+
+Like timbers, we assume the grain is always running in the length direction.
+
+Boards are often joined length wise. You must make sure the board is wide enough to incorporate the entire cut for the length wise joints. This is different than joints at the ends where timbers/boards can "extend" to where the cut needs to be. See the Cutting section for more details.
+
 
 
 # Measuring
