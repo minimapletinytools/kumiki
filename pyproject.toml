@@ -31,9 +31,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/minimaple/kumiki"
-Repository = "https://github.com/minimaple/kumiki"
-Documentation = "https://github.com/minimaple/kumiki/tree/main/docs"
+Homepage = "https://github.com/minimapletinytools/kumiki"
+Repository = "https://github.com/minimapletinytools/kumiki"
+Documentation = "https://github.com/minimapletinytools/kumiki/tree/main/docs"
 
 [build-system]
 requires = ["hatchling"]
