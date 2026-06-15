@@ -9,9 +9,10 @@
   -open workspace step was confusing
 -names of joints and timbers is hard to understand, but figured it out over time yay
 -pattern book is hard to find
--no way to update agent usage instructions
+
 -having better axis labels
--layers menu is covering the info
+DONE-no way to update agent usage instructions
+DONE-layers menu is covering the info
 -very easy to confuse faces on timbers with faces on camera
 -agent is having hard time understanding what the inset shoulder
 -if you ask it to take a screenshot it wille xport as obj and then starts an http server LOL
@@ -261,11 +262,21 @@ DONE-add camera mode toggle
   -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
 DONE-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
 DONE-kigumi readme update
+
+-screenshot funcitonality still broken
+  -expsoe caputre screenshot command, not sure where it went
+-update copilot-insturctions to ponit directly to agent_usage_insturctions
+-rename project.yaml to kigumi.yaml (no bw campatability please)
+-refresh the frame viewer command seems to be be broken
+
+-make website
+
 -do the big joint reorg 
   - 3 pattern list modes
     - sort by joint arrangement type and other major groups (default)
     - by patternbook
     - 1 big list 
+
 -try and run a full loop agent test on this to see if it all works
 -agent prompt examples
 -new kigumi icon
@@ -286,7 +297,6 @@ DONE-kigumi readme update
 
 
 :: TODO
-
 DONE-screenshot capability broken (test the new one)
 DONE-open viewer works, but you also need a refresh after changes are made command for agent to use
 DONE-improve agent instructions
@@ -313,7 +323,8 @@ DONE-fix layers view in kigumi covering title
     2. it should be default collapsed
     3. in it collapsed state, it should look something like []> timber list]
 
--screenshot funcitonality still broken
+
+
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again
 -do ticket refactor so that each timber type can have its own ticket?
