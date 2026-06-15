@@ -269,7 +269,7 @@ DONE-kigumi readme update
 -try and run a full loop agent test on this to see if it all works
 -agent prompt examples
 -new kigumi icon
-  -make suer to update the sidebar icon as well
+  DONE-make suer to update the sidebar icon as well
 -marketing
   -make basic exampl ecase
   -make program castle joint video
