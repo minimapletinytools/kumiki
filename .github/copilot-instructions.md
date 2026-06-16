@@ -1,10 +1,8 @@
 # Kumiki
 
-Primary instructions now live in `AGENTS.md` at the repository root.
+Please see the following:
 
-Read and follow:
+- `docs/agent_usage_instructions.md`
+- `docs/concepts.md`
 
-- `AGENTS.md`
-
-Always use SymPy types (Rational or Float) for all numeric values - never Python floats.
 

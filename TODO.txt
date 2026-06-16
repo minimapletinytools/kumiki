@@ -263,9 +263,10 @@ DONE-add camera mode toggle
 DONE-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
 DONE-kigumi readme update
 
--screenshot funcitonality still broken
-  -expsoe caputre screenshot command, not sure where it went
--update copilot-insturctions to ponit directly to agent_usage_insturctions
+-test
+  -screenshot funcitonality still broken
+    -expsoe caputre screenshot command, not sure where it went
+DONE-update copilot-insturctions to ponit directly to agent_usage_insturctions
 -rename project.yaml to kigumi.yaml (no bw campatability please)
 -refresh the frame viewer command seems to be be broken
 

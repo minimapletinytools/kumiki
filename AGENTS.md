@@ -4,8 +4,9 @@ This is the canonical instruction entry point for AI coding agents in this repos
 
 ## Core Instruction Files
 
-- Library authoring rules: `.github/instructions/authoring.instructions.md`
+- Kumiki concepts: `docs/concepts.md`
 - Pattern/design usage rules: `docs/agent_usage_instructions.md`
+- Library authoring rules: `.github/instructions/authoring.instructions.md`
 - Kigumi frontend rules: `.github/instructions/kigumi-viewer-frontend.instructions.md`
 
 ## Skills
