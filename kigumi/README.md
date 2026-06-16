@@ -1,6 +1,6 @@
 # Kigumi
 
-Kigumi is a VS Code extension that renders Kumiki frames. 
+Kigumi is a VS Code extension that renders [kumiki](https://github.com/minimapletinytools/kumiki) frames. 
 
 ## Prerequisites
 

@@ -271,7 +271,7 @@ DONE-update copilot-insturctions to ponit directly to agent_usage_insturctions
 
 
 -make website
-  
+  make a website for kumiki/kigumi in the website folder. I added some photos in there for you to use. the website should be a super simple site that matches the usual programming library website. It should have 2 buttons, one that goes to github, and one that takes you to a how to install page. use a static page library for the website and make it work with github pages althought I will point to it from another domain at some point
 
 -do the big joint reorg 
   - 3 pattern list modes
