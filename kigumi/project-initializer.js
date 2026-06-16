@@ -335,7 +335,7 @@ function writeProjectYaml(workspaceRoot, pythonPath, metadata) {
         }
     }
 
-    fs.writeFileSync(path.join(folder, 'project.yaml'), `${lines.join('\n')}\n`, 'utf8');
+    fs.writeFileSync(path.join(folder, 'kigumi.yaml'), `${lines.join('\n')}\n`, 'utf8');
 }
 
 function getBundledExampleFrameContent() {
@@ -634,7 +634,7 @@ function getInitializationStatus(workspaceRoot, filePath) {
     const isLocalDev = !!env.isLocalDev;
     const hasKigumiYaml = fs.existsSync(path.join(resolvedRoot, KUMIKI_YAML_RELATIVE_PATH))
         || fs.existsSync(path.join(resolvedRoot, LEGACY_KIGUMI_YAML_NAME));
-    const hasProjectYaml = fs.existsSync(path.join(resolvedRoot, '.kigumi', 'project.yaml'));
+    const hasProjectYaml = fs.existsSync(path.join(resolvedRoot, '.kigumi', 'kigumi.yaml'));
     const hasVenvPython = fs.existsSync(getVenvPython(resolvedRoot));
     const hasExampleFile = fs.existsSync(path.join(resolvedRoot, 'my_cute_frame.py'));
     const hasExistingProject = hasKigumiYaml || hasProjectYaml || hasVenvPython || hasExampleFile;

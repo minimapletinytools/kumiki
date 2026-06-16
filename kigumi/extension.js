@@ -741,7 +741,7 @@ function activate(context) {
         }
 
         if (initStatus.isInitialized) {
-            vscode.window.showInformationMessage('Project initialized: .kigumi/kumiki.yaml, .kigumi/project.yaml, .venv, and my_cute_frame.py are present.');
+            vscode.window.showInformationMessage('Project initialized: .kigumi/kumiki.yaml, .kigumi/kigumi.yaml, .venv, and my_cute_frame.py are present.');
             if (sidebarProvider) {
                 await sidebarProvider.refresh(true);
             }

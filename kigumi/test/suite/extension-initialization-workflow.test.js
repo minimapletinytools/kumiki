@@ -149,8 +149,8 @@ describe('Kigumi initialization workflow', () => {
       const framePath = path.join(tempWorkspaceRoot, 'my_cute_frame.py');
       assert.ok(fs.existsSync(framePath), 'Expected my_cute_frame.py to be created');
 
-      const projectYamlPath = path.join(tempWorkspaceRoot, '.kigumi', 'project.yaml');
-      assert.ok(fs.existsSync(projectYamlPath), 'Expected .kigumi/project.yaml to be created');
+      const projectYamlPath = path.join(tempWorkspaceRoot, '.kigumi', 'kigumi.yaml');
+      assert.ok(fs.existsSync(projectYamlPath), 'Expected .kigumi/kigumi.yaml to be created');
 
       const venvPython = getVenvPython(tempWorkspaceRoot);
       assert.ok(fs.existsSync(venvPython), 'Expected virtual environment Python to exist');

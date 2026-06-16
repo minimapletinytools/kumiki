@@ -73,7 +73,7 @@ class PythonRunnerSession {
         if (!this.projectRoot) {
             return null;
         }
-        const yamlPath = path.join(this.projectRoot, '.kigumi', 'project.yaml');
+        const yamlPath = path.join(this.projectRoot, '.kigumi', 'kigumi.yaml');
         if (!fs.existsSync(yamlPath)) {
             return null;
         }
@@ -88,7 +88,7 @@ class PythonRunnerSession {
                 return pythonPath;
             }
         } catch (error) {
-            this.channel.appendLine(`[env] Failed reading .kigumi/project.yaml: ${error.message}`);
+            this.channel.appendLine(`[env] Failed reading .kigumi/kigumi.yaml: ${error.message}`);
         }
         return null;
     }
@@ -294,7 +294,7 @@ class PythonRunnerSession {
             }
         }
 
-        fs.writeFileSync(path.join(kumikiDir, 'project.yaml'), `${lines.join('\n')}\n`, 'utf8');
+        fs.writeFileSync(path.join(kumikiDir, 'kigumi.yaml'), `${lines.join('\n')}\n`, 'utf8');
     }
 
     async ensurePythonEnvironment() {

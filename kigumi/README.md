@@ -76,9 +76,9 @@ On first render in a project, Kumiki bootstraps a project-local environment auto
    - Local dev checkout: `pip install -e <projectRoot>` (editable kumiki)
    - Non-local project: `pip install kumiki` (from PyPI)
   - Core packages: `sympy`, `numpy`, `trimesh`, `manifold3d`
-5. Writes `.kigumi/project.yaml` with Python path and setup metadata
+5. Writes `.kigumi/kigumi.yaml` with Python path and setup metadata
 
-On later runs, Kigumi reuses the configured interpreter from `.kigumi/project.yaml` when available.
+On later runs, Kigumi reuses the configured interpreter from `.kigumi/kigumi.yaml` when available.
 
 Note: If neither `uv` nor a working bootstrap Python launcher is available, initialization will fail with instructions to install `uv` manually.
 
