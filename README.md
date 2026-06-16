@@ -28,14 +28,19 @@ Kigumi ships with a patternbook and several examples. These can be explored thro
 
 ## making changes
 
-Kigumi installs with a set of AI agent instructions. The installed `kumiki` Python package includes the Kumiki library source files, built-in patterns, and the `docs/` content, so those resources are present in the Python environment used by Kigumi. Using human like prompting should serve you pretty well. Using carpentry or woodworknig terminology will serve you better. Please refer to the patternbook for the list of available joints. It's best to build your structure in increments previewing each step along the way but I won't stop you from asking your agent to "build me a house".
+Kigumi designs are built with CODE. You can write this CODE yourself, or you can ask AI to write the CODE for you.
 
-You can implement your own joints as well but AI agents currently struggle with this, especially if you are unfamiliar with terminology and geometry conventions for prompting it, so don't expect much.
+Kigumi installs with a set of AI agent instructions. The installed `kumiki` Python package includes the Kumiki library source files, built-in patterns, and the `docs/` content, so those resources are present in the Python environment used by Kigumi. Using human like prompting should serve you pretty well. Using carpentry or woodworknig terminology will serve you better. Please refer to the patternbook for the list of available joints. It's best to build your structure in increments previewing each step along the way but I won't stop you from asking your agent to "build me a house". You can implement your own joints as well. The AI agents currently struggle with this especially if you are unfamiliar with terminology and geometry conventions for prompting it, so don't expect much. Someday I'll have better prompting examples and skills to share here. Stay tuned.
 
-Understanding Kumiki will allow you to better pilot the AI agent to implement your designs. Please see the docs folder to learn more about Kumiki's designs. You can of course implement your designs yourself too!
+To learn more about authoring Kumiki designs without AI, please start with [docs/concepts.md](docs/concepts.md) to learn more about Kumiki's design philosophy, and then proceed with the various example structures that ship with Kumiki.
+Kumiki is very SIMPLE and VERBOSE by design. So it LOOKS complex but in actuality, it is quite simple to understand. A typical structure is built as follows:
 
-Someday I'll have better prompting examples and skills to share here. Stay tuned.
+- estabalish a footprint
+- erect foundational timbers on the footprint
+- join foundational timbers with additional timbers to complete the "shape" of the structure
+- cut joints on timbers to properly connect the timbers completing the structure
 
+Understanding Kumiki will also allow you to better instruct the agent to implement your designs! For example, instead of saying "I want my building to be an L shape" you might say "establish an L shaped footprint for the building". If you ever have questions, you can also just ask the agent to explain!
 
 ## Drawing Support
 
