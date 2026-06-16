@@ -8,6 +8,15 @@ on:
         required: true
         default: false
         type: boolean
+      target:
+        description: Which registry to publish to
+        required: true
+        default: both
+        type: choice
+        options:
+          - both
+          - vscode
+          - ovsx
 
   pull_request:
     paths:
@@ -103,7 +112,7 @@ jobs:
     name: Publish To VS Code Marketplace
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'both' || github.event.inputs.target == 'vscode')
     permissions:
       contents: read
 
@@ -134,7 +143,7 @@ jobs:
     name: Publish To Open VSX
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'both' || github.event.inputs.target == 'ovsx')
     permissions:
       contents: read
 
