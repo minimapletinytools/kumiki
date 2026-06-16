@@ -1,0 +1,88 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Layout title="Install · Kumiki">
+  <section class="install">
+    <h1>Install</h1>
+    <p class="lead">
+      Kumiki is a Python library and Kigumi is a companion VS Code extension. The full
+      installation instructions are still being written — the section headers below show what
+      will be covered.
+    </p>
+
+    <div class="todo-banner">
+      <strong>TODO:</strong> fill in step-by-step instructions for each section.
+    </div>
+
+    <h2>Prerequisites</h2>
+    <p>TODO — Python version, OS support, recommended VS Code version.</p>
+
+    <h2>Install the Kumiki Python library</h2>
+    <p>TODO — pip install command, virtual environment guidance, verifying the install.</p>
+
+    <h2>Install the Kigumi VS Code extension</h2>
+    <p>TODO — install steps and pointer to the latest VSIX or marketplace listing.</p>
+
+    <h2>Initialize a new Kumiki project</h2>
+    <p>TODO — running <code>Kigumi: Initialize Project</code>, what the generated <code>.kigumi/</code> folder contains, where to put your first frame.</p>
+
+    <h2>Open your first frame</h2>
+    <p>TODO — opening a <code>.py</code> frame, the <em>Open Current File In Viewer</em> command, refreshing on save.</p>
+
+    <h2>Troubleshooting</h2>
+    <p>TODO — common issues and where logs live.</p>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">
+        View on GitHub
+      </a>
+      <a class="btn btn-secondary" href={`${base}/`}>
+        Back to home
+      </a>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .install {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 2rem 0 1rem;
+  }
+  .install h1 {
+    font-size: 2.2rem;
+    margin: 0 0 0.6rem;
+  }
+  .lead {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    margin: 0 0 1.4rem;
+  }
+  .todo-banner {
+    background: var(--surface);
+    border: 1px dashed var(--accent-soft);
+    border-radius: 0.6rem;
+    padding: 0.8rem 1rem;
+    color: var(--ink-soft);
+    margin-bottom: 2rem;
+  }
+  .install h2 {
+    font-size: 1.2rem;
+    margin: 1.8rem 0 0.4rem;
+  }
+  .install p { color: var(--ink-soft); margin: 0 0 0.6rem; }
+  .install code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 0.3rem;
+    padding: 0.05rem 0.35rem;
+    font-size: 0.92em;
+  }
+  .cta-row {
+    display: flex;
+    gap: 0.8rem;
+    margin-top: 2.4rem;
+    flex-wrap: wrap;
+  }
+</style>
