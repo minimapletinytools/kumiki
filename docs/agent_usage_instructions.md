@@ -2,7 +2,12 @@
 
 ## Background
 
-When a workspace is initialized with Kigumi, `kumiki` is installed into that workspace `.venv`. Resolve the installed package path with `.venv/bin/python3 -c "import kumiki, pathlib; print(pathlib.Path(kumiki.__file__).resolve().parent)"` (on Windows use `.venv\\Scripts\\python.exe`), then read `<that_path>/docs/concepts.md` first to understand Kumiki core concepts and architecture.
+When starting work in a workspace, run the **`init-kumiki-project`** skill (`.claude/skills/init-kumiki-project/SKILL.md`). It will:
+
+1. Determine whether the folder is actually a kumiki project (empty/new, or already has kumiki Python files) — and ask the user to confirm if the folder looks like it belongs to something else.
+2. Check whether kumiki is already installed in `.venv/`.
+3. Initialize the venv and install kumiki if needed.
+4. Resolve the installed package path and read `<that_path>/docs/concepts.md` to load Kumiki core concepts before doing any design work.
 
 ## General Usage Pattern *START HERE*
 
