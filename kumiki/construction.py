@@ -597,8 +597,9 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     if location_on_timber2 is not None:
         pos2 = locate_position_on_centerline_from_bottom(timber2, location_on_timber2).position
     else:
-        # Project location_on_timber1 to timber2's Z axis
-        pos2 = Matrix([pos1[0], pos1[1], timber2.get_bottom_position_global()[2] + location_on_timber1])
+        # Find the point on timber2's centerline at the same z-height as pos1
+        timber2_bottom = timber2.get_bottom_position_global()
+        pos2 = Matrix([timber2_bottom[0], timber2_bottom[1], timber2_bottom[2] + location_on_timber1])
     
     # Calculate length direction (from timber1 to timber2)
     length_direction = pos2 - pos1
