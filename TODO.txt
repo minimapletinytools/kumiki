@@ -331,8 +331,8 @@ DONE/IGNORE-it would be better just to have agent point to docs files inside kig
 -improve erroring on initialize due to missing deps
 
 -the perfect AABB geometry render choice in kigumi doesn't do naything, 
-  the render choices shoulde: actual (default), perfect timber within (ptw) (renders the perfect geometry rather tan the actlua geometry), ptw bounding box (renders a minimal bounding box for the perfect tmiber within geometry, create a get_minimal_aabb_csg() method in PerfectTimberWithin in timber.py to do this )
--BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
+  - the render choices shoulde: actual (default), perfect timber within (ptw) (renders the perfect geometry rather tan the actlua geometry), ptw bounding box (renders a minimal bounding box for the perfect tmiber within geometry, create a get_minimal_aabb_csg() method in PerfectTimberWithin in timber.py to do this )
+  -BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
 
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again

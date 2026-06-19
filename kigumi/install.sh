@@ -1,10 +1,48 @@
 #!/bin/bash
 # Installation script for Kigumi extension
 
-echo "🐴 Installing Kigumi extension..."
-
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Rotate the animal emoji in the sidebar view name so you can always tell
+# whether a fresh install took effect vs. a cached/stale extension version.
+ANIMALS=("🐴" "🦒" "🐘" "🦊" "🐺" "🦝" "🐻" "🦁" "🐯" "🐸" "🦓" "🐮" "🐷" "🦅" "🐧" "🦋" "🐢" "🦀" "🐙" "🦈")
+NEXT_ANIMAL=$(python3 - "$SCRIPT_DIR/package.json" "${ANIMALS[@]}" <<'PYEOF'
+import sys, json, re
+
+pkg_path = sys.argv[1]
+animals = sys.argv[2:]
+
+with open(pkg_path) as f:
+    pkg = json.load(f)
+
+views = pkg.get("contributes", {}).get("views", {}).get("kigumi", [])
+current = next((v["name"] for v in views if v.get("id") == "kigumi.explorer"), "")
+
+# Extract current emoji (last non-space token after "Explorer")
+m = re.search(r'Explorer\s+(\S+)$', current)
+current_emoji = m.group(1) if m else ""
+
+try:
+    idx = animals.index(current_emoji)
+    next_emoji = animals[(idx + 1) % len(animals)]
+except ValueError:
+    next_emoji = animals[0]
+
+for v in views:
+    if v.get("id") == "kigumi.explorer":
+        base = re.sub(r'\s+\S+$', '', v["name"]) if re.search(r'\s+\S+$', v["name"]) else v["name"]
+        v["name"] = f"{base} {next_emoji}"
+
+with open(pkg_path, "w") as f:
+    json.dump(pkg, f, indent=2, ensure_ascii=False)
+    f.write("\n")
+
+print(next_emoji)
+PYEOF
+)
+
+echo "${NEXT_ANIMAL} Installing Kigumi extension..."
 
 echo "Preparing bundled agent instructions..."
 if command -v node >/dev/null 2>&1; then
