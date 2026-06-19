@@ -1,0 +1,496 @@
+{
+  "entries": {
+    "patterns/CSG_debug_examples.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_CSG_debug_examples",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "angled_shoulder_notch",
+          "csg",
+          "cube_cutout",
+          "dovetail_shoulder_geometry_raw",
+          "dovetail_tenon_geometry_raw",
+          "gooseneck_profile",
+          "halfspace_cut",
+          "hexagon_extrusion",
+          "lap_cut_timber",
+          "positioned_cube",
+          "shoulder_notch",
+          "shoulder_notch_raw",
+          "union_cubes"
+        ],
+        "loaded": true,
+        "names": [
+          "cube_cutout",
+          "halfspace_cut",
+          "positioned_cube",
+          "union_cubes",
+          "hexagon_extrusion",
+          "lap_cut_timber",
+          "gooseneck_profile",
+          "shoulder_notch",
+          "angled_shoulder_notch",
+          "shoulder_notch_raw",
+          "dovetail_shoulder_geometry_raw",
+          "dovetail_tenon_geometry_raw"
+        ],
+        "static_entries": [
+          {
+            "kind": "factory",
+            "lineno": 677,
+            "name": "create_csg_examples_patternbook"
+          }
+        ]
+      },
+      "relative_path": "CSG_debug_examples.py",
+      "sha256": "cbf25663cf3088701942ad6f063278aad3438a70a81d429eff061b8a8c8bf518",
+      "warnings": []
+    },
+    "patterns/basic_joints_examples.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_basic_joints_examples",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "basic_joints",
+          "butt",
+          "corner",
+          "cross",
+          "end",
+          "house",
+          "japanese",
+          "lap",
+          "miter",
+          "mortise_tenon",
+          "splice"
+        ],
+        "loaded": true,
+        "names": [
+          "basic_miter",
+          "basic_miter_face_aligned",
+          "basic_tongue_fork",
+          "basic_butt",
+          "basic_butt_splice",
+          "basic_cross_lap",
+          "basic_house",
+          "basic_splined_double_butt",
+          "basic_splice_lap",
+          "basic_mortise_tenon",
+          "basic_mortise_tenon_peg",
+          "basic_gooseneck",
+          "basic_dovetail",
+          "basic_mitered_keyed_lap"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 265,
+            "name": "create_basic_joints_patternbook"
+          }
+        ]
+      },
+      "relative_path": "basic_joints_examples.py",
+      "sha256": "eec82e1f0b685fcfa8e013f1ccbd0f94c3cf6bb47a568827b621c9e7ce5ee387",
+      "warnings": []
+    },
+    "patterns/construction_examples.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_construction_examples",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "centerline",
+          "construction"
+        ],
+        "loaded": true,
+        "names": [
+          "posts_with_beam_centerline"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 68,
+            "name": "create_construction_patternbook"
+          }
+        ]
+      },
+      "relative_path": "construction_examples.py",
+      "sha256": "3356c0d2575ad5423227dcbab60834d7fed3b5cbd75fb07e0172e7cfef1c10e2",
+      "warnings": []
+    },
+    "patterns/double_butt_joints_example.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "make_splined_opposing_double_butt_joint_example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 19,
+          "name": "make_splined_opposing_double_butt_joint_example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_double_butt_joints_example",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "butt",
+          "double_butt_joints",
+          "splined_opposing"
+        ],
+        "loaded": true,
+        "names": [
+          "splined_opposing_double_butt_joint"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 56,
+            "name": "create_double_butt_joints_patternbook"
+          }
+        ]
+      },
+      "relative_path": "double_butt_joints_example.py",
+      "sha256": "758b07b1b321a37d8b894ae559c7df3de11979eb42b40e64a485e94b3b9bae11",
+      "warnings": []
+    },
+    "patterns/irrational_angles_example.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_all_irrational_examples",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 34,
+          "name": "create_all_irrational_examples"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_irrational_angles_example",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "irrational_angles",
+          "test_examples"
+        ],
+        "loaded": true,
+        "names": [
+          "irrational_angles_test"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 16,
+            "name": "create_irrational_angles_patternbook"
+          }
+        ]
+      },
+      "relative_path": "irrational_angles_example.py",
+      "sha256": "fefef9634b8a6e330d00a97227b9282f0eb8545bca5adc4e28fb334551c756be",
+      "warnings": []
+    },
+    "patterns/japanese_joints_example.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_japanese_joints_example",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "butt",
+          "corner",
+          "dovetail",
+          "end",
+          "gooseneck",
+          "japanese_joints",
+          "miter"
+        ],
+        "loaded": true,
+        "names": [
+          "gooseneck_simple",
+          "dovetail_butt",
+          "mitered_keyed_lap",
+          "mitered_keyed_lap_130deg"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 29,
+            "name": "create_japanese_joints_patternbook"
+          }
+        ]
+      },
+      "relative_path": "japanese_joints_example.py",
+      "sha256": "3ea7bdf1be16b0859d9113bc09986a0c39f01bd9125ad23ef83f5091854c869b",
+      "warnings": []
+    },
+    "patterns/mortise_and_tenon_joint_examples.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_mortise_and_tenon_joint_examples",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "basic",
+          "basic_fat",
+          "basic_fat_round",
+          "brace",
+          "butt",
+          "corner",
+          "double_angled",
+          "inset_shoulder_fat",
+          "mortise_tenon",
+          "round_fat",
+          "through_fat",
+          "wedged_half_dovetail"
+        ],
+        "loaded": true,
+        "names": [
+          "basic_4x4",
+          "basic_FAT",
+          "round_FAT",
+          "basic_FAT_two_round_timbers",
+          "through_tenon_FAT",
+          "inset_shoulder_FAT",
+          "brace_joint",
+          "double_angled",
+          "wedged_half_dovetail",
+          "half_dovetail_no_wedge"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 431,
+            "name": "create_mortise_and_tenon_patternbook"
+          }
+        ]
+      },
+      "relative_path": "mortise_and_tenon_joint_examples.py",
+      "sha256": "0a644cc24d086756635488a9ace8f84bf4e1ac0de8f14a3e1538153f5a144d2a",
+      "warnings": []
+    },
+    "patterns/patternbook_example.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_patternbook_example",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "a",
+          "b",
+          "e",
+          "m",
+          "o",
+          "p",
+          "s",
+          "t",
+          "x"
+        ],
+        "loaded": true,
+        "names": [
+          "short_post",
+          "tall_post",
+          "wide_post",
+          "small_beam",
+          "medium_beam",
+          "large_beam",
+          "small_box",
+          "medium_box",
+          "large_box"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 11,
+            "name": "create_simple_post_pattern"
+          },
+          {
+            "kind": "function",
+            "lineno": 84,
+            "name": "create_beam_patterns"
+          },
+          {
+            "kind": "function",
+            "lineno": 156,
+            "name": "create_csg_box_patterns"
+          },
+          {
+            "kind": "function",
+            "lineno": 281,
+            "name": "create_patternbook_example_patternbook"
+          }
+        ]
+      },
+      "relative_path": "patternbook_example.py",
+      "sha256": "6bf621409688f1e20bd895d9257f38cd5a135f48755c113d7f529cddd76474ab",
+      "warnings": []
+    },
+    "patterns/plain_joints_example.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_plain_joints_example",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "butt",
+          "corner",
+          "corner_lap",
+          "cross",
+          "cross_lap",
+          "end",
+          "house",
+          "miter",
+          "plain_joints",
+          "splice",
+          "splice_lap",
+          "tongue_and_fork"
+        ],
+        "loaded": true,
+        "names": [
+          "miter_joint",
+          "miter_joint_face_aligned",
+          "miter_joint_3d_angles",
+          "butt_joint",
+          "butt_joint_3d_angles",
+          "tongue_and_fork_corner_joint_90",
+          "tongue_and_fork_corner_joint_135",
+          "tongue_and_fork_butt_joint_90",
+          "tongue_and_fork_butt_joint_138",
+          "splice_joint",
+          "splice_lap_joint",
+          "house_joint",
+          "cross_lap_joint",
+          "corner_lap_joint"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 557,
+            "name": "create_plain_joints_patternbook"
+          }
+        ]
+      },
+      "relative_path": "plain_joints_example.py",
+      "sha256": "e1b3cb9a4b64a4fa192d233496be743a54eafc023772a9c8214d5fe8642a502f",
+      "warnings": []
+    },
+    "patterns/structures/horsey_example.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_sawhorse",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 37,
+          "name": "create_sawhorse"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_horsey_example",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/horsey_example.py",
+      "sha256": "629dd52b50a88063c74a26f544f53ef3cb8eb89347e259c1121792f47d066b24",
+      "warnings": []
+    },
+    "patterns/structures/my_cute_frame.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "build_frame",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 31,
+          "name": "build_frame"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_my_cute_frame",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/my_cute_frame.py",
+      "sha256": "0a9e0a449ed610eeca56e0bce5a205328af0f5fe97a59c08755d9858c21772f2",
+      "warnings": []
+    },
+    "patterns/structures/oscarshed.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_oscarshed",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 41,
+          "name": "create_oscarshed"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_oscarshed",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/oscarshed.py",
+      "sha256": "0d3d0094fd4332e5bece9b7afd79d8df1d000a0ee1f9fa3a45f61b55f8b74747",
+      "warnings": []
+    },
+    "patterns/structures/tinyhouse120.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_tinyhouse120",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 49,
+          "name": "create_tinyhouse120"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_tinyhouse120",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/tinyhouse120.py",
+      "sha256": "4500bc41e7d6a661b79b7047c87289a0adcd9b4cf218a554faaa42378ef6d272",
+      "warnings": []
+    },
+    "patterns/tongue_and_groove_joint_example.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_tongue_and_groove_joint_example",
+      "multiple_frames": false,
+      "patternbook": {
+        "groups": [
+          "boards",
+          "tongue_groove"
+        ],
+        "loaded": true,
+        "names": [
+          "tongue_and_groove"
+        ],
+        "static_entries": [
+          {
+            "kind": "function",
+            "lineno": 51,
+            "name": "create_tongue_and_groove_patternbook"
+          }
+        ]
+      },
+      "relative_path": "tongue_and_groove_joint_example.py",
+      "sha256": "458fb249e5f3e36ee7132c136b61a33a5cfa56811cda6a0c4714843866121512",
+      "warnings": []
+    }
+  },
+  "generated_at": "2026-06-19T18:42:46.753813+00:00",
+  "root_folder": "patterns",
+  "schema_version": 1
+}

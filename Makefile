@@ -17,6 +17,7 @@ help:
 
 setup:
 	uv sync --group dev
+	uv run python tools/build_pattern_index.py
 
 test:
 	uv run --group dev python -m pytest tests/

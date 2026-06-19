@@ -330,8 +330,8 @@ DONE/IGNORE-it would be better just to have agent point to docs files inside kig
 
 -improve erroring on initialize due to missing deps
 
--the perfect AABB geometry render choice doesn't do naything, 
-  the render choices shoulde: actual, perfect, bounding box
+-the perfect AABB geometry render choice in kigumi doesn't do naything, 
+  the render choices shoulde: actual (default), perfect timber within (ptw) (renders the perfect geometry rather tan the actlua geometry), ptw bounding box (renders a minimal bounding box for the perfect tmiber within geometry, create a get_minimal_aabb_csg() method in PerfectTimberWithin in timber.py to do this )
 -BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
 
 -test regular imperfect rectangular timber stuff
@@ -453,19 +453,7 @@ DONE/IGNORE-it would be better just to have agent point to docs files inside kig
   -add layers view to left I guess
 
 
--UI whatever
-  DONE-output proper error if you try and open a non-frame file
-  DONE-render kumiki should not open in new tab
-  IGNORE-move focus button, make it more cute
-  IGNORE-add # joints table view at bottom (shouldh include joint type, but you need metadat for this)
-  DONE/IGNORE-maybe add "assume upright structure" to limit camera movement with mouse?
-  
-  DONE-background seleciton should also change font color in viewer
-  DONE-blueprint background sucks lololol blueprint should do infinite blueprint plane with horizon instead (horizon backgrounds)
-  DONE-add toggle for  debug info in lower right
-  DONE-selected info should just be one line
-  IGNORE-add front facing direction3d to Frame
-  DONE-add some background color choices (colors, gradient,s whatever fun stuff)
+
   
 -perf related stuff stuff 
   -see what you can do about numeric percision of contains_point
@@ -587,6 +575,20 @@ M3.5
 
 
 :: TODONE 
+
+DONE-UI whatever
+  DONE-output proper error if you try and open a non-frame file
+  DONE-render kumiki should not open in new tab
+  IGNORE-move focus button, make it more cute
+  IGNORE-add # joints table view at bottom (shouldh include joint type, but you need metadat for this)
+  DONE/IGNORE-maybe add "assume upright structure" to limit camera movement with mouse?
+  
+  DONE-background seleciton should also change font color in viewer
+  DONE-blueprint background sucks lololol blueprint should do infinite blueprint plane with horizon instead (horizon backgrounds)
+  DONE-add toggle for  debug info in lower right
+  DONE-selected info should just be one line
+  IGNORE-add front facing direction3d to Frame
+  DONE-add some background color choices (colors, gradient,s whatever fun stuff)
 DONE-remove tag pill box from search
 DONE-fix joint indentatino level
 DONE-fix patternbook joints not showing
