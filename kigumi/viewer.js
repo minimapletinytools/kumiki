@@ -16,7 +16,7 @@ const ViewerPhase = Object.freeze({
 });
 
 function normalizeViewerOptions(viewerOptions) {
-    return {};
+    return (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
 }
 
 function getNonce() {

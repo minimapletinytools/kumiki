@@ -2752,8 +2752,8 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (this._lastGeometryData) {
-            this.refreshSequence = (this.refreshSequence || 0) + 1;
-            const token = this.refreshSequence;
+            this.activeRefreshToken += 1;
+            const token = this.activeRefreshToken;
             this.updateMeshScene(this._lastGeometryData, token, null).catch((err) => {
                 // eslint-disable-next-line no-console
                 console.error('setGeometryMode: updateMeshScene failed', err);

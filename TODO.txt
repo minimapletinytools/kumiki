@@ -28,7 +28,7 @@ and since kumiki designs are written in code, we will be relying AI agents to wr
 Last year I built a shed for Oscar, our neighborhood homeless friend, let's design them a shower stall next.
 to get started, we'll ask the agent to define a foot print for the structure, let's say 3'x4' with 4x4 8' posts on each inside corner of the footprint.
 And of course 4x4s are actually 3.5"x3.5" so let's make sure the agent knows what we mean
-"let's build an outdoor shower for oscar. create a new file and start by creating a 3x4' foot print. on the inside of corner of each footprint, add a 3.5" x 3.5" posts (called a 4x4) that is 8' tall, open the project in kigumi when you're done so I can see the results"
+"let's build an outdoor shower for oscar. create a new file and start by creating a 3x4' foot print. on the inside of corner of each footprint, add a 3.5" x 3.5" posts (called a 4x4) that is 8' tall"
 
 BTW, there are many approaches you can take to prompt the agent, and you might find some more effective than others. I encourgae you to play around, the way I'm prompting is simply what works for me.
 
@@ -268,7 +268,7 @@ DONE-make website
   -get domain D:
 
   
--test
+DONE/IGNORE-test
   -screenshot funcitonality still broken
     -expsoe caputre screenshot command, not sure where it went
   -refresh the frame viewer command seems to be be broken
