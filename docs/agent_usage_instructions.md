@@ -2,18 +2,13 @@
 
 ## Background
 
-When starting work in a workspace, run the **`init-kumiki-project`** skill (`.claude/skills/init-kumiki-project/SKILL.md`). It will:
-
-1. Determine whether the folder is actually a kumiki project (empty/new, or already has kumiki Python files) — and ask the user to confirm if the folder looks like it belongs to something else.
-2. Check whether kumiki is already installed in `.venv/`.
-3. Initialize the venv and install kumiki if needed.
-4. Resolve the installed package path and read `<that_path>/docs/concepts.md` to load Kumiki core concepts before doing any design work.
+When starting work in a workspace, if in dout, run the **`init-kumiki-project`** skill (`docs/skills/init-kumiki-project/SKILL.md`).
 
 ## General Usage Pattern *START HERE*
 
 Unless the user is specific about what they want, always follow the following implementation pattern:
 
-- for structure, define a `Footprint` for the whole structure
+- for structures, define a `Footprint` for the whole structure
 - create initial timbers by placing posts vertically on the footprint or place mudsilles horizontally on the footprint
 - for timbers spanning between existing timbers always use the join_timbers method
 - only create timbers manually if the above methods are insufficient
@@ -123,7 +118,7 @@ When authoring a frame for the user, always test locally first just by running t
 
 Afterwards, if the user is wanting a full agentic development loop, test the frame by actually opening it in Kigumi
 
-## VS Code Commands for Full Agentic Development Loop
+## VS Code Commands for Full Agentic Development Loop (only if you have access to VSCode commands, sorry Claude)
 
 Use this sequence after headless local validation passes.
 

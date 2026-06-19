@@ -40,6 +40,8 @@ Run the VS Code command:
 kigumi.initializeProjectInWorkspace
 ```
 
+or if you can't, ask the user to run it from the command palette (cmd/ctrl+shift+p) by searching for "Kigumi: Initialize Project" OR through the Kigumi menu in the sidebar.
+
 This command (title: **"Kigumi: Initialize Project"**) handles everything:
 - Creates `.venv/` with Python 3.13 via `uv`
 - Installs kumiki and its viewer dependencies

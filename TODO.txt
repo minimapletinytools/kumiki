@@ -326,14 +326,19 @@ DONE-fix layers view in kigumi covering title
     1. it should show up below the "title/selection" bar at the top left corner, right now it overlaps it.
     2. it should be default collapsed
     3. in it collapsed state, it should look something like []> timber list]
+DONE/IGNORE-it would be better just to have agent point to docs files inside kigumi libarry, you can also add a view docs vscode command
 
+-improve erroring on initialize due to missing deps
 
+-the perfect AABB geometry render choice doesn't do naything, 
+  the render choices shoulde: actual, perfect, bounding box
+-BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
 
 -test regular imperfect rectangular timber stuff
 -you broke notching on mortise and tenon joint again
 -do ticket refactor so that each timber type can have its own ticket?
   -or do we do the derived ticket thing instead?
--improve erroring on initialize due to missing deps
+
 -can you make meshing run in parallel?
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
@@ -401,15 +406,12 @@ DONE-fix layers view in kigumi covering title
   
 
 -BOARDS
-  -I thin kit might be better not to do boards... boards are grain orieted so they make more sense as timbers
-  -decide if you even want boards..
-  -convert_to_timberlike(board : Board, top_maps_to : TimberFace, right_maps_to : TimberFace) -> Timber (or maybe some temp Timber class)
-  -do tongue and groove joint
+  DONE-I thin kit might be better not to do boards... boards are grain orieted so they make more sense as timbers
+  DONE-decide if you even want boards..
+  IGNORE-convert_to_timberlike(board : Board, top_maps_to : TimberFace, right_maps_to : TimberFace) -> Timber (or maybe some temp Timber class)
+  DONE-do tongue and groove joint
   -do the ita-kura joint (board in groove)
   
-
-
-
 
 -do assembly metadata
   DONE-create assemblydirection class 
@@ -439,7 +441,6 @@ DONE-fix layers view in kigumi covering title
   -do yo uneed/want more rafters?
   
 
-
 -UI feature select
   -if 2 feature sselected, do measurement rendering between them :O
   -byd efault, noly features are the 6 sides of a timber
@@ -451,15 +452,16 @@ DONE-fix layers view in kigumi covering title
   -finish ticket system
   -add layers view to left I guess
 
+
 -UI whatever
   DONE-output proper error if you try and open a non-frame file
   DONE-render kumiki should not open in new tab
-  -move focus button, make it more cute
-  -add # joints table view at bottom (shouldh include joint type, but you need metadat for this)
-  -maybe add "assume upright structure" to limit camera movement with mouse?
-  -figure out why box view doesn't render right for the gooseneck, end cut is correct
-  -background seleciton should also change font color in viewer
-  -blueprint background sucks lololol blueprint should do infinite blueprint plane with horizon instead (horizon backgrounds)
+  IGNORE-move focus button, make it more cute
+  IGNORE-add # joints table view at bottom (shouldh include joint type, but you need metadat for this)
+  DONE/IGNORE-maybe add "assume upright structure" to limit camera movement with mouse?
+  
+  DONE-background seleciton should also change font color in viewer
+  DONE-blueprint background sucks lololol blueprint should do infinite blueprint plane with horizon instead (horizon backgrounds)
   DONE-add toggle for  debug info in lower right
   DONE-selected info should just be one line
   IGNORE-add front facing direction3d to Frame
