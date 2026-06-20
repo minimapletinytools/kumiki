@@ -8,7 +8,7 @@ const ViewerPhase = Object.freeze({
     ERROR: 'error',
 });
 
-const VALID_GEOMETRY_MODES = new Set(['actual', 'perfectAabb']);
+const VALID_GEOMETRY_MODES = new Set(['actual', 'perfectTimberWithin']);
 
 function normalizeV3RenderParameterValue(value) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -385,7 +385,7 @@ class ViewerSettingsPanel {
                     geometry
                     <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
                         <option value="actual">actual</option>
-                        <option value="perfectAabb">perfect AABB</option>
+                        <option value="perfectTimberWithin">perfect timber within</option>
                     </select>
                 </label>
                 <label>
@@ -2725,7 +2725,7 @@ class KigumiViewerApp extends LitElement {
         for (const mesh of lastMeshes) {
             if (mesh && mesh.memberType === 'timber'
                 && mesh.hasActualGeometryDifferentFromPerfect
-                && Array.isArray(mesh.perfectAabbVertices)) {
+                && Array.isArray(mesh.perfectTimberWithinVertices)) {
                 const key = mesh.memberKey || mesh.timberKey;
                 if (key) {
                     swappedKeys.add(key);
@@ -2734,7 +2734,7 @@ class KigumiViewerApp extends LitElement {
         }
 
         // Feature/CSG selections reference triangles on the actual-geometry mesh;
-        // the perfect-AABB mesh is a different surface, so sub-selections become
+        // the perfect-timber-within mesh is a different surface, so sub-selections become
         // invalid when geometry swaps. Timber-level selection (memberKey) is
         // preserved because identity is keyed by memberKey, not by mesh contents.
         if (swappedKeys.size > 0 && this.selectionManager) {
@@ -3730,17 +3730,17 @@ class KigumiViewerApp extends LitElement {
 
             const meshT0 = performance.now();
             // Choose vertex/index arrays based on geometryMode. Non-perfect timbers
-            // include perfectAabbVertices/perfectAabbIndices; perfect timbers and
+            // include perfectTimberWithinVertices/perfectTimberWithinIndices; perfect timbers and
             // accessories always use the actual vertices/indices regardless of mode.
-            const useAabb = (
-                geometryMode === 'perfectAabb'
+            const usePerfectTimberWithin = (
+                geometryMode === 'perfectTimberWithin'
                 && memberType === 'timber'
                 && mesh.hasActualGeometryDifferentFromPerfect
-                && Array.isArray(mesh.perfectAabbVertices)
-                && Array.isArray(mesh.perfectAabbIndices)
+                && Array.isArray(mesh.perfectTimberWithinVertices)
+                && Array.isArray(mesh.perfectTimberWithinIndices)
             );
-            const vertexSource = useAabb ? mesh.perfectAabbVertices : (mesh.vertices || []);
-            const indexSource = useAabb ? mesh.perfectAabbIndices : (mesh.indices || []);
+            const vertexSource = usePerfectTimberWithin ? mesh.perfectTimberWithinVertices : (mesh.vertices || []);
+            const indexSource = usePerfectTimberWithin ? mesh.perfectTimberWithinIndices : (mesh.indices || []);
             const positions = new Float32Array(vertexSource);
             const indexedGeometry = new THREE.BufferGeometry();
             indexedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));

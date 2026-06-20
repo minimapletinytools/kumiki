@@ -299,12 +299,12 @@ def prism_to_mesh(prism: Any) -> Dict[str, Any]:
     }
 
 
-def _build_perfect_aabb_csg_local(cut_timber: Any) -> Any:
-    """Build a perfect-AABB (rectangular prism) CSG with the same cuts applied.
+def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
+    """Build a perfect-timber-within (rectangular prism) CSG with the same cuts applied.
 
     This mirrors CutTimber.render_timber_with_cuts_csg_local, but substitutes a
     plain rectangular prism (sized to the timber's perfect bounding box) for the
-    timber's actual base CSG. Used to render a "perfect AABB" preview of
+    timber's actual base CSG. Used to render a "perfect timber within" preview of
     non-perfect timbers (e.g. RoundTimber, RegularPolygonTimber, MeshTimber).
     """
     from kumiki.cutcsg import Difference
@@ -372,7 +372,7 @@ def _cut_timber_to_triangle_mesh_payload(
     # does not detect actual non-rectangular geometry (e.g. RoundTimber has
     # is_perfect_timber()==True when diameter==size, but its actual CSG is a
     # cylinder, not a rectangular prism). Use class identity to determine
-    # whether the actual geometry differs from the perfect AABB.
+    # whether the actual geometry differs from the perfect timber within.
     non_rectangular_classes = ('RoundTimber', 'MeshTimber', 'RegularPolygonTimber')
     has_non_rectangular_actual = timber_class in non_rectangular_classes
 
@@ -405,10 +405,10 @@ def _cut_timber_to_triangle_mesh_payload(
     # so the viewer can swap meshes locally without round-tripping to Python.
     if has_non_rectangular_actual:
         try:
-            perfect_csg = _build_perfect_aabb_csg_local(cut_timber)
+            perfect_csg = _build_perfect_timber_within_csg_local(cut_timber)
             perfect = _triangulate_local_csg(cut_timber, perfect_csg)
-            payload["perfectAabbVertices"] = perfect["vertices"]
-            payload["perfectAabbIndices"] = perfect["indices"]
+            payload["perfectTimberWithinVertices"] = perfect["vertices"]
+            payload["perfectTimberWithinIndices"] = perfect["indices"]
             payload["hasActualGeometryDifferentFromPerfect"] = True
         except Exception as exc:  # noqa: BLE001 — best-effort optional payload
             log_stderr(
