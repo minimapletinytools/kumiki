@@ -108,7 +108,7 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 
 :: TODO
 
-
+-add left click to drag option (only when not clicking on frame obviously)
 -make the refresh button more prominent in the viewer itself
 -do setup vid
 -do shower vid

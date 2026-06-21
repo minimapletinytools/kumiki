@@ -930,8 +930,16 @@ class KigumiViewerApp extends LitElement {
 
     render() {
         const cameraMode = this.cameraController.getCameraMode();
+        const hasPendingChanges = this.hasPendingRenderParameterChanges();
         return html`
             <button id="to-v3d" title="Jump back to 3D view">to v3d view</button>
+            ${hasPendingChanges
+                ? html`<button
+                    id="top-center-refresh-btn"
+                    type="button"
+                    title="Refresh using current parameter values"
+                    @click=${() => this.requestRefreshWithPendingParameters()}>refresh (changes detected)</button>`
+                : ''}
             <div id="viewport">
                 <canvas id="c"></canvas>
                 <div id="loading-overlay" class=${this.isOverlayVisible() ? 'visible' : ''}>
