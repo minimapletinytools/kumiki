@@ -17,11 +17,42 @@ on:
           - both
           - vscode
           - ovsx
+      publish:
+        description: Publish the built extension after packaging
+        required: true
+        default: true
+        type: boolean
+      tag:
+        description: Git ref or tag to build. Defaults to current ref when empty.
+        required: false
+        type: string
 
   pull_request:
     paths:
       - 'kigumi/**'
       - '.github/workflows/publish-kigumi.yml'
+
+  workflow_call:
+    inputs:
+      prerelease:
+        required: false
+        type: boolean
+        default: false
+      target:
+        required: false
+        type: choice
+        options:
+          - both
+          - vscode
+          - ovsx
+        default: both
+      publish:
+        required: false
+        type: boolean
+        default: true
+      tag:
+        required: false
+        type: string
 
 jobs:
   build:
@@ -42,7 +73,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref || github.ref_name }}
+          ref: ${{ coalesce(inputs.tag, github.event.inputs.tag, github.head_ref, github.ref_name) }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -88,7 +119,7 @@ jobs:
       - name: Package extension
         run: |
           EXTRA_ARGS=()
-          if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+          if [ "${{ coalesce(inputs.prerelease, github.event.inputs.prerelease) }}" = "true" ]; then
             EXTRA_ARGS+=(--pre-release)
           fi
           npx @vscode/vsce package "${EXTRA_ARGS[@]}"
@@ -112,7 +143,7 @@ jobs:
     name: Publish To VS Code Marketplace
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'both' || github.event.inputs.target == 'vscode')
+    if: ${{ coalesce(inputs.publish, github.event.inputs.publish) && (coalesce(inputs.target, github.event.inputs.target) == 'both' || coalesce(inputs.target, github.event.inputs.target) == 'vscode') }}
     permissions:
       contents: read
 
@@ -134,7 +165,7 @@ jobs:
         shell: bash
         run: |
           EXTRA_ARGS=()
-          if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+          if [ "${{ coalesce(inputs.prerelease, github.event.inputs.prerelease, false) }}" = "true" ]; then
             EXTRA_ARGS+=(--pre-release)
           fi
           npx @vscode/vsce publish --packagePath "${{ needs.build.outputs.vsix_name }}" --pat "$VSCE_PAT" "${EXTRA_ARGS[@]}"
@@ -143,7 +174,7 @@ jobs:
     name: Publish To Open VSX
     needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.target == 'both' || github.event.inputs.target == 'ovsx')
+    if: ${{ coalesce(inputs.publish, github.event.inputs.publish) && (coalesce(inputs.target, github.event.inputs.target) == 'both' || coalesce(inputs.target, github.event.inputs.target) == 'ovsx') }}
     permissions:
       contents: read
 
@@ -165,7 +196,7 @@ jobs:
         shell: bash
         run: |
           EXTRA_ARGS=()
-          if [ "${{ github.event.inputs.prerelease }}" = "true" ]; then
+          if [ "${{ coalesce(inputs.prerelease, github.event.inputs.prerelease, false) }}" = "true" ]; then
             EXTRA_ARGS+=(--pre-release)
           fi
           npx ovsx publish "${{ needs.build.outputs.vsix_name }}" --pat "$OVSX_PAT" "${EXTRA_ARGS[@]}"

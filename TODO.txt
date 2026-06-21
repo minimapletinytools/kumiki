@@ -1,29 +1,3 @@
-:: 6/21 patternbook refacotr notes
-
--patternbook refactor
-  -get rid of explicit patternbook class, we will replace patterns with a hirearchical + tag system
-  -at the top level, patterns are lumped either into a library or a workspace, this won't change, this is like a special top level folder that can be optionally disabled when displaying (don't worry about this part for now)
-  -each individual pattern now has a "path" field which is a standard "/" path string that is scoped under the library name or workspace, so for example "corner_joints/plain_miter_joint/125_degrees" and this gets implicitly be namespace to "kumiki/corner_joints/plain_miter_joint/125_degrees". note in this caes 125_degrees in the name of the pattern rather than a folder
-  -a pattern folder may share the same name as a pattern, hence a pattern may have children, tihs is useful becase we may have a "plain_miter_joint" example that has several different configuration examplesa s children for examples.
-  -figure out a smart way to deal with name conflicts
-  -the example files will return a list of patterns rather than a pattern book
-  -tags work as before, each folder name is also considered an implicit tag
-  -there are a couple special tags:
-    -main: indicates the "main" example which may (or may not) have child configuration examples
-    -poop: these examples are for internal development purposes only and are not shown normally unelss "poop" tag is explicitly used
-    -corner/splice/butt/etc...: so each joint arragement has its own special tag
-  -the kigumi sidebar now has the following display modes:
-    -hirercihacl with implicit namespace
-      -hierchical without implicit namespace (future featuer, don't do this one yet, just make suer it's possible or stub it out)
-    -sorted by tags, by default in this mode, the tag selection list will contain "main" 
-      -when "main" is in the tag selection list, the display mode is exceptional, it will show the "main" jointsa nd if they are children, the dropdown will be available and its children will show even if it does not have the "main" tag.
-      -when "main" is not in the tag selection list, just display an unhirerchical list of all filtered joints, the displayed joint name should still include the path up until its first "main" parent
-  -add a doc somewhere explaninig how the patternbook system works, keep it CONCISE but definitely outline all the rules, basicalyl just reformat what I wrote above and add anything that might be missing.
-    
-
--only show folders in the pattern viewer based on the folder path in the pattern,s don't use the files that returned the pattern, ignore those.
-  
-  
 
 :: 6/21 WEBSITE INSTALL GUIDE
 
@@ -1231,6 +1205,32 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: END TODONE
+
+:: 6/21 patternbook refacotr notes
+
+DONE-patternbook refactor
+  -get rid of explicit patternbook class, we will replace patterns with a hirearchical + tag system
+  -at the top level, patterns are lumped either into a library or a workspace, this won't change, this is like a special top level folder that can be optionally disabled when displaying (don't worry about this part for now)
+  -each individual pattern now has a "path" field which is a standard "/" path string that is scoped under the library name or workspace, so for example "corner_joints/plain_miter_joint/125_degrees" and this gets implicitly be namespace to "kumiki/corner_joints/plain_miter_joint/125_degrees". note in this caes 125_degrees in the name of the pattern rather than a folder
+  -a pattern folder may share the same name as a pattern, hence a pattern may have children, tihs is useful becase we may have a "plain_miter_joint" example that has several different configuration examplesa s children for examples.
+  -figure out a smart way to deal with name conflicts
+  -the example files will return a list of patterns rather than a pattern book
+  -tags work as before, each folder name is also considered an implicit tag
+  -there are a couple special tags:
+    -main: indicates the "main" example which may (or may not) have child configuration examples
+    -poop: these examples are for internal development purposes only and are not shown normally unelss "poop" tag is explicitly used
+    -corner/splice/butt/etc...: so each joint arragement has its own special tag
+  -the kigumi sidebar now has the following display modes:
+    -hirercihacl with implicit namespace
+      -hierchical without implicit namespace (future featuer, don't do this one yet, just make suer it's possible or stub it out)
+    -sorted by tags, by default in this mode, the tag selection list will contain "main" 
+      -when "main" is in the tag selection list, the display mode is exceptional, it will show the "main" jointsa nd if they are children, the dropdown will be available and its children will show even if it does not have the "main" tag.
+      -when "main" is not in the tag selection list, just display an unhirerchical list of all filtered joints, the displayed joint name should still include the path up until its first "main" parent
+  -add a doc somewhere explaninig how the patternbook system works, keep it CONCISE but definitely outline all the rules, basicalyl just reformat what I wrote above and add anything that might be missing.
+DONE-only show folders in the pattern viewer based on the folder path in the pattern,s don't use the files that returned the pattern, ignore those.
+  
+  
+
 
 :: 6/20 THE BIG JOINT REORG
 

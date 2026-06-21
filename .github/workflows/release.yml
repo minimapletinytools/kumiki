@@ -1,244 +1,277 @@
-name: Create GitHub Release
+name: Release and Publish
 
 on:
   push:
     tags:
       - 'kumiki-v*'
       - 'kigumi-v*'
-
   workflow_dispatch:
     inputs:
-      target:
-        description: Which project to release
+      tag:
+        description: "Git tag to release. Defaults to the pushed tag or the latest tag when empty."
+        required: false
+        type: string
+      kumiki:
+        description: "Include kumiki in this workflow run."
         required: true
+        default: true
+        type: boolean
+      kumiki_publish:
+        description: "Publish kumiki to PyPI/TestPyPI."
+        required: true
+        default: true
+        type: boolean
+      kumiki_publish_target:
+        description: "Publish kumiki to the selected PyPI index."
+        required: true
+        default: pypi
         type: choice
         options:
-          - kumiki
-          - kigumi
-      tag:
-        description: Git tag to build and publish (for example, kumiki-v0.2.4)
+          - testpypi
+          - pypi
+      kumiki_release:
+        description: "Create a GitHub release asset for kumiki."
         required: true
-        type: string
+        default: true
+        type: boolean
+      kigumi:
+        description: "Include kigumi in this workflow run."
+        required: true
+        default: true
+        type: boolean
+      kigumi_publish_vscode:
+        description: "Publish kigumi to the VS Code Marketplace."
+        required: true
+        default: true
+        type: boolean
+      kigumi_publish_ovsx:
+        description: "Publish kigumi to Open VSX."
+        required: true
+        default: true
+        type: boolean
+      kigumi_prerelease:
+        description: "Publish kigumi as a pre-release when sending to marketplaces."
+        required: true
+        default: false
+        type: boolean
+      kigumi_release:
+        description: "Create a GitHub release asset for kigumi."
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
 
 jobs:
-  release-kumiki:
-    name: Release Kumiki
+  resolve_tag:
+    name: Resolve tag
     runs-on: ubuntu-latest
-    if: >-
-      ${{
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/kumiki-v')) ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'kumiki')
-      }}
+    outputs:
+      tag: ${{ steps.resolve.outputs.tag }}
+      prefix: ${{ steps.resolve.outputs.prefix }}
 
     steps:
-      - name: Resolve release tag
-        id: release_tag
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-
-          if [[ ! "$TAG" =~ ^kumiki-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Expected tag like kumiki-v0.2.4, got: $TAG" >&2
-            exit 1
-          fi
-
-          VERSION="${TAG#kumiki-v}"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
       - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ steps.release_tag.outputs.tag }}
 
-      - name: Validate package version matches tag
+      - name: Resolve tag
+        id: resolve
         shell: bash
         run: |
-          TAG_VERSION="${{ steps.release_tag.outputs.version }}"
-          FILE_VERSION=$(python -c "import tomllib; from pathlib import Path; print(tomllib.loads(Path('pyproject.toml').read_text(encoding='utf-8'))['project']['version'])")
+          TAG="${{ coalesce(inputs.tag, github.event.inputs.tag, '') }}"
+          if [ -z "$TAG" ]; then
+            if [ "${{ github.event_name }}" = "push" ]; then
+              TAG="${{ github.ref_name }}"
+            else
+              git fetch --tags --prune
+              TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+            fi
+          fi
 
-          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
-            echo "Tag version ($TAG_VERSION) does not match pyproject.toml ($FILE_VERSION)" >&2
+          if [[ "$TAG" =~ ^kumiki-v ]]; then
+            PREFIX=kumiki
+          elif [[ "$TAG" =~ ^kigumi-v ]]; then
+            PREFIX=kigumi
+          else
+            echo "Tag must start with kumiki-v or kigumi-v, got: $TAG" >&2
             exit 1
           fi
 
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Cache uv artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml', 'uv.lock') }}
-          restore-keys: |
-            uv-${{ runner.os }}-py3.12-
-
-      - name: Install dependencies
-        run: |
-          if [ ! -f kumiki/_pattern_index.json ]; then
-            echo '{"schema_version":1,"entries":{}}' > kumiki/_pattern_index.json
+          if [ -z "$TAG" ]; then
+            echo "No tag specified and no tag could be resolved." >&2
+            exit 1
           fi
-          uv sync --group dev
 
-      - name: Generate pattern index
-        run: uv run --group dev python tools/build_pattern_index.py
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "prefix=$PREFIX" >> "$GITHUB_OUTPUT"
 
-      - name: Build package
-        run: uv build
-
-      - name: Validate distribution metadata
-        run: uvx twine check dist/*
-
-      - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release_tag.outputs.tag }}
-          name: Kumiki v${{ steps.release_tag.outputs.version }}
-          generate_release_notes: true
-          body: |
-            Python package release assets for Kumiki v${{ steps.release_tag.outputs.version }}.
-
-            Install from PyPI after publishing:
-
-            ```bash
-            pip install kumiki==${{ steps.release_tag.outputs.version }}
-            ```
-
-            Or install directly from the attached wheel.
-          files: dist/*
-
-  release-kigumi:
-    name: Release Kigumi
-    runs-on: ubuntu-latest
+  build_kumiki:
+    name: Build Kumiki Package
     if: >-
       ${{
-        (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/kigumi-v')) ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.target == 'kigumi')
+        (coalesce(inputs.kumiki, github.event.inputs.kumiki) ||
+        coalesce(inputs.kumiki_publish, github.event.inputs.kumiki_publish) ||
+        coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release)) &&
+        needs.resolve_tag.outputs.prefix == 'kumiki'
       }}
+    uses: ./.github/workflows/publish.yml
+    with:
+      target: ${{ coalesce(inputs.kumiki_publish_target, github.event.inputs.kumiki_publish_target, 'pypi') }}
+      publish: false
+      tag: ${{ needs.resolve_tag.outputs.tag }}
 
-    defaults:
-      run:
-        working-directory: kigumi
+  build_kigumi:
+    name: Build Kigumi Extension
+    if: >-
+      ${{
+        (coalesce(inputs.kigumi, github.event.inputs.kigumi) ||
+        coalesce(inputs.kigumi_publish_vscode, github.event.inputs.kigumi_publish_vscode) ||
+        coalesce(inputs.kigumi_publish_ovsx, github.event.inputs.kigumi_publish_ovsx) ||
+        coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release)) &&
+        needs.resolve_tag.outputs.prefix == 'kigumi'
+      }}
+    uses: ./.github/workflows/publish-kigumi.yml
+    with:
+      target: both
+      publish: false
+      prerelease: ${{ coalesce(inputs.kigumi_prerelease, github.event.inputs.kigumi_prerelease, false) }}
+      tag: ${{ needs.resolve_tag.outputs.tag }}
+
+  publish_kumiki:
+    name: Publish kumiki to PyPI
+    needs:
+      - build_kumiki
+    runs-on: ubuntu-latest
+    if: ${{ coalesce(inputs.kumiki_publish, github.event.inputs.kumiki_publish) && needs.resolve_tag.outputs.prefix == 'kumiki' }}
+    permissions:
+      contents: read
 
     steps:
-      - name: Resolve release tag
-        id: release_tag
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ github.event.inputs.tag }}"
-          else
-            TAG="${{ github.ref_name }}"
-          fi
-
-          if [[ ! "$TAG" =~ ^kigumi-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "Expected tag like kigumi-v0.1.4, got: $TAG" >&2
-            exit 1
-          fi
-
-          VERSION="${TAG#kigumi-v}"
-          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
-          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: Download kumiki artifacts
+        uses: actions/download-artifact@v4
         with:
-          fetch-depth: 0
-          ref: ${{ steps.release_tag.outputs.tag }}
+          name: dist
+          path: dist
 
-      - name: Validate package version matches tag
-        shell: bash
-        working-directory: kigumi
-        run: |
-          TAG_VERSION="${{ steps.release_tag.outputs.version }}"
-          FILE_VERSION=$(node -p "require('./package.json').version")
-
-          if [ "$TAG_VERSION" != "$FILE_VERSION" ]; then
-            echo "Tag version ($TAG_VERSION) does not match kigumi/package.json ($FILE_VERSION)" >&2
-            exit 1
-          fi
-
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v5
-
-      - name: Set up Python
-        run: uv python install 3.12
-
-      - name: Cache uv artifacts
-        uses: actions/cache@v4
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          path: |
-            ~/.cache/uv
-            .venv
-          key: uv-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml', 'uv.lock') }}
-          restore-keys: |
-            uv-${{ runner.os }}-py3.12-
+          repository-url: ${{ coalesce(inputs.kumiki_publish_target, github.event.inputs.kumiki_publish_target, 'pypi') == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
 
-      - name: Install dependencies
-        run: |
-          if [ ! -f ../kumiki/_pattern_index.json ]; then
-            echo '{"schema_version":1,"entries":{}}' > ../kumiki/_pattern_index.json
-          fi
-          uv sync --group dev
+  publish_kigumi_vscode:
+    name: Publish kigumi to VS Code Marketplace
+    needs:
+      - build_kigumi
+    runs-on: ubuntu-latest
+    if: ${{ coalesce(inputs.kigumi_publish_vscode, github.event.inputs.kigumi_publish_vscode) && needs.resolve_tag.outputs.prefix == 'kigumi' }}
+    permissions:
+      contents: read
 
+    steps:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: kigumi/package.json
 
-      - name: Install Node.js dependencies
-        run: npm install
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kigumi-vsix
+          path: .
 
-      - name: Stage bundled docs
-        run: |
-          mkdir -p .kigumi/docs
-          rsync -a --delete ../docs/ .kigumi/docs/
-
-      - name: Run unit tests
-        run: npm run test:unit
-
-      - name: Package extension
-        run: npx @vscode/vsce package
-
-      - name: Resolve VSIX name
-        id: package_info
+      - name: Publish extension to VS Code Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         shell: bash
         run: |
-          VSIX_NAME="kigumi-${{ steps.release_tag.outputs.version }}.vsix"
-          if [ ! -f "$VSIX_NAME" ]; then
-            echo "Expected VSIX not found: $VSIX_NAME" >&2
-            ls -la *.vsix || true
-            exit 1
+          EXTRA_ARGS=()
+          if [ "${{ coalesce(inputs.kigumi_prerelease, github.event.inputs.kigumi_prerelease, false) }}" = "true" ]; then
+            EXTRA_ARGS+=(--pre-release)
           fi
-          echo "vsix_name=${VSIX_NAME}" >> "$GITHUB_OUTPUT"
+          npx @vscode/vsce publish --packagePath "${{ needs.build_kigumi.outputs.vsix_name }}" --pat "$VSCE_PAT" "${EXTRA_ARGS[@]}"
+
+  publish_kigumi_ovsx:
+    name: Publish kigumi to Open VSX
+    needs:
+      - build_kigumi
+    runs-on: ubuntu-latest
+    if: ${{ coalesce(inputs.kigumi_publish_ovsx, github.event.inputs.kigumi_publish_ovsx) && needs.resolve_tag.outputs.prefix == 'kigumi' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: kigumi-vsix
+          path: .
+
+      - name: Publish extension to Open VSX
+        env:
+          OVSX_PAT: ${{ secrets.OPENVSXPAT }}
+        shell: bash
+        run: |
+          EXTRA_ARGS=()
+          if [ "${{ coalesce(inputs.kigumi_prerelease, github.event.inputs.kigumi_prerelease, false) }}" = "true" ]; then
+            EXTRA_ARGS+=(--pre-release)
+          fi
+          npx ovsx publish "${{ needs.build_kigumi.outputs.vsix_name }}" --pat "$OVSX_PAT" "${EXTRA_ARGS[@]}"
+
+  create_release:
+    name: Create GitHub Release
+    needs:
+      - resolve_tag
+    if: ${{
+      (needs.resolve_tag.outputs.prefix == 'kumiki' && coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release)) ||
+      (needs.resolve_tag.outputs.prefix == 'kigumi' && coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release))
+    }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download kumiki assets
+        if: ${{ needs.resolve_tag.outputs.prefix == 'kumiki' && coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release) }}
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: kumiki-dist
+
+      - name: Download kigumi assets
+        if: ${{ needs.resolve_tag.outputs.prefix == 'kigumi' && coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release) }}
+        uses: actions/download-artifact@v4
+        with:
+          name: kigumi-vsix
+          path: kigumi-dist
+
+      - name: Build release file list
+        id: files
+        shell: bash
+        run: |
+          files=()
+          if [ "${{ coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release) }}" = "true" ]; then
+            files+=("kumiki-dist/dist/*")
+          fi
+          if [ "${{ coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release) }}" = "true" ]; then
+            files+=("kigumi-dist/*.vsix")
+          fi
+          printf '%s\n' "${files[@]}" > release-files.txt
+          echo "files=$(python -c 'import json,sys; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))' < release-files.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.release_tag.outputs.tag }}
-          name: Kigumi v${{ steps.release_tag.outputs.version }}
+          tag_name: ${{ needs.resolve_tag.outputs.tag }}
+          name: ${{ needs.resolve_tag.outputs.tag }}
           generate_release_notes: true
           body: |
-            VS Code extension release for Kigumi v${{ steps.release_tag.outputs.version }}.
+            Release for tag ${{ needs.resolve_tag.outputs.tag }}.
 
-            Install locally from the attached `.vsix`:
-
-            ```bash
-            code --install-extension kigumi-${{ steps.release_tag.outputs.version }}.vsix
-            ```
-          files: kigumi/${{ steps.package_info.outputs.vsix_name }}
+            This release contains the selected kumiki and/or kigumi artifacts.
+          files: ${{ fromJson(steps.files.outputs.files) }}
