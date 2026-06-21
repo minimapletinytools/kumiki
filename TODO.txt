@@ -109,37 +109,6 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 :: TODO
 
 
--update kumiki sidebar scaning:
-  -lets update the sidebar project scanning, it has 2 distinct things contexts:
-    -workspace
-    -libraries (kumiki somewhat special)
-  and does 2 things
-    -scan for frames
-    -scan for patterns
-  the explorer as it is shows frames followed by patterns
-  within it, it should always show workspace first followed by kumiki, followed by other libraries
-  some heuristics and the project.json are used to reduce time spent scanning libraries for frames/patterns
-  when in local development mode, library scanning is disabled, and kumiki stuff just shows up as workspace stuff
-  This is mostly working already but please do the following:
-    -library frame scanning appears to be broken, please fix
-    -make sure the ordering is workspace > kumiki > other libraries 
-    -update the project index for libraries to also include examples to reduce scanning needs
-
-- update relase workflow and skills
-  lets update our release workflow and relaese skill, do the following
-  - create ONE workflow that takes a TAG input (defaults to most recent tag if left empty) and has the following choices
-    - publish kigumi to openVSX (optionally as a prerelaes)
-    - publish kigumi to vscode marketplace (optionally as a prerelaes)
-    - publish kumiki to pypi or testpi
-    - create a relaes for kumiki on the relaes page
-    - create a release for kigumi on the relase page (it's ONE release that contains  kigumi and/or kumiki for the tagged version based which options were selected)
-  - existing release/pbulish workflows can be converted to composite or resuable workflows or whatever that are called by the above
-  - so this way we can do release of kigumi and/or kumiki and have full control over things
-  - by default, we publish as a release to both extension marketplaces nad we publish to pypi and cerate a relase for both kigumi and kumiki
-  - update the current release skill to reflect this new process. the tag pushing part is still manual so the process goes
-    - create tags and push them
-    - kick of workflow to do release for the targets we chose
-
 -make the refresh button more prominent in the viewer itself
 -do setup vid
 -do shower vid
@@ -410,6 +379,38 @@ M3.5
 
 
 :: TODONE 
+
+DONE-update kumiki sidebar scaning:
+  -lets update the sidebar project scanning, it has 2 distinct things contexts:
+    -workspace
+    -libraries (kumiki somewhat special)
+  and does 2 things
+    -scan for frames
+    -scan for patterns
+  the explorer as it is shows frames followed by patterns
+  within it, it should always show workspace first followed by kumiki, followed by other libraries
+  some heuristics and the project.json are used to reduce time spent scanning libraries for frames/patterns
+  when in local development mode, library scanning is disabled, and kumiki stuff just shows up as workspace stuff
+  This is mostly working already but please do the following:
+    -library frame scanning appears to be broken, please fix
+    -make sure the ordering is workspace > kumiki > other libraries 
+    -update the project index for libraries to also include examples to reduce scanning needs
+
+DONE- update relase workflow and skills
+  lets update our release workflow and relaese skill, do the following
+  - create ONE workflow that takes a TAG input (defaults to most recent tag if left empty) and has the following choices
+    - publish kigumi to openVSX (optionally as a prerelaes)
+    - publish kigumi to vscode marketplace (optionally as a prerelaes)
+    - publish kumiki to pypi or testpi
+    - create a relaes for kumiki on the relaes page
+    - create a release for kigumi on the relase page (it's ONE release that contains  kigumi and/or kumiki for the tagged version based which options were selected)
+  - existing release/pbulish workflows can be converted to composite or resuable workflows or whatever that are called by the above
+  - so this way we can do release of kigumi and/or kumiki and have full control over things
+  - by default, we publish as a release to both extension marketplaces nad we publish to pypi and cerate a relase for both kigumi and kumiki
+  - update the current release skill to reflect this new process. the tag pushing part is still manual so the process goes
+    - create tags and push them
+    - kick of workflow to do release for the targets we chose
+
 
 DONE-screenshot capability broken (test the new one)
 DONE-open viewer works, but you also need a refresh after changes are made command for agent to use

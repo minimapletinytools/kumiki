@@ -97,7 +97,15 @@ class KigumiSidebarProvider {
         }
 
         if (element.type === 'framesRoot') {
-            return this.getFrameFileNodes();
+            return this.getWorkspaceFrameNodes();
+        }
+
+        if (element.type === 'exampleFramesRoot') {
+            return this.getLibraryFrameNodes();
+        }
+
+        if (element.type === 'libraryFrameGroup') {
+            return this.getLibraryFrameGroupChildren(element.data.items);
         }
 
         if (element.type === 'patternsRoot') {
@@ -519,23 +527,32 @@ class KigumiSidebarProvider {
             contextValue: 'kumikiWebsiteAction',
         }));
 
-        const frameCount = this._state.frames.length;
+        const wsFrameCount = this._state.frames.length;
         nodes.push(new SidebarNode({
             key: 'frames-root',
             type: 'framesRoot',
-            label: this._state.isScanning ? 'Frames (scanning...)' : `Frames (${frameCount})`,
+            label: this._state.isScanning ? 'Frames (scanning...)' : `Frames (${wsFrameCount})`,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             iconPath: new vscode.ThemeIcon(this._state.isScanning ? 'loading~spin' : 'symbol-class'),
         }));
 
-        const pbCount = this._state.workspacePatternbooks.length;
+        const libFrameCount = (this._state.shippedExamples || []).length + (this._state.dependencyExamples || []).length;
+        if (libFrameCount > 0) {
+            nodes.push(new SidebarNode({
+                key: 'example-frames-root',
+                type: 'exampleFramesRoot',
+                label: 'Example Frames',
+                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                iconPath: new vscode.ThemeIcon('symbol-folder'),
+            }));
+        }
+
         nodes.push(new SidebarNode({
             key: 'patterns-root',
             type: 'patternsRoot',
             label: this._state.isScanning ? 'Patterns (scanning...)' : 'Patterns',
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             iconPath: new vscode.ThemeIcon(this._state.isScanning ? 'loading~spin' : 'symbol-array'),
-            description: this._state.isScanning ? '' : `${pbCount} workspace patternbook${pbCount === 1 ? '' : 's'}`,
         }));
 
         const totalErrors = this._state.discoveryErrors.length + this._state.scanErrors.length;
@@ -626,7 +643,7 @@ class KigumiSidebarProvider {
         })];
     }
 
-    getFrameFileNodes() {
+    getWorkspaceFrameNodes() {
         const nodes = [];
         if (this._state.isScanning) {
             nodes.push(new SidebarNode({
@@ -638,11 +655,8 @@ class KigumiSidebarProvider {
         }
 
         const wsFrames = this._state.frames || [];
-        const shippedFrames = this._state.shippedExamples || [];
-        const depFrames = this._state.dependencyExamples || [];
-        const totalFrames = wsFrames.length + shippedFrames.length + depFrames.length;
 
-        if (totalFrames === 0) {
+        if (wsFrames.length === 0) {
             nodes.push(new SidebarNode({
                 key: 'frames-empty',
                 type: 'placeholder',
@@ -653,7 +667,6 @@ class KigumiSidebarProvider {
             return nodes;
         }
 
-        // Workspace frames
         nodes.push(...wsFrames.map((frameFile) => new SidebarNode({
             key: `frame-file:workspace:${frameFile.filePath}`,
             type: 'frameFile',
@@ -668,43 +681,64 @@ class KigumiSidebarProvider {
             data: frameFile,
         })));
 
+        return nodes;
+    }
+
+    getLibraryFrameNodes() {
+        const nodes = [];
+        const shippedFrames = this._state.shippedExamples || [];
+        const depFrames = this._state.dependencyExamples || [];
+
         // Kumiki frames
         if (shippedFrames.length > 0) {
-            nodes.push(...shippedFrames.map((item) => new SidebarNode({
-                key: `frame-file:kumiki:${item.sourceFile}`,
-                type: 'frameFile',
-                label: item.name,
-                description: '(kumiki)',
-                collapsibleState: vscode.TreeItemCollapsibleState.None,
-                command: {
-                    title: 'Open frame file',
-                    command: 'kigumi.openFrameFromSidebar',
-                    arguments: [item.sourceFile],
-                },
-                iconPath: new vscode.ThemeIcon('file-code'),
-                data: item,
-            })));
+            nodes.push(new SidebarNode({
+                key: 'library-frames:kumiki',
+                type: 'libraryFrameGroup',
+                label: 'Kumiki',
+                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                iconPath: new vscode.ThemeIcon('package'),
+                data: { items: shippedFrames },
+            }));
         }
 
-        // Dependency frames
-        if (depFrames.length > 0) {
-            nodes.push(...depFrames.map((item) => new SidebarNode({
-                key: `frame-file:dep:${item.sourceFile}`,
-                type: 'frameFile',
-                label: item.name,
-                description: '(library)',
-                collapsibleState: vscode.TreeItemCollapsibleState.None,
-                command: {
-                    title: 'Open frame file',
-                    command: 'kigumi.openFrameFromSidebar',
-                    arguments: [item.sourceFile],
-                },
-                iconPath: new vscode.ThemeIcon('file-code'),
-                data: item,
-            })));
+        // Group dependency frames by library name
+        const depsByLib = {};
+        for (const item of depFrames) {
+            const libName = item.name || path.basename(item.sourceFile, '.py');
+            if (!depsByLib[libName]) {
+                depsByLib[libName] = [];
+            }
+            depsByLib[libName].push(item);
+        }
+
+        for (const libName of Object.keys(depsByLib).sort()) {
+            nodes.push(new SidebarNode({
+                key: `library-frames:dep:${libName}`,
+                type: 'libraryFrameGroup',
+                label: libName,
+                collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                iconPath: new vscode.ThemeIcon('extensions'),
+                data: { items: depsByLib[libName] },
+            }));
         }
 
         return nodes;
+    }
+
+    getLibraryFrameGroupChildren(items) {
+        return (items || []).map((item) => new SidebarNode({
+            key: `frame-file:library:${item.sourceFile}`,
+            type: 'frameFile',
+            label: item.name,
+            collapsibleState: vscode.TreeItemCollapsibleState.None,
+            command: {
+                title: 'Open frame file',
+                command: 'kigumi.openFrameFromSidebar',
+                arguments: [item.sourceFile],
+            },
+            iconPath: new vscode.ThemeIcon('file-code'),
+            data: item,
+        }));
     }
 
     getPatternSectionNodes() {
@@ -720,14 +754,12 @@ class KigumiSidebarProvider {
             }));
         }
 
-        // Workspace patternbooks section
+        // Workspace patterns section
         const pbCount = this._state.workspacePatternbooks.length;
         nodes.push(new SidebarNode({
             key: 'pattern-section:workspace-patternbooks',
             type: 'patternSection',
-            label: this._groupByPatternbook
-                ? `Workspace (${pbCount} patternbook${pbCount === 1 ? '' : 's'})`
-                : 'Workspace patterns',
+            label: `Workspace (${pbCount})`,
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             iconPath: new vscode.ThemeIcon('folder-opened'),
             data: { sectionKey: 'workspace-patternbooks' },
