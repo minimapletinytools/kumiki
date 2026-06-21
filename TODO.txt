@@ -1,28 +1,5 @@
-:: 6/20 THE BIG JOINT REORG
+:: 6/21 patternbook refacotr notes
 
-Do the big joint refactor, we will refactor joints to be sorted by their arrangement type rather than how they are organized right now. So the new joint files should be: 
-
--corner_joints
--splice_joints
--butt_joints
--multi-butt joints (double/triple/quadruple butt joints)
--cross_joints
--board_joints
--compound_joints
--free_joints
--decorative_joints
--basic_joints (same as is right now)
-
-these all still remain in the workshop folder.
-
-the non joint files should be moved into a "shavings" folder e.g. files like shavings.py, build-a-butt, notching, etc)
-
-Come up with a plan first and confirm with me befor eimplementing
-
-
-
-
-:: 6/21/2026 THE BIG PATTERNBOOK REFACTOR
 -patternbook refactor
   -get rid of explicit patternbook class, we will replace patterns with a hirearchical + tag system
   -at the top level, patterns are lumped either into a library or a workspace, this won't change, this is like a special top level folder that can be optionally disabled when displaying (don't worry about this part for now)
@@ -43,25 +20,18 @@ Come up with a plan first and confirm with me befor eimplementing
       -when "main" is not in the tag selection list, just display an unhirerchical list of all filtered joints, the displayed joint name should still include the path up until its first "main" parent
   -add a doc somewhere explaninig how the patternbook system works, keep it CONCISE but definitely outline all the rules, basicalyl just reformat what I wrote above and add anything that might be missing.
     
+
+
+  
   
 
-:: 6/9 adeline notes
+:: 6/21 WEBSITE INSTALL GUIDE
 
--installing uv is weird
-  -didn't know about running in the terminal
-  -installing python is easy <- should support both python and uv
-    -was python needed? not sure
-  -open workspace step was confusing
--names of joints and timbers is hard to understand, but figured it out over time yay
--pattern book is hard to find
+Kumiki is used with the Kigumi VSCode extension. To install Kigumi and use Kumiki do the following:
 
--having better axis labels
-DONE-no way to update agent usage instructions
-DONE-layers menu is covering the info
--very easy to confuse faces on timbers with faces on camera
--agent is having hard time understanding what the inset shoulder
--if you ask it to take a screenshot it wille xport as obj and then starts an http server LOL
--board doing scissor joints need a good way to do this... (use timebr or boards?)
+1. install [VSCode](https://code.visualstudio.com/)
+2. install the [Kigumi VSCode extension](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi), kigumi is also [available on OpenVSX](https://open-vsx.org/extension/minimaple/kigumi) if you're using Cursor and also available on our [release page](https://github.com/minimapletinytools/kumiki/releases) as a .vsix file if you prefer that for some reason.
+3. install either [uv](https://docs.astral.sh/uv/getting-started/installation/#__tabbed_1_1) or [python](https://www.python.org/downloads/), you can skip this step if you already have one of them installed
 
 
 
@@ -138,191 +108,8 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 
 
 
-:: 3/17/2026 selection / layer view
+:: TODO
 
-Lets add a layout view.... We want a menu in the webview part of the viewer that spans the entire left side that has an option >> expansion thingy to collapse it.
-
-it should have no background or a light transparent background (similar to fusion 360's layer menu view)
-
-it should contain a hirerchacial list view. so ecah time you go down alevel it indents by a bit.
-
-For now, the list view contais the following:
-
-- timbers
-  - list of all timbers
-    - list of cuttings on the timber
-- joints
-  - list of all joints
-     - list of timber+cutting (so these are just cuttings, since cuttings belong to both joints and timber,s list the timber name as well here)
-     - list af accesories belonging to the joint
-
-cuttings have a sub hierrachy although these will never have persisted state associated with them and may not support things like hide/lock (these are feature we may want to add later)
--list of tagged CSGs on the cutting
-  -list of features in the tagged CSG, 
-
-Accessories do not have the sub hierarchy for CSG/features
-
-we may support stuff like locking, fixing and hiding through the layers view in the future so make sure to architect it to support this
-
-when you select an element in the viewer it should also highlight in the layers view and conversely as well
-so basically there needs to be mapping sbetween th eselection manage,r layers view and main view.
-
-Propose a refactor to suppor this.
-
-
-
-
--the layers view should not have a scroll bar OVERLAY over the existing view             
--hide the show/lock icons for now since tehy aren't implemneted
-
-
-
-
-:: 4/14/2026 drawing generation coad
-
-automatic drawing
-- ensures every feature can be solved
-- can tag features to be used as reference features and drawer prioritizes drawing to these features
-- can tag features with pN to determine order which they get solved in. And P0 means a reference feature
-- solve the feature tree such taht each feature is referenced to some other fetaure and teh entire tree is navigatable
-- can tag features as no measure
-- some feature are coincident (e.g. one face of a row of ortise holes are all coplanar) and only one of the needs to be drawn
-  - this can be represented as a "shares plane" or whatever measure so no specila treatment neede necessarily
-bonus
--in UI, can select which fetaure to use a reference to draw some other feature
-  -so ecah feature has a list of features it is measured to
-
-
-CoAD based feature refreenceing
-we have a way to reference any feature on the cut timbers, so this will be the unit that CoAD drawing is done from
-
-case study: double miter 2x4 with double miter on both end
-- first flag one vertex and adjacent edge as p0
-  - all miter angles will get mesaured to this edge by default 
-- flag the opposite vertex as p1 and the remaining vertices are flagged as p∞ as we don't want to show solutions for them in the drawing
-- using default drawer, we get the first set of stuff we need
-- next, use custom drawer, we could generate a table referencing each miter angle in the drawing write the matching bevel angle for it into a table
-- I guess we could also mark the bevel angle directly on the drawnig
-- we could create a feature plane that cuts on the first miter and then use that to generate the bevel angle directly in the 3d view!
-
-
-
-:: 3/30/2026 kumiki viewer environment
-
-- when you open a my_structure.py file with the extension
-- check the parent folder for an existing .kumiki/project.yaml file which will contain info on the python environment and the girrafecad version, otheriwse create it using the latest version available
-- cerate teh python virtual environment to run runner.py in
-
-
-
-:: V0 release TODO
-DONE-finalize kigumi functions
-  -add menu, menu should populate list of patterns and projects in the open folder (maybe ditch the in-viewer thing)
-DONE-come up with sensible instalation strat
-  -do pip package for release
-  DONE-do proper python env on installing extension, maybe add installation loading screen
-  -do vscode extension release
-DONE-add generic miter joint
-DONE/IGNORE-do the layers view for timbers and joints, don't do projects/patterns since you can put that in the menu, or maybe youshould still just do it? idk
-DONE-get round drawbores working (holes not round and they drawbores get rendered at the origin)
-DONE-make the initilaize kigumi prjoect an actually BUTTON rather than just ar egular text thing that you click on
-DONE-add initalizing progress bar that also prevents you from double running the initialize method, in general the initilaize method should check if initailzation is already in progress
-DONE-create a better default my_cute_frame (the current one does not work, calls non existing bulid_cube_frame function, instead make a super simple saw hores as teh example or somethnig
-DONE-lock hide is broken
-DONE-fix my cute frame, why are accessories not rendering correctl (need to fix round drawbore)
-DONE-make cute frame tenons more flat and add draw bores just for fun
-IGNORE-test the networkx fallback thing or remove it
-DONE-selecting in viewer does not deselect in layer sview
-DONE-increase contrast between background and objects
-DONE-or maybe reduce global lighting so faces are more pronounced
-DONE-integrate layers view with regular view
-DONE-BUG joints view in layers does not show any joints for my cute frame
-DONE-update my cute frame to use the python example or rupdate the example..
-DONE-BUG patterns from kumiki do load in sid ebar but most can't be opened and view source/duplicate is broken
-DONE-when viewing pattern books view in sidebar, you should eb abel to open the entire pattern book 
-DONE-opening pattern errors should go to console. Im' not sure why it's not, so hard to get errors
-DONE-indent for joints layers view is broken
-DONE-fresh install not picking up patterns in kumiki library
-DONE-add a command to open kigumi in the left hand side bar
-DONE-create sensible kigumi commands, and remove or hide the rest with kigumiinternalignoreme or osmething
-  -Kigumi: Open explorer
-  -Kigumi: Open Current File in Viewer
-DONE-top level "timbers" and "joints" folder text in the layers view should be bolded
-DONE-set shadows to be off by default
-DONE-the viewer area should be slightly smaller vertically so that it's easier to see and interact with the non-viewer area at the bottom
-IGNORE/DONE-shadows broken in tinyshed120
-DONE-text over dark background still needs to be fixed
-IGNORE-even scrolling down a little bit shows the "scorll to top" button
-  DONE-or perhaps if window is scrolled even a bit, scrolling the top view scrolls the entire window
-DONE-layers view needs to be scrollable 
-DONE-layers view should be IN the webview, or at least cropped to not overflow it
-DONE-kigumi sidebar
-  DONE-remove the rocket ship initialize kigumi buton from the top bar
-  DONE-rmove the play button from teh top bar
-  DONE-there seem to be 2x refresh buttons in the top bar, we only need 1
-  DONE-add a current/latest kumiki version display, fetch version from https://pypi.org/project/kumiki/
-  DONE-add an update kumiki button to kigumi
-  DONE-add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
-DONE-ensure make pattern-index before each publish (maybe run as part of the bump version job)
-DONE/IGNORE-BUG my_cute_frame no longer getting scanned
-DONE-fix export
-  DONE-add buttons
-  DONE-add cadquery check and install button ugh
-DONE-cleanup the bottom area for kigumi
-  DONE-tighten the member list, dimenison + rought cut 
-  DONE-add export button
-  DONE-remove the patternbook
-DONE-kigumi init
-  DONE-initilaize project should also set .gitignor
-  DONE-update kumiki should be grayed out if no project is initialized and it should just not show at all acutaly..
-  DONE-initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
-  DONE-initialize kigumi project button line should show "initailizing project..." while initialization is in project. so in summary it has the following stase:
-    -initialize project
-    -initializing
-    -kumiki dev mode
-    -don't show at all (if project is detected)
-DONE-make sure kigumi installs ltaest version of kumiki
-DONE-finish docs
-  DONE-finish README
-  DONE-finish agents doc
-  DONE/IGNORE-finish and remove docs folder?
-DONE-viewer should show *changes detected" in teh webview and maybe offer ar efresh button, or just move the parmeters refresh thing to be more prominent
-IGNORE-come up with better names fro command so its easier to find the important ones
-IGNORE/DONE-searching
-  DONE-show layer tags is broken
-  -maybe layer tags should show in the list view at the bottom instead?
-  -have a drop down list all tags thing that you can click + select rather than search?
-  -searching should search for either tags or joint name (figure out a way to do this)
-DONE-test installation
-  DONE-raw installation of kigumi, installs deps
-  DONE-create new project/design
-  DONE-able to open patterns and copy them into self workspace
-DONE-do a design pass
-  DONE-timber list view should actually be useful
-  DONE-stuff showing below the view should be cleaner/tighter 
-  IGNORE-move focus button maybe
-  IGNORE-make the gizmos slightly trasparent?
-DONE-camera controls should be absolute? use focus to reset
-DONE-add camera mode toggle
-  -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
-DONE-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
-DONE-kigumi readme update
-DONE-update copilot-insturctions to ponit directly to agent_usage_insturctions
-DONE-make website
-  make a website for kumiki/kigumi in the website folder. I added some photos in there for you to use. the website should be a super simple site that matches the usual programming library website. It should have 2 buttons, one that goes to github, and one that takes you to a how to install page. use a static page library for the website and make it work with github pages althought I will point to it from another domain at some point
-  -get domain D:
-DONE/IGNORE-test
-  -screenshot funcitonality still broken
-    -expsoe caputre screenshot command, not sure where it went
-  -refresh the frame viewer command seems to be be broken
-  -rename project.yaml to kigumi.yaml (no bw campatability please)
-DONE-do one more install pass
-
--do setup vid
--do shower vid
--do example cleanup
--make website
-  -get domain D:
 
 -update kumiki sidebar scaning:
   -lets update the sidebar project scanning, it has 2 distinct things contexts:
@@ -339,14 +126,27 @@ DONE-do one more install pass
     -library frame scanning appears to be broken, please fix
     -make sure the ordering is workspace > kumiki > other libraries 
     -update the project index for libraries to also include examples to reduce scanning needs
-  
 
--do the big joint reorg 
-  - 3 pattern list modes
-    - sort by joint arrangement type and other major groups (default)
-    - by patternbook
-    - 1 big list 
+- update relase workflow and skills
+  lets update our release workflow and relaese skill, do the following
+  - create ONE workflow that takes a TAG input (defaults to most recent tag if left empty) and has the following choices
+    - publish kigumi to openVSX (optionally as a prerelaes)
+    - publish kigumi to vscode marketplace (optionally as a prerelaes)
+    - publish kumiki to pypi or testpi
+    - create a relaes for kumiki on the relaes page
+    - create a release for kigumi on the relase page (it's ONE release that contains  kigumi and/or kumiki for the tagged version based which options were selected)
+  - existing release/pbulish workflows can be converted to composite or resuable workflows or whatever that are called by the above
+  - so this way we can do release of kigumi and/or kumiki and have full control over things
+  - by default, we publish as a release to both extension marketplaces nad we publish to pypi and cerate a relase for both kigumi and kumiki
+  - update the current release skill to reflect this new process. the tag pushing part is still manual so the process goes
+    - create tags and push them
+    - kick of workflow to do release for the targets we chose
 
+-do setup vid
+-do shower vid
+-do example cleanup
+-make website
+  -get domain D:
 -try and run a full loop agent test on this to see if it all works
 -agent prompt examples
 -new kigumi icon
@@ -366,36 +166,7 @@ DONE-do one more install pass
 
 
 
-:: TODO
-DONE-screenshot capability broken (test the new one)
-DONE-open viewer works, but you also need a refresh after changes are made command for agent to use
-DONE-improve agent instructions
-  DONE-create a TLDR; section at the top outlining general workflow
-  DONE-suggest what to do when 3 wood intersects
-DONE-DOCS
-  DONE-explain parameterization
-DONE-NON PERFECT TIMBER
-  DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
-  DONE-add round timber stuff
-  DONE-add asserts to joint functions to indicate if they can support non perfect timbers
-DONE-fix accessory export
-DONE-add 3mf or some other format better than STL for combined
-DONE-add settings savigns
-  -test it
-DONE-round mortise and tenon
-DONE-update kumiki should also recopy the docs folder
-DONE?-clicking on patterns opens both the pattern and pattern book on my new mac...
-DONE-click on patterns holud lawys open in existing collumn by default, not in an ew collumn ugh
-DONE-2 kigumi version files
-DONE-fix layers view in kigumi covering title
-  the layers view (wher ethe joint and timber list is shown) should have the following changes:
-    1. it should show up below the "title/selection" bar at the top left corner, right now it overlaps it.
-    2. it should be default collapsed
-    3. in it collapsed state, it should look something like []> timber list]
-DONE/IGNORE-it would be better just to have agent point to docs files inside kigumi libarry, you can also add a view docs vscode command
-
 -what is "paternbook_exmaple" and why is it broken?
-
 -improve erroring on initialize due to missing deps
 -add support for actual AABB render mode
   -BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
@@ -640,6 +411,34 @@ M3.5
 
 
 :: TODONE 
+
+DONE-screenshot capability broken (test the new one)
+DONE-open viewer works, but you also need a refresh after changes are made command for agent to use
+DONE-improve agent instructions
+  DONE-create a TLDR; section at the top outlining general workflow
+  DONE-suggest what to do when 3 wood intersects
+DONE-DOCS
+  DONE-explain parameterization
+DONE-NON PERFECT TIMBER
+  DONE-do mortise and tenon joint test with round timebr to see wha thappen lol
+  DONE-add round timber stuff
+  DONE-add asserts to joint functions to indicate if they can support non perfect timbers
+DONE-fix accessory export
+DONE-add 3mf or some other format better than STL for combined
+DONE-add settings savigns
+  -test it
+DONE-round mortise and tenon
+DONE-update kumiki should also recopy the docs folder
+DONE?-clicking on patterns opens both the pattern and pattern book on my new mac...
+DONE-click on patterns holud lawys open in existing collumn by default, not in an ew collumn ugh
+DONE-2 kigumi version files
+DONE-fix layers view in kigumi covering title
+  the layers view (wher ethe joint and timber list is shown) should have the following changes:
+    1. it should show up below the "title/selection" bar at the top left corner, right now it overlaps it.
+    2. it should be default collapsed
+    3. in it collapsed state, it should look something like []> timber list]
+DONE/IGNORE-it would be better just to have agent point to docs files inside kigumi libarry, you can also add a view docs vscode command
+
 
 DONE-UI whatever
   DONE-output proper error if you try and open a non-frame file
@@ -1407,6 +1206,233 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: END TODONE
+
+:: 6/20 THE BIG JOINT REORG
+
+Do the big joint refactor, we will refactor joints to be sorted by their arrangement type rather than how they are organized right now. So the new joint files should be: 
+
+-corner_joints
+-splice_joints
+-butt_joints
+-multi-butt joints (double/triple/quadruple butt joints)
+-cross_joints
+-board_joints
+-compound_joints
+-free_joints
+-decorative_joints
+-basic_joints (same as is right now)
+
+these all still remain in the workshop folder.
+
+the non joint files should be moved into a "shavings" folder e.g. files like shavings.py, build-a-butt, notching, etc)
+
+Come up with a plan first and confirm with me befor eimplementing
+
+
+
+
+:: 6/9 adeline notes
+
+-installing uv is weird
+  -didn't know about running in the terminal
+  -installing python is easy <- should support both python and uv
+    -was python needed? not sure
+  -open workspace step was confusing
+-names of joints and timbers is hard to understand, but figured it out over time yay
+-pattern book is hard to find
+
+-having better axis labels
+DONE-no way to update agent usage instructions
+DONE-layers menu is covering the info
+-very easy to confuse faces on timbers with faces on camera
+-agent is having hard time understanding what the inset shoulder
+-if you ask it to take a screenshot it wille xport as obj and then starts an http server LOL
+-board doing scissor joints need a good way to do this... (use timebr or boards?)
+
+
+
+
+:: 3/17/2026 selection / layer view
+
+Lets add a layout view.... We want a menu in the webview part of the viewer that spans the entire left side that has an option >> expansion thingy to collapse it.
+
+it should have no background or a light transparent background (similar to fusion 360's layer menu view)
+
+it should contain a hirerchacial list view. so ecah time you go down alevel it indents by a bit.
+
+For now, the list view contais the following:
+
+- timbers
+  - list of all timbers
+    - list of cuttings on the timber
+- joints
+  - list of all joints
+     - list of timber+cutting (so these are just cuttings, since cuttings belong to both joints and timber,s list the timber name as well here)
+     - list af accesories belonging to the joint
+
+cuttings have a sub hierrachy although these will never have persisted state associated with them and may not support things like hide/lock (these are feature we may want to add later)
+-list of tagged CSGs on the cutting
+  -list of features in the tagged CSG, 
+
+Accessories do not have the sub hierarchy for CSG/features
+
+we may support stuff like locking, fixing and hiding through the layers view in the future so make sure to architect it to support this
+
+when you select an element in the viewer it should also highlight in the layers view and conversely as well
+so basically there needs to be mapping sbetween th eselection manage,r layers view and main view.
+
+Propose a refactor to suppor this.
+
+
+
+
+-the layers view should not have a scroll bar OVERLAY over the existing view             
+-hide the show/lock icons for now since tehy aren't implemneted
+
+
+
+
+:: 4/14/2026 drawing generation coad
+
+automatic drawing
+- ensures every feature can be solved
+- can tag features to be used as reference features and drawer prioritizes drawing to these features
+- can tag features with pN to determine order which they get solved in. And P0 means a reference feature
+- solve the feature tree such taht each feature is referenced to some other fetaure and teh entire tree is navigatable
+- can tag features as no measure
+- some feature are coincident (e.g. one face of a row of ortise holes are all coplanar) and only one of the needs to be drawn
+  - this can be represented as a "shares plane" or whatever measure so no specila treatment neede necessarily
+bonus
+-in UI, can select which fetaure to use a reference to draw some other feature
+  -so ecah feature has a list of features it is measured to
+
+
+CoAD based feature refreenceing
+we have a way to reference any feature on the cut timbers, so this will be the unit that CoAD drawing is done from
+
+case study: double miter 2x4 with double miter on both end
+- first flag one vertex and adjacent edge as p0
+  - all miter angles will get mesaured to this edge by default 
+- flag the opposite vertex as p1 and the remaining vertices are flagged as p∞ as we don't want to show solutions for them in the drawing
+- using default drawer, we get the first set of stuff we need
+- next, use custom drawer, we could generate a table referencing each miter angle in the drawing write the matching bevel angle for it into a table
+- I guess we could also mark the bevel angle directly on the drawnig
+- we could create a feature plane that cuts on the first miter and then use that to generate the bevel angle directly in the 3d view!
+
+
+
+:: 3/30/2026 kumiki viewer environment
+
+- when you open a my_structure.py file with the extension
+- check the parent folder for an existing .kumiki/project.yaml file which will contain info on the python environment and the girrafecad version, otheriwse create it using the latest version available
+- cerate teh python virtual environment to run runner.py in
+
+
+
+
+:: V0 release TODO
+DONE-finalize kigumi functions
+  -add menu, menu should populate list of patterns and projects in the open folder (maybe ditch the in-viewer thing)
+DONE-come up with sensible instalation strat
+  -do pip package for release
+  DONE-do proper python env on installing extension, maybe add installation loading screen
+  -do vscode extension release
+DONE-add generic miter joint
+DONE/IGNORE-do the layers view for timbers and joints, don't do projects/patterns since you can put that in the menu, or maybe youshould still just do it? idk
+DONE-get round drawbores working (holes not round and they drawbores get rendered at the origin)
+DONE-make the initilaize kigumi prjoect an actually BUTTON rather than just ar egular text thing that you click on
+DONE-add initalizing progress bar that also prevents you from double running the initialize method, in general the initilaize method should check if initailzation is already in progress
+DONE-create a better default my_cute_frame (the current one does not work, calls non existing bulid_cube_frame function, instead make a super simple saw hores as teh example or somethnig
+DONE-lock hide is broken
+DONE-fix my cute frame, why are accessories not rendering correctl (need to fix round drawbore)
+DONE-make cute frame tenons more flat and add draw bores just for fun
+IGNORE-test the networkx fallback thing or remove it
+DONE-selecting in viewer does not deselect in layer sview
+DONE-increase contrast between background and objects
+DONE-or maybe reduce global lighting so faces are more pronounced
+DONE-integrate layers view with regular view
+DONE-BUG joints view in layers does not show any joints for my cute frame
+DONE-update my cute frame to use the python example or rupdate the example..
+DONE-BUG patterns from kumiki do load in sid ebar but most can't be opened and view source/duplicate is broken
+DONE-when viewing pattern books view in sidebar, you should eb abel to open the entire pattern book 
+DONE-opening pattern errors should go to console. Im' not sure why it's not, so hard to get errors
+DONE-indent for joints layers view is broken
+DONE-fresh install not picking up patterns in kumiki library
+DONE-add a command to open kigumi in the left hand side bar
+DONE-create sensible kigumi commands, and remove or hide the rest with kigumiinternalignoreme or osmething
+  -Kigumi: Open explorer
+  -Kigumi: Open Current File in Viewer
+DONE-top level "timbers" and "joints" folder text in the layers view should be bolded
+DONE-set shadows to be off by default
+DONE-the viewer area should be slightly smaller vertically so that it's easier to see and interact with the non-viewer area at the bottom
+IGNORE/DONE-shadows broken in tinyshed120
+DONE-text over dark background still needs to be fixed
+IGNORE-even scrolling down a little bit shows the "scorll to top" button
+  DONE-or perhaps if window is scrolled even a bit, scrolling the top view scrolls the entire window
+DONE-layers view needs to be scrollable 
+DONE-layers view should be IN the webview, or at least cropped to not overflow it
+DONE-kigumi sidebar
+  DONE-remove the rocket ship initialize kigumi buton from the top bar
+  DONE-rmove the play button from teh top bar
+  DONE-there seem to be 2x refresh buttons in the top bar, we only need 1
+  DONE-add a current/latest kumiki version display, fetch version from https://pypi.org/project/kumiki/
+  DONE-add an update kumiki button to kigumi
+  DONE-add a go to website button in kigumi https://github.com/minimapletinytools/kumiki
+DONE-ensure make pattern-index before each publish (maybe run as part of the bump version job)
+DONE/IGNORE-BUG my_cute_frame no longer getting scanned
+DONE-fix export
+  DONE-add buttons
+  DONE-add cadquery check and install button ugh
+DONE-cleanup the bottom area for kigumi
+  DONE-tighten the member list, dimenison + rought cut 
+  DONE-add export button
+  DONE-remove the patternbook
+DONE-kigumi init
+  DONE-initilaize project should also set .gitignor
+  DONE-update kumiki should be grayed out if no project is initialized and it should just not show at all acutaly..
+  DONE-initializing kumiki project from kigumi should also copy the concepts folder or maybe just copy the whole docs folder
+  DONE-initialize kigumi project button line should show "initailizing project..." while initialization is in project. so in summary it has the following stase:
+    -initialize project
+    -initializing
+    -kumiki dev mode
+    -don't show at all (if project is detected)
+DONE-make sure kigumi installs ltaest version of kumiki
+DONE-finish docs
+  DONE-finish README
+  DONE-finish agents doc
+  DONE/IGNORE-finish and remove docs folder?
+DONE-viewer should show *changes detected" in teh webview and maybe offer ar efresh button, or just move the parmeters refresh thing to be more prominent
+IGNORE-come up with better names fro command so its easier to find the important ones
+IGNORE/DONE-searching
+  DONE-show layer tags is broken
+  -maybe layer tags should show in the list view at the bottom instead?
+  -have a drop down list all tags thing that you can click + select rather than search?
+  -searching should search for either tags or joint name (figure out a way to do this)
+DONE-test installation
+  DONE-raw installation of kigumi, installs deps
+  DONE-create new project/design
+  DONE-able to open patterns and copy them into self workspace
+DONE-do a design pass
+  DONE-timber list view should actually be useful
+  DONE-stuff showing below the view should be cleaner/tighter 
+  IGNORE-move focus button maybe
+  IGNORE-make the gizmos slightly trasparent?
+DONE-camera controls should be absolute? use focus to reset
+DONE-add camera mode toggle
+  -add a new toggle next to the "focus" button that has a little camear icon and either says "standard" or "free" default to standard. in standard mode, the y axis of the camera rotation is fixed to the Z axis of scene. In free mode it is as it is right now
+DONE-remove trash structures (or ceraet a new spot for them so they don't ship with the library)
+DONE-kigumi readme update
+DONE-update copilot-insturctions to ponit directly to agent_usage_insturctions
+DONE-make website
+  make a website for kumiki/kigumi in the website folder. I added some photos in there for you to use. the website should be a super simple site that matches the usual programming library website. It should have 2 buttons, one that goes to github, and one that takes you to a how to install page. use a static page library for the website and make it work with github pages althought I will point to it from another domain at some point
+  -get domain D:
+DONE/IGNORE-test
+  -screenshot funcitonality still broken
+    -expsoe caputre screenshot command, not sure where it went
+  -refresh the frame viewer command seems to be be broken
+  -rename project.yaml to kigumi.yaml (no bw campatability please)
+DONE-do one more install pass
+
 
 :: 4/14/2026 menu view (deprecated now that we have sidebar)
 So it goes as follows, the LHS has 3 sections in this order
