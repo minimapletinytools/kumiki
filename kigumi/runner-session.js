@@ -10,6 +10,18 @@ const { resolveProjectEnvironment } = require('./project-root');
 
 const ENV_SETUP_CACHE = new Map();
 
+function getKigumiVersion(extensionPath) {
+    const pkg = JSON.parse(fs.readFileSync(path.join(extensionPath, 'package.json'), 'utf8'));
+    return pkg.version;
+}
+
+// Returns a pip version specifier that constrains kumiki to the same major.minor as kigumi.
+// e.g. kigumi 0.3.2 → "kumiki~=0.3.0"  (pip ~= means >=0.3.0, <0.4.0)
+function kumikiCompatiblePipSpec(kigumiVersion) {
+    const [major, minor] = kigumiVersion.split('.').map(Number);
+    return `kumiki~=${major}.${minor}.0`;
+}
+
 class PythonRunnerSession {
     constructor(filePath, context, channel) {
         this.filePath = filePath;
@@ -357,7 +369,9 @@ class PythonRunnerSession {
             if (this.isLocalDev && fs.existsSync(path.join(this.projectRoot, 'pyproject.toml'))) {
                 await this.runCommand(pythonCmd, ['-m', 'pip', 'install', '-e', this.projectRoot]);
             } else {
-                await this.runCommand(pythonCmd, ['-m', 'pip', 'install', 'kumiki']);
+                const spec = kumikiCompatiblePipSpec(getKigumiVersion(this.context.extensionPath));
+                this.channel.appendLine(`[env] Installing ${spec}`);
+                await this.runCommand(pythonCmd, ['-m', 'pip', 'install', spec]);
             }
             installedViewerDeps = true;
         }
@@ -372,8 +386,7 @@ class PythonRunnerSession {
     }
 
     async checkKumikiVersionCompatibility(pythonCmd) {
-        const kigummiPkgPath = path.join(this.context.extensionPath, 'package.json');
-        const kigummiVersion = JSON.parse(fs.readFileSync(kigummiPkgPath, 'utf8')).version;
+        const kigummiVersion = getKigumiVersion(this.context.extensionPath);
         const [kigummiMajor, kigummiMinor] = kigummiVersion.split('.').map(Number);
 
         let kumikiVersion;
