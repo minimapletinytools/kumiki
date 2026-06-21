@@ -637,7 +637,12 @@ class KigumiSidebarProvider {
             }));
         }
 
-        if (this._state.frames.length === 0) {
+        const wsFrames = this._state.frames || [];
+        const shippedFrames = this._state.shippedExamples || [];
+        const depFrames = this._state.dependencyExamples || [];
+        const totalFrames = wsFrames.length + shippedFrames.length + depFrames.length;
+
+        if (totalFrames === 0) {
             nodes.push(new SidebarNode({
                 key: 'frames-empty',
                 type: 'placeholder',
@@ -648,8 +653,9 @@ class KigumiSidebarProvider {
             return nodes;
         }
 
-        nodes.push(...this._state.frames.map((frameFile) => new SidebarNode({
-            key: `frame-file:${frameFile.filePath}`,
+        // Workspace frames
+        nodes.push(...wsFrames.map((frameFile) => new SidebarNode({
+            key: `frame-file:workspace:${frameFile.filePath}`,
             type: 'frameFile',
             label: frameFile.relativePath,
             collapsibleState: vscode.TreeItemCollapsibleState.None,
@@ -661,6 +667,42 @@ class KigumiSidebarProvider {
             iconPath: new vscode.ThemeIcon('file-code'),
             data: frameFile,
         })));
+
+        // Kumiki frames
+        if (shippedFrames.length > 0) {
+            nodes.push(...shippedFrames.map((item) => new SidebarNode({
+                key: `frame-file:kumiki:${item.sourceFile}`,
+                type: 'frameFile',
+                label: item.name,
+                description: '(kumiki)',
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                command: {
+                    title: 'Open frame file',
+                    command: 'kigumi.openFrameFromSidebar',
+                    arguments: [item.sourceFile],
+                },
+                iconPath: new vscode.ThemeIcon('file-code'),
+                data: item,
+            })));
+        }
+
+        // Dependency frames
+        if (depFrames.length > 0) {
+            nodes.push(...depFrames.map((item) => new SidebarNode({
+                key: `frame-file:dep:${item.sourceFile}`,
+                type: 'frameFile',
+                label: item.name,
+                description: '(library)',
+                collapsibleState: vscode.TreeItemCollapsibleState.None,
+                command: {
+                    title: 'Open frame file',
+                    command: 'kigumi.openFrameFromSidebar',
+                    arguments: [item.sourceFile],
+                },
+                iconPath: new vscode.ThemeIcon('file-code'),
+                data: item,
+            })));
+        }
 
         return nodes;
     }

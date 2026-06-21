@@ -111,3 +111,41 @@ def build_frame() -> Frame:
 """
     info = analyze_source(src, "f.py")
     assert [e.name for e in info.frames] == ["build_frame"]
+
+
+def test_untyped_example_assignment_detected():
+    src = """
+from kumiki import Frame
+example = Frame.from_joints([])
+"""
+    info = analyze_source(src, "f.py")
+    assert [e.name for e in info.frames] == ["example"]
+
+
+def test_untyped_build_frame_assignment_detected():
+    src = """
+from kumiki import Frame
+build_frame = Frame()
+"""
+    info = analyze_source(src, "f.py")
+    assert [e.name for e in info.frames] == ["build_frame"]
+
+
+def test_untyped_build_frame_function_recognized():
+    src = """
+def build_frame():
+    return some_thing()
+"""
+    info = analyze_source(src, "f.py")
+    assert [e.name for e in info.frames] == ["build_frame"]
+    assert info.frames[0].kind == "function"
+
+
+def test_untyped_example_function_recognized():
+    src = """
+def example():
+    return something()
+"""
+    info = analyze_source(src, "f.py")
+    assert [e.name for e in info.frames] == ["example"]
+    assert info.frames[0].kind == "function"

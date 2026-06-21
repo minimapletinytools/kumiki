@@ -240,10 +240,24 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
                 info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
             continue
 
+        # Recognize example/build_frame assignments even if the RHS isn't a Frame() call
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                for name in _record_target_names(target):
+                    if name == "example" or name == "build_frame":
+                        info.frames.append(StaticEntry(name, "var", node.lineno))
+            continue
+
         # def name(...) -> Frame: ...
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             canonical = _annotation_target(node.returns, aliases)
             if canonical == _FRAME_NAME:
+                info.frames.append(StaticEntry(node.name, "function", node.lineno))
+            # Also recognize build_frame() even without explicit Frame annotation
+            elif node.name == "build_frame":
+                info.frames.append(StaticEntry(node.name, "function", node.lineno))
+            # Also recognize example() even without explicit Frame annotation
+            elif node.name == "example":
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
 
     return info
