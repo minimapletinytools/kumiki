@@ -16,10 +16,21 @@ Use this skill when asked to bump version(s) for kumiki and/or kigumi and publis
   - kumiki: `kumiki-v<version>`
   - kigumi: `kigumi-v<version>`
 
+## Version coupling rule
+
+**kumiki and kigumi must share the same major.minor version at all times.**
+kigumi enforces this at runtime and will refuse to start if they diverge.
+
+- Patch bumps (`0.3.1`, `0.3.2`, …) are independent — only bump the project that changed.
+- **Minor (or major) bumps must always bump both projects together to the same major.minor.**
+  This is required whenever kumiki introduces a breaking API change that kigumi depends on.
+- When the user says "breaking change" or asks for a `minor`/`major` bump, always target `both`.
+
 ## Inputs
 
 - `target`: `kumiki`, `kigumi`, or `both`
 - `bump`: `patch` | `minor` | `major` (default `patch`)
+- `explicit_version`: optional exact version string (e.g. `0.3.0`) — when set, skip the bump arithmetic and write this version directly. Requires `target=both` if used for a minor/major sync.
 
 ## Mandatory behavior
 
@@ -36,6 +47,8 @@ Use this skill when asked to bump version(s) for kumiki and/or kigumi and publis
 
 ## Exact bump logic
 
+If `explicit_version` is provided, use it directly instead of running bump arithmetic.
+
 ### kumiki
 
 Files to update:
@@ -46,24 +59,28 @@ Files to update:
 Suggested command:
 
 ```bash
-python - <<'PY'
+python3 - <<'PY'
 import re
-import tomllib
 from pathlib import Path
 
-bump = "patch"  # replace at runtime
+bump = "patch"          # replace at runtime, or set new = "X.Y.Z" directly
+explicit = ""           # replace with explicit_version if provided
 
 pyproject = Path("pyproject.toml")
 text = pyproject.read_text(encoding="utf-8")
-current = tomllib.loads(text)["project"]["version"]
-major, minor, patch = map(int, current.split("."))
-if bump == "major":
-    major, minor, patch = major + 1, 0, 0
-elif bump == "minor":
-    minor, patch = minor + 1, 0
+m = re.search(r'(?m)^version = "([^"]+)"$', text)
+current = m.group(1)
+if explicit:
+    new = explicit
 else:
-    patch += 1
-new = f"{major}.{minor}.{patch}"
+    major, minor, patch = map(int, current.split("."))
+    if bump == "major":
+        major, minor, patch = major + 1, 0, 0
+    elif bump == "minor":
+        minor, patch = minor + 1, 0
+    else:
+        patch += 1
+    new = f"{major}.{minor}.{patch}"
 text = re.sub(r'(?m)^version = "[^"]+"$', f'version = "{new}"', text, count=1)
 pyproject.write_text(text, encoding="utf-8")
 
@@ -90,16 +107,23 @@ node - <<'NODE'
 const fs = require('fs');
 const p = 'kigumi/package.json';
 const bump = 'patch'; // replace at runtime
+const explicit = '';   // replace with explicit_version if provided
 const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
-let [major, minor, patch] = pkg.version.split('.').map(Number);
-if (bump === 'major') {
-  major += 1; minor = 0; patch = 0;
-} else if (bump === 'minor') {
-  minor += 1; patch = 0;
+let newVersion;
+if (explicit) {
+  newVersion = explicit;
 } else {
-  patch += 1;
+  let [major, minor, patch] = pkg.version.split('.').map(Number);
+  if (bump === 'major') {
+    major += 1; minor = 0; patch = 0;
+  } else if (bump === 'minor') {
+    minor += 1; patch = 0;
+  } else {
+    patch += 1;
+  }
+  newVersion = `${major}.${minor}.${patch}`;
 }
-pkg.version = `${major}.${minor}.${patch}`;
+pkg.version = newVersion;
 fs.writeFileSync(p, `${JSON.stringify(pkg, null, 2)}\n`, 'utf8');
 console.log(pkg.version);
 NODE

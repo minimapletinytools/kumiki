@@ -362,11 +362,45 @@ class PythonRunnerSession {
             installedViewerDeps = true;
         }
 
+        await this.checkKumikiVersionCompatibility(pythonCmd);
+
         this.writeProjectYaml(pythonCmd, {
             createdVenv,
             installedViewerDeps,
             missingBefore,
         });
+    }
+
+    async checkKumikiVersionCompatibility(pythonCmd) {
+        const kigummiPkgPath = path.join(this.context.extensionPath, 'package.json');
+        const kigummiVersion = JSON.parse(fs.readFileSync(kigummiPkgPath, 'utf8')).version;
+        const [kigummiMajor, kigummiMinor] = kigummiVersion.split('.').map(Number);
+
+        let kumikiVersion;
+        try {
+            const { stdout } = await this.runCommand(pythonCmd, [
+                '-c', 'import kumiki; print(kumiki.__version__)',
+            ]);
+            kumikiVersion = stdout.trim();
+        } catch (error) {
+            this.channel.appendLine(`[env] Could not read kumiki version: ${error.message}`);
+            return;
+        }
+
+        const [kumikiMajor, kumikiMinor] = kumikiVersion.split('.').map(Number);
+        if (kumikiMajor === kigummiMajor && kumikiMinor === kigummiMinor) {
+            this.channel.appendLine(`[env] kumiki ${kumikiVersion} is compatible with kigumi ${kigummiVersion}`);
+            return;
+        }
+
+        const kumikiNewer = kumikiMajor > kigummiMajor || (kumikiMajor === kigummiMajor && kumikiMinor > kigummiMinor);
+        const advice = kumikiNewer
+            ? `Please upgrade the Kigumi extension to a version compatible with kumiki ${kumikiVersion}.`
+            : `Please upgrade kumiki: run \`pip install -U kumiki\` in your project's virtual environment.`;
+        throw new Error(
+            `kumiki version mismatch: kigumi ${kigummiVersion} requires kumiki ${kigummiMajor}.${kigummiMinor}.x, ` +
+            `but found kumiki ${kumikiVersion}. ${advice}`
+        );
     }
 
     start() {
