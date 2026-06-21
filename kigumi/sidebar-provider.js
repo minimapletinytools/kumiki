@@ -793,6 +793,7 @@ class KigumiSidebarProvider {
                     key: `workspace-pattern-folder:${childPath}`,
                     type: 'workspacePatternFolder',
                     label: seg,
+                    description: isMain ? 'main' : undefined,
                     collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                     command: isMain ? {
                         title: 'Open pattern',
