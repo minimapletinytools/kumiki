@@ -12,6 +12,16 @@ const {
 const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
 const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
 
+function getKigumiVersion() {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version;
+}
+
+// pip ~= spec: kigumi 0.3.2 → "kumiki~=0.3.0" (>=0.3.0, <0.4.0)
+function kumikiCompatiblePipSpec() {
+    const [major, minor] = getKigumiVersion().split('.').map(Number);
+    return `kumiki~=${major}.${minor}.0`;
+}
+
 function stripLeadingYamlFrontmatter(content) {
     if (!content.startsWith('---')) {
         return content;
@@ -601,12 +611,13 @@ async function installOrUpdateKumiki(workspaceRoot, pythonPath, isLocalDev) {
     await runCommand(pythonPath, ['-m', 'pip', 'install', '--upgrade', 'pip'], workspaceRoot);
     summary.push('Upgraded pip to the latest available version.');
 
+    const pipSpec = kumikiCompatiblePipSpec();
     if (isLocalDev && fs.existsSync(path.join(workspaceRoot, 'pyproject.toml'))) {
         await runCommand(pythonPath, ['-m', 'pip', 'install', '--upgrade', '-e', workspaceRoot], workspaceRoot);
         summary.push('Installed local editable Kumiki package from workspace source.');
     } else {
-        await runCommand(pythonPath, ['-m', 'pip', 'install', '--upgrade', 'kumiki'], workspaceRoot);
-        summary.push('Attempted to install/upgrade Kumiki from PyPI to the latest version.');
+        await runCommand(pythonPath, ['-m', 'pip', 'install', '--upgrade', pipSpec], workspaceRoot);
+        summary.push(`Installed/upgraded Kumiki from PyPI (${pipSpec}).`);
     }
 
     const missingAfter = await getMissingViewerDependencies(workspaceRoot, pythonPath);
@@ -617,12 +628,27 @@ async function installOrUpdateKumiki(workspaceRoot, pythonPath, isLocalDev) {
     }
     if (missingAfter.length > 0) {
         summary.push(`Still missing after install: ${missingAfter.join(', ')}`);
+        throw new Error(
+            `Installation incomplete — the following required packages are still missing after install: ${missingAfter.join(', ')}. ` +
+            `Check the Kigumi output channel for details.`
+        );
     } else {
         summary.push('All required viewer dependencies are available after install.');
     }
 
     const kumikiVersion = await getInstalledKumikiVersion(workspaceRoot, pythonPath);
     summary.push(`Installed Kumiki version: ${kumikiVersion}`);
+
+    if (kumikiVersion !== 'unknown') {
+        const [kMajor, kMinor] = getKigumiVersion().split('.').map(Number);
+        const [iMajor, iMinor] = kumikiVersion.split('.').map(Number);
+        if (iMajor !== kMajor || iMinor !== kMinor) {
+            throw new Error(
+                `kumiki version mismatch after install: installed ${kumikiVersion} but kigumi ${getKigumiVersion()} requires ${kMajor}.${kMinor}.x. ` +
+                `This should not happen — please report it.`
+            );
+        }
+    }
 
     return {
         installedViewerDeps: missingBefore.length > 0,

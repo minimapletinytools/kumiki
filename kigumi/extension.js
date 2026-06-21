@@ -769,7 +769,8 @@ function activate(context) {
                     vscode.window.showWarningMessage(warning);
                 }
             }
-            vscode.window.showInformationMessage('Kigumi workspace initialized and Kumiki was updated to latest.');
+            const kumikiVer = initializeResult && initializeResult.kumikiVersion ? ` (kumiki ${initializeResult.kumikiVersion})` : '';
+            vscode.window.showInformationMessage(`Kigumi workspace initialized${kumikiVer}.`);
         } catch (error) {
             if (error && error.code === 'INITIALIZATION_IN_PROGRESS') {
                 vscode.window.showInformationMessage('Kigumi initialization is already in progress.');
@@ -806,8 +807,9 @@ function activate(context) {
             }, async () => {
                 const result = await updateWorkspaceKumiki(rootHint, activeFilePath);
                 logKumikiInstallResult('update', result);
+                const ver = result && result.kumikiVersion ? ` to ${result.kumikiVersion}` : '';
+                vscode.window.showInformationMessage(`Kumiki updated${ver}.`);
             });
-            vscode.window.showInformationMessage('Kumiki update complete.');
         } catch (error) {
             if (error && error.code === 'INITIALIZATION_IN_PROGRESS') {
                 vscode.window.showInformationMessage('Kigumi update is already in progress.');
