@@ -21,7 +21,7 @@
   -add a doc somewhere explaninig how the patternbook system works, keep it CONCISE but definitely outline all the rules, basicalyl just reformat what I wrote above and add anything that might be missing.
     
 
-
+-only show folders in the pattern viewer based on the folder path in the pattern,s don't use the files that returned the pattern, ignore those.
   
   
 

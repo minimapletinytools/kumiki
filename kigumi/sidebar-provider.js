@@ -112,6 +112,10 @@ class KigumiSidebarProvider {
             return this.getWorkspacePatternbookPatternNodes(element.data.patternbook);
         }
 
+        if (element.type === 'workspacePatternFolder') {
+            return this.getWorkspacePatternFolderChildren(element.data.pathPrefix);
+        }
+
         if (element.type === 'patternbookGroup') {
             return this.getShippedPatternNodesForPatternbook(element.data.sectionKey, element.data.patternbookName);
         }
@@ -737,43 +741,92 @@ class KigumiSidebarProvider {
     }
 
     getWorkspacePatternbookNodes() {
-        const patternbooks = this._state.workspacePatternbooks;
-        if (!patternbooks || patternbooks.length === 0) {
-            return [new SidebarNode({
-                key: 'workspace-patternbooks-empty',
-                type: 'placeholder',
-                label: 'No patterns found',
-                description: 'Files with patterns = [...] will appear here',
-                iconPath: new vscode.ThemeIcon('circle-slash'),
-            })];
-        }
-
         if (this._groupByPatternbook) {
-            // Hierarchical: show each patternbook file as a folder
-            return patternbooks.map((pb) => {
-                const patternCount = Array.isArray(pb.patterns) ? pb.patterns.length : 0;
-                return new SidebarNode({
-                    key: `workspace-patternbook:${pb.filePath}`,
-                    type: 'workspacePatternbook',
-                    label: pb.patternbookName,
-                    description: `${patternCount} pattern${patternCount === 1 ? '' : 's'}`,
-                    collapsibleState: patternCount > 0
-                        ? vscode.TreeItemCollapsibleState.Collapsed
-                        : vscode.TreeItemCollapsibleState.None,
-                    command: {
-                        title: 'Open patternbook',
-                        command: 'kigumi.openPatternFromSidebar',
-                        arguments: [{ sourceFile: pb.filePath, patternName: null }],
-                    },
-                    iconPath: new vscode.ThemeIcon('book'),
-                    tooltip: pb.filePath,
-                    data: { patternbook: pb },
-                    contextValue: 'workspacePatternbook',
-                });
-            });
+            const allPatterns = this._getAllWorkspacePatterns();
+            const nodes = this._buildPatternTreeNodes(allPatterns, null);
+            if (nodes.length === 0) {
+                return [new SidebarNode({
+                    key: 'workspace-patternbooks-empty',
+                    type: 'placeholder',
+                    label: 'No patterns found',
+                    description: 'Files with patterns = [...] will appear here',
+                    iconPath: new vscode.ThemeIcon('circle-slash'),
+                })];
+            }
+            return nodes;
         } else {
             return this.getFlatWorkspacePatternNodes();
         }
+    }
+
+    _getAllWorkspacePatterns() {
+        const all = [];
+        for (const pb of (this._state.workspacePatternbooks || [])) {
+            for (const p of (Array.isArray(pb.patterns) ? pb.patterns : [])) {
+                all.push({ path: p.path, tags: p.tags, pattern_type: p.pattern_type, sourceFile: pb.filePath });
+            }
+        }
+        return all;
+    }
+
+    _buildPatternTreeNodes(allPatterns, parentPath) {
+        const prefix = parentPath ? parentPath + '/' : '';
+        const childSegments = new Set();
+        for (const p of allPatterns) {
+            if (!p.path.startsWith(prefix)) continue;
+            const remainder = p.path.slice(prefix.length);
+            if (!remainder) continue;
+            const firstSeg = remainder.split('/')[0];
+            if (firstSeg) childSegments.add(firstSeg);
+        }
+
+        const nodes = [];
+        for (const seg of [...childSegments].sort()) {
+            const childPath = prefix + seg;
+            const patternAtPath = allPatterns.find(p => p.path === childPath);
+            const hasChildren = allPatterns.some(p => p.path.startsWith(childPath + '/'));
+
+            if (hasChildren) {
+                const isMain = patternAtPath && Array.isArray(patternAtPath.tags) && patternAtPath.tags.includes('main');
+                const sourceFile = patternAtPath ? patternAtPath.sourceFile : null;
+                nodes.push(new SidebarNode({
+                    key: `workspace-pattern-folder:${childPath}`,
+                    type: 'workspacePatternFolder',
+                    label: seg,
+                    collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
+                    command: isMain ? {
+                        title: 'Open pattern',
+                        command: 'kigumi.openPatternFromSidebar',
+                        arguments: [{ sourceFile, patternName: childPath }],
+                    } : undefined,
+                    iconPath: new vscode.ThemeIcon(isMain ? 'symbol-string' : 'folder'),
+                    tooltip: childPath,
+                    data: { pathPrefix: childPath, sourceFile },
+                    contextValue: isMain ? 'patternFolderWithMain' : 'patternFolder',
+                }));
+            } else if (patternAtPath) {
+                nodes.push(new SidebarNode({
+                    key: `workspace-pattern:${patternAtPath.sourceFile}:${childPath}`,
+                    type: 'patternItem',
+                    label: seg,
+                    tooltip: `${childPath} — ${patternAtPath.sourceFile}`,
+                    command: {
+                        title: 'Open pattern',
+                        command: 'kigumi.openPatternFromSidebar',
+                        arguments: [{ sourceFile: patternAtPath.sourceFile, patternName: childPath }],
+                    },
+                    iconPath: new vscode.ThemeIcon('symbol-string'),
+                    data: { sourceFile: patternAtPath.sourceFile, patternName: childPath, sectionKey: 'workspace-patternbooks' },
+                    contextValue: 'patternItemWorkspace',
+                }));
+            }
+        }
+        return nodes;
+    }
+
+    getWorkspacePatternFolderChildren(pathPrefix) {
+        const allPatterns = this._getAllWorkspacePatterns();
+        return this._buildPatternTreeNodes(allPatterns, pathPrefix);
     }
 
     getWorkspacePatternbookPatternNodes(pb) {
