@@ -5,7 +5,7 @@ with different reference features
 
 from sympy import Rational
 from kumiki import *
-from kumiki.patternbook import PatternBook, PatternMetadata
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern
 
 def inches(value):
     """Convert inches to meters using exact rational arithmetic."""
@@ -93,3 +93,7 @@ def create_all_construction_examples():
 
 
 example = create_all_construction_examples
+
+patterns = [
+    Pattern(path="construction/posts_with_beam_centerline", lambda_=lambda center: create_test_posts_with_beam_centerline(), pattern_type='frame', tags=['main']),
+]

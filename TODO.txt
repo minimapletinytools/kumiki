@@ -30,8 +30,32 @@
 Kumiki is used with the Kigumi VSCode extension. To install Kigumi and use Kumiki do the following:
 
 1. install [VSCode](https://code.visualstudio.com/)
-2. install the [Kigumi VSCode extension](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi), kigumi is also [available on OpenVSX](https://open-vsx.org/extension/minimaple/kigumi) if you're using Cursor and also available on our [release page](https://github.com/minimapletinytools/kumiki/releases) as a .vsix file if you prefer that for some reason.
+2. install the [Kigumi VSCode extension](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi)
+  a. kigumi is also [available on OpenVSX](https://open-vsx.org/extension/minimaple/kigumi) if you're using Cursor
+  b. and also available on our [release page](https://github.com/minimapletinytools/kumiki/releases) as a .vsix file if you prefer that for some reason.
 3. install either [uv](https://docs.astral.sh/uv/getting-started/installation/#__tabbed_1_1) or [python](https://www.python.org/downloads/), you can skip this step if you already have one of them installed
+4. create a folder somewhere, and then in VScode do "File > Open Folder" and open that folder
+  a. this folder will be your kigumi project "workspace"
+5. once you open the folder, open teh kigumi sidebar for the VSCode extension menu 
+  a. this is usually a vertical collumn on th eleft side of vscode 
+  b. or sometimes in a little dropdown in the top of the left side panel.
+  c. or use the command pallet (cmd/ctrl + shift + P) and choose "View: Show Kigumi"
+6. in the Kigumi sidebar, click the "Initialize Project" button and wait a few seconds
+  a. this will install kumiki and create several files in your workspace
+7. once initialized, you can use the kigumi sidebar to open your project files, called frames, and browse various examples, called patterns
+8. open "my_cute_frame" in the kigumi viewer from the sidebar
+  a. modify my_cute_frame.py and click the refresh button to see any changes
+9. if you make a new frame file, it will show up in the "frames" section in the kigumi sidebar explorer
+  a. you may need to click the "refresh" button to make new files show up.
+
+AI usage guide
+1. Kumiki Frames can be hand coded or can be authored by AI
+2. You can use any AI agent you want, VSCode ships with [copilot](https://github.com/features/copilot/ai-code-editor) so you can start with that
+  a. the free copilot subscription can already do some work but it's slow, limited and doesn't like to work as hard
+  b. you'll likely want to update the 10/mo license which can do mostly everything you want.
+3. open the agent chat window and start asking it to do stuff
+  "make me a cute saw horse, it contains 2 horizontal "feet" on a 1'x2' footprint, with two vertical "legs" on top of teh feet, and a horizontal beam resting on top of the 2 legs. There should also be a stretcher connecting the 2 legs in the middle. Joint everything with mortise and tenon joinery with square pegs please!"
+
 
 
 
@@ -142,6 +166,7 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
     - create tags and push them
     - kick of workflow to do release for the targets we chose
 
+-make the refresh button more prominent in the viewer itself
 -do setup vid
 -do shower vid
 -do example cleanup

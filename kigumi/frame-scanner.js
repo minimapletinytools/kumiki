@@ -140,11 +140,22 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
     const patternbookFiles = [];
     for (const rec of (index.patternbooks || [])) {
         const relPath = rec.relative_path || path.relative(workspaceRoot, rec.file_path);
+        // New format: patterns is [{path, tags, pattern_type}]
+        // Legacy format: pattern_names + group_names
+        const newPatterns = Array.isArray(rec.patterns) ? rec.patterns : [];
+        const legacyNames = Array.isArray(rec.pattern_names) ? rec.pattern_names : [];
+        // Filter poop-tagged patterns from sidebar
+        const sidebarPatterns = newPatterns.filter(
+            (p) => !Array.isArray(p.tags) || !p.tags.includes('poop')
+        );
         patternbookFiles.push({
             filePath: rec.file_path,
             relativePath: relPath,
             patternbookName: path.basename(rec.file_path || '', '.py'),
-            patternNames: Array.isArray(rec.pattern_names) ? rec.pattern_names : [],
+            patterns: sidebarPatterns,
+            patternNames: newPatterns.length > 0
+                ? sidebarPatterns.map((p) => p.path)
+                : legacyNames,
             groupNames: Array.isArray(rec.group_names) ? rec.group_names : [],
             loadError: rec.load_error || null,
         });

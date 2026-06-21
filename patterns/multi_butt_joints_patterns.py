@@ -13,7 +13,7 @@ from kumiki.timber import *
 from kumiki.joints.workshop.multi_butt_joints import cut_splined_opposing_double_butt_joint
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
-from kumiki.patternbook import PatternBook, PatternMetadata
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern
 
 
 def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
@@ -84,3 +84,7 @@ def create_all_multi_butt_joint_patterns() -> Union[Frame]:
 
 
 example = create_all_multi_butt_joint_patterns
+
+patterns = [
+    Pattern(path="multi_butt_joints/splined_opposing_double_butt_joint", lambda_=make_splined_opposing_double_butt_joint_example, pattern_type='frame', tags=['main']),
+]

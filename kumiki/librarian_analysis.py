@@ -45,11 +45,12 @@ class ModuleStaticInfo:
     file_path: str
     frames: List[StaticEntry] = field(default_factory=list)
     patternbooks: List[StaticEntry] = field(default_factory=list)
+    pattern_lists: List[StaticEntry] = field(default_factory=list)
     parse_error: Optional[str] = None
 
     @property
     def has_anything(self) -> bool:
-        return bool(self.frames) or bool(self.patternbooks)
+        return bool(self.frames) or bool(self.patternbooks) or bool(self.pattern_lists)
 
     @property
     def chosen_frame(self) -> Optional[StaticEntry]:
@@ -177,6 +178,25 @@ def _is_legacy_patternbook_factory(name: str) -> bool:
     )
 
 
+def _is_pattern_list_assignment(node: ast.Assign) -> bool:
+    """True if this is a module-level `patterns = [...]` assignment."""
+    if not isinstance(node.value, (ast.List, ast.Call)):
+        return False
+    for target in node.targets:
+        for name in _record_target_names(target):
+            if name == "patterns":
+                return True
+    return False
+
+
+def _is_pattern_list_ann_assign(node: ast.AnnAssign) -> bool:
+    """True if this is a module-level `patterns: ... = [...]` annotation."""
+    return (
+        isinstance(node.target, ast.Name)
+        and node.target.id == "patterns"
+    )
+
+
 def _record_target_names(target: ast.expr) -> List[str]:
     """Extract simple identifier targets from an assignment LHS."""
     names: List[str] = []
@@ -222,6 +242,9 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
             canonical = _call_target(node.value, aliases)
             if canonical not in (_FRAME_NAME, _PATTERNBOOK_NAME):
+                # Check for patterns = [...] (new pattern list system)
+                if _is_pattern_list_assignment(node):
+                    info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
                 continue
             for target in node.targets:
                 for name in _record_target_names(target):
@@ -230,6 +253,17 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
                         info.frames.append(entry)
                     else:
                         info.patternbooks.append(entry)
+            continue
+
+        # patterns = [...] list literal assignment
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List):
+            if _is_pattern_list_assignment(node):
+                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
+            continue
+
+        # patterns: List[Pattern] = [...] annotated assignment
+        if isinstance(node, ast.AnnAssign) and _is_pattern_list_ann_assign(node):
+            info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
             continue
 
         # def name(...) -> Frame: ...

@@ -9,8 +9,8 @@ representations are converted to floating point values in CAD systems.
 from sympy import Rational, pi, Matrix, cos, sin
 from kumiki.timber import Frame, TimberFace, TimberReferenceEnd, create_v3, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
-from kumiki.joints.workshop.mortise_and_tenon_joint import cut_mortise_and_tenon_joint
-from kumiki.patternbook import PatternBook, PatternMetadata
+from kumiki.joints.workshop.butt_joints import cut_mortise_and_tenon_joint
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern
 
 
 def create_irrational_angles_patternbook() -> PatternBook:
@@ -97,6 +97,10 @@ def create_all_irrational_examples() -> Frame:
 
 
 example = create_all_irrational_examples
+
+patterns = [
+    Pattern(path="irrational_angles/mortise_and_tenon_37_degrees", lambda_=lambda center: create_all_irrational_examples(), pattern_type='frame', tags=['main']),
+]
 
 
 if __name__ == "__main__":

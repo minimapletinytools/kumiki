@@ -194,6 +194,42 @@ def make_pattern_from_csg(csg_func: Callable[..., CutCSG]) -> PatternLambda:
 
 
 @dataclass(frozen=True)
+class Pattern:
+    """A single renderable pattern in the new pattern system.
+
+    path: hierarchical path like "corner_joints/cut_plain_miter_joint".
+          Each path segment is an implicit tag for filtering.
+    lambda_: callable(center: V3, **kwargs) -> Frame | CutCSG
+    tags: explicit tags. Special values: 'main' (default display when file opened),
+          'poop' (hide from sidebar).
+    pattern_type: 'frame' or 'csg'
+    """
+    path: str
+    lambda_: PatternLambda
+    tags: List[str] = field(default_factory=list)
+    pattern_type: Literal['frame', 'csg'] = 'frame'
+
+    @property
+    def name(self) -> str:
+        return self.path.split('/')[-1]
+
+    @property
+    def path_segments(self) -> List[str]:
+        return self.path.split('/')
+
+    def all_tags(self) -> List[str]:
+        """Return all tags including implicit path segment tags."""
+        return list(self.path_segments) + list(self.tags)
+
+    def raise_at(self, center: Optional[Any] = None, **kwargs: Any) -> Any:
+        """Raise this pattern at the given center (defaults to origin)."""
+        if center is None:
+            from sympy import Integer
+            center = create_v3(Integer(0), Integer(0), Integer(0))
+        return self.lambda_(center, **kwargs)
+
+
+@dataclass(frozen=True)
 class PatternMetadata:
     """
     Metadata describing a pattern in the pattern book.

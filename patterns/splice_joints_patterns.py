@@ -15,7 +15,7 @@ from kumiki.example_shavings import (
     create_canonical_example_splice_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import PatternBook, PatternMetadata
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_frame
 
 # Standard timber dimensions (4" x 5", 4' long) - matches canonical examples
 TIMBER_WIDTH = inches(4)
@@ -182,3 +182,9 @@ def create_all_splice_joint_patterns(use_round_timbers=False) -> Frame:
 
 
 example = create_all_splice_joint_patterns
+
+patterns = [
+    Pattern(path="splice_joints/plain_butt_splice_joint", lambda_=lambda center: Frame(cut_timbers=make_splice_joint_example(center), name="Plain Butt Splice Joint"), pattern_type='frame', tags=['main']),
+    Pattern(path="splice_joints/plain_splice_lap_joint", lambda_=lambda center: Frame(cut_timbers=make_splice_lap_joint_example(center), name="Plain Splice Lap Joint"), pattern_type='frame'),
+    Pattern(path="splice_joints/lapped_gooseneck_splice_joint", lambda_=make_pattern_from_frame(create_simple_gooseneck_example), pattern_type='frame'),
+]

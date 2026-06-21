@@ -35,7 +35,7 @@ from kumiki.example_shavings import (
     _CANONICAL_EXAMPLE_TIMBER_LENGTH,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_joint
 
 
 def example_basic_miter_joint(position=None):
@@ -340,3 +340,20 @@ def create_all_basic_joints_examples():
 
 
 example = create_all_basic_joints_examples
+
+patterns = [
+    Pattern(path="basic_joints/basic_miter_joint", lambda_=make_pattern_from_joint(example_basic_miter_joint), pattern_type='frame', tags=['main']),
+    Pattern(path="basic_joints/basic_miter_joint_face_aligned", lambda_=make_pattern_from_joint(example_basic_miter_joint_face_aligned), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_tongue_and_fork_corner_joint", lambda_=make_pattern_from_joint(example_basic_tongue_and_fork_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_butt_joint", lambda_=make_pattern_from_joint(example_basic_butt_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_butt_splice_joint", lambda_=make_pattern_from_joint(example_basic_butt_splice_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_cross_lap_joint", lambda_=make_pattern_from_joint(example_basic_cross_lap_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_house_joint", lambda_=make_pattern_from_joint(example_basic_house_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_splined_opposing_double_butt_joint", lambda_=make_pattern_from_joint(example_basic_splined_opposing_double_butt_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_splice_lap_joint", lambda_=make_pattern_from_joint(example_basic_splice_lap_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_mortise_and_tenon_with_peg", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint_with_peg), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_lapped_gooseneck_joint", lambda_=make_pattern_from_joint(example_basic_lapped_gooseneck_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_housed_dovetail_butt_joint", lambda_=make_pattern_from_joint(example_basic_housed_dovetail_butt_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_mitered_and_keyed_lap_joint", lambda_=make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint), pattern_type='frame'),
+]

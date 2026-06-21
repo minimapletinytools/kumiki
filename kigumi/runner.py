@@ -1006,6 +1006,14 @@ def _looks_like_patternbook(value: Any) -> bool:
     return callable(getattr(value, "list_patterns", None)) and callable(getattr(value, "raise_pattern", None))
 
 
+def _looks_like_pattern_list(value: Any) -> bool:
+    """True if value is a non-empty list of Pattern objects."""
+    if not isinstance(value, list) or not value:
+        return False
+    first = value[0]
+    return hasattr(first, "path") and hasattr(first, "lambda_") and hasattr(first, "tags")
+
+
 def _is_valid_module_part(name: str) -> bool:
     return name.isidentifier() and not name.startswith("_")
 
@@ -1086,6 +1094,35 @@ def frame_from_patternbook(patternbook: Any) -> Any:
         result = patternbook.raise_patternbook_as_frame()
 
     return _coerce_viewable_frame(result, "patternbook")
+
+
+def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
+    """Raise the first 'main'-tagged pattern from a List[Pattern] as a frame.
+
+    Returns (frame, pattern_list) — the list is stored as the "patternbook"
+    equivalent in SlotState so raise_specific_pattern can reload it.
+    """
+    from sympy import Integer
+    from kumiki.rule import create_v3
+
+    origin = create_v3(Integer(0), Integer(0), Integer(0))
+
+    # Prefer the first 'main'-tagged pattern; fall back to first pattern overall.
+    target = None
+    for p in pattern_list:
+        if "main" in getattr(p, "tags", []):
+            target = p
+            break
+    if target is None and pattern_list:
+        target = pattern_list[0]
+
+    if target is None:
+        raise ValueError("Pattern list is empty")
+
+    with contextlib.redirect_stdout(sys.stderr):
+        result = target.lambda_(origin)
+    frame = _coerce_viewable_frame(result, target.name)
+    return frame, pattern_list
 
 
 def _serialize_render_parameters_for_slot(slot_state: SlotState) -> Dict[str, Any]:
@@ -1189,6 +1226,12 @@ def resolve_frame_from_module(
             render_parameters,
         )
         return _coerce_viewable_frame(frame, "build_frame"), None, descriptors, applied
+
+    if hasattr(module, "patterns"):
+        pattern_list = getattr(module, "patterns")
+        if _looks_like_pattern_list(pattern_list):
+            frame, patternbook = _frame_from_pattern_list(pattern_list)
+            return frame, patternbook, [], {}
 
     if hasattr(module, "patternbook"):
         patternbook = getattr(module, "patternbook")
@@ -1986,27 +2029,45 @@ def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
 
     # Shipped patterns — bundled inside the kumiki package as kumiki/patterns/
     # (pip-installed) or at the sibling patterns/ folder in a dev checkout.
+    def _extract_patterns_from_index(index: Any) -> List[Any]:
+        items = []
+        for pb_record in index.get("patternbooks", []):
+            source_file = pb_record.get("file_path")
+            new_patterns = pb_record.get("patterns") or []
+            if new_patterns:
+                for p in new_patterns:
+                    path = p.get("path", "")
+                    tags = list(p.get("tags") or [])
+                    name = path.split("/")[-1] if path else ""
+                    items.append({
+                        "path": path,
+                        "name": name,
+                        "tags": tags,
+                        "groups": [],
+                        "source_file": source_file,
+                    })
+            else:
+                group_names = list(pb_record.get("group_names") or [])
+                for name in pb_record.get("pattern_names") or []:
+                    items.append({
+                        "path": name,
+                        "name": name,
+                        "tags": [],
+                        "groups": group_names,
+                        "source_file": source_file,
+                    })
+        return items
+
     try:
         import kumiki
         kumiki_dir = Path(kumiki.__file__).resolve().parent
-        # Installed wheel: patterns are inside the package directory.
-        # Dev checkout fallback: patterns/ sits next to the kumiki/ folder.
         shipped_patterns_dir = kumiki_dir / "patterns"
         if not shipped_patterns_dir.is_dir():
             shipped_patterns_dir = kumiki_dir.parent / "patterns"
         if shipped_patterns_dir.is_dir():
             with contextlib.redirect_stdout(sys.stderr):
                 index = scan_library_index(str(shipped_patterns_dir))
-            patterns_list = []
-            for pb_record in index.get("patternbooks", []):
-                source_file = pb_record.get("file_path")
-                group_names = list(pb_record.get("group_names") or [])
-                for name in pb_record.get("pattern_names") or []:
-                    patterns_list.append({
-                        "name": name,
-                        "groups": group_names,
-                        "source_file": source_file,
-                    })
+            patterns_list = _extract_patterns_from_index(index)
             if patterns_list:
                 sources.append({"source": "shipped", "folder": str(shipped_patterns_dir), "patterns": patterns_list})
     except Exception as exc:
@@ -2019,16 +2080,7 @@ def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
             try:
                 with contextlib.redirect_stdout(sys.stderr):
                     index = scan_library_index(str(local_patterns_dir))
-                patterns_list = []
-                for pb_record in index.get("patternbooks", []):
-                    source_file = pb_record.get("file_path")
-                    group_names = list(pb_record.get("group_names") or [])
-                    for name in pb_record.get("pattern_names") or []:
-                        patterns_list.append({
-                            "name": name,
-                            "groups": group_names,
-                            "source_file": source_file,
-                        })
+                patterns_list = _extract_patterns_from_index(index)
                 if patterns_list:
                     sources.append({"source": "local", "folder": str(local_patterns_dir), "patterns": patterns_list})
             except Exception as exc:
@@ -2049,6 +2101,15 @@ def _find_pattern_lambda(patternbook: Any, pattern_name: str) -> Any:
     return None
 
 
+def _find_pattern_in_list(pattern_list: List[Any], pattern_name: str) -> Optional[Any]:
+    """Find a Pattern in a List[Pattern] by path or name."""
+    for p in pattern_list:
+        path = getattr(p, "path", "")
+        if path == pattern_name or path.split("/")[-1] == pattern_name:
+            return p
+    return None
+
+
 def _raise_specific_pattern(
     source_file: str,
     pattern_name: str,
@@ -2062,20 +2123,64 @@ def _raise_specific_pattern(
     t0 = time.monotonic()
     module = load_module_from_path(resolved, verbose=True)
 
-    # Find patternbook
+    # --- New: List[Pattern] system ---
+    if hasattr(module, "patterns") and _looks_like_pattern_list(getattr(module, "patterns")):
+        pattern_list = getattr(module, "patterns")
+        pattern = _find_pattern_in_list(pattern_list, pattern_name)
+        if pattern is None:
+            available = [getattr(p, "path", "") for p in pattern_list]
+            raise ValueError(f"Pattern '{pattern_name}' not found. Available: {available}")
+
+        pattern_lambda = pattern.lambda_
+        render_parameter_schema, applied_render_parameters = resolve_callable_render_parameters(
+            pattern_lambda,
+            render_parameters,
+            skip_first_parameter=True,
+        )
+
+        from sympy import Integer
+        from kumiki.rule import create_v3
+        origin = create_v3(Integer(0), Integer(0), Integer(0))
+        with contextlib.redirect_stdout(sys.stderr):
+            pattern_result = pattern_lambda(origin, **applied_render_parameters)
+        frame = _coerce_viewable_frame(pattern_result, f"Pattern '{pattern.name}'")
+
+        reload_s = time.monotonic() - t0
+        slot = SlotState(
+            file_path=resolved,
+            module=module,
+            frame=frame,
+            mesh_cache={},
+            patternbook=pattern_list,
+            single_pattern_name=pattern.path,
+            render_parameter_schema=render_parameter_schema,
+            applied_render_parameters=applied_render_parameters,
+        )
+        result = {
+            "examplePath": str(resolved),
+            "patternName": pattern.path,
+            "frame": {
+                "name": frame.name if hasattr(frame, "name") else pattern.name,
+                "timber_count": len(frame.cut_timbers),
+                "accessories_count": len(frame.accessories) if hasattr(frame, "accessories") else 0,
+            },
+            "renderParameters": _serialize_render_parameters_for_slot(slot),
+            "profiling": {"reload_s": reload_s},
+        }
+        return slot, result
+
+    # --- Legacy: PatternBook system ---
     patternbook = None
     if hasattr(module, "patternbook") and _looks_like_patternbook(module.patternbook):
         patternbook = module.patternbook
     elif hasattr(module, "example"):
         candidate = getattr(module, "example")
-        # Resolve callable example references
         if callable(candidate) and not _looks_like_patternbook(candidate):
             with contextlib.redirect_stdout(sys.stderr):
                 candidate = candidate()
         if _looks_like_patternbook(candidate):
             patternbook = candidate
     else:
-        # Try factory functions
         for attr_name in dir(module):
             if attr_name.startswith("create_") and attr_name.endswith("_patternbook"):
                 factory = getattr(module, attr_name)

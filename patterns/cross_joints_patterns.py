@@ -15,7 +15,7 @@ from kumiki.example_shavings import (
     create_canonical_example_splice_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import PatternBook, PatternMetadata
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern
 
 # Standard timber dimensions (4" x 5", 4' long) - matches canonical examples
 TIMBER_WIDTH = inches(4)
@@ -163,3 +163,8 @@ def create_all_cross_joint_patterns(use_round_timbers=False) -> Frame:
 
 
 example = create_all_cross_joint_patterns
+
+patterns = [
+    Pattern(path="cross_joints/cut_plain_cross_lap_house_joint", lambda_=lambda center: Frame(cut_timbers=make_house_joint_example(center), name="Plain Cross Lap House Joint"), pattern_type='frame', tags=['main']),
+    Pattern(path="cross_joints/cut_plain_cross_lap_joint", lambda_=lambda center: Frame(cut_timbers=make_cross_lap_joint_example(center), name="Plain Cross Lap Joint"), pattern_type='frame'),
+]

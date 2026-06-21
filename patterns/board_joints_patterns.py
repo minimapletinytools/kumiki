@@ -3,7 +3,7 @@
 from sympy import Matrix
 
 from kumiki.joints.workshop.board_joints import cut_tongue_and_groove_joint
-from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_joint
 from kumiki.rule import feet, inches
 from kumiki.ticket import BoardTicket
 from kumiki.timber import Board, Orientation, Transform, create_v3
@@ -68,6 +68,10 @@ def create_all_board_joint_patterns():
 
 
 example = create_all_board_joint_patterns
+
+patterns = [
+    Pattern(path="board_joints/tongue_and_groove", lambda_=make_pattern_from_joint(example_tongue_and_groove), pattern_type='frame', tags=['main']),
+]
 
 
 if __name__ == "__main__":

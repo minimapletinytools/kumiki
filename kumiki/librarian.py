@@ -33,7 +33,7 @@ from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple,
 from sympy import Float, Rational
 
 from .librarian_analysis import ModuleStaticInfo, analyze_file
-from .patternbook import PatternBook
+from .patternbook import Pattern, PatternBook
 
 
 _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
@@ -440,6 +440,7 @@ class LibrarianModuleRecord:
     relative_path: str
     module_name: str
     patternbook: Optional[PatternBook] = None
+    pattern_list: Optional[List[Pattern]] = None
     example: Optional[Any] = None
     warnings: List[str] = field(default_factory=list)
     load_error: Optional[str] = None
@@ -467,6 +468,14 @@ class LibrarianScanResult:
             module.patternbook
             for module in self.modules
             if module.patternbook is not None
+        ]
+
+    @property
+    def pattern_lists(self) -> List[List[Pattern]]:
+        return [
+            module.pattern_list
+            for module in self.modules
+            if module.pattern_list is not None
         ]
 
     @property
@@ -669,6 +678,27 @@ def _resolve_patternbook(module: Any, warnings: List[str]) -> Optional[PatternBo
     return None
 
 
+def _resolve_pattern_list(module: Any, warnings: List[str]) -> Optional[List[Pattern]]:
+    """Return List[Pattern] from module.patterns if it's a valid pattern list."""
+    if not hasattr(module, "patterns"):
+        return None
+    candidate = getattr(module, "patterns")
+    if not isinstance(candidate, list):
+        warnings.append(
+            f"module.patterns exists but is {type(candidate).__name__}, expected list"
+        )
+        return None
+    patterns: List[Pattern] = []
+    for i, item in enumerate(candidate):
+        if not isinstance(item, Pattern):
+            warnings.append(
+                f"module.patterns[{i}] is {type(item).__name__}, expected Pattern — skipping"
+            )
+            continue
+        patterns.append(item)
+    return patterns if patterns else None
+
+
 def _resolve_example(module: Any) -> Optional[Any]:
     """Return the legacy module-level ``example`` attribute if present."""
     return getattr(module, "example", None)
@@ -714,7 +744,7 @@ def _scan_single_file(
     if not static_info.has_anything:
         return record
 
-    needs_import = bool(static_info.patternbooks) or (
+    needs_import = bool(static_info.patternbooks) or bool(static_info.pattern_lists) or (
         load_frame_examples and bool(static_info.frames)
     )
     if not needs_import:
@@ -730,7 +760,9 @@ def _scan_single_file(
     if module is None:
         return record
 
-    if static_info.patternbooks:
+    if static_info.pattern_lists:
+        record.pattern_list = _resolve_pattern_list(module, record.warnings)
+    if static_info.patternbooks and record.pattern_list is None:
         record.patternbook = _resolve_patternbook(module, record.warnings)
     if load_frame_examples and static_info.frames:
         record.example = _resolve_example(module)
@@ -841,15 +873,34 @@ def build_scan_index(scan_result: LibrarianScanResult) -> Dict[str, Any]:
         warnings = list(rec.warnings or [])
         static = rec.static_info
 
-        if rec.patternbook is not None or (static and static.patternbooks):
+        has_pattern_list = rec.pattern_list is not None or (static and static.pattern_lists)
+        has_patternbook = rec.patternbook is not None or (static and static.patternbooks)
+        if has_pattern_list or has_patternbook:
+            pl = rec.pattern_list
             pb = rec.patternbook
+            if pl is not None:
+                patterns_payload = [
+                    {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type}
+                    for p in pl
+                ]
+                pattern_names = [p.name for p in pl]
+                group_names: List[str] = []
+            elif pb is not None:
+                patterns_payload = []
+                pattern_names = _pattern_names_from_patternbook(pb)
+                group_names = _group_names_from_patternbook(pb)
+            else:
+                patterns_payload = []
+                pattern_names = []
+                group_names = []
             patternbooks.append({
                 "file_path": abs_path,
                 "relative_path": rec.relative_path,
                 "module_name": rec.module_name,
-                "pattern_names": _pattern_names_from_patternbook(pb) if pb else [],
-                "group_names": _group_names_from_patternbook(pb) if pb else [],
-                "patternbook_loaded": pb is not None,
+                "patterns": patterns_payload,
+                "pattern_names": pattern_names,
+                "group_names": group_names,
+                "patternbook_loaded": pl is not None or pb is not None,
                 "content_sha256": rec.content_sha256,
                 "load_error": rec.load_error,
                 "warnings": warnings,

@@ -19,9 +19,9 @@ from kumiki.rule import Orientation, Transform, inches, feet
 from kumiki.timber import Timber, TimberReferenceEnd, TimberFace, TimberLongFace, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.shavings import chop_lap_on_timber_end, chop_profile_on_timber_face
-from kumiki.joints.workshop.notching import chop_shoulder_notch_on_timber_face
-from kumiki.joints.workshop.japanese_joints import draw_gooseneck_polygon
-from kumiki.joints.workshop.build_a_butt import (
+from kumiki.joints.workshop.shavings.notching import chop_shoulder_notch_on_timber_face
+from kumiki.joints.workshop.shavings.shavings import draw_gooseneck_polygon
+from kumiki.joints.workshop.shavings.build_a_butt import (
     DovetailTenonWedgeAccessoryParameters,
     compute_butt_joint_shoulder,
     build_dovetail_shoulder_geometery,
@@ -674,16 +674,18 @@ EXAMPLES = {
 }
 
 
+from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_csg
+
+
 def create_csg_examples_patternbook():
     """
     Create a PatternBook with all CSG example patterns.
-    
+
     Each pattern has groups: ["csg", "{example_type}"]
-    
+
     Returns:
         PatternBook: PatternBook containing all CSG example patterns
     """
-    from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_csg
 
     patterns = []
     for key, info in EXAMPLES.items():
@@ -722,6 +724,22 @@ def list_examples():
         print(f"  {key:20s} - {info['name']}")
         print(f"  {' '*20}   {info['description']}")
     print("=" * 60)
+
+
+patterns = [
+    Pattern(path="csg_debug/cube_cutout", lambda_=make_pattern_from_csg(example_cube_with_cube_cutout), pattern_type='csg', tags=['main']),
+    Pattern(path="csg_debug/halfspace_cut", lambda_=make_pattern_from_csg(example_cube_with_halfspace_cut), pattern_type='csg'),
+    Pattern(path="csg_debug/positioned_cube", lambda_=make_pattern_from_csg(example_cube_at_position), pattern_type='csg'),
+    Pattern(path="csg_debug/union_cubes", lambda_=make_pattern_from_csg(example_union_of_cubes), pattern_type='csg'),
+    Pattern(path="csg_debug/hexagon_extrusion", lambda_=make_pattern_from_csg(example_hexagon_extrusion), pattern_type='csg'),
+    Pattern(path="csg_debug/lap_cut_timber", lambda_=make_pattern_from_csg(example_lap_cut_on_timber), pattern_type='csg'),
+    Pattern(path="csg_debug/gooseneck_profile_cut", lambda_=make_pattern_from_csg(example_gooseneck_profile_cut), pattern_type='csg'),
+    Pattern(path="csg_debug/shoulder_notch_on_timber", lambda_=make_pattern_from_csg(example_shoulder_notch_on_timber), pattern_type='csg'),
+    Pattern(path="csg_debug/chop_shoulder_notch_raw", lambda_=make_pattern_from_csg(example_chop_shoulder_notch_on_timber_face_raw), pattern_type='csg'),
+    Pattern(path="csg_debug/angled_shoulder_notch", lambda_=make_pattern_from_csg(example_angled_shoulder_notch_on_timber), pattern_type='csg'),
+    Pattern(path="csg_debug/dovetail_shoulder_geometry_raw", lambda_=make_pattern_from_csg(example_dovetail_shoulder_geometry_raw), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/dovetail_tenon_geometry_raw", lambda_=make_pattern_from_csg(example_dovetail_tenon_geometry_raw), pattern_type='csg', tags=['poop']),
+]
 
 
 if __name__ == "__main__":
