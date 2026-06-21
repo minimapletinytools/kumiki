@@ -1,5 +1,7 @@
 :: 6/20 THE BIG JOINT REORG
 
+Do the big joint refactor, we will refactor joints to be sorted by their arrangement type rather than how they are organized right now. So the new joint files should be: 
+
 -corner_joints
 -splice_joints
 -butt_joints
@@ -11,7 +13,11 @@
 -decorative_joints
 -basic_joints (same as is right now)
 
--shavings/... (contains all non-joint cutting files, like shavings, build-a-butt, notching, etc)
+these all still remain in the workshop folder.
+
+the non joint files should be moved into a "shavings" folder e.g. files like shavings.py, build-a-butt, notching, etc)
+
+Come up with a plan first and confirm with me befor eimplementing
 
 
 
