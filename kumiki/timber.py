@@ -1371,14 +1371,6 @@ class Cutting:
             )
         return None
 
-    def get_top_end_cut_local(self) -> Optional[HalfSpace]:
-        """Backward-compatible alias for get_maybe_top_end_cut()."""
-        return self.get_maybe_top_end_cut()
-
-    def get_bottom_end_cut_local(self) -> Optional[HalfSpace]:
-        """Backward-compatible alias for get_maybe_bottom_end_cut()."""
-        return self.get_maybe_bottom_end_cut()
-
     def get_negative_csg_local(self) -> CutCSG:
         """
         Get the complete negative CSG including end cuts.
@@ -1401,8 +1393,8 @@ class Cutting:
         if self.negative_csg is not None:
             _append_component(self.negative_csg)
 
-        top_end_cut = self.get_top_end_cut_local()
-        bottom_end_cut = self.get_bottom_end_cut_local()
+        top_end_cut = self.get_maybe_top_end_cut()
+        bottom_end_cut = self.get_maybe_bottom_end_cut()
         if top_end_cut is not None:
             _append_component(top_end_cut)
         if bottom_end_cut is not None:
@@ -1515,13 +1507,13 @@ def _create_timber_prism_csg_local(
     """
     # Check if bottom end has cuts
     has_bottom_cut = any(
-        cut.get_bottom_end_cut_local() is not None
+        cut.get_maybe_bottom_end_cut() is not None
         for cut in cuts
     )
     
     # Check if top end has cuts  
     has_top_cut = any(
-        cut.get_top_end_cut_local() is not None
+        cut.get_maybe_top_end_cut() is not None
         for cut in cuts
     )
     
@@ -1558,8 +1550,8 @@ def did_end_cuts_extend_timber(timber: PerfectTimberWithin, cuts: List['Cutting'
     from kumiki.rule import safe_compare, Comparison
     
     for cut in cuts:
-        top_end_cut = cut.get_top_end_cut_local()
-        bottom_end_cut = cut.get_bottom_end_cut_local()
+        top_end_cut = cut.get_maybe_top_end_cut()
+        bottom_end_cut = cut.get_maybe_bottom_end_cut()
 
         # Check top end cut
         if top_end_cut is not None:
@@ -1677,8 +1669,8 @@ class CutTimber:
         
         # Check all cuts for end cuts
         for cut in self.cuts:
-            top_end_cut = cut.get_top_end_cut_local()
-            bottom_end_cut = cut.get_bottom_end_cut_local()
+            top_end_cut = cut.get_maybe_top_end_cut()
+            bottom_end_cut = cut.get_maybe_bottom_end_cut()
 
             # Handle top end cut
             if top_end_cut is not None:

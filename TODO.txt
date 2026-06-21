@@ -271,8 +271,8 @@ DONE/IGNORE-test
     -expsoe caputre screenshot command, not sure where it went
   -refresh the frame viewer command seems to be be broken
   -rename project.yaml to kigumi.yaml (no bw campatability please)
+DONE-do one more install pass
 
--do one more install pass
 -do setup vid
 -do shower vid
 -do example cleanup

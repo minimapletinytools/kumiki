@@ -311,8 +311,8 @@ def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
     from kumiki.timber import _create_extended_rectangular_prism
 
     timber = cut_timber.timber
-    has_bottom_cut = any(c.get_bottom_end_cut_local() is not None for c in cut_timber.cuts)
-    has_top_cut = any(c.get_top_end_cut_local() is not None for c in cut_timber.cuts)
+    has_bottom_cut = any(c.get_maybe_bottom_end_cut() is not None for c in cut_timber.cuts)
+    has_top_cut = any(c.get_maybe_top_end_cut() is not None for c in cut_timber.cuts)
 
     base_prism = _create_extended_rectangular_prism(
         size=timber.get_perfect_size(),
