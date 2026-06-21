@@ -293,9 +293,6 @@ def create_patternbook_example_patternbook() -> PatternBook:
     return PatternBook.merge_multiple(books)
 
 
-patternbook = create_patternbook_example_patternbook()
-
-
 def _make_short_post(center):
     return Frame(cut_timbers=[CutTimber(timber_from_directions(length=feet(4), size=create_v2(inches(4), inches(4)), bottom_position=center, length_direction=create_v3(Integer(0), Integer(0), Integer(1)), width_direction=create_v3(Integer(1), Integer(0), Integer(0)), ticket="short_post"), cuts=[])], ticket="short_post_frame")
 

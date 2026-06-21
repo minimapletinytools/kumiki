@@ -731,15 +731,7 @@ class KigumiSidebarProvider {
         return [];
     }
 
-    _getPatternName(p, pb) {
-        // New format: p has .path; legacy: p is a string
-        if (typeof p === 'string') return p;
-        return p.path || p.name || path.basename(pb.filePath, '.py');
-    }
-
     _getPatternDisplayLabel(p) {
-        if (typeof p === 'string') return p;
-        // Show last path segment as label
         const segments = (p.path || '').split('/');
         return segments[segments.length - 1] || p.path || '';
     }
@@ -759,9 +751,7 @@ class KigumiSidebarProvider {
         if (this._groupByPatternbook) {
             // Hierarchical: show each patternbook file as a folder
             return patternbooks.map((pb) => {
-                const patternCount = Array.isArray(pb.patterns) && pb.patterns.length > 0
-                    ? pb.patterns.length
-                    : (Array.isArray(pb.patternNames) ? pb.patternNames.length : 0);
+                const patternCount = Array.isArray(pb.patterns) ? pb.patterns.length : 0;
                 return new SidebarNode({
                     key: `workspace-patternbook:${pb.filePath}`,
                     type: 'workspacePatternbook',
@@ -787,18 +777,50 @@ class KigumiSidebarProvider {
     }
 
     getWorkspacePatternbookPatternNodes(pb) {
-        // New format: pb.patterns is [{path, tags, pattern_type}]
-        const newPatterns = Array.isArray(pb.patterns) ? pb.patterns : [];
-        const legacyNames = Array.isArray(pb.patternNames) ? pb.patternNames : [];
+        const patterns = Array.isArray(pb.patterns) ? pb.patterns : [];
 
-        if (newPatterns.length > 0) {
-            return newPatterns.map((p) => {
+        if (patterns.length === 0) {
+            return [new SidebarNode({
+                key: `workspace-pb-empty:${pb && pb.filePath}`,
+                type: 'placeholder',
+                label: 'No patterns found',
+                iconPath: new vscode.ThemeIcon('circle-slash'),
+            })];
+        }
+
+        return patterns.map((p) => {
+            const displayLabel = this._getPatternDisplayLabel(p);
+            const patternName = p.path;
+            return new SidebarNode({
+                key: `workspace-pattern:${pb.filePath}:${patternName}`,
+                type: 'patternItem',
+                label: displayLabel,
+                tooltip: `${patternName} — ${pb.filePath}`,
+                command: {
+                    title: 'Open pattern',
+                    command: 'kigumi.openPatternFromSidebar',
+                    arguments: [{ sourceFile: pb.filePath, patternName }],
+                },
+                iconPath: new vscode.ThemeIcon('symbol-string'),
+                data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
+                contextValue: 'patternItemWorkspace',
+            });
+        });
+    }
+
+    getFlatWorkspacePatternNodes() {
+        const patternbooks = this._state.workspacePatternbooks || [];
+        const nodes = [];
+
+        for (const pb of patternbooks) {
+            for (const p of (Array.isArray(pb.patterns) ? pb.patterns : [])) {
                 const displayLabel = this._getPatternDisplayLabel(p);
                 const patternName = p.path;
-                return new SidebarNode({
-                    key: `workspace-pattern:${pb.filePath}:${patternName}`,
+                nodes.push(new SidebarNode({
+                    key: `workspace-pattern-flat:${pb.filePath}:${patternName}`,
                     type: 'patternItem',
                     label: displayLabel,
+                    description: pb.patternbookName,
                     tooltip: `${patternName} — ${pb.filePath}`,
                     command: {
                         title: 'Open pattern',
@@ -808,82 +830,7 @@ class KigumiSidebarProvider {
                     iconPath: new vscode.ThemeIcon('symbol-string'),
                     data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
                     contextValue: 'patternItemWorkspace',
-                });
-            });
-        }
-
-        // Legacy fallback
-        if (legacyNames.length === 0) {
-            return [new SidebarNode({
-                key: `workspace-pb-empty:${pb && pb.filePath}`,
-                type: 'placeholder',
-                label: 'No patterns found',
-                iconPath: new vscode.ThemeIcon('circle-slash'),
-            })];
-        }
-
-        return legacyNames.map((patternName) => new SidebarNode({
-            key: `workspace-pattern:${pb.filePath}:${patternName}`,
-            type: 'patternItem',
-            label: patternName,
-            tooltip: `${patternName} — ${pb.filePath}`,
-            command: {
-                title: 'Open pattern',
-                command: 'kigumi.openPatternFromSidebar',
-                arguments: [{ sourceFile: pb.filePath, patternName }],
-            },
-            iconPath: new vscode.ThemeIcon('symbol-string'),
-            data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
-            contextValue: 'patternItemWorkspace',
-        }));
-    }
-
-    getFlatWorkspacePatternNodes() {
-        const patternbooks = this._state.workspacePatternbooks || [];
-        const nodes = [];
-
-        for (const pb of patternbooks) {
-            const newPatterns = Array.isArray(pb.patterns) ? pb.patterns : [];
-            const legacyNames = Array.isArray(pb.patternNames) ? pb.patternNames : [];
-
-            if (newPatterns.length > 0) {
-                for (const p of newPatterns) {
-                    const displayLabel = this._getPatternDisplayLabel(p);
-                    const patternName = p.path;
-                    nodes.push(new SidebarNode({
-                        key: `workspace-pattern-flat:${pb.filePath}:${patternName}`,
-                        type: 'patternItem',
-                        label: displayLabel,
-                        description: pb.patternbookName,
-                        tooltip: `${patternName} — ${pb.filePath}`,
-                        command: {
-                            title: 'Open pattern',
-                            command: 'kigumi.openPatternFromSidebar',
-                            arguments: [{ sourceFile: pb.filePath, patternName }],
-                        },
-                        iconPath: new vscode.ThemeIcon('symbol-string'),
-                        data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
-                        contextValue: 'patternItemWorkspace',
-                    }));
-                }
-            } else {
-                for (const patternName of legacyNames) {
-                    nodes.push(new SidebarNode({
-                        key: `workspace-pattern-flat:${pb.filePath}:${patternName}`,
-                        type: 'patternItem',
-                        label: patternName,
-                        description: pb.patternbookName,
-                        tooltip: `${patternName} — ${pb.filePath}`,
-                        command: {
-                            title: 'Open pattern',
-                            command: 'kigumi.openPatternFromSidebar',
-                            arguments: [{ sourceFile: pb.filePath, patternName }],
-                        },
-                        iconPath: new vscode.ThemeIcon('symbol-string'),
-                        data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
-                        contextValue: 'patternItemWorkspace',
-                    }));
-                }
+                }));
             }
         }
 

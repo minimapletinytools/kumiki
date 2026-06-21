@@ -59,7 +59,6 @@ def _entry_from_static(static_frames: Iterable[StaticEntry]) -> List[Dict[str, A
 def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
     static = rec.static_info
     frames = list(static.frames) if static else []
-    patternbooks_static = list(static.patternbooks) if static else []
     chosen = static.chosen_frame if static else None
 
     entry: Dict[str, Any] = {
@@ -72,29 +71,8 @@ def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
         "multiple_frames": bool(static and static.multiple_frames),
         "warnings": list(rec.warnings or []),
         "load_error": rec.load_error,
+        "patternbook": None,
     }
-
-    if patternbooks_static or rec.patternbook is not None:
-        pb = rec.patternbook
-        names: List[str] = []
-        groups: List[str] = []
-        if pb is not None:
-            try:
-                names = list(pb.list_patterns())
-            except Exception:
-                names = []
-            try:
-                groups = list(pb.list_groups())
-            except Exception:
-                groups = []
-        entry["patternbook"] = {
-            "loaded": pb is not None,
-            "names": names,
-            "groups": groups,
-            "static_entries": _entry_from_static(patternbooks_static),
-        }
-    else:
-        entry["patternbook"] = None
 
     return entry
 
@@ -113,13 +91,9 @@ def build_pattern_index(
     """Build a pattern index dict for *root_folder*.
 
     When *prior_index* is supplied, entries whose source ``sha256`` still
-    matches are reused verbatim — in particular their cached
-    ``patternbook.names`` / ``patternbook.groups`` — which avoids re-importing
-    unchanged patternbook modules.
+    matches are reused verbatim — which avoids re-importing unchanged modules.
 
-    Frame files are never imported here (the underlying scan keeps
-    ``load_frame_examples=False``); only patternbook files are imported, and
-    only when their sha256 has changed.
+    Frame files are never imported here; only pattern-list files are imported.
     """
     root = Path(root_folder).resolve()
     if not root.exists() or not root.is_dir():
@@ -156,11 +130,6 @@ def build_pattern_index(
             file_path,
             load_frame_examples=False,
         )
-        # _scan_single_file already imports patternbooks when present; only
-        # skip the import when caller asked us to.
-        if not load_patternbooks and record.patternbook is not None:
-            record.patternbook = None
-
         entries[relative_path] = _entry_from_record(record)
 
     return {

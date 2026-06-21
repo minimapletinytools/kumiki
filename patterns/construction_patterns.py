@@ -82,18 +82,6 @@ def create_construction_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_construction_patternbook()
-
-
-def create_all_construction_examples():
-    """Create all construction examples for testing."""
-    # For now, just return the centerline example
-    # You can create a combined frame if needed
-    return create_test_posts_with_beam_centerline()
-
-
-example = create_all_construction_examples
-
 patterns = [
     Pattern(path="construction/posts_with_beam_centerline", lambda_=lambda center: create_test_posts_with_beam_centerline(), pattern_type='frame', tags=['main']),
 ]

@@ -26,9 +26,6 @@ from typing import List, Optional
 # Canonical type names we recognize.  Module-of-origin checks are restricted to
 # kumiki and its submodules; any other origin is ignored.
 _FRAME_NAME = "Frame"
-_PATTERNBOOK_NAME = "PatternBook"
-_LEGACY_PATTERNBOOK_FACTORY = "create_"  # prefix
-_LEGACY_PATTERNBOOK_FACTORY_SUFFIX = "_patternbook"
 
 
 @dataclass(frozen=True)
@@ -44,13 +41,12 @@ class ModuleStaticInfo:
     """Result of statically analyzing a single source file."""
     file_path: str
     frames: List[StaticEntry] = field(default_factory=list)
-    patternbooks: List[StaticEntry] = field(default_factory=list)
     pattern_lists: List[StaticEntry] = field(default_factory=list)
     parse_error: Optional[str] = None
 
     @property
     def has_anything(self) -> bool:
-        return bool(self.frames) or bool(self.patternbooks) or bool(self.pattern_lists)
+        return bool(self.frames) or bool(self.pattern_lists)
 
     @property
     def chosen_frame(self) -> Optional[StaticEntry]:
@@ -87,22 +83,21 @@ def _collect_kumiki_aliases(tree: ast.Module) -> dict[str, str]:
             for alias in node.names:
                 if alias.name == "*":
                     aliases[_FRAME_NAME] = _FRAME_NAME
-                    aliases[_PATTERNBOOK_NAME] = _PATTERNBOOK_NAME
                     continue
-                if alias.name in (_FRAME_NAME, _PATTERNBOOK_NAME):
+                if alias.name == _FRAME_NAME:
                     local = alias.asname or alias.name
                     aliases[local] = alias.name
     return aliases
 
 
 def _annotation_target(annotation: Optional[ast.expr], aliases: dict[str, str]) -> Optional[str]:
-    """If ``annotation`` ultimately references a kumiki ``Frame`` / ``PatternBook``,
+    """If ``annotation`` ultimately references a kumiki ``Frame``,
     return the canonical name; else ``None``.
 
     Handles bare names (``Frame``), attribute access (``kumiki.Frame``,
     ``kumiki.timber.Frame``), and string-form annotations (``"Frame"``).
     Stripping of ``Optional[...]`` / ``list[...]`` / etc. is intentionally not
-    done — entries are only counted when the value *is* a Frame/PatternBook,
+    done — entries are only counted when the value *is* a Frame,
     not a container of them.
     """
     if annotation is None:
@@ -112,11 +107,11 @@ def _annotation_target(annotation: Optional[ast.expr], aliases: dict[str, str]) 
         text = annotation.value.strip()
         if text in aliases:
             return aliases[text]
-        if text in (_FRAME_NAME, _PATTERNBOOK_NAME):
+        if text == _FRAME_NAME:
             return text
         # accept dotted forms like "kumiki.Frame"
         tail = text.rsplit(".", 1)[-1]
-        if tail in (_FRAME_NAME, _PATTERNBOOK_NAME):
+        if tail == _FRAME_NAME:
             return tail
         return None
     if isinstance(annotation, ast.Name):
@@ -129,13 +124,13 @@ def _annotation_target(annotation: Optional[ast.expr], aliases: dict[str, str]) 
             parts.append(attr.attr)
             attr = attr.value
         if isinstance(attr, ast.Name) and attr.id == "kumiki":
-            if parts and parts[0] in (_FRAME_NAME, _PATTERNBOOK_NAME):
+            if parts and parts[0] == _FRAME_NAME:
                 return parts[0]
     return None
 
 
 def _call_target(call: ast.Call, aliases: dict[str, str]) -> Optional[str]:
-    """If ``call`` is a constructor or classmethod of ``Frame`` / ``PatternBook``,
+    """If ``call`` is a constructor or classmethod of ``Frame``,
     return the canonical name; else ``None``.
 
     Recognizes ``Frame(...)``, ``Frame.from_joints(...)``, ``kumiki.Frame(...)``,
@@ -145,7 +140,7 @@ def _call_target(call: ast.Call, aliases: dict[str, str]) -> Optional[str]:
     # Direct: Frame(...) or alias F(...)
     if isinstance(func, ast.Name):
         canonical = aliases.get(func.id)
-        if canonical in (_FRAME_NAME, _PATTERNBOOK_NAME):
+        if canonical == _FRAME_NAME:
             return canonical
         return None
     # Attribute: X.method(...) or kumiki[.sub].Frame(...)
@@ -153,29 +148,19 @@ def _call_target(call: ast.Call, aliases: dict[str, str]) -> Optional[str]:
         # Case A: <Frame-or-alias>.classmethod(...)
         if isinstance(func.value, ast.Name):
             canonical = aliases.get(func.value.id)
-            if canonical in (_FRAME_NAME, _PATTERNBOOK_NAME):
+            if canonical == _FRAME_NAME:
                 return canonical
-        # Case B: kumiki[.sub].Frame(...) — last attr is Frame/PatternBook,
-        # root is "kumiki"
+        # Case B: kumiki[.sub].Frame(...) — last attr is Frame, root is "kumiki"
         parts: List[str] = []
         node: ast.expr = func
         while isinstance(node, ast.Attribute):
             parts.append(node.attr)
             node = node.value
         if isinstance(node, ast.Name) and node.id == "kumiki":
-            # parts is [innermost, ..., outermost]; the func name is parts[0]
-            # We accept either kumiki.Frame(...) (parts == [Frame])
-            # or kumiki.sub.Frame.classmethod(...) (parts == [classmethod, Frame, sub])
             for candidate in parts:
-                if candidate in (_FRAME_NAME, _PATTERNBOOK_NAME):
+                if candidate == _FRAME_NAME:
                     return candidate
     return None
-
-
-def _is_legacy_patternbook_factory(name: str) -> bool:
-    return name.startswith(_LEGACY_PATTERNBOOK_FACTORY) and name.endswith(
-        _LEGACY_PATTERNBOOK_FACTORY_SUFFIX
-    )
 
 
 def _is_pattern_list_assignment(node: ast.Assign) -> bool:
@@ -226,33 +211,27 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
             if canonical == _FRAME_NAME:
                 info.frames.append(StaticEntry(node.target.id, "var", node.lineno))
                 continue
-            if canonical == _PATTERNBOOK_NAME:
-                info.patternbooks.append(StaticEntry(node.target.id, "var", node.lineno))
-                continue
             # Also accept call-on-rhs even when annotated to something else
             if isinstance(node.value, ast.Call):
                 rhs = _call_target(node.value, aliases)
                 if rhs == _FRAME_NAME:
                     info.frames.append(StaticEntry(node.target.id, "var", node.lineno))
-                elif rhs == _PATTERNBOOK_NAME:
-                    info.patternbooks.append(StaticEntry(node.target.id, "var", node.lineno))
+            # patterns: List[Pattern] = [...] annotated assignment
+            if _is_pattern_list_ann_assign(node):
+                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
             continue
 
         # Untyped assignment: name = Frame(...) / Frame.from_joints(...)
         if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
             canonical = _call_target(node.value, aliases)
-            if canonical not in (_FRAME_NAME, _PATTERNBOOK_NAME):
-                # Check for patterns = [...] (new pattern list system)
-                if _is_pattern_list_assignment(node):
-                    info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
+            if canonical == _FRAME_NAME:
+                for target in node.targets:
+                    for name in _record_target_names(target):
+                        info.frames.append(StaticEntry(name, "var", node.lineno))
                 continue
-            for target in node.targets:
-                for name in _record_target_names(target):
-                    entry = StaticEntry(name, "var", node.lineno)
-                    if canonical == _FRAME_NAME:
-                        info.frames.append(entry)
-                    else:
-                        info.patternbooks.append(entry)
+            # Check for patterns = [...] (new pattern list system)
+            if _is_pattern_list_assignment(node):
+                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
             continue
 
         # patterns = [...] list literal assignment
@@ -261,23 +240,11 @@ def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
                 info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
             continue
 
-        # patterns: List[Pattern] = [...] annotated assignment
-        if isinstance(node, ast.AnnAssign) and _is_pattern_list_ann_assign(node):
-            info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
-            continue
-
         # def name(...) -> Frame: ...
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
             canonical = _annotation_target(node.returns, aliases)
             if canonical == _FRAME_NAME:
                 info.frames.append(StaticEntry(node.name, "function", node.lineno))
-                continue
-            if canonical == _PATTERNBOOK_NAME:
-                info.patternbooks.append(StaticEntry(node.name, "function", node.lineno))
-                continue
-            # Legacy fallback: create_*_patternbook factories with no annotation
-            if _is_legacy_patternbook_factory(node.name) and canonical is None:
-                info.patternbooks.append(StaticEntry(node.name, "factory", node.lineno))
 
     return info
 

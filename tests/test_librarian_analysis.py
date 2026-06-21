@@ -11,7 +11,6 @@ my_thing: Frame = Frame.from_joints([])
     info = analyze_source(src, "f.py")
     assert [e.name for e in info.frames] == ["my_thing"]
     assert info.frames[0].kind == "var"
-    assert info.patternbooks == []
 
 
 def test_frame_constructor_call_detected_without_annotation():
@@ -80,19 +79,6 @@ def c() -> Frame: ...
     assert info.multiple_frames is True
 
 
-def test_patternbook_detection_and_legacy_factory():
-    src = """
-from kumiki import PatternBook
-book: PatternBook = PatternBook()
-def create_my_patternbook():
-    return PatternBook()
-"""
-    info = analyze_source(src, "f.py")
-    names = [(e.name, e.kind) for e in info.patternbooks]
-    assert ("book", "var") in names
-    assert ("create_my_patternbook", "factory") in names
-
-
 def test_non_kumiki_frame_ignored():
     src = """
 from somewhere_else import Frame
@@ -100,7 +86,6 @@ thing: Frame = Frame()
 """
     info = analyze_source(src, "f.py")
     assert info.frames == []
-    assert info.patternbooks == []
 
 
 def test_string_form_annotation():

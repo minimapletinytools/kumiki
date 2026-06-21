@@ -140,12 +140,8 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
     const patternbookFiles = [];
     for (const rec of (index.patternbooks || [])) {
         const relPath = rec.relative_path || path.relative(workspaceRoot, rec.file_path);
-        // New format: patterns is [{path, tags, pattern_type}]
-        // Legacy format: pattern_names + group_names
-        const newPatterns = Array.isArray(rec.patterns) ? rec.patterns : [];
-        const legacyNames = Array.isArray(rec.pattern_names) ? rec.pattern_names : [];
-        // Filter poop-tagged patterns from sidebar
-        const sidebarPatterns = newPatterns.filter(
+        const allPatterns = Array.isArray(rec.patterns) ? rec.patterns : [];
+        const sidebarPatterns = allPatterns.filter(
             (p) => !Array.isArray(p.tags) || !p.tags.includes('poop')
         );
         patternbookFiles.push({
@@ -153,15 +149,10 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
             relativePath: relPath,
             patternbookName: path.basename(rec.file_path || '', '.py'),
             patterns: sidebarPatterns,
-            patternNames: newPatterns.length > 0
-                ? sidebarPatterns.map((p) => p.path)
-                : legacyNames,
-            groupNames: Array.isArray(rec.group_names) ? rec.group_names : [],
             loadError: rec.load_error || null,
         });
         if (logLine) {
-            const names = (rec.pattern_names || []).join(',');
-            logLine(`[workspace-scan] patternbook=${relPath} names=[${names}]`);
+            logLine(`[workspace-scan] patternbook=${relPath} patterns=${sidebarPatterns.length}`);
         }
     }
 

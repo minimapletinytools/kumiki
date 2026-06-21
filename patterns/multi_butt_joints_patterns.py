@@ -68,23 +68,6 @@ def create_multi_butt_joints_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_multi_butt_joints_patternbook()
-
-
-def create_all_multi_butt_joint_patterns() -> Union[Frame]:
-    """
-    Create double butt joint examples with automatic spacing starting from the origin.
-
-    Returns:
-        Frame object containing all cut timbers
-    """
-    book = create_multi_butt_joints_patternbook()
-    frame = book.raise_pattern_group("double_butt_joints", separation_distance=Rational(2))
-    return frame
-
-
-example = create_all_multi_butt_joint_patterns
-
 patterns = [
     Pattern(path="multi_butt_joints/splined_opposing_double_butt_joint", lambda_=make_splined_opposing_double_butt_joint_example, pattern_type='frame', tags=['main']),
 ]

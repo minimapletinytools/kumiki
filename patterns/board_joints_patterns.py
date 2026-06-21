@@ -59,16 +59,6 @@ def create_board_joints_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_board_joints_patternbook()
-
-
-def create_all_board_joint_patterns():
-    """Raise the tongue-and-groove group into a single frame."""
-    return patternbook.raise_pattern_group("tongue_groove", separation_distance=inches(96))
-
-
-example = create_all_board_joint_patterns
-
 patterns = [
     Pattern(path="board_joints/tongue_and_groove", lambda_=make_pattern_from_joint(example_tongue_and_groove), pattern_type='frame', tags=['main']),
 ]

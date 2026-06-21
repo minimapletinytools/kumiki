@@ -33,7 +33,7 @@ from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple,
 from sympy import Float, Rational
 
 from .librarian_analysis import ModuleStaticInfo, analyze_file
-from .patternbook import Pattern, PatternBook
+from .patternbook import Pattern
 
 
 _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
@@ -439,7 +439,6 @@ def serialize_render_parameter_value(value: Any) -> Any:
 class LibrarianModuleRecord:
     relative_path: str
     module_name: str
-    patternbook: Optional[PatternBook] = None
     pattern_list: Optional[List[Pattern]] = None
     example: Optional[Any] = None
     warnings: List[str] = field(default_factory=list)
@@ -460,14 +459,6 @@ class LibrarianScanResult:
             f"{module.relative_path}: {module.load_error}"
             for module in self.modules
             if module.load_error is not None
-        ]
-
-    @property
-    def pattern_books(self) -> List[PatternBook]:
-        return [
-            module.patternbook
-            for module in self.modules
-            if module.patternbook is not None
         ]
 
     @property
@@ -647,37 +638,6 @@ def _load_module_from_path(
         return None, f"{attempted_file}: {type(exc).__name__}: {exc}", tb, module_name
 
 
-def _resolve_patternbook(module: Any, warnings: List[str]) -> Optional[PatternBook]:
-    if hasattr(module, "patternbook"):
-        candidate = getattr(module, "patternbook")
-        if isinstance(candidate, PatternBook):
-            return candidate
-        warnings.append(
-            f"module.patternbook exists but is {type(candidate).__name__}, expected PatternBook"
-        )
-
-    factory_names = [
-        name
-        for name in dir(module)
-        if name.startswith("create_") and name.endswith("_patternbook")
-    ]
-
-    for name in sorted(factory_names):
-        factory = getattr(module, name)
-        if not callable(factory):
-            continue
-        try:
-            result = factory()
-        except Exception as exc:
-            warnings.append(f"{name}() failed: {type(exc).__name__}: {exc}")
-            continue
-        if isinstance(result, PatternBook):
-            return result
-        warnings.append(f"{name}() returned {type(result).__name__}, expected PatternBook")
-
-    return None
-
-
 def _resolve_pattern_list(module: Any, warnings: List[str]) -> Optional[List[Pattern]]:
     """Return List[Pattern] from module.patterns if it's a valid pattern list."""
     if not hasattr(module, "patterns"):
@@ -744,7 +704,7 @@ def _scan_single_file(
     if not static_info.has_anything:
         return record
 
-    needs_import = bool(static_info.patternbooks) or bool(static_info.pattern_lists) or (
+    needs_import = bool(static_info.pattern_lists) or (
         load_frame_examples and bool(static_info.frames)
     )
     if not needs_import:
@@ -762,8 +722,6 @@ def _scan_single_file(
 
     if static_info.pattern_lists:
         record.pattern_list = _resolve_pattern_list(module, record.warnings)
-    if static_info.patternbooks and record.pattern_list is None:
-        record.patternbook = _resolve_patternbook(module, record.warnings)
     if load_frame_examples and static_info.frames:
         record.example = _resolve_example(module)
     return record
@@ -815,20 +773,6 @@ def scan_specific_files(
 # ---------------------------------------------------------------------------
 
 
-def _pattern_names_from_patternbook(patternbook: PatternBook) -> List[str]:
-    try:
-        return [pattern_name for pattern_name in patternbook.list_patterns()]
-    except Exception:
-        return []
-
-
-def _group_names_from_patternbook(patternbook: PatternBook) -> List[str]:
-    try:
-        return [group_name for group_name in patternbook.list_groups()]
-    except Exception:
-        return []
-
-
 def _frame_record_for_index(
     abs_path: str,
     rec: LibrarianModuleRecord,
@@ -873,34 +817,19 @@ def build_scan_index(scan_result: LibrarianScanResult) -> Dict[str, Any]:
         warnings = list(rec.warnings or [])
         static = rec.static_info
 
-        has_pattern_list = rec.pattern_list is not None or (static and static.pattern_lists)
-        has_patternbook = rec.patternbook is not None or (static and static.patternbooks)
-        if has_pattern_list or has_patternbook:
-            pl = rec.pattern_list
-            pb = rec.patternbook
-            if pl is not None:
-                patterns_payload = [
-                    {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type}
-                    for p in pl
-                ]
-                pattern_names = [p.name for p in pl]
-                group_names: List[str] = []
-            elif pb is not None:
-                patterns_payload = []
-                pattern_names = _pattern_names_from_patternbook(pb)
-                group_names = _group_names_from_patternbook(pb)
-            else:
-                patterns_payload = []
-                pattern_names = []
-                group_names = []
+        if rec.pattern_list is not None or (static and static.pattern_lists):
+            pl = rec.pattern_list or []
+            patterns_payload = [
+                {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type}
+                for p in pl
+            ]
             patternbooks.append({
                 "file_path": abs_path,
                 "relative_path": rec.relative_path,
                 "module_name": rec.module_name,
                 "patterns": patterns_payload,
-                "pattern_names": pattern_names,
-                "group_names": group_names,
-                "patternbook_loaded": pl is not None or pb is not None,
+                "pattern_names": [p.name for p in pl],
+                "patternbook_loaded": rec.pattern_list is not None,
                 "content_sha256": rec.content_sha256,
                 "load_error": rec.load_error,
                 "warnings": warnings,
@@ -940,20 +869,3 @@ def scan_workspace_index(workspace_root: str) -> Dict[str, Any]:
     return scan_library_index(workspace_root)
 
 
-# ---------------------------------------------------------------------------
-# Anthology helper
-# ---------------------------------------------------------------------------
-
-
-def create_anthology_pattern_book_from_folder(
-    folder_path: str,
-) -> Tuple[PatternBook, LibrarianScanResult]:
-    scan_result = scan_library_folder(folder_path, load_frame_examples=True)
-    if not scan_result.pattern_books:
-        raise ValueError(
-            "No valid PatternBook objects discovered. "
-            f"Import errors: {len(scan_result.errors)}"
-        )
-
-    anthology = PatternBook.merge_multiple(scan_result.pattern_books)
-    return anthology, scan_result

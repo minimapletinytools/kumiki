@@ -1002,10 +1002,6 @@ def _looks_like_frame(value: Any) -> bool:
     return hasattr(value, "cut_timbers") and hasattr(value, "accessories")
 
 
-def _looks_like_patternbook(value: Any) -> bool:
-    return callable(getattr(value, "list_patterns", None)) and callable(getattr(value, "raise_pattern", None))
-
-
 def _looks_like_pattern_list(value: Any) -> bool:
     """True if value is a non-empty list of Pattern objects."""
     if not isinstance(value, list) or not value:
@@ -1087,13 +1083,6 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> Any:
         log_stderr(f"[reload] Loaded module: {module_name} from {file_path}")
     
     return module
-
-
-def frame_from_patternbook(patternbook: Any) -> Any:
-    with contextlib.redirect_stdout(sys.stderr):
-        result = patternbook.raise_patternbook_as_frame()
-
-    return _coerce_viewable_frame(result, "patternbook")
 
 
 def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
@@ -1200,9 +1189,21 @@ def resolve_frame_from_module(
     or a **callable** that returns one (preferred — avoids heavy work at import
     time).
     """
+    if hasattr(module, "patterns"):
+        pattern_list = getattr(module, "patterns")
+        if _looks_like_pattern_list(pattern_list):
+            frame, patternbook = _frame_from_pattern_list(pattern_list)
+            return frame, patternbook, [], {}
+
+    if hasattr(module, "build_frame") and callable(module.build_frame):
+        frame, descriptors, applied = _resolve_callable_entry_with_render_parameters(
+            module.build_frame,
+            render_parameters,
+        )
+        return _coerce_viewable_frame(frame, "build_frame"), None, descriptors, applied
+
     if hasattr(module, "example"):
         example = getattr(module, "example")
-        # If example is a callable (function reference), invoke it now
         if callable(example):
             example, descriptors, applied = _resolve_callable_entry_with_render_parameters(
                 example,
@@ -1217,29 +1218,9 @@ def resolve_frame_from_module(
             return _coerce_viewable_frame(example, "example"), None, descriptors, applied
         except TypeError:
             pass
-        if _looks_like_patternbook(example):
-            return frame_from_patternbook(example), example, descriptors, applied
-
-    if hasattr(module, "build_frame") and callable(module.build_frame):
-        frame, descriptors, applied = _resolve_callable_entry_with_render_parameters(
-            module.build_frame,
-            render_parameters,
-        )
-        return _coerce_viewable_frame(frame, "build_frame"), None, descriptors, applied
-
-    if hasattr(module, "patterns"):
-        pattern_list = getattr(module, "patterns")
-        if _looks_like_pattern_list(pattern_list):
-            frame, patternbook = _frame_from_pattern_list(pattern_list)
-            return frame, patternbook, [], {}
-
-    if hasattr(module, "patternbook"):
-        patternbook = getattr(module, "patternbook")
-        if _looks_like_patternbook(patternbook):
-            return frame_from_patternbook(patternbook), patternbook, [], {}
 
     raise AttributeError(
-        "Module must expose a module-level 'example' Frame, a 'patternbook', or a build_frame() function"
+        "Module must expose a module-level 'patterns' list, 'example' Frame, or a 'build_frame()' function"
     )
 
 
@@ -2033,29 +2014,17 @@ def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
         items = []
         for pb_record in index.get("patternbooks", []):
             source_file = pb_record.get("file_path")
-            new_patterns = pb_record.get("patterns") or []
-            if new_patterns:
-                for p in new_patterns:
-                    path = p.get("path", "")
-                    tags = list(p.get("tags") or [])
-                    name = path.split("/")[-1] if path else ""
-                    items.append({
-                        "path": path,
-                        "name": name,
-                        "tags": tags,
-                        "groups": [],
-                        "source_file": source_file,
-                    })
-            else:
-                group_names = list(pb_record.get("group_names") or [])
-                for name in pb_record.get("pattern_names") or []:
-                    items.append({
-                        "path": name,
-                        "name": name,
-                        "tags": [],
-                        "groups": group_names,
-                        "source_file": source_file,
-                    })
+            for p in (pb_record.get("patterns") or []):
+                path = p.get("path", "")
+                tags = list(p.get("tags") or [])
+                name = path.split("/")[-1] if path else ""
+                items.append({
+                    "path": path,
+                    "name": name,
+                    "tags": tags,
+                    "groups": [],
+                    "source_file": source_file,
+                })
         return items
 
     try:
@@ -2092,13 +2061,6 @@ def _list_available_patterns(force_rescan: bool = False) -> Dict[str, Any]:
     result = {"sources": sources, "scan_s": scan_s}
     _patterns_cache = result
     return result
-
-
-def _find_pattern_lambda(patternbook: Any, pattern_name: str) -> Any:
-    for metadata, pattern_lambda in getattr(patternbook, "patterns", []):
-        if getattr(metadata, "pattern_name", None) == pattern_name:
-            return pattern_lambda
-    return None
 
 
 def _find_pattern_in_list(pattern_list: List[Any], pattern_name: str) -> Optional[Any]:
@@ -2169,71 +2131,10 @@ def _raise_specific_pattern(
         }
         return slot, result
 
-    # --- Legacy: PatternBook system ---
-    patternbook = None
-    if hasattr(module, "patternbook") and _looks_like_patternbook(module.patternbook):
-        patternbook = module.patternbook
-    elif hasattr(module, "example"):
-        candidate = getattr(module, "example")
-        if callable(candidate) and not _looks_like_patternbook(candidate):
-            with contextlib.redirect_stdout(sys.stderr):
-                candidate = candidate()
-        if _looks_like_patternbook(candidate):
-            patternbook = candidate
-    else:
-        for attr_name in dir(module):
-            if attr_name.startswith("create_") and attr_name.endswith("_patternbook"):
-                factory = getattr(module, attr_name)
-                if callable(factory):
-                    result = factory()
-                    if _looks_like_patternbook(result):
-                        patternbook = result
-                        break
-
-    if patternbook is None:
-        raise ValueError(f"No patternbook found in {source_file}")
-
-    available = patternbook.list_patterns()
-    if pattern_name not in available:
-        raise ValueError(f"Pattern '{pattern_name}' not found. Available: {available}")
-
-    pattern_lambda = _find_pattern_lambda(patternbook, pattern_name)
-    if pattern_lambda is None:
-        raise ValueError(f"Pattern '{pattern_name}' callable could not be resolved")
-
-    render_parameter_schema, applied_render_parameters = resolve_callable_render_parameters(
-        pattern_lambda,
-        render_parameters,
-        skip_first_parameter=True,
+    raise ValueError(
+        f"No patterns list found in {source_file}. "
+        "Pattern files must expose a module-level 'patterns = [Pattern(...), ...]' list."
     )
-
-    with contextlib.redirect_stdout(sys.stderr):
-        pattern_result = patternbook.raise_pattern(pattern_name, **applied_render_parameters)
-    frame = _coerce_viewable_frame(pattern_result, f"Pattern '{pattern_name}'")
-
-    reload_s = time.monotonic() - t0
-    slot = SlotState(
-        file_path=resolved,
-        module=module,
-        frame=frame,
-        mesh_cache={},
-        patternbook=patternbook,
-        single_pattern_name=pattern_name,
-        render_parameter_schema=render_parameter_schema,
-        applied_render_parameters=applied_render_parameters,
-    )
-    result = {
-        "examplePath": str(resolved),
-        "patternName": pattern_name,
-        "frame": {
-            "name": frame.name if hasattr(frame, "name") else pattern_name,
-            "timber_count": len(frame.cut_timbers),
-            "accessories_count": len(frame.accessories) if hasattr(frame, "accessories") else 0,
-        },
-        "renderParameters": _serialize_render_parameters_for_slot(slot),
-        "profiling": {"reload_s": reload_s},
-    }
-    return slot, result
 
 
 def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerState, Dict[str, Any], bool]:

@@ -390,8 +390,6 @@ def create_all_corner_joint_patterns(use_round_timbers=False) -> Frame:
     return Frame(cut_timbers=all_timbers, name="Corner Joint Patterns")
 
 
-example = create_all_corner_joint_patterns
-
 patterns = [
     Pattern(path="corner_joints/cut_plain_miter_joint", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_example(center), name="Plain Miter Joint"), pattern_type='frame', tags=['main']),
     Pattern(path="corner_joints/cut_plain_miter_joint_face_aligned", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_face_aligned_example(center), name="Plain Miter Joint (Face Aligned)"), pattern_type='frame'),

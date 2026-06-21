@@ -26,12 +26,13 @@ def build_frame() -> Frame:
     return Frame.from_joints([])
 """
 
-PATTERNBOOK_SOURCE = """
-from kumiki.patternbook import PatternBook
+PATTERN_LIST_SOURCE = """
+from kumiki.patternbook import Pattern
+from kumiki.timber import Frame
 
-
-def create_things_patternbook() -> PatternBook:
-    return PatternBook()
+patterns = [
+    Pattern(path="things/a_thing", lambda_=lambda center: Frame(cut_timbers=[], name="Thing"), pattern_type='frame', tags=['main']),
+]
 """
 
 EXPLODING_FRAME_SOURCE = """
@@ -50,8 +51,8 @@ def sample_root(tmp_path: Path) -> Path:
     (tmp_path / "frames").mkdir()
     (tmp_path / "frames" / "a.py").write_text(FRAME_SOURCE)
     (tmp_path / "frames" / "exploding.py").write_text(EXPLODING_FRAME_SOURCE)
-    (tmp_path / "books").mkdir()
-    (tmp_path / "books" / "b.py").write_text(PATTERNBOOK_SOURCE)
+    (tmp_path / "patterns").mkdir()
+    (tmp_path / "patterns" / "b.py").write_text(PATTERN_LIST_SOURCE)
     (tmp_path / "unrelated.py").write_text("x = 1\n")
     return tmp_path
 
@@ -64,8 +65,8 @@ def test_build_pattern_index_shape(sample_root: Path):
     # Frame files appear, including the exploding one (we never imported it).
     assert "frames/a.py" in entries
     assert "frames/exploding.py" in entries
-    # Patternbook file appears.
-    assert "books/b.py" in entries
+    # Pattern list file appears.
+    assert "patterns/b.py" in entries
     # Unrelated file is omitted.
     assert "unrelated.py" not in entries
 
@@ -74,10 +75,6 @@ def test_build_pattern_index_shape(sample_root: Path):
     assert frame_entry["chosen_frame_kind"] == "function"
     assert frame_entry["sha256"]
     assert frame_entry["patternbook"] is None
-
-    pb_entry = entries["books/b.py"]
-    assert pb_entry["patternbook"] is not None
-    assert pb_entry["patternbook"]["loaded"] is True
 
 
 def test_frame_files_never_imported_during_build(sample_root: Path):
@@ -91,17 +88,15 @@ def test_frame_files_never_imported_during_build(sample_root: Path):
 def test_refresh_reuses_unchanged_entries(sample_root: Path, tmp_path: Path):
     index_path = tmp_path / "pattern_index.json"
     first = refresh_pattern_index(str(sample_root), str(index_path))
-    first_pb_entry = first["entries"]["books/b.py"]
+    first_pb_entry = first["entries"]["patterns/b.py"]
 
     # Touch only one file.
     (sample_root / "frames" / "a.py").write_text(FRAME_SOURCE + "\n# changed\n")
     second = refresh_pattern_index(str(sample_root), str(index_path))
 
-    # Patternbook entry's sha unchanged → reused identity (same dict object
-    # would be wrong; check sha and contents).
-    second_pb_entry = second["entries"]["books/b.py"]
+    # Pattern list entry's sha unchanged → reused identity.
+    second_pb_entry = second["entries"]["patterns/b.py"]
     assert second_pb_entry["sha256"] == first_pb_entry["sha256"]
-    assert second_pb_entry["patternbook"] == first_pb_entry["patternbook"]
 
     # Frame entry sha must differ.
     assert (

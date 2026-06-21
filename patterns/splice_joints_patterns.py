@@ -181,8 +181,6 @@ def create_all_splice_joint_patterns(use_round_timbers=False) -> Frame:
     return Frame(cut_timbers=all_timbers, name="Splice Joint Patterns")
 
 
-example = create_all_splice_joint_patterns
-
 patterns = [
     Pattern(path="splice_joints/plain_butt_splice_joint", lambda_=lambda center: Frame(cut_timbers=make_splice_joint_example(center), name="Plain Butt Splice Joint"), pattern_type='frame', tags=['main']),
     Pattern(path="splice_joints/plain_splice_lap_joint", lambda_=lambda center: Frame(cut_timbers=make_splice_lap_joint_example(center), name="Plain Splice Lap Joint"), pattern_type='frame'),

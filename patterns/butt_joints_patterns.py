@@ -659,29 +659,6 @@ def create_mortise_and_tenon_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_mortise_and_tenon_patternbook()
-
-
-def create_all_mortise_and_tenon_examples():
-    """
-    Create mortise and tenon joint examples with automatic spacing.
-    
-    This now uses the PatternBook to raise all patterns in the "mortise_tenon" group.
-    
-    Returns:
-        Frame: Frame object containing all cut timbers and accessories for the examples
-    """
-    book = create_mortise_and_tenon_patternbook()
-    
-    # Raise all patterns in the "mortise_tenon" group with 6 feet spacing
-    frame = book.raise_pattern_group("mortise_tenon", separation_distance=inches(72))
-    
-    return frame
-
-
-example = create_all_mortise_and_tenon_examples
-
-
 if __name__ == "__main__":
     # Run all examples
     examples = [
@@ -768,8 +745,6 @@ def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
     all_timbers += make_butt_joint_3d_angles_example(origin + create_v3(step * 3, Integer(0), Integer(0)), use_round_timbers)
     return Frame(cut_timbers=all_timbers, name="Butt Joint Patterns")
 
-
-example = create_all_butt_joint_patterns
 
 patterns = [
     Pattern(path="butt_joints/tongue_and_fork_butt_joint_90", lambda_=lambda center: Frame(cut_timbers=make_tongue_and_fork_butt_joint_90_example(center), name="Tongue and Fork Butt Joint 90°"), pattern_type='frame', tags=['main']),

@@ -162,8 +162,6 @@ def create_all_cross_joint_patterns(use_round_timbers=False) -> Frame:
     return Frame(cut_timbers=all_timbers, name="Cross Joint Patterns")
 
 
-example = create_all_cross_joint_patterns
-
 patterns = [
     Pattern(path="cross_joints/cut_plain_cross_lap_house_joint", lambda_=lambda center: Frame(cut_timbers=make_house_joint_example(center), name="Plain Cross Lap House Joint"), pattern_type='frame', tags=['main']),
     Pattern(path="cross_joints/cut_plain_cross_lap_joint", lambda_=lambda center: Frame(cut_timbers=make_cross_lap_joint_example(center), name="Plain Cross Lap Joint"), pattern_type='frame'),

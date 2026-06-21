@@ -28,9 +28,6 @@ def create_irrational_angles_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_irrational_angles_patternbook()
-
-
 def create_all_irrational_examples() -> Frame:
     """
     Create a mortise and tenon joint at 37 degrees (an irrational angle).
@@ -95,8 +92,6 @@ def create_all_irrational_examples() -> Frame:
     
     return frame
 
-
-example = create_all_irrational_examples
 
 patterns = [
     Pattern(path="irrational_angles/mortise_and_tenon_37_degrees", lambda_=lambda center: create_all_irrational_examples(), pattern_type='frame', tags=['main']),

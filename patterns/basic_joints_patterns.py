@@ -319,28 +319,6 @@ def create_basic_joints_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_basic_joints_patternbook()
-
-
-def create_all_basic_joints_examples():
-    """
-    Create basic joint examples with automatic spacing.
-    
-    This uses the PatternBook to raise all patterns in the "basic_joints" group.
-    
-    Returns:
-        Frame: Frame object containing all cut timbers and accessories for the examples
-    """
-    book = create_basic_joints_patternbook()
-    
-    # Raise all patterns in the "basic_joints" group with 6 feet spacing
-    frame = book.raise_pattern_group("basic_joints", separation_distance=inches(72))
-    
-    return frame
-
-
-example = create_all_basic_joints_examples
-
 patterns = [
     Pattern(path="basic_joints/basic_miter_joint", lambda_=make_pattern_from_joint(example_basic_miter_joint), pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_miter_joint_face_aligned", lambda_=make_pattern_from_joint(example_basic_miter_joint_face_aligned), pattern_type='frame'),
