@@ -652,6 +652,7 @@ def cut_plain_tongue_and_fork_joint(
     )
 
 
+# TODO mov esomewhere else or rename?
 def cut_tongue_and_fork_butt_joint(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
@@ -1490,6 +1491,7 @@ def _find_closest_face_to_timber(timber: PerfectTimberWithin, other_timber: Perf
     return closest_face
 
 
+# TODO DELETE 
 def cut_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """
     Creates a house (dado/housing) joint where the housing timber is notched to receive the housed timber.
@@ -1760,3 +1762,26 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
     return joint
 
 
+
+def cut_free_house_joint(housing_timber : TimberLike, housed_timber : Union[TimberLike, CutTimber]) -> Joint:
+    """
+    Creates a generic house joint where the housing timber is cut to receive the housed timber.
+    The housed_timber can be a CutTimber which houses the CutTimber's geometry. 
+
+    Args:
+        housing_timber: Timber that will be cut to house the housed timber 
+        housed_timber: Timber that will be housed 
+    """
+
+    # if housed_timber is not perfect, output a warning indicating that cuts will be dependent on imperfect size 
+    # TODO flag joints or even CSG features (using tickets) that have cuts measured from imperfect features!!
+
+    # if housed_timber is a TimberLike, use it's actual CSG as the negative_csg for the housing timber's cut
+
+    # if housed_timber is a CutTimber
+    # find the four long face planes of the AABB of the housing_timber 
+    # now check which of CutTimber's CSG geometry lives entirely on the external side of the 4 planes
+    # specifically, for each CSG leaf feature in the CutTimber's negative_csg, see if that feature INTERSECTED with the housed_timbers actual AABB is entirely contained in the external side of the plane
+    # if this is the case, that means that CSG feature does not actually affect the housed timber and can be removed from the tree
+    # generated the pruned CSG tree of the housed_timber as the negative_csg for the housing timber's cut
+    pass

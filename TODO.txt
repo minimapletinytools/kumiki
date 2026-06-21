@@ -1,3 +1,14 @@
+:: 6/20 THE BIG JOINT REORG
+
+-joints by file or arragement type?
+  -if file, basic joints move into joints by file
+-free_joints
+-decorative_joints
+-boards -> board_joints
+
+
+-patternbook changes
+  -allow pathing or parenting in patterns?
 
 
 :: 6/9 adeline notes
@@ -272,6 +283,8 @@ DONE/IGNORE-test
   -refresh the frame viewer command seems to be be broken
   -rename project.yaml to kigumi.yaml (no bw campatability please)
 DONE-do one more install pass
+
+
 
 -do setup vid
 -do shower vid

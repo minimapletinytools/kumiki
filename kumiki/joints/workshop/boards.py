@@ -307,6 +307,6 @@ def cut_ita_kura_compound_joint(boards : List[Board], board_top_end_timbers : Li
     # return the complete joint with all members included in the cuttings dictionary
 
 
-
+    raise NotImplementedError("cut_ita_kura_compound_joint is not implemented yet")
     pass
 
