@@ -1,15 +1,43 @@
 :: 6/20 THE BIG JOINT REORG
 
--joints by file or arragement type?
-  -if file, basic joints move into joints by file
+-corner_joints
+-splice_joints
+-butt_joints
+-multi-butt joints (double/triple/quadruple butt joints)
+-cross_joints
+-board_joints
+-compound_joints
 -free_joints
 -decorative_joints
--boards -> board_joints
+-basic_joints (same as is right now)
+
+-shavings/... (contains all non-joint cutting files, like shavings, build-a-butt, notching, etc)
 
 
--patternbook changes
-  -allow pathing or parenting in patterns?
 
+
+:: 6/21/2026 THE BIG PATTERNBOOK REFACTOR
+-patternbook refactor
+  -get rid of explicit patternbook class, we will replace patterns with a hirearchical + tag system
+  -at the top level, patterns are lumped either into a library or a workspace, this won't change, this is like a special top level folder that can be optionally disabled when displaying (don't worry about this part for now)
+  -each individual pattern now has a "path" field which is a standard "/" path string that is scoped under the library name or workspace, so for example "corner_joints/plain_miter_joint/125_degrees" and this gets implicitly be namespace to "kumiki/corner_joints/plain_miter_joint/125_degrees". note in this caes 125_degrees in the name of the pattern rather than a folder
+  -a pattern folder may share the same name as a pattern, hence a pattern may have children, tihs is useful becase we may have a "plain_miter_joint" example that has several different configuration examplesa s children for examples.
+  -figure out a smart way to deal with name conflicts
+  -the example files will return a list of patterns rather than a pattern book
+  -tags work as before, each folder name is also considered an implicit tag
+  -there are a couple special tags:
+    -main: indicates the "main" example which may (or may not) have child configuration examples
+    -poop: these examples are for internal development purposes only and are not shown normally unelss "poop" tag is explicitly used
+    -corner/splice/butt/etc...: so each joint arragement has its own special tag
+  -the kigumi sidebar now has the following display modes:
+    -hirercihacl with implicit namespace
+      -hierchical without implicit namespace (future featuer, don't do this one yet, just make suer it's possible or stub it out)
+    -sorted by tags, by default in this mode, the tag selection list will contain "main" 
+      -when "main" is in the tag selection list, the display mode is exceptional, it will show the "main" jointsa nd if they are children, the dropdown will be available and its children will show even if it does not have the "main" tag.
+      -when "main" is not in the tag selection list, just display an unhirerchical list of all filtered joints, the displayed joint name should still include the path up until its first "main" parent
+  -add a doc somewhere explaninig how the patternbook system works, keep it CONCISE but definitely outline all the rules, basicalyl just reformat what I wrote above and add anything that might be missing.
+    
+  
 
 :: 6/9 adeline notes
 
@@ -284,13 +312,28 @@ DONE/IGNORE-test
   -rename project.yaml to kigumi.yaml (no bw campatability please)
 DONE-do one more install pass
 
-
-
 -do setup vid
 -do shower vid
 -do example cleanup
 -make website
   -get domain D:
+
+-update kumiki sidebar scaning:
+  -lets update the sidebar project scanning, it has 2 distinct things contexts:
+    -workspace
+    -libraries (kumiki somewhat special)
+  and does 2 things
+    -scan for frames
+    -scan for patterns
+  the explorer as it is shows frames followed by patterns
+  within it, it should always show workspace first followed by kumiki, followed by other libraries
+  some heuristics and the project.json are used to reduce time spent scanning libraries for frames/patterns
+  when in local development mode, library scanning is disabled, and kumiki stuff just shows up as workspace stuff
+  This is mostly working already but please do the following:
+    -library frame scanning appears to be broken, please fix
+    -make sure the ordering is workspace > kumiki > other libraries 
+    -update the project index for libraries to also include examples to reduce scanning needs
+  
 
 -do the big joint reorg 
   - 3 pattern list modes
@@ -344,6 +387,8 @@ DONE-fix layers view in kigumi covering title
     2. it should be default collapsed
     3. in it collapsed state, it should look something like []> timber list]
 DONE/IGNORE-it would be better just to have agent point to docs files inside kigumi libarry, you can also add a view docs vscode command
+
+-what is "paternbook_exmaple" and why is it broken?
 
 -improve erroring on initialize due to missing deps
 -add support for actual AABB render mode
