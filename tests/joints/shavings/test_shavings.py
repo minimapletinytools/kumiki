@@ -4,7 +4,7 @@ Tests for shavings.py - Helper functions for joint validation
 
 import pytest
 from sympy import Rational
-from kumiki.joints.workshop.shavings import (
+from kumiki.joints.workshop.shavings.shavings import (
     check_timber_overlap_for_splice_joint_is_sensible, 
     chop_timber_end_with_prism,
     chop_timber_end_with_half_plane,
@@ -12,7 +12,7 @@ from kumiki.joints.workshop.shavings import (
     scribe_face_plane_onto_centerline,
     scribe_centerline_onto_centerline
 )
-from kumiki.joints.workshop.notching import chop_shoulder_notch_on_timber_face
+from kumiki.joints.workshop.shavings.notching import chop_shoulder_notch_on_timber_face
 from kumiki.timber import timber_from_directions, TimberReferenceEnd, TimberFace, TimberLongFace
 from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel
 from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace

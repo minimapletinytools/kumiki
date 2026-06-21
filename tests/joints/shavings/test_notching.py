@@ -7,7 +7,7 @@ from sympy import Rational
 
 from kumiki.cutcsg import Difference, Intersection
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
-from kumiki.joints.workshop.notching import (
+from kumiki.joints.workshop.shavings.notching import (
     BraceJointScribeNotchingConfig,
     CrossCapJointScribeNotchingConfig,
     DoubleButtJointScribeNotchingConfig,

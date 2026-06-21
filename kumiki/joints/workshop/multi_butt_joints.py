@@ -1,19 +1,17 @@
 """
-Kumiki - Double butt joint construction functions
+Kumiki - Multi-butt joint construction functions
 Contains functions for creating joints where two butt timbers meet a single receiving timber.
-
-TODO rename this file to three_way_joints.py
 """
 
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .build_a_butt import (
+from .shavings.build_a_butt import (
     SimplePegParameters,
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
 )
-from .notching import (
+from .shavings.notching import (
     chop_shoulder_notch_aligned_with_timber,
     warn_if_arrangement_timbers_imperfect,
 )
@@ -272,7 +270,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
 
     spline_transform = Transform(
         position=slot_marking_transform_global.position + slot_direction_global * (effective_slot_depth-slot_depth)/2,
-        orientation=slot_marking_transform_global.orientation,
+        orientation=slot_marking_orientation_global,
     )
 
     peg_holes_in_spline_local: List[CutCSG] = []
@@ -477,7 +475,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
         positive_csg=spline_positive_csg,
     )
     joint_accessories["spline"] = spline
-    
+
     return Joint(
         cuttings={
             "receiving_timber": receiving_cut,
@@ -487,30 +485,6 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
         ticket=JointTicket(joint_type="splined_opposing_double_butt"),
         jointAccessories=joint_accessories,
     )
-
-
-# chatGPT translates this to Japanese as:
-# 小根付き通しほぞの十字相欠き梁組
-# kone-tsuki tōshi-hozo no jūji aigaki harigumi
-def cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon(
-        # arrangement.cross_timber_1 is always assumed to be the "bottom" in the cross lap joint
-        arrangement: CrossCapJointTimberArrangement, 
-
-        # the size of the tenon as it passes through cross_timber_1 measured relative to post_timber
-        tenon_size_in_cross_timber_1: V2,
-        # the size of the tenon as it passes through cross_timber_2 measured relative to post_timber, must be smaller than tenon_size_in_cross_timber_1
-        tenon_size_in_cross_timber_2: V2,
-
-        # length of the tenon, stops exactly at the face of cross_timber_2 if None
-        tenon_length: Optional[Numeric] = None,
-        # depth of the mortise through both cross timbers mesaured from the face of cross_timber_1, through mortise if None
-        mortise_depth: Optional[Numeric] = None,
-
-        # location of the cross lap cut measured from the bottom of cross_timber_2, 0 means the cut is at the bottom of cross_timber_2 (relative to the joint)
-        cross_lap_cut_ratio: Numeric = Rational(1, 2),
-        ):
-    raise NotImplementedError("cross lap beam assembly on post with stepped mortise and tenon not implemented yet")
-
 
 
 def cut_castle_joint(
@@ -528,7 +502,7 @@ def cut_castle_joint(
         ):
     # note that the cross lap is always centered ON THE POST and not based on the cross beam positions
 
-    # check if the cross beams are so wide that they overlap each other outside of the post (need to check separately for each of the 4 corners) 
+    # check if the cross beams are so wide that they overlap each other outside of the post (need to check separately for each of the 4 corners)
     # if miter_cross_beams_if_overlapping_outside_post is true, miter the cross beams so they don't overlap
     # if miter_cross_beams_if_overlapping_outside_post is fales, output a warning
     raise NotImplementedError("castle joint not implemented yet")

@@ -1,3 +1,7 @@
+"""
+Kumiki - Board joint construction functions
+Contains functions for creating joints between boards.
+"""
 
 import warnings
 from typing import List, Tuple
@@ -256,13 +260,8 @@ def cut_tongue_and_groove_joint(
         ticket=JointTicket(joint_type="tongue_and_groove"),
     )
 
-#def cut_ship_lap_joint
 
-#def cut_board_in_groove_joint
-
-#def cut_hazo_mizo_joint = cut_board_in_groove_joint
-
-def cut_ita_kura_compound_joint(boards : List[Board], board_top_end_timbers : List[TimberLike], board_bottom_end_timbers : List[TimberLike], board_left_side_timbers : List[TimberLike], board_right_side_timbers : List[TimberLike], groove_depths : Tuple[Numeric, Numeric, Numeric, Numeric], groove_extra_depths : Tuple[Numeric,Numeric, Numeric, Numeric], groove_extra_space : Numeric = Rational(0)):
+def cut_ita_kura_compound_joint(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_depths: Tuple[Numeric, Numeric, Numeric, Numeric], groove_extra_depths: Tuple[Numeric, Numeric, Numeric, Numeric], groove_extra_space: Numeric = Rational(0)):
     """
     fits boards in between the timbers using the board_in_groove_joint
 
@@ -270,7 +269,7 @@ def cut_ita_kura_compound_joint(boards : List[Board], board_top_end_timbers : Li
 
     All boards must be coplanar, only the first board in the list is used to determine the size and position of the grooves, the boards should be in order
     The boards are extended with end cuts to fit into the grooves on the board_top/bottom_end_timbers
-    the grooves are cut to desired depth and the boards are cut to fit into the grooves padded by groove_extra_depths. You can use this to model fit tolerance if you want but more important it is to provide space for wood expansion. Don't make the same mistake I did!! 
+    the grooves are cut to desired depth and the boards are cut to fit into the grooves padded by groove_extra_depths. You can use this to model fit tolerance if you want but more important it is to provide space for wood expansion. Don't make the same mistake I did!!
 
     Args:
         board_top_end_timbers: A list of timbers that will have grooves cut to receive the "top" end of the boards
@@ -280,33 +279,7 @@ def cut_ita_kura_compound_joint(boards : List[Board], board_top_end_timbers : Li
         groove_depths: A tuple of four numeric values representing the desireds depth of grooves cut into the board_[top,bottom,left,right]_end/side_timbers (in that order)
         groove_extra_depths: A tuple of four numeric values representing the extra depth to cut into the board_[top,bottom,left,right]_side_timbers beyond the groove depth (in that order)
         groove_extra_space: the extra depth to cut the groove, when 0, the groove is cut to the same thickness as the boards
-    
+
     The boards position are cut to the first timber in each list, and the groove is then extended into the other timbers in the list.
     """
-
-    # assert all boards and timbers are face aligned (just pick one and check face alignment against it, as face alignment is transitive)
-
-    # assert that the front faces of all boards are coplanar
-    # assert that the back faces of all boards are coplanar
-
-    # assert that the first board_top/bottom_end_timbers timber has orthogonal length directino to the boards
-    # assert that the first board_left/right_side_timbers timber has parallel length directino to the boards
-
-    # assert that the first board_top_end_timbers is in  the board length direction away from the first board_bottom_end_timbers so as to ensure that their relative position is correct
-    
-    # assert that the first board_left_side_timbers is left (x axis) of the first board_right_side_timbers in the first board's local coordinates
-    
-    # determine the grooving face for the first timber on each of the ends/sides
-    # using these 4 faces, create a boundary for the inside shoulder of the joint
-    # expand this boundary out by groove_depths + groove_extra_depths
-    # now create 4 rectangular prisms based on the expanded boundary and along the centerline plane of the boards  with thickness equal to the board thickness (y axis) + groove_extra_space
-
-    # create end cuts on the boards based on the expanded boundary
-    # create side cuts on the (half space cuts) based on the expanded boundary but not including the groove_extra_depths part
-
-    # return the complete joint with all members included in the cuttings dictionary
-
-
     raise NotImplementedError("cut_ita_kura_compound_joint is not implemented yet")
-    pass
-

@@ -1,6 +1,6 @@
 """
-Kumiki - Mortise and Tenon Joint Construction Functions
-Contains various mortise and tenon joint implementations
+Kumiki - Butt joint construction functions
+Contains plain butt, tongue-and-fork butt, mortise-and-tenon, and housed dovetail butt joint implementations.
 """
 
 from __future__ import annotations  # Enable deferred annotation evaluation
@@ -9,6 +9,10 @@ import warnings
 from functools import wraps
 
 from kumiki.timber import *
+from kumiki.construction import *
+from kumiki.rule import *
+from .shavings import *
+from .shavings.notching import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderNotchCSGGeometry, chop_notch_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -22,19 +26,9 @@ from kumiki.measuring import (
     get_point_on_face_global,
     Space,
 )
-from kumiki.construction import *
 from kumiki.timber_shavings import are_timbers_plane_aligned
-from kumiki.rule import *
-from kumiki.rule import safe_dot_product
 from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder
-from .notching import (
-    ShoulderNotchCSGGeometry,
-    chop_notch_for_butt_joint_arrangement,
-    chop_shoulder_notch_aligned_with_timber,
-    does_shoulder_plane_need_notching,
-    warn_if_arrangement_timbers_imperfect,
-)
-from .build_a_butt import (
+from .shavings.build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
     PegPositionResult,
     PegPositionSpace,
@@ -64,35 +58,425 @@ def safe_transform_vector(*args, **kwargs):
     return prune(_raw_safe_transform_vector(*args, **kwargs))
 
 
+# Aliases for backwards compatibility
+CSGUnion = SolidUnion
+
+
 # ============================================================================
-# Helepers
+# Helper functions
 # ============================================================================
 
 
-@dataclass(frozen=True)
-class WedgeParameters:
+def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace) -> V3:
     """
-    Parameters for wedges in mortise and tenon joints.
-    
-    Attributes:
-        shape: Shape specification for the wedge
-        depth: Depth of the wedge cut (may differ from length of wedge)
-        width_axis: Wedges run along this axis. When looking perpendicular to this
-                    and the length axis, you see the trapezoidal "sides" of the wedges
-        positions: Positions from center of timber in the width axis
-        expand_mortise: Amount to fan out bottom of mortise to fit wedges
-                        - 0 means straight sides (default)
-                        - X means expand both sides of mortise bottom by X (total), the shoulder of the mortise remains the original size
+    Helper function to calculate the center position of a timber face.
+
+    Args:
+        timber: The timber object
+        face: The face to get the center position for
+
+    Returns:
+        3D position vector at the center of the specified face
     """
-    shape: WedgeShape
-    depth: Numeric
-    width_axis: Direction3D
-    positions: List[Numeric]
-    expand_mortise: Numeric = Rational(0)
+    face = face.to.face()
+
+    if face == TimberFace.TOP:
+        return locate_top_center_position(timber).position
+    elif face == TimberFace.BOTTOM:
+        return locate_bottom_center_position(timber).position
+    else:
+        # For long faces (LEFT, RIGHT, FRONT, BACK), center is at mid-length
+        from sympy import Rational
+        face_center = timber.get_bottom_position_global() + (timber.length / Rational(2)) * timber.get_length_direction_global()
+
+        # Offset to the face surface
+        if face == TimberFace.RIGHT:
+            face_center = face_center + (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+        elif face == TimberFace.LEFT:
+            face_center = face_center - (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+        elif face == TimberFace.FRONT:
+            face_center = face_center + (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+        else:  # BACK
+            face_center = face_center - (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+
+        return face_center
 
 
 # ============================================================================
-# Helper Functions
+# Butt Joint Construction Functions
+# ============================================================================
+
+
+def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
+    """
+    Creates a butt joint where the butt timber is cut flush with the face of the receiving timber.
+
+    The butt timber's end is trimmed along the plane of the best-matching long face of the
+    receiving timber. The receiving timber is not cut.
+
+    Works for any non-parallel angle between the timbers, including oblique 3D angles.
+    The cut plane follows the actual receiving face geometry rather than being perpendicular
+    to the butt timber's axis, so the mating face is always flush.
+
+    Args:
+        arrangement: Butt joint arrangement with butt_timber, receiving_timber, butt_timber_end.
+
+    Returns:
+        Joint object containing the cut butt timber and uncut receiving timber.
+
+    Raises:
+        AssertionError: If the timbers are parallel.
+    """
+    from kumiki.rule import safe_dot_product, safe_compare, Comparison, safe_transform_vector
+
+    receiving_timber = arrangement.receiving_timber
+    butt_timber = arrangement.butt_timber
+    butt_end = arrangement.butt_timber_end
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
+
+    assert not are_vectors_parallel(
+        receiving_timber.get_length_direction_global(),
+        butt_timber.get_length_direction_global(),
+    ), "Timbers cannot be parallel for a butt joint"
+
+    # Get the direction of the butt end (pointing outward from the timber body)
+    if butt_end == TimberReferenceEnd.TOP:
+        butt_direction = butt_timber.get_length_direction_global()
+    else:
+        butt_direction = -butt_timber.get_length_direction_global()
+
+    # Find the long face of the receiving timber that faces the incoming butt timber.
+    # We pass -butt_direction because the face we want has its outward normal pointing
+    # toward the butt timber (i.e., opposite to the butt travel direction).
+    receiving_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(-butt_direction)
+    receiving_face_dir_global = receiving_timber.get_face_direction_global(receiving_face)
+
+    # A point on the receiving face plane (use face center)
+    face_center = _get_face_center_position(receiving_timber, receiving_face)
+
+    # Orient the cut-plane normal to point in the direction material is removed
+    # (i.e., away from the butt timber body, toward the receiving timber).
+    # The receiving face normal points toward the butt, so flip it.
+    dot_check = safe_dot_product(receiving_face_dir_global, butt_direction)
+    if safe_compare(dot_check, 0, Comparison.GT):
+        cut_normal_global = receiving_face_dir_global
+    else:
+        cut_normal_global = -receiving_face_dir_global
+
+    # Convert cut plane to butt timber local coordinates
+    local_normal = safe_transform_vector(butt_timber.orientation.matrix.T, cut_normal_global)
+    local_offset = (
+        safe_dot_product(cut_normal_global, face_center)
+        - safe_dot_product(cut_normal_global, butt_timber.get_bottom_position_global())
+    )
+    end_cut_distance_from_bottom = safe_dot_product(
+        face_center - butt_timber.get_bottom_position_global(),
+        butt_timber.get_length_direction_global(),
+    )
+
+    end_cut = HalfSpace(normal=local_normal, offset=local_offset)
+
+    cut = Cutting(
+        timber=butt_timber,
+        maybe_top_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=end_cut,
+    )
+
+    joint = Joint(
+        cuttings={
+            "receiving_timber": Cutting(timber=receiving_timber),
+            "butt_timber": cut,
+        },
+        ticket=JointTicket(joint_type="plain_butt"),
+        jointAccessories={},
+    )
+
+    return joint
+
+
+def cut_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint:
+    """
+    Creates a butt joint where the butt timber is cut flush with the face of the receiving timber.
+
+    Requires the timbers to be face-aligned. For an unrestricted version that works at any
+    angle, use `cut_plain_butt_joint` directly.
+
+    Args:
+        arrangement: Butt joint arrangement with butt_timber, receiving_timber, butt_timber_end.
+                     Timbers must be face-aligned and non-parallel.
+
+    Returns:
+        Joint object containing the cut butt timber and uncut receiving timber.
+
+    Raises:
+        AssertionError: If the timbers are not face-aligned or are parallel.
+    """
+    assert are_timbers_face_aligned(arrangement.receiving_timber, arrangement.butt_timber), \
+        "Timbers must be face-aligned (orientations related by 90-degree rotations) for this joint type"
+    return cut_plain_butt_joint(arrangement)
+
+
+def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJointTimberArrangement) -> Joint:
+    """
+    DEPRECATED: Use `cut_plain_butt_joint_on_face_aligned_timbers` instead.
+
+    Original implementation kept for reference. The new thin wrapper delegates to
+    `cut_plain_butt_joint` which uses the receiving face plane directly, producing
+    identical results for face-aligned perpendicular timbers.
+    """
+    receiving_timber = arrangement.receiving_timber
+    butt_timber = arrangement.butt_timber
+    butt_end = arrangement.butt_timber_end
+
+    assert are_timbers_face_aligned(receiving_timber, butt_timber), \
+        "Timbers must be face-aligned (orientations related by 90-degree rotations) for this joint type"
+
+    assert not are_vectors_parallel(receiving_timber.get_length_direction_global(), butt_timber.get_length_direction_global()), \
+        "Timbers cannot be parallel for a butt joint"
+
+    if butt_end == TimberReferenceEnd.TOP:
+        butt_direction = butt_timber.get_length_direction_global()
+    else:
+        butt_direction = -butt_timber.get_length_direction_global()
+
+    receiving_face = receiving_timber.get_closest_oriented_face_from_global_direction(-butt_direction)
+
+    face_center = _get_face_center_position(receiving_timber, receiving_face)
+
+    from kumiki.rule import safe_dot_product
+    distance_from_bottom = safe_dot_product(face_center - butt_timber.get_bottom_position_global(), butt_timber.get_length_direction_global())
+    distance_from_end = butt_timber.length - distance_from_bottom if butt_end == TimberReferenceEnd.TOP else distance_from_bottom
+
+    cut = Cutting(
+        timber=butt_timber,
+        maybe_top_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=None
+    )
+
+    joint = Joint(
+        cuttings={"receiving_timber": Cutting(timber=receiving_timber), "butt_timber": cut},
+        ticket=JointTicket(joint_type="plain_butt"),
+        jointAccessories={},
+    )
+
+    return joint
+
+
+def cut_tongue_and_fork_butt_joint(
+    arrangement: ButtJointTimberArrangement,
+    tongue_thickness: Optional[Numeric] = None,
+    tongue_position: Numeric = Rational(0),
+) -> Joint:
+    """
+    Creates a plain tongue-and-fork butt joint.
+
+    Like the corner variant, the butt timber forms the tongue (cheeks removed)
+    and the receiving timber forms the fork (slot cut into it). The difference
+    is that the receiving (fork) timber does **not** receive an end cut — it
+    continues through the joint.
+
+    Args:
+        arrangement: Butt arrangement where butt_timber is the tongue and
+            receiving_timber is the fork.
+        tongue_thickness: Tongue thickness along the shared plane normal.
+            If None, defaults to 1/3 of the tongue timber dimension in that axis.
+        tongue_position: Offset of the tongue center from the tongue timber
+            centerline along the shared plane normal. 0 means centered.
+
+    Returns:
+        Joint containing both cut timbers.
+
+    Raises:
+        AssertionError: If timbers are not plane aligned, are parallel, or
+            tongue parameters are out of bounds.
+    """
+    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, CutCSG, adopt_csg
+    from kumiki.rule import safe_dot_product, safe_compare, Comparison
+
+    error = arrangement.check_plane_aligned()
+    assert error is None, error
+
+    tongue_timber = arrangement.butt_timber
+    fork_timber = arrangement.receiving_timber
+    tongue_end = arrangement.butt_timber_end
+
+    warn_if_arrangement_timbers_imperfect(arrangement)
+
+    assert not are_vectors_parallel(
+        tongue_timber.get_length_direction_global(),
+        fork_timber.get_length_direction_global(),
+    ), "Timbers cannot be parallel for a tongue-and-fork butt joint"
+
+    # -------------------------------------------------------------------------
+    # Tongue geometry: shared plane normal, thickness, width
+    # -------------------------------------------------------------------------
+    shared_plane_normal_hint = arrangement.compute_normalized_timber_cross_product()
+    tongue_normal_face = tongue_timber.get_closest_oriented_long_face_from_global_direction(shared_plane_normal_hint)
+    tongue_normal_direction = tongue_timber.get_face_direction_global(tongue_normal_face)
+
+    tongue_normal_dimension = tongue_timber.get_size_in_face_normal_axis(tongue_normal_face)
+    if tongue_thickness is None:
+        tongue_thickness = tongue_normal_dimension / Rational(3)
+
+    assert safe_compare(tongue_thickness, 0, Comparison.GT), "tongue_thickness must be greater than 0"
+    assert safe_compare(tongue_normal_dimension - tongue_thickness, 0, Comparison.GE), \
+        "tongue_thickness must be <= the tongue timber size in the shared plane normal axis"
+
+    half_tongue_dimension = tongue_normal_dimension / Rational(2)
+    half_tongue_thickness = tongue_thickness / Rational(2)
+    assert safe_compare(half_tongue_dimension - (Abs(tongue_position) + half_tongue_thickness), 0, Comparison.GE), \
+        "tongue_position and tongue_thickness place the tongue outside the tongue timber boundary"
+
+    tongue_normal_axis_index = tongue_timber.get_size_index_in_long_face_normal_axis(tongue_normal_face)
+    tongue_width_axis_index = 1 if tongue_normal_axis_index == 0 else 0
+    tongue_width = tongue_timber.size[tongue_width_axis_index]
+
+    tongue_end_direction = tongue_timber.get_face_direction_global(tongue_end)
+
+    # -------------------------------------------------------------------------
+    # Shoulder plane (M&T pattern): compute on fork timber, mark onto tongue
+    # -------------------------------------------------------------------------
+    butt_arrangement_for_shoulder = ButtJointTimberArrangement(
+        receiving_timber=fork_timber,
+        butt_timber=tongue_timber,
+        butt_timber_end=tongue_end,
+    )
+    fork_entry_long_face = fork_timber.get_closest_oriented_long_face_from_global_direction(-tongue_end_direction)
+    fork_shoulder_distance = fork_timber.get_size_in_face_normal_axis(fork_entry_long_face) / Rational(2)
+
+    shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+        butt_arrangement_for_shoulder, fork_shoulder_distance
+    )
+    shoulder_from_tongue_end_mark = mark_distance_from_end_along_centerline(
+        shoulder_plane, tongue_timber, tongue_end
+    )
+    shoulder_point_global = shoulder_from_tongue_end_mark.locate().position
+
+    # -------------------------------------------------------------------------
+    # Marking space at shoulder (M&T pattern)
+    # -------------------------------------------------------------------------
+    marking_origin_global = shoulder_point_global + tongue_normal_direction * tongue_position
+
+    tongue_orientation_global = Orientation.from_z_and_y(
+        z_direction=normalize_vector(tongue_end_direction),
+        y_direction=normalize_vector(tongue_normal_direction),
+    )
+    marking_space_transform = Transform(position=marking_origin_global, orientation=tongue_orientation_global)
+    marking_space = Space(transform=marking_space_transform)
+
+    # -------------------------------------------------------------------------
+    # Tongue prism and shoulder half-space (M&T pattern)
+    # -------------------------------------------------------------------------
+    tongue_back_extension = max(tongue_timber.size[0], tongue_timber.size[1])
+    tongue_prism_global = RectangularPrism(
+        size=create_v2(tongue_width, tongue_thickness),
+        transform=marking_space.transform,
+        start_distance=-tongue_back_extension,
+        end_distance=tongue_timber.length,
+    )
+
+    shoulder_half_space_global = HalfSpace(
+        normal=-shoulder_plane.normal,
+        offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
+    )
+
+    tongue_prism_local = adopt_csg(None, tongue_timber.transform, tongue_prism_global)
+    shoulder_half_space_local = adopt_csg(None, tongue_timber.transform, shoulder_half_space_global)
+
+    tongue_negative_csg = Difference(
+        base=shoulder_half_space_local,
+        subtract=[tongue_prism_local],
+    )
+
+    # -------------------------------------------------------------------------
+    # Fork slot: extends through the full fork timber depth.
+    # Unlike the corner variant (where the fork timber is end-cut), here
+    # the fork is not end-cut, so the slot must extend far enough to
+    # accommodate the tongue after its angled end cut.  We over-extend
+    # by the fork timber's max cross-section to guarantee coverage at
+    # any joint angle — the extra length is harmlessly outside the timber.
+    # -------------------------------------------------------------------------
+    fork_entry_long_face_for_end_cut = fork_timber.get_closest_oriented_long_face_from_global_direction(-tongue_end_direction)
+    fork_far_face = fork_entry_long_face_for_end_cut.to.face().get_opposite_face()
+    fork_far_face_normal_global = fork_timber.get_face_direction_global(fork_far_face)
+    fork_far_face_point_global = get_point_on_face_global(fork_far_face, fork_timber)
+
+    fork_slot_depth = safe_dot_product(
+        fork_far_face_point_global - shoulder_point_global,
+        normalize_vector(tongue_end_direction),
+    )
+    assert safe_compare(fork_slot_depth, 0, Comparison.GT), \
+        "Fork slot depth must be > 0; check timber arrangement and end selections"
+
+    fork_slot_end_overshoot = max(fork_timber.size[0], fork_timber.size[1])
+    fork_slot_back_extension = max(fork_timber.size[0], fork_timber.size[1]) * Rational(2)
+    fork_slot_prism_global = RectangularPrism(
+        size=create_v2(tongue_width, tongue_thickness),
+        transform=marking_space.transform,
+        start_distance=-fork_slot_back_extension,
+        end_distance=fork_slot_depth + fork_slot_end_overshoot,
+    )
+    fork_negative_csg = adopt_csg(None, fork_timber.transform, fork_slot_prism_global)
+
+    # -------------------------------------------------------------------------
+    # Tongue end cut — aligns with the fork face opposite the entry face
+    # (same as corner variant)
+    # -------------------------------------------------------------------------
+    tongue_end_hs_normal_global = (
+        fork_far_face_normal_global
+        if safe_dot_product(fork_far_face_normal_global, tongue_end_direction) > 0
+        else -fork_far_face_normal_global
+    )
+    from kumiki.rule import safe_transform_vector
+    tongue_end_cut_local_normal = safe_transform_vector(
+        tongue_timber.orientation.matrix.T, tongue_end_hs_normal_global
+    )
+    tongue_end_cut_local_offset = (
+        safe_dot_product(tongue_end_hs_normal_global, fork_far_face_point_global)
+        - safe_dot_product(tongue_end_hs_normal_global, tongue_timber.get_bottom_position_global())
+    )
+    tongue_end_cut = HalfSpace(normal=tongue_end_cut_local_normal, offset=tongue_end_cut_local_offset)
+    tongue_end_cut_distance_from_bottom = safe_dot_product(
+        fork_far_face_point_global - tongue_timber.get_bottom_position_global(),
+        tongue_timber.get_length_direction_global(),
+    )
+
+    # -------------------------------------------------------------------------
+    # No fork end cut — fork timber continues through the joint
+    # -------------------------------------------------------------------------
+
+    tongue_negative_parts: list[CutCSG] = [tongue_negative_csg, tongue_end_cut]
+
+    # -------------------------------------------------------------------------
+    # Assemble cuts and joint
+    # -------------------------------------------------------------------------
+    tongue_cut = Cutting(
+        timber=tongue_timber,
+        maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=CSGUnion(children=tongue_negative_parts),
+    )
+
+    fork_cut = Cutting(
+        timber=fork_timber,
+        negative_csg=fork_negative_csg,
+    )
+
+    return Joint(
+        cuttings={
+            "tongue_timber": tongue_cut,
+            "fork_timber": fork_cut,
+        },
+        ticket=JointTicket(joint_type="tongue_and_fork_butt"),
+        jointAccessories={},
+    )
+
+
+# ============================================================================
+# Mortise and Tenon helpers
 # ============================================================================
 
 
@@ -120,6 +504,28 @@ def convert_mortise_shoulder_inset_to_centerline_distance(
     inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, receiving_timber)
     inset_marking = mark_plane_from_edge_in_direction(inset_plane, receiving_timber, TimberCenterline.CENTERLINE)
     return inset_marking.distance
+
+
+@dataclass(frozen=True)
+class WedgeParameters:
+    """
+    Parameters for wedges in mortise and tenon joints.
+
+    Attributes:
+        shape: Shape specification for the wedge
+        depth: Depth of the wedge cut (may differ from length of wedge)
+        width_axis: Wedges run along this axis. When looking perpendicular to this
+                    and the length axis, you see the trapezoidal "sides" of the wedges
+        positions: Positions from center of timber in the width axis
+        expand_mortise: Amount to fan out bottom of mortise to fit wedges
+                        - 0 means straight sides (default)
+                        - X means expand both sides of mortise bottom by X (total), the shoulder of the mortise remains the original size
+    """
+    shape: WedgeShape
+    depth: Numeric
+    width_axis: Direction3D
+    positions: List[Numeric]
+    expand_mortise: Numeric = Rational(0)
 
 
 # ============================================================================
@@ -248,7 +654,7 @@ def cut_mortise_and_tenon_joint(
     back_extension = max(tenon_size[0], tenon_size[1]) / sin_angle_safe
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberReferenceEnd.TOP else "tenon_bot"
-    
+
     if use_round_tenon:
         # Round tenon: use cylinder with diameter = tenon_size[0]
         tenon_radius = tenon_size[0] / Integer(2)
@@ -359,7 +765,7 @@ def cut_mortise_and_tenon_joint(
                 position=marking_space.transform.position,
                 orientation=mortise_hole_orientation,
             )
-            
+
             mortise_hole_prism_global = RectangularPrism(
                 size=mortise_hole_size,
                 transform=mortise_hole_transform,
@@ -431,7 +837,7 @@ def cut_mortise_and_tenon_joint(
     tip_position_global = marking_space.transform.position + tenon_length_direction_global * max(tenon_length, max(tenon_size[0], tenon_size[1])/cos_angle)
     tip_position_local = tenon_timber.transform.global_to_local(tip_position_global)
     tip_z_local = tip_position_local[2]
-    
+
     tenon_cut = Cutting(
         timber=tenon_timber,
         maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.TOP else None,
@@ -528,14 +934,6 @@ def cut_mortise_and_tenon_joint(
     tenon_cut_timber = tenon_cut
     mortise_cut_timber = mortise_cut
 
-
-    #joint_accessories["debug"] = CSGAccessory(
-    #    transform = tenon_timber.transform,
-    #    positive_csg = notch_geom.butting_timber_relief_negative_CSG if notch_geom is not None else None,
-    #)
-
-
-
     return Joint(
         cuttings={
             tenon_timber.ticket.name: tenon_cut_timber,
@@ -543,7 +941,7 @@ def cut_mortise_and_tenon_joint(
         },
         ticket=JointTicket(joint_type="mortise_and_tenon"),
         jointAccessories=joint_accessories,
-    ) 
+    )
 
 
 def cut_mortise_and_tenon_joint_on_PAT(
@@ -603,7 +1001,7 @@ def cut_mortise_and_tenon_joint_on_PAT(
     mortise_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction
     ).to.face()
-    
+
     mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
         mortise_shoulder_inset=mortise_shoulder_inset,
         mortise_face=mortise_face,
@@ -623,7 +1021,7 @@ def cut_mortise_and_tenon_joint_on_PAT(
         use_round_tenon=use_round_tenon,
     )
 
-    
+
 
 def cut_mortise_and_tenon_joint_on_FAT(
     arrangement: ButtJointTimberArrangement,
@@ -752,7 +1150,7 @@ def cut_round_mortise_and_tenon_joint_on_PAT(
     mortise_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction
     ).to.face()
-    
+
     mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
         mortise_shoulder_inset=mortise_shoulder_inset,
         mortise_face=mortise_face,
@@ -917,3 +1315,249 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
         ticket=JointTicket(joint_type="wedged_half_dovetail_mortise_and_tenon"),
         jointAccessories=joint_accessories,
     )
+
+
+# ============================================================================
+# Japanese butt joints (moved from japanese_joints.py)
+# ============================================================================
+
+
+def cut_housed_dovetail_butt_joint(
+    arrangement: ButtJointTimberArrangement,
+    receiving_timber_shoulder_inset: Numeric,
+    dovetail_length: Numeric,
+    dovetail_small_width: Numeric,
+    dovetail_large_width: Numeric,
+    dovetail_lateral_offset: Numeric = Rational(0),
+    dovetail_depth: Optional[Numeric] = None
+) -> Joint:
+    """
+    Creates a dovetail butt joint (蟻継ぎ / Ari Tsugi) between two orthogonal timbers.
+
+    This is a traditional Japanese timber joint where a dovetail-shaped tenon on one timber
+    fits into a matching dovetail socket on another timber. The dovetail shape provides
+    mechanical resistance to pulling apart.
+
+    Args:
+        arrangement: Butt joint arrangement where butt_timber is the dovetail timber,
+            receiving_timber receives the dovetail socket, butt_timber_end is the cut end,
+            and front_face_on_butt_timber is the face where the dovetail profile is visible.
+        receiving_timber_shoulder_inset: Distance to inset the shoulder notch on the receiving timber
+        dovetail_length: Length of the dovetail tenon
+        dovetail_small_width: Width of the narrow end of the dovetail (at the tip)
+        dovetail_large_width: Width of the wide end of the dovetail (at the base)
+        dovetail_lateral_offset: Lateral offset of the dovetail from center (default 0)
+        dovetail_depth: Depth of the dovetail cut. If None, defaults to half the timber dimension
+
+    Returns:
+        Joint object containing the two CutTimbers with the dovetail cuts applied
+
+    Raises:
+        ValueError: If the parameters are invalid or the timbers are not orthogonal
+
+    Notes:
+        - The dovetail provides mechanical resistance to pulling apart
+        - Timbers must be orthogonal (at 90 degrees) for this joint
+        - No lap is used in this joint (unlike the lapped gooseneck joint)
+    """
+
+    require_check(arrangement.check_face_aligned_and_orthogonal())
+    warn_if_arrangement_timbers_imperfect(arrangement)
+    assert arrangement.front_face_on_butt_timber is not None, (
+        "arrangement.front_face_on_butt_timber must be set to determine the dovetail face"
+    )
+    dovetail_timber = arrangement.butt_timber
+    receiving_timber = arrangement.receiving_timber
+    dovetail_timber_end = arrangement.butt_timber_end
+    dovetail_timber_face = arrangement.front_face_on_butt_timber
+
+    # ========================================================================
+    # Parameter validation
+    # ========================================================================
+
+    # Validate positive dimensions
+    if dovetail_length <= 0:
+        raise ValueError(f"dovetail_length must be positive, got {dovetail_length}")
+    if dovetail_small_width <= 0:
+        raise ValueError(f"dovetail_small_width must be positive, got {dovetail_small_width}")
+    if dovetail_large_width <= 0:
+        raise ValueError(f"dovetail_large_width must be positive, got {dovetail_large_width}")
+    if receiving_timber_shoulder_inset < 0:
+        raise ValueError(f"receiving_timber_shoulder_inset must be non-negative, got {receiving_timber_shoulder_inset}")
+
+    # Validate that large_width > small_width (dovetail taper requirement)
+    if dovetail_large_width <= dovetail_small_width:
+        raise ValueError(
+            f"dovetail_large_width ({dovetail_large_width}) must be greater than "
+            f"dovetail_small_width ({dovetail_small_width})"
+        )
+
+    # Validate dovetail_depth if provided
+    if dovetail_depth is not None and dovetail_depth <= 0:
+        raise ValueError(f"dovetail_depth must be positive if provided, got {dovetail_depth}")
+
+    # assert that dovetail_timber_face is perpendicular to receiving_timber.get_length_direction_global()
+    if are_vectors_parallel(dovetail_timber.get_face_direction_global(dovetail_timber_face), receiving_timber.get_length_direction_global()):
+        raise ValueError(
+            "Dovetail timber face must be perpendicular to receiving timber length direction for dovetail butt joint. "
+            "The face should be oriented such that the dovetail profile is visible when looking along the receiving timber. "
+            "Try rotating the dovetail face by 90 degrees. "
+            f"Got dovetail_timber_face direction: {dovetail_timber.get_face_direction_global(dovetail_timber_face).T}, "
+            f"receiving_timber length_direction: {receiving_timber.get_length_direction_global().T}"
+        )
+
+    # ========================================================================
+    # Calculate default depth if not provided
+    # ========================================================================
+
+    if dovetail_depth is None:
+        # Default: half the timber dimension perpendicular to the dovetail face
+        dovetail_depth = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.to.face()) / Rational(2)
+
+    # ========================================================================
+    # Create the dovetail profile (simple trapezoid)
+    # TODO move into separate function
+    # ========================================================================
+
+    # Dovetail profile in 2D (X = lateral, Y = along timber length from end)
+    # Y=0 is at the timber end, Y increases going into the timber
+    # Small width at Y=0 (tip), large width at Y=dovetail_length (base)
+
+    dovetail_profile = [
+        # Tip (narrow end at the timber end)
+        Matrix([-dovetail_small_width / Rational(2) + dovetail_lateral_offset, 0]),
+        Matrix([dovetail_small_width / Rational(2) + dovetail_lateral_offset, 0]),
+        # Base (wide end)
+        Matrix([dovetail_large_width / Rational(2) + dovetail_lateral_offset, dovetail_length]),
+        Matrix([-dovetail_large_width / Rational(2) + dovetail_lateral_offset, dovetail_length]),
+    ]
+
+
+    # ========================================================================
+    # create the marking transform
+    # it is on the centerline of the dovetail face where it intersects the inset shoulder of the mortise timber
+    # ========================================================================
+
+    receiving_timber_shoulder_face = receiving_timber.get_closest_oriented_face_from_global_direction(-dovetail_timber.get_face_direction_global(dovetail_timber_end.to.face()))
+    face_plane = scribe_face_plane_onto_centerline(
+        face=receiving_timber_shoulder_face,
+        face_timber=receiving_timber
+    )
+    marking = mark_distance_from_end_along_centerline(face_plane, dovetail_timber, dovetail_timber_end)
+    shoulder_distance_from_end = marking.distance - receiving_timber_shoulder_inset
+
+    offset_to_dovetail_face = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face) / Rational(2) * dovetail_timber.get_face_direction_global(dovetail_timber_face)
+
+    marking_transform_position = dovetail_timber.get_bottom_position_global() + shoulder_distance_from_end * dovetail_timber.get_length_direction_global() + offset_to_dovetail_face
+    marking_transform_orientation = orientation_pointing_towards_face_sitting_on_face(towards_face=dovetail_timber_end.to.face(), sitting_face=dovetail_timber_face.to.face())
+    dovetail_timber_marking_transform = Transform(position=marking_transform_position, orientation=marking_transform_orientation)
+
+
+    # ========================================================================
+    # Cut dovetail shape into dovetail timber
+    # ========================================================================
+
+    # Create the dovetail profile CSG using chop_profile_on_timber_face
+    # This creates the profile extrusion
+    dovetail_profile_csg = chop_profile_on_timber_face(
+        timber=dovetail_timber,
+        end=dovetail_timber_end,
+        face=dovetail_timber_face.to.face(),
+        profile=dovetail_profile,
+        depth=dovetail_depth,
+        profile_y_offset_from_end=shoulder_distance_from_end
+    )
+
+    # dovetail housing prism
+    dovetail_housing_prism = chop_timber_end_with_prism(
+        timber=dovetail_timber,
+        end=dovetail_timber_end,
+        distance_from_end_to_cut=shoulder_distance_from_end
+    )
+
+    # ========================================================================
+    # Cut shoulder notch on receiving timber
+    # ========================================================================
+
+    # Calculate where along the receiving timber the shoulder should be
+    dovetail_centerline = scribe_centerline_onto_centerline(dovetail_timber)
+    marking_receiving = mark_distance_from_end_along_centerline(dovetail_centerline, receiving_timber)
+    receiving_timber_notch_center = marking_receiving.distance
+
+    # Create shoulder notch if inset is specified
+    if receiving_timber_shoulder_inset > 0:
+        # Notch dimensions match the dovetail timber's cross-section at the housing
+        # Width is the length of the housing (shoulder_distance_from_end on dovetail timber)
+        notch_width = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right().to.face())
+
+        # Depth is the amount of inset
+        notch_depth = receiving_timber_shoulder_inset
+
+        receiving_timber_shoulder_notch = chop_shoulder_notch_on_timber_face(
+            timber=receiving_timber,
+            notch_face=receiving_timber_shoulder_face,
+            distance_along_timber=receiving_timber_notch_center,
+            notch_width=notch_width,
+            notch_depth=notch_depth
+        )
+
+    # ========================================================================
+    # Adopt the dovetail socket CSG to the receiving timber
+    # ========================================================================
+
+    # Transform the dovetail profile CSG from dovetail_timber coordinates to receiving_timber coordinates
+    dovetail_socket_csg = adopt_csg(dovetail_timber.transform, receiving_timber.transform, dovetail_profile_csg)
+
+    # ========================================================================
+    # Create Cut objects for each timber
+    # ========================================================================
+
+    # Create a redundant end cut for the dovetail timber
+    # The end cut should be at the end of the dovetail profile
+    # The dovetail extends from the shoulder (at shoulder_distance_from_end) toward the end for dovetail_length
+
+    if dovetail_timber_end == TimberReferenceEnd.TOP:
+        # For TOP end: shoulder is at (timber.length - shoulder_distance_from_end)
+        # Dovetail extends toward +Z for dovetail_length
+        dovetail_end_local_z = dovetail_timber.length - shoulder_distance_from_end + dovetail_length
+        dovetail_timber_end_cut = HalfSpace(normal=create_v3(0, 0, 1), offset=dovetail_end_local_z)
+    else:  # BOTTOM
+        # For BOTTOM end: shoulder is at shoulder_distance_from_end
+        # Dovetail extends toward -Z for dovetail_length
+        dovetail_end_local_z = shoulder_distance_from_end - dovetail_length
+        dovetail_timber_end_cut = HalfSpace(normal=create_v3(0, 0, -1), offset=-dovetail_end_local_z)
+
+    dovetail_timber_cut_obj = Cutting(
+        timber=dovetail_timber,
+        maybe_top_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberReferenceEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberReferenceEnd.BOTTOM else None,
+        negative_csg=Difference(dovetail_housing_prism, [dovetail_profile_csg])
+    )
+
+    # Combine shoulder notch and dovetail socket if shoulder inset is specified
+    if receiving_timber_shoulder_inset > 0:
+        receiving_timber_negative_csg = CSGUnion([receiving_timber_shoulder_notch, dovetail_socket_csg])
+    else:
+        receiving_timber_negative_csg = dovetail_socket_csg
+
+    receiving_timber_cut_obj = Cutting(
+        timber=receiving_timber,
+        negative_csg=receiving_timber_negative_csg
+    )
+
+    return Joint(
+        cuttings={
+            dovetail_timber.ticket.name: dovetail_timber_cut_obj,
+            receiving_timber.ticket.name: receiving_timber_cut_obj
+        },
+        ticket=JointTicket(joint_type="housed_dovetail_butt"),
+        jointAccessories={},
+    )
+
+
+# ============================================================================
+# Aliases for Japanese joint functions
+# ============================================================================
+
+cut_蟻仕口 = cut_housed_dovetail_butt_joint
+cut_ari_shiguchi = cut_housed_dovetail_butt_joint

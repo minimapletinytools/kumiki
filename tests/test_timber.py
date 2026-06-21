@@ -1241,7 +1241,7 @@ class TestFrameBoundingBox:
     
     def test_x_shaped_timbers_with_butt_joint(self):
         """Test bounding box for two timbers in a crossing configuration with a butt joint cut."""
-        from kumiki.joints.workshop.plain_joints import cut_plain_butt_joint_on_face_aligned_timbers
+        from kumiki.joints.workshop.butt_joints import cut_plain_butt_joint_on_face_aligned_timbers
         
         # Create two timbers in a crossing configuration that meet near the origin
         # Timber A: receiving timber (uncut), runs perpendicular to timberB

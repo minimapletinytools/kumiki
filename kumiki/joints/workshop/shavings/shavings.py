@@ -836,3 +836,81 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberReferenceEnd, fac
     
     return extrusion
 
+
+# ============================================================================
+# Gooseneck polygon helpers (moved from japanese_joints.py)
+# ============================================================================
+
+
+def draw_gooseneck_polygon_NONCONVEX(length: Numeric, small_width: Numeric, large_width: Numeric, head_length: Numeric) -> List[V2]:
+    """
+    Returns the non-convex gooseneck profile as a single polygon (for reference/visualization).
+
+    The gooseneck shape has a narrow neck that widens into a trapezoidal head. This polygon
+    is non-convex and cannot be used directly with chop_profile_on_timber_face. Use
+    draw_gooseneck_polygon_CONVEX (aliased as draw_gooseneck_polygon) for actual cutting.
+
+    Args:
+        length: Total length of the gooseneck shape along the profile Y-axis.
+        small_width: Width of the neck (the narrow portion).
+        large_width: Width of the head (the wide trapezoid base; must be > small_width).
+        head_length: Length of the trapezoidal head portion.
+
+    Returns:
+        List of 2D points forming the non-convex gooseneck polygon (counter-clockwise).
+    """
+    from sympy import Matrix as _Matrix
+    return [
+            _Matrix([small_width/2, 0]),
+            _Matrix([small_width/2, length-head_length]),
+            _Matrix([large_width/2, length-head_length]),
+            _Matrix([small_width/2, length]),
+            _Matrix([-small_width/2, length]),
+            _Matrix([-large_width/2, length-head_length]),
+            _Matrix([-small_width/2, length-head_length]),
+            _Matrix([-small_width/2, 0]),
+        ]
+
+
+def draw_gooseneck_polygon_CONVEX(length: Numeric, small_width: Numeric, large_width: Numeric, head_length: Numeric) -> List[List[V2]]:
+    """
+    Returns the gooseneck profile decomposed into convex polygons for use with chop_profile_on_timber_face.
+
+    The non-convex gooseneck shape is split into two convex polygons — a neck rectangle and
+    a head trapezoid — whose union gives the full gooseneck. This is the format required by
+    chop_profile_on_timber_face (List[List[V2]]).
+
+    Args:
+        length: Total length of the gooseneck shape along the profile Y-axis.
+        small_width: Width of the neck (the narrow portion).
+        large_width: Width of the head (the wide trapezoid base; must be > small_width).
+        head_length: Length of the trapezoidal head portion.
+
+    Returns:
+        List of two convex polygon point lists: [neck_rectangle, head_trapezoid].
+    """
+    from sympy import Matrix as _Matrix
+    # Decompose the gooseneck into 2 convex polygons
+    # Center rectangle and head trapezoid
+
+    # Center neck rectangle
+    center_rect = [
+        _Matrix([small_width/2, 0]),
+        _Matrix([small_width/2, length-head_length]),
+        _Matrix([-small_width/2, length-head_length]),
+        _Matrix([-small_width/2, 0]),
+    ]
+
+    # Head trapezoid (single shape)
+    head_trap = [
+        _Matrix([-large_width/2, length-head_length]),
+        _Matrix([large_width/2, length-head_length]),
+        _Matrix([small_width/2, length]),
+        _Matrix([-small_width/2, length]),
+    ]
+
+    return [center_rect, head_trap]
+
+
+# Alias for convenience
+draw_gooseneck_polygon = draw_gooseneck_polygon_CONVEX

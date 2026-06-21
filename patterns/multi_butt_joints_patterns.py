@@ -10,8 +10,8 @@ from typing import Union
 
 from kumiki.rule import V3, create_v3
 from kumiki.timber import *
-from kumiki.joints.workshop.double_butt_joints import cut_splined_opposing_double_butt_joint
-from kumiki.joints.workshop.build_a_butt import SimplePegParameters
+from kumiki.joints.workshop.multi_butt_joints import cut_splined_opposing_double_butt_joint
+from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
 from kumiki.patternbook import PatternBook, PatternMetadata
 
@@ -53,7 +53,7 @@ def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
     return Frame.from_joints([joint], name="Splined Opposing Double Butt Joint")
 
 
-def create_double_butt_joints_patternbook() -> PatternBook:
+def create_multi_butt_joints_patternbook() -> PatternBook:
     """
     Create a PatternBook with all double butt joint patterns.
 
@@ -68,19 +68,19 @@ def create_double_butt_joints_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_double_butt_joints_patternbook()
+patternbook = create_multi_butt_joints_patternbook()
 
 
-def create_all_double_butt_joint_examples() -> Union[Frame]:
+def create_all_multi_butt_joint_patterns() -> Union[Frame]:
     """
     Create double butt joint examples with automatic spacing starting from the origin.
 
     Returns:
         Frame object containing all cut timbers
     """
-    book = create_double_butt_joints_patternbook()
+    book = create_multi_butt_joints_patternbook()
     frame = book.raise_pattern_group("double_butt_joints", separation_distance=Rational(2))
     return frame
 
 
-example = create_all_double_butt_joint_examples
+example = create_all_multi_butt_joint_patterns

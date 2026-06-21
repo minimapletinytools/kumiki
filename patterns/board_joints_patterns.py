@@ -2,7 +2,7 @@
 
 from sympy import Matrix
 
-from kumiki.joints.workshop.boards import cut_tongue_and_groove_joint
+from kumiki.joints.workshop.board_joints import cut_tongue_and_groove_joint
 from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_joint
 from kumiki.rule import feet, inches
 from kumiki.ticket import BoardTicket
@@ -48,7 +48,7 @@ def example_tongue_and_groove(position=None):
     )
 
 
-def create_tongue_and_groove_patternbook() -> PatternBook:
+def create_board_joints_patternbook() -> PatternBook:
     """Create PatternBook containing the single tongue-and-groove board pattern."""
     patterns = [
         (
@@ -59,18 +59,18 @@ def create_tongue_and_groove_patternbook() -> PatternBook:
     return PatternBook(patterns=patterns)
 
 
-patternbook = create_tongue_and_groove_patternbook()
+patternbook = create_board_joints_patternbook()
 
 
-def create_all_tongue_and_groove_examples():
+def create_all_board_joint_patterns():
     """Raise the tongue-and-groove group into a single frame."""
     return patternbook.raise_pattern_group("tongue_groove", separation_distance=inches(96))
 
 
-example = create_all_tongue_and_groove_examples
+example = create_all_board_joint_patterns
 
 
 if __name__ == "__main__":
-    frame = create_all_tongue_and_groove_examples()
+    frame = create_all_board_joint_patterns()
     print(f"Frame: {frame.name}")
     print(f"Cut timbers: {len(frame.cut_timbers)}")

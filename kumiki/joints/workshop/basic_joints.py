@@ -11,18 +11,29 @@ from dataclasses import replace
 from typing import Optional, List, Tuple, cast
 from kumiki.timber import *
 from kumiki.rule import *
-from .plain_joints import (
+from .corner_joints import (
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
+    cut_tongue_and_fork_corner_joint,
+    cut_mitered_and_keyed_lap_joint,
+)
+from .butt_joints import (
     cut_plain_butt_joint,
     cut_plain_butt_joint_on_face_aligned_timbers,
-    cut_tongue_and_fork_corner_joint,
     cut_tongue_and_fork_butt_joint,
+    cut_mortise_and_tenon_joint_on_FAT,
+    cut_housed_dovetail_butt_joint,
+)
+from .splice_joints import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
+    cut_plain_splice_lap_joint_on_aligned_timbers,
+    cut_lapped_gooseneck_joint,
+)
+from .cross_joints import (
     cut_plain_cross_lap_joint,
     cut_plain_cross_lap_house_joint,
-    cut_plain_splice_lap_joint_on_aligned_timbers,
 )
+from .multi_butt_joints import cut_splined_opposing_double_butt_joint
 from kumiki.construction import (
     ButtJointTimberArrangement,
     SpliceJointTimberArrangement,
@@ -30,16 +41,7 @@ from kumiki.construction import (
     CrossJointTimberArrangement,
     DoubleButtJointTimberArrangement,
 )
-from .mortise_and_tenon_joint import (
-    cut_mortise_and_tenon_joint_on_FAT,
-)
-from .build_a_butt import SimplePegParameters
-from .double_butt_joints import cut_splined_opposing_double_butt_joint
-from .japanese_joints import (
-    cut_lapped_gooseneck_joint,
-    cut_housed_dovetail_butt_joint,
-    cut_mitered_and_keyed_lap_joint,
-)
+from .shavings.build_a_butt import SimplePegParameters
 
 
 _raw_safe_dot_product = safe_dot_product

@@ -1,143 +1,186 @@
 """
-Japanese Joints Examples
-
-This module demonstrates traditional Japanese timber joints:
-- Lapped Gooseneck Joint (腰掛鎌継ぎ / Koshikake Kama Tsugi) - for splicing beams end-to-end
-- Dovetail Butt Joint (蟻仕口 / Ari Shiguchi) - for connecting timbers at right angles
-- Mitered and Keyed Lap Joint (箱相欠き車知栓仕口 / Hako Aikaki Shachi Sen Shikuchi) - for corner joints
-
-Each function creates and returns a Frame object with the joint example.
+Corner Joints Patterns
 """
 
-from typing import Optional
-import sys
-sys.path.append('..')
+from sympy import Matrix, Rational, sqrt
+from typing import Union, List, Optional
+from dataclasses import replace
 
-from sympy import Rational, Integer
 from kumiki import *
-from kumiki.ticket import TimberTicket
-from kumiki.patternbook import PatternBook, PatternMetadata
 from kumiki.example_shavings import (
-    create_canonical_example_splice_joint_timbers,
-    create_canonical_example_butt_joint_timbers,
+    RoundTimberConfig,
     create_canonical_example_corner_joint_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
+    create_canonical_example_butt_joint_timbers,
+    create_canonical_example_splice_joint_timbers,
+    _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.rule import inches, degrees
+from kumiki.patternbook import PatternBook, PatternMetadata
+
+# Standard timber dimensions (4" x 5", 4' long) - matches canonical examples
+TIMBER_WIDTH = inches(4)
+TIMBER_HEIGHT = inches(5)
+TIMBER_LENGTH = inches(48)
+TIMBER_SIZE_2D = create_v2(TIMBER_WIDTH, TIMBER_HEIGHT)
+
+def _maybe_round_timber_config(use_round_timbers: bool):
+    if not use_round_timbers:
+        return None
+    return RoundTimberConfig(
+        diameter=max(_CANONICAL_EXAMPLE_TIMBER_SIZE[0], _CANONICAL_EXAMPLE_TIMBER_SIZE[1]) * sqrt(2)
+    )
 
 
-def create_japanese_joints_patternbook() -> PatternBook:
+def _maybe_round_timber(timber, use_round_timbers: bool):
+    if not use_round_timbers:
+        return timber
+    return RoundTimber(
+        length=timber.length,
+        size=timber.size,
+        transform=timber.transform,
+        ticket=timber.ticket,
+        diameter=max(timber.size[0], timber.size[1]) * sqrt(2),
+    )
+
+
+def _make_frame_pattern(pattern_func, name: str):
+    return lambda center, use_round_timbers=False: Frame(
+        cut_timbers=pattern_func(center, use_round_timbers=use_round_timbers),
+        name=name,
+    )
+
+
+
+def make_miter_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
     """
-    Create a PatternBook with Japanese joint patterns.
-    
-    Each pattern has groups: ["japanese_joints", "{joint_type}", "{arrangement_type}"]
-    
+    Create a basic miter joint example with non-axis-aligned timbers.
+    Two timbers meet at their ends with a miter cut, at 67 degrees apart.
+    This demonstrates the general miter joint (non-face-aligned case).
+
+    Args:
+        position: Bottom position where the two timbers meet (V3)
+
     Returns:
-        PatternBook: PatternBook containing Japanese joint patterns
+        List of CutTimber objects representing the joint
     """
-    patterns = [
-        (PatternMetadata("gooseneck_simple", ["japanese_joints", "gooseneck", "end"], "frame"),
-         lambda center: create_simple_gooseneck_example(position=center)),
-        
-        (PatternMetadata("dovetail_butt", ["japanese_joints", "dovetail", "butt"], "frame"),
-         lambda center: create_dovetail_butt_joint_example(position=center)),
-        
-        (PatternMetadata("mitered_keyed_lap", ["japanese_joints", "miter", "corner"], "frame"),
-         lambda center: create_mitered_and_keyed_lap_joint_example(position=center)),
-        
-        (PatternMetadata("mitered_keyed_lap_130deg", ["japanese_joints", "miter", "corner"], "frame"),
-         lambda center: create_mitered_and_keyed_lap_joint_130deg_example(position=center)),
-    ]
-    
-    return PatternBook(patterns=patterns)
+    arrangement = create_canonical_example_corner_joint_timbers(
+        corner_angle=degrees(67),
+        position=position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
+    )
+    timberA = replace(arrangement.timber1, ticket=TimberTicket("MiterJoint_TimberA"))
+    timberB = replace(arrangement.timber2, ticket=TimberTicket("MiterJoint_TimberB"))
+    miter_arrangement = CornerJointTimberArrangement(
+        timber1=timberA,
+        timber2=timberB,
+        timber1_end=arrangement.timber1_end,
+        timber2_end=arrangement.timber2_end
+    )
+    joint = cut_plain_miter_joint(miter_arrangement)
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-patternbook = create_japanese_joints_patternbook()
-
-
-
-def create_simple_gooseneck_example(position: Optional[V3] = None):
+def make_miter_joint_face_aligned_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
     """
-    Create a gooseneck splice joint example using canonical 4"x5"x4' timbers.
-    
+    Create a miter joint for face-aligned timbers.
+    Similar to basic miter but specifically for face-aligned configurations.
+    Uses canonical corner joint arrangement (timber1 in +Y, timber2 in +X).
+
     Args:
-        position: Center position of the joint (V3). Defaults to origin.
+        position: Center position of the joint (V3)
+
+    Returns:
+        List of CutTimber objects representing the joint
     """
-    # Create splice joint arrangement using canonical function
-    # This creates two horizontal timbers meeting end-to-end
-    arrangement = create_canonical_example_splice_joint_timbers(position=position)
-    
-    # Rename timbers for clarity in this joint context
-    from dataclasses import replace
-    gooseneck_timber = replace(arrangement.timber1, ticket=TimberTicket("gooseneck_timber"))
-    receiving_timber = replace(arrangement.timber2, ticket=TimberTicket("receiving_timber"))
-    arrangement = replace(
-        arrangement,
-        timber1=gooseneck_timber,
-        timber2=receiving_timber,
-        front_face_on_timber1=TimberLongFace.RIGHT,
+    # Get canonical corner joint timbers at position
+    arrangement = create_canonical_example_right_angle_corner_joint_timbers(
+        position=position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
     )
 
-    # Create the gooseneck joint using parameters appropriate for canonical timber size
-    joint = cut_lapped_gooseneck_joint(
-        arrangement=arrangement,
-        gooseneck_length=inches(6),        # 6" gooseneck length
-        gooseneck_small_width=inches(1),   # 1" narrow end
-        gooseneck_large_width=inches(3),   # 3" wide end
-        gooseneck_head_length=inches(2),   # 2" head length
-        lap_length=inches(3),              # 3" lap length
-        gooseneck_depth=inches(2)          # 2" depth
+    # Rename timbers for clarity (timber2 is +X, timber1 is +Y)
+    timberA = replace(arrangement.timber2, ticket=TimberTicket("MiterFaceAligned_TimberA"))  # +X direction
+    timberB = replace(arrangement.timber1, ticket=TimberTicket("MiterFaceAligned_TimberB"))  # +Y direction
+
+    miter_arrangement = CornerJointTimberArrangement(
+        timber1=timberA,
+        timber2=timberB,
+        timber1_end=TimberReferenceEnd.BOTTOM,
+        timber2_end=TimberReferenceEnd.BOTTOM
     )
-    
-    frame = Frame.from_joints(
-        [joint],
-        name="Lapped Gooseneck Splice Joint"
-    )
-    
-    return frame
+    joint = cut_plain_miter_joint_on_face_aligned_timbers(miter_arrangement)
+
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-def create_dovetail_butt_joint_example(position: Optional[V3] = None):
+def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
     """
-    Create a dovetail butt joint (蟻仕口 / Ari Shiguchi) using canonical 4"x5"x4' timbers.
-    
-    This is a traditional Japanese joint where a dovetail-shaped tenon on one timber
-    fits into a matching dovetail socket on another timber. The dovetail shape provides
-    mechanical resistance to pulling apart.
-    
-    Configuration:
-        - Uses canonical butt joint timbers (receiving along X, dovetail/butt along Y)
-    
-    Args:
-        position: Center position of the joint (V3). Defaults to origin.
+    Miter joint with timbers at oblique 3D angles.
+
+    TimberA runs at ~37° elevation in the XZ plane: direction (4, 0, 3)/5.
+    TimberB runs with components in all three axes: direction (2, 4, 3)/sqrt(29).
+    Neither timber is axis-aligned, demonstrating the general 3D case.
     """
-    from dataclasses import replace
+    from sympy import sqrt
 
-    arrangement = create_canonical_example_butt_joint_timbers(position=position)
-    dovetail_timber = replace(arrangement.butt_timber, ticket=TimberTicket("dovetail_timber"))
-    arrangement = replace(
-        arrangement,
-        butt_timber=dovetail_timber,
-        front_face_on_butt_timber=TimberLongFace.RIGHT,
-    )
+    sqrt29 = sqrt(29)
+    sqrt5 = sqrt(5)
 
-    joint = cut_housed_dovetail_butt_joint(
-        arrangement=arrangement,
-        receiving_timber_shoulder_inset=inches(Rational(1, 2)),  # 0.5" shoulder inset
-        dovetail_length=inches(4),                                # 4" long dovetail tenon
-        dovetail_small_width=inches(Rational(3, 2)),             # 1.5" narrow end
-        dovetail_large_width=inches(3),                          # 3" wide end
-        dovetail_lateral_offset=Rational(0),                     # Centered
-        dovetail_depth=inches(Rational(5, 2))                    # 2.5" deep cut
+    # (4,0,3)/5 is a unit vector, elevation ~37° from horizontal in XZ plane
+    dirA = Matrix([Rational(4), Rational(0), Rational(3)]) / 5
+    widthA = Matrix([Rational(0), Rational(1), Rational(0)])  # perp to dirA since dirA has no Y component
+
+    # (2,4,3)/sqrt(29) — has components in all 3 axes
+    dirB = Matrix([Rational(2), Rational(4), Rational(3)]) / sqrt29
+    # (-4,2,0)/sqrt(20) = (-2,1,0)/sqrt(5) is perpendicular to dirB: 2*(-2)+4*1+3*0 = 0
+    widthB = Matrix([Rational(-2), Rational(1), Rational(0)]) / sqrt5
+
+    timberA = _maybe_round_timber(timber_from_directions(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=position,
+        length_direction=dirA,
+        width_direction=widthA,
+        ticket=TimberTicket("MiterWeird_TimberA"),
+    ), use_round_timbers)
+    timberB = _maybe_round_timber(timber_from_directions(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=position,
+        length_direction=dirB,
+        width_direction=widthB,
+        ticket=TimberTicket("MiterWeird_TimberB"),
+    ), use_round_timbers)
+
+    arrangement = CornerJointTimberArrangement(
+        timber1=timberA,
+        timber2=timberB,
+        timber1_end=TimberReferenceEnd.BOTTOM,
+        timber2_end=TimberReferenceEnd.BOTTOM,
     )
-    
-    # Create a frame from the joint
-    frame = Frame.from_joints(
-        [joint],
-        name="Dovetail Butt Joint Example (蟻仕口 / Ari Shiguchi)"
+    joint = cut_plain_miter_joint(arrangement)
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
+
+
+def make_corner_lap_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
+    """
+    Create a corner lap joint where each corner timber gets a lap plus an end cut.
+    """
+    arrangement = create_canonical_example_right_angle_corner_joint_timbers(
+        position=position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
     )
-    
-    return frame
+    joint = cut_plain_corner_lap_joint(
+        CornerJointTimberArrangement(
+            timber1=arrangement.timber1,
+            timber2=arrangement.timber2,
+            timber1_end=arrangement.timber1_end,
+            timber2_end=arrangement.timber2_end,
+            front_face_on_timber1=None,
+        ),
+        cut_ratio=Rational(1, 2),
+    )
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
 def create_mitered_and_keyed_lap_joint_example(position: Optional[V3] = None):
@@ -308,3 +351,18 @@ if __name__ == "__main__":
     print("    - Resists tension, shear, and compression")
     print("")
     print(f"Total frames created: {len(frames)}")
+
+def create_all_corner_joint_patterns(use_round_timbers=False) -> Frame:
+    origin = create_v3(Integer(0), Integer(0), Integer(0))
+    step = inches(24)
+    all_timbers = []
+    all_timbers += make_miter_joint_example(origin, use_round_timbers)
+    all_timbers += make_miter_joint_face_aligned_example(origin + create_v3(step, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_miter_joint_3d_angles_example(origin + create_v3(step * 2, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_tongue_and_fork_corner_joint_90_example(origin + create_v3(step * 3, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_tongue_and_fork_corner_joint_135_example(origin + create_v3(step * 4, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_corner_lap_joint_example(origin + create_v3(step * 5, Integer(0), Integer(0)), use_round_timbers)
+    return Frame(cut_timbers=all_timbers, name="Corner Joint Patterns")
+
+
+example = create_all_corner_joint_patterns

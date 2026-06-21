@@ -3,7 +3,7 @@
 import pytest
 from sympy import Integer, Matrix, Rational
 
-from kumiki.joints.workshop.boards import cut_tongue_and_groove_joint
+from kumiki.joints.workshop.board_joints import cut_tongue_and_groove_joint
 from kumiki.ticket import BoardTicket
 from kumiki.timber import Board, Orientation, Transform, create_v3
 from kumiki.cutcsg import RectangularPrism, SolidUnion
