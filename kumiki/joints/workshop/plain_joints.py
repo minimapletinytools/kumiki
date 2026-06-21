@@ -1491,13 +1491,14 @@ def _find_closest_face_to_timber(timber: PerfectTimberWithin, other_timber: Perf
     return closest_face
 
 
-# TODO DELETE 
-def cut_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
+def cut_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """
     Creates a house (dado/housing) joint where the housing timber is notched to receive the housed timber.
 
     Only the housing timber is cut (timber1); the housed timber (timber2) is not modified.
     Implemented as a cross-lap joint with cut_ratio=1.
+
+    Note this diffeent from cut_free_house_joint in the way it handles relief cuts on the non-ptw parts of the timbers.
 
     Args:
         arrangement: Cross-joint arrangement where timber1 is the housing timber (to be notched)
@@ -1513,146 +1514,6 @@ def cut_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     # Use cross lap joint with cut_ratio=1 (only cut timber1, not timber2)
     return cut_plain_cross_lap_joint(arrangement, cut_ratio=Rational(1, 1))
 
-
-# TODO DELETE
-def cut_plain_house_joint_DEPRECATED(housing_timber: TimberLike, housed_timber: TimberLike, extend_housed_timber_to_infinity: bool = False) -> Joint:
-    """
-    DEPRECATED: Use cut_plain_house_joint() instead.
-    
-    Creates a plain housed joint (also called housing joint or dado joint) where the 
-    housing_timber is notched to fit the housed_timber. The housed timber fits completely
-    into a notch cut in the housing timber.
-    
-    Args:
-        housing_timber: Timber that will receive the housing cut (gets the groove)
-        housed_timber: Timber that will be housed (fits into the groove, remains uncut)
-        extend_housed_timber_to_infinity: If True, the housed timber is extended to infinity in both directions, otherwise the finite timber is used
-        
-    Returns:
-        Joint object containing both timbers
-        
-    Raises:
-        AssertionError: If timbers don't intersect or are parallel
-        
-    Example:
-        A shelf (housed_timber) fitting into the side of a cabinet (housing_timber).
-        The cabinet side gets a groove cut into it to receive the shelf.
-    """
-    from kumiki.cutcsg import Difference, RectangularPrism
-    
-    # Verify that the timbers are not parallel (their length directions must differ)
-    from kumiki.rule import safe_dot_product
-    dot_product = safe_dot_product(housing_timber.get_length_direction_global(), housed_timber.get_length_direction_global())
-    assert abs(abs(dot_product) - 1) > Rational(1, 1000000), \
-        "Timbers must not be parallel (their length directions must differ)"
-    
-    # Check that the timbers intersect when extended infinitely
-    # For two lines to intersect, they must either:
-    # 1. Actually intersect at a point, or
-    # 2. Be skew lines that would intersect if one were translated
-    # For housed joints, we require that they actually overlap in 3D space
-    
-    # A simple check: compute the closest points between the two timber centerlines
-    # If the distance is less than the sum of half their cross-sections, they overlap
-    
-    # Direction vectors
-    d1 = housing_timber.get_length_direction_global()
-    d2 = housed_timber.get_length_direction_global()
-    
-    # Points on each line (use bottom positions)
-    p1 = housing_timber.get_bottom_position_global()
-    p2 = housed_timber.get_bottom_position_global()
-    
-    # Vector between the two line points
-    w = p1 - p2
-    
-    # Calculate closest points between two lines in 3D
-    # See: http://paulbourke.net/geometry/pointlineplane/
-    a = safe_dot_product(d1, d1)
-    b = safe_dot_product(d1, d2)
-    c = safe_dot_product(d2, d2)
-    d = safe_dot_product(d1, w)
-    e = safe_dot_product(d2, w)
-    
-    denom = a * c - b * b
-    
-    # If denom is very small, lines are parallel (already checked above)
-    # Calculate parameters for closest points
-    if abs(denom) < Rational(1, 1000000):
-        # Lines are parallel, use simple distance check
-        # Project p2 onto the line defined by p1 and d1
-        t = -safe_dot_product(d1, w) / a if a > Integer(0) else Integer(0)
-        closest_on_1 = p1 + t * d1
-        distance = safe_norm(p2 - closest_on_1)
-    else:
-        t1 = (b * e - c * d) / denom
-        t2 = (a * e - b * d) / denom
-        
-        closest_on_1 = p1 + t1 * d1
-        closest_on_2 = p2 + t2 * d2
-        
-        distance = safe_norm(closest_on_1 - closest_on_2)
-    
-    # Check if timbers are close enough to intersect
-    # They should intersect if the closest distance is less than the sum of half their cross-sections
-    max_separation = (housing_timber.size[0] + housing_timber.size[1] + 
-                     housed_timber.size[0] + housed_timber.size[1]) / 2
-    
-    assert float(distance) < float(max_separation), \
-        f"Timbers do not intersect (closest distance: {float(distance):.4f}m, max allowed: {float(max_separation):.4f}m)"
-    
-    # Create a CSG difference: housing_timber - housed_timber
-    # The housed timber's prism will be subtracted from the housing timber
-    
-    # Calculate the relative transformation
-    # housed_prism in housing_timber's local frame = housing_orientation^T * housed_orientation
-    from kumiki.rule import safe_transform_vector
-    relative_orientation = Orientation(safe_transform_vector(housing_timber.orientation.matrix.T, housed_timber.orientation.matrix))
-    
-    # Transform the housed timber's position to housing timber's local coordinates
-    housed_origin_local = safe_transform_vector(housing_timber.orientation.matrix.T, housed_timber.get_bottom_position_global() - housing_timber.get_bottom_position_global())
-    
-    # Determine start and end distances based on extend_housed_timber_to_infinity
-    if extend_housed_timber_to_infinity:
-        # Use infinite prism to ensure it cuts through the housing timber completely
-        start_distance = None
-        end_distance = None
-    else:
-        # Use finite timber dimensions
-        # The prism's position and orientation already place it in the housing timber's local space
-        # So we just need the housed timber's own start (0) and end (length) distances
-        start_distance = Integer(0)
-        end_distance = housed_timber.length
-    
-    # Create the housed prism in housing timber's LOCAL coordinate system
-    housed_transform_local = Transform(position=housed_origin_local, orientation=relative_orientation)
-    housed_prism_local = RectangularPrism(
-        size=housed_timber.size,
-        transform=housed_transform_local,
-        start_distance=start_distance,
-        end_distance=end_distance
-    )
-    
-    # Create the CSG cut for the housing timber
-    cut = Cutting(
-        timber=housing_timber,
-        negative_csg=housed_prism_local  # Subtract the housed timber's volume
-    )
-    
-    # Create CutTimber for the housing timber (with cut)
-    cut_housing = cut
-    
-    # Create CutTimber for the housed timber (no cuts)
-    cut_housed = Cutting(timber=housed_timber)
-    
-    # Create and return the Joint
-    joint = Joint(
-        cuttings={"housing_timber": cut_housing, "housed_timber": cut_housed},
-        ticket=JointTicket(joint_type="plain_housing"),
-        jointAccessories={},
-    )
-    
-    return joint
 
 def cut_plain_splice_lap_joint_on_aligned_timbers(
     arrangement: SpliceJointTimberArrangement,

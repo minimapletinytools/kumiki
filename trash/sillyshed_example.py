@@ -284,8 +284,8 @@ def _build_joints(
         front_rafter = _find_rafter(rafters, "Front", x_tag)
         back_rafter = _find_rafter(rafters, "Back", x_tag)
 
-        joints.append(cut_plain_house_joint(CrossJointTimberArrangement(timber1=front_rafter, timber2=plate_front)))
-        joints.append(cut_plain_house_joint(CrossJointTimberArrangement(timber1=back_rafter, timber2=plate_back)))
+        joints.append(cut_plain_cross_lap_house_joint(CrossJointTimberArrangement(timber1=front_rafter, timber2=plate_front)))
+        joints.append(cut_plain_cross_lap_house_joint(CrossJointTimberArrangement(timber1=back_rafter, timber2=plate_back)))
 
         joints.append(
             cut_tongue_and_fork_corner_joint(

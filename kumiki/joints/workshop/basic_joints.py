@@ -20,7 +20,7 @@ from .plain_joints import (
     cut_tongue_and_fork_butt_joint,
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_cross_lap_joint,
-    cut_plain_house_joint,
+    cut_plain_cross_lap_house_joint,
     cut_plain_splice_lap_joint_on_aligned_timbers,
 )
 from kumiki.construction import (
@@ -243,7 +243,7 @@ def cut_basic_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     Creates a house (dado/housing) joint where the housing timber is notched to receive the housed timber.
 
     Only the housing timber is cut; the housed timber is unaffected. Convenience wrapper; see
-    `cut_plain_house_joint` for details.
+    `cut_plain_cross_lap_house_joint` for details.
 
     Args:
         arrangement: Cross joint arrangement where timber1 is the housing timber and timber2
@@ -254,7 +254,7 @@ def cut_basic_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """
     error = arrangement.check_face_aligned_and_orthogonal()
     assert error is None, error
-    return cut_plain_house_joint(arrangement)
+    return cut_plain_cross_lap_house_joint(arrangement)
 
 
 def cut_basic_splined_opposing_double_butt_joint(

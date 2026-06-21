@@ -37,7 +37,7 @@ from kumiki.joints.workshop.plain_joints import (
     cut_tongue_and_fork_butt_joint,
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_cross_lap_joint,
-    cut_plain_house_joint,
+    cut_plain_cross_lap_house_joint,
     cut_plain_splice_lap_joint_on_aligned_timbers,
 )
 from kumiki.example_shavings import (
@@ -436,7 +436,7 @@ def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutT
         timber1=housing_timber,
         timber2=housed_timber
     )
-    joint = cut_plain_house_joint(house_arrangement)
+    joint = cut_plain_cross_lap_house_joint(house_arrangement)
 
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 

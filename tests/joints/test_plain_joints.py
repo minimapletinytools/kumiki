@@ -565,7 +565,7 @@ class TestSpliceJoint:
 
 
 class TestHouseJoint:
-    """Test cut_plain_house_joint function."""
+    """Test cut_plain_cross_lap_house_joint function."""
     
     # 🐪
     def test_basic_house_joint_perpendicular_timbers(self):
@@ -577,7 +577,7 @@ class TestHouseJoint:
         housed_timber = create_centered_horizontal_timber(direction='y', length=100, size=(10, 10), zoffset=-1)
 
         arrangement = CrossJointTimberArrangement(timber1=housing_timber, timber2=housed_timber)
-        joint = cut_plain_house_joint(arrangement)
+        joint = cut_plain_cross_lap_house_joint(arrangement)
         assert joint is not None
         assert len(joint.cuttings) == 2
         assert joint.cuttings["timberA"].timber == housing_timber
@@ -624,7 +624,7 @@ class TestHouseJoint:
             timber2=housed_timber,
             front_face_on_timber1=TimberLongFace.FRONT
         )
-        joint = cut_plain_house_joint(arrangement)
+        joint = cut_plain_cross_lap_house_joint(arrangement)
         
         # Get the housing timber with its cut
         housing_cut_timber = joint.cuttings["timberA"]

@@ -786,16 +786,12 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # The side girts are the housing timber (receiving the housed timber)
     # The back top plate is the housed timber (fitting into the pockets)
     
-    joint_back_beam_left_housing = cut_plain_house_joint_DEPRECATED(
-        housing_timber=side_girt_left,
-        housed_timber=top_plate_back,
-        extend_housed_timber_to_infinity=False
+    joint_back_beam_left_housing = cut_plain_cross_lap_house_joint(
+        CrossJointTimberArrangement(timber1=side_girt_left, timber2=top_plate_back)
     )
-    
-    joint_back_beam_right_housing = cut_plain_house_joint_DEPRECATED(
-        housing_timber=side_girt_right,
-        housed_timber=top_plate_back,
-        extend_housed_timber_to_infinity=False
+
+    joint_back_beam_right_housing = cut_plain_cross_lap_house_joint(
+        CrossJointTimberArrangement(timber1=side_girt_right, timber2=top_plate_back)
     )
 
     # ============================================================================
@@ -996,19 +992,12 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     rafter_house_joints = []
     
     for i, rafter in enumerate(rafters, start=1):
-        # TODO switch to not DEPRECATED one
-        # Create house joint with back top plate
-        joint_back = cut_plain_house_joint_DEPRECATED(
-            housing_timber=top_plate_back,
-            housed_timber=rafter,
-            extend_housed_timber_to_infinity=False
+        joint_back = cut_plain_cross_lap_house_joint(
+            CrossJointTimberArrangement(timber1=top_plate_back, timber2=rafter)
         )
-        
-        # Create house joint with front top plate
-        joint_front = cut_plain_house_joint_DEPRECATED(
-            housing_timber=top_plate_front,
-            housed_timber=rafter,
-            extend_housed_timber_to_infinity=False
+
+        joint_front = cut_plain_cross_lap_house_joint(
+            CrossJointTimberArrangement(timber1=top_plate_front, timber2=rafter)
         )
         
         rafter_house_joints.append((joint_back, joint_front))

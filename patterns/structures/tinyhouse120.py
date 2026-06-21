@@ -1208,7 +1208,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         (top_plate_right, top_plate_back),
     ]:
         corner_top_plate_compound_joints.append(
-            cut_plain_house_joint(
+            cut_plain_cross_lap_house_joint(
                 CrossJointTimberArrangement(
                     timber1=side_plate,
                     timber2=cross_plate,
@@ -1415,7 +1415,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     rafter_house_joints: List[Joint] = []
     for housing_timber, housed_timber in rafter_housing_pairs:
         rafter_house_joints.append(
-            cut_plain_house_joint(
+            cut_plain_cross_lap_house_joint(
                 CrossJointTimberArrangement(
                     timber1=housing_timber,
                     timber2=housed_timber,
