@@ -25,10 +25,7 @@ on:
       target:
         required: false
         default: "testpypi"
-        type: choice
-        options:
-          - testpypi
-          - pypi
+        type: string
       publish:
         required: false
         default: true
@@ -36,9 +33,8 @@ on:
       tag:
         required: false
         type: string
-
-outputs:
-  version: ${{ jobs.build.outputs.version }}
+    outputs:
+      version: ${{ jobs.build.outputs.version }}
 
 jobs:
   build:

@@ -40,11 +40,7 @@ on:
         default: false
       target:
         required: false
-        type: choice
-        options:
-          - both
-          - vscode
-          - ovsx
+        type: string
         default: both
       publish:
         required: false
