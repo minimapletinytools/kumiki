@@ -636,7 +636,7 @@ canvas { display: block; width: 100%; height: 100%; }
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
-    padding: 8px 14px;
+    padding: 9px 16px 8px;
     border: 1px solid var(--hv-panel-border);
     border-radius: 6px;
     background: var(--hv-accent);
@@ -647,6 +647,22 @@ canvas { display: block; width: 100%; height: 100%; }
     letter-spacing: 0.02em;
     text-transform: lowercase;
     transition: background 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1px;
+    line-height: 1.1;
+    text-align: center;
+}
+#top-center-refresh-btn .top-center-refresh-primary {
+    font-size: 13px;
+    font-weight: 700;
+}
+#top-center-refresh-btn .top-center-refresh-secondary {
+    font-size: 10px;
+    font-weight: 500;
+    opacity: 0.92;
 }
 #top-center-refresh-btn:hover {
     background: var(--hv-accent-strong);

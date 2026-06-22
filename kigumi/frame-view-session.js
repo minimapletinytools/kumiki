@@ -78,6 +78,7 @@ class FrameViewSession {
         this.lastDirtyRefreshVersion = null;
         this.lastRefreshReason = null;
         this.lastRefreshAt = null;
+        this.sourceHasPendingChanges = false;
         this.viewerSettings = null;
         // Cached payloads for potential panel re-open flows
         this._lastFrameData = null;
@@ -209,6 +210,7 @@ class FrameViewSession {
         });
         this._setupWebviewMessageHandler();
         this.log('[webview] viewer log bridge active');
+        this.setSourceHasPendingChanges(false, { force: true });
         this.postLoadingStatus('raising frame', { reason: 'session initialize', refreshToken: this.refreshSequence });
 
         this.profiler.resetMilestones();
@@ -757,6 +759,7 @@ class FrameViewSession {
                 loadingText: '',
                 keepLoading: false,
             }, this.refreshOptions, this.viewerSettings);
+            this.setSourceHasPendingChanges(false);
             // Cache payloads for panel re-open (pattern sessions)
             this._lastFrameData = frameData;
             this._lastGeometryData = geometryData;
@@ -1219,12 +1222,42 @@ class FrameViewSession {
             return;
         }
 
+        if (!this.autoRefreshOnFileChange) {
+            this.log(`[watcher] Detected ${source} change; awaiting manual refresh.`);
+            this.setSourceHasPendingChanges(true);
+            return;
+        }
+
         this.log(`[watcher] Auto-reloading due to ${source} change...`);
         try {
             await this.refresh(`${source} change`);
         } catch (error) {
             this.log(`[watcher] Auto-reload failed for ${path.basename(this.filePath)}: ${error.message || error}`);
         }
+    }
+
+    setSourceHasPendingChanges(nextValue, options = {}) {
+        const normalized = Boolean(nextValue);
+        const force = options && options.force === true;
+        if (!force && this.sourceHasPendingChanges === normalized) {
+            return;
+        }
+        this.sourceHasPendingChanges = normalized;
+        this._postSourceChangeState();
+    }
+
+    _postSourceChangeState() {
+        if (!this.panel) {
+            return;
+        }
+        this.panel.webview.postMessage({
+            type: 'sourceChangeState',
+            payload: {
+                sourceHasPendingChanges: this.sourceHasPendingChanges,
+            },
+        }).catch((error) => {
+            this.log(`[webview] Failed to post source change state: ${error.message || error}`);
+        });
     }
 
     extractRunnerErrorDetails(error) {

@@ -91,6 +91,7 @@ function createInitialViewState() {
         loadingText: 'raising frame',
         refreshToken: 0,
         error: null,
+        sourceHasPendingChanges: false,
     };
 }
 
@@ -930,7 +931,7 @@ class KigumiViewerApp extends LitElement {
 
     render() {
         const cameraMode = this.cameraController.getCameraMode();
-        const hasPendingChanges = this.hasPendingRenderParameterChanges();
+        const hasPendingChanges = this.hasPendingRenderParameterChanges() || this.viewState.sourceHasPendingChanges;
         return html`
             <button id="to-v3d" title="Jump back to 3D view">to v3d view</button>
             ${hasPendingChanges
@@ -938,7 +939,10 @@ class KigumiViewerApp extends LitElement {
                     id="top-center-refresh-btn"
                     type="button"
                     title="Refresh using current parameter values"
-                    @click=${() => this.requestRefreshWithPendingParameters()}>refresh (changes detected)</button>`
+                    @click=${() => this.requestRefreshWithPendingParameters()}>
+                        <span class="top-center-refresh-primary">refresh</span>
+                        <span class="top-center-refresh-secondary">changes detected</span>
+                    </button>`
                 : ''}
             <div id="viewport">
                 <canvas id="c"></canvas>
@@ -1907,6 +1911,15 @@ class KigumiViewerApp extends LitElement {
             const payload = (message.payload && typeof message.payload === 'object') ? message.payload : {};
             if (typeof payload.installingCadqueryOcp === 'boolean') {
                 this.installingCadqueryOcp = payload.installingCadqueryOcp;
+                this.requestUpdate();
+            }
+            return;
+        }
+
+        if (message.type === 'sourceChangeState') {
+            const payload = (message.payload && typeof message.payload === 'object') ? message.payload : {};
+            if (typeof payload.sourceHasPendingChanges === 'boolean') {
+                this.setViewState({ sourceHasPendingChanges: payload.sourceHasPendingChanges });
                 this.requestUpdate();
             }
             return;
@@ -3828,6 +3841,7 @@ class KigumiViewerApp extends LitElement {
             : this.activeRefreshToken;
         const error = typeof next.error === 'string' && next.error ? next.error : null;
         const showOutputLink = Boolean(next.showOutputLink);
+        const sourceHasPendingChanges = Boolean(next.sourceHasPendingChanges);
 
         return {
             phase,
@@ -3835,6 +3849,7 @@ class KigumiViewerApp extends LitElement {
             refreshToken,
             error,
             showOutputLink,
+            sourceHasPendingChanges,
             keepLoading: Boolean(next.keepLoading),
         };
     }

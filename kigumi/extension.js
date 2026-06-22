@@ -105,6 +105,45 @@ function activate(context) {
         }
     }));
 
+    const updateSessionSourceChangeState = (document, options = {}) => {
+        if (!document || document.languageId !== 'python') {
+            return;
+        }
+
+        const normalizedDocPath = normalizeSessionFilePath(document.fileName);
+        if (!normalizedDocPath) {
+            return;
+        }
+
+        const forceChanged = options.sourceChanged === true;
+        const nextState = forceChanged ? true : Boolean(document.isDirty);
+
+        const mainSession = getFrameSession(normalizedDocPath);
+        if (mainSession && !mainSession.isDisposed) {
+            mainSession.setSourceHasPendingChanges(nextState);
+        }
+
+        for (const session of patternSessions.values()) {
+            if (!session || session.isDisposed) {
+                continue;
+            }
+            if (normalizeSessionFilePath(session.filePath) === normalizedDocPath) {
+                session.setSourceHasPendingChanges(nextState);
+            }
+        }
+    };
+
+    context.subscriptions.push(vscode.workspace.onDidChangeTextDocument((event) => {
+        if (!event || !event.document) {
+            return;
+        }
+        updateSessionSourceChangeState(event.document);
+    }));
+
+    context.subscriptions.push(vscode.workspace.onDidSaveTextDocument((document) => {
+        updateSessionSourceChangeState(document, { sourceChanged: true });
+    }));
+
     sidebarProvider = new KigumiSidebarProvider(context, {
         getPythonCommand: () => {
             const mainSession = _findAnyAliveMainSession();
