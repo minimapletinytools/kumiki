@@ -49,6 +49,13 @@ on:
       tag:
         required: false
         type: string
+    outputs:
+      version:
+        description: "kigumi extension version"
+        value: ${{ jobs.build.outputs.version }}
+      vsix_name:
+        description: "kigumi VSIX filename"
+        value: ${{ jobs.build.outputs.vsix_name }}
 
 jobs:
   build:
