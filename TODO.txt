@@ -109,6 +109,8 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 :: TODO
 
 DONE-make the refresh button more prominent in the viewer itself
+
+
 -add left click to drag option (only when not clicking on frame obviously)
 
 -do setup vid

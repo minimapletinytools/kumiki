@@ -383,6 +383,10 @@ class ViewerSettingsPanel {
                     debug info
                 </label>
                 <label>
+                    <input id="left-click-rotate-toggle" type="checkbox" ?checked=${this.app.leftClickDragRotatesCamera}>
+                    left click to rotate camera
+                </label>
+                <label>
                     geometry
                     <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
                         <option value="actual">actual</option>
@@ -488,6 +492,7 @@ class ViewerSettingsPanel {
         const reflectionsToggle = renderRoot.querySelector('#reflections-toggle');
         const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
         const debugToggle = renderRoot.querySelector('#debug-toggle');
+        const leftClickRotateToggle = renderRoot.querySelector('#left-click-rotate-toggle');
         const exportCombinedToggle = renderRoot.querySelector('#export-combined-toggle');
         const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
         const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
@@ -520,6 +525,12 @@ class ViewerSettingsPanel {
                 debugEl.style.display = this.app.debugEnabled ? 'block' : 'none';
             }
         });
+
+        if (leftClickRotateToggle) {
+            leftClickRotateToggle.addEventListener('change', (event) => {
+                this.app.setLeftClickDragRotatesCameraEnabled(event.target.checked);
+            });
+        }
 
         shadowsToggle.addEventListener('change', (event) => {
             this.app.setShadowsEnabled(event.target.checked);
@@ -596,11 +607,15 @@ class ViewerSettingsPanel {
         const exportFormatObjToggle = renderRoot.querySelector('#export-format-obj-toggle');
         const exportFormatStepToggle = renderRoot.querySelector('#export-format-step-toggle');
         const themeSelect = renderRoot.querySelector('#theme-select');
+        const leftClickRotateToggle = renderRoot.querySelector('#left-click-rotate-toggle');
         if (edgeVisibilitySlider) {
             edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
         }
         if (unselectedTransparencySlider) {
             unselectedTransparencySlider.value = String(100 - this.app.unselectedTransparencyPercent);
+        }
+        if (leftClickRotateToggle) {
+            leftClickRotateToggle.checked = this.app.leftClickDragRotatesCamera;
         }
         if (exportCombinedToggle) {
             exportCombinedToggle.checked = this.app.exportCombinedEnabled;
@@ -831,12 +846,16 @@ class KigumiViewerApp extends LitElement {
         this.mouseAction = null;
         this.lastX = 0;
         this.lastY = 0;
+        this.mouseDownButton = null;
+        this.mouseDownTarget = null;
+        this.mouseActionMoved = false;
 
         this.showCenterGizmo = true;
         this.edgesEnabled = true;
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
         this.debugEnabled = false;
+        this.leftClickDragRotatesCamera = true;
         this.logFilterText = '';
         this.memberListRoughLengthAllowanceMm = 30;
         this.memberListOptions = {
@@ -932,6 +951,9 @@ class KigumiViewerApp extends LitElement {
     render() {
         const cameraMode = this.cameraController.getCameraMode();
         const hasPendingChanges = this.hasPendingRenderParameterChanges() || this.viewState.sourceHasPendingChanges;
+        const navigationHint = this.leftClickDragRotatesCamera
+            ? 'left/right drag orbit • middle drag pan • scroll zoom • F focus'
+            : 'right drag orbit • middle drag pan • scroll zoom • F focus';
         return html`
             <button id="to-v3d" title="Jump back to 3D view">to v3d view</button>
             ${hasPendingChanges
@@ -969,7 +991,7 @@ class KigumiViewerApp extends LitElement {
                     </div>
                 </div>
                 <div id="debug"></div>
-                <div id="hint">right drag orbit • middle drag pan • scroll zoom • F focus</div>
+                <div id="hint">${navigationHint}</div>
             </div>
             <div id="top-controls">
                 ${this.settingsPanel.render()}
@@ -1185,7 +1207,7 @@ class KigumiViewerApp extends LitElement {
         });
 
         canvas.addEventListener('mousedown', (event) => {
-            if (event.button === 2) {
+            if (event.button === 2 || (event.button === 0 && this.leftClickDragRotatesCamera)) {
                 this.mouseAction = 'orbit';
                 this.cameraController.captureOrbitDragFrame();
             } else if (event.button === 1) {
@@ -1196,6 +1218,9 @@ class KigumiViewerApp extends LitElement {
             event.preventDefault();
             this.lastX = event.clientX;
             this.lastY = event.clientY;
+            this.mouseDownButton = event.button;
+            this.mouseDownTarget = event.target;
+            this.mouseActionMoved = false;
             this.cameraController.cancelAnimation();
         });
 
@@ -1533,6 +1558,7 @@ class KigumiViewerApp extends LitElement {
                 shadowsEnabled: Boolean(this.shadowsEnabled),
                 reflectionsEnabled: Boolean(this.reflectionsEnabled),
                 debugEnabled: Boolean(this.debugEnabled),
+                leftClickDragRotatesCamera: Boolean(this.leftClickDragRotatesCamera),
                 unselectedTransparencyPercent: Number(this.unselectedTransparencyPercent),
                 activeTheme: String(this.activeTheme || 'forest'),
                 exportFormatStlEnabled: Boolean(this.exportFormatStlEnabled),
@@ -1588,6 +1614,9 @@ class KigumiViewerApp extends LitElement {
             if (debugEl) {
                 debugEl.style.display = this.debugEnabled ? 'block' : 'none';
             }
+        }
+        if (typeof ui.leftClickDragRotatesCamera === 'boolean') {
+            this.setLeftClickDragRotatesCameraEnabled(ui.leftClickDragRotatesCamera);
         }
         if (Number.isFinite(ui.unselectedTransparencyPercent)) {
             this.setUnselectedTransparencyPercent(Number(ui.unselectedTransparencyPercent));
@@ -2127,9 +2156,24 @@ class KigumiViewerApp extends LitElement {
 
     onWindowMouseUp(event) {
         const activeMouseAction = this.mouseAction;
+        const mouseDownButton = this.mouseDownButton;
+        const mouseDownTarget = this.mouseDownTarget;
+        const mouseActionMoved = this.mouseActionMoved;
         this.mouseAction = null;
+        this.mouseDownButton = null;
+        this.mouseDownTarget = null;
+        this.mouseActionMoved = false;
         const canvas = this.renderRoot && this.renderRoot.querySelector ? this.renderRoot.querySelector('#c') : null;
         if (!activeMouseAction && canvas && event.target === canvas) {
+            this.handleCanvasClick(event);
+            return;
+        }
+        if (
+            activeMouseAction === 'orbit'
+            && mouseDownButton === 0
+            && mouseDownTarget === canvas
+            && !mouseActionMoved
+        ) {
             this.handleCanvasClick(event);
         }
     }
@@ -2138,10 +2182,15 @@ class KigumiViewerApp extends LitElement {
         if (!this.mouseAction) {
             return;
         }
+        const dx = event.clientX - this.lastX;
+        const dy = event.clientY - this.lastY;
+        if (Math.abs(dx) + Math.abs(dy) > 2) {
+            this.mouseActionMoved = true;
+        }
         if (this.mouseAction === 'orbit') {
             this.cameraController.applyOrbitDelta(
-                event.clientX - this.lastX,
-                event.clientY - this.lastY,
+                dx,
+                dy,
             );
         } else if (this.mouseAction === 'pan') {
             this.panCameraInViewPlane(this.lastX, this.lastY, event.clientX, event.clientY);
@@ -3092,6 +3141,11 @@ class KigumiViewerApp extends LitElement {
     setReflectionsEnabled(enabled) {
         this.reflectionsEnabled = enabled;
         this.updateReflectionTransforms();
+    }
+
+    setLeftClickDragRotatesCameraEnabled(enabled) {
+        this.leftClickDragRotatesCamera = Boolean(enabled);
+        this.requestUpdate();
     }
 
     resolveRenderProfile(profileId) {
