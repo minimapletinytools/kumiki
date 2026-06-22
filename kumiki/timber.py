@@ -2117,8 +2117,7 @@ def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
         joints: List of Joint objects to combine
         ticket: JointTicket for the compound joint
     """
-    # TODO finish
-    pass
+    raise NotImplementedError
 
 @dataclass(frozen=True)
 class Frame:

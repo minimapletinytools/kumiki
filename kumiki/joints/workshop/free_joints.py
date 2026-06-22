@@ -48,9 +48,8 @@ def cut_free_house_joint(housing_timber: TimberLike, housed_timber: Union[Timber
         housed_aabb = housed_prism_in_housing.get_aabb()
 
         # Housing_timber cross-section half-extents (in its own local space).
-        # size[0]/size[1] are sympy Expr; pyright can't verify the operator, hence the ignores.
-        half_w = housing_timber.size[0] / Rational(2)  # type: ignore[operator]
-        half_h = housing_timber.size[1] / Rational(2)  # type: ignore[operator]
+        half_w = housing_timber.size[0] / Rational(2)
+        half_h = housing_timber.size[1] / Rational(2)
 
         def _take_max(a: Numeric, b: Numeric) -> Numeric:
             return a if safe_compare(a, b, Comparison.GE) else b
