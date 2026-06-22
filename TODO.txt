@@ -79,6 +79,8 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 DONE-make the refresh button more prominent in the viewer itself
 DONE-add left click to drag option (only when not clicking on frame obviously)
 
+-if minor version mismatch, kigumi should show incompatible version for kumiki, upgrade requried
+-website should say install one of uv (preferred)
 -do setup vid
 -do shower vid
 -do example cleanup

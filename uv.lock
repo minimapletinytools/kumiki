@@ -157,7 +157,7 @@ wheels = [
 
 [[package]]
 name = "kumiki"
-version = "0.2.7"
+version = "0.3.3"
 source = { editable = "." }
 dependencies = [
     { name = "lxml" },
