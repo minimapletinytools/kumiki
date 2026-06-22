@@ -116,7 +116,7 @@ jobs:
     with:
       target: ${{ inputs.kumiki_publish_target || github.event.inputs.kumiki_publish_target || 'pypi' }}
       publish: false
-      tag: ${{ needs.resolve_tag.outputs.tag }}
+      tag: ${{ inputs.tag || github.event.inputs.tag || github.ref_name }}
 
   build_kigumi:
     name: Build Kigumi Extension
@@ -127,7 +127,7 @@ jobs:
       target: both
       publish: false
       prerelease: ${{ inputs.kigumi_prerelease == true || github.event.inputs.kigumi_prerelease == 'true' }}
-      tag: ${{ needs.resolve_tag.outputs.tag }}
+      tag: ${{ inputs.tag || github.event.inputs.tag || github.ref_name }}
 
   publish_kumiki:
     name: Publish kumiki to PyPI
