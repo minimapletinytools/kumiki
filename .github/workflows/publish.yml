@@ -34,7 +34,9 @@ on:
         required: false
         type: string
     outputs:
-      version: ${{ jobs.build.outputs.version }}
+      version:
+        description: "kumiki package version"
+        value: ${{ jobs.build.outputs.version }}
 
 jobs:
   build:
