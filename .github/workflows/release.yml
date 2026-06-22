@@ -81,7 +81,7 @@ jobs:
         id: resolve
         shell: bash
         run: |
-          TAG="${{ coalesce(inputs.tag, github.event.inputs.tag, '') }}"
+          TAG="${{ inputs.tag || github.event.inputs.tag }}"
           if [ -z "$TAG" ]; then
             if [ "${{ github.event_name }}" = "push" ]; then
               TAG="${{ github.ref_name }}"
@@ -110,42 +110,47 @@ jobs:
 
   build_kumiki:
     name: Build Kumiki Package
+    needs: [resolve_tag]
     if: >-
       ${{
-        (coalesce(inputs.kumiki, github.event.inputs.kumiki) ||
-        coalesce(inputs.kumiki_publish, github.event.inputs.kumiki_publish) ||
-        coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release)) &&
-        needs.resolve_tag.outputs.prefix == 'kumiki'
+        needs.resolve_tag.outputs.prefix == 'kumiki' &&
+        (github.event_name == 'push' ||
+         inputs.kumiki == true || github.event.inputs.kumiki == 'true' ||
+         inputs.kumiki_publish == true || github.event.inputs.kumiki_publish == 'true' ||
+         inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true')
       }}
     uses: ./.github/workflows/publish.yml
     with:
-      target: ${{ coalesce(inputs.kumiki_publish_target, github.event.inputs.kumiki_publish_target, 'pypi') }}
+      target: ${{ inputs.kumiki_publish_target || github.event.inputs.kumiki_publish_target || 'pypi' }}
       publish: false
       tag: ${{ needs.resolve_tag.outputs.tag }}
 
   build_kigumi:
     name: Build Kigumi Extension
+    needs: [resolve_tag]
     if: >-
       ${{
-        (coalesce(inputs.kigumi, github.event.inputs.kigumi) ||
-        coalesce(inputs.kigumi_publish_vscode, github.event.inputs.kigumi_publish_vscode) ||
-        coalesce(inputs.kigumi_publish_ovsx, github.event.inputs.kigumi_publish_ovsx) ||
-        coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release)) &&
-        needs.resolve_tag.outputs.prefix == 'kigumi'
+        needs.resolve_tag.outputs.prefix == 'kigumi' &&
+        (github.event_name == 'push' ||
+         inputs.kigumi == true || github.event.inputs.kigumi == 'true' ||
+         inputs.kigumi_publish_vscode == true || github.event.inputs.kigumi_publish_vscode == 'true' ||
+         inputs.kigumi_publish_ovsx == true || github.event.inputs.kigumi_publish_ovsx == 'true' ||
+         inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true')
       }}
     uses: ./.github/workflows/publish-kigumi.yml
     with:
       target: both
       publish: false
-      prerelease: ${{ coalesce(inputs.kigumi_prerelease, github.event.inputs.kigumi_prerelease, false) }}
+      prerelease: ${{ inputs.kigumi_prerelease == true || github.event.inputs.kigumi_prerelease == 'true' }}
       tag: ${{ needs.resolve_tag.outputs.tag }}
 
   publish_kumiki:
     name: Publish kumiki to PyPI
     needs:
+      - resolve_tag
       - build_kumiki
     runs-on: ubuntu-latest
-    if: ${{ coalesce(inputs.kumiki_publish, github.event.inputs.kumiki_publish) && needs.resolve_tag.outputs.prefix == 'kumiki' }}
+    if: ${{ (inputs.kumiki_publish == true || github.event.inputs.kumiki_publish == 'true' || github.event_name == 'push') && needs.resolve_tag.outputs.prefix == 'kumiki' }}
     permissions:
       contents: read
 
@@ -159,14 +164,15 @@ jobs:
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: ${{ coalesce(inputs.kumiki_publish_target, github.event.inputs.kumiki_publish_target, 'pypi') == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          repository-url: ${{ (inputs.kumiki_publish_target || github.event.inputs.kumiki_publish_target || 'pypi') == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
 
   publish_kigumi_vscode:
     name: Publish kigumi to VS Code Marketplace
     needs:
+      - resolve_tag
       - build_kigumi
     runs-on: ubuntu-latest
-    if: ${{ coalesce(inputs.kigumi_publish_vscode, github.event.inputs.kigumi_publish_vscode) && needs.resolve_tag.outputs.prefix == 'kigumi' }}
+    if: ${{ (inputs.kigumi_publish_vscode == true || github.event.inputs.kigumi_publish_vscode == 'true' || github.event_name == 'push') && needs.resolve_tag.outputs.prefix == 'kigumi' }}
     permissions:
       contents: read
 
@@ -188,7 +194,7 @@ jobs:
         shell: bash
         run: |
           EXTRA_ARGS=()
-          if [ "${{ coalesce(inputs.kigumi_prerelease, github.event.inputs.kigumi_prerelease, false) }}" = "true" ]; then
+          if [ "${{ inputs.kigumi_prerelease == true || github.event.inputs.kigumi_prerelease == 'true' }}" = "true" ]; then
             EXTRA_ARGS+=(--pre-release)
           fi
           npx @vscode/vsce publish --packagePath "${{ needs.build_kigumi.outputs.vsix_name }}" --pat "$VSCE_PAT" "${EXTRA_ARGS[@]}"
@@ -196,9 +202,10 @@ jobs:
   publish_kigumi_ovsx:
     name: Publish kigumi to Open VSX
     needs:
+      - resolve_tag
       - build_kigumi
     runs-on: ubuntu-latest
-    if: ${{ coalesce(inputs.kigumi_publish_ovsx, github.event.inputs.kigumi_publish_ovsx) && needs.resolve_tag.outputs.prefix == 'kigumi' }}
+    if: ${{ (inputs.kigumi_publish_ovsx == true || github.event.inputs.kigumi_publish_ovsx == 'true' || github.event_name == 'push') && needs.resolve_tag.outputs.prefix == 'kigumi' }}
     permissions:
       contents: read
 
@@ -220,7 +227,7 @@ jobs:
         shell: bash
         run: |
           EXTRA_ARGS=()
-          if [ "${{ coalesce(inputs.kigumi_prerelease, github.event.inputs.kigumi_prerelease, false) }}" = "true" ]; then
+          if [ "${{ inputs.kigumi_prerelease == true || github.event.inputs.kigumi_prerelease == 'true' }}" = "true" ]; then
             EXTRA_ARGS+=(--pre-release)
           fi
           npx ovsx publish "${{ needs.build_kigumi.outputs.vsix_name }}" --pat "$OVSX_PAT" "${EXTRA_ARGS[@]}"
@@ -229,22 +236,30 @@ jobs:
     name: Create GitHub Release
     needs:
       - resolve_tag
-    if: ${{
-      (needs.resolve_tag.outputs.prefix == 'kumiki' && coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release)) ||
-      (needs.resolve_tag.outputs.prefix == 'kigumi' && coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release))
-    }}
+      - build_kumiki
+      - build_kigumi
+    if: >-
+      ${{
+        !cancelled() && needs.resolve_tag.result == 'success' &&
+        (
+          (needs.resolve_tag.outputs.prefix == 'kumiki' &&
+           (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) ||
+          (needs.resolve_tag.outputs.prefix == 'kigumi' &&
+           (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))
+        )
+      }}
     runs-on: ubuntu-latest
 
     steps:
       - name: Download kumiki assets
-        if: ${{ needs.resolve_tag.outputs.prefix == 'kumiki' && coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release) }}
+        if: ${{ needs.resolve_tag.outputs.prefix == 'kumiki' && (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push') }}
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: kumiki-dist
 
       - name: Download kigumi assets
-        if: ${{ needs.resolve_tag.outputs.prefix == 'kigumi' && coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release) }}
+        if: ${{ needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push') }}
         uses: actions/download-artifact@v4
         with:
           name: kigumi-vsix
@@ -255,10 +270,10 @@ jobs:
         shell: bash
         run: |
           files=()
-          if [ "${{ coalesce(inputs.kumiki_release, github.event.inputs.kumiki_release) }}" = "true" ]; then
+          if [ "${{ inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push' }}" = "true" ] && [ -d kumiki-dist ]; then
             files+=("kumiki-dist/dist/*")
           fi
-          if [ "${{ coalesce(inputs.kigumi_release, github.event.inputs.kigumi_release) }}" = "true" ]; then
+          if [ "${{ inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push' }}" = "true" ] && [ -d kigumi-dist ]; then
             files+=("kigumi-dist/*.vsix")
           fi
           printf '%s\n' "${files[@]}" > release-files.txt

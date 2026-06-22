@@ -54,7 +54,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ coalesce(inputs.tag, github.event.inputs.tag, github.head_ref, github.ref_name) }}
+          ref: ${{ inputs.tag || github.event.inputs.tag || github.head_ref || github.ref_name }}
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v5
@@ -108,8 +108,8 @@ jobs:
     name: Publish To Index
     needs: build
     runs-on: ubuntu-latest
-    if: coalesce(inputs.publish, github.event.inputs.publish)
-    environment: ${{ coalesce(inputs.target, github.event.inputs.target) }}
+    if: ${{ inputs.publish == true || github.event.inputs.publish == 'true' }}
+    environment: ${{ inputs.target || github.event.inputs.target }}
     permissions:
       contents: read
       id-token: write
@@ -124,7 +124,7 @@ jobs:
       - name: Publish package
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          repository-url: ${{ coalesce(inputs.target, github.event.inputs.target) == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
+          repository-url: ${{ (inputs.target || github.event.inputs.target || 'pypi') == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}
 
   verify:
     name: Verify Published Package
@@ -132,7 +132,7 @@ jobs:
       - build
       - publish
     runs-on: ubuntu-latest
-    if: coalesce(inputs.publish, github.event.inputs.publish)
+    if: ${{ inputs.publish == true || github.event.inputs.publish == 'true' }}
 
     steps:
       - name: Set up Python
@@ -148,7 +148,7 @@ jobs:
             exit 1
           fi
 
-          if [ "${{ coalesce(inputs.target, github.event.inputs.target) }}" = "testpypi" ]; then
+          if [ "${{ inputs.target || github.event.inputs.target }}" = "testpypi" ]; then
             python -m pip install --upgrade pip
             python -m pip install \
               --index-url https://test.pypi.org/simple/ \
