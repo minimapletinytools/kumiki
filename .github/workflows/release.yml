@@ -113,6 +113,9 @@ jobs:
     needs: [resolve_tag]
     if: ${{ needs.resolve_tag.outputs.prefix == 'kumiki' && (github.event_name == 'push' || inputs.kumiki == true || github.event.inputs.kumiki == 'true' || inputs.kumiki_publish == true || github.event.inputs.kumiki_publish == 'true' || inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true') }}
     uses: ./.github/workflows/publish.yml
+    permissions:
+      contents: read
+      id-token: write
     with:
       target: ${{ inputs.kumiki_publish_target || github.event.inputs.kumiki_publish_target || 'pypi' }}
       publish: false
