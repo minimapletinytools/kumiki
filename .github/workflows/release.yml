@@ -136,8 +136,10 @@ jobs:
       - build_kumiki
     runs-on: ubuntu-latest
     if: ${{ (inputs.kumiki_publish == true || github.event.inputs.kumiki_publish == 'true' || github.event_name == 'push') && needs.resolve_tag.outputs.prefix == 'kumiki' }}
+    environment: ${{ inputs.kumiki_publish_target || github.event.inputs.kumiki_publish_target || 'pypi' }}
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Download kumiki artifacts
@@ -232,28 +234,14 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: dist
-          path: kumiki-dist
+          path: release-assets
 
       - name: Download kigumi assets
         if: ${{ needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push') }}
         uses: actions/download-artifact@v4
         with:
           name: kigumi-vsix
-          path: kigumi-dist
-
-      - name: Build release file list
-        id: files
-        shell: bash
-        run: |
-          files=()
-          if [ "${{ inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push' }}" = "true" ] && [ -d kumiki-dist ]; then
-            files+=("kumiki-dist/dist/*")
-          fi
-          if [ "${{ inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push' }}" = "true" ] && [ -d kigumi-dist ]; then
-            files+=("kigumi-dist/*.vsix")
-          fi
-          printf '%s\n' "${files[@]}" > release-files.txt
-          echo "files=$(python -c 'import json,sys; print(json.dumps([line.strip() for line in sys.stdin if line.strip()]))' < release-files.txt)" >> "$GITHUB_OUTPUT"
+          path: release-assets
 
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
@@ -261,8 +249,4 @@ jobs:
           tag_name: ${{ needs.resolve_tag.outputs.tag }}
           name: ${{ needs.resolve_tag.outputs.tag }}
           generate_release_notes: true
-          body: |
-            Release for tag ${{ needs.resolve_tag.outputs.tag }}.
-
-            This release contains the selected kumiki and/or kigumi artifacts.
-          files: ${{ fromJson(steps.files.outputs.files) }}
+          files: release-assets/*
