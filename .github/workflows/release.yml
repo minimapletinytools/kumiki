@@ -111,14 +111,7 @@ jobs:
   build_kumiki:
     name: Build Kumiki Package
     needs: [resolve_tag]
-    if: >-
-      ${{
-        needs.resolve_tag.outputs.prefix == 'kumiki' &&
-        (github.event_name == 'push' ||
-         inputs.kumiki == true || github.event.inputs.kumiki == 'true' ||
-         inputs.kumiki_publish == true || github.event.inputs.kumiki_publish == 'true' ||
-         inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true')
-      }}
+    if: ${{ needs.resolve_tag.outputs.prefix == 'kumiki' && (github.event_name == 'push' || inputs.kumiki == true || github.event.inputs.kumiki == 'true' || inputs.kumiki_publish == true || github.event.inputs.kumiki_publish == 'true' || inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true') }}
     uses: ./.github/workflows/publish.yml
     with:
       target: ${{ inputs.kumiki_publish_target || github.event.inputs.kumiki_publish_target || 'pypi' }}
@@ -128,15 +121,7 @@ jobs:
   build_kigumi:
     name: Build Kigumi Extension
     needs: [resolve_tag]
-    if: >-
-      ${{
-        needs.resolve_tag.outputs.prefix == 'kigumi' &&
-        (github.event_name == 'push' ||
-         inputs.kigumi == true || github.event.inputs.kigumi == 'true' ||
-         inputs.kigumi_publish_vscode == true || github.event.inputs.kigumi_publish_vscode == 'true' ||
-         inputs.kigumi_publish_ovsx == true || github.event.inputs.kigumi_publish_ovsx == 'true' ||
-         inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true')
-      }}
+    if: ${{ needs.resolve_tag.outputs.prefix == 'kigumi' && (github.event_name == 'push' || inputs.kigumi == true || github.event.inputs.kigumi == 'true' || inputs.kigumi_publish_vscode == true || github.event.inputs.kigumi_publish_vscode == 'true' || inputs.kigumi_publish_ovsx == true || github.event.inputs.kigumi_publish_ovsx == 'true' || inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true') }}
     uses: ./.github/workflows/publish-kigumi.yml
     with:
       target: both
@@ -238,16 +223,7 @@ jobs:
       - resolve_tag
       - build_kumiki
       - build_kigumi
-    if: >-
-      ${{
-        !cancelled() && needs.resolve_tag.result == 'success' &&
-        (
-          (needs.resolve_tag.outputs.prefix == 'kumiki' &&
-           (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) ||
-          (needs.resolve_tag.outputs.prefix == 'kigumi' &&
-           (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))
-        )
-      }}
+    if: ${{ !cancelled() && needs.resolve_tag.result == 'success' && ((needs.resolve_tag.outputs.prefix == 'kumiki' && (inputs.kumiki_release == true || github.event.inputs.kumiki_release == 'true' || github.event_name == 'push')) || (needs.resolve_tag.outputs.prefix == 'kigumi' && (inputs.kigumi_release == true || github.event.inputs.kigumi_release == 'true' || github.event_name == 'push'))) }}
     runs-on: ubuntu-latest
 
     steps:
