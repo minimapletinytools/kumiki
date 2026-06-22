@@ -1,0 +1,16 @@
+name: Test Minimal Reusable
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: false
+        type: string
+
+jobs:
+  build_kumiki:
+    uses: ./.github/workflows/publish.yml
+    with:
+      target: testpypi
+      publish: false
+      tag: ${{ inputs.tag }}
