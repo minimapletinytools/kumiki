@@ -351,7 +351,7 @@ describe('runner protocol', () => {
       expect(ready.type).toBe('ready');
 
       const projectRoot = path.resolve(__dirname, '..', '..');
-      const sourceFile = path.join(projectRoot, 'patterns', 'CSG_debug_examples.py');
+      const sourceFile = path.join(projectRoot, 'patterns', 'CSG_debug_patterns.py');
       const raise = await client.request('raise_specific_pattern', {
         slot: 'pattern_csg',
         sourceFile,
@@ -359,7 +359,7 @@ describe('runner protocol', () => {
       });
 
       expect(raise.ok).toBe(true);
-      expect(raise.result.patternName).toBe('halfspace_cut');
+      expect(raise.result.patternName).toBe('csg_debug/halfspace_cut');
       expect(raise.result.slot).toBe('pattern_csg');
       expect(raise.result.frame.timber_count).toBe(0);
       expect(raise.result.frame.accessories_count).toBeGreaterThan(0);

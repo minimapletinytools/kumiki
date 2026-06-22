@@ -367,21 +367,24 @@ describe('KigumiSidebarProvider', () => {
   });
 
   describe('patternbook click behavior', () => {
-    test('workspace patternbook parent node should open full patternbook', () => {
+    test('workspace patternbook nodes list individual patterns', () => {
       provider._state.workspacePatternbooks = [
         {
           filePath: '/ws/patterns/book.py',
           patternbookName: 'book',
-          patternNames: ['a', 'b'],
+          patterns: [
+            { path: 'a', tags: [] },
+            { path: 'b', tags: [] },
+          ],
         },
       ];
 
       const nodes = provider.getWorkspacePatternbookNodes();
-      expect(nodes).toHaveLength(1);
+      expect(nodes).toHaveLength(2);
       expect(nodes[0].command).toEqual({
-        title: 'Open patternbook',
+        title: 'Open pattern',
         command: 'kigumi.openPatternFromSidebar',
-        arguments: [{ sourceFile: '/ws/patterns/book.py', patternName: null }],
+        arguments: [{ sourceFile: '/ws/patterns/book.py', patternName: 'a' }],
       });
     });
 

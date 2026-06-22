@@ -1,4 +1,4 @@
-"""Test fixture: a module that exports a patternbook with two patterns."""
+"""Test fixture: a module that exports a patterns list with two patterns."""
 import sys
 from pathlib import Path
 
@@ -8,7 +8,7 @@ sys.path.insert(0, str(project_root))
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.timber import Frame, CutTimber
-from kumiki.patternbook import PatternBook, PatternMetadata, make_pattern_from_frame
+from kumiki.patternbook import Pattern, make_pattern_from_frame
 
 
 def _build_small_frame():
@@ -35,7 +35,7 @@ def _build_tall_frame():
     return Frame(name="Tall Pattern", cut_timbers=(CutTimber(timber=timber, cuts=()),), accessories=())
 
 
-patternbook = PatternBook(patterns=[
-    (PatternMetadata("small_post_pattern", ["test_group"]), make_pattern_from_frame(_build_small_frame)),
-    (PatternMetadata("tall_post_pattern", ["test_group"]), make_pattern_from_frame(_build_tall_frame)),
-])
+patterns = [
+    Pattern(path="small_post_pattern", lambda_=make_pattern_from_frame(_build_small_frame), tags=["test_group"]),
+    Pattern(path="tall_post_pattern", lambda_=make_pattern_from_frame(_build_tall_frame), tags=["test_group"]),
+]

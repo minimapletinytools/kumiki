@@ -7,7 +7,7 @@ sys.path.insert(0, str(project_root))
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.timber import Frame, add_milestone
-from patterns.basic_joints_examples import example_basic_butt_joint
+from patterns.basic_joints_patterns import example_basic_butt_joint
 
 
 def build_frame():
