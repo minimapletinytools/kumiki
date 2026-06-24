@@ -1,5 +1,6 @@
 from sympy import Rational
 from kumiki import *
+from kumiki.ticket import BoardTicket
 
 
 # Footprint: 3' wide (X) x 4' deep (Y)
@@ -223,7 +224,7 @@ def example() -> Frame:
     # 1/2" gap from the right post's inner face (symmetric placement)
     right_vert_x     = base_width - post_size[0] - inches(Rational(1, 2)) - door_stock[0] / 2
     right_vert_bot_z = beam_top_z + inches(2)
-    right_vert_len   = inches(58)
+    right_vert_len   = inches(64)
     door_right_vert = create_axis_aligned_timber(
         bottom_position=create_v3(right_vert_x, door_y, right_vert_bot_z),
         length=right_vert_len,
@@ -253,10 +254,164 @@ def example() -> Frame:
         ticket="Door Top Rail",
     )
 
-    door_pieces = [door_left_vert, door_right_vert, door_rail_bot, door_rail_top]
+    # ── Door mortise-and-tenon joints ─────────────────────────────────────────
+    # Tenon: 2" wide (in Z) × 1/4" thick (in Y, ≈ 1/3 of the 3/4" stock).
+    # Offset to the inside edge of each rail (the edge facing the door opening)
+    # so the mortise doesn't blow out the end of the vertical stock.
+    #   bottom rail: inside = top edge; tenon center = +0.75" in local X (+Z)
+    #   top rail:    inside = bottom edge; tenon center = -0.75" in local X (+Z)
+    door_tenon_size    = Matrix([inches(2), inches(Rational(1, 4))])
+    door_tenon_length  = inches(Rational(3, 2))   # 1.5" into the vertical piece
+    door_mortise_depth = inches(2)
 
-    return Frame.from_joints(all_joints, name="Oscar's Outdoor Shower",
-                             additional_unjointed_timbers=door_pieces)
+    door_tenon_pos_bot = Matrix([ inches(Rational(3, 4)), Rational(0)])
+    door_tenon_pos_top = Matrix([-inches(Rational(3, 4)), Rational(0)])
+
+    def door_joint(receiving, rail, end, tenon_pos):
+        return cut_mortise_and_tenon_joint_on_FAT(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=receiving,
+                butt_timber=rail,
+                butt_timber_end=end,
+                front_face_on_butt_timber=None,
+            ),
+            tenon_size=door_tenon_size,
+            tenon_length=door_tenon_length,
+            mortise_depth=door_mortise_depth,
+            tenon_position=tenon_pos,
+        )
+
+    j_door_bot_left  = door_joint(door_left_vert,  door_rail_bot, TimberReferenceEnd.BOTTOM, door_tenon_pos_bot)
+    j_door_bot_right = door_joint(door_right_vert, door_rail_bot, TimberReferenceEnd.TOP,    door_tenon_pos_bot)
+    j_door_top_left  = door_joint(door_left_vert,  door_rail_top, TimberReferenceEnd.BOTTOM, door_tenon_pos_top)
+    j_door_top_right = door_joint(door_right_vert, door_rail_top, TimberReferenceEnd.TOP,    door_tenon_pos_top)
+
+    # ── Door hinge joints ─────────────────────────────────────────────────────
+    # Round 1" pivot tenon on the top and bottom of the left vertical stile.
+    # mortise_shoulder_distance_from_centerline = beam/plate half-depth + 1/4" gap:
+    #   bottom: shoulder 1/4" above beam top face  → +3" from beam centerline
+    #   top:    shoulder 1/4" below plate bot face → -3" from plate centerline
+    hinge_clearance    = member_size[0] / 2 + inches(Rational(1, 4))  # 2.75" + 0.25" = 3"
+    hinge_tenon_length = inches(Rational(3, 2))   # 1.5" pivot depth
+    hinge_mortise_depth = hinge_tenon_length
+    hinge_diameter = inches(Rational(3, 5))
+
+    hinge_bot = cut_round_mortise_and_tenon_joint(
+        arrangement=ButtJointTimberArrangement(
+            receiving_timber=beam_front,
+            butt_timber=door_left_vert,
+            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            front_face_on_butt_timber=None,
+        ),
+        diameter=hinge_diameter,
+        tenon_length=hinge_tenon_length,
+        mortise_depth=hinge_mortise_depth,
+        mortise_shoulder_distance_from_centerline=hinge_clearance,
+    )
+
+    hinge_top = cut_round_mortise_and_tenon_joint(
+        arrangement=ButtJointTimberArrangement(
+            receiving_timber=top_plate_front,
+            butt_timber=door_left_vert,
+            butt_timber_end=TimberReferenceEnd.TOP,
+            front_face_on_butt_timber=None,
+        ),
+        diameter=hinge_diameter,
+        tenon_length=hinge_tenon_length,
+        mortise_depth=hinge_mortise_depth,
+        mortise_shoulder_distance_from_centerline=hinge_clearance,
+    )
+
+    # ── Wall boards ───────────────────────────────────────────────────────────
+    # 3/4"-thick horizontal boards fill the left, right, and back walls.
+    # Each end extends 3/8" into a vertical groove in the corner posts (housed joint).
+    # Adjacent boards overlap 1/4" for tongue-and-groove joints.
+    # Board width is solved so N boards fill each wall height exactly.
+    post_housing_depth = inches(Rational(3, 8))
+    tongue_depth_tg    = inches(Rational(1, 4))
+    tongue_width_tg    = inches(Rational(1, 4))
+    board_thickness_w  = inches(Rational(3, 4))
+
+    side_girt_bot_z  = side_girt_height - member_size[0] / 2
+    back_plate_bot_z = top_plate_back_height - member_size[0] / 2
+
+    side_wall_fill = side_girt_bot_z - beam_top_z   # 75.25"
+    back_wall_fill = back_plate_bot_z - beam_top_z  # 81.75"
+
+    N_side = 11   # ≈7.07" per board
+    N_back = 12   # ≈7.04" per board
+    board_width_side = (side_wall_fill + (N_side - 1) * tongue_depth_tg) / N_side
+    board_width_back = (back_wall_fill + (N_back - 1) * tongue_depth_tg) / N_back
+
+    side_board_len = base_depth - 2 * post_size[1] + 2 * post_housing_depth  # 41.75"
+    back_board_len = base_width - 2 * post_size[0] + 2 * post_housing_depth  # 29.75"
+
+    board_size_side = create_v2(board_width_side, board_thickness_w)
+    board_size_back = create_v2(board_width_back, board_thickness_w)
+
+    # Orientations: local Z = board length direction, local X = board height (+Z global)
+    #   side walls: local Z = +Y, local X = +Z, local Y = +X
+    #   back wall:  local Z = +X, local X = +Z, local Y = -Y
+    orient_side = Orientation.from_z_and_x(Matrix([0, 1, 0]), Matrix([0, 0, 1]))
+    orient_back = Orientation.from_z_and_x(Matrix([1, 0, 0]), Matrix([0, 0, 1]))
+
+    def make_wall_boards(N, bw, blen, bsize, orient, px, py, prefix):
+        """Stack N boards in global Z. px/py = Board transform.position x and y."""
+        bds = []
+        for i in range(N):
+            z = beam_top_z + bw / 2 + i * (bw - tongue_depth_tg)
+            bds.append(Board(
+                length=blen,
+                size=bsize,
+                transform=Transform(position=create_v3(px, py, z), orientation=orient),
+                ticket=BoardTicket(name=f"{prefix} {i + 1}"),
+            ))
+        return bds
+
+    # Side wall boards: px = post center X (board centered in post depth),
+    #                  py = post front-face Y minus housing_depth (board front-end Y)
+    left_wall_boards = make_wall_boards(
+        N_side, board_width_side, side_board_len, board_size_side, orient_side,
+        px=post_size[0] / 2, py=post_size[1] - post_housing_depth, prefix="Left Wall Board",
+    )
+    right_wall_boards = make_wall_boards(
+        N_side, board_width_side, side_board_len, board_size_side, orient_side,
+        px=base_width - post_size[0] / 2, py=post_size[1] - post_housing_depth,
+        prefix="Right Wall Board",
+    )
+    # Back wall boards: px = post front-face X minus housing_depth (board left-end X),
+    #                  py = back-post center Y (board centered in post depth)
+    back_wall_boards = make_wall_boards(
+        N_back, board_width_back, back_board_len, board_size_back, orient_back,
+        px=post_size[0] - post_housing_depth, py=base_depth - post_size[1] / 2,
+        prefix="Back Wall Board",
+    )
+
+    wall_tg_joints = [
+        cut_tongue_and_groove_joint(
+            tongue_board=wall[i], groove_board=wall[i + 1],
+            tongue_depth=tongue_depth_tg, tongue_width=tongue_width_tg,
+        )
+        for wall in (left_wall_boards, right_wall_boards, back_wall_boards)
+        for i in range(len(wall) - 1)
+    ]
+    wall_housing_joints = [
+        cut_free_house_joint(housing_timber=post, housed_timber=board)
+        for wall, posts in (
+            (left_wall_boards,  [post_front_left,  post_back_left]),
+            (right_wall_boards, [post_front_right, post_back_right]),
+            (back_wall_boards,  [post_back_left,   post_back_right]),
+        )
+        for board in wall for post in posts
+    ]
+
+    return Frame.from_joints(
+        all_joints
+        + [j_door_bot_left, j_door_bot_right, j_door_top_left, j_door_top_right,
+           hinge_bot, hinge_top]
+        + wall_tg_joints + wall_housing_joints,
+        name="Oscar's Outdoor Shower",
+    )
 
 
 if __name__ == "__main__":
