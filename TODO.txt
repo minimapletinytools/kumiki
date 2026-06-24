@@ -14,7 +14,7 @@ And of course 4x4s are actually 3.5"x3.5" so let's make sure the agent knows wha
 
 BTW, there are many approaches you can take to prompt the agent, and you might find some more effective than others.
 
-"next we'll want to join the posts using 4x6s (3.5x5.5) floor beams such that there is a 3" gap between the bottom of the beam and the floor"
+"next we'll want to join the posts using 4x6s (3.5x5.5) floor beams such that there is a 3" gap between the bottom of the beam and the floor, the 5.5 size is in the vertical axis"
 
 Now kumiki is written with timber framing terminology, and using this terminology can help the agent better understand what you're wanting.
 
