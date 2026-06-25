@@ -85,6 +85,8 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 DONE-make the refresh button more prominent in the viewer itself
 DONE-add left click to drag option (only when not clicking on frame obviously)
 DONE/IGNORE-if minor version mismatch, kigumi should show incompatible version for kumiki, upgrade requried
+
+-claude code edits don't get picked up by file scanning in kumiki...
 -rename _on_FAT/PAT to be explicit
 -update instructions to have agent prefer _on_FAT/PAT variant when appropriate, and then also update instructions to use basic variants
 -updtae instructions to explain that tenons should be cut longer in the length direction of the mortise timber...
