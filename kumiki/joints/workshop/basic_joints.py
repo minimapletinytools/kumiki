@@ -1,10 +1,10 @@
 """
 Kumiki - Basic joint construction functions
 
-Convenience wrappers (cut_basic_*) that call the underlying joint functions with
-sensible default sizing. Use these for quick prototyping; for full control over
-dimensions and parameters, call the underlying cut_plain_*, cut_mortise_and_tenon_*,
-or cut_lapped_* functions directly.
+Convenience wrappers (cut_basic_* and cut_basic_plain_*) that call the underlying
+joint functions with sensible default sizing. Use these for quick prototyping; for
+full control over dimensions and parameters, call the underlying cut_plain_*,
+cut_mortise_and_tenon_*, or cut_lapped_* functions directly.
 """
 
 from dataclasses import replace
@@ -65,7 +65,7 @@ def safe_transform_vector(*args, **kwargs):
 # Plain Joint Wrappers
 # ============================================================================
 
-def cut_basic_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
+def cut_basic_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     """
     Creates a miter joint between two timbers, cutting each end at half the angle between them.
 
@@ -80,7 +80,7 @@ def cut_basic_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     return cut_plain_miter_joint(arrangement)
 
 
-def cut_basic_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint:
+def cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint:
     """
     Creates a miter joint between two face-aligned timbers meeting at a 90-degree corner.
 
@@ -169,7 +169,7 @@ def cut_basic_tongue_and_fork_butt_joint(
     )
 
 
-def cut_basic_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
+def cut_basic_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
     """
     Creates a butt joint where the butt timber is cut flush with the receiving timber's face.
 
@@ -186,7 +186,7 @@ def cut_basic_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
     return cut_plain_butt_joint(arrangement)
 
 
-def cut_basic_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint:
+def cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArrangement) -> Joint:
     """
     Creates a butt joint where the butt timber is cut flush with the receiving timber's face.
 
@@ -204,7 +204,7 @@ def cut_basic_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArr
     return cut_plain_butt_joint_on_face_aligned_timbers(arrangement)
 
 
-def cut_basic_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint:
+def cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimberArrangement) -> Joint:
     """
     Creates a plain butt splice joint between two parallel timbers cut at a shared plane.
 
@@ -222,7 +222,7 @@ def cut_basic_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     return cut_plain_butt_splice_joint_on_aligned_timbers(arrangement)
 
 
-def cut_basic_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint:
+def cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """
     Creates a cross-lap joint between two intersecting timbers with equal material removal.
 
@@ -240,7 +240,7 @@ def cut_basic_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint
     return cut_plain_cross_lap_joint(arrangement)
 
 
-def cut_basic_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
+def cut_basic_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """
     Creates a house (dado/housing) joint where the housing timber is notched to receive the housed timber.
 
@@ -339,7 +339,7 @@ def cut_basic_splined_opposing_double_butt_joint(
     )
 
 
-def cut_basic_splice_lap_joint_on_aligned_timbers(
+def cut_basic_plain_splice_lap_joint_on_aligned_timbers(
     arrangement: SpliceJointTimberArrangement,
 ) -> Joint:
     """

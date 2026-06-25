@@ -432,7 +432,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
     )
     
     # Plain miter joint between the two corner timbers
-    miter_joint = cut_basic_miter_joint(
+    miter_joint = cut_basic_plain_miter_joint(
         CornerJointTimberArrangement(
             timber1=timber1,
             timber2=timber2,

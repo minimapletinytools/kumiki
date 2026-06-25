@@ -30,7 +30,7 @@ stable public API.
 **Importing from workshop:**
 
 ```python
-from kumiki.joints.workshop.basic_joints import cut_basic_butt_joint
+from kumiki.joints.workshop.basic_joints import cut_basic_plain_butt_joint
 from kumiki.joints.workshop.mortise_and_tenon_joint import cut_mortise_and_tenon_joint_on_face_aligned_timbers
 ```
 

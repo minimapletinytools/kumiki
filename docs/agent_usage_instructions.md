@@ -64,7 +64,7 @@ Timbers for a typical structure are usually defined
 
 Once timbers have been laid out, use the various `cut_*` methods to cut joints joining the timbers. There are many types of joints.
 
-Almost all joints have a `cut_basic_*` variation inside of basic_joints.py which take minimal parameters. Always use the basic variants until the user provides specific requirements.
+Most plain joints have a `cut_basic_plain_*` variation inside of basic_joints.py which take minimal parameters. Always use the basic variants until the user provides specific requirements.
 
 ### finding joint parameters
 
@@ -75,7 +75,7 @@ Joint parameters are always set relative to one of the features on one of the ti
 If the user does not specify which joint, use the following (or one of its variants) as defaults:
 
 - for butt joints use cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers
-- for corner joints use cut_basic_miter_joint or cut_plain_corner_lap_joint
+- for corner joints use cut_basic_plain_miter_joint or cut_plain_corner_lap_joint
 - for splice joint use cut_basic_plain_splice_lap_joint_on_aligned_timbers
 - for cross joints use cut_basic_plain_cross_lap_joint
 

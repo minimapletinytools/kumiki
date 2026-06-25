@@ -12,15 +12,15 @@ from kumiki.timber import (
 )
 from kumiki.ticket import Ticket
 from kumiki.joints.workshop.basic_joints import (
-    cut_basic_miter_joint,
-    cut_basic_miter_joint_on_face_aligned_timbers,
+    cut_basic_plain_miter_joint,
+    cut_basic_plain_miter_joint_on_face_aligned_timbers,
     cut_basic_tongue_and_fork_corner_joint,
-    cut_basic_butt_joint_on_face_aligned_timbers,
-    cut_basic_butt_splice_joint_on_aligned_timbers,
-    cut_basic_cross_lap_joint,
-    cut_basic_house_joint,
+    cut_basic_plain_butt_joint_on_face_aligned_timbers,
+    cut_basic_plain_butt_splice_joint_on_aligned_timbers,
+    cut_basic_plain_cross_lap_joint,
+    cut_basic_plain_house_joint,
     cut_basic_splined_opposing_double_butt_joint,
-    cut_basic_splice_lap_joint_on_aligned_timbers,
+    cut_basic_plain_splice_lap_joint_on_aligned_timbers,
     cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_basic_lapped_gooseneck_joint,
     cut_basic_housed_dovetail_butt_joint,
@@ -46,7 +46,7 @@ def example_basic_miter_joint(position=None):
         position = create_v3(0, 0, 0)
     
     arrangement = create_canonical_example_right_angle_corner_joint_timbers(position)
-    joint = cut_basic_miter_joint(arrangement)
+    joint = cut_basic_plain_miter_joint(arrangement)
     
     return joint
 
@@ -59,7 +59,7 @@ def example_basic_miter_joint_face_aligned(position=None):
         position = create_v3(0, 0, 0)
     
     arrangement = create_canonical_example_right_angle_corner_joint_timbers(position)
-    joint = cut_basic_miter_joint_on_face_aligned_timbers(arrangement)
+    joint = cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement)
     
     return joint
 
@@ -85,7 +85,7 @@ def example_basic_butt_joint(position=None):
         position = create_v3(0, 0, 0)
     
     arrangement = create_canonical_example_butt_joint_timbers(position)
-    joint = cut_basic_butt_joint_on_face_aligned_timbers(arrangement)
+    joint = cut_basic_plain_butt_joint_on_face_aligned_timbers(arrangement)
     
     return joint
 
@@ -98,7 +98,7 @@ def example_basic_butt_splice_joint(position=None):
         position = create_v3(0, 0, 0)
     
     arrangement = create_canonical_example_splice_joint_timbers(position)
-    joint = cut_basic_butt_splice_joint_on_aligned_timbers(arrangement)
+    joint = cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement)
     
     return joint
 
@@ -111,7 +111,7 @@ def example_basic_cross_lap_joint(position=None):
         position = create_v3(0, 0, 0)
     
     arrangement = create_canonical_example_cross_joint_timbers(position=position)
-    joint = cut_basic_cross_lap_joint(arrangement)
+    joint = cut_basic_plain_cross_lap_joint(arrangement)
     
     return joint
 
@@ -125,7 +125,7 @@ def example_basic_house_joint(position=None):
     
     # TODO offset
     arrangement = create_canonical_example_cross_joint_timbers(position=position, lateral_offset=inches(2))
-    joint = cut_basic_house_joint(arrangement)
+    joint = cut_basic_plain_house_joint(arrangement)
     
     return joint
 
@@ -155,7 +155,7 @@ def example_basic_splice_lap_joint(position=None):
 
     from kumiki.construction import SpliceJointTimberArrangement
     arrangement = create_canonical_example_splice_joint_timbers(position)
-    joint = cut_basic_splice_lap_joint_on_aligned_timbers(
+    joint = cut_basic_plain_splice_lap_joint_on_aligned_timbers(
         SpliceJointTimberArrangement(
             timber1=arrangement.timber1,
             timber2=arrangement.timber2,

@@ -9,7 +9,7 @@ All dimensions use exact SymPy Rational values through helper unit functions.
 """
 
 from kumiki import *
-from kumiki.joints.workshop.basic_joints import cut_basic_miter_joint
+from kumiki.joints.workshop.basic_joints import cut_basic_plain_miter_joint
 
 
 # -----------------------------------------------------------------------------
@@ -122,7 +122,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
     joints: list[Joint] = []
 
     # Apex A-joints: one miter at the top of each side frame (acute angle points to TOP/+Z).
-    left_apex_joint = cut_basic_miter_joint(
+    left_apex_joint = cut_basic_plain_miter_joint(
         CornerJointTimberArrangement(
             timber1=left_front_rail,
             timber2=left_back_rail,
@@ -131,7 +131,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
         )
     )
 
-    right_apex_joint = cut_basic_miter_joint(
+    right_apex_joint = cut_basic_plain_miter_joint(
         CornerJointTimberArrangement(
             timber1=right_front_rail,
             timber2=right_back_rail,

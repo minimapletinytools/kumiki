@@ -1098,7 +1098,7 @@ DONE-rewrite all joint tests, they are all kinda messed up tbh
     -delete test relying on get_end_position
   DONE-house joint
     -add test using contains_point
-  DONE-cut_basic_cross_lap_joint
+  DONE-cut_basic_plain_cross_lap_joint
     -TODO
 
 DONE-improve tests
