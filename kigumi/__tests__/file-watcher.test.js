@@ -429,7 +429,7 @@ describe('FileWatcher', () => {
   });
 
   describe('enable/disable', () => {
-    test('should ignore file changes while disabled', () => {
+    test('should still notify on file changes while disabled', () => {
       const callback = jest.fn();
       const watcher = new FileWatcher('/path/to/example.py', null, callback);
       watcher.start({ enabled: false });
@@ -438,7 +438,7 @@ describe('FileWatcher', () => {
       exampleWatcher._onDidChange();
       jest.advanceTimersByTime(300);
 
-      expect(callback).not.toHaveBeenCalled();
+      expect(callback).toHaveBeenCalledWith('example file');
     });
 
     test('should process file changes after re-enabled', () => {

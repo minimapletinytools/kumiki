@@ -89,11 +89,9 @@ DONE-updtae instructions to explain that tenons should be cut longer in the leng
 DONE-rename _on_FAT/PAT to be explicit
 DONE-update instructions to have agent prefer _on_FAT/PAT variant when appropriate,
 DONE-update instructions to prefer basic joint variants
--claude code edits don't get picked up by file scanning in kumiki...
+DONE/IGNORE-website should say install one of uv (preferred)
+DONE-claude code edits don't get picked up by file scanning in kumiki...
 
-
-
--website should say install one of uv (preferred)
 -do setup vid
 -do shower vid
 -do example cleanup
@@ -111,14 +109,13 @@ DONE-update instructions to prefer basic joint variants
   -make some content drip
 -stuff to test
   -test the install cadquery stuff 
-  -test export step and export STL combined/inidivdual again
-  -test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
+  DONE-test export step and export STL combined/inidivdual again
+  DONE-test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
 
 
 
 
 
--what is "paternbook_exmaple" and why is it broken?
 -improve erroring on initialize due to missing deps
 -add support for actual AABB render mode
   -BUG figure out why box view doesn't render right for the gooseneck, end cut is correct

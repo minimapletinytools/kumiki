@@ -153,11 +153,6 @@ class FileWatcher {
             return;
         }
 
-        if (!this.isEnabled) {
-            this.logChange(`Ignoring ${source} event because auto refresh is disabled`);
-            return;
-        }
-
         if (this.debounceTimer !== null) {
             this.logChange(`Coalescing additional ${source} event into pending reload`);
             clearTimeout(this.debounceTimer);
@@ -165,7 +160,11 @@ class FileWatcher {
 
         this.debounceTimer = setTimeout(() => {
             if (!this.isDisposed && this.onChangeCallback) {
-                this.logChange(`Firing reload callback for ${source}`);
+                this.logChange(
+                    this.isEnabled
+                        ? `Firing reload callback for ${source}`
+                        : `Firing reload callback for ${source} while auto refresh is disabled`
+                );
                 this.onChangeCallback(source);
             }
             this.debounceTimer = null;
