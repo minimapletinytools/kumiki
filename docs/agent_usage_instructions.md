@@ -75,9 +75,11 @@ Joint parameters are always set relative to one of the features on one of the ti
 If the user does not specify which joint, use the following (or one of its variants) as defaults:
 
 - for butt joints use cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers
-- for corner joints use cut_plain_miter_joint or cut_plain_corner_lap_joint
-- for splice joint use cut_plain_splice_lap_joint_on_aligned_timbers
-- for cross joints use cut_plain_cross_lap_joint
+- for corner joints use cut_basic_miter_joint or cut_plain_corner_lap_joint
+- for splice joint use cut_basic_plain_splice_lap_joint_on_aligned_timbers
+- for cross joints use cut_basic_plain_cross_lap_joint
+
+The basic variants of all joints provide sensible defaults for most parameters. If there are specific needs that aren't met by the defaults, use the non basic variants next, and then finally explore using other joints all together.
 
 ### default joints for timber frames
 
