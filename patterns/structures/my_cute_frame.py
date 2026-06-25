@@ -82,7 +82,7 @@ def build_frame() -> Frame:
     )
 
     def mortise_into_side(cross, cross_end, side):
-        return cut_mortise_and_tenon_joint_on_FAT(
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=side,
                 butt_timber=cross,

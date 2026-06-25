@@ -91,7 +91,7 @@ def locate_pat_shoulder_plane_from_centerline_to_reference_face(
     """
     Compute a shoulder plane on `shoulder_timber` using a face plane on `reference_timber`.
 
-    This helper assumes a plane-aligned arrangement (PAT-style usage). It scribes the
+    This helper assumes a plane-aligned arrangement. It scribes the
     reference face plane onto the shoulder timber centerline, then returns the timber
     cross-section plane at that mark (normal = shoulder timber length direction).
 

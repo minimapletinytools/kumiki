@@ -553,7 +553,7 @@ def cut_mortise_and_tenon_joint(
     Creates a mortise and tenon joint with full control over all parameters.
 
     This is the generic implementation used by all specialized variants
-    (`cut_mortise_and_tenon_joint_on_PAT`, `cut_mortise_and_tenon_joint_on_FAT`).
+    (`cut_mortise_and_tenon_joint_on_plane_aligned_timbers`, `cut_mortise_and_tenon_joint_on_face_aligned_timbers`).
     Prefer those variants for common cases.
 
     Args:
@@ -944,7 +944,7 @@ def cut_mortise_and_tenon_joint(
     )
 
 
-def cut_mortise_and_tenon_joint_on_PAT(
+def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tenon_size: V2,
     tenon_length: Numeric,
@@ -957,10 +957,10 @@ def cut_mortise_and_tenon_joint_on_PAT(
     use_round_tenon: bool = False,
 ) -> Joint:
     """
-    Creates a mortise and tenon joint for plane-aligned timbers (PAT).
+    Creates a mortise and tenon joint for plane-aligned timbers.
 
-    PAT (plane-aligned timbers) means both timbers lie in the same plane. The timbers may
-    meet at any angle — use `cut_mortise_and_tenon_joint_on_FAT` for the standard 90-degree
+    Plane-aligned timbers means both timbers lie in the same plane. The timbers may
+    meet at any angle — use `cut_mortise_and_tenon_joint_on_face_aligned_timbers` for the standard 90-degree
     case.
 
     Like the generic `cut_mortise_and_tenon_joint`, but accepts `mortise_shoulder_inset`
@@ -1023,7 +1023,7 @@ def cut_mortise_and_tenon_joint_on_PAT(
 
 
 
-def cut_mortise_and_tenon_joint_on_FAT(
+def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tenon_size: V2,
     tenon_length: Numeric,
@@ -1035,14 +1035,14 @@ def cut_mortise_and_tenon_joint_on_FAT(
     use_round_tenon: bool = False,
 ) -> Joint:
     """
-    Creates a mortise and tenon joint for face-aligned orthogonal timbers (FAT).
+    Creates a mortise and tenon joint for face-aligned orthogonal timbers.
 
-    FAT (face-aligned and orthogonal timbers) means both timbers are face-aligned
+    Face-aligned orthogonal timbers means both timbers are face-aligned
     (orientations related by 90-degree rotations) and their length axes are perpendicular.
     This is the standard configuration for timber-frame T-joints and corners. For angled
-    joints in the same plane, use `cut_mortise_and_tenon_joint_on_PAT`.
+    joints in the same plane, use `cut_mortise_and_tenon_joint_on_plane_aligned_timbers`.
 
-    This is a stricter variant of `cut_mortise_and_tenon_joint_on_PAT` that enforces
+    This is a stricter variant of `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` that enforces
     perpendicularity and does not support crop_tenon_to_mortise_orientation_on_angled_joints.
 
     Args:
@@ -1067,7 +1067,7 @@ def cut_mortise_and_tenon_joint_on_FAT(
 
     require_check(arrangement.check_face_aligned_and_orthogonal())
 
-    return cut_mortise_and_tenon_joint_on_PAT(
+    return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tenon_size=tenon_size,
         tenon_length=tenon_length,
@@ -1114,7 +1114,7 @@ def cut_round_mortise_and_tenon_joint(
     )
 
 
-def cut_round_mortise_and_tenon_joint_on_PAT(
+def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     diameter: Numeric,
     tenon_length: Numeric,
@@ -1122,7 +1122,7 @@ def cut_round_mortise_and_tenon_joint_on_PAT(
     mortise_shoulder_inset: Numeric = Rational(0),
 ) -> Joint:
     """
-    Creates a simplified round mortise and tenon joint for plane-aligned timbers (PAT).
+    Creates a simplified round mortise and tenon joint for plane-aligned timbers.
 
     This is a convenience wrapper around `cut_mortise_and_tenon_joint` for
     round tenon use cases with a single diameter parameter.
@@ -1218,7 +1218,8 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
 
     # Convert the user-facing `mortise_shoulder_inset` (measured inward from the mortise
     # entry face) into the signed-from-centerline distance that `compute_butt_joint_shoulder`
-    # expects. This mirrors how `cut_mortise_and_tenon_joint_on_PAT/FAT` handle the inset.
+    # expects. This mirrors how `cut_mortise_and_tenon_joint_on_plane_aligned_timbers`
+    # and `cut_mortise_and_tenon_joint_on_face_aligned_timbers` handle the inset.
     tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
     mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction

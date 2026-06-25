@@ -151,7 +151,7 @@ def example() -> Frame:
     tenon_pos_offset  = Matrix([inches(Rational( 1, 4)), Rational(0)])
 
     def fat_joint(receiving, butt, end, face, tenon_pos=None):
-        return cut_mortise_and_tenon_joint_on_FAT(
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=receiving,
                 butt_timber=butt,
@@ -268,7 +268,7 @@ def example() -> Frame:
     door_tenon_pos_top = Matrix([-inches(Rational(3, 4)), Rational(0)])
 
     def door_joint(receiving, rail, end, tenon_pos):
-        return cut_mortise_and_tenon_joint_on_FAT(
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=receiving,
                 butt_timber=rail,

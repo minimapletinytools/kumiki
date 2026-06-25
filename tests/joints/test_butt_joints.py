@@ -271,8 +271,8 @@ from kumiki.joints.workshop.shavings.build_a_butt import (
 )
 from kumiki.joints.workshop.butt_joints import (
     WedgeParameters,
-    cut_mortise_and_tenon_joint_on_FAT,
-    cut_mortise_and_tenon_joint_on_PAT,
+    cut_mortise_and_tenon_joint_on_face_aligned_timbers,
+    cut_mortise_and_tenon_joint_on_plane_aligned_timbers,
 )
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -379,7 +379,7 @@ class TestMortiseAndTenonGeometry:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=None,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=tenon_length,
@@ -433,7 +433,7 @@ class TestMortiseAndTenonGeometry:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=None,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -499,7 +499,7 @@ class TestPegStuff:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -559,7 +559,7 @@ class TestPegStuff:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -642,7 +642,7 @@ class TestPegStuff:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -692,7 +692,7 @@ class TestPegStuff:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -731,7 +731,7 @@ class TestPegStuff:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
-        joint_with_offset = cut_mortise_and_tenon_joint_on_FAT(
+        joint_with_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -748,7 +748,7 @@ class TestPegStuff:
             tenon_hole_offset=Rational(0)
         )
         
-        joint_no_offset = cut_mortise_and_tenon_joint_on_FAT(
+        joint_no_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -791,7 +791,7 @@ class TestPegStuff:
             butt_timber_end=TimberReferenceEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         )
-        joint = cut_mortise_and_tenon_joint_on_PAT(
+        joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([inches(2), inches(2)]),
             tenon_length=inches(4),
@@ -831,7 +831,7 @@ class TestMortiseAndTenonCSGHierarchy:
             butt_timber=tenon_timber,
             butt_timber_end=TimberReferenceEnd.BOTTOM,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),
@@ -872,7 +872,7 @@ class TestMortiseAndTenonCSGHierarchy:
             butt_timber=tenon_timber,
             butt_timber_end=TimberReferenceEnd.BOTTOM,
         )
-        joint = cut_mortise_and_tenon_joint_on_FAT(
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
             tenon_size=Matrix([Rational(2), Rational(2)]),
             tenon_length=Rational(4),

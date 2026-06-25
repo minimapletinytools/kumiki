@@ -21,7 +21,7 @@ from .butt_joints import (
     cut_plain_butt_joint,
     cut_plain_butt_joint_on_face_aligned_timbers,
     cut_tongue_and_fork_butt_joint,
-    cut_mortise_and_tenon_joint_on_FAT,
+    cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_housed_dovetail_butt_joint,
 )
 from .splice_joints import (
@@ -382,7 +382,7 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
 
     Tenon dimensions are derived automatically: 3/4 of the mortise timber's relevant depth for
     the height and 1/3 of its face width for the width. Tenon length equals the full width of the
-    mortise timber. For full control over sizing, use `cut_mortise_and_tenon_joint_on_FAT` directly.
+    mortise timber. For full control over sizing, use `cut_mortise_and_tenon_joint_on_face_aligned_timbers` directly.
 
     Args:
         tenon_timber: The timber that will receive the tenon cut.
@@ -434,7 +434,7 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
         butt_timber_end=tenon_end,
         front_face_on_butt_timber=front_face_on_butt_timber,
     )
-    return cut_mortise_and_tenon_joint_on_FAT(
+    return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
         tenon_size=tenon_size,
         tenon_length=tenon_length,

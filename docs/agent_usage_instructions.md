@@ -158,6 +158,11 @@ Common automation loop example:
 
 # Common Design Patterns
 
+## locating (measuring) and marking
+
+Use methods in measuring.py to convert "locations" measured relative from one timber into "markings" on another timber which can then return measurements relative to any feature of that timber.
+This is very useful as many functions take input parameters in local space of one timber, but we may want to take those measurements from another timber.
+
 ## splicing patterns
 
 When members exceed a certain length it may be desireable to splice the member for the following reasons:
@@ -182,6 +187,29 @@ Here are some typical guidelines:
 - use `cut_plain_butt_splice_joint_on_aligned_timbers` as a placeholder in other scenarios until more splice joint types are added
     - otherwise never use `cut_plain_butt_splice_joint_on_aligned_timbers` as it resists no loads whatsoever
 
+## mortise and tenon joint patterns
+
+### tenon sizing
+
+As a general rule of thumb, the tenon should be 1/3 the width of the face its entering into in the mortise timber. The height (the axis that aligns with the length axis of the mortise timber) should be slightly less than the height or width (depending on orientation) of the tenon timber. Bigger tenons are stronger and making it slightly smaller creates a nice lip on the shoulder that looks nicer.
+
+### tenon positioning
+
+Although tenon position argument is specified in the tenon timber's local coordinates, it is often desireable to position the tenon in the mortise timbers coordinate as the positioning of the mortise hole is more structurally impactful. In general
+
+1. if the tenon timber is roughly in the middle (in both length and width) of the mortise timber, just set the tenon to be located at 0,0 for simplicity
+2. if the tenon is off to the side width wise (as in, in the orthogonal direction to centerline of the mortise timber), locate the tenon to be at the centerline of the mortise timber 
+3. if teh tenon is off to the end of the mortise timber, locate the tenon as far away from the end as possible to prevent the mortise from blowing out at the end
+
+If you need to position the mortise from a long face of the mortise timber, you can using measuring.py to locate a distance away from the long face (locate_into_face) on the mortise timber and then mark it onto the tenon timber (mark_plane_from_edge_in_direction) which can then be used to get the relative measurement needed by the joint function.
+
+### double, triple and quadruple mortise and tenon joints
+
+A mortise timber may have several mortise and tenon joints coming into it from different faces. We need to be careful so that the tenon geometry does not intersect in the timber. There are a few ways to deal with this:
+
+- Sometimes, there is enough space to offset the tenons in the length axis of the mortise timber to prevent them from intersecting
+- You can make the tenon shorter so that they don't intersect, but there may not be enough space for pegs in this case
+- You can use specialized double/triple/quadruple butt joints that are designed specifically for this purpose, but these joints are more complicated
 
 ## structure patterns
 

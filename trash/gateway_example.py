@@ -409,7 +409,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         )
 
     def _beam_to_post_joint(beam: Timber, beam_end: TimberReferenceEnd, post: Timber) -> Joint:
-        return cut_mortise_and_tenon_joint_on_FAT(
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=post,
                 butt_timber=beam,
@@ -423,7 +423,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         )
 
     def _beam_to_plate_joint(beam: Timber, beam_end: TimberReferenceEnd, plate: Timber) -> Joint:
-        return cut_mortise_and_tenon_joint_on_FAT(
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=plate,
                 butt_timber=beam,
@@ -437,7 +437,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         )
 
     def _post_to_plate_joint(post: Timber, plate: Timber) -> Joint:
-        return cut_mortise_and_tenon_joint_on_FAT(
+        return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=plate,
                 butt_timber=post,

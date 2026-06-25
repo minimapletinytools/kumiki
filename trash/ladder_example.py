@@ -185,7 +185,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             pair_label="Back",
         )
 
-        front_left_rung_joint = cut_mortise_and_tenon_joint_on_PAT(
+        front_left_rung_joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=left_front_rail,
                 butt_timber=front_left_half_rung,
@@ -199,7 +199,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             peg_parameters=None,
         )
 
-        front_right_rung_joint = cut_mortise_and_tenon_joint_on_PAT(
+        front_right_rung_joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=right_front_rail,
                 butt_timber=front_right_half_rung,
@@ -213,7 +213,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             peg_parameters=None,
         )
 
-        back_left_rung_joint = cut_mortise_and_tenon_joint_on_PAT(
+        back_left_rung_joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=left_back_rail,
                 butt_timber=back_left_half_rung,
@@ -227,7 +227,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             peg_parameters=None,
         )
 
-        back_right_rung_joint = cut_mortise_and_tenon_joint_on_PAT(
+        back_right_rung_joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=right_back_rail,
                 butt_timber=back_right_half_rung,

@@ -135,7 +135,7 @@ def create_sawhorse() -> Frame:
     # Tenon at post BOTTOM going up into beam - peg goes through RIGHT face
     peg_params_post_beam = base_peg_params  # Already has RIGHT face
 
-    left_beam_post_joint = cut_mortise_and_tenon_joint_on_FAT(
+    left_beam_post_joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=left_beam,
             butt_timber=left_post,
@@ -148,7 +148,7 @@ def create_sawhorse() -> Frame:
         peg_parameters=peg_params_post_beam,
     )
 
-    right_beam_post_joint = cut_mortise_and_tenon_joint_on_FAT(
+    right_beam_post_joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_beam,
             butt_timber=right_post,
@@ -210,7 +210,7 @@ def create_sawhorse() -> Frame:
     # Tenon at post TOP going up into plate - peg goes through FRONT face
     peg_params_post_plate = base_peg_params
 
-    left_post_plate_joint = cut_mortise_and_tenon_joint_on_FAT(
+    left_post_plate_joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=plate,
             butt_timber=left_post,
@@ -223,7 +223,7 @@ def create_sawhorse() -> Frame:
         peg_parameters=peg_params_post_plate,
     )
 
-    right_post_plate_joint = cut_mortise_and_tenon_joint_on_FAT(
+    right_post_plate_joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=plate,
             butt_timber=right_post,

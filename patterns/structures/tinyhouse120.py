@@ -947,7 +947,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 if _is_horizontal_timber(butt_timber)
                 else None
             )
-            return cut_mortise_and_tenon_joint_on_FAT(
+            return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     butt_timber=butt_timber,
                     receiving_timber=receiving_timber,
@@ -967,14 +967,14 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             )
         except Exception as err:
             print(
-                f"Error creating FAT joint label={label} butt_end={butt_timber_end} face_aligned={are_timbers_face_aligned(butt_timber, receiving_timber)} plane_aligned={are_timbers_plane_aligned(butt_timber, receiving_timber)}",
+                f"Error creating face-aligned joint label={label} butt_end={butt_timber_end} face_aligned={are_timbers_face_aligned(butt_timber, receiving_timber)} plane_aligned={are_timbers_plane_aligned(butt_timber, receiving_timber)}",
                 file=sys.stderr,
                 flush=True,
             )
             print(_describe_timber("butt_timber", butt_timber), file=sys.stderr, flush=True)
             print(_describe_timber("receiving_timber", receiving_timber), file=sys.stderr, flush=True)
             raise AssertionError(
-                f"FAT joint failed for label='{label}' butt='{butt_timber.ticket.name}' receiving='{receiving_timber.ticket.name}' end='{butt_timber_end}': {err}"
+                f"Face-aligned joint failed for label='{label}' butt='{butt_timber.ticket.name}' receiving='{receiving_timber.ticket.name}' end='{butt_timber_end}': {err}"
             ) from err
 
     def _wall_stud_joint(stud: PerfectTimberWithin, beam: PerfectTimberWithin, stud_end: TimberReferenceEnd) -> Joint:
@@ -1104,7 +1104,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         )
 
     bottom_beam_corner_post_joints: List[Joint] = []
-    # FAT joints for corner posts
+    # Face-aligned joints for corner posts
     for beam, post, beam_end in [
         (beam_front_1, post_FL, TimberReferenceEnd.BOTTOM),
         (beam_front_3, post_FR, TimberReferenceEnd.TOP),
@@ -1168,7 +1168,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         (post_BR, top_plate_right),
     ]:
         corner_top_plate_compound_joints.append(
-            cut_mortise_and_tenon_joint_on_FAT(
+            cut_mortise_and_tenon_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     receiving_timber=side_plate,
                     butt_timber=post,
@@ -1188,7 +1188,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         (post_BR, top_plate_back),
     ]:
         corner_top_plate_compound_joints.append(
-            cut_mortise_and_tenon_joint_on_FAT(
+            cut_mortise_and_tenon_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     receiving_timber=cross_plate,
                     butt_timber=post,
@@ -1223,7 +1223,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         long_axis_global: V3,
     ) -> Joint:
         try:
-            return cut_mortise_and_tenon_joint_on_FAT(
+            return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     butt_timber=stud,
                     receiving_timber=beam,
@@ -1237,14 +1237,14 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             )
         except Exception as err:
             print(
-                f"Error creating king-post FAT joint stud_end={stud_end} face_aligned={are_timbers_face_aligned(stud, beam)} plane_aligned={are_timbers_plane_aligned(stud, beam)}",
+                f"Error creating king-post face-aligned joint stud_end={stud_end} face_aligned={are_timbers_face_aligned(stud, beam)} plane_aligned={are_timbers_plane_aligned(stud, beam)}",
                 file=sys.stderr,
                 flush=True,
             )
             print(_describe_timber("stud", stud), file=sys.stderr, flush=True)
             print(_describe_timber("beam", beam), file=sys.stderr, flush=True)
             raise AssertionError(
-                f"FAT king-post joint failed for stud='{stud.ticket.name}' beam='{beam.ticket.name}' end='{stud_end}': {err}"
+                f"Face-aligned king-post joint failed for stud='{stud.ticket.name}' beam='{beam.ticket.name}' end='{stud_end}': {err}"
             ) from err
 
     front_back_axis = create_v3(Integer(0), Integer(1), Integer(0))

@@ -248,7 +248,7 @@ def _build_joints(
         for x_tag in ["Left", "Center", "Right"]:
             post = _find_post(posts, side, x_tag)
             joints.append(
-                cut_mortise_and_tenon_joint_on_FAT(
+                cut_mortise_and_tenon_joint_on_face_aligned_timbers(
                     arrangement=ButtJointTimberArrangement(
                         receiving_timber=mudsill,
                         butt_timber=post,
@@ -266,7 +266,7 @@ def _build_joints(
         for x_tag in ["Left", "Center", "Right"]:
             post = _find_post(posts, side, x_tag)
             joints.append(
-                cut_mortise_and_tenon_joint_on_FAT(
+                cut_mortise_and_tenon_joint_on_face_aligned_timbers(
                     arrangement=ButtJointTimberArrangement(
                         receiving_timber=plate,
                         butt_timber=post,
