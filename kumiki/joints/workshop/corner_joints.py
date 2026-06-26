@@ -198,7 +198,6 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # Transform normal: local_normal = orientation^T * global_normal
     # Transform offset: local_offset = global_offset - (global_normal · timber.get_bottom_position_global())
     local_normalA = safe_transform_vector(timberA.orientation.matrix.T, normalA)
-    local_offsetA = safe_dot_product(intersection_point, normalA) - safe_dot_product(normalA, timberA.get_bottom_position_global())
 
     # For timberB: check if miter_normal points away from or towards the timber
     dot_B = safe_dot_product(normB, miter_normal)
@@ -211,17 +210,65 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
 
     # Convert to LOCAL coordinates for timberB
     local_normalB = safe_transform_vector(timberB.orientation.matrix.T, normalB)
-    local_offsetB = safe_dot_product(intersection_point, normalB) - safe_dot_product(normalB, timberB.get_bottom_position_global())
+
+    # Calculate offset for each timber's miter cut
+    # The cut plane should pass through the outer edges (tips) of the joint, not at the centerline intersection.
+    # For each timber, we offset the plane outward by an amount depending on the cross-section and joint angle.
+    from sympy import sqrt, atan2, pi
+
+    # Compute the angle between the timber directions
+    cos_angle = safe_dot_product(normA, normB)
+    # Clamp to [-1, 1] to avoid numerical issues with acos
+    cos_angle_clamped = max(prune(Rational(-1)), min(prune(Rational(1)), cos_angle))
+    # angle = acos(cos_angle_clamped)  # angle between centerlines
+    # For offset calculation, we need sin(angle/2)
+    # sin(angle/2) = sqrt((1 - cos(angle)) / 2)
+    sin_half_angle_sq = (Rational(1) - cos_angle_clamped) / Rational(2)
+    sin_half_angle = sqrt(sin_half_angle_sq) if safe_compare(sin_half_angle_sq, 0, Comparison.GT) else Rational(1)
+
+    # For each timber, calculate the offset distance from centerline to outer corner
+    # This is the distance from the centerline to the farthest corner of the cross-section,
+    # projected along the bisector direction
+    half_width_A = timberA.size[0] / Rational(2)
+    half_height_A = timberA.size[1] / Rational(2)
+    # Outer corner distance: sqrt((half_width)^2 + (half_height)^2)
+    outer_corner_dist_A = sqrt(half_width_A ** Rational(2) + half_height_A ** Rational(2))
+
+    half_width_B = timberB.size[0] / Rational(2)
+    half_height_B = timberB.size[1] / Rational(2)
+    outer_corner_dist_B = sqrt(half_width_B ** Rational(2) + half_height_B ** Rational(2))
+
+    # Offset the miter plane along the bisector (which is in the miter plane)
+    # For a timber with outer corner distance d and joint half-angle α:
+    # offset ≈ d / sin(α) if sin(α) > 0, else use a large value
+    if not zero_test(sin_half_angle):
+        offset_dist_A = outer_corner_dist_A / sin_half_angle
+        offset_dist_B = outer_corner_dist_B / sin_half_angle
+    else:
+        # Degenerate case: parallel timbers or very shallow angle, use large offset
+        offset_dist_A = outer_corner_dist_A * Rational(100)
+        offset_dist_B = outer_corner_dist_B * Rational(100)
+
+    # Move the intersection point along the bisector direction (within the miter plane)
+    # to get the actual cut position at the timber tips
+    miter_cut_point_A = prune(intersection_point + bisector * offset_dist_A)
+    miter_cut_point_B = prune(intersection_point + bisector * offset_dist_B)
+
+    # Create the offset for the HalfSpace in global coordinates
+    local_offsetA = safe_dot_product(miter_cut_point_A, normalA) - safe_dot_product(normalA, timberA.get_bottom_position_global())
+    local_offsetB = safe_dot_product(miter_cut_point_B, normalB) - safe_dot_product(normalB, timberB.get_bottom_position_global())
 
     # Create the end cut HalfSpaces (in LOCAL coordinates relative to each timber)
     end_cut_A = HalfSpace(normal=local_normalA, offset=local_offsetA)
     end_cut_B = HalfSpace(normal=local_normalB, offset=local_offsetB)
+    
+    # Distance from timber bottom to the miter cut plane along the timber's length direction
     end_cut_A_distance_from_bottom = safe_dot_product(
-        intersection_point - timberA.get_bottom_position_global(),
+        miter_cut_point_A - timberA.get_bottom_position_global(),
         timberA.get_length_direction_global(),
     )
     end_cut_B_distance_from_bottom = safe_dot_product(
-        intersection_point - timberB.get_bottom_position_global(),
+        miter_cut_point_B - timberB.get_bottom_position_global(),
         timberB.get_length_direction_global(),
     )
 
