@@ -261,25 +261,33 @@ def cut_tongue_and_groove_joint(
     )
 
 
-def cut_ita_kura_compound_joint(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_depths: Tuple[Numeric, Numeric, Numeric, Numeric], groove_extra_depths: Tuple[Numeric, Numeric, Numeric, Numeric], groove_extra_space: Numeric = Rational(0)):
+def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_extra_space: Numeric = Rational(0)):
     """
     fits boards in between the timbers using the board_in_groove_joint
 
-    all boards and timbers must be face aligned
+    All timbers must be face aligned and in particluar form a rectangular frame around the boards
 
-    All boards must be coplanar, only the first board in the list is used to determine the size and position of the grooves, the boards should be in order
-    The boards are extended with end cuts to fit into the grooves on the board_top/bottom_end_timbers
-    the grooves are cut to desired depth and the boards are cut to fit into the grooves padded by groove_extra_depths. You can use this to model fit tolerance if you want but more important it is to provide space for wood expansion. Don't make the same mistake I did!!
+    The groove position and depths are based on the boards so the boards are expected to be positioned and sized to where they will fit, in particular no cuts are made on the boards.
+
+    The boards are all expected to be the same thickness and coplanar and form a "rectangle" shape.
+
+    TODO add an optional maybe_end_cut_boards_to_groove_depth parameter. If provided the boards are extended with end cuts to fit into the grooves on the board_top/bottom_end_timbers
 
     Args:
+        boards: A list of boards to be fitted into the grooves
         board_top_end_timbers: A list of timbers that will have grooves cut to receive the "top" end of the boards
         board_bottom_end_timbers: A list of timbers that will have grooves cut to receive the "bottom" end of the boards
         board_left_side_timbers: A list of timbers that will have grooves cut to receive the "left" side of the boards
         board_right_side_timbers: A list of timbers that will have grooves cut to receive the "right" side of the boards
-        groove_depths: A tuple of four numeric values representing the desireds depth of grooves cut into the board_[top,bottom,left,right]_end/side_timbers (in that order)
-        groove_extra_depths: A tuple of four numeric values representing the extra depth to cut into the board_[top,bottom,left,right]_side_timbers beyond the groove depth (in that order)
-        groove_extra_space: the extra depth to cut the groove, when 0, the groove is cut to the same thickness as the boards
-
-    The boards position are cut to the first timber in each list, and the groove is then extended into the other timbers in the list.
+        groove_extra_space: Extra space to add to the groove depth beyond the board thickness, to allow for easier fitting of the boards into the grooves
     """
-    raise NotImplementedError("cut_ita_kura_compound_joint is not implemented yet")
+     
+    # assert all boards, and timbers are face aligned
+
+    # go through all boards and determine the rectangular prism that contains all of them. assert that all boards are coplanar, the same thickness, have parallel length axis, and that their top/bottom edges are all aligned
+
+    # add groove_extra_space to the rectangular prism
+
+    # return a joint that removes the enlargened rectangular prism from all of the timbers in board_top_end_timbers, board_bottom_end_timbers, board_left_side_timbers, and board_right_side_timbers
+
+    raise NotImplementedError("cut_board_in_grooved_rectangular_frame_joint is not implemented yet")
