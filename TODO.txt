@@ -91,8 +91,7 @@ DONE-update instructions to have agent prefer _on_FAT/PAT variant when appropria
 DONE-update instructions to prefer basic joint variants
 DONE/IGNORE-website should say install one of uv (preferred)
 DONE-claude code edits don't get picked up by file scanning in kumiki...
-
--test-fixture patterns getting picked up by scanner
+DONE-test-fixture patterns getting picked up by scanner
 
 -do setup vid
 -do shower vid
