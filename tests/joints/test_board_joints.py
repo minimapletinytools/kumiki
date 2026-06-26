@@ -3,9 +3,13 @@
 import pytest
 from sympy import Integer, Matrix, Rational
 
-from kumiki.joints.workshop.board_joints import cut_tongue_and_groove_joint
-from kumiki.ticket import BoardTicket
-from kumiki.timber import Board, Orientation, Transform, create_v3
+from kumiki.joints.workshop.board_joints import (
+    cut_board_in_grooved_rectangular_frame_joint,
+    cut_tongue_and_groove_joint,
+)
+from kumiki.ticket import BoardTicket, TimberTicket
+from kumiki.rule import equality_test
+from kumiki.timber import Board, Orientation, Timber, Transform, create_v3
 from kumiki.cutcsg import RectangularPrism, SolidUnion
 
 
@@ -198,3 +202,131 @@ class TestTongueAndGrooveJoint:
                 tongue_depth=Rational(1),
                 tongue_width=Rational(2),
             )
+
+
+class TestBoardInGroovedRectangularFrameJoint:
+    """Tests for cut_board_in_grooved_rectangular_frame_joint."""
+
+    def _make_frame(self, *, n_boards=2, groove_extra_space=Rational(0)):
+        """
+        Build a panel of *n_boards* side-by-side boards and four surrounding
+        frame timbers, all with identity orientation for simplicity.
+
+        Board dimensions: width=10, thickness=2, length=20.
+        Frame timbers: 3×3 cross-section.
+        """
+        board_width     = Rational(10)
+        board_thickness = Rational(2)
+        board_length    = Rational(20)
+        timber_size     = Matrix([Rational(3), Rational(3)])
+
+        boards = [
+            Board(
+                length=board_length,
+                size=Matrix([board_width, board_thickness]),
+                transform=Transform(
+                    position=create_v3(board_width * Integer(i), Integer(0), Integer(0)),
+                    orientation=Orientation.identity(),
+                ),
+                ticket=BoardTicket(name=f"board_{i}"),
+            )
+            for i in range(n_boards)
+        ]
+
+        panel_half_w = board_width * n_boards / Integer(2)
+
+        top_timber = Timber(
+            length=Rational(5),
+            size=timber_size,
+            transform=Transform(
+                position=create_v3(Integer(0), Integer(0), board_length),
+                orientation=Orientation.identity(),
+            ),
+            ticket=TimberTicket(name="top"),
+        )
+        bot_timber = Timber(
+            length=Rational(5),
+            size=timber_size,
+            transform=Transform.identity(),
+            ticket=TimberTicket(name="bottom"),
+        )
+        left_timber = Timber(
+            length=board_length,
+            size=timber_size,
+            transform=Transform(
+                position=create_v3(-panel_half_w, Integer(0), Integer(0)),
+                orientation=Orientation.identity(),
+            ),
+            ticket=TimberTicket(name="left"),
+        )
+        right_timber = Timber(
+            length=board_length,
+            size=timber_size,
+            transform=Transform(
+                position=create_v3(panel_half_w, Integer(0), Integer(0)),
+                orientation=Orientation.identity(),
+            ),
+            ticket=TimberTicket(name="right"),
+        )
+
+        joint = cut_board_in_grooved_rectangular_frame_joint(
+            boards=boards,
+            board_top_end_timbers=[top_timber],
+            board_bottom_end_timbers=[bot_timber],
+            board_left_side_timbers=[left_timber],
+            board_right_side_timbers=[right_timber],
+            groove_extra_space=groove_extra_space,
+        )
+        return joint, boards, [top_timber, bot_timber, left_timber, right_timber]
+
+    def test_joint_structure(self):
+        """Returns frame-timber cuttings plus uncut board members."""
+        joint, boards, _ = self._make_frame()
+
+        assert joint.ticket.joint_type == "board_in_grooved_frame"
+        expected_frame_keys = {"top", "bottom", "left", "right"}
+        expected_board_keys = {b.ticket.name for b in boards}
+        assert set(joint.cuttings.keys()) == expected_frame_keys | expected_board_keys
+
+        for key in expected_frame_keys:
+            cutting = joint.cuttings[key]
+            assert cutting.label == "board_in_grooved_frame"
+            assert isinstance(cutting.negative_csg, RectangularPrism)
+
+        for key in expected_board_keys:
+            cutting = joint.cuttings[key]
+            assert cutting.label == "board_in_grooved_frame"
+            assert cutting.negative_csg is None
+
+    def test_groove_thickness_matches_board(self):
+        """Groove Y-size equals board thickness when groove_extra_space=0.
+
+        Side timbers share the reference board's orientation so the prism
+        size is not permuted by adopt_csg; we can check size[1] directly.
+        """
+        board_thickness = Rational(2)
+        joint, _, _ = self._make_frame(groove_extra_space=Rational(0))
+
+        left_prism = joint.cuttings["left"].negative_csg
+        assert isinstance(left_prism, RectangularPrism)
+        assert equality_test(left_prism.size[1], board_thickness)
+
+    def test_groove_extra_space_widens_groove(self):
+        """Groove Y-size grows by groove_extra_space."""
+        board_thickness = Rational(2)
+        extra           = Rational(1, 4)
+        joint, _, _ = self._make_frame(groove_extra_space=extra)
+
+        left_prism = joint.cuttings["left"].negative_csg
+        assert isinstance(left_prism, RectangularPrism)
+        assert equality_test(left_prism.size[1], board_thickness + extra)
+
+    def test_groove_width_spans_full_panel(self):
+        """Groove X-size equals total panel width (n_boards × board_width)."""
+        n   = 3
+        bw  = Rational(10)
+        joint, _, _ = self._make_frame(n_boards=n)
+
+        left_prism = joint.cuttings["left"].negative_csg
+        assert isinstance(left_prism, RectangularPrism)
+        assert equality_test(left_prism.size[0], bw * Integer(n))

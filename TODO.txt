@@ -190,12 +190,12 @@ DONE-test-fixture patterns getting picked up by scanner
   
   
 
--BOARDS
+DONE-BOARDS
   DONE-I thin kit might be better not to do boards... boards are grain orieted so they make more sense as timbers
   DONE-decide if you even want boards..
   IGNORE-convert_to_timberlike(board : Board, top_maps_to : TimberFace, right_maps_to : TimberFace) -> Timber (or maybe some temp Timber class)
   DONE-do tongue and groove joint
-  -do the ita-kura joint (board in groove)
+  DONE-do the ita-kura joint (board in groove)
   
 
 -do assembly metadata

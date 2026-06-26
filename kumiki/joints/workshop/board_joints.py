@@ -4,7 +4,7 @@ Contains functions for creating joints between boards.
 """
 
 import warnings
-from typing import List, Tuple
+from typing import Dict, List, Tuple
 
 from sympy import Matrix
 
@@ -17,8 +17,9 @@ from kumiki.rule import (
     safe_compare,
     equality_test,
 )
-from kumiki.cutcsg import RectangularPrism, SolidUnion
+from kumiki.cutcsg import RectangularPrism, SolidUnion, adopt_csg
 from kumiki.construction import Transform, Orientation
+from kumiki.timber_shavings import are_timbers_face_aligned
 
 
 def cut_tongue_and_groove_joint(
@@ -282,12 +283,116 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
         groove_extra_space: Extra space to add to the groove depth beyond the board thickness, to allow for easier fitting of the boards into the grooves
     """
      
-    # assert all boards, and timbers are face aligned
+    assert boards, "boards must not be empty"
 
-    # go through all boards and determine the rectangular prism that contains all of them. assert that all boards are coplanar, the same thickness, have parallel length axis, and that their top/bottom edges are all aligned
+    ref = boards[0]
+    board_thickness = ref.size[1]
 
-    # add groove_extra_space to the rectangular prism
+    # Assert all boards have the same orientation matrix and thickness.
+    for i, b in enumerate(boards[1:], start=1):
+        for r in range(3):
+            for c in range(3):
+                assert equality_test(
+                    b.transform.orientation.matrix[r, c],
+                    ref.transform.orientation.matrix[r, c],
+                ), (
+                    f"all boards must have the same orientation "
+                    f"(board {i} differs from board 0 at [{r},{c}])"
+                )
+        assert equality_test(b.size[1], board_thickness), (
+            f"all boards must have the same thickness "
+            f"(board {i} has {b.size[1]}, board 0 has {board_thickness})"
+        )
 
-    # return a joint that removes the enlargened rectangular prism from all of the timbers in board_top_end_timbers, board_bottom_end_timbers, board_left_side_timbers, and board_right_side_timbers
+    # Assert all frame timbers are face-aligned with the boards.
+    all_frame_timbers: List[TimberLike] = (
+        board_top_end_timbers
+        + board_bottom_end_timbers
+        + board_left_side_timbers
+        + board_right_side_timbers
+    )
+    for t in all_frame_timbers:
+        assert are_timbers_face_aligned(t, ref), (
+            f"all frame timbers must be face-aligned with the boards, "
+            f"but timber '{t.ticket.name}' is not"
+        )
 
-    raise NotImplementedError("cut_board_in_grooved_rectangular_frame_joint is not implemented yet")
+    # Compute the bounding box of all boards in the reference board's local frame.
+    # Board local: X = width, Y = thickness, Z = length.
+    # board.transform.position is the bottom center (at Z=0 in board local).
+    min_x: Numeric
+    max_x: Numeric
+    min_y: Numeric
+    max_y: Numeric
+    min_z: Numeric
+    max_z: Numeric
+
+    # Seed from the reference board (always at local origin).
+    min_x = -ref.size[0] / Integer(2)
+    max_x =  ref.size[0] / Integer(2)
+    min_y = -board_thickness / Integer(2)
+    max_y =  board_thickness / Integer(2)
+    min_z =  Integer(0)
+    max_z =  ref.length
+
+    for i, b in enumerate(boards[1:], start=1):
+        pos_in_ref_local = ref.transform.global_to_local(b.transform.position)
+        # Coplanar assertion: Y offset of board bottom in ref local frame must be zero.
+        assert equality_test(pos_in_ref_local[1], Integer(0)), (
+            f"board {i} is not coplanar with board 0 "
+            f"(Y offset = {pos_in_ref_local[1]} in ref local frame)"
+        )
+        x_lo = pos_in_ref_local[0] - b.size[0] / Integer(2)
+        x_hi = pos_in_ref_local[0] + b.size[0] / Integer(2)
+        z_lo = pos_in_ref_local[2]
+        z_hi = pos_in_ref_local[2] + b.length
+        min_x = min(min_x, x_lo)
+        max_x = max(max_x, x_hi)
+        min_z = min(min_z, z_lo)
+        max_z = max(max_z, z_hi)
+
+    x_center = (min_x + max_x) / Integer(2)
+    y_center = (min_y + max_y) / Integer(2)  # = 0 for coplanar boards
+    x_size   = max_x - min_x
+    y_size   = (max_y - min_y) + groove_extra_space
+    z_span   = max_z - min_z
+
+    # Build the groove prism in the reference board's local coordinate frame.
+    # Subtracting this volume from each frame timber cuts the groove that receives
+    # the board panel edges.
+    groove_prism_ref_local = RectangularPrism(
+        size=Matrix([x_size, y_size]),
+        transform=Transform(
+            position=Matrix([x_center, y_center, min_z]),
+            orientation=Orientation.identity(),
+        ),
+        start_distance=Integer(0),
+        end_distance=z_span,
+        label="board_groove",
+    )
+
+    # Re-express the groove prism in each frame timber's local coordinate frame
+    # and build a Cutting for each timber.
+    cuttings: Dict[str, Cutting] = {}
+    for timber in all_frame_timbers:
+        groove_in_timber_local = adopt_csg(
+            ref.transform, timber.transform, groove_prism_ref_local
+        )
+        cuttings[timber.ticket.name] = Cutting(
+            timber=timber,
+            negative_csg=groove_in_timber_local,
+            label="board_in_grooved_frame",
+        )
+
+    # Include boards as uncut members so the returned joint can form a complete frame.
+    for board in boards:
+        cuttings[board.ticket.name] = Cutting(
+            timber=board,
+            negative_csg=None,
+            label="board_in_grooved_frame",
+        )
+
+    return Joint(
+        cuttings=cuttings,
+        ticket=JointTicket(joint_type="board_in_grooved_frame"),
+    )
