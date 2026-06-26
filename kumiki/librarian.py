@@ -487,7 +487,7 @@ _DEFAULT_SKIP_DIR_NAMES = frozenset({
     ".git", ".hg", ".svn", ".venv", "venv", "node_modules", "__pycache__",
     "dist", "build", ".mypy_cache", ".pytest_cache", ".ruff_cache",
     ".tox", ".nox", ".eggs", ".idea", ".vscode", ".vscode-test",
-    "oldcrap",
+    "oldcrap", "test-fixtures", "test_fixtures",
 })
 
 _DEFAULT_SKIP_PATH_SEGMENTS = (

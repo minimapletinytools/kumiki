@@ -92,6 +92,8 @@ DONE-update instructions to prefer basic joint variants
 DONE/IGNORE-website should say install one of uv (preferred)
 DONE-claude code edits don't get picked up by file scanning in kumiki...
 
+-test-fixture patterns getting picked up by scanner
+
 -do setup vid
 -do shower vid
 -do example cleanup
@@ -123,7 +125,6 @@ DONE-claude code edits don't get picked up by file scanning in kumiki...
 -you broke notching on mortise and tenon joint again
 -do ticket refactor so that each timber type can have its own ticket?
   -or do we do the derived ticket thing instead?
-
 -can you make meshing run in parallel?
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)

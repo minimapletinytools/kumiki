@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Optional
 
-from kumiki.librarian import Param, discover_callable_render_parameters, resolve_callable_render_parameters
+from kumiki.librarian import (
+    Param,
+    _should_skip_dir,
+    discover_callable_render_parameters,
+    resolve_callable_render_parameters,
+)
 from kumiki.rule import V3, create_v3
 from sympy import Rational
 
@@ -63,3 +69,8 @@ def test_explicit_optional_v3_param_round_trips_default() -> None:
 
     _, resolved = resolve_callable_render_parameters(build, None)
     assert resolved["center"] == default
+
+
+def test_default_skip_dirs_include_test_fixtures() -> None:
+    assert _should_skip_dir("test-fixtures", Path("/tmp/workspace/test-fixtures")) is True
+    assert _should_skip_dir("test_fixtures", Path("/tmp/workspace/test_fixtures")) is True
