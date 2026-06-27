@@ -121,44 +121,70 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 
 
 
-
--improve erroring on initialize due to missing deps
--add support for actual AABB render mode
-  -BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
--test regular imperfect rectangular timber stuff
--you broke notching on mortise and tenon joint again
 -do ticket refactor so that each timber type can have its own ticket?
   -or do we do the derived ticket thing instead?
--can you make meshing run in parallel?
+
+-test regular imperfect rectangular timber stuff
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
--do scribe notching on all joints (followup content yee)
--make butt jonit with shoulder inset notching more generic
-  -notch_length, measured in the length direction of the receiving timber
-  -notch_width, always 100% the full dimension of the receiving timber
-  -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
-  -notch_style, straight walls only for now
-  -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
--figure out inset notching.... config
-  -0 degree notch up to insertion face
-  -afterwards do the regular notching with varibale relief angle
-  -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
-    -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
-      -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
+-add sensibility checks to arrangement (so basically they intersect at least a little bit)
+  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
 
+
+
+
+-NOTCHING 
+  -do scribe notching on all joints (followup content yee)
+  -make butt jonit with shoulder inset notching more generic
+    -notch_length, measured in the length direction of the receiving timber
+    -notch_width, always 100% the full dimension of the receiving timber
+    -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
+    -notch_style, straight walls only for now
+    -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
+  -figure out inset notching.... config
+    -0 degree notch up to insertion face
+    -afterwards do the regular notching with varibale relief angle
+    -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
+      -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
+        -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
+  -notching configs
+    -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
+    -do generic butt joint notching config (no inset) + implement on joints + test
+    -do generic end joint notching config (no inset) + implement on joints + test
+    -do generic splice joint noching config??
+
+
+-consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
+-you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
 -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
     - joint type tags should be prioritized, or instead sort by tags that show up most often
     - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
     Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
-
+-add support for actual AABB render mode
+  -BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
+-you broke notching on mortise and tenon joint again
+-can you make meshing run in parallel?
+-UI feature select
+  -if 2 feature sselected, do measurement rendering between them :O
+  -byd efault, noly features are the 6 sides of a timber
+    -you can usually not select the end face so how can we tell which is the top/bottom?
+      -maybe add an arrow gizmo pointing to the top in the center of teh timber?
+      -or for features that coincide with local cardinal dircetions of timber you can flag it
 -look into promoting some plain joints
+-rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future 
+-do assembly metadata
+  DONE-create assemblydirection class 
+  -for accessories, have assemblydriection but also have locking accessory
+  -can you rename accessory btw??
+  -add assembly directions to existing joints
+    -can have helpers from arragement classes to do this in most cases
+-add more tests using the right way
+-the right way to do hashing is to have all joints hash their input properties and store a _hash property
 
--you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
--notching configs
-  -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
-  -do generic butt joint notching config (no inset) + implement on joints + test
-  -do generic end joint notching config (no inset) + implement on joints + test
-  -do generic splice joint noching config??
+
+
+
+
 
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon
@@ -189,26 +215,8 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
     -may as well do a union joint then? (these would really be decorative joints...)
     -or would it be better just to have folsk make custom joints
 
-
-
-    
-  
-  
--do assembly metadata
-  DONE-create assemblydirection class 
-  -for accessories, have assemblydriection but also have locking accessory
-  -can you rename accessory btw??
-  -add assembly directions to existing joints
-    -can have helpers from arragement classes to do this in most cases
-
-  
--add more tests using the right way
--the right way to do hashing is to have all joints hash their input properties and store a _hash property
-
 -do spiral castle design hehe
   -you need the castle joint I guess, time to try out 3 way joints
-
-
 -do tinyhouse shed
   DONE-fix joists between intermediate posts, they should mortise and tenon into the posts
   DONE-make floor joist dovetails smaller so they don't intersect with the post tenons
@@ -222,39 +230,11 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
   -do yo uneed/want more rafters?
   
 
--UI feature select
-  -if 2 feature sselected, do measurement rendering between them :O
-  -byd efault, noly features are the 6 sides of a timber
-    -you can usually not select the end face so how can we tell which is the top/bottom?
-      -maybe add an arrow gizmo pointing to the top in the center of teh timber?
-      -or for features that coincide with local cardinal dircetions of timber you can flag it
--UI layer view 
-  -decide on layer view organization
-  -finish ticket system
-  -add layers view to left I guess
 
 
 
-  
--perf related stuff stuff 
-  -see what you can do about numeric percision of contains_point
-  -do yet another perf pass, still pretty slow
-  -decide if hashing is ever worth it and or just remove it entirely
-    -or maybe come up with a faster hashing method?
 
--rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future
--add accessories to STEP STL and viewer
--and export STEP/STL button back into viewer (comibne/single, step/stl options, defaultable)
-
--consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
--add sensibility checks to arrangement (so basically they intersect at least a little bit)
-  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
--document example/patternbook stuff
--after viewer, you should integrate patternbook into viewer
--update agent insturction
--reorg joints by joint type 
 -consider making a brace function that both creates a timber and joins it!
--do sympy numeric conversion at the start of each joint... Or just have the numeric stuff cached in the timber or maybe transform class
 -add CutCSG::get_surface_curvature(point: V3) -> Optional[Tuple[V3, Numeric, V3, Numeric]] (returns derivative and basis for the derivative) so you can properly do the point on boundary check.. welly ou may as well just have a get_surface_info that returns stuff like its curvature, whether it's an edge or face, and the curvature info.
 -create a helper for sizing mortise and timber tenons (so that the "height" of the tenon is always in the mortise timber axis)
   -just copy code from basic_mortise_and_tenon and update tha functino to use the helper
@@ -265,19 +245,6 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
     
 
 
-
-RENAMEIFY
-  -be consistent about function local/golbal naming
-    -local input vars should have the suffix  _local
-      -some things must be interpreted locally such as "face" or "distance", these d onot have the suffix
-    -functions return things in golbal space by default unless _local suffix
-  -come up with joint naming rules, in particular if _on_face_aligned_timbers sholud be used or not
-    -oFAT on face aligned timbers
-    -oFAACaT on face aligned coaxial timbers
-    -oPAT on plane aligned timbers (one pair of faces are parallel)
-    -oPT on parallel timbers
-    -oOT on orthognal timbers
-  
 
 
 TESTIFY
@@ -356,6 +323,38 @@ M3.5
 
 
 :: TODONE 
+
+
+DONE/IGNORE-improve erroring on initialize due to missing deps
+DONE/IGNORE-UI layer view 
+  -decide on layer view organization
+  -finish ticket system
+  -add layers view to left I guess
+DONE/IGNORE-perf related stuff stuff 
+  -see what you can do about numeric percision of contains_point
+  -do yet another perf pass, still pretty slow
+  -decide if hashing is ever worth it and or just remove it entirely
+    -or maybe come up with a faster hashing method?
+DONE-add accessories to STEP STL and viewer
+DONE-and export STEP/STL button back into viewer (comibne/single, step/stl options, defaultable)
+DONE-document example/patternbook stuff
+DONE-after viewer, you should integrate patternbook into viewer
+DONE-update agent insturction
+DONE-reorg joints by joint type 
+
+
+RENAMEIFY
+  -be consistent about function local/golbal naming
+    -local input vars should have the suffix  _local
+      -some things must be interpreted locally such as "face" or "distance", these d onot have the suffix
+    -functions return things in golbal space by default unless _local suffix
+  -come up with joint naming rules, in particular if _on_face_aligned_timbers sholud be used or not
+    -oFAT on face aligned timbers
+    -oFAACaT on face aligned coaxial timbers
+    -oPAT on plane aligned timbers (one pair of faces are parallel)
+    -oPT on parallel timbers
+    -oOT on orthognal timbers
+DONE/IGNORE-do sympy numeric conversion at the start of each joint... Or just have the numeric stuff cached in the timber or maybe transform class
 DONE-make the refresh button more prominent in the viewer itself
 DONE-add left click to drag option (only when not clicking on frame obviously)
 DONE/IGNORE-if minor version mismatch, kigumi should show incompatible version for kumiki, upgrade requried
