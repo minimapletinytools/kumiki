@@ -102,6 +102,7 @@ DONE-poopify more patterns
 
 -reorg all mortise and tenon joint examples
 
+-why does pattern viewer say "abc" ?
 -update pattern discovery to just use the new method
     def _might_contain_patternbook(src: str) -> bool:
         if re.search(r"^\s*patternbook\s*=", src, flags=re.M):

@@ -224,6 +224,7 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     return RoundTimberConfig(diameter=max(_CANONICAL_EXAMPLE_TIMBER_SIZE[1],_CANONICAL_EXAMPLE_TIMBER_SIZE[0])*sqrt(2))
 
 
+# TODO delete me
 def example_basic_mortise_and_tenon(position=None, use_round_timbers=False):
     """
     Create a basic mortise and tenon joint using canonical butt joint timbers (4"x5"x4').
@@ -251,8 +252,7 @@ def example_basic_mortise_and_tenon(position=None, use_round_timbers=False):
     )
     return joint
 
-
-# TODO delete me
+# TODO make a main patterns and all the _mortise_and_tenon_on_face_aligned ones below should become its childre
 def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False):
     """
     Basic blind mortise and tenon using cut_mortise_and_tenon_joint_on_face_aligned_timbers.
@@ -272,7 +272,7 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
         mortise_depth=inches(7, 2),
     )
 
-# TODO rename to example_mortise_and_tenon_with_round_tenon
+# TODO rename to example_mortise_and_tenon_with_round_tenon_on_face_aligned_timbers
 def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False):
     """
     Round (cylindrical) mortise and tenon using cut_round_mortise_and_tenon_joint.
@@ -331,13 +331,11 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers(po
         mortise_depth=inches(7, 2),
     )
 
-# TODO rename to example_mortise_and_tenon_with_wedge
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_wedge(position=None, use_round_timbers=False):
     # TODO: wedge support not yet implemented
     pass
 
 
-# TODO rename to example_mortise_and_tenon_with_through_tenon
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(position=None, use_round_timbers=False):
     """
     Through tenon with 3" stickout past the mortise timber, and the tenon offset
@@ -368,7 +366,6 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(p
         tenon_position=Matrix([inches(0), inches(1)]),
     )
 
-
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder(position=None, use_round_timbers=False):
     """
     Mortise and tenon with a 0.5" shoulder inset from the mortise entry face.
@@ -390,15 +387,61 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_s
         mortise_shoulder_inset=inches(1, 2),
     )
 
+def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=False):
+    """
+    Mortise and tenon with timbers meeting at two non-orthogonal angles.
 
-def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_wedge(position=None, use_round_timbers=False):
-    # TODO: wedge support not yet implemented
-    pass
+    Takes the brace arrangement (timber1 in +Y, brace at 45 deg in XY plane),
+    then rotates timber1 by 45 degrees around the Z axis so the mortise timber
+    is no longer axis-aligned. The brace enters the rotated timber1 at a
+    compound angle -- non-orthogonal in both the horizontal and vertical planes.
+    """
+    from sympy import Integer, pi
+    from dataclasses import replace
+    from kumiki.rule import Orientation, radians
+    from kumiki.ticket import Ticket
 
+    if position is None:
+        position = create_v3(0, 0, 0)
 
-# TODO
-def example_angled_mortise_and_tenon_on_plane_aligned_timbers(position=None, use_round_timbers=False):
-    pass
+    brace_arrangement = create_canonical_example_brace_joint_timbers(
+        position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
+    )
+    timber1 = brace_arrangement.timber1
+    brace_timber = brace_arrangement.brace_timber
+
+    local_z = create_v3(Integer(0), Integer(0), Integer(1))
+    rotation = Orientation.from_angle_axis(radians(pi / Integer(6)), local_z)
+    rotated_orientation = timber1.orientation * rotation
+    rotated_transform = Transform(position=timber1.transform.position, orientation=rotated_orientation)
+    mortise_timber = replace(timber1, transform=rotated_transform, ticket=TimberTicket("rotated_mortise"))
+
+    peg_params = SimplePegParameters(
+        shape=PegShape.SQUARE,
+        peg_positions=[(inches(1), Rational(0))],
+        size=inches(1, 2)
+    )
+
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=brace_timber,
+        receiving_timber=mortise_timber,
+        butt_timber_end=TimberReferenceEnd.BOTTOM,
+        #front_face_on_butt_timber=TimberLongFace.RIGHT,
+        # use this example, fix bug on peg length
+        front_face_on_butt_timber=TimberLongFace.FRONT,
+    )
+
+    return cut_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length=inches(5),
+        mortise_depth=inches(3),
+        mortise_shoulder_distance_from_centerline=inches(2),
+        peg_parameters=peg_params,
+        crop_tenon_to_mortise_orientation_on_angled_joints=True,
+    )
+
 
 def example_brace_joint(position=None, use_round_timbers=False):
     """
@@ -506,60 +549,6 @@ def example_brace_joint(position=None, use_round_timbers=False):
     # Frame.from_joints will handle merging cuts on timbers that appear in multiple joints
     return Frame.from_joints([miter_joint, joint1, joint2], name="Brace Joint with Mortise and Tenon")
 
-def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=False):
-    """
-    Mortise and tenon with timbers meeting at two non-orthogonal angles.
-
-    Takes the brace arrangement (timber1 in +Y, brace at 45 deg in XY plane),
-    then rotates timber1 by 45 degrees around the Z axis so the mortise timber
-    is no longer axis-aligned. The brace enters the rotated timber1 at a
-    compound angle -- non-orthogonal in both the horizontal and vertical planes.
-    """
-    from sympy import Integer, pi
-    from dataclasses import replace
-    from kumiki.rule import Orientation, radians
-    from kumiki.ticket import Ticket
-
-    if position is None:
-        position = create_v3(0, 0, 0)
-
-    brace_arrangement = create_canonical_example_brace_joint_timbers(
-        position,
-        timber_config=_maybe_round_timber_config(use_round_timbers),
-    )
-    timber1 = brace_arrangement.timber1
-    brace_timber = brace_arrangement.brace_timber
-
-    local_z = create_v3(Integer(0), Integer(0), Integer(1))
-    rotation = Orientation.from_angle_axis(radians(pi / Integer(6)), local_z)
-    rotated_orientation = timber1.orientation * rotation
-    rotated_transform = Transform(position=timber1.transform.position, orientation=rotated_orientation)
-    mortise_timber = replace(timber1, transform=rotated_transform, ticket=TimberTicket("rotated_mortise"))
-
-    peg_params = SimplePegParameters(
-        shape=PegShape.SQUARE,
-        peg_positions=[(inches(1), Rational(0))],
-        size=inches(1, 2)
-    )
-
-    arrangement = ButtJointTimberArrangement(
-        butt_timber=brace_timber,
-        receiving_timber=mortise_timber,
-        butt_timber_end=TimberReferenceEnd.BOTTOM,
-        #front_face_on_butt_timber=TimberLongFace.RIGHT,
-        # use this example, fix bug on peg length
-        front_face_on_butt_timber=TimberLongFace.FRONT,
-    )
-
-    return cut_mortise_and_tenon_joint(
-        arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
-        tenon_length=inches(5),
-        mortise_depth=inches(3),
-        mortise_shoulder_distance_from_centerline=inches(2),
-        peg_parameters=peg_params,
-        crop_tenon_to_mortise_orientation_on_angled_joints=True,
-    )
 
 
 
