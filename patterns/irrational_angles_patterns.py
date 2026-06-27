@@ -94,7 +94,7 @@ def create_all_irrational_examples() -> Frame:
 
 
 patterns = [
-    Pattern(path="irrational_angles/mortise_and_tenon_37_degrees", lambda_=lambda center: create_all_irrational_examples(), pattern_type='frame', tags=['main']),
+    Pattern(path="irrational_angles/mortise_and_tenon_37_degrees", lambda_=lambda center: create_all_irrational_examples(), pattern_type='frame', tags=['main', 'poop']),
 ]
 
 

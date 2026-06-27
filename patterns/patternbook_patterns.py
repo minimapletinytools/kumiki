@@ -325,15 +325,15 @@ def _make_large_box(center):
 
 
 patterns = [
-    Pattern(path="patternbook_examples/short_post", lambda_=_make_short_post, pattern_type='frame', tags=['main']),
-    Pattern(path="patternbook_examples/tall_post", lambda_=_make_tall_post, pattern_type='frame'),
-    Pattern(path="patternbook_examples/wide_post", lambda_=_make_wide_post, pattern_type='frame'),
-    Pattern(path="patternbook_examples/small_beam", lambda_=_make_small_beam, pattern_type='frame'),
-    Pattern(path="patternbook_examples/medium_beam", lambda_=_make_medium_beam, pattern_type='frame'),
-    Pattern(path="patternbook_examples/large_beam", lambda_=_make_large_beam, pattern_type='frame'),
-    Pattern(path="patternbook_examples/small_box", lambda_=_make_small_box, pattern_type='csg'),
-    Pattern(path="patternbook_examples/medium_box", lambda_=_make_medium_box, pattern_type='csg'),
-    Pattern(path="patternbook_examples/large_box", lambda_=_make_large_box, pattern_type='csg'),
+    Pattern(path="patternbook_examples/short_post", lambda_=_make_short_post, pattern_type='frame', tags=['main', 'poop']),
+    Pattern(path="patternbook_examples/tall_post", lambda_=_make_tall_post, pattern_type='frame', tags=['poop']),
+    Pattern(path="patternbook_examples/wide_post", lambda_=_make_wide_post, pattern_type='frame', tags=['poop']),
+    Pattern(path="patternbook_examples/small_beam", lambda_=_make_small_beam, pattern_type='frame', tags=['poop']),
+    Pattern(path="patternbook_examples/medium_beam", lambda_=_make_medium_beam, pattern_type='frame', tags=['poop']),
+    Pattern(path="patternbook_examples/large_beam", lambda_=_make_large_beam, pattern_type='frame', tags=['poop']),
+    Pattern(path="patternbook_examples/small_box", lambda_=_make_small_box, pattern_type='csg', tags=['poop']),
+    Pattern(path="patternbook_examples/medium_box", lambda_=_make_medium_box, pattern_type='csg', tags=['poop']),
+    Pattern(path="patternbook_examples/large_box", lambda_=_make_large_box, pattern_type='csg', tags=['poop']),
 ]
 
 

@@ -98,8 +98,10 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 
 :: TODO
 DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
+DONE-poopify more patterns
 
--poopify more patterns
+-reorg all mortise and tenon joint examples
+
 -update pattern discovery to just use the new method
     def _might_contain_patternbook(src: str) -> bool:
         if re.search(r"^\s*patternbook\s*=", src, flags=re.M):
@@ -109,6 +111,8 @@ DONE-the scroll to top button is gone and the refresh viewer button should stay 
         if re.search(r"^\s*patterns\s*=", src, flags=re.M):
             return True
         return False
+-would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
+
 
 -duplicate source button broke (or mayb enot you need to test it in an actual install)
 -do setup vid

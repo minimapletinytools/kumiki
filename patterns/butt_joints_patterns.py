@@ -252,6 +252,7 @@ def example_basic_mortise_and_tenon(position=None, use_round_timbers=False):
     return joint
 
 
+# TODO delete me
 def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False):
     """
     Basic blind mortise and tenon using cut_mortise_and_tenon_joint_on_face_aligned_timbers.
@@ -271,7 +272,7 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
         mortise_depth=inches(7, 2),
     )
 
-
+# TODO rename to example_mortise_and_tenon_with_round_tenon
 def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False):
     """
     Round (cylindrical) mortise and tenon using cut_round_mortise_and_tenon_joint.
@@ -306,7 +307,7 @@ def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
         mortise_shoulder_distance_from_centerline=mortise_shoulder_distance,
     )
 
-
+# TODO  rename example_mortise_and_tenon_with_round_timbers
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers(position=None, use_round_timbers=True):
     """
     Basic blind mortise and tenon on the canonical butt-joint layout,
@@ -329,11 +330,14 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers(po
         tenon_length=inches(3),
         mortise_depth=inches(7, 2),
     )
+
+# TODO rename to example_mortise_and_tenon_with_wedge
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_wedge(position=None, use_round_timbers=False):
     # TODO: wedge support not yet implemented
     pass
 
 
+# TODO rename to example_mortise_and_tenon_with_through_tenon
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(position=None, use_round_timbers=False):
     """
     Through tenon with 3" stickout past the mortise timber, and the tenon offset

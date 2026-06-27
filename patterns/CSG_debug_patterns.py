@@ -724,16 +724,16 @@ def list_examples():
 
 
 patterns = [
-    Pattern(path="csg_debug/cube_cutout", lambda_=make_pattern_from_csg(example_cube_with_cube_cutout), pattern_type='csg', tags=['main']),
-    Pattern(path="csg_debug/halfspace_cut", lambda_=make_pattern_from_csg(example_cube_with_halfspace_cut), pattern_type='csg'),
-    Pattern(path="csg_debug/positioned_cube", lambda_=make_pattern_from_csg(example_cube_at_position), pattern_type='csg'),
-    Pattern(path="csg_debug/union_cubes", lambda_=make_pattern_from_csg(example_union_of_cubes), pattern_type='csg'),
-    Pattern(path="csg_debug/hexagon_extrusion", lambda_=make_pattern_from_csg(example_hexagon_extrusion), pattern_type='csg'),
-    Pattern(path="csg_debug/lap_cut_timber", lambda_=make_pattern_from_csg(example_lap_cut_on_timber), pattern_type='csg'),
-    Pattern(path="csg_debug/gooseneck_profile_cut", lambda_=make_pattern_from_csg(example_gooseneck_profile_cut), pattern_type='csg'),
-    Pattern(path="csg_debug/shoulder_notch_on_timber", lambda_=make_pattern_from_csg(example_shoulder_notch_on_timber), pattern_type='csg'),
-    Pattern(path="csg_debug/chop_shoulder_notch_raw", lambda_=make_pattern_from_csg(example_chop_shoulder_notch_on_timber_face_raw), pattern_type='csg'),
-    Pattern(path="csg_debug/angled_shoulder_notch", lambda_=make_pattern_from_csg(example_angled_shoulder_notch_on_timber), pattern_type='csg'),
+    Pattern(path="csg_debug/cube_cutout", lambda_=make_pattern_from_csg(example_cube_with_cube_cutout), pattern_type='csg', tags=['main', 'poop']),
+    Pattern(path="csg_debug/halfspace_cut", lambda_=make_pattern_from_csg(example_cube_with_halfspace_cut), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/positioned_cube", lambda_=make_pattern_from_csg(example_cube_at_position), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/union_cubes", lambda_=make_pattern_from_csg(example_union_of_cubes), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/hexagon_extrusion", lambda_=make_pattern_from_csg(example_hexagon_extrusion), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/lap_cut_timber", lambda_=make_pattern_from_csg(example_lap_cut_on_timber), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/gooseneck_profile_cut", lambda_=make_pattern_from_csg(example_gooseneck_profile_cut), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/shoulder_notch_on_timber", lambda_=make_pattern_from_csg(example_shoulder_notch_on_timber), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/chop_shoulder_notch_raw", lambda_=make_pattern_from_csg(example_chop_shoulder_notch_on_timber_face_raw), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/angled_shoulder_notch", lambda_=make_pattern_from_csg(example_angled_shoulder_notch_on_timber), pattern_type='csg', tags=['poop']),
     Pattern(path="csg_debug/dovetail_shoulder_geometry_raw", lambda_=make_pattern_from_csg(example_dovetail_shoulder_geometry_raw), pattern_type='csg', tags=['poop']),
     Pattern(path="csg_debug/dovetail_tenon_geometry_raw", lambda_=make_pattern_from_csg(example_dovetail_tenon_geometry_raw), pattern_type='csg', tags=['poop']),
 ]
