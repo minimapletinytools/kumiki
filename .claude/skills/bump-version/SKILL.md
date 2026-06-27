@@ -174,20 +174,4 @@ Only create/push relevant tag(s) for selected targets.
 - `git show --name-only --stat HEAD`
 - `git tag --list 'kumiki-v*' 'kigumi-v*' --sort=-creatordate | head`
 
-Do not trigger publishing in this skill.
-
-After pushing tags, start the unified release workflow instead of publishing directly. For example:
-
-```bash
-gh workflow run .github/workflows/release.yml --ref main \
-  -f tag=<tag> \
-  -f kumiki=true \
-  -f kumiki_publish=true \
-  -f kumiki_publish_target=pypi \
-  -f kumiki_release=true \
-  -f kigumi=true \
-  -f kigumi_publish_vscode=true \
-  -f kigumi_publish_ovsx=true \
-  -f kigumi_prerelease=false \
-  -f kigumi_release=true
-```
+Do not trigger publishing in this skill. Pushing the tags is sufficient — `release.yml` triggers automatically on tag push and routes jobs by tag prefix (kumiki-v* → kumiki jobs, kigumi-v* → kigumi jobs). Do NOT manually dispatch the workflow after pushing tags; doing so duplicates the publish step and causes a failure.
