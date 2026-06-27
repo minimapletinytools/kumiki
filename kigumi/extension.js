@@ -439,6 +439,34 @@ function activate(context) {
     });
     context.subscriptions.push(openPatternFromSidebar);
 
+    const openPatternInNewWindow = vscode.commands.registerCommand('kigumi.openPatternInNewWindow', async (element) => {
+        // Context menu passes the SidebarNode tree item; data lives in element.data
+        const data = element && (element.data || element);
+        const sourceFile = data && data.sourceFile;
+        const patternName = data && data.patternName;
+        if (!sourceFile) {
+            vscode.window.showErrorMessage('Pattern entry is missing a source file.');
+            return;
+        }
+
+        let runner;
+        try {
+            runner = await _getOrCreateBackgroundRunner(sourceFile, context);
+        } catch (error) {
+            outputChannel.appendLine(`Open pattern error: ${error.message}\n${error.stack}`);
+            vscode.window.showErrorMessage(`Failed to start Kigumi runner: ${error.message}`);
+            return;
+        }
+
+        if (patternName) {
+            await _openPatternFromWebview(runner, patternName, sourceFile, context, { forceNewWindow: true });
+            return;
+        }
+
+        await _openBookFromWebview(runner, sourceFile, context);
+    });
+    context.subscriptions.push(openPatternInNewWindow);
+
     const openExampleFromSidebar = vscode.commands.registerCommand('kigumi.openExampleFromSidebar', async (sourceFile) => {
         await openFileInViewer(sourceFile, context);
     });
@@ -940,6 +968,24 @@ async function openFileInViewer(filePath, context) {
 }
 
 /**
+ * Find the pattern session whose panel is currently active (focused) or visible.
+ * Returns null if no pattern session has an open panel.
+ */
+function _findActiveOrVisiblePatternSession() {
+    for (const session of patternSessions.values()) {
+        if (!session.isDisposed && session.panel && session.panel.active) {
+            return session;
+        }
+    }
+    for (const session of patternSessions.values()) {
+        if (!session.isDisposed && session.panel && session.panel.visible) {
+            return session;
+        }
+    }
+    return null;
+}
+
+/**
  * Find any alive main session (for reusing its runner).
  */
 function _findAnyAliveMainSession() {
@@ -976,8 +1022,10 @@ async function _getOrCreateBackgroundRunner(sourceFile, context) {
 
 /**
  * Open a pattern viewer triggered from the webview pattern list.
+ * By default, if a pattern panel is already active/visible it is reused (replaced).
+ * Pass { forceNewWindow: true } to always open a fresh panel.
  */
-async function _openPatternFromWebview(runner, patternName, sourceFile, context) {
+async function _openPatternFromWebview(runner, patternName, sourceFile, context, { forceNewWindow = false } = {}) {
     if (!runner || !runner.isAlive()) {
         vscode.window.showErrorMessage('Kigumi runner is not running.');
         return;
@@ -991,6 +1039,26 @@ async function _openPatternFromWebview(runner, patternName, sourceFile, context)
         sourceFile,
         patternName,
     });
+
+    if (!forceNewWindow) {
+        const existingSession = _findActiveOrVisiblePatternSession();
+        if (existingSession) {
+            const oldSlotName = existingSession.slotName;
+            patternSessions.delete(oldSlotName);
+            patternSessions.set(slotName, existingSession);
+            try {
+                if (runner.isAlive() && oldSlotName !== slotName) {
+                    await runner.request('unload_slot', { slot: oldSlotName });
+                }
+            } catch (err) {
+                outputChannel.appendLine(`Failed to unload old slot '${oldSlotName}': ${err.message || err}`);
+            }
+            existingSession.reassignPattern({ slotName, patternName, filePath: sourceFile });
+            existingSession.reveal();
+            await existingSession.refresh('pattern replaced from sidebar');
+            return;
+        }
+    }
 
     const patternSession = new FrameViewSession(
         sourceFile,

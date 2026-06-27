@@ -47,7 +47,7 @@
       "kigumi": [
         {
           "id": "kigumi.explorer",
-          "name": "Kigumi Explorer 🦊",
+          "name": "Kigumi Explorer 🦝",
           "icon": "templogo.png"
         }
       ]
@@ -132,6 +132,11 @@
         "title": "Duplicate To Workspace",
         "category": "Kigumi",
         "icon": "$(copy)"
+      },
+      {
+        "command": "kigumi.openPatternInNewWindow",
+        "title": "Open in New Tab",
+        "category": "Kigumi"
       }
     ],
     "menus": {
@@ -175,6 +180,10 @@
         {
           "command": "kigumi.duplicatePatternToWorkspace",
           "when": "false"
+        },
+        {
+          "command": "kigumi.openPatternInNewWindow",
+          "when": "false"
         }
       ],
       "view/item/context": [
@@ -187,6 +196,11 @@
           "command": "kigumi.duplicatePatternToWorkspace",
           "when": "view == kigumi.explorer && (viewItem == patternItem || viewItem == patternbookGroupItem)",
           "group": "inline@2"
+        },
+        {
+          "command": "kigumi.openPatternInNewWindow",
+          "when": "view == kigumi.explorer && (viewItem == patternItem || viewItem == patternItemWorkspace)",
+          "group": "navigation@1"
         }
       ]
     },

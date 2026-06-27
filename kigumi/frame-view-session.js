@@ -612,6 +612,29 @@ class FrameViewSession {
         }
     }
 
+    /**
+     * Swap this session to point at a new pattern slot without recreating the panel.
+     * Call this after the new slot has already been loaded in the runner.
+     * The caller is responsible for updating `patternSessions` and unloading the old slot.
+     */
+    reassignPattern({ slotName, patternName, filePath }) {
+        this.slotName = slotName;
+        this.patternName = patternName;
+        if (filePath !== this.filePath) {
+            this.filePath = filePath;
+            if (this.fileWatcher) {
+                this.fileWatcher.dispose();
+                this.fileWatcher = new FileWatcher(
+                    this.filePath,
+                    this.runnerSession && this.runnerSession.projectRoot,
+                    (source) => this.onFileChanged(source),
+                    (message) => this.log(`[watcher] ${message}`)
+                );
+                this.fileWatcher.start({ enabled: this.autoRefreshOnFileChange });
+            }
+        }
+    }
+
     async ensureRunnerSession() {
         if (this.isDisposed) {
             throw new Error(`Session is disposed for ${this.filePath}`);
