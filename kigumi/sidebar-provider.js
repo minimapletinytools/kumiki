@@ -874,7 +874,7 @@ class KigumiSidebarProvider {
                         command: 'kigumi.openPatternFromSidebar',
                         arguments: [{ sourceFile, patternName: childPath }],
                     } : undefined,
-                    iconPath: new vscode.ThemeIcon(isMain ? 'symbol-string' : 'folder'),
+                    iconPath: new vscode.ThemeIcon('folder'),
                     tooltip: childPath,
                     data: { pathPrefix: childPath, sourceFile },
                     contextValue: isMain ? 'patternFolderWithMain' : 'patternFolder',
@@ -890,7 +890,7 @@ class KigumiSidebarProvider {
                         command: 'kigumi.openPatternFromSidebar',
                         arguments: [{ sourceFile: patternAtPath.sourceFile, patternName: childPath }],
                     },
-                    iconPath: new vscode.ThemeIcon('symbol-string'),
+                    iconPath: undefined,
                     data: { sourceFile: patternAtPath.sourceFile, patternName: childPath, sectionKey: 'workspace-patternbooks' },
                     contextValue: 'patternItemWorkspace',
                 }));
@@ -929,14 +929,15 @@ class KigumiSidebarProvider {
                     command: 'kigumi.openPatternFromSidebar',
                     arguments: [{ sourceFile: pb.filePath, patternName }],
                 },
-                iconPath: new vscode.ThemeIcon('symbol-string'),
+                iconPath: undefined,
                 data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
                 contextValue: 'patternItemWorkspace',
             });
         });
     }
 
-    getFlatWorkspacePatternNodes() {
+    getFlatWorkspacePatternNodes()
+ {
         const patternbooks = this._state.workspacePatternbooks || [];
         const nodes = [];
 
@@ -955,7 +956,7 @@ class KigumiSidebarProvider {
                         command: 'kigumi.openPatternFromSidebar',
                         arguments: [{ sourceFile: pb.filePath, patternName }],
                     },
-                    iconPath: new vscode.ThemeIcon('symbol-string'),
+                    iconPath: undefined,
                     data: { sourceFile: pb.filePath, patternName, sectionKey: 'workspace-patternbooks' },
                     contextValue: 'patternItemWorkspace',
                 }));
@@ -1001,7 +1002,7 @@ class KigumiSidebarProvider {
                             command: 'kigumi.openPatternFromSidebar',
                             arguments: [{ sourceFile: item.sourceFile, patternName: item.name || null }],
                         },
-                        iconPath: new vscode.ThemeIcon('symbol-string'),
+                        iconPath: undefined,
                         data: { sourceFile: item.sourceFile, patternName: item.name, sectionKey },
                         contextValue: 'patternItem',
                     });
@@ -1064,7 +1065,7 @@ class KigumiSidebarProvider {
                     command: 'kigumi.openPatternFromSidebar',
                     arguments: [{ sourceFile: item.sourceFile, patternName: item.name || null }],
                 },
-                iconPath: new vscode.ThemeIcon('symbol-string'),
+                iconPath: undefined,
                 data: { sourceFile: item.sourceFile, patternName: item.name, sectionKey },
                 contextValue: 'patternItem',
             });
