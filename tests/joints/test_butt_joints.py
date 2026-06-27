@@ -1112,9 +1112,9 @@ def _make_simple_butt_arrangement():
 
 
 class TestHousedDovetailButtJoint:
-    """Test cut_housed_dovetail_butt_joint function."""
+    """Test cut_dropin_dovetail_butt_joint function."""
 
-    def test_general_housed_dovetail_butt_joint(self):
+    def test_general_dropin_dovetail_butt_joint(self):
         """
         General test: create the joint with normal parameters, validate structure
         (cut counts, CSG types, end cuts), then walk key points through the geometry.
@@ -1135,7 +1135,7 @@ class TestHousedDovetailButtJoint:
         dovetail_timber = arrangement.butt_timber
         receiving_timber = arrangement.receiving_timber
 
-        joint = cut_housed_dovetail_butt_joint(
+        joint = cut_dropin_dovetail_butt_joint(
             arrangement=arrangement,
             receiving_timber_shoulder_inset=Rational(1),
             dovetail_length=Rational(4),
@@ -1238,7 +1238,7 @@ class TestHousedDovetailButtJoint:
                 front_face_on_butt_timber=front_face,
             )
 
-            joint = cut_housed_dovetail_butt_joint(
+            joint = cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement,
                 receiving_timber_shoulder_inset=Rational(1),
                 dovetail_length=Rational(3),
@@ -1255,7 +1255,7 @@ class TestHousedDovetailButtJoint:
         """With shoulder_inset=0 receiving timber has no shoulder notch (no SolidUnion)."""
         arrangement = _make_butt_arrangement()
 
-        joint = cut_housed_dovetail_butt_joint(
+        joint = cut_dropin_dovetail_butt_joint(
             arrangement=arrangement,
             receiving_timber_shoulder_inset=Rational(0),
             dovetail_length=Rational(3),
@@ -1273,31 +1273,31 @@ class TestHousedDovetailButtJoint:
         arrangement = _make_butt_arrangement()
 
         with pytest.raises(ValueError, match="dovetail_length must be positive"):
-            cut_housed_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
                 dovetail_length=Rational(0), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(3),
             )
 
         with pytest.raises(ValueError, match="dovetail_small_width must be positive"):
-            cut_housed_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
                 dovetail_length=Rational(3), dovetail_small_width=Rational(-1), dovetail_large_width=Rational(3),
             )
 
         with pytest.raises(ValueError, match="dovetail_large_width.*must be greater"):
-            cut_housed_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
                 dovetail_length=Rational(3), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(1),
             )
 
         with pytest.raises(ValueError, match="receiving_timber_shoulder_inset must be non-negative"):
-            cut_housed_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement, receiving_timber_shoulder_inset=Rational(-1),
                 dovetail_length=Rational(3), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(3),
             )
 
         with pytest.raises(ValueError, match="dovetail_depth must be positive"):
-            cut_housed_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
                 dovetail_length=Rational(3), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(3),
                 dovetail_depth=Rational(0),
@@ -1321,7 +1321,7 @@ class TestHousedDovetailButtJoint:
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         )
         with pytest.raises(ValueError, match="perpendicular to receiving timber length"):
-            cut_housed_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement,
                 receiving_timber_shoulder_inset=Rational(1),
                 dovetail_length=Rational(3),

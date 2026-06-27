@@ -1323,7 +1323,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
 # ============================================================================
 
 
-def cut_housed_dovetail_butt_joint(
+def cut_dropin_dovetail_butt_joint(
     arrangement: ButtJointTimberArrangement,
     receiving_timber_shoulder_inset: Numeric,
     dovetail_length: Numeric,
@@ -1560,5 +1560,5 @@ def cut_housed_dovetail_butt_joint(
 # Aliases for Japanese joint functions
 # ============================================================================
 
-cut_蟻仕口 = cut_housed_dovetail_butt_joint
-cut_ari_shiguchi = cut_housed_dovetail_butt_joint
+cut_蟻仕口 = cut_dropin_dovetail_butt_joint
+cut_ari_shiguchi = cut_dropin_dovetail_butt_joint

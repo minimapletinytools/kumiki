@@ -93,7 +93,7 @@ The basic variants of all joints provide sensible defaults for most parameters. 
     - cut_mitered_and_keyed_lap_joint (most complicated, no end grain exposed)
 - for joist-to-beam or joist-to-mudsill joints use
     - cut_dropin_housed_butt_joint (simplest)
-    - cut_housed_dovetail_butt_joint (if joist needs to resist spreading forces)
+    - cut_dropin_dovetail_butt_joint (if joist needs to resist spreading forces)
 
 ## Combining everything into a Frame
 

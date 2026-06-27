@@ -22,7 +22,7 @@ from .butt_joints import (
     cut_plain_butt_joint_on_face_aligned_timbers,
     cut_tongue_and_fork_butt_joint,
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
-    cut_housed_dovetail_butt_joint,
+    cut_dropin_dovetail_butt_joint,
 )
 from .splice_joints import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
@@ -496,7 +496,7 @@ def cut_basic_lapped_gooseneck_joint(
     )
 
 
-def cut_basic_housed_dovetail_butt_joint(
+def cut_basic_dropin_dovetail_butt_joint(
     dovetail_timber: TimberLike,
     receiving_timber: TimberLike,
     dovetail_timber_end: TimberReferenceEnd,
@@ -512,7 +512,7 @@ def cut_basic_housed_dovetail_butt_joint(
     Dovetail dimensions scale with the timber width regardless of the values passed for
     dovetail_length, dovetail_small_width, and dovetail_large_width — those parameters are
     overridden internally (present for API compatibility). For full control, use
-    `cut_housed_dovetail_butt_joint` directly.
+    `cut_dropin_dovetail_butt_joint` directly.
 
     Args:
         dovetail_timber: The timber with the dovetail tenon.
@@ -536,7 +536,7 @@ def cut_basic_housed_dovetail_butt_joint(
     dovetail_small_width = width*Rational(1, 2)
     dovetail_large_width = width*Rational(2, 3)
 
-    return cut_housed_dovetail_butt_joint(
+    return cut_dropin_dovetail_butt_joint(
         arrangement=ButtJointTimberArrangement(
             butt_timber=dovetail_timber,
             receiving_timber=receiving_timber,

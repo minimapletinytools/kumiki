@@ -651,7 +651,7 @@ class TestMiteredAndKeyedLapJoint:
 
 
 # ============================================================================
-# Tests for cut_housed_dovetail_butt_joint
+# Tests for cut_dropin_dovetail_butt_joint
 # ============================================================================
 
 

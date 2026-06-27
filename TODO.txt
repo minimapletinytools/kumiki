@@ -118,7 +118,7 @@ DONE-update pattern discovery to just use the new method
         return False
 IGNORE/DONE-duplicate source button broke (or mayb enot you need to test it in an actual install)
 DONE-wedged half dovetail joint broke
--rename housed dovtail to dropin dovetail butt joint
+DONE-rename housed dovtail to dropin dovetail butt joint
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
 -have patterns replace the currentyl open viewer, frames create new viewer
   -or do right click open in new window option

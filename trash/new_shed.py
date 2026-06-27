@@ -415,7 +415,7 @@ def create_honeycomb_shed():
     #     print(f"  Dovetail joint {i}...")
     #     # Create dovetail at the mudsill end (TOP end of joist)
     #     # The dovetail face should be perpendicular to the mudsill
-    #     joint = cut_housed_dovetail_butt_joint(
+    #     joint = cut_dropin_dovetail_butt_joint(
     #         dovetail_timber=joist,
     #         receiving_timber=mudsills[i],
     #         dovetail_timber_end=TimberReferenceEnd.TOP,

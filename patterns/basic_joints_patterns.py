@@ -23,7 +23,7 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_plain_splice_lap_joint_on_aligned_timbers,
     cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_basic_lapped_gooseneck_joint,
-    cut_basic_housed_dovetail_butt_joint,
+    cut_basic_dropin_dovetail_butt_joint,
     cut_basic_mitered_and_keyed_lap_joint,
 )
 from kumiki.example_shavings import (
@@ -218,7 +218,7 @@ def example_basic_lapped_gooseneck_joint(position=None):
     return joint
 
 
-def example_basic_housed_dovetail_butt_joint(position=None):
+def example_basic_dropin_dovetail_butt_joint(position=None):
     """
     Create a basic housed dovetail butt joint.
     Uses canonical butt joint timbers (receiving along X, butt/dovetail along Y).
@@ -234,7 +234,7 @@ def example_basic_housed_dovetail_butt_joint(position=None):
     dovetail_large_width = width * Rational(2, 3)
     receiving_timber_shoulder_inset = inches(1)  # 1 inch inset
 
-    joint = cut_basic_housed_dovetail_butt_joint(
+    joint = cut_basic_dropin_dovetail_butt_joint(
         dovetail_timber=arrangement.butt_timber,
         receiving_timber=arrangement.receiving_timber,
         dovetail_timber_end=arrangement.butt_timber_end,
@@ -275,6 +275,6 @@ patterns = [
     Pattern(path="basic_joints/basic_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint), pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_mortise_and_tenon/with_peg", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint_with_peg), pattern_type='frame'),
     Pattern(path="basic_joints/basic_lapped_gooseneck_joint", lambda_=make_pattern_from_joint(example_basic_lapped_gooseneck_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_housed_dovetail_butt_joint", lambda_=make_pattern_from_joint(example_basic_housed_dovetail_butt_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_dropin_dovetail_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_dovetail_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mitered_and_keyed_lap_joint", lambda_=make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint), pattern_type='frame'),
 ]
