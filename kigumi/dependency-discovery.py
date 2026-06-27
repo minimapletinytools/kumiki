@@ -28,6 +28,8 @@ def _might_contain_patternbook(src: str) -> bool:
         return True
     if re.search(r"^\s*def\s+create_\w+_patternbook\s*\(", src, flags=re.M):
         return True
+    if re.search(r"^\s*patterns\s*=", src, flags=re.M):
+        return True
     return False
 
 

@@ -54,17 +54,17 @@ hello in this video I will show you how to get started with the kumiki timber fr
 
 If you're just here to see a demo of how kumiki is used, feel free to jump ahead to the stamp in the video.
 
-To get stared with kumiki, you'll need to install VSCode, the kigumi VSCode extension and either UV or python.
+To get stared with kumiki, you'll need to install VSCode and either UV or python. Once you've installed VSCode, open the extension menu and search for "kumiki" to install the kumiki extension which I already have installed here.
 
-Once you install each all of these, you're ready to get started. In VSCode choose open folder and then create a new folder that will be your project workspace where all your kumiki designs will go.
+You're ready to get started now. In VSCode choose open folder and then create a new folder that will be your project workspace where all your kumiki designs will go.
 
-IF you installed the kigumi extension properly, you should see the kigumi extension icon in the left sidebar. Click on it to open the Kigumi extension.
+Click the Kumiki icon in the sidebar to open the Kigumi extension.
 
 Next hit the initialize project button which will initialize the folder you created with the required files. You only need to do this step once. If you're running into errors at this step, it may be because you did not install UV or python or some other issue. you can try installing python if you installed UV or vice versa.
 
 The initialize project button will create several required files in your project workspace as well as a example design to help you get started.
 
-Oncey ou've initialized your project, the kigumi sidebar will allow you to browse you kumiki design, AKA frames, as well examples AKA patterns that ship with kumiki
+Once you've initialized your project, the kigumi sidebar will allow you to browse you kumiki design, AKA frames, as well examples AKA patterns that ship with kumiki
 
 lets open up the eaxmple frame that got created for us, this will launch the kigumi viewer
 - here you can move the camera around
@@ -97,8 +97,19 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 
 
 :: TODO
-
 DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
+
+-poopify more patterns
+-update pattern discovery to just use the new method
+    def _might_contain_patternbook(src: str) -> bool:
+        if re.search(r"^\s*patternbook\s*=", src, flags=re.M):
+            return True
+        if re.search(r"^\s*def\s+create_\w+_patternbook\s*\(", src, flags=re.M):
+            return True
+        if re.search(r"^\s*patterns\s*=", src, flags=re.M):
+            return True
+        return False
+
 -duplicate source button broke (or mayb enot you need to test it in an actual install)
 -do setup vid
 -do shower vid
