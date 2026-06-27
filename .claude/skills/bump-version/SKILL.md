@@ -131,6 +131,20 @@ NODE
 
 Tag: `kigumi-v<new_version>`
 
+## Pre-commit: Regenerate agent context bundle
+
+Before committing, always regenerate the bundled usage instructions (combines usage instructions + full API context):
+
+```bash
+cat docs/agent_usage_instructions.md docs/agent_context.md > kigumi/.generated/bundled-usage-instructions.md
+```
+
+Also update the `VERSION:X.Y.Z` line at the top of `docs/agent_context.md` to match the new kumiki version:
+
+```bash
+sed -i '' "s/^VERSION:[0-9.]*/VERSION:<new_version>/" docs/agent_context.md
+```
+
 ## Commit and tag
 
 Single commit message when both are bumped:
@@ -145,7 +159,7 @@ Single-target messages:
 Commands:
 
 ```bash
-git add pyproject.toml kumiki/__init__.py kigumi/package.json
+git add pyproject.toml kumiki/__init__.py kigumi/package.json docs/agent_context.md kigumi/.generated/bundled-usage-instructions.md
 git commit -m "<message>"
 git tag -a "kumiki-vX.Y.Z" -m "Release kumiki vX.Y.Z"
 git tag -a "kigumi-vA.B.C" -m "Release kigumi vA.B.C"
