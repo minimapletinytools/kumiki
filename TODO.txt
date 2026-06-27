@@ -99,11 +99,7 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 :: TODO
 
 DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
-
-
--duplicate source button broke
-
-
+-duplicate source button broke (or mayb enot you need to test it in an actual install)
 -do setup vid
 -do shower vid
 -do example cleanup
@@ -124,12 +120,8 @@ DONE-the scroll to top button is gone and the refresh viewer button should stay 
   DONE-test export step and export STL combined/inidivdual again
   DONE-test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
 
-
-
-
 -do ticket refactor so that each timber type can have its own ticket?
   -or do we do the derived ticket thing instead?
-
 -test regular imperfect rectangular timber stuff
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
