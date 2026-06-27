@@ -2,7 +2,7 @@
   "name": "kigumi",
   "displayName": "Kigumi",
   "description": "Kiguim is a viewer tool for Kumiki designs",
-  "version": "0.3.3",
+  "version": "0.3.4",
   "publisher": "minimaple",
   "repository": {
     "type": "git",

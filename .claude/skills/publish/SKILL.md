@@ -24,7 +24,7 @@ Use this skill to trigger GitHub Actions release and publishing workflows.
 - `tag`: optional git tag to release. Defaults to the most recent tag when omitted.
 - `kumiki`: `true` / `false`
 - `kumiki_publish`: `true` / `false`
-- `kumiki_publish_target`: `testpypi` (default) or `pypi`
+- `kumiki_publish_target`: `pypi` (default) or `testpypi`
 - `kumiki_release`: `true` / `false`
 - `kigumi`: `true` / `false`
 - `kigumi_publish_vscode`: `true` / `false`
@@ -59,7 +59,7 @@ gh workflow run .github/workflows/release.yml --ref main \
 Trigger kumiki-only publish:
 
 ```bash
-gh workflow run .github/workflows/publish.yml --ref main -f target=testpypi -f publish=true
+gh workflow run .github/workflows/publish.yml --ref main -f target=pypi -f publish=true
 ```
 
 Trigger kigumi-only publish:
@@ -71,7 +71,7 @@ gh workflow run .github/workflows/publish-kigumi.yml --ref main -f target=both -
 Trigger both lower-level publishes:
 
 ```bash
-gh workflow run .github/workflows/publish.yml --ref main -f target=testpypi -f publish=true
+gh workflow run .github/workflows/publish.yml --ref main -f target=pypi -f publish=true
 gh workflow run .github/workflows/publish-kigumi.yml --ref main -f target=both -f publish=true -f prerelease=false
 ```
 
