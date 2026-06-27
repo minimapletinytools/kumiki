@@ -56,7 +56,7 @@ If you're just here to see a demo of how kumiki is used, feel free to jump ahead
 
 To get stared with kumiki, you'll need to install VSCode and either UV or python. Once you've installed VSCode, open the extension menu and search for "kumiki" to install the kumiki extension which I already have installed here.
 
-You're ready to get started now. In VSCode choose open folder and then create a new folder that will be your project workspace where all your kumiki designs will go.
+You're ready to get started now. In VSCode choose open folder and then create a new folder that will become your project workspace where all your kumiki designs will go.
 
 Click the Kumiki icon in the sidebar to open the Kigumi extension.
 
@@ -71,15 +71,16 @@ lets open up the eaxmple frame that got created for us, this will launch the kig
 - select timbers
 - look at the list of timbers and joints
 - and so on
-- if you scroll down, you'll see some options for the viewer, and some other less useful features 
+- if you scroll down, you'll see some options for the viewer, and some other features 
 
 now lets go take a look the patterns that ship with kumiki in the sidebar.
-patterns are usually simple frames that demo just one joint or concept
+patterns are simple frames that demo just one joint or concept
 
-- here's asimple butt splice joint, not very exciting
-- and here's a goosenceck splice joint, a little more fun
+- here's a simple miter joint
+- a mortise and tenon joint
+- and here's a goosenceck splice joint
 
-you can also hit the view source button to see the source code for the pattern.
+you can also hit the view or duplicate source button to see and modify the source code for the pattern.
 
 I'll let you explore on your own here. Kumiki is being actively developed on so there will be many more patterns (and hence joints) to come
 
@@ -87,11 +88,17 @@ If there's ever a new version of kumiki, it will detect it and you can press a b
 
 Now let's make our own design. Kumiki is a code aided design library. All kumiki frames are designed with as code. I'll make no speculations about our future here, but AI is really good at writing code so we'll use AI to generate our kumiki designs.
 
-VSCode ships with the copilot AI coding agent, and if you sign up for an account which gives you enough free tokens to make a few simple frame designs. Since I ran already out of copilot tokens, I'll be using Claude. You can use any coding agent you want!
+VSCode ships with the copilot AI coding agent, and if you sign up for an account which gives you enough free tokens to make a simple frame design. Since I ran already out of copilot tokens, I'll be using Claude. You can use any coding agent you want!
 
-There's no need to be shy, let's ask the agent to build us a sawhorse. 
+Now let's ask the agent to build us a sawhorse.
 
-"plesae make me a sawhorse out of 5"x5" timbers. it should have two 2' parallel feet resting lengthwise on the ground 4' apart. In the center of these feet, place two posts that are 2' tall. Then connect the top of the posts with a 6' beam that is the top surface of the saw horse. Lastly, connect the middle of the 2 posts with a stretcher"
+"let's make a sawhorse out of 5"x5" timbers. Start by creating two 2' parallle feet resting horizontally on the ground 4' apart"
+
+"in the center of these feet, place posts that are 2' tall' to form teh legs of the sawhorse
+
+"then connect the top of the posts with a 6' beam to form the back of the saw horse"
+
+"Lastly, join the middle of the 2 posts with a stretcher to form the belly of the saw horse"
 
 
 
@@ -99,11 +106,8 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 :: TODO
 DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
 DONE-poopify more patterns
-
--reorg all mortise and tenon joint examples
-
--why does pattern viewer say "abc" ?
--update pattern discovery to just use the new method
+DONE-why does pattern viewer say "abc" ?
+DONE-update pattern discovery to just use the new method
     def _might_contain_patternbook(src: str) -> bool:
         if re.search(r"^\s*patternbook\s*=", src, flags=re.M):
             return True
@@ -112,10 +116,14 @@ DONE-poopify more patterns
         if re.search(r"^\s*patterns\s*=", src, flags=re.M):
             return True
         return False
+IGNORE/DONE-duplicate source button broke (or mayb enot you need to test it in an actual install)
+DONE-wedged half dovetail joint broke
+-get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
+-have patterns replace the currentyl open viewer, frames create new viewer
+  -or do right click open in new window option
+-rename housed dovtail to dropin dovetail butt joint
 -would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
-
-
--duplicate source button broke (or mayb enot you need to test it in an actual install)
+-reorg all mortise and tenon joint examples
 -do setup vid
 -do shower vid
 -do example cleanup

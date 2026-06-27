@@ -163,6 +163,24 @@ def _mesh_union(csg: SolidUnion) -> TriangleMesh:
     return TriangleMesh(mesh=result_mesh)
 
 
+def _collect_subtract_meshes(node: CutCSG, out: list) -> None:
+    """Recursively expand SolidUnion nodes into individual subtract meshes.
+
+    Subtracting a union is equivalent to subtracting each member separately:
+    X - union(A, B) == X - A - B.  Expanding the union avoids computing a
+    potentially non-watertight intermediate union mesh (which breaks manifold
+    boolean operations) and lets the manifold engine handle all operands in a
+    single pass.
+    """
+    if isinstance(node, EmptyCSG):
+        return
+    if isinstance(node, SolidUnion):
+        for child in node.children:
+            _collect_subtract_meshes(child, out)
+    else:
+        out.append(triangulate_cutcsg(node).mesh)
+
+
 def _mesh_difference(csg: Difference) -> TriangleMesh:
     if isinstance(csg.base, EmptyCSG):
         empty = trimesh.Trimesh(
@@ -170,11 +188,8 @@ def _mesh_difference(csg: Difference) -> TriangleMesh:
         )
         return TriangleMesh(mesh=empty, face_sources=tuple())
     meshes = [triangulate_cutcsg(csg.base).mesh]
-    meshes.extend(
-        triangulate_cutcsg(child).mesh
-        for child in csg.subtract
-        if not isinstance(child, EmptyCSG)
-    )
+    for child in csg.subtract:
+        _collect_subtract_meshes(child, meshes)
     result_mesh = _run_boolean("difference", meshes)
     return TriangleMesh(mesh=result_mesh)
 

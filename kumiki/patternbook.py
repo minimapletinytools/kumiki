@@ -7,7 +7,7 @@ and raise them at different positions for visualization and testing.
 
 from sympy import Rational
 import inspect
-from typing import Any, List, Tuple, Optional, Callable, Union, Literal, Sequence
+from typing import Any, Dict, List, Tuple, Optional, Callable, Union, Literal, Sequence
 from dataclasses import dataclass, field, replace
 from .rule import V3, create_v3, Transform
 from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, JointAccessory
@@ -55,7 +55,11 @@ def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
     def pattern_lambda(center: V3, **pattern_kwargs: Any) -> Frame:
         joint = joint_func(**pattern_kwargs)
         translated_timbers: List[CutTimber] = []
-        for cutting in joint.cuttings.values():
+        # Build translated cuttings dict in parallel so that the Cutting objects
+        # stored in the joint and in the CutTimbers are identical (same identity),
+        # which is required by serialize_layers's identity-based cut_indices lookup.
+        translated_cuttings: Dict[str, Any] = {}
+        for name, cutting in joint.cuttings.items():
             new_position = cutting.timber.get_bottom_position_global() + center
             # Preserve the concrete timber subclass (RoundTimber, MeshTimber, etc.) — only override the transform.
             translated_timber = replace(
@@ -64,6 +68,7 @@ def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
             )
             translated_cut = replace(cutting, timber=translated_timber)
             translated_timbers.append(CutTimber(timber=translated_timber, cuts=[translated_cut]))
+            translated_cuttings[name] = translated_cut
 
         translated_accessories: List[JointAccessory] = []
         if joint.jointAccessories:
@@ -108,7 +113,12 @@ def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
                 else:
                     translated_accessories.append(accessory)
 
-        return Frame(cut_timbers=translated_timbers, accessories=translated_accessories)
+        translated_joint = replace(joint, cuttings=translated_cuttings)
+        return Frame(
+            cut_timbers=translated_timbers,
+            accessories=translated_accessories,
+            source_joints=[translated_joint],
+        )
 
     setattr(pattern_lambda, "__signature__", _build_pattern_lambda_signature(joint_func))
     return pattern_lambda
