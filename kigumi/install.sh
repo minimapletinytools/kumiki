@@ -52,8 +52,8 @@ else
     exit 1
 fi
 
-VSCODE_EXT_DIR="$HOME/.vscode/extensions/kigumi"
-CURSOR_EXT_DIR="$HOME/.cursor/extensions/kigumi"
+VSCODE_EXT_DIR="$HOME/.vscode/extensions/kigumi-local"
+CURSOR_EXT_DIR="$HOME/.cursor/extensions/kigumi-local"
 
 TARGETS=("$VSCODE_EXT_DIR" "$CURSOR_EXT_DIR")
 EDITORS=("VSCode" "Cursor")
@@ -95,6 +95,15 @@ for i in "${!TARGETS[@]}"; do
         mkdir -p "$EXT_DIR/.kigumi/docs"
         rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/.kigumi/docs/"
     fi
+
+    # Pin to a high version so this local install always wins over any marketplace version
+    python3 -c "
+import json
+path = '$EXT_DIR/package.json'
+with open(path) as f: p = json.load(f)
+p['version'] = '999.0.0'
+with open(path, 'w') as f: json.dump(p, f, indent=2, ensure_ascii=False); f.write('\n')
+"
 done
 
 echo "✅ Kigumi installed successfully in VSCode and Cursor!"
