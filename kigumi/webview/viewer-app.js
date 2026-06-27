@@ -955,18 +955,18 @@ class KigumiViewerApp extends LitElement {
             ? 'left/right drag orbit • middle drag pan • scroll zoom • F focus'
             : 'right drag orbit • middle drag pan • scroll zoom • F focus';
         return html`
-            <button id="to-v3d" title="Jump back to 3D view">to v3d view</button>
-            ${hasPendingChanges
-                ? html`<button
-                    id="top-center-refresh-btn"
-                    type="button"
-                    title="Refresh using current parameter values"
-                    @click=${() => this.requestRefreshWithPendingParameters()}>
-                        <span class="top-center-refresh-primary">refresh</span>
-                        <span class="top-center-refresh-secondary">changes detected</span>
-                    </button>`
-                : ''}
+            <button id="to-v3d" title="Scroll back to top">to v3d view</button>
             <div id="viewport">
+                ${hasPendingChanges
+                    ? html`<button
+                        id="top-center-refresh-btn"
+                        type="button"
+                        title="Refresh using current parameter values"
+                        @click=${() => this.requestRefreshWithPendingParameters()}>
+                            <span class="top-center-refresh-primary">refresh</span>
+                            <span class="top-center-refresh-secondary">changes detected</span>
+                        </button>`
+                    : ''}
                 <canvas id="c"></canvas>
                 <div id="loading-overlay" class=${this.isOverlayVisible() ? 'visible' : ''}>
                     <div id="loading-text">${this.viewState.loadingText}</div>

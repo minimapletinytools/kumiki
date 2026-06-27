@@ -272,6 +272,7 @@ def create_basic_joints_patternbook() -> PatternBook:
     Returns:
         PatternBook: PatternBook containing all basic joint patterns
     """
+    
     patterns = [
         (PatternMetadata("basic_miter", ["basic_joints", "miter", "corner"], "frame"),
          make_pattern_from_joint(example_basic_miter_joint)),

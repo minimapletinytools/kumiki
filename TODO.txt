@@ -98,8 +98,11 @@ There's no need to be shy, let's ask the agent to build us a sawhorse.
 
 :: TODO
 
+DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
+
+
 -duplicate source button broke
--the scroll to top button is gone and the refresh viewer button should stay IN the viewer
+
 
 -do setup vid
 -do shower vid

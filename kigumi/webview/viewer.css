@@ -632,7 +632,7 @@ canvas { display: block; width: 100%; height: 100%; }
     background: var(--hv-control-bg-solid-hover);
 }
 #top-center-refresh-btn {
-    position: fixed;
+    position: absolute;
     top: 12px;
     left: 50%;
     transform: translateX(-50%);
@@ -643,7 +643,7 @@ canvas { display: block; width: 100%; height: 100%; }
     color: white;
     font: 600 12px 'Segoe UI', sans-serif;
     cursor: pointer;
-    z-index: 51;
+    z-index: 10;
     letter-spacing: 0.02em;
     text-transform: lowercase;
     transition: background 0.2s ease;

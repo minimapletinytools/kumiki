@@ -387,6 +387,10 @@ class PythonRunnerSession {
 
     async checkKumikiVersionCompatibility(pythonCmd) {
         const kigummiVersion = getKigumiVersion(this.context.extensionPath);
+        if (kigummiVersion.startsWith('999.')) {
+            this.channel.appendLine(`[env] Local dev install (${kigummiVersion}), skipping kumiki version check`);
+            return;
+        }
         const [kigummiMajor, kigummiMinor] = kigummiVersion.split('.').map(Number);
 
         let kumikiVersion;
