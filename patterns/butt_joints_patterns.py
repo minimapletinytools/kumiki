@@ -19,7 +19,7 @@ from kumiki.example_shavings import (
     create_canonical_example_brace_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
-from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_joint, make_pattern_from_frame
+from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame
 
 # Standard timber dimensions (4" x 5", 4' long) - matches canonical examples
 TIMBER_WIDTH = inches(4)
@@ -214,7 +214,7 @@ from kumiki.example_shavings import (
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
 from kumiki.construction import CornerJointTimberArrangement
-from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_joint, make_pattern_from_frame
+from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame
 from kumiki.ticket import TimberTicket
 
 
@@ -605,51 +605,6 @@ def example_wedged_half_dovetail_mortise_and_tenon_no_wedge(position=None, use_r
         dovetail_depth=inches(1, 2),
         mortise_shoulder_inset = inches(1, 2),
     )
-
-
-def create_mortise_and_tenon_patternbook() -> PatternBook:
-    """
-    Create a PatternBook with all mortise and tenon joint patterns.
-
-    Each pattern has groups: ["mortise_tenon", "{variant}", "{arrangement_type}"]
-    For example: ["mortise_tenon", "basic", "butt"] or ["mortise_tenon", "brace", "corner"]
-
-    Returns:
-        PatternBook: PatternBook containing all mortise and tenon joint patterns
-    """
-    patterns = [
-        (PatternMetadata("basic_4x4", ["mortise_tenon", "basic", "butt"], "frame"),
-         make_pattern_from_joint(example_basic_mortise_and_tenon)),
-
-        (PatternMetadata("basic_face_aligned", ["mortise_tenon", "basic_face_aligned", "butt"], "frame"),
-         make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers)),
-
-        (PatternMetadata("round_face_aligned", ["mortise_tenon", "round_face_aligned", "butt"], "frame"),
-         make_pattern_from_joint(example_round_mortise_and_tenon_on_face_aligned_timbers)),
-
-        (PatternMetadata("basic_face_aligned_two_round_timbers", ["mortise_tenon", "basic_face_aligned_round", "butt"], "frame"),
-         make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers)),
-
-        (PatternMetadata("through_tenon_face_aligned", ["mortise_tenon", "through_face_aligned", "butt"], "frame"),
-         make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon)),
-
-        (PatternMetadata("inset_shoulder_face_aligned", ["mortise_tenon", "inset_shoulder_face_aligned", "butt"], "frame"),
-         make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder)),
-
-        (PatternMetadata("brace_joint", ["mortise_tenon", "brace", "corner"], "frame"),
-         make_pattern_from_frame(example_brace_joint)),
-
-        (PatternMetadata("double_angled", ["mortise_tenon", "double_angled", "corner"], "frame"),
-         make_pattern_from_joint(example_double_angled_mortise_and_tenon)),
-
-        (PatternMetadata("wedged_half_dovetail", ["mortise_tenon", "wedged_half_dovetail", "butt"], "frame"),
-         make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon)),
-
-        (PatternMetadata("half_dovetail_no_wedge", ["mortise_tenon", "wedged_half_dovetail", "butt"], "frame"),
-         make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge)),
-    ]
-
-    return PatternBook(patterns=patterns)
 
 
 if __name__ == "__main__":

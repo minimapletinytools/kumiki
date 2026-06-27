@@ -8,7 +8,7 @@ from kumiki.joints.workshop.board_joints import (
 )
 from kumiki.joints.workshop.corner_joints import cut_plain_miter_joint_on_face_aligned_timbers
 from kumiki.construction import CornerJointTimberArrangement
-from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_joint, make_pattern_from_frame
+from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame
 from kumiki.rule import feet, inches
 from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.timber import Board, Frame, Orientation, Timber, TimberReferenceEnd, Transform, create_v3
@@ -51,17 +51,6 @@ def example_tongue_and_groove(position=None):
         tongue_center_offset=inches(0),
         groove_extra_depth=inches(0),
     )
-
-
-def create_board_joints_patternbook() -> PatternBook:
-    """Create PatternBook containing the single tongue-and-groove board pattern."""
-    patterns = [
-        (
-            PatternMetadata("tongue_and_groove", ["tongue_groove", "boards"], "frame"),
-            make_pattern_from_joint(example_tongue_and_groove),
-        ),
-    ]
-    return PatternBook(patterns=patterns)
 
 
 def example_board_in_grooved_frame(

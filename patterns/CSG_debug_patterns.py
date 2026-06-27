@@ -674,27 +674,7 @@ EXAMPLES = {
 }
 
 
-from kumiki.patternbook import PatternBook, PatternMetadata, Pattern, make_pattern_from_csg
-
-
-def create_csg_examples_patternbook():
-    """
-    Create a PatternBook with all CSG example patterns.
-
-    Each pattern has groups: ["csg", "{example_type}"]
-
-    Returns:
-        PatternBook: PatternBook containing all CSG example patterns
-    """
-
-    patterns = []
-    for key, info in EXAMPLES.items():
-        patterns.append((
-            PatternMetadata(key, ["csg", key], "csg"),
-            make_pattern_from_csg(info['function'])
-        ))
-
-    return PatternBook(patterns=patterns)
+from kumiki.patternbook import Pattern, make_pattern_from_csg
 
 
 def get_example(example_key: str):

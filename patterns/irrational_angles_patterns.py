@@ -10,22 +10,7 @@ from sympy import Rational, pi, Matrix, cos, sin
 from kumiki.timber import Frame, TimberFace, TimberReferenceEnd, create_v3, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.butt_joints import cut_mortise_and_tenon_joint
-from kumiki.patternbook import PatternBook, PatternMetadata, Pattern
-
-
-def create_irrational_angles_patternbook() -> PatternBook:
-    """
-    Create a PatternBook with irrational angles test pattern.
-    
-    Returns:
-        PatternBook: PatternBook containing the irrational angles test pattern
-    """
-    patterns = [
-        (PatternMetadata("irrational_angles_test", ["irrational_angles", "test_examples"], "frame"),
-         lambda center: create_all_irrational_examples()),
-    ]
-    
-    return PatternBook(patterns=patterns)
+from kumiki.patternbook import Pattern
 
 
 def create_all_irrational_examples() -> Frame:
