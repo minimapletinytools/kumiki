@@ -162,7 +162,7 @@ def create_axis_aligned_timber(bottom_position: V3, length: Numeric, size: V2,
     Creates an axis-aligned timber using TimberFace to reference directions
     in the world coordinate system.
 
-    AGENT NOTE: AVOID this function if possible, prefer methods like join_timber, attach_timber, create_*_timber_on_footprint, or even create_axis_aligned_timber, which are more robust and easier to use.
+    AGENT NOTE: AVOID this function if possible, prefer methods like join_timber, attach_face/plane_aligned_timber, create_*_timber_on_footprint, or even create_axis_aligned_timber, which are more robust and easier to use.
     
     Args:
         bottom_position: Position of the bottom point of the timber
@@ -568,6 +568,8 @@ def attach_timber(
     ticket: Optional[Union[TimberTicket, str]] = None,
 ):
     """
+    NOTE this function is perhaps not so useful in practice, it's mainly here for completeness. Perhaps there are some cases where it's a better alternative to create_timber
+
     Creates a timber that isattached to ``original_timber``.
 
     The original timber is referred to as "original_timber" and the new timber as
@@ -591,6 +593,14 @@ def attach_timber(
 
     Returns:
         The new attached timber, face-aligned with and positioned relative to the original timber.
+    """
+    pass
+
+
+# TODO
+def attach_plane_aligned_timber(
+):
+    """
     """
     pass
 
@@ -644,14 +654,140 @@ def attach_face_aligned_timber(
     Returns:
         The new attached timber, face-aligned with and positioned relative to the original timber.
     """
-    # TODO
-    # assert that attached_timber_long_face_to_measure_to_for_length_position is CENTERLINE or parallel to top/bottom faces of original_timber
-    # assert that original_timber_face_to_measure_from_for_lateral_position is CENTERLINE or perpendicular to original_timber_long_face_that_attached_timber_points_to
-    # assert that attached_timber_long_face_to_measure_to_for_lateral_position is CENTERLINE or perpendicular to original_timber_long_face_that_attached_timber_points_to
+    # ---- type checks ----
+    assert isinstance(original_timber, PerfectTimberWithin), \
+        f"original_timber must be a timber (PerfectTimberWithin), got {type(original_timber).__name__}"
+    assert isinstance(original_timber_long_face_that_attached_timber_points_to, TimberLongFace), \
+        f"original_timber_long_face_that_attached_timber_points_to must be TimberLongFace, got {type(original_timber_long_face_that_attached_timber_points_to).__name__}"
+    assert isinstance(attached_timber_end_that_points_towards_original_timber, TimberReferenceEnd), \
+        f"attached_timber_end_that_points_towards_original_timber must be TimberReferenceEnd, got {type(attached_timber_end_that_points_towards_original_timber).__name__}"
+    assert isinstance(original_timber_end_to_measure_from_for_length_position, TimberReferenceEnd), \
+        f"original_timber_end_to_measure_from_for_length_position must be TimberReferenceEnd, got {type(original_timber_end_to_measure_from_for_length_position).__name__}"
+    assert isinstance(attached_timber_long_face_to_measure_to_for_length_position, (TimberLongFace, TimberCenterline)), \
+        f"attached_timber_long_face_to_measure_to_for_length_position must be TimberLongFace or TimberCenterline, got {type(attached_timber_long_face_to_measure_to_for_length_position).__name__}"
+    assert isinstance(original_timber_face_to_measure_from_for_lateral_position, (TimberFace, TimberCenterline)), \
+        f"original_timber_face_to_measure_from_for_lateral_position must be TimberFace or TimberCenterline, got {type(original_timber_face_to_measure_from_for_lateral_position).__name__}"
+    assert isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, (TimberLongFace, TimberCenterline)), \
+        f"attached_timber_long_face_to_measure_to_for_lateral_position must be TimberLongFace or TimberCenterline, got {type(attached_timber_long_face_to_measure_to_for_lateral_position).__name__}"
 
-    
-    
-    pass
+    # ---- orthonormal basis from the original timber's perfect-timber-within ----
+    # a = attach direction (out of the chosen long face), l = original length axis, t = lateral axis
+    a = original_timber.get_face_direction_global(original_timber_long_face_that_attached_timber_points_to)
+    l = original_timber.get_length_direction_global()
+    t = cross_product(a, l)
+
+    # ---- attached timber length axis ----
+    if attached_timber_end_that_points_towards_original_timber == TimberReferenceEnd.BOTTOM:
+        length_dir = a
+    else:  # the TOP end sits on the original-timber side
+        length_dir = -a
+
+    # ---- derive the cross-section orientation from the named measure-to faces ----
+    # The named faces must end up parallel to the original features they are measured from:
+    #   - the length-position face is parallel to the original's TOP/BOTTOM ends (axis l)
+    #   - the lateral-position face is parallel to the original's lateral faces (axis t)
+    # A long face on RIGHT/LEFT lies on the width (X) axis; FRONT/BACK lies on the height (Y) axis,
+    # so the only decision is whether the width axis runs along l or along t.
+    def _is_width_axis(face: TimberLongFace) -> bool:
+        return face in (TimberLongFace.RIGHT, TimberLongFace.LEFT)
+
+    width_axis_along_l: Optional[bool] = None
+    if isinstance(attached_timber_long_face_to_measure_to_for_length_position, TimberLongFace):
+        # this face must be parallel to l: the width axis is along l iff this is a width (RIGHT/LEFT) face
+        width_axis_along_l = _is_width_axis(attached_timber_long_face_to_measure_to_for_length_position)
+    if isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, TimberLongFace):
+        # this face must be parallel to t: the width axis is along l iff this is a height (FRONT/BACK) face
+        lateral_wants_width_along_l = not _is_width_axis(attached_timber_long_face_to_measure_to_for_lateral_position)
+        if width_axis_along_l is None:
+            width_axis_along_l = lateral_wants_width_along_l
+        else:
+            assert width_axis_along_l == lateral_wants_width_along_l, (
+                "attached_timber_long_face_to_measure_to_for_length_position and "
+                "attached_timber_long_face_to_measure_to_for_lateral_position imply conflicting cross-section "
+                "orientations (they must reference perpendicular faces of the attached timber)"
+            )
+    if width_axis_along_l is None:
+        # neither face named (both CENTERLINE): default the width axis along the original length
+        width_axis_along_l = True
+
+    width_dir = l if width_axis_along_l else t
+    height_dir = normalize_vector(cross_product(length_dir, width_dir))
+
+    attached_total_length = attached_timber_length + attached_timber_opposite_length
+    assert safe_compare(attached_total_length, Integer(0), Comparison.GT), \
+        "attached timber total length (attached_timber_length + attached_timber_opposite_length) must be positive"
+
+    def _attached_long_face_normal_and_half(face: TimberLongFace) -> Tuple[Direction3D, Numeric]:
+        """Outward global normal and center-to-face half size for a long face of the attached timber."""
+        if face == TimberLongFace.RIGHT:
+            return width_dir, size[0] / Integer(2)
+        elif face == TimberLongFace.LEFT:
+            return -width_dir, size[0] / Integer(2)
+        elif face == TimberLongFace.FRONT:
+            return height_dir, size[1] / Integer(2)
+        else:  # BACK
+            return -height_dir, size[1] / Integer(2)
+
+    O = original_timber.get_bottom_position_global()
+
+    # ---- attach-axis coordinate of the attached timber's center ----
+    # The original centerline has a constant attach-axis coordinate (a is perpendicular to l).
+    center_a = O.dot(a) + (attached_timber_length - attached_timber_opposite_length) / Integer(2)
+
+    # ---- length-position-axis coordinate (along l) ----
+    # Measure from the chosen end of the original timber, going into the timber.
+    end_face = original_timber_end_to_measure_from_for_length_position
+    end_l = get_center_point_on_face_global(end_face, original_timber).dot(l)
+    if end_face == TimberReferenceEnd.TOP:
+        target_l = end_l - length_position_measurement  # into the timber from the top is -l
+    else:  # BOTTOM
+        target_l = end_l + length_position_measurement  # into the timber from the bottom is +l
+    if isinstance(attached_timber_long_face_to_measure_to_for_length_position, TimberLongFace):
+        len_normal, len_half = _attached_long_face_normal_and_half(attached_timber_long_face_to_measure_to_for_length_position)
+        assert are_vectors_parallel(len_normal, l), (
+            "attached_timber_long_face_to_measure_to_for_length_position must be parallel to the original timber's "
+            "TOP/BOTTOM end faces"
+        )
+        center_l = target_l - len_normal.dot(l) * len_half
+    else:  # CENTERLINE
+        center_l = target_l
+
+    # ---- lateral-position-axis coordinate (along t) ----
+    if isinstance(original_timber_face_to_measure_from_for_lateral_position, TimberFace):
+        orig_lat_normal = normalize_vector(original_timber.get_face_direction_global(original_timber_face_to_measure_from_for_lateral_position))
+        assert are_vectors_parallel(orig_lat_normal, t), (
+            "original_timber_face_to_measure_from_for_lateral_position must be a lateral face of the original timber "
+            "(perpendicular to original_timber_long_face_that_attached_timber_points_to and to the length)"
+        )
+        from_t = get_center_point_on_face_global(original_timber_face_to_measure_from_for_lateral_position, original_timber).dot(t)
+        into_sign_t = -orig_lat_normal.dot(t)  # positive measurement goes into the original timber
+    else:  # CENTERLINE
+        from_t = O.dot(t)
+        into_sign_t = Integer(1)
+    target_t = from_t + lateral_position_measurement * into_sign_t
+    if isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, TimberLongFace):
+        lat_normal, lat_half = _attached_long_face_normal_and_half(attached_timber_long_face_to_measure_to_for_lateral_position)
+        assert are_vectors_parallel(lat_normal, t), (
+            "attached_timber_long_face_to_measure_to_for_lateral_position must be a lateral face (perpendicular to "
+            "original_timber_long_face_that_attached_timber_points_to)"
+        )
+        center_t = target_t - lat_normal.dot(t) * lat_half
+    else:  # CENTERLINE
+        center_t = target_t
+
+    # ---- reconstruct the center in global coordinates and build the timber ----
+    # (a, l, t) is an orthonormal basis, so a global point equals the sum of its coords times the axes.
+    center = center_a * a + center_l * l + center_t * t
+    bottom_position = center - length_dir * (attached_total_length / Integer(2))
+
+    return create_timber(
+        bottom_position=bottom_position,
+        length=attached_total_length,
+        size=size,
+        length_direction=length_dir,
+        width_direction=width_dir,
+        ticket=ticket,
+    )
     
 
 def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin, 

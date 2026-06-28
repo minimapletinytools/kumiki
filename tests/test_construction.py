@@ -1901,7 +1901,9 @@ class TestAttachFaceAlignedTimber:
                 lateral_position_measurement=Rational(1),
             )
 
-    def test_assert_length_to_non_parallel_face(self, symbolic_mode):
+    def test_assert_conflicting_orientation_faces(self, symbolic_mode):
+        # the length face and lateral face both reference the width (X) axis -> they imply
+        # contradictory cross-section orientations, which must error
         post = self._make_post()
         with pytest.raises(AssertionError):
             attach_face_aligned_timber(
@@ -1909,21 +1911,35 @@ class TestAttachFaceAlignedTimber:
                 size=create_v2(Rational(2), Rational(3)),
                 original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
                 attached_timber_length=Rational(5),
-                # FRONT is a lateral face of the beam, not parallel to the post's end faces
-                attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.FRONT,
+                # length-face on the width axis -> wants width along the post length...
+                attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.RIGHT,
                 length_position_measurement=Rational(4),
-            )
-
-    def test_assert_lateral_to_non_lateral_attached_face(self, symbolic_mode):
-        post = self._make_post()
-        with pytest.raises(AssertionError):
-            attach_face_aligned_timber(
-                original_timber=post,
-                size=create_v2(Rational(2), Rational(3)),
-                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-                attached_timber_length=Rational(5),
-                # RIGHT runs along the post length, not a lateral face of the beam
-                attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+                # ...lateral-face on the same axis -> wants width along the lateral axis -> conflict
+                attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.LEFT,
                 lateral_position_measurement=Rational(1),
             )
+
+    def test_orientation_derived_from_named_lateral_face(self, symbolic_mode):
+        post = self._make_post()
+        # naming a FRONT/BACK lateral face -> the width axis runs along the post length (+Z)
+        beam_fb = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.FRONT,
+        )
+        self._assert_v3(beam_fb.get_width_direction_global(), 0, 0, 1)
+        # naming a RIGHT/LEFT lateral face -> the width axis runs along the lateral axis (t = -Y)
+        beam_rl = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+        )
+        self._assert_v3(beam_rl.get_width_direction_global(), 0, -1, 0)
+        # both remain face-aligned with the post regardless of the chosen orientation
+        assert are_timbers_face_aligned(post, beam_fb)
+        assert are_timbers_face_aligned(post, beam_rl)
 

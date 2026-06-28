@@ -110,7 +110,53 @@ def make_attach_face_aligned_timber_example():
         accessories=[]
     )
 
+def make_attach_face_aligned_timber_flush_example():
+    """
+    A 5"x5" vertical post with a 5"x7" timber attached to its RIGHT face.
+
+    - Lateral: the attached timber's centerline is offset 1" from the post's (non-centerline)
+      FRONT face.
+    - Length: the attached timber's RIGHT face is measured 0" from the post's TOP end, so the
+      end of the post is flush with that face of the attached timber.
+    """
+    post_size = create_v2(inches(5), inches(5))
+    post_height = feet(8)
+    attached_size = create_v2(inches(5), inches(7))
+
+    post = timber_from_directions(
+        length=post_height,
+        size=post_size,
+        bottom_position=create_v3(0, 0, 0),
+        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
+        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        ticket="Post",
+    )
+
+    attached = attach_face_aligned_timber(
+        original_timber=post,
+        size=attached_size,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length=feet(3),
+        # length: the attached timber's RIGHT face is flush (0") with the post's TOP end
+        original_timber_end_to_measure_from_for_length_position=TimberReferenceEnd.TOP,
+        attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.RIGHT,
+        length_position_measurement=inches(0),
+        # lateral: 1" from the post's FRONT face (measured to the attached timber's centerline)
+        original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,
+        lateral_position_measurement=inches(1),
+        ticket="Attached_Timber",
+    )
+
+    return Frame(
+        cut_timbers=[
+            CutTimber(post),
+            CutTimber(attached),
+        ],
+        accessories=[]
+    )
+
 patterns = [
     Pattern(path="construction/join_face_aligned_on_face_aligned_timbers", lambda_=lambda center: make_join_face_aligned_on_face_aligned_timbers_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber", lambda_=lambda center: make_attach_face_aligned_timber_example(), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_face_aligned_timber_flush", lambda_=lambda center: make_attach_face_aligned_timber_flush_example(), pattern_type='frame', tags=['main']),
 ]
