@@ -122,6 +122,11 @@ DONE-rename housed dovtail to dropin dovetail butt joint
 DONE-have patterns replace the currentyl open viewer, frames create new viewer
   -or do right click open in new window option
 
+-add agent notes for timber orientation
+-do attach_timber function
+  -orientation paremetrs
+  -should be able to align feature of existing timber with feature of created timber
+
 
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
 -would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
@@ -132,7 +137,7 @@ DONE-have patterns replace the currentyl open viewer, frames create new viewer
 -make website
   -get domain D:
 -try and run a full loop agent test on this to see if it all works
--agent prompt examples
+IGNORE-agent prompt examples
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
 -marketing

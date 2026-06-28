@@ -134,11 +134,14 @@ class Stickout:
 # Timber Creation Functions
 # ============================================================================
 
+
 def create_timber(bottom_position: V3, length: Numeric, size: V2, 
                   length_direction: Direction3D, width_direction: Direction3D, ticket: Optional[Union[TimberTicket, str]] = None) -> Timber:
     """
     Creates a timber at bottom_position with given dimensions and rotates it 
     to the length_direction and width_direction
+
+    AGENT NOTE: AVOID this function if possible, prefer methods like join_timber, attach_timber, create_*_timber_on_footprint, or even create_axis_aligned_timber, which are more robust and easier to use.
     
     Args:
         bottom_position: Position of the bottom point of the timber
@@ -156,6 +159,8 @@ def create_axis_aligned_timber(bottom_position: V3, length: Numeric, size: V2,
     """
     Creates an axis-aligned timber using TimberFace to reference directions
     in the world coordinate system.
+
+    AGENT NOTE: AVOID this function if possible, prefer methods like join_timber, attach_timber, create_*_timber_on_footprint, or even create_axis_aligned_timber, which are more robust and easier to use.
     
     Args:
         bottom_position: Position of the bottom point of the timber
@@ -546,6 +551,23 @@ def split_timber(
     )
     
     return (bottom_timber, top_timber)
+
+def attach_face_aligned_timber(timber:  PerfectTimberWithin, ticket: Optional[Union[TimberTicket, str]] = None) -> Timber:
+    """
+    Creates a timber that is face aligned and attached to the given timber. The original timber is refered to as "original_timber" and the new timber is refered to as "attached_timber".
+
+    original_timber_long_face_that_attached_timber_points_to : TimberLongFace
+    attached_timber_end_that_points_towards_original_timber : TimberReferenceEnd
+
+    original_timber_end_to_measure_from_for_length_position : TimberReferenceEnd
+    attached_timber_long_face_to_measure_to_for_length_position : TimberLongFace
+    length_position_measurement : Numeric
+
+    original_timber_face_to_measure_from_for_lateral_position : TimberFace | TimberCenterline
+    attached_timber_long_face_to_measure_to_for_lateral_position : TimberLongFace | TimberCenterline
+    lateral_position_measurement : Numeric
+    """
+    pass
 
 def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin, 
                 location_on_timber1: Numeric,
