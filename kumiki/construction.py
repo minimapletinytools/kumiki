@@ -10,6 +10,8 @@ from kumiki.measuring import *
 from kumiki.timber_shavings import *
 from kumiki.ticket import TimberTicket
 from typing import Dict, Any
+# TODO switch to warnings.deprecated when upgrading to Python 3.13
+from typing_extensions import deprecated
 
 
 # ============================================================================
@@ -552,6 +554,45 @@ def split_timber(
     
     return (bottom_timber, top_timber)
 
+def attach_timber(
+    original_timber: TimberLike,
+    size: V2, 
+    attached_timber_direction: Direction3D,
+    attached_timber_length: Numeric,
+    attached_timber_opposite_length: Numeric = Integer(0),
+    attached_timber_right_direction: Optional[Direction3D] = None,
+    attached_timber_end_that_points_towards_original_timber: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
+    original_timber_end_to_measure_from_for_length_position: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
+    length_position_measurement: Numeric = Integer(0),
+    lateral_offset: Numeric = Integer(0),
+    ticket: Optional[Union[TimberTicket, str]] = None,
+):
+    """
+    Creates a timber that isattached to ``original_timber``.
+
+    The original timber is referred to as "original_timber" and the new timber as
+    "attached_timber". 
+
+    ## Positioning
+
+    The attached timber's ``attached_timber_end_that_points_towards_original_timber`` end position is ``length_position_measurement`` away from 
+    ``original_timber_end_to_measure_from_for_length_position`` and then ``lateral_offset`` away from the centerline of the original timber, 
+    measured in the direction 
+    length axis of the original timber CROSS length axis of the created attached timber
+
+    ## Orientation
+
+    The attached timber's orientation is such that its length axis is in the attached_timber_direction direction
+    and its right face best aligns with ``attached_timber_right_direction``.
+    if ``attached_timber_right_direction`` is None then the direction of the TOP face of the original timber is used instead.
+
+    
+
+
+    Returns:
+        The new attached timber, face-aligned with and positioned relative to the original timber.
+    """
+    pass
 
 def attach_face_aligned_timber(
     original_timber: TimberLike,
@@ -796,6 +837,7 @@ def join_plane_aligned_on_place_aligned_timbers(timber1: PerfectTimberWithin, ti
 
 
 # TODO this function kinda sucks... awkward to measure to use, yo uneed to locate_face(timber1).mark_distance_from_end_along_centerline().distance or osmething crap like that to set lateral_offset_from_timber1 :(
+@deprecated("attach_face_aligned_timber is easier to understand")
 def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
                                                 location_on_timber1: Numeric,
                                                 stickout: Stickout,

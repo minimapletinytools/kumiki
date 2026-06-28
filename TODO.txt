@@ -124,8 +124,10 @@ DONE-have patterns replace the currentyl open viewer, frames create new viewer
 
 -add agent notes for timber orientation
 -do attach_timber function
-  -orientation paremetrs
-  -should be able to align feature of existing timber with feature of created timber
+  DONE-orientation paremetrs
+  DONE-should be able to align feature of existing timber with feature of created timber
+  -do attach_plane_aligned_timber
+  -do attach_timber
   -test and fix it lol
 
 
