@@ -570,10 +570,9 @@ def attach_timber(
     """
     NOTE this function is perhaps not so useful in practice, it's mainly here for completeness. Perhaps there are some cases where it's a better alternative to create_timber
 
-    Creates a timber that isattached to ``original_timber``.
+    Creates a timber that is attached to ``original_timber``.
 
-    The original timber is referred to as "original_timber" and the new timber as
-    "attached_timber". 
+    The original timber is referred to as "original_timber" and the new timber as "attached_timber". 
 
     ## Positioning
 
@@ -588,17 +587,27 @@ def attach_timber(
     and its right face best aligns with ``attached_timber_right_direction``.
     if ``attached_timber_right_direction`` is None then the direction of the TOP face of the original timber is used instead.
 
-    
-
-
     Returns:
         The new attached timber, face-aligned with and positioned relative to the original timber.
     """
     pass
 
 
-# TODO
 def attach_plane_aligned_timber(
+    original_timber: TimberLike,
+    size: V2, # always width, height in the local coordinates of the created attached timber
+    original_timber_long_face_that_attached_timber_points_to: TimberLongFace,
+    attached_timber_angle: Numeric, # angle between the length axis of the original timber and attached timber, note that this flips depending on attached_timber_end_that_points_towards_original_timber
+    attached_timber_length: Numeric,
+    attached_timber_opposite_length: Numeric = Integer(0),
+    attached_timber_end_that_points_towards_original_timber: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
+    original_timber_end_to_measure_from_for_length_position: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
+    attached_timber_long_face_to_measure_to_for_length_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
+    length_position_measurement: Numeric = Integer(0),
+    original_timber_face_to_measure_from_for_lateral_position: Union[TimberFace, TimberCenterline] = TimberCenterline.CENTERLINE,
+    attached_timber_long_face_to_measure_to_for_lateral_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
+    lateral_position_measurement: Numeric = Integer(0),
+    ticket: Optional[Union[TimberTicket, str]] = None,
 ):
     """
     """
