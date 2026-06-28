@@ -2138,6 +2138,7 @@ class Frame:
     accessories: List[JointAccessory] = field(default_factory=list)
     name: Optional[str] = None
     source_joints: Optional[List] = field(default=None, compare=False, hash=False, repr=False)
+    footprints: List[Footprint] = field(default_factory=list)
 
     @classmethod
     def from_joints(cls, joints: List[Joint],

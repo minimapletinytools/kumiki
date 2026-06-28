@@ -234,10 +234,76 @@ def make_attach_timber_example():
         accessories=[]
     )
 
+def _square_footprint(origin_x, origin_y, side):
+    """A square footprint with its near corner at (origin_x, origin_y)."""
+    return Footprint([
+        create_v2(origin_x, origin_y),
+        create_v2(origin_x + side, origin_y),
+        create_v2(origin_x + side, origin_y + side),
+        create_v2(origin_x, origin_y + side),
+    ])
+
+
+def make_footprint_vertical_example():
+    """
+    inside / outside / center placement of 5 posts on a 2' square footprint: one 4"x4" post on each
+    of the 4 corners plus one in the middle. The three placements are shown side by side.
+    """
+    side = feet(2)
+    post_size = create_v2(inches(4), inches(4))
+    post_height = feet(2)
+    spacing = feet(4)
+
+    footprints = []
+    cut_timbers = []
+    for i, location in enumerate([FootprintLocation.INSIDE, FootprintLocation.OUTSIDE, FootprintLocation.CENTER]):
+        origin_x = spacing * i
+        footprint = _square_footprint(origin_x, Integer(0), side)
+        footprints.append(footprint)
+        # a post on each of the 4 corners, placed inside / outside / on-center of the corner
+        for corner in range(4):
+            cut_timbers.append(CutTimber(create_vertical_timber_on_footprint_corner(
+                footprint, corner, post_height, location, post_size,
+                ticket=f"Post_{location.name}_corner{corner}")))
+        # a post in the middle of the footprint (centered on the centroid)
+        center_post = create_axis_aligned_timber(
+            create_v3(origin_x + side / 2, side / 2, Integer(0)),
+            post_height, post_size, TimberFace.TOP,
+            ticket=f"Post_{location.name}_middle")
+        cut_timbers.append(CutTimber(center_post))
+
+    return Frame(cut_timbers=cut_timbers, accessories=[], footprints=footprints)
+
+
+def make_footprint_horizontal_example():
+    """
+    inside / outside / center placement of 4 mudsills on a 2' square footprint (one 4"x4" mudsill
+    per side). The three placements are shown side by side.
+    """
+    side = feet(2)
+    mudsill_size = create_v2(inches(4), inches(4))
+    spacing = feet(4)
+
+    footprints = []
+    cut_timbers = []
+    for i, location in enumerate([FootprintLocation.INSIDE, FootprintLocation.OUTSIDE, FootprintLocation.CENTER]):
+        origin_x = spacing * i
+        footprint = _square_footprint(origin_x, Integer(0), side)
+        footprints.append(footprint)
+        # a mudsill on each of the 4 sides
+        for side_index in range(4):
+            cut_timbers.append(CutTimber(create_horizontal_timber_on_footprint(
+                footprint, side_index, location, mudsill_size,
+                ticket=f"Mudsill_{location.name}_side{side_index}")))
+
+    return Frame(cut_timbers=cut_timbers, accessories=[], footprints=footprints)
+
 patterns = [
     Pattern(path="construction/join_face_aligned_on_face_aligned_timbers", lambda_=lambda center: make_join_face_aligned_on_face_aligned_timbers_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber", lambda_=lambda center: make_attach_face_aligned_timber_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber_flush", lambda_=lambda center: make_attach_face_aligned_timber_flush_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_plane_aligned_timber_brace", lambda_=lambda center: make_attach_plane_aligned_timber_brace_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_timber", lambda_=lambda center: make_attach_timber_example(), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/footprint/vertical", lambda_=lambda center: make_footprint_vertical_example(), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/footprint/horizontal", lambda_=lambda center: make_footprint_horizontal_example(), pattern_type='frame', tags=['main']),
 ]

@@ -645,9 +645,26 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
             removed_keys.append(cached_key)
             del ss.mesh_cache[cached_key]
 
+    # Footprints are flat polygons in the XY (z=0) ground plane. We send their corners (as
+    # [x, y, 0] points) and let the viewer build a light fill + darkened edge.
+    footprints_payload = []
+    frame_footprints = list(getattr(frame, "footprints", None) or [])
+    for index, footprint in enumerate(frame_footprints):
+        try:
+            corners = []
+            for corner in footprint.corners:
+                corners.append([float(corner[0]), float(corner[1]), 0.0])
+            footprints_payload.append({
+                "key": f"footprint#{index}",
+                "corners": corners,
+            })
+        except Exception as exc:
+            log_stderr(f"Warning: skipping footprint {index}: {exc}")
+
     return {
         "kind": "triangle-geometry",
         "meshes": meshes,
+        "footprints": footprints_payload,
         "changedKeys": changed_keys,
         "removedKeys": removed_keys,
         "remeshMetrics": remesh_metrics,

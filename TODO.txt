@@ -121,16 +121,15 @@ DONE-wedged half dovetail joint broke
 DONE-rename housed dovtail to dropin dovetail butt joint
 DONE-have patterns replace the currentyl open viewer, frames create new viewer
   -or do right click open in new window option
-
--add agent notes for timber orientation
--do attach_timber function
+DONE-add agent notes for timber orientation
+DONE-do attach_timber function
   DONE-orientation paremetrs
   DONE-should be able to align feature of existing timber with feature of created timber
   -do attach_plane_aligned_timber
   -do attach_timber
   -test and fix it lol
-
-
+  
+-consider removing the opposite_length or renaming it stickout in attach_timber functions
 -cleanup and author new construction pattern
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
 -would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...

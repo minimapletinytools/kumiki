@@ -379,6 +379,10 @@ class ViewerSettingsPanel {
                     reflection
                 </label>
                 <label>
+                    <input id="footprint-toggle" type="checkbox" ?checked=${this.app.footprintsEnabled}>
+                    footprint
+                </label>
+                <label>
                     <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
                     debug info
                 </label>
@@ -539,6 +543,13 @@ class ViewerSettingsPanel {
         reflectionsToggle.addEventListener('change', (event) => {
             this.app.setReflectionsEnabled(event.target.checked);
         });
+
+        const footprintToggle = renderRoot.querySelector('#footprint-toggle');
+        if (footprintToggle) {
+            footprintToggle.addEventListener('change', (event) => {
+                this.app.setFootprintsEnabled(event.target.checked);
+            });
+        }
 
         if (exportCombinedToggle) {
             exportCombinedToggle.addEventListener('change', (event) => {
@@ -854,6 +865,8 @@ class KigumiViewerApp extends LitElement {
         this.edgesEnabled = true;
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
+        this.footprintsEnabled = true;
+        this.footprintObjects = [];
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
         this.logFilterText = '';
@@ -1369,6 +1382,7 @@ class KigumiViewerApp extends LitElement {
         this.setEdgesEnabled(this.edgesEnabled);
         this.setShadowsEnabled(this.shadowsEnabled);
         this.setReflectionsEnabled(this.reflectionsEnabled);
+        this.setFootprintsEnabled(this.footprintsEnabled);
 
         this.updateCamera();
         const animate = () => {
@@ -1557,6 +1571,7 @@ class KigumiViewerApp extends LitElement {
                 edgeLineVisibilityPercent: Number(this.edgeLineVisibilityPercent),
                 shadowsEnabled: Boolean(this.shadowsEnabled),
                 reflectionsEnabled: Boolean(this.reflectionsEnabled),
+                footprintsEnabled: Boolean(this.footprintsEnabled),
                 debugEnabled: Boolean(this.debugEnabled),
                 leftClickDragRotatesCamera: Boolean(this.leftClickDragRotatesCamera),
                 unselectedTransparencyPercent: Number(this.unselectedTransparencyPercent),
@@ -1605,6 +1620,9 @@ class KigumiViewerApp extends LitElement {
         }
         if (typeof ui.reflectionsEnabled === 'boolean') {
             this.setReflectionsEnabled(ui.reflectionsEnabled);
+        }
+        if (typeof ui.footprintsEnabled === 'boolean') {
+            this.setFootprintsEnabled(ui.footprintsEnabled);
         }
         if (typeof ui.debugEnabled === 'boolean') {
             this.debugEnabled = ui.debugEnabled;
@@ -3143,6 +3161,86 @@ class KigumiViewerApp extends LitElement {
         this.updateReflectionTransforms();
     }
 
+    setFootprintsEnabled(enabled) {
+        this.footprintsEnabled = enabled;
+        if (Array.isArray(this.footprintObjects)) {
+            for (const obj of this.footprintObjects) {
+                if (obj && obj.group) {
+                    obj.group.visible = enabled;
+                }
+            }
+        }
+    }
+
+    disposeFootprintObjects() {
+        if (!Array.isArray(this.footprintObjects)) {
+            this.footprintObjects = [];
+            return;
+        }
+        for (const obj of this.footprintObjects) {
+            if (!obj) {
+                continue;
+            }
+            if (obj.group && this.scene) {
+                this.scene.remove(obj.group);
+            }
+            if (obj.fillGeometry) obj.fillGeometry.dispose();
+            if (obj.fillMaterial) obj.fillMaterial.dispose();
+            if (obj.edgeGeometry) obj.edgeGeometry.dispose();
+            if (obj.edgeMaterial) obj.edgeMaterial.dispose();
+        }
+        this.footprintObjects = [];
+    }
+
+    rebuildFootprints(footprints) {
+        this.disposeFootprintObjects();
+        const list = Array.isArray(footprints) ? footprints : [];
+        for (const footprint of list) {
+            const corners = (footprint && Array.isArray(footprint.corners)) ? footprint.corners : [];
+            if (corners.length < 3) {
+                continue;
+            }
+
+            // Light filled polygon in the ground (XY, z=0) plane.
+            const shape = new THREE.Shape();
+            shape.moveTo(corners[0][0], corners[0][1]);
+            for (let i = 1; i < corners.length; i += 1) {
+                shape.lineTo(corners[i][0], corners[i][1]);
+            }
+            shape.closePath();
+            const fillGeometry = new THREE.ShapeGeometry(shape);
+            const fillMaterial = new THREE.MeshBasicMaterial({
+                color: 0xb8bec8,
+                transparent: true,
+                opacity: 0.3,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+            });
+            const fillMesh = new THREE.Mesh(fillGeometry, fillMaterial);
+            fillMesh.renderOrder = -1;
+
+            // Darkened edge around the footprint boundary.
+            const edgePoints = corners.map((c) => new THREE.Vector3(c[0], c[1], 0));
+            edgePoints.push(new THREE.Vector3(corners[0][0], corners[0][1], 0));
+            const edgeGeometry = new THREE.BufferGeometry().setFromPoints(edgePoints);
+            const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x3b4250 });
+            const edgeLine = new THREE.Line(edgeGeometry, edgeMaterial);
+            edgeLine.renderOrder = 0;
+
+            const group = new THREE.Group();
+            // Lift a hair off the ground plane to avoid z-fighting with the shadow catcher.
+            group.position.z = 0.0015;
+            group.add(fillMesh);
+            group.add(edgeLine);
+            group.visible = this.footprintsEnabled;
+            if (this.scene) {
+                this.scene.add(group);
+            }
+
+            this.footprintObjects.push({ group, fillGeometry, fillMaterial, edgeGeometry, edgeMaterial });
+        }
+    }
+
     setLeftClickDragRotatesCameraEnabled(enabled) {
         this.leftClickDragRotatesCamera = Boolean(enabled);
         this.requestUpdate();
@@ -3875,6 +3973,7 @@ class KigumiViewerApp extends LitElement {
             }
         }
 
+        this.rebuildFootprints(geometryData && geometryData.footprints);
         this.rebuildTimberTable(meshes);
         this.updateReflectionTransforms();
         this.applySelectionOpacity();
