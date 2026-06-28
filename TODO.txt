@@ -126,8 +126,10 @@ DONE-have patterns replace the currentyl open viewer, frames create new viewer
 -do attach_timber function
   -orientation paremetrs
   -should be able to align feature of existing timber with feature of created timber
+  -test and fix it lol
 
 
+-cleanup and author new construction pattern
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
 -would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
 -reorg all mortise and tenon joint examples

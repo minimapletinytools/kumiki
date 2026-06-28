@@ -1769,3 +1769,161 @@ def test_join_plane_aligned_on_place_aligned_timbers():
         t1.get_face_direction_global(TimberLongFace.LEFT),
     )
 
+
+class TestAttachFaceAlignedTimber:
+    """Tests for attach_face_aligned_timber."""
+
+    def _make_post(self):
+        # Vertical 2x2 post from the origin, length 10, length +Z, width +X.
+        # => RIGHT face normal +X, FRONT face normal +Y, length +Z.
+        return timber_from_directions(
+            length=Rational(10),
+            size=create_v2(Rational(2), Rational(2)),
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="Post",
+        )
+
+    def _assert_v3(self, v, x, y, z):
+        assert simplify(v[0] - x) == 0, f"x: got {v[0]}, expected {x}"
+        assert simplify(v[1] - y) == 0, f"y: got {v[1]}, expected {y}"
+        assert simplify(v[2] - z) == 0, f"z: got {v[2]}, expected {z}"
+
+    def test_basic_orientation_and_position(self, symbolic_mode):
+        post = self._make_post()
+        beam = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            ticket="Beam",
+        )
+        # length runs out the RIGHT (+X) face of the post
+        self._assert_v3(beam.get_length_direction_global(), 1, 0, 0)
+        # width axis runs along the post's length (+Z) per the orientation convention
+        self._assert_v3(beam.get_width_direction_global(), 0, 0, 1)
+        assert simplify(beam.length - Rational(5)) == 0
+        # with defaults the bottom end sits at the post centerline and the beam extends out
+        self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
+        # fully face-aligned with the post
+        assert are_timbers_face_aligned(post, beam)
+
+    def test_length_and_lateral_position(self, symbolic_mode):
+        post = self._make_post()
+        beam = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            length_position_measurement=Rational(4),
+            original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberCenterline.CENTERLINE,
+            lateral_position_measurement=Rational(1),
+        )
+        # 4 up from the bottom along the post; 1 "into" the post from the front face
+        # (front face at y=1 -> centerline lands at y=0)
+        self._assert_v3(beam.get_bottom_position_global(), 0, 0, 4)
+
+    def test_opposite_length_bottom_end(self, symbolic_mode):
+        post = self._make_post()
+        beam = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            attached_timber_opposite_length=Rational(1),
+        )
+        assert simplify(beam.length - Rational(6)) == 0
+        # bottom end (toward the original) is 1 on the far side of the post centerline
+        self._assert_v3(beam.get_bottom_position_global(), -1, 0, 0)
+
+    def test_top_end_points_toward_original(self, symbolic_mode):
+        post = self._make_post()
+        beam = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            attached_timber_opposite_length=Rational(1),
+            attached_timber_end_that_points_towards_original_timber=TimberReferenceEnd.TOP,
+        )
+        assert simplify(beam.length - Rational(6)) == 0
+        # length now points back toward the post (-X); the bottom sticks out at x=5
+        self._assert_v3(beam.get_length_direction_global(), -1, 0, 0)
+        self._assert_v3(beam.get_bottom_position_global(), 5, 0, 0)
+        # the physical span [-1, 5] in X is identical to the BOTTOM-end case
+        self._assert_v3(locate_top_center_position(beam).position, -1, 0, 0)
+
+    def test_length_measure_to_long_face(self, symbolic_mode):
+        post = self._make_post()
+        beam = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            length_position_measurement=Rational(4),
+            attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.LEFT,
+        )
+        # the beam's LEFT face (its lower face along +Z) is exactly 4 up from the post bottom
+        left_face_center = get_center_point_on_face_global(TimberLongFace.LEFT, beam)
+        assert simplify(left_face_center[2] - Rational(4)) == 0
+        # the beam center is half its width (1) above that face
+        self._assert_v3(beam.get_bottom_position_global(), 0, 0, 5)
+
+    def test_face_aligned_for_each_long_face(self, symbolic_mode):
+        # attaching out of each of the post's long faces stays face-aligned
+        post = self._make_post()
+        for face in [TimberLongFace.RIGHT, TimberLongFace.LEFT, TimberLongFace.FRONT, TimberLongFace.BACK]:
+            beam = attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(Rational(2), Rational(3)),
+                original_timber_long_face_that_attached_timber_points_to=face,
+                attached_timber_length=Rational(5),
+            )
+            assert are_timbers_face_aligned(post, beam), f"not face aligned for {face}"
+            # the beam points out of the chosen face
+            assert are_vectors_parallel(
+                beam.get_length_direction_global(),
+                post.get_face_direction_global(face),
+            )
+
+    def test_assert_lateral_from_non_lateral_face(self, symbolic_mode):
+        post = self._make_post()
+        with pytest.raises(AssertionError):
+            attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(Rational(2), Rational(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length=Rational(5),
+                # RIGHT face normal is the attach axis, not a lateral face
+                original_timber_face_to_measure_from_for_lateral_position=TimberFace.RIGHT,
+                lateral_position_measurement=Rational(1),
+            )
+
+    def test_assert_length_to_non_parallel_face(self, symbolic_mode):
+        post = self._make_post()
+        with pytest.raises(AssertionError):
+            attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(Rational(2), Rational(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length=Rational(5),
+                # FRONT is a lateral face of the beam, not parallel to the post's end faces
+                attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.FRONT,
+                length_position_measurement=Rational(4),
+            )
+
+    def test_assert_lateral_to_non_lateral_attached_face(self, symbolic_mode):
+        post = self._make_post()
+        with pytest.raises(AssertionError):
+            attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(Rational(2), Rational(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length=Rational(5),
+                # RIGHT runs along the post length, not a lateral face of the beam
+                attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
+                lateral_position_measurement=Rational(1),
+            )
+
