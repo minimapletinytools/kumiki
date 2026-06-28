@@ -265,12 +265,11 @@ def make_footprint_vertical_example():
             cut_timbers.append(CutTimber(create_vertical_timber_on_footprint_corner(
                 footprint, corner, post_height, location, post_size,
                 ticket=f"Post_{location.name}_corner{corner}")))
-        # a post in the middle of the footprint (centered on the centroid)
-        center_post = create_axis_aligned_timber(
-            create_v3(origin_x + side / 2, side / 2, Integer(0)),
-            post_height, post_size, TimberFace.TOP,
-            ticket=f"Post_{location.name}_middle")
-        cut_timbers.append(CutTimber(center_post))
+        # a post at the midpoint of side 0, demonstrating non-corner footprint side placement
+        mid_post = create_vertical_timber_on_footprint_side(
+            footprint, 0, side / 2, post_height, location, post_size,
+            ticket=f"Post_{location.name}_side_mid")
+        cut_timbers.append(CutTimber(mid_post))
 
     return Frame(cut_timbers=cut_timbers, accessories=[], footprints=footprints)
 
