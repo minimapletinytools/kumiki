@@ -1943,3 +1943,81 @@ class TestAttachFaceAlignedTimber:
         assert are_timbers_face_aligned(post, beam_fb)
         assert are_timbers_face_aligned(post, beam_rl)
 
+
+class TestAttachPlaneAlignedTimber:
+    """Tests for attach_plane_aligned_timber (the angled generalization)."""
+
+    def _make_post(self):
+        return timber_from_directions(
+            length=Rational(10),
+            size=create_v2(Rational(2), Rational(2)),
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="Post",
+        )
+
+    def _assert_v3(self, v, x, y, z):
+        assert simplify(v[0] - x) == 0, f"x: got {v[0]}, expected {x}"
+        assert simplify(v[1] - y) == 0, f"y: got {v[1]}, expected {y}"
+        assert simplify(v[2] - z) == 0, f"z: got {v[2]}, expected {z}"
+
+    def test_reduces_to_face_aligned_at_ninety_degrees(self, symbolic_mode):
+        # at pi/2 the plane-aligned attach must match the face-aligned attach exactly
+        post = self._make_post()
+        common = dict(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length=Rational(5),
+            attached_timber_opposite_length=Rational(1),
+            length_position_measurement=Rational(4),
+            original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,
+            attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.BACK,
+            lateral_position_measurement=Rational(1),
+        )
+        plane = attach_plane_aligned_timber(attached_timber_angle=pi / 2, **common)
+        face = attach_face_aligned_timber(**common)
+        bp, bf = plane.get_bottom_position_global(), face.get_bottom_position_global()
+        self._assert_v3(bp, bf[0], bf[1], bf[2])
+        assert simplify(plane.length - face.length) == 0
+        ld, lf = plane.get_length_direction_global(), face.get_length_direction_global()
+        self._assert_v3(ld, lf[0], lf[1], lf[2])
+        wd, wf = plane.get_width_direction_global(), face.get_width_direction_global()
+        self._assert_v3(wd, wf[0], wf[1], wf[2])
+
+    def test_angled_brace_direction_and_plane_alignment(self, symbolic_mode):
+        # a 45-degree brace out the RIGHT face runs up-and-out and stays plane-aligned
+        post = self._make_post()
+        brace = attach_plane_aligned_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(2)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_angle=pi / 4,
+            attached_timber_length=Rational(6),
+        )
+        ld = brace.get_length_direction_global()
+        assert simplify(ld[0] - ld[2]) == 0      # equal +X and +Z components
+        assert simplify(ld[1]) == 0              # nothing lateral
+        assert simplify(ld[0] ** 2 + ld[2] ** 2 - 1) == 0  # unit length
+        assert simplify(ld[0]) > 0 and simplify(ld[2]) > 0  # up and out
+        assert are_timbers_plane_aligned(post, brace)
+
+    def test_end_flips_the_angle(self, symbolic_mode):
+        # the end that points toward the original flips the length direction (angle -> pi - angle)
+        post = self._make_post()
+        kw = dict(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(2)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_angle=pi / 4,
+            attached_timber_length=Rational(6),
+        )
+        bottom = attach_plane_aligned_timber(
+            attached_timber_end_that_points_towards_original_timber=TimberReferenceEnd.BOTTOM, **kw)
+        top = attach_plane_aligned_timber(
+            attached_timber_end_that_points_towards_original_timber=TimberReferenceEnd.TOP, **kw)
+        lb, lt = bottom.get_length_direction_global(), top.get_length_direction_global()
+        # the two length directions are exact opposites
+        self._assert_v3(lb, -lt[0], -lt[1], -lt[2])
+
