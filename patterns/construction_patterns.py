@@ -15,12 +15,12 @@ def inches(value):
 
 def create_test_posts_with_beam_centerline():
     """
-    Create two 4"x4"x8" vertical posts 8" apart, joined by a beam at centerline.
+    Create two 4"x4"x4' vertical posts 4' apart, joined by a beam at centerline.
     
     This uses the default centerline reference (feature_to_mark_on_joining_timber=None).
     """
     post_size = create_v2(inches(4), inches(4))
-    post_height = inches(8)  # 8 feet = 96 inches
+    post_height = feet(4) 
     beam_size = create_v2(inches(4), inches(4))
     
     # Create left post at origin
@@ -33,11 +33,11 @@ def create_test_posts_with_beam_centerline():
         ticket="Post_Left"
     )
     
-    # Create right post 8" away in X direction
+    # Create right post 4' away in X direction
     post_right = timber_from_directions(
         length=post_height,
         size=post_size,
-        bottom_position=create_v3(inches(8), 0, 0),
+        bottom_position=create_v3(feet(4), 0, 0),
         length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
         width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
         ticket="Post_Right"
@@ -47,9 +47,9 @@ def create_test_posts_with_beam_centerline():
     beam_centerline = join_face_aligned_on_face_aligned_timbers(
         timber1=post_left,
         timber2=post_right,
-        location_on_timber1=inches(4),  # Middle of 96" post
+        location_on_timber1=feet(2),  # Middle of 4' post
         stickout=Stickout.nostickout(),
-        lateral_offset_from_timber1=inches(0),
+        lateral_offset_from_timber1=feet(0),
         size=beam_size,
         feature_to_mark_on_joining_timber=TimberFeature.CENTERLINE,  # Default: centerline
         orientation_face_on_timber1=TimberFace.TOP,
