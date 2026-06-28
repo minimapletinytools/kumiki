@@ -560,7 +560,7 @@ def attach_timber(
     attached_timber_direction: Direction3D,
     attached_timber_length: Numeric,
     attached_timber_opposite_length: Numeric = Integer(0),
-    attached_timber_right_direction: Optional[Direction3D] = None,
+    attached_timber_width_direction: Optional[Direction3D] = None,
     attached_timber_end_that_points_towards_original_timber: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
     original_timber_end_to_measure_from_for_length_position: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
     length_position_measurement: Numeric = Integer(0),
@@ -590,7 +590,56 @@ def attach_timber(
     Returns:
         The new attached timber, face-aligned with and positioned relative to the original timber.
     """
-    pass
+    # ---- type checks ----
+    assert isinstance(original_timber, PerfectTimberWithin), \
+        f"original_timber must be a timber (PerfectTimberWithin), got {type(original_timber).__name__}"
+    assert isinstance(attached_timber_end_that_points_towards_original_timber, TimberReferenceEnd), \
+        f"attached_timber_end_that_points_towards_original_timber must be TimberReferenceEnd, got {type(attached_timber_end_that_points_towards_original_timber).__name__}"
+    assert isinstance(original_timber_end_to_measure_from_for_length_position, TimberReferenceEnd), \
+        f"original_timber_end_to_measure_from_for_length_position must be TimberReferenceEnd, got {type(original_timber_end_to_measure_from_for_length_position).__name__}"
+
+    # point_dir is the direction the attached timber points; length_dir is its +length (bottom->top),
+    # which flips when the TOP end is the one sitting against the original timber.
+    point_dir = normalize_vector(attached_timber_direction)
+    if attached_timber_end_that_points_towards_original_timber == TimberReferenceEnd.BOTTOM:
+        length_dir = point_dir
+    else:
+        length_dir = -point_dir
+
+    # ---- reference point: a position on the original timber's centerline, then offset laterally ----
+    if original_timber_end_to_measure_from_for_length_position == TimberReferenceEnd.BOTTOM:
+        reference = locate_position_on_centerline_from_bottom(original_timber, length_position_measurement).position
+    else:  # TOP
+        reference = locate_position_on_centerline_from_top(original_timber, length_position_measurement).position
+
+    if lateral_offset != Integer(0):
+        # lateral direction = original length axis CROSS the attached timber's length axis
+        original_length_dir = original_timber.get_length_direction_global()
+        assert not are_vectors_parallel(length_dir, original_length_dir), \
+            "lateral_offset requires the attached timber to not be parallel to the original timber's length"
+        lateral_dir = normalize_vector(cross_product(original_length_dir, length_dir))
+        reference = reference + lateral_dir * lateral_offset
+
+    # ---- extend along the pointing direction and build the timber ----
+    attached_total_length = attached_timber_length + attached_timber_opposite_length
+    assert safe_compare(attached_total_length, Integer(0), Comparison.GT), \
+        "attached timber total length (attached_timber_length + attached_timber_opposite_length) must be positive"
+
+    center = reference + point_dir * (attached_timber_length - attached_timber_opposite_length) / Integer(2)
+    bottom_position = center - length_dir * (attached_total_length / Integer(2))
+
+    # default the width direction to the original timber's length (its TOP face direction)
+    width_direction = attached_timber_width_direction if attached_timber_width_direction is not None \
+        else original_timber.get_length_direction_global()
+
+    return create_timber(
+        bottom_position=bottom_position,
+        length=attached_total_length,
+        size=size,
+        length_direction=length_dir,
+        width_direction=width_direction,
+        ticket=ticket,
+    )
 
 
 def attach_plane_aligned_timber(

@@ -194,9 +194,50 @@ def make_attach_plane_aligned_timber_brace_example():
         accessories=[]
     )
 
+def make_attach_timber_example():
+    """
+    A 4"x4" vertical post with a 4"x4" timber attached pointing in an arbitrary direction.
+
+    Unlike the face/plane-aligned variants, attach_timber takes a raw direction vector and is not
+    aligned to the post's faces: the timber points along (2, 1, 1), with its near end 24" up the
+    post centerline and offset 6" laterally.
+    """
+    post_size = create_v2(inches(4), inches(4))
+    post_height = feet(8)
+    attached_size = create_v2(inches(4), inches(4))
+
+    post = timber_from_directions(
+        length=post_height,
+        size=post_size,
+        bottom_position=create_v3(0, 0, 0),
+        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
+        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        ticket="Post",
+    )
+
+    attached = attach_timber(
+        original_timber=post,
+        size=attached_size,
+        attached_timber_direction=create_v3(Integer(2), Integer(1), Integer(1)),  # arbitrary
+        attached_timber_length=feet(3),
+        original_timber_end_to_measure_from_for_length_position=TimberReferenceEnd.BOTTOM,
+        length_position_measurement=inches(24),
+        lateral_offset=inches(6),
+        ticket="Attached",
+    )
+
+    return Frame(
+        cut_timbers=[
+            CutTimber(post),
+            CutTimber(attached),
+        ],
+        accessories=[]
+    )
+
 patterns = [
     Pattern(path="construction/join_face_aligned_on_face_aligned_timbers", lambda_=lambda center: make_join_face_aligned_on_face_aligned_timbers_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber", lambda_=lambda center: make_attach_face_aligned_timber_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber_flush", lambda_=lambda center: make_attach_face_aligned_timber_flush_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_plane_aligned_timber_brace", lambda_=lambda center: make_attach_plane_aligned_timber_brace_example(), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_timber", lambda_=lambda center: make_attach_timber_example(), pattern_type='frame', tags=['main']),
 ]

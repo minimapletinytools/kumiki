@@ -2021,3 +2021,45 @@ class TestAttachPlaneAlignedTimber:
         # the two length directions are exact opposites
         self._assert_v3(lb, -lt[0], -lt[1], -lt[2])
 
+
+class TestAttachTimber:
+    """Test for attach_timber (arbitrary direction, no face/plane alignment)."""
+
+    def test_direction_position_and_lateral_offset(self, symbolic_mode):
+        post = timber_from_directions(
+            length=Rational(10),
+            size=create_v2(Rational(2), Rational(2)),
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="Post",
+        )
+        # point out the +X direction, 5 long, near (bottom) end 4 up the post centerline
+        beam = attach_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(2)),
+            attached_timber_direction=create_v3(1, 0, 0),
+            attached_timber_length=Rational(5),
+            length_position_measurement=Rational(4),
+        )
+        assert simplify(beam.length - Rational(5)) == 0
+        self._assert_v3(beam.get_length_direction_global(), 1, 0, 0)
+        # the near end sits on the post centerline at height 4 and the beam extends out +X
+        self._assert_v3(beam.get_bottom_position_global(), 0, 0, 4)
+
+        # lateral_offset shifts along original-length x attached-length = cross(+Z, +X) = +Y
+        offset_beam = attach_timber(
+            original_timber=post,
+            size=create_v2(Rational(2), Rational(2)),
+            attached_timber_direction=create_v3(1, 0, 0),
+            attached_timber_length=Rational(5),
+            length_position_measurement=Rational(4),
+            lateral_offset=Rational(3),
+        )
+        self._assert_v3(offset_beam.get_bottom_position_global(), 0, 3, 4)
+
+    def _assert_v3(self, v, x, y, z):
+        assert simplify(v[0] - x) == 0, f"x: got {v[0]}, expected {x}"
+        assert simplify(v[1] - y) == 0, f"y: got {v[1]}, expected {y}"
+        assert simplify(v[2] - z) == 0, f"z: got {v[2]}, expected {z}"
+
