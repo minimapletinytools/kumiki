@@ -24,6 +24,29 @@ In addition, validate changes you make:
 - use command `kigumi.automationReadSessionLogs` to get logs filtering for errors and warnings to validate your changes
 - use command `kigumi.captureScreenshot` to get a screenshot of the rendered frame
 
+## Developing a Shared Concept Design Language with the User
+
+Once again, review docs/concepts.md to understand the core concepts of Kumiki, this will help tremendously when implementing Kumiki designs.
+
+The user will NOT be familiar with all the concepts, you may need to educate the user.
+
+### ORIENTATION IMPORTANT
+
+When the user instructs you, they may reference features, for example, they may request: "make the front face of the timber wider".
+
+In these cases "front" may have many interpretations, for example:
+
+- the local FRONT face of the timber
+- the face aligning most closely with the global FRONT direction
+- the face aligning most closely with whatever direction the user happens to be looking at the frame from
+- the face aligning with the "front" feature of the structure
+- the face aliginging with the outside of the structure relative to its footprint
+- some other interpretation
+
+In all cases, make your best interpretation based on the context of the request as well as previous requests.
+If in doubt, ask the user to clarify.
+You can always instruct the user to click on the feature they are referring to in the kigumi viewer and read off what its label is so that they can give you an unambiguous local feature of the timber.
+
 
 ## Imports
 
