@@ -13,7 +13,7 @@ def inches(value):
     # So value inches = value * 0.0254 = value * 254/10000 = value * 127/5000
     return Rational(value) * Rational(254, 10000)
 
-def create_test_posts_with_beam_centerline():
+def make_join_face_aligned_on_face_aligned_timbers_example():
     """
     Create two 4"x4"x4' vertical posts 4' apart, joined by a beam at centerline.
     
@@ -65,7 +65,7 @@ def create_test_posts_with_beam_centerline():
         accessories=[]
     )
 
-def create_post_with_attached_beam():
+def make_attach_face_aligned_timber_example():
     """
     Create a 4"x4" vertical post with a 4"x6" beam attached to its RIGHT face.
 
@@ -90,15 +90,15 @@ def create_post_with_attached_beam():
         original_timber=post,
         size=beam_size,
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-        attached_timber_length=inches(48),
-        attached_timber_opposite_length=inches(2),
+        attached_timber_length=feet(4),
+        attached_timber_opposite_length=feet(2),
         # position 48" up from the bottom, measured to the beam centerline
         original_timber_end_to_measure_from_for_length_position=TimberReferenceEnd.BOTTOM,
-        length_position_measurement=inches(48),
+        length_position_measurement=feet(2),
         # keep the beam's BACK face flush with the post's FRONT face laterally
         original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,
         attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.BACK,
-        lateral_position_measurement=inches(0),
+        lateral_position_measurement=feet(0),
         ticket="Attached_Beam",
     )
 
@@ -111,6 +111,6 @@ def create_post_with_attached_beam():
     )
 
 patterns = [
-    Pattern(path="construction/posts_with_beam_centerline", lambda_=lambda center: create_test_posts_with_beam_centerline(), pattern_type='frame', tags=['main']),
-    Pattern(path="construction/post_with_attached_beam", lambda_=lambda center: create_post_with_attached_beam(), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/join_face_aligned_on_face_aligned_timbers", lambda_=lambda center: make_join_face_aligned_on_face_aligned_timbers_example(), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_face_aligned_timber", lambda_=lambda center: make_attach_face_aligned_timber_example(), pattern_type='frame', tags=['main']),
 ]

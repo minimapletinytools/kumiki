@@ -552,10 +552,10 @@ def split_timber(
     
     return (bottom_timber, top_timber)
 
-# TODO I doubt this is right, check and fix
+
 def attach_face_aligned_timber(
     original_timber: TimberLike,
-    size: V2,
+    size: V2, # always width, height in the local coordinates of the created attached timber
     original_timber_long_face_that_attached_timber_points_to: TimberLongFace,
     attached_timber_length: Numeric,
     attached_timber_opposite_length: Numeric = Integer(0),
@@ -603,9 +603,12 @@ def attach_face_aligned_timber(
     Returns:
         The new attached timber, face-aligned with and positioned relative to the original timber.
     """
+    # TODO
     # assert that attached_timber_long_face_to_measure_to_for_length_position is CENTERLINE or parallel to top/bottom faces of original_timber
     # assert that original_timber_face_to_measure_from_for_lateral_position is CENTERLINE or perpendicular to original_timber_long_face_that_attached_timber_points_to
     # assert that attached_timber_long_face_to_measure_to_for_lateral_position is CENTERLINE or perpendicular to original_timber_long_face_that_attached_timber_points_to
+
+    
     
     pass
     
