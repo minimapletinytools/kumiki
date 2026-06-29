@@ -678,10 +678,10 @@ def attach_plane_aligned_timber(
       (tilted) length axis, measured from the original timber's centerline.
     - the length-position is measured along the original timber's length axis from
       ``original_timber_end_to_measure_from_for_length_position`` to
-      ``attached_timber_long_face_to_measure_to_for_length_position`` (or its centerline).
+      ``attached_timber_long_face_to_measure_to_for_length_position`` (or orthogonally to its centerline).
     - the lateral-position is measured along the lateral axis from
       ``original_timber_face_to_measure_from_for_lateral_position`` to
-      ``attached_timber_long_face_to_measure_to_for_lateral_position`` (or its centerline).
+      ``attached_timber_long_face_to_measure_to_for_lateral_position`` (or orthogonally to its centerline).
 
     All measurements are taken from the perfect timber within of the original and attached timber.
 

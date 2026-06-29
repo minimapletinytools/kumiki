@@ -89,12 +89,15 @@ DONE-do attach_timber function
 DONE-update footprint examples so post on side is correct not in center...
 DONE-cleanup and author new construction pattern
 IGNORE-agent prompt examples
+DONE-TimberReferenceEnd -> TimberEnd
+DONE-do setup vid
+
 -someway to mke footprint show up more clearly in footprint examples? (probably just render on top of everything?)
 -consider removing the opposite_length or renaming it stickout in attach_timber functions
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
 -would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
 -reorg all mortise and tenon joint examples
--do setup vid
+
 -do shower vid
 -do example cleanup
 -make website
