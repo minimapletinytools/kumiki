@@ -32,7 +32,7 @@ class TestSpliceJoint:
         joint = cut_plain_butt_splice_joint_on_aligned_timbers(
             SpliceJointTimberArrangement(
                 timber1=timberA, timber2=timberB,
-                timber1_end=TimberReferenceEnd.TOP, timber2_end=TimberReferenceEnd.BOTTOM
+                timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.BOTTOM
             )
         )
         
@@ -78,7 +78,7 @@ class TestSpliceJoint:
         joint = cut_plain_butt_splice_joint_on_aligned_timbers(
             SpliceJointTimberArrangement(
                 timber1=timberA, timber2=timberB,
-                timber1_end=TimberReferenceEnd.TOP, timber2_end=TimberReferenceEnd.BOTTOM
+                timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.BOTTOM
             ),
             splice_point
         )
@@ -116,7 +116,7 @@ class TestSpliceJoint:
         joint = cut_plain_butt_splice_joint_on_aligned_timbers(
             SpliceJointTimberArrangement(
                 timber1=timberA, timber2=timberB,
-                timber1_end=TimberReferenceEnd.TOP, timber2_end=TimberReferenceEnd.TOP
+                timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.TOP
             )
         )
         
@@ -154,7 +154,7 @@ class TestSpliceJoint:
             cut_plain_butt_splice_joint_on_aligned_timbers(
                 SpliceJointTimberArrangement(
                     timber1=timberA, timber2=timberB,
-                    timber1_end=TimberReferenceEnd.TOP, timber2_end=TimberReferenceEnd.BOTTOM
+                    timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.BOTTOM
                 )
             )
 
@@ -205,8 +205,8 @@ class TestSpliceLapJoint:
             arrangement=SpliceJointTimberArrangement(
                 timber1=timberA,
                 timber2=timberB,
-                timber1_end=TimberReferenceEnd.TOP,
-                timber2_end=TimberReferenceEnd.BOTTOM,
+                timber1_end=TimberEnd.TOP,
+                timber2_end=TimberEnd.BOTTOM,
                 front_face_on_timber1=TimberLongFace.BACK
             ),
             lap_length=lap_length,

@@ -110,8 +110,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_front,
             timber2=mudsill_left,
-            timber1_end=TimberReferenceEnd.BOTTOM,
-            timber2_end=TimberReferenceEnd.TOP,
+            timber1_end=TimberEnd.BOTTOM,
+            timber2_end=TimberEnd.TOP,
             front_face_on_timber1=TimberLongFace.RIGHT,
         ),
     )
@@ -123,8 +123,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_front,
             timber2=mudsill_right,
-            timber1_end=TimberReferenceEnd.TOP,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.TOP,
+            timber2_end=TimberEnd.BOTTOM,
             front_face_on_timber1=TimberLongFace.RIGHT,
         ),
     )
@@ -136,8 +136,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_right,
             timber2=mudsill_back,
-            timber1_end=TimberReferenceEnd.TOP,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.TOP,
+            timber2_end=TimberEnd.BOTTOM,
             front_face_on_timber1=TimberLongFace.RIGHT,
         ),
     )
@@ -149,8 +149,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_back,
             timber2=mudsill_left,
-            timber1_end=TimberReferenceEnd.TOP,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.TOP,
+            timber2_end=TimberEnd.BOTTOM,
             front_face_on_timber1=TimberLongFace.RIGHT,
         ),
     )
@@ -265,7 +265,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_front,
             butt_timber=post_front_left,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
         tenon_size=tenon_size,
@@ -280,7 +280,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_front,
             butt_timber=post_front_right,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
         tenon_size=tenon_size,
@@ -294,7 +294,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_back,
             butt_timber=post_back_right,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
         tenon_size=tenon_size,
@@ -308,7 +308,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_back,
             butt_timber=post_back_left,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
         tenon_size=tenon_size,
@@ -335,7 +335,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_back,
             butt_timber=post_back_middle_right,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
         tenon_size=middle_post_tenon_size,
@@ -348,7 +348,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_back,
             butt_timber=post_back_middle_left,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
         tenon_size=middle_post_tenon_size,
@@ -410,7 +410,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=side_girt_left,
             butt_timber=post_back_left,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=side_girt_back_tenon_size,
@@ -423,7 +423,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=side_girt_right,
             butt_timber=post_back_right,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=side_girt_back_tenon_size,
@@ -460,7 +460,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=post_front_left,
             butt_timber=side_girt_left,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
         tenon_size=side_girt_tenon_size,
@@ -474,7 +474,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=post_front_right,
             butt_timber=side_girt_right,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
         tenon_size=side_girt_tenon_size,
@@ -561,8 +561,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=SpliceJointTimberArrangement(
             timber1=front_girt_middle,
             timber2=front_girt_left,
-            timber1_end=TimberReferenceEnd.BOTTOM,
-            timber2_end=TimberReferenceEnd.TOP,
+            timber1_end=TimberEnd.BOTTOM,
+            timber2_end=TimberEnd.TOP,
             front_face_on_timber1=TimberLongFace.FRONT,
         ),
         gooseneck_length=gooseneck_length,
@@ -579,8 +579,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=SpliceJointTimberArrangement(
             timber1=front_girt_middle,
             timber2=front_girt_right,
-            timber1_end=TimberReferenceEnd.TOP,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.TOP,
+            timber2_end=TimberEnd.BOTTOM,
             front_face_on_timber1=TimberLongFace.FRONT,
         ),
         gooseneck_length=gooseneck_length,
@@ -618,7 +618,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=post_front_left,
             butt_timber=front_girt_left,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
         tenon_size=front_girt_tenon_size,
@@ -632,7 +632,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=post_front_right,
             butt_timber=front_girt_right,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
         tenon_size=front_girt_tenon_size,
@@ -727,7 +727,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=top_plate_back,
             butt_timber=post_back_middle_right,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=middle_post_tenon_size,
@@ -740,7 +740,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=top_plate_back,
             butt_timber=post_back_middle_left,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=middle_post_tenon_size,
@@ -759,7 +759,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=top_plate_front,
             butt_timber=post_front_left,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=middle_post_tenon_size,
@@ -772,7 +772,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=top_plate_front,
             butt_timber=post_front_right,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=middle_post_tenon_size,
@@ -812,7 +812,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=top_plate_back,
             butt_timber=post_back_left,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=corner_post_to_beam_tenon_size,
@@ -825,7 +825,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=top_plate_back,
             butt_timber=post_back_right,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         tenon_size=corner_post_to_beam_tenon_size,
@@ -906,7 +906,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             arrangement=ButtJointTimberArrangement(
                 butt_timber=joist,
                 receiving_timber=mudsill_front,
-                butt_timber_end=TimberReferenceEnd.BOTTOM,
+                butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=TimberLongFace.RIGHT,
             ),
             receiving_timber_shoulder_inset=dovetail_shoulder_inset,
@@ -922,7 +922,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             arrangement=ButtJointTimberArrangement(
                 butt_timber=joist,
                 receiving_timber=mudsill_back,
-                butt_timber_end=TimberReferenceEnd.TOP,
+                butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.RIGHT,
             ),
             receiving_timber_shoulder_inset=dovetail_shoulder_inset,

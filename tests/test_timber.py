@@ -105,14 +105,14 @@ class TestTimberEnumConversions:
         assert TimberFeature.BACK_FACE.long_face() == TimberLongFace.BACK
     
     def test_timber_reference_end_to_feature(self):
-        """Test TimberReferenceEnd to TimberFeature conversion."""
-        assert TimberReferenceEnd.TOP.to == TimberFeature.TOP_FACE
-        assert TimberReferenceEnd.BOTTOM.to == TimberFeature.BOTTOM_FACE
+        """Test TimberEnd to TimberFeature conversion."""
+        assert TimberEnd.TOP.to == TimberFeature.TOP_FACE
+        assert TimberEnd.BOTTOM.to == TimberFeature.BOTTOM_FACE
     
     def test_timber_feature_to_end(self):
-        """Test TimberFeature to TimberReferenceEnd conversion."""
-        assert TimberFeature.TOP_FACE.end() == TimberReferenceEnd.TOP
-        assert TimberFeature.BOTTOM_FACE.end() == TimberReferenceEnd.BOTTOM
+        """Test TimberFeature to TimberEnd conversion."""
+        assert TimberFeature.TOP_FACE.end() == TimberEnd.TOP
+        assert TimberFeature.BOTTOM_FACE.end() == TimberEnd.BOTTOM
     
     def test_timber_long_edge_to_feature(self):
         """Test TimberLongEdge to TimberFeature conversion."""
@@ -184,9 +184,9 @@ class TestTimberEnumConversions:
     
     def test_timber_feature_end_conversion_invalid(self):
         """Test that converting non-end features to end raises error."""
-        with pytest.raises(ValueError, match="Cannot convert.*to TimberReferenceEnd"):
+        with pytest.raises(ValueError, match="Cannot convert.*to TimberEnd"):
             TimberFeature.RIGHT_FACE.end()
-        with pytest.raises(ValueError, match="Cannot convert.*to TimberReferenceEnd"):
+        with pytest.raises(ValueError, match="Cannot convert.*to TimberEnd"):
             TimberFeature.CENTERLINE.end()
     
     def test_timber_feature_edge_conversion_invalid(self):
@@ -1270,7 +1270,7 @@ class TestFrameBoundingBox:
             ButtJointTimberArrangement(
                 receiving_timber=timberA,
                 butt_timber=timberB,
-                butt_timber_end=TimberReferenceEnd.TOP
+                butt_timber_end=TimberEnd.TOP
             )
         )
         

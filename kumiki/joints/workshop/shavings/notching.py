@@ -26,7 +26,7 @@ from kumiki.cutcsg import (
 )
 from kumiki.measuring import Plane, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
-from kumiki.timber import Cutting, TimberCenterline, TimberFace, TimberLike, TimberReferenceEnd
+from kumiki.timber import Cutting, TimberCenterline, TimberFace, TimberLike, TimberEnd
 from kumiki.timber_shavings import (
     are_timbers_plane_aligned,
     get_perfect_support_distance_from_centerline,
@@ -306,7 +306,7 @@ def does_shoulder_plane_need_notching(
         return True
 
     tenon_end_direction = tenon_timber.get_face_direction_global(
-        TimberFace.TOP if tenon_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
+        TimberFace.TOP if tenon_end == TimberEnd.TOP else TimberFace.BOTTOM
     )
     mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction
@@ -324,7 +324,7 @@ def does_shoulder_plane_need_notching(
 def chop_shoulder_notch_aligned_with_timber(
     notch_timber: TimberLike,
     butting_timber: TimberLike,
-    butting_timber_end: TimberReferenceEnd,
+    butting_timber_end: TimberEnd,
     distance_from_centerline: Numeric,
     notch_wall_relief_cut_angle_radians: Numeric = Integer(0),
 ) -> Union[RectangularPrism, SolidUnion]:
@@ -346,7 +346,7 @@ def chop_shoulder_notch_aligned_with_timber(
 
     notch_length_dir_global = notch_timber.get_length_direction_global()
 
-    if butting_timber_end == TimberReferenceEnd.TOP:
+    if butting_timber_end == TimberEnd.TOP:
         raw_approach = -butting_timber.get_length_direction_global()
     else:
         raw_approach = butting_timber.get_length_direction_global()
@@ -633,7 +633,7 @@ def chop_notch_for_butt_joint_arrangement(
 
     # Direction from butt body out the joining end (= into receiving timber).
     butt_end_face = (
-        TimberFace.TOP if butt_timber_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
+        TimberFace.TOP if butt_timber_end == TimberEnd.TOP else TimberFace.BOTTOM
     )
     butt_end_direction_global = butt_timber.get_face_direction_global(butt_end_face)
 

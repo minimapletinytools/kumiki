@@ -100,7 +100,7 @@ class TestMiterJoint:
         # Create miter joint
         arrangement = CornerJointTimberArrangement(
             timber1=timberA, timber2=timberB,
-            timber1_end=TimberReferenceEnd.BOTTOM, timber2_end=TimberReferenceEnd.BOTTOM
+            timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM
         )
         joint = cut_plain_miter_joint_on_face_aligned_timbers(arrangement)
 
@@ -165,7 +165,7 @@ class TestMiterJoint:
             # Create miter joint
             arrangement = CornerJointTimberArrangement(
                 timber1=timberA, timber2=timberB,
-                timber1_end=TimberReferenceEnd.BOTTOM, timber2_end=TimberReferenceEnd.BOTTOM
+                timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM
             )
             joint = cut_plain_miter_joint_on_face_aligned_timbers(arrangement)
             
@@ -196,7 +196,7 @@ class TestMiterJoint:
         with pytest.raises(AssertionError, match="perpendicular"):
             arrangement = CornerJointTimberArrangement(
                 timber1=timberA, timber2=timberB,
-                timber1_end=TimberReferenceEnd.BOTTOM, timber2_end=TimberReferenceEnd.BOTTOM
+                timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM
             )
             cut_plain_miter_joint_on_face_aligned_timbers(arrangement)
         
@@ -204,7 +204,7 @@ class TestMiterJoint:
         with pytest.raises(AssertionError, match="perpendicular"):
             arrangement = CornerJointTimberArrangement(
                 timber1=timberA, timber2=timberC,
-                timber1_end=TimberReferenceEnd.BOTTOM, timber2_end=TimberReferenceEnd.BOTTOM
+                timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM
             )
             cut_plain_miter_joint_on_face_aligned_timbers(arrangement)
 
@@ -228,7 +228,7 @@ class TestMiterJoint:
 
         arrangement = CornerJointTimberArrangement(
             timber1=timberA, timber2=timberB,
-            timber1_end=TimberReferenceEnd.BOTTOM, timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM,
         )
         joint = cut_plain_miter_joint(arrangement)
 
@@ -270,8 +270,8 @@ class TestTongueAndForkJoint:
         arrangement = CornerJointTimberArrangement(
             timber1=tongue_timber,
             timber2=fork_timber,
-            timber1_end=TimberReferenceEnd.BOTTOM,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.BOTTOM,
+            timber2_end=TimberEnd.BOTTOM,
         )
         joint = cut_tongue_and_fork_corner_joint(arrangement)
 
@@ -300,7 +300,7 @@ class TestTongueAndForkJoint:
         )
         expected_tongue_end_cut = Cutting.make_end_cut(
             tongue_timber,
-            TimberReferenceEnd.BOTTOM,
+            TimberEnd.BOTTOM,
             tongue_distance_from_bottom,
         )
         actual_tongue_end_cut = tongue_cut.get_maybe_bottom_end_cut()
@@ -314,7 +314,7 @@ class TestTongueAndForkJoint:
         )
         expected_fork_end_cut = Cutting.make_end_cut(
             fork_timber,
-            TimberReferenceEnd.BOTTOM,
+            TimberEnd.BOTTOM,
             fork_distance_from_bottom,
         )
         actual_fork_end_cut = fork_cut.get_maybe_bottom_end_cut()
@@ -328,8 +328,8 @@ class TestTongueAndForkJoint:
         arrangement_a = CornerJointTimberArrangement(
             timber1=tongue_timber_a,
             timber2=fork_timber_a,
-            timber1_end=TimberReferenceEnd.BOTTOM,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.BOTTOM,
+            timber2_end=TimberEnd.BOTTOM,
         )
 
         joint_centered = cut_tongue_and_fork_corner_joint(arrangement_a)
@@ -339,8 +339,8 @@ class TestTongueAndForkJoint:
         arrangement_b = CornerJointTimberArrangement(
             timber1=tongue_timber_b,
             timber2=fork_timber_b,
-            timber1_end=TimberReferenceEnd.BOTTOM,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.BOTTOM,
+            timber2_end=TimberEnd.BOTTOM,
         )
         joint_shifted = cut_tongue_and_fork_corner_joint(
             arrangement_b,
@@ -373,8 +373,8 @@ class TestTongueAndForkJoint:
                 CornerJointTimberArrangement(
                     timber1=tongue_parallel,
                     timber2=fork_parallel,
-                    timber1_end=TimberReferenceEnd.BOTTOM,
-                    timber2_end=TimberReferenceEnd.BOTTOM,
+                    timber1_end=TimberEnd.BOTTOM,
+                    timber2_end=TimberEnd.BOTTOM,
                 )
             )
 
@@ -392,8 +392,8 @@ class TestTongueAndForkJoint:
                 CornerJointTimberArrangement(
                     timber1=tongue_non_plane,
                     timber2=fork_non_plane,
-                    timber1_end=TimberReferenceEnd.BOTTOM,
-                    timber2_end=TimberReferenceEnd.BOTTOM,
+                    timber1_end=TimberEnd.BOTTOM,
+                    timber2_end=TimberEnd.BOTTOM,
                 )
             )
 
@@ -407,8 +407,8 @@ class TestCornerLapJoint:
         arrangement = CornerJointTimberArrangement(
             timber1=timberA,
             timber2=timberB,
-            timber1_end=TimberReferenceEnd.BOTTOM,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.BOTTOM,
+            timber2_end=TimberEnd.BOTTOM,
             front_face_on_timber1=TimberLongFace.FRONT,
         )
 
@@ -437,8 +437,8 @@ class TestCornerLapJoint:
             timberB.get_length_direction_global(),
         )
 
-        expected_A_end_cut = Cutting.make_end_cut(timberA, TimberReferenceEnd.BOTTOM, expected_A_distance)
-        expected_B_end_cut = Cutting.make_end_cut(timberB, TimberReferenceEnd.BOTTOM, expected_B_distance)
+        expected_A_end_cut = Cutting.make_end_cut(timberA, TimberEnd.BOTTOM, expected_A_distance)
+        expected_B_end_cut = Cutting.make_end_cut(timberB, TimberEnd.BOTTOM, expected_B_distance)
 
         actual_A_end_cut = cutA.get_maybe_bottom_end_cut()
         actual_B_end_cut = cutB.get_maybe_bottom_end_cut()
@@ -494,13 +494,13 @@ def _assert_joint_structure(joint, num_keys, num_laps):
 def _assert_end_cuts_match_arrangement(joint, arrangement):
     cutA = joint.cuttings["timberA"]
     cutB = joint.cuttings["timberB"]
-    if arrangement.timber1_end == TimberReferenceEnd.TOP:
+    if arrangement.timber1_end == TimberEnd.TOP:
         assert cutA.get_maybe_top_end_cut() is not None
         assert cutA.get_maybe_bottom_end_cut() is None
     else:
         assert cutA.get_maybe_bottom_end_cut() is not None
         assert cutA.get_maybe_top_end_cut() is None
-    if arrangement.timber2_end == TimberReferenceEnd.TOP:
+    if arrangement.timber2_end == TimberEnd.TOP:
         assert cutB.get_maybe_top_end_cut() is not None
         assert cutB.get_maybe_bottom_end_cut() is None
     else:
@@ -639,8 +639,8 @@ class TestMiteredAndKeyedLapJoint:
         arrangement = CornerJointTimberArrangement(
             timber1=timberA,
             timber2=timberB,
-            timber1_end=TimberReferenceEnd.BOTTOM,
-            timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.BOTTOM,
+            timber2_end=TimberEnd.BOTTOM,
             front_face_on_timber1=TimberLongFace.RIGHT,
         )
         with pytest.raises((ValueError, AssertionError)):
@@ -683,7 +683,7 @@ def _make_simple_butt_arrangement():
     return ButtJointTimberArrangement(
         butt_timber=beam,
         receiving_timber=post,
-        butt_timber_end=TimberReferenceEnd.TOP,
+        butt_timber_end=TimberEnd.TOP,
         front_face_on_butt_timber=TimberLongFace.RIGHT,
     )
 

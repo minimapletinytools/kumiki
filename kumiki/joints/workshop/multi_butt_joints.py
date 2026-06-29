@@ -42,7 +42,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
                                            # length is in the axis parallel to the butt timbers
                                            spline_length: Numeric,
                                            # REQUIRED: the slot faces this end of the receiving timber
-                                           slot_facing_end_on_receiving_timber: TimberReferenceEnd,
+                                           slot_facing_end_on_receiving_timber: TimberEnd,
                                            # the spline has this much extra depth beyond the slot depth; defaults to 1/4 of slot_depth
                                            spline_extra_depth=None,
                                            # the slot extends this much beyond the spline on each end for clearance
@@ -75,8 +75,8 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     assert error is None, error
     warn_if_arrangement_timbers_imperfect(arrangement)
 
-    assert isinstance(slot_facing_end_on_receiving_timber, TimberReferenceEnd), (
-        f"slot_facing_end_on_receiving_timber must be TimberReferenceEnd, got "
+    assert isinstance(slot_facing_end_on_receiving_timber, TimberEnd), (
+        f"slot_facing_end_on_receiving_timber must be TimberEnd, got "
         f"{type(slot_facing_end_on_receiving_timber).__name__}"
     )
 
@@ -126,8 +126,8 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     slot_length = spline_length + Rational(2) * slot_symmetric_extra_length
     assert safe_compare(slot_length, 0, Comparison.GT), "slot_length must be > 0"
 
-    def _locate_butt_end_center_global(timber: TimberLike, end: TimberReferenceEnd) -> V3:
-        if end == TimberReferenceEnd.TOP:
+    def _locate_butt_end_center_global(timber: TimberLike, end: TimberEnd) -> V3:
+        if end == TimberEnd.TOP:
             return locate_top_center_position(timber).position
         return timber.get_bottom_position_global()
 
@@ -175,7 +175,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
         end_distance=slot_length / Rational(2),
     )
 
-    def _make_shoulder_end_cut(timber: TimberLike, timber_end: TimberReferenceEnd) -> HalfSpace:
+    def _make_shoulder_end_cut(timber: TimberLike, timber_end: TimberEnd) -> HalfSpace:
         butt_end_direction_global = timber.get_face_direction_global(timber_end)
         receiving_face = receiving_timber.get_closest_oriented_face_from_global_direction(-butt_end_direction_global)
         receiving_face_center_global = get_point_on_face_global(receiving_face, receiving_timber)
@@ -184,7 +184,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
             receiving_face_center_global - timber.get_bottom_position_global(),
             timber.get_length_direction_global(),
         )
-        if timber_end == TimberReferenceEnd.TOP:
+        if timber_end == TimberEnd.TOP:
             distance_from_end = timber.length - distance_from_bottom
         else:
             distance_from_end = distance_from_bottom
@@ -200,12 +200,12 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     butt_2_shoulder_end_cut = _make_shoulder_end_cut(butt_timber_2, arrangement.butt_timber_2_end)
     butt_1_shoulder_distance_from_bottom = (
         butt_1_shoulder_end_cut.offset
-        if arrangement.butt_timber_1_end == TimberReferenceEnd.TOP
+        if arrangement.butt_timber_1_end == TimberEnd.TOP
         else -butt_1_shoulder_end_cut.offset
     )
     butt_2_shoulder_distance_from_bottom = (
         butt_2_shoulder_end_cut.offset
-        if arrangement.butt_timber_2_end == TimberReferenceEnd.TOP
+        if arrangement.butt_timber_2_end == TimberEnd.TOP
         else -butt_2_shoulder_end_cut.offset
     )
 
@@ -218,7 +218,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     if safe_compare(shoulder_symmetric_inset, 0, Comparison.GT):
         def _make_receiving_shoulder_notch_local(
             butting_timber: TimberLike,
-            butting_timber_end: TimberReferenceEnd,
+            butting_timber_end: TimberEnd,
         ) -> CutCSG:
             butt_end_direction_global = butting_timber.get_face_direction_global(butting_timber_end)
             receiving_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(
@@ -257,14 +257,14 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     )
     butt_1_cut = Cutting(
         timber=butt_timber_1,
-        maybe_top_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.BOTTOM else None,
         negative_csg=butt_1_slot_negative_csg_local,
     )
     butt_2_cut = Cutting(
         timber=butt_timber_2,
-        maybe_top_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.BOTTOM else None,
         negative_csg=butt_2_slot_negative_csg_local,
     )
 
@@ -297,7 +297,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
 
         def _append_pegs_for_butt(
             butt_timber: TimberLike,
-            butt_end: TimberReferenceEnd,
+            butt_end: TimberEnd,
             peg_face_on_butt: TimberLongFace,
             butt_negative_parts: List[CutCSG],
             accessory_prefix: str,
@@ -445,14 +445,14 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
 
         butt_1_cut = Cutting(
             timber=butt_timber_1,
-            maybe_top_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberReferenceEnd.TOP else None,
-            maybe_bottom_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberReferenceEnd.BOTTOM else None,
+            maybe_top_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.TOP else None,
+            maybe_bottom_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.BOTTOM else None,
             negative_csg=butt_1_negative_parts[0] if len(butt_1_negative_parts) == 1 else CSGUnion(children=butt_1_negative_parts),
         )
         butt_2_cut = Cutting(
             timber=butt_timber_2,
-            maybe_top_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberReferenceEnd.TOP else None,
-            maybe_bottom_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberReferenceEnd.BOTTOM else None,
+            maybe_top_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.TOP else None,
+            maybe_bottom_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.BOTTOM else None,
             negative_csg=butt_2_negative_parts[0] if len(butt_2_negative_parts) == 1 else CSGUnion(children=butt_2_negative_parts),
         )
 

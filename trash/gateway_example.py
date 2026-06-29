@@ -408,7 +408,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
             )
         )
 
-    def _beam_to_post_joint(beam: Timber, beam_end: TimberReferenceEnd, post: Timber) -> Joint:
+    def _beam_to_post_joint(beam: Timber, beam_end: TimberEnd, post: Timber) -> Joint:
         return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=post,
@@ -422,7 +422,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
             peg_parameters=None,
         )
 
-    def _beam_to_plate_joint(beam: Timber, beam_end: TimberReferenceEnd, plate: Timber) -> Joint:
+    def _beam_to_plate_joint(beam: Timber, beam_end: TimberEnd, plate: Timber) -> Joint:
         return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=plate,
@@ -441,7 +441,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=plate,
                 butt_timber=post,
-                butt_timber_end=TimberReferenceEnd.TOP,
+                butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=None,
             ),
             tenon_size=post_tenon_size,
@@ -460,16 +460,16 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         (4, 5),
     ]
     for segment, (left_index, right_index) in zip(fence_bottom_beam_segments, fence_front_bay_pairs):
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.BOTTOM, fence_posts_front[left_index]))
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.TOP, fence_posts_front[right_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.BOTTOM, fence_posts_front[left_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.TOP, fence_posts_front[right_index]))
 
     inner_top_bay_pairs = [
         (1, 2),
         (3, 4),
     ]
     for segment, (left_index, right_index) in zip(fence_top_inner_beam_segments, inner_top_bay_pairs):
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.BOTTOM, fence_posts_front[left_index]))
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.TOP, fence_posts_front[right_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.BOTTOM, fence_posts_front[left_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.TOP, fence_posts_front[right_index]))
 
     outer_top_bay_pairs = [
         (0, 1),
@@ -480,34 +480,34 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         all_joints.append(_post_to_plate_joint(fence_posts_front[right_index], segment))
 
     # Rear support connector beams (left/right, bottom/top)
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[0], TimberReferenceEnd.BOTTOM, fence_posts_front[0]))
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[0], TimberReferenceEnd.TOP, rear_support_posts[0]))
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[1], TimberReferenceEnd.BOTTOM, fence_posts_front[0]))
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[1], TimberReferenceEnd.TOP, rear_support_posts[0]))
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[2], TimberReferenceEnd.BOTTOM, fence_posts_front[5]))
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[2], TimberReferenceEnd.TOP, rear_support_posts[1]))
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[3], TimberReferenceEnd.BOTTOM, fence_posts_front[5]))
-    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[3], TimberReferenceEnd.TOP, rear_support_posts[1]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[0], TimberEnd.BOTTOM, fence_posts_front[0]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[0], TimberEnd.TOP, rear_support_posts[0]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[1], TimberEnd.BOTTOM, fence_posts_front[0]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[1], TimberEnd.TOP, rear_support_posts[0]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[2], TimberEnd.BOTTOM, fence_posts_front[5]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[2], TimberEnd.TOP, rear_support_posts[1]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[3], TimberEnd.BOTTOM, fence_posts_front[5]))
+    all_joints.append(_beam_to_post_joint(rear_support_connector_beams[3], TimberEnd.TOP, rear_support_posts[1]))
 
     # Hallway beam segments per row pair (left side)
     for row_index, segment in enumerate(hallway_left_beam_bottom_segments):
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.BOTTOM, hallway_left_posts[row_index]))
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.TOP, hallway_left_posts[row_index + 1]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.BOTTOM, hallway_left_posts[row_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.TOP, hallway_left_posts[row_index + 1]))
     for row_index, segment in enumerate(hallway_left_beam_top_segments):
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.BOTTOM, hallway_left_posts[row_index]))
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.TOP, hallway_left_posts[row_index + 1]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.BOTTOM, hallway_left_posts[row_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.TOP, hallway_left_posts[row_index + 1]))
 
     # Hallway beam segments per row pair (right side)
     for row_index, segment in enumerate(hallway_right_beam_bottom_segments):
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.BOTTOM, hallway_right_posts[row_index]))
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.TOP, hallway_right_posts[row_index + 1]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.BOTTOM, hallway_right_posts[row_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.TOP, hallway_right_posts[row_index + 1]))
     for row_index, segment in enumerate(hallway_right_beam_top_segments):
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.BOTTOM, hallway_right_posts[row_index]))
-        all_joints.append(_beam_to_post_joint(segment, TimberReferenceEnd.TOP, hallway_right_posts[row_index + 1]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.BOTTOM, hallway_right_posts[row_index]))
+        all_joints.append(_beam_to_post_joint(segment, TimberEnd.TOP, hallway_right_posts[row_index + 1]))
 
     # Entry beam into entry posts
-    all_joints.append(_beam_to_post_joint(entry_beam, TimberReferenceEnd.BOTTOM, fence_posts_front[2]))
-    all_joints.append(_beam_to_post_joint(entry_beam, TimberReferenceEnd.TOP, fence_posts_front[3]))
+    all_joints.append(_beam_to_post_joint(entry_beam, TimberEnd.BOTTOM, fence_posts_front[2]))
+    all_joints.append(_beam_to_post_joint(entry_beam, TimberEnd.TOP, fence_posts_front[3]))
 
     # Entry posts into top plate
     all_joints.append(_post_to_plate_joint(fence_posts_front[2], entry_top_plate))

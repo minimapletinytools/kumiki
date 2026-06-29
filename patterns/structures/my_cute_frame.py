@@ -96,10 +96,10 @@ def build_frame() -> Frame:
         )
 
     joints = [
-        mortise_into_side(back_cross, TimberReferenceEnd.BOTTOM, left_side),
-        mortise_into_side(back_cross, TimberReferenceEnd.TOP, right_side),
-        mortise_into_side(front_cross, TimberReferenceEnd.BOTTOM, left_side),
-        mortise_into_side(front_cross, TimberReferenceEnd.TOP, right_side),
+        mortise_into_side(back_cross, TimberEnd.BOTTOM, left_side),
+        mortise_into_side(back_cross, TimberEnd.TOP, right_side),
+        mortise_into_side(front_cross, TimberEnd.BOTTOM, left_side),
+        mortise_into_side(front_cross, TimberEnd.TOP, right_side),
     ]
 
     return Frame.from_joints(joints, name="My Cute Frame")

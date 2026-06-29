@@ -139,7 +139,7 @@ def create_sawhorse() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=left_beam,
             butt_timber=left_post,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
         tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in beam's Y direction)
@@ -152,7 +152,7 @@ def create_sawhorse() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_beam,
             butt_timber=right_post,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
         tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in beam's Y direction)
@@ -180,7 +180,7 @@ def create_sawhorse() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=left_post,
             butt_timber=stretcher,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,  # Left end of stretcher
+            butt_timber_end=TimberEnd.BOTTOM,  # Left end of stretcher
             front_face_on_butt_timber=TimberLongFace.LEFT,
         ),
         dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
@@ -194,7 +194,7 @@ def create_sawhorse() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_post,
             butt_timber=stretcher,
-            butt_timber_end=TimberReferenceEnd.TOP,  # Right end of stretcher
+            butt_timber_end=TimberEnd.TOP,  # Right end of stretcher
             front_face_on_butt_timber=TimberLongFace.LEFT,
         ),
         dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
@@ -214,7 +214,7 @@ def create_sawhorse() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=plate,
             butt_timber=left_post,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
         tenon_size=Matrix([tenon_width, tenon_thickness]),  # 3" x 1" (3" in plate's X direction)
@@ -227,7 +227,7 @@ def create_sawhorse() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=plate,
             butt_timber=right_post,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
         tenon_size=Matrix([tenon_width, tenon_thickness]),  # 3" x 1" (3" in plate's X direction)

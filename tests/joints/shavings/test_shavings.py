@@ -13,7 +13,7 @@ from kumiki.joints.workshop.shavings.shavings import (
     scribe_centerline_onto_centerline
 )
 from kumiki.joints.workshop.shavings.notching import chop_shoulder_notch_on_timber_face
-from kumiki.timber import timber_from_directions, TimberReferenceEnd, TimberFace, TimberLongFace
+from kumiki.timber import timber_from_directions, TimberEnd, TimberFace, TimberLongFace
 from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel
 from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace
 from kumiki.measuring import mark_distance_from_end_along_centerline
@@ -51,7 +51,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # Check the configuration - join TOP to TOP so ends face each other
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.TOP, TimberEnd.TOP
         )
         
         assert error is None, f"Expected no error, but got: {error}"
@@ -84,7 +84,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # Join TOP to TOP so ends face each other
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.TOP, TimberEnd.TOP
         )
         
         assert error is None, f"Expected no error for touching ends, but got: {error}"
@@ -116,7 +116,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         # Invalid: joining TOP to TOP when both point same direction
         # (both ends face same direction, away from each other)
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.TOP, TimberEnd.TOP
         )
         
         assert error is not None, "Expected error for ends facing away from each other"
@@ -149,7 +149,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         )
         
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.TOP, TimberEnd.TOP
         )
         
         assert error is not None, "Expected error for non-parallel timbers"
@@ -183,7 +183,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         )
         
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.TOP, TimberEnd.TOP
         )
         
         assert error is not None, "Expected error for separated timbers"
@@ -219,7 +219,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # Join TOP to TOP so ends face each other
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.TOP, TimberEnd.TOP
         )
         
         assert error is None, f"Expected no error for vertical splice, but got: {error}"
@@ -253,7 +253,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # Join TOP to TOP so ends face each other (both at x=36")
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.TOP, TimberEnd.TOP
         )
         
         # Should be valid - sizes don't matter for this check
@@ -286,7 +286,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         # Valid: joining TOP to BOTTOM when both point same direction
         # (ends face towards each other)
         error = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.BOTTOM
+            timberA, timberB, TimberEnd.TOP, TimberEnd.BOTTOM
         )
         
         assert error is None, f"Expected no error for same direction opposite ends (oscarshed case), but got: {error}"
@@ -316,12 +316,12 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # Test with TOP/BOTTOM (normal)
         error1 = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.TOP, TimberReferenceEnd.BOTTOM
+            timberA, timberB, TimberEnd.TOP, TimberEnd.BOTTOM
         )
         
         # Test with BOTTOM/TOP (swapped)
         error2 = check_timber_overlap_for_splice_joint_is_sensible(
-            timberA, timberB, TimberReferenceEnd.BOTTOM, TimberReferenceEnd.TOP
+            timberA, timberB, TimberEnd.BOTTOM, TimberEnd.TOP
         )
         
         # Both should work (one will likely give an error about direction or separation)
@@ -347,7 +347,7 @@ class TestChopTimberEndWithPrism:
         
         # Chop 2 feet from the top
         chop_distance = inches(24)
-        prism = chop_timber_end_with_prism(timber, TimberReferenceEnd.TOP, chop_distance)
+        prism = chop_timber_end_with_prism(timber, TimberEnd.TOP, chop_distance)
         
         # Verify the prism properties
         assert prism.size == timber.size
@@ -374,7 +374,7 @@ class TestChopTimberEndWithPrism:
         
         # Chop 2 feet from the bottom
         chop_distance = inches(24)
-        prism = chop_timber_end_with_prism(timber, TimberReferenceEnd.BOTTOM, chop_distance)
+        prism = chop_timber_end_with_prism(timber, TimberEnd.BOTTOM, chop_distance)
         
         # Verify the prism properties
         assert prism.size == timber.size
@@ -400,7 +400,7 @@ class TestChopTimberEndWithPrism:
         
         # Chop 6 inches from the top (east) end
         chop_distance = inches(6)
-        prism = chop_timber_end_with_prism(timber, TimberReferenceEnd.TOP, chop_distance)
+        prism = chop_timber_end_with_prism(timber, TimberEnd.TOP, chop_distance)
         
         # Verify the prism has correct dimensions
         assert prism.size == timber.size
@@ -421,7 +421,7 @@ class TestChopTimberEndWithPrism:
         
         # Chop 1/3 from the top
         chop_distance = Rational(1, 3)
-        prism = chop_timber_end_with_prism(timber, TimberReferenceEnd.TOP, chop_distance)
+        prism = chop_timber_end_with_prism(timber, TimberEnd.TOP, chop_distance)
         
         # Should get exact rational arithmetic
         expected_start = Rational(10) - Rational(1, 3)
@@ -446,7 +446,7 @@ class TestChopTimberEndWithHalfspace:
         
         # Chop 2 feet from the top
         chop_distance = inches(24)
-        half_plane = chop_timber_end_with_half_plane(timber, TimberReferenceEnd.TOP, chop_distance)
+        half_plane = chop_timber_end_with_half_plane(timber, TimberEnd.TOP, chop_distance)
         
         # For TOP end with distance 24 from end:
         # - Normal should point in +Z direction (0, 0, 1)
@@ -468,7 +468,7 @@ class TestChopTimberEndWithHalfspace:
         
         # Chop 2 feet from the bottom
         chop_distance = inches(24)
-        half_plane = chop_timber_end_with_half_plane(timber, TimberReferenceEnd.BOTTOM, chop_distance)
+        half_plane = chop_timber_end_with_half_plane(timber, TimberEnd.BOTTOM, chop_distance)
         
         # For BOTTOM end with distance 24 from end:
         # - Normal should point in -Z direction (0, 0, -1)
@@ -489,7 +489,7 @@ class TestChopTimberEndWithHalfspace:
         
         # Chop 1/3 from the top
         chop_distance = Rational(1, 3)
-        half_plane = chop_timber_end_with_half_plane(timber, TimberReferenceEnd.TOP, chop_distance)
+        half_plane = chop_timber_end_with_half_plane(timber, TimberEnd.TOP, chop_distance)
         
         # Should get exact rational arithmetic
         expected_offset = Rational(10) - Rational(1, 3)
@@ -524,7 +524,7 @@ class TestChopLapOnTimberEnd:
         shoulder_distance = inches(6)  # 6" from end
         lap_depth = inches(2)  # 2" depth to KEEP on RIGHT side (half of 4" width for half-lap)
         lap_face = TimberFace.RIGHT  # Lap on RIGHT face (keep material here)
-        lap_end = TimberReferenceEnd.TOP  # Cutting from top end
+        lap_end = TimberEnd.TOP  # Cutting from top end
         
         # Create the lap cut
         lap_prism, lap_end_cut = chop_lap_on_timber_end(
@@ -707,7 +707,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.LEFT,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.TOP)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.TOP)
         distance = marking.distance
         
         # Expected calculation (true geometric intersection):
@@ -751,7 +751,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.BACK,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.TOP)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.TOP)
         distance = marking.distance
         
         # Expected calculation (true geometric intersection):
@@ -794,7 +794,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.FRONT,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.BOTTOM)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.BOTTOM)
         distance = marking.distance
         
         # Expected calculation (true geometric intersection):
@@ -836,7 +836,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.FRONT,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.TOP)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.TOP)
         distance = marking.distance
         
         # Expected calculation (true geometric intersection):
@@ -879,7 +879,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.LEFT,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.TOP)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.TOP)
         distance = marking.distance
         
         # Expected calculation:
@@ -922,7 +922,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.BACK,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.TOP)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.TOP)
         distance = marking.distance
         
         # Expected calculation (true geometric intersection):
@@ -964,7 +964,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.LEFT,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.TOP)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.TOP)
         distance = marking.distance
         
         # Expected calculation (true geometric intersection):
@@ -1007,7 +1007,7 @@ class TestScribeFaceOnCenterline:
             face=TimberFace.BOTTOM,
             face_timber=timber_b
         )
-        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberReferenceEnd.TOP)
+        marking = mark_distance_from_end_along_centerline(face_plane, timber_a, TimberEnd.TOP)
         distance = marking.distance
         
         # Expected calculation (true geometric intersection):
@@ -1114,12 +1114,12 @@ class TestFindProjectedIntersectionOnCenterlines:
         # Measure from TOP of vertical timber and BOTTOM of horizontal
         # Mark the horizontal timber's centerline and measure onto vertical timber from TOP
         centerline_horizontal = scribe_centerline_onto_centerline(timber_horizontal)
-        marking_vertical = mark_distance_from_end_along_centerline(centerline_horizontal, timber_vertical, TimberReferenceEnd.TOP)
+        marking_vertical = mark_distance_from_end_along_centerline(centerline_horizontal, timber_vertical, TimberEnd.TOP)
         distA = marking_vertical.distance
         
         # Mark the vertical timber's centerline and measure onto horizontal timber from BOTTOM
         centerline_vertical = scribe_centerline_onto_centerline(timber_vertical)
-        marking_horizontal = mark_distance_from_end_along_centerline(centerline_vertical, timber_horizontal, TimberReferenceEnd.BOTTOM)
+        marking_horizontal = mark_distance_from_end_along_centerline(centerline_vertical, timber_horizontal, TimberEnd.BOTTOM)
         distB = marking_horizontal.distance
         
         # From TOP of vertical (36" high), intersection at 18" from bottom = 18" from top down

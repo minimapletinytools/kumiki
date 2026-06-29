@@ -217,8 +217,8 @@ def _build_joints(
     def _make_corner_arrangement(
         timber1: Timber,
         timber2: Timber,
-        timber1_end: TimberReferenceEnd,
-        timber2_end: TimberReferenceEnd,
+        timber1_end: TimberEnd,
+        timber2_end: TimberEnd,
     ) -> CornerJointTimberArrangement:
         corner_plane_normal = normalize_vector(
             cross_product(
@@ -238,10 +238,10 @@ def _build_joints(
         )
 
     # Mudsills: keyed miter joints on all four corners.
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_front, base_left, TimberReferenceEnd.BOTTOM, TimberReferenceEnd.BOTTOM)))
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_front, base_right, TimberReferenceEnd.TOP, TimberReferenceEnd.BOTTOM)))
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_back, base_left, TimberReferenceEnd.BOTTOM, TimberReferenceEnd.TOP)))
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_back, base_right, TimberReferenceEnd.TOP, TimberReferenceEnd.TOP)))
+    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_front, base_left, TimberEnd.BOTTOM, TimberEnd.BOTTOM)))
+    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_front, base_right, TimberEnd.TOP, TimberEnd.BOTTOM)))
+    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_back, base_left, TimberEnd.BOTTOM, TimberEnd.TOP)))
+    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_back, base_right, TimberEnd.TOP, TimberEnd.TOP)))
 
     # Posts -> mudsills: short tenons.
     for side, mudsill in [("Front", base_front), ("Back", base_back)]:
@@ -252,7 +252,7 @@ def _build_joints(
                     arrangement=ButtJointTimberArrangement(
                         receiving_timber=mudsill,
                         butt_timber=post,
-                        butt_timber_end=TimberReferenceEnd.BOTTOM,
+                        butt_timber_end=TimberEnd.BOTTOM,
                     ),
                     tenon_size=post_to_mudsill_tenon_size,
                     tenon_length=post_to_mudsill_tenon_length,
@@ -270,7 +270,7 @@ def _build_joints(
                     arrangement=ButtJointTimberArrangement(
                         receiving_timber=plate,
                         butt_timber=post,
-                        butt_timber_end=TimberReferenceEnd.TOP,
+                        butt_timber_end=TimberEnd.TOP,
                     ),
                     tenon_size=post_to_plate_tenon_size,
                     tenon_length=post_to_plate_tenon_length,
@@ -292,8 +292,8 @@ def _build_joints(
                 CornerJointTimberArrangement(
                     timber1=front_rafter,
                     timber2=back_rafter,
-                    timber1_end=TimberReferenceEnd.TOP,
-                    timber2_end=TimberReferenceEnd.TOP,
+                    timber1_end=TimberEnd.TOP,
+                    timber2_end=TimberEnd.TOP,
                 )
             )
         )

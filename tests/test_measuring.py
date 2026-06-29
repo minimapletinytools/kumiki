@@ -908,11 +908,11 @@ class TestMarkDistanceFromCornerAlongEdge:
         )
         plane = Plane(normal=create_v3(0, 0, 1), point=create_v3(0, 0, 30))
         result = mark_distance_from_corner_along_edge_by_intersecting_plane(
-            plane, timber, TimberCenterline.CENTERLINE, TimberReferenceEnd.BOTTOM
+            plane, timber, TimberCenterline.CENTERLINE, TimberEnd.BOTTOM
         )
         assert isinstance(result, DistanceFromCornerAlongEdge)
         assert result.distance == Rational(30)
-        assert result.end == TimberReferenceEnd.BOTTOM
+        assert result.end == TimberEnd.BOTTOM
         pt = result.locate()
         assert pt.position[2] == Rational(30)
 
@@ -929,7 +929,7 @@ class TestMarkDistanceFromCornerAlongEdge:
         )
         horiz_line = Line(direction=create_v3(1, 0, 0), point=create_v3(5, 0, 40))
         result = mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(
-            horiz_line, timber, TimberCenterline.CENTERLINE, TimberReferenceEnd.BOTTOM
+            horiz_line, timber, TimberCenterline.CENTERLINE, TimberEnd.BOTTOM
         )
         assert isinstance(result, DistanceFromCornerAlongEdge)
         assert result.distance == Rational(40)

@@ -20,7 +20,7 @@ import traceback
 import time
 from typing import Optional, Tuple, List
 from sympy import Matrix, Float
-from kumiki import CutTimber, Timber, TimberFace, TimberReferenceEnd, TimberLongFace
+from kumiki import CutTimber, Timber, TimberFace, TimberEnd, TimberLongFace
 from kumiki.rule import Orientation
 
 

@@ -126,8 +126,8 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
         CornerJointTimberArrangement(
             timber1=left_front_rail,
             timber2=left_back_rail,
-            timber1_end=TimberReferenceEnd.TOP,
-            timber2_end=TimberReferenceEnd.TOP,
+            timber1_end=TimberEnd.TOP,
+            timber2_end=TimberEnd.TOP,
         )
     )
 
@@ -135,8 +135,8 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
         CornerJointTimberArrangement(
             timber1=right_front_rail,
             timber2=right_back_rail,
-            timber1_end=TimberReferenceEnd.TOP,
-            timber2_end=TimberReferenceEnd.TOP,
+            timber1_end=TimberEnd.TOP,
+            timber2_end=TimberEnd.TOP,
         )
     )
 
@@ -189,7 +189,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=left_front_rail,
                 butt_timber=front_left_half_rung,
-                butt_timber_end=TimberReferenceEnd.BOTTOM,
+                butt_timber_end=TimberEnd.BOTTOM,
             ),
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,
@@ -203,7 +203,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=right_front_rail,
                 butt_timber=front_right_half_rung,
-                butt_timber_end=TimberReferenceEnd.BOTTOM,
+                butt_timber_end=TimberEnd.BOTTOM,
             ),
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,
@@ -217,7 +217,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=left_back_rail,
                 butt_timber=back_left_half_rung,
-                butt_timber_end=TimberReferenceEnd.BOTTOM,
+                butt_timber_end=TimberEnd.BOTTOM,
             ),
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,
@@ -231,7 +231,7 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=right_back_rail,
                 butt_timber=back_right_half_rung,
-                butt_timber_end=TimberReferenceEnd.BOTTOM,
+                butt_timber_end=TimberEnd.BOTTOM,
             ),
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,

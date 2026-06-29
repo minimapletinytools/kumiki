@@ -169,27 +169,27 @@ def example() -> Frame:
     # FRONT on each beam maps to a horizontal axis perpendicular to its span:
     #   beam_front / beam_back (span +X): FRONT = global −Y  (peg front-to-back)
     #   beam_left  / beam_right (span +Y): FRONT = global +X  (peg side-to-side)
-    j_front_fl = fat_joint(post_front_left,  beam_front, TimberReferenceEnd.BOTTOM, TimberLongFace.FRONT, tenon_pos_default)
-    j_front_fr = fat_joint(post_front_right, beam_front, TimberReferenceEnd.TOP,    TimberLongFace.FRONT, tenon_pos_default)
-    j_back_bl  = fat_joint(post_back_left,   beam_back,  TimberReferenceEnd.BOTTOM, TimberLongFace.BACK, tenon_pos_default)
-    j_back_br  = fat_joint(post_back_right,  beam_back,  TimberReferenceEnd.TOP,    TimberLongFace.BACK, tenon_pos_default)
-    j_left_fl  = fat_joint(post_front_left,  beam_left,  TimberReferenceEnd.BOTTOM, TimberLongFace.BACK, tenon_pos_offset)
-    j_left_bl  = fat_joint(post_back_left,   beam_left,  TimberReferenceEnd.TOP,    TimberLongFace.BACK, tenon_pos_offset)
-    j_right_fr = fat_joint(post_front_right, beam_right, TimberReferenceEnd.BOTTOM, TimberLongFace.FRONT, tenon_pos_offset)
-    j_right_br = fat_joint(post_back_right,  beam_right, TimberReferenceEnd.TOP,    TimberLongFace.FRONT, tenon_pos_offset)
+    j_front_fl = fat_joint(post_front_left,  beam_front, TimberEnd.BOTTOM, TimberLongFace.FRONT, tenon_pos_default)
+    j_front_fr = fat_joint(post_front_right, beam_front, TimberEnd.TOP,    TimberLongFace.FRONT, tenon_pos_default)
+    j_back_bl  = fat_joint(post_back_left,   beam_back,  TimberEnd.BOTTOM, TimberLongFace.BACK, tenon_pos_default)
+    j_back_br  = fat_joint(post_back_right,  beam_back,  TimberEnd.TOP,    TimberLongFace.BACK, tenon_pos_default)
+    j_left_fl  = fat_joint(post_front_left,  beam_left,  TimberEnd.BOTTOM, TimberLongFace.BACK, tenon_pos_offset)
+    j_left_bl  = fat_joint(post_back_left,   beam_left,  TimberEnd.TOP,    TimberLongFace.BACK, tenon_pos_offset)
+    j_right_fr = fat_joint(post_front_right, beam_right, TimberEnd.BOTTOM, TimberLongFace.FRONT, tenon_pos_offset)
+    j_right_br = fat_joint(post_back_right,  beam_right, TimberEnd.TOP,    TimberLongFace.FRONT, tenon_pos_offset)
 
     # Side girts → posts  (FRONT = global +X, peg across the wall)
-    j_sg_left_fl  = fat_joint(post_front_left,  side_girt_left,  TimberReferenceEnd.BOTTOM, TimberLongFace.FRONT)
-    j_sg_left_bl  = fat_joint(post_back_left,   side_girt_left,  TimberReferenceEnd.TOP,    TimberLongFace.FRONT)
-    j_sg_right_fr = fat_joint(post_front_right, side_girt_right, TimberReferenceEnd.BOTTOM, TimberLongFace.FRONT)
-    j_sg_right_br = fat_joint(post_back_right,  side_girt_right, TimberReferenceEnd.TOP,    TimberLongFace.FRONT)
+    j_sg_left_fl  = fat_joint(post_front_left,  side_girt_left,  TimberEnd.BOTTOM, TimberLongFace.FRONT)
+    j_sg_left_bl  = fat_joint(post_back_left,   side_girt_left,  TimberEnd.TOP,    TimberLongFace.FRONT)
+    j_sg_right_fr = fat_joint(post_front_right, side_girt_right, TimberEnd.BOTTOM, TimberLongFace.FRONT)
+    j_sg_right_br = fat_joint(post_back_right,  side_girt_right, TimberEnd.TOP,    TimberLongFace.FRONT)
 
     # Top plates ← posts  (post tenon goes up; face chosen so peg drills in global +Y)
     #   post_fl.FRONT = +Y, post_fr.RIGHT = +Y, post_bl.LEFT = +Y, post_br.BACK = +Y
-    j_tp_front_fl = fat_joint(top_plate_front, post_front_left,  TimberReferenceEnd.TOP, TimberLongFace.FRONT)
-    j_tp_front_fr = fat_joint(top_plate_front, post_front_right, TimberReferenceEnd.TOP, TimberLongFace.RIGHT)
-    j_tp_back_bl  = fat_joint(top_plate_back,  post_back_left,   TimberReferenceEnd.TOP, TimberLongFace.LEFT)
-    j_tp_back_br  = fat_joint(top_plate_back,  post_back_right,  TimberReferenceEnd.TOP, TimberLongFace.BACK)
+    j_tp_front_fl = fat_joint(top_plate_front, post_front_left,  TimberEnd.TOP, TimberLongFace.FRONT)
+    j_tp_front_fr = fat_joint(top_plate_front, post_front_right, TimberEnd.TOP, TimberLongFace.RIGHT)
+    j_tp_back_bl  = fat_joint(top_plate_back,  post_back_left,   TimberEnd.TOP, TimberLongFace.LEFT)
+    j_tp_back_br  = fat_joint(top_plate_back,  post_back_right,  TimberEnd.TOP, TimberLongFace.BACK)
 
     all_joints = [
         j_front_fl, j_front_fr, j_back_bl,  j_back_br,
@@ -281,10 +281,10 @@ def example() -> Frame:
             tenon_position=tenon_pos,
         )
 
-    j_door_bot_left  = door_joint(door_left_vert,  door_rail_bot, TimberReferenceEnd.BOTTOM, door_tenon_pos_bot)
-    j_door_bot_right = door_joint(door_right_vert, door_rail_bot, TimberReferenceEnd.TOP,    door_tenon_pos_bot)
-    j_door_top_left  = door_joint(door_left_vert,  door_rail_top, TimberReferenceEnd.BOTTOM, door_tenon_pos_top)
-    j_door_top_right = door_joint(door_right_vert, door_rail_top, TimberReferenceEnd.TOP,    door_tenon_pos_top)
+    j_door_bot_left  = door_joint(door_left_vert,  door_rail_bot, TimberEnd.BOTTOM, door_tenon_pos_bot)
+    j_door_bot_right = door_joint(door_right_vert, door_rail_bot, TimberEnd.TOP,    door_tenon_pos_bot)
+    j_door_top_left  = door_joint(door_left_vert,  door_rail_top, TimberEnd.BOTTOM, door_tenon_pos_top)
+    j_door_top_right = door_joint(door_right_vert, door_rail_top, TimberEnd.TOP,    door_tenon_pos_top)
 
     # ── Door hinge joints ─────────────────────────────────────────────────────
     # Round 1" pivot tenon on the top and bottom of the left vertical stile.
@@ -300,7 +300,7 @@ def example() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=beam_front,
             butt_timber=door_left_vert,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
         diameter=hinge_diameter,
@@ -313,7 +313,7 @@ def example() -> Frame:
         arrangement=ButtJointTimberArrangement(
             receiving_timber=top_plate_front,
             butt_timber=door_left_vert,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
         diameter=hinge_diameter,

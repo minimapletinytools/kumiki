@@ -6,7 +6,7 @@ Uses canonical timber configurations from construction.py
 from sympy import Matrix, Rational
 from kumiki.rule import inches, Transform
 from kumiki.timber import (
-    Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
+    Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
@@ -140,7 +140,7 @@ def example_basic_splined_opposing_double_butt_joint(position=None):
     arrangement = create_canonical_example_opposing_double_butt_joint_timbers(position)
     joint = cut_basic_splined_opposing_double_butt_joint(
         arrangement=arrangement,
-        slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+        slot_facing_end_on_receiving_timber=TimberEnd.TOP,
     )
 
     return joint

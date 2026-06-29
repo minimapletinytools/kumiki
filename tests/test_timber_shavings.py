@@ -708,7 +708,7 @@ class TestProjectGlobalPointOntoTimberFace:
         assert projected_global == expected_global
     
     def test_project_accepts_timber_reference_end(self, symbolic_mode):
-        """Test that the method accepts TimberReferenceEnd as well as TimberFace."""
+        """Test that the method accepts TimberEnd as well as TimberFace."""
         timber = timber_from_directions(
             length=Rational(2),
             size=create_v2(Rational("0.2"), Rational("0.3")),
@@ -719,8 +719,8 @@ class TestProjectGlobalPointOntoTimberFace:
         
         global_point = create_v3(0, 0, 0)
         
-        # Should work with TimberReferenceEnd.TOP
-        projected_with_end = timber.project_global_point_onto_timber_face_global(global_point, TimberReferenceEnd.TOP)
+        # Should work with TimberEnd.TOP
+        projected_with_end = timber.project_global_point_onto_timber_face_global(global_point, TimberEnd.TOP)
         projected_with_face = timber.project_global_point_onto_timber_face_global(global_point, TimberFace.TOP)
         
         # Both should give the same result
@@ -750,7 +750,7 @@ class TestCreateWedgeInTimberEnd:
         """Test creating a wedge at the TOP end."""
         wedge = create_wedge_in_timber_end(
             timber=self.timber,
-            end=TimberReferenceEnd.TOP,
+            end=TimberEnd.TOP,
             position=create_v3(Rational(2), Rational(3), 0),
             shape=self.wedge_spec
         )
@@ -770,7 +770,7 @@ class TestCreateWedgeInTimberEnd:
         """Test creating a wedge at the BOTTOM end."""
         wedge = create_wedge_in_timber_end(
             timber=self.timber,
-            end=TimberReferenceEnd.BOTTOM,
+            end=TimberEnd.BOTTOM,
             position=create_v3(Rational(-1), Rational(2), 0),
             shape=self.wedge_spec
         )
@@ -784,7 +784,7 @@ class TestCreateWedgeInTimberEnd:
         """Test creating a wedge at the timber centerline."""
         wedge = create_wedge_in_timber_end(
             timber=self.timber,
-            end=TimberReferenceEnd.TOP,
+            end=TimberEnd.TOP,
             position=create_v3(0, 0, 0),  # Center of cross-section
             shape=self.wedge_spec
         )

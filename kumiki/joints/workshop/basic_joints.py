@@ -261,7 +261,7 @@ def cut_basic_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joi
 
 def cut_basic_splined_opposing_double_butt_joint(
     arrangement: DoubleButtJointTimberArrangement,
-    slot_facing_end_on_receiving_timber: TimberReferenceEnd,
+    slot_facing_end_on_receiving_timber: TimberEnd,
 ) -> Joint:
     """
     Creates a splined opposing double butt joint with default sizing and a default peg.
@@ -374,7 +374,7 @@ def cut_basic_plain_splice_lap_joint_on_aligned_timbers(
 def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
     tenon_timber: TimberLike,
     mortise_timber: TimberLike,
-    tenon_end: TimberReferenceEnd,
+    tenon_end: TimberEnd,
     use_peg: bool = False,
 ) -> Joint:
     """
@@ -393,7 +393,7 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
     Returns:
         Joint object containing the two CutTimbers and, if use_peg=True, a Peg accessory.
     """
-    assert isinstance(tenon_end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(tenon_end).__name__}"
+    assert isinstance(tenon_end, TimberEnd), f"expected TimberEnd, got {type(tenon_end).__name__}"
     # this is the "side" of the joint
     joint_side_mortise_timber_face = mortise_timber.get_closest_oriented_face_from_global_direction(cross_product(mortise_timber.get_length_direction_global(), tenon_timber.get_face_direction_global(tenon_end.to.face())))
     joint_side_tenon_timber_face = tenon_timber.get_closest_oriented_face_from_global_direction(mortise_timber.get_face_direction_global(joint_side_mortise_timber_face))
@@ -451,7 +451,7 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
 def cut_basic_lapped_gooseneck_joint(
     gooseneck_timber: TimberLike,
     receiving_timber: TimberLike,
-    receiving_timber_end: TimberReferenceEnd,
+    receiving_timber_end: TimberEnd,
     gooseneck_timber_face: TimberLongFace,
 ) -> Joint:
     """
@@ -470,7 +470,7 @@ def cut_basic_lapped_gooseneck_joint(
     Returns:
         Joint object containing the two CutTimbers with gooseneck cuts.
     """
-    assert isinstance(receiving_timber_end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(receiving_timber_end).__name__}"
+    assert isinstance(receiving_timber_end, TimberEnd), f"expected TimberEnd, got {type(receiving_timber_end).__name__}"
     assert isinstance(gooseneck_timber_face, TimberLongFace), f"expected TimberLongFace, got {type(gooseneck_timber_face).__name__}"
     assert isinstance(gooseneck_timber, Timber), f"expected Timber, got {type(gooseneck_timber).__name__}"
     assert isinstance(receiving_timber, Timber), f"expected Timber, got {type(receiving_timber).__name__}"
@@ -479,7 +479,7 @@ def cut_basic_lapped_gooseneck_joint(
     gooseneck_small_width = width*Rational(1, 4)
     gooseneck_large_width = width*Rational(1, 2)
     gooseneck_head_length = width*Rational(1, 2)
-    gooseneck_timber_end = TimberReferenceEnd.BOTTOM if receiving_timber_end == TimberReferenceEnd.TOP else TimberReferenceEnd.TOP
+    gooseneck_timber_end = TimberEnd.BOTTOM if receiving_timber_end == TimberEnd.TOP else TimberEnd.TOP
 
     return cut_lapped_gooseneck_joint(
         arrangement=SpliceJointTimberArrangement(
@@ -499,7 +499,7 @@ def cut_basic_lapped_gooseneck_joint(
 def cut_basic_dropin_dovetail_butt_joint(
     dovetail_timber: TimberLike,
     receiving_timber: TimberLike,
-    dovetail_timber_end: TimberReferenceEnd,
+    dovetail_timber_end: TimberEnd,
     dovetail_timber_face: TimberLongFace,
     receiving_timber_shoulder_inset: Numeric,
     dovetail_length: Numeric,
@@ -527,7 +527,7 @@ def cut_basic_dropin_dovetail_butt_joint(
     Returns:
         Joint object containing the two CutTimbers with dovetail cuts.
     """
-    assert isinstance(dovetail_timber_end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(dovetail_timber_end).__name__}"
+    assert isinstance(dovetail_timber_end, TimberEnd), f"expected TimberEnd, got {type(dovetail_timber_end).__name__}"
     assert isinstance(dovetail_timber_face, TimberLongFace), f"expected TimberLongFace, got {type(dovetail_timber_face).__name__}"
     assert isinstance(dovetail_timber, Timber), f"expected Timber, got {type(dovetail_timber).__name__}"
     assert isinstance(receiving_timber, Timber), f"expected Timber, got {type(receiving_timber).__name__}"

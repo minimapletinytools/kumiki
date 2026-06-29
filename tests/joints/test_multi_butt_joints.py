@@ -31,7 +31,7 @@ class TestSplinedOpposingDoubleButtJoint:
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
         joint = cut_basic_splined_opposing_double_butt_joint(
             arrangement,
-            TimberReferenceEnd.TOP,
+            TimberEnd.TOP,
         )
 
         assert set(joint.cuttings.keys()) == {"receiving_timber", "butt_timber_1", "butt_timber_2"}
@@ -44,7 +44,7 @@ class TestSplinedOpposingDoubleButtJoint:
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
         joint = cut_basic_splined_opposing_double_butt_joint(
             arrangement,
-            TimberReferenceEnd.TOP,
+            TimberEnd.TOP,
         )
 
         receiving_center_global = (
@@ -52,7 +52,7 @@ class TestSplinedOpposingDoubleButtJoint:
             + arrangement.receiving_timber.get_length_direction_global() * arrangement.receiving_timber.length / Rational(2)
         )
 
-        slot_direction_global = arrangement.receiving_timber.get_face_direction_global(TimberReferenceEnd.TOP)
+        slot_direction_global = arrangement.receiving_timber.get_face_direction_global(TimberEnd.TOP)
         joint_plane_normal_global = normalize_vector(
             cross_product(
                 arrangement.butt_timber_1.get_length_direction_global(),
@@ -97,7 +97,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             shoulder_symmetric_inset=Rational(0),
         )
         joint_inset = cut_splined_opposing_double_butt_joint(
@@ -105,7 +105,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             shoulder_symmetric_inset=inches(1),
         )
 
@@ -127,7 +127,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             shoulder_symmetric_inset=Rational(0),
         )
         joint_inset = cut_splined_opposing_double_butt_joint(
@@ -135,7 +135,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             shoulder_symmetric_inset=inches(1),
         )
 
@@ -160,7 +160,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             peg_parameters=peg_parameters,
         )
 
@@ -194,7 +194,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             peg_parameters=peg_parameters,
         )
 
@@ -232,7 +232,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             peg_parameters=peg_parameters_no_offset,
         )
         joint_offset = cut_splined_opposing_double_butt_joint(
@@ -240,7 +240,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             peg_parameters=peg_parameters_offset,
         )
 
@@ -275,7 +275,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_thickness=inches(1),
             slot_depth=inches(2),
             spline_length=inches(12),
-            slot_facing_end_on_receiving_timber=TimberReferenceEnd.TOP,
+            slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             spline_extra_depth=spline_extra_depth,
             peg_parameters=peg_parameters,
         )
@@ -288,7 +288,7 @@ class TestSplinedOpposingDoubleButtJoint:
         assert isinstance(spline, CSGAccessory)
 
         slot_direction_global = arrangement.receiving_timber.get_face_direction_global(
-            TimberReferenceEnd.TOP
+            TimberEnd.TOP
         )
         non_extra_spline_center_global = (
             spline.transform.position - slot_direction_global * spline_extra_depth / Rational(2)

@@ -297,7 +297,7 @@ class MockCutting:
     This mock can be used in place of actual Cut objects when testing
     CutTimber functionality without needing full cut implementations.
     """
-    def __init__(self, timber: Timber, end_position: V3, maybe_end_cut: Optional[TimberReferenceEnd] = None):
+    def __init__(self, timber: Timber, end_position: V3, maybe_end_cut: Optional[TimberEnd] = None):
         """
         Initialize a mock cut.
         
@@ -309,10 +309,10 @@ class MockCutting:
         self.timber = timber
         self._end_position = end_position
         # Convert old maybe_end_cut to new format
-        if maybe_end_cut == TimberReferenceEnd.TOP:
+        if maybe_end_cut == TimberEnd.TOP:
             self._maybe_top_end_cut = True  # Mock value
             self._maybe_bottom_end_cut = None
-        elif maybe_end_cut == TimberReferenceEnd.BOTTOM:
+        elif maybe_end_cut == TimberEnd.BOTTOM:
             self._maybe_top_end_cut = None
             self._maybe_bottom_end_cut = True  # Mock value
         else:

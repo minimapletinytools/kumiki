@@ -100,7 +100,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
     arrangement = ButtJointTimberArrangement(
         butt_timber=butt_timber,
         receiving_timber=receiving_timber,
-        butt_timber_end=TimberReferenceEnd.BOTTOM,
+        butt_timber_end=TimberEnd.BOTTOM,
     )
     joint = cut_tongue_and_fork_butt_joint(arrangement)
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
@@ -184,7 +184,7 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
     joint = cut_plain_butt_joint(ButtJointTimberArrangement(
         receiving_timber=receiving,
         butt_timber=butt,
-        butt_timber_end=TimberReferenceEnd.TOP,
+        butt_timber_end=TimberEnd.TOP,
     ))
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
@@ -196,7 +196,7 @@ Example usage of mortise and tenon joint functions
 from sympy import Matrix, Rational, Integer
 from kumiki.rule import inches, Transform, degrees
 from kumiki.timber import (
-    Timber, TimberReferenceEnd, TimberFace, TimberLongFace, Peg, Wedge,
+    Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
     create_v3, V2, CutTimber, Frame
 )
@@ -426,7 +426,7 @@ def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=Fal
     arrangement = ButtJointTimberArrangement(
         butt_timber=brace_timber,
         receiving_timber=mortise_timber,
-        butt_timber_end=TimberReferenceEnd.BOTTOM,
+        butt_timber_end=TimberEnd.BOTTOM,
         #front_face_on_butt_timber=TimberLongFace.RIGHT,
         # use this example, fix bug on peg length
         front_face_on_butt_timber=TimberLongFace.FRONT,
@@ -514,7 +514,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
     arrangement1 = ButtJointTimberArrangement(
         butt_timber=brace_timber,
         receiving_timber=timber1,
-        butt_timber_end=TimberReferenceEnd.BOTTOM,  # Tenon on the end of brace that connects to timber1
+        butt_timber_end=TimberEnd.BOTTOM,  # Tenon on the end of brace that connects to timber1
         front_face_on_butt_timber=TimberLongFace.RIGHT,  # matches peg_parameters.tenon_face
     )
     joint1 = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
@@ -532,7 +532,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
     arrangement2 = ButtJointTimberArrangement(
         butt_timber=brace_timber,
         receiving_timber=timber2,
-        butt_timber_end=TimberReferenceEnd.TOP,  # Tenon on the end of brace that connects to timber2
+        butt_timber_end=TimberEnd.TOP,  # Tenon on the end of brace that connects to timber2
         front_face_on_butt_timber=TimberLongFace.RIGHT,  # matches peg_parameters.tenon_face
     )
     joint2 = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(

@@ -71,14 +71,14 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         raise ValueError("Timbers must have parallel length axes for a splice joint")
 
     # Get the end positions for each timber
-    if timberA_end == TimberReferenceEnd.TOP:
+    if timberA_end == TimberEnd.TOP:
         endA_position = locate_top_center_position(timberA).position
         directionA = timberA.get_length_direction_global()
     else:  # BOTTOM
         endA_position = locate_bottom_center_position(timberA).position
         directionA = -timberA.get_length_direction_global()
 
-    if timberB_end == TimberReferenceEnd.TOP:
+    if timberB_end == TimberEnd.TOP:
         endB_position = locate_top_center_position(timberB).position
         directionB = timberB.get_length_direction_global()
     else:  # BOTTOM
@@ -127,23 +127,23 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
 
     # Calculate distance from each timber end to the splice point
     distance_A_from_bottom = safe_dot_product(splice_point - timberA.get_bottom_position_global(), timberA.get_length_direction_global())
-    distance_A_from_end = timberA.length - distance_A_from_bottom if timberA_end == TimberReferenceEnd.TOP else distance_A_from_bottom
+    distance_A_from_end = timberA.length - distance_A_from_bottom if timberA_end == TimberEnd.TOP else distance_A_from_bottom
 
     distance_B_from_bottom = safe_dot_product(splice_point - timberB.get_bottom_position_global(), timberB.get_length_direction_global())
-    distance_B_from_end = timberB.length - distance_B_from_bottom if timberB_end == TimberReferenceEnd.TOP else distance_B_from_bottom
+    distance_B_from_end = timberB.length - distance_B_from_bottom if timberB_end == TimberEnd.TOP else distance_B_from_bottom
 
     # Create the Cuts
     cutA = Cutting(
         timber=timberA,
-        maybe_top_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=None
     )
 
     cutB = Cutting(
         timber=timberB,
-        maybe_top_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=None
     )
 
@@ -232,26 +232,26 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
     # Create Cuts for both timbers with separated lap and end cuts
     top_end_cut_distance_from_bottom = (
         top_end_cut.offset
-        if top_lap_timber_end == TimberReferenceEnd.TOP
+        if top_lap_timber_end == TimberEnd.TOP
         else -top_end_cut.offset
     )
     bottom_end_cut_distance_from_bottom = (
         bottom_end_cut.offset
-        if bottom_lap_timber_end == TimberReferenceEnd.TOP
+        if bottom_lap_timber_end == TimberEnd.TOP
         else -bottom_end_cut.offset
     )
 
     cut_top = Cutting(
         timber=top_lap_timber,
-        maybe_top_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=top_lap_prism
     )
 
     cut_bottom = Cutting(
         timber=bottom_lap_timber,
-        maybe_top_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=bottom_lap_prism
     )
 
@@ -366,7 +366,7 @@ def cut_lapped_gooseneck_joint(
     gooseneck_lateral_offset_direction_global = receiving_timber.get_face_direction_global(gooseneck_timber_face.rotate_right())
 
     # Get the receiving timber end position
-    if receiving_timber_end == TimberReferenceEnd.TOP:
+    if receiving_timber_end == TimberEnd.TOP:
         receiving_timber_end_position_global = locate_top_center_position(receiving_timber).position
     else:  # BOTTOM
         receiving_timber_end_position_global = receiving_timber.get_bottom_position_global()
@@ -424,7 +424,7 @@ def cut_lapped_gooseneck_joint(
     # ========================================================================
 
     # Calculate shoulder position for receiving timber (distance from end to shoulder)
-    if receiving_timber_end == TimberReferenceEnd.TOP:
+    if receiving_timber_end == TimberEnd.TOP:
         receiving_timber_shoulder_from_end = receiving_timber.length - gooseneck_starting_position_on_receiving_timber
     else:  # BOTTOM
         receiving_timber_shoulder_from_end = gooseneck_starting_position_on_receiving_timber
@@ -458,7 +458,7 @@ def cut_lapped_gooseneck_joint(
         * gooseneck_timber.get_length_direction_global()
     )[0, 0]
 
-    if gooseneck_timber_end == TimberReferenceEnd.TOP:
+    if gooseneck_timber_end == TimberEnd.TOP:
         gooseneck_timber_lap_shoulder_from_end = gooseneck_timber.length - gooseneck_lap_start_on_gooseneck_timber
     else:  # BOTTOM
         gooseneck_timber_lap_shoulder_from_end = gooseneck_lap_start_on_gooseneck_timber
@@ -529,7 +529,7 @@ def cut_lapped_gooseneck_joint(
     # TODO this seems to be wrong?
     gooseneck_end_position_from_timber_end = gooseneck_timber_lap_shoulder_from_end - gooseneck_extension_from_receiving_end
 
-    if gooseneck_timber_end == TimberReferenceEnd.TOP:
+    if gooseneck_timber_end == TimberEnd.TOP:
         # End cut at distance from top
         gooseneck_end_cut_local_z = gooseneck_timber.length - gooseneck_end_position_from_timber_end
         gooseneck_timber_end_cut = HalfSpace(normal=create_v3(0, 0, 1), offset=gooseneck_end_cut_local_z)
@@ -543,7 +543,7 @@ def cut_lapped_gooseneck_joint(
     if receiving_timber_end_cut is not None:
         receiving_end_cut_local_z = (
             receiving_timber_end_cut.offset
-            if receiving_timber_end == TimberReferenceEnd.TOP
+            if receiving_timber_end == TimberEnd.TOP
             else -receiving_timber_end_cut.offset
         )
 
@@ -559,14 +559,14 @@ def cut_lapped_gooseneck_joint(
     # Create Cut objects for each timber
     receiving_timber_cut_obj = Cutting(
         timber=receiving_timber,
-        maybe_top_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=receiving_timber_negative_csg
     )
     gooseneck_timber_cut_obj = Cutting(
         timber=gooseneck_timber,
-        maybe_top_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=gooseneck_timber_combined_csg
     )
 

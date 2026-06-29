@@ -35,7 +35,7 @@ cd kigumi && npm run test:ext:complex
 ## Key Files
 
 ### kumiki/timber.py
-Core immutable types: `Timber`, `TimberFace`, `TimberLongFace`, `TimberReferenceEnd`, etc. All timber-related geometric operations (axes, size, position). All timber-related core APIs and types live here.
+Core immutable types: `Timber`, `TimberFace`, `TimberLongFace`, `TimberEnd`, etc. All timber-related geometric operations (axes, size, position). All timber-related core APIs and types live here.
 
 ### kumiki/construction.py
 Core construction logic and timber joinery helpers: joining timbers, computing join positions, projecting axes, relationships between multiple members. Canonical location for geometry construction logic beyond simple data definition.

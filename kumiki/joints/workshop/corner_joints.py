@@ -101,14 +101,14 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     warn_if_arrangement_timbers_imperfect(arrangement)
 
     # Get the end directions for each timber (pointing outward from the timber)
-    if timberA_end == TimberReferenceEnd.TOP:
+    if timberA_end == TimberEnd.TOP:
         directionA = timberA.get_length_direction_global()
         endA_position = locate_top_center_position(timberA).position
     else:  # BOTTOM
         directionA = -timberA.get_length_direction_global()
         endA_position = locate_bottom_center_position(timberA).position
 
-    if timberB_end == TimberReferenceEnd.TOP:
+    if timberB_end == TimberEnd.TOP:
         directionB = timberB.get_length_direction_global()
         endB_position = locate_top_center_position(timberB).position
     else:  # BOTTOM
@@ -274,15 +274,15 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
 
     cutA = Cutting(
         timber=timberA,
-        maybe_top_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_A,
     )
 
     cutB = Cutting(
         timber=timberB,
-        maybe_top_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_B,
     )
 
@@ -550,15 +550,15 @@ def cut_tongue_and_fork_corner_joint(
     # -------------------------------------------------------------------------
     tongue_cut = Cutting(
         timber=tongue_timber,
-        maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=tongue_negative_parts),
     )
 
     fork_cut = Cutting(
         timber=fork_timber,
-        maybe_top_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=fork_negative_parts),
     )
 
@@ -655,12 +655,12 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
         timber=timberA,
         maybe_top_end_cut_distance_from_bottom=(
             timberA_end_cut_distance_from_bottom
-            if timberA_end == TimberReferenceEnd.TOP
+            if timberA_end == TimberEnd.TOP
             else cross_lap_cutA.maybe_top_end_cut_distance_from_bottom
         ),
         maybe_bottom_end_cut_distance_from_bottom=(
             timberA_end_cut_distance_from_bottom
-            if timberA_end == TimberReferenceEnd.BOTTOM
+            if timberA_end == TimberEnd.BOTTOM
             else cross_lap_cutA.maybe_bottom_end_cut_distance_from_bottom
         ),
         negative_csg=cross_lap_cutA.negative_csg,
@@ -670,12 +670,12 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
         timber=timberB,
         maybe_top_end_cut_distance_from_bottom=(
             timberB_end_cut_distance_from_bottom
-            if timberB_end == TimberReferenceEnd.TOP
+            if timberB_end == TimberEnd.TOP
             else cross_lap_cutB.maybe_top_end_cut_distance_from_bottom
         ),
         maybe_bottom_end_cut_distance_from_bottom=(
             timberB_end_cut_distance_from_bottom
-            if timberB_end == TimberReferenceEnd.BOTTOM
+            if timberB_end == TimberEnd.BOTTOM
             else cross_lap_cutB.maybe_bottom_end_cut_distance_from_bottom
         ),
         negative_csg=cross_lap_cutB.negative_csg,
@@ -779,12 +779,12 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
     # ========================================================================
 
     # Get end directions (pointing outward from timber)
-    if timberA_end == TimberReferenceEnd.TOP:
+    if timberA_end == TimberEnd.TOP:
         directionA = timberA.get_length_direction_global()
     else:  # BOTTOM
         directionA = -timberA.get_length_direction_global()
 
-    if timberB_end == TimberReferenceEnd.TOP:
+    if timberB_end == TimberEnd.TOP:
         directionB = timberB.get_length_direction_global()
     else:  # BOTTOM
         directionB = -timberB.get_length_direction_global()
@@ -919,7 +919,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
 
     # Find where timberB's centerline intersects timberA's centerline
     timberB_centerline = locate_centerline(timberB)
-    centerline_marking = mark_distance_from_end_along_centerline(timberB_centerline, timberA, end=TimberReferenceEnd.BOTTOM)
+    centerline_marking = mark_distance_from_end_along_centerline(timberB_centerline, timberA, end=TimberEnd.BOTTOM)
 
     marking_position = timberA.get_bottom_position_global()
     marking_position = marking_position + timberA.get_length_direction_global() * centerline_marking.distance
@@ -946,7 +946,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
 
     # Create orientation for the marking transform
     # Z-axis points toward the end (along timber length direction or opposite)
-    if timberA_end == TimberReferenceEnd.TOP:
+    if timberA_end == TimberEnd.TOP:
         marking_z = timberA.get_length_direction_global()
     else:
         marking_z = -timberA.get_length_direction_global()
@@ -1178,7 +1178,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
     # These cross the corner of the miter
 
 
-    if timberA_end == TimberReferenceEnd.TOP:
+    if timberA_end == TimberEnd.TOP:
         # Cut the top: position is outward from marking, normal points up (to cut away top)
         rough_cut_position_A = marking_position + timberA.get_length_direction_global() * finger_size_y
         rough_cut_normal_A_global = timberA.get_length_direction_global()
@@ -1191,7 +1191,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
     local_offset_A_rough = safe_dot_product(rough_cut_position_A, rough_cut_normal_A_global) - safe_dot_product(rough_cut_normal_A_global, timberA.get_bottom_position_global())
     rough_end_cut_A = HalfSpace(normal=local_normal_A_rough, offset=local_offset_A_rough)
 
-    if timberB_end == TimberReferenceEnd.TOP:
+    if timberB_end == TimberEnd.TOP:
         rough_cut_position_B = marking_position + timberB.get_length_direction_global() * finger_size_y
         rough_cut_normal_B_global = timberB.get_length_direction_global()
     else:  # BOTTOM
@@ -1289,27 +1289,27 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
 
     rough_end_cut_A_z = (
         rough_end_cut_A.offset
-        if timberA_end == TimberReferenceEnd.TOP
+        if timberA_end == TimberEnd.TOP
         else -rough_end_cut_A.offset
     )
     rough_end_cut_B_z = (
         rough_end_cut_B.offset
-        if timberB_end == TimberReferenceEnd.TOP
+        if timberB_end == TimberEnd.TOP
         else -rough_end_cut_B.offset
     )
 
     # Create Cutting objects
     cutA = Cutting(
         timber=timberA,
-        maybe_top_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=negative_csg_A
     )
 
     cutB = Cutting(
         timber=timberB,
-        maybe_top_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=negative_csg_B
     )
 

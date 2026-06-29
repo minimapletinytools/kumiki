@@ -6,7 +6,7 @@ import pytest
 from sympy import Rational, cos, sin, pi
 from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector, safe_compare, Comparison
 from kumiki.timber import (
-    TimberReferenceEnd,
+    TimberEnd,
     timber_from_directions, create_v3
 )
 from kumiki.construction import ButtJointTimberArrangement
@@ -79,7 +79,7 @@ class TestMeasureMortiseShoulderPlane:
         arrangement = ButtJointTimberArrangement(
             butt_timber=tenon_timber,
             receiving_timber=mortise_timber,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
         )
 
         plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(

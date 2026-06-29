@@ -141,7 +141,7 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
     ), "Timbers cannot be parallel for a butt joint"
 
     # Get the direction of the butt end (pointing outward from the timber body)
-    if butt_end == TimberReferenceEnd.TOP:
+    if butt_end == TimberEnd.TOP:
         butt_direction = butt_timber.get_length_direction_global()
     else:
         butt_direction = -butt_timber.get_length_direction_global()
@@ -179,8 +179,8 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
 
     cut = Cutting(
         timber=butt_timber,
-        maybe_top_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut,
     )
 
@@ -236,7 +236,7 @@ def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJoi
     assert not are_vectors_parallel(receiving_timber.get_length_direction_global(), butt_timber.get_length_direction_global()), \
         "Timbers cannot be parallel for a butt joint"
 
-    if butt_end == TimberReferenceEnd.TOP:
+    if butt_end == TimberEnd.TOP:
         butt_direction = butt_timber.get_length_direction_global()
     else:
         butt_direction = -butt_timber.get_length_direction_global()
@@ -247,12 +247,12 @@ def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJoi
 
     from kumiki.rule import safe_dot_product
     distance_from_bottom = safe_dot_product(face_center - butt_timber.get_bottom_position_global(), butt_timber.get_length_direction_global())
-    distance_from_end = butt_timber.length - distance_from_bottom if butt_end == TimberReferenceEnd.TOP else distance_from_bottom
+    distance_from_end = butt_timber.length - distance_from_bottom if butt_end == TimberEnd.TOP else distance_from_bottom
 
     cut = Cutting(
         timber=butt_timber,
-        maybe_top_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=distance_from_bottom if butt_end == TimberEnd.BOTTOM else None,
         negative_csg=None
     )
 
@@ -455,8 +455,8 @@ def cut_tongue_and_fork_butt_joint(
     # -------------------------------------------------------------------------
     tongue_cut = Cutting(
         timber=tongue_timber,
-        maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=tongue_negative_parts),
     )
 
@@ -653,7 +653,7 @@ def cut_mortise_and_tenon_joint(
     sin_angle_safe = Rational(1, 10000) if safe_zero_test(sin_angle_sq) else sqrt(Abs(sin_angle_sq))
     back_extension = max(tenon_size[0], tenon_size[1]) / sin_angle_safe
 
-    tenon_tip_name = "tenon_top" if tenon_end == TimberReferenceEnd.TOP else "tenon_bot"
+    tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
 
     if use_round_tenon:
         # Round tenon: use cylinder with diameter = tenon_size[0]
@@ -840,8 +840,8 @@ def cut_mortise_and_tenon_joint(
 
     tenon_cut = Cutting(
         timber=tenon_timber,
-        maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
         negative_csg=tenon_cut_csg,
         label="mortise_and_tenon",
     )
@@ -918,8 +918,8 @@ def cut_mortise_and_tenon_joint(
             tenon_cut_with_pegs_csg = CSGUnion(children=[tenon_cut_csg] + peg_holes_in_tenon_local)
             tenon_cut = Cutting(
                 timber=tenon_timber,
-                maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.TOP else None,
-                maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.BOTTOM else None,
+                maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
+                maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
                 negative_csg=tenon_cut_with_pegs_csg,
                 label="mortise_and_tenon",
             )
@@ -996,7 +996,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     # Step 2: Determine which face of the mortise timber the tenon enters from
     # -------------------------------------------------------------------------
     tenon_end_direction = arrangement.butt_timber.get_face_direction_global(
-        TimberFace.TOP if arrangement.butt_timber_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
+        TimberFace.TOP if arrangement.butt_timber_end == TimberEnd.TOP else TimberFace.BOTTOM
     )
     mortise_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction
@@ -1145,7 +1145,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     # Step 2: Determine which face of the mortise timber the tenon enters from
     # -------------------------------------------------------------------------
     tenon_end_direction = arrangement.butt_timber.get_face_direction_global(
-        TimberFace.TOP if arrangement.butt_timber_end == TimberReferenceEnd.TOP else TimberFace.BOTTOM
+        TimberFace.TOP if arrangement.butt_timber_end == TimberEnd.TOP else TimberFace.BOTTOM
     )
     mortise_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction
@@ -1292,8 +1292,8 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
 
     tenon_cut = Cutting(
         timber=tenon_timber,
-        maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
         negative_csg=tenon_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
     )
@@ -1517,7 +1517,7 @@ def cut_dropin_dovetail_butt_joint(
     # The end cut should be at the end of the dovetail profile
     # The dovetail extends from the shoulder (at shoulder_distance_from_end) toward the end for dovetail_length
 
-    if dovetail_timber_end == TimberReferenceEnd.TOP:
+    if dovetail_timber_end == TimberEnd.TOP:
         # For TOP end: shoulder is at (timber.length - shoulder_distance_from_end)
         # Dovetail extends toward +Z for dovetail_length
         dovetail_end_local_z = dovetail_timber.length - shoulder_distance_from_end + dovetail_length
@@ -1530,8 +1530,8 @@ def cut_dropin_dovetail_butt_joint(
 
     dovetail_timber_cut_obj = Cutting(
         timber=dovetail_timber,
-        maybe_top_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberReferenceEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberReferenceEnd.BOTTOM else None,
+        maybe_top_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=Difference(dovetail_housing_prism, [dovetail_profile_csg])
     )
 

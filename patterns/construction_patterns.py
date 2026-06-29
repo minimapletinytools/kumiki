@@ -93,7 +93,7 @@ def make_attach_face_aligned_timber_example():
         attached_timber_length=feet(4),
         attached_timber_opposite_length=feet(2),
         # position 48" up from the bottom, measured to the beam centerline
-        original_timber_end_to_measure_from_for_length_position=TimberReferenceEnd.BOTTOM,
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
         length_position_measurement=feet(2),
         # keep the beam's BACK face flush with the post's FRONT face laterally
         original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,
@@ -138,7 +138,7 @@ def make_attach_face_aligned_timber_flush_example():
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
         attached_timber_length=feet(3),
         # length: the attached timber's RIGHT face is flush (0") with the post's TOP end
-        original_timber_end_to_measure_from_for_length_position=TimberReferenceEnd.TOP,
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
         attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.RIGHT,
         length_position_measurement=inches(0),
         # lateral: 1" from the post's FRONT face (measured to the attached timber's centerline)
@@ -181,7 +181,7 @@ def make_attach_plane_aligned_timber_brace_example():
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
         attached_timber_angle=pi / 4,  # 45 degrees up-and-out
         attached_timber_length=feet(3),
-        original_timber_end_to_measure_from_for_length_position=TimberReferenceEnd.BOTTOM,
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
         length_position_measurement=inches(24),
         ticket="Brace",
     )
@@ -220,7 +220,7 @@ def make_attach_timber_example():
         size=attached_size,
         attached_timber_direction=create_v3(Integer(2), Integer(1), Integer(1)),  # arbitrary
         attached_timber_length=feet(3),
-        original_timber_end_to_measure_from_for_length_position=TimberReferenceEnd.BOTTOM,
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
         length_position_measurement=inches(24),
         lateral_offset=inches(6),
         ticket="Attached",

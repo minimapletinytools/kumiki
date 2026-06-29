@@ -43,7 +43,7 @@ class TestButtJoint:
         arrangement = ButtJointTimberArrangement(
             butt_timber=timberB,
             receiving_timber=timberA,
-            butt_timber_end=TimberReferenceEnd.BOTTOM
+            butt_timber_end=TimberEnd.BOTTOM
         )
         joint = cut_plain_butt_joint_on_face_aligned_timbers(arrangement)
 
@@ -114,7 +114,7 @@ class TestButtJoint:
             arrangement = ButtJointTimberArrangement(
                 butt_timber=timberB,
                 receiving_timber=timberA,
-                butt_timber_end=TimberReferenceEnd.BOTTOM
+                butt_timber_end=TimberEnd.BOTTOM
             )
             cut_plain_butt_joint_on_face_aligned_timbers(arrangement)
         
@@ -123,7 +123,7 @@ class TestButtJoint:
             arrangement = ButtJointTimberArrangement(
                 butt_timber=timberC,
                 receiving_timber=timberA,
-                butt_timber_end=TimberReferenceEnd.BOTTOM
+                butt_timber_end=TimberEnd.BOTTOM
             )
             cut_plain_butt_joint_on_face_aligned_timbers(arrangement)
 
@@ -163,7 +163,7 @@ class TestButtJoint:
         arrangement = ButtJointTimberArrangement(
             butt_timber=timberB,
             receiving_timber=timberA,
-            butt_timber_end=TimberReferenceEnd.BOTTOM
+            butt_timber_end=TimberEnd.BOTTOM
         )
         joint = cut_plain_butt_joint_on_face_aligned_timbers(arrangement)
         
@@ -221,7 +221,7 @@ class TestTongueAndForkButtJoint:
         arrangement = ButtJointTimberArrangement(
             butt_timber=tongue_timber,
             receiving_timber=fork_timber,
-            butt_timber_end=TimberReferenceEnd.TOP,
+            butt_timber_end=TimberEnd.TOP,
         )
         joint = cut_tongue_and_fork_butt_joint(arrangement)
 
@@ -259,7 +259,7 @@ from typing import List
 from sympy import Matrix, Rational, Integer, simplify, sin, cos, pi
 from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, zero_test, safe_compare, Comparison, safe_dot_product, safe_normalize_vector as normalize_vector
 from kumiki.timber import (
-    Timber, TimberReferenceEnd, TimberFace, TimberLongFace,
+    Timber, TimberEnd, TimberFace, TimberLongFace,
     V2, V3, Numeric, PegShape, WedgeShape, Peg, Cutting, CutTimber,
     timber_from_directions, create_v3
 )
@@ -376,7 +376,7 @@ class TestMortiseAndTenonGeometry:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -430,7 +430,7 @@ class TestMortiseAndTenonGeometry:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -496,7 +496,7 @@ class TestPegStuff:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -556,7 +556,7 @@ class TestPegStuff:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -639,7 +639,7 @@ class TestPegStuff:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -689,7 +689,7 @@ class TestPegStuff:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -728,7 +728,7 @@ class TestPegStuff:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         )
         joint_with_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -788,7 +788,7 @@ class TestPegStuff:
         arrangement = ButtJointTimberArrangement(
             butt_timber=brace_timber,
             receiving_timber=timber1,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         )
         joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
@@ -829,7 +829,7 @@ class TestMortiseAndTenonCSGHierarchy:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
@@ -870,7 +870,7 @@ class TestMortiseAndTenonCSGHierarchy:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
@@ -921,7 +921,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         return ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         )
 
@@ -1106,7 +1106,7 @@ def _make_simple_butt_arrangement():
     return ButtJointTimberArrangement(
         butt_timber=beam,
         receiving_timber=post,
-        butt_timber_end=TimberReferenceEnd.TOP,
+        butt_timber_end=TimberEnd.TOP,
         front_face_on_butt_timber=TimberLongFace.RIGHT,
     )
 
@@ -1215,10 +1215,10 @@ class TestHousedDovetailButtJoint:
         """Test that the joint is constructable in several timber orientation combos."""
         test_cases = [
             # (butt_dir, recv_dir, butt_end, front_face)
-            ('y', 'x', TimberReferenceEnd.BOTTOM, TimberLongFace.FRONT),
-            ('-y', 'x', TimberReferenceEnd.BOTTOM, TimberLongFace.FRONT),
-            ('x', 'y', TimberReferenceEnd.BOTTOM, TimberLongFace.FRONT),
-            ('x', '-y', TimberReferenceEnd.TOP, TimberLongFace.FRONT),
+            ('y', 'x', TimberEnd.BOTTOM, TimberLongFace.FRONT),
+            ('-y', 'x', TimberEnd.BOTTOM, TimberLongFace.FRONT),
+            ('x', 'y', TimberEnd.BOTTOM, TimberLongFace.FRONT),
+            ('x', '-y', TimberEnd.TOP, TimberLongFace.FRONT),
         ]
 
         for butt_dir, recv_dir, butt_end, front_face in test_cases:
@@ -1317,7 +1317,7 @@ class TestHousedDovetailButtJoint:
         arrangement = ButtJointTimberArrangement(
             butt_timber=butt,
             receiving_timber=recv,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         )
         with pytest.raises(ValueError, match="perpendicular to receiving timber length"):

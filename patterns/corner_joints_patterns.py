@@ -105,8 +105,8 @@ def make_miter_joint_face_aligned_example(position: V3, use_round_timbers=False)
     miter_arrangement = CornerJointTimberArrangement(
         timber1=timberA,
         timber2=timberB,
-        timber1_end=TimberReferenceEnd.BOTTOM,
-        timber2_end=TimberReferenceEnd.BOTTOM
+        timber1_end=TimberEnd.BOTTOM,
+        timber2_end=TimberEnd.BOTTOM
     )
     joint = cut_plain_miter_joint_on_face_aligned_timbers(miter_arrangement)
 
@@ -155,8 +155,8 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
     arrangement = CornerJointTimberArrangement(
         timber1=timberA,
         timber2=timberB,
-        timber1_end=TimberReferenceEnd.BOTTOM,
-        timber2_end=TimberReferenceEnd.BOTTOM,
+        timber1_end=TimberEnd.BOTTOM,
+        timber2_end=TimberEnd.BOTTOM,
     )
     joint = cut_plain_miter_joint(arrangement)
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]

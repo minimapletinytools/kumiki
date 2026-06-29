@@ -21,7 +21,7 @@ from kumiki.joints.workshop.shavings.notching import (
 from kumiki.rule import create_v2, safe_normalize_vector as normalize_vector
 from kumiki.timber import (
     TimberFace,
-    TimberReferenceEnd,
+    TimberEnd,
     create_v3,
     timber_from_directions,
 )
@@ -68,11 +68,11 @@ class TestShoulderNotchingDecision:
         aligned_arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
         )
         assert are_timbers_plane_aligned(mortise_timber, tenon_timber)
 
-        tenon_end_direction = tenon_timber.get_face_direction_global(TimberReferenceEnd.BOTTOM)
+        tenon_end_direction = tenon_timber.get_face_direction_global(TimberEnd.BOTTOM)
         mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
             -tenon_end_direction
         ).to.face()
@@ -100,7 +100,7 @@ class TestShoulderNotchingDecision:
         non_plane_arrangement = ButtJointTimberArrangement(
             receiving_timber=non_plane_mortise,
             butt_timber=non_plane_tenon,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
         )
 
         assert not are_timbers_plane_aligned(non_plane_mortise, non_plane_tenon)
@@ -123,7 +123,7 @@ class TestChopNotchForButtJointArrangement:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
         )
 
         # Mortise is 6x6, so nominal entry face half-size = 3.

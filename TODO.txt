@@ -1,6 +1,15 @@
+:: 6/28 CONTENT PLAN
 
+- double saw horse workbench
+  - do 2x10 "tray"
+  - do 2x 4x8 tops  and 4x6 legs with 1 4x8 leg for the vise
+  -BONUS add well into tray and Us in feet with decorative cuts when you have those
 
+- outdoor shower
+  - 4x3 footprint, door on fornt 4' side, lean top awning with taller side on front side
+  -BONUS can you do slats instead of tongue and groove
 
+- do the shed from the timber framing book
 
 :: 5/30 kumiki intro script
 
@@ -48,57 +57,6 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 
-
-:: 5/30
-hello in this video I will show you how to get started with the kumiki timber frame design language and the kigumi viewer. 
-
-If you're just here to see a demo of how kumiki is used, feel free to jump ahead to the stamp in the video.
-
-To get stared with kumiki, you'll need to install VSCode and either UV or python. Once you've installed VSCode, open the extension menu and search for "kumiki" to install the kumiki extension which I already have installed here.
-
-You're ready to get started now. In VSCode choose open folder and then create a new folder that will become your project workspace where all your kumiki designs will go.
-
-Click the Kumiki icon in the sidebar to open the Kigumi extension.
-
-Next hit the initialize project button which will initialize the folder you created with the required files. You only need to do this step once. If you're running into errors at this step, it may be because you did not install UV or python or some other issue. you can try installing python if you installed UV or vice versa.
-
-The initialize project button will create several required files in your project workspace as well as a example design to help you get started.
-
-Once you've initialized your project, the kigumi sidebar will allow you to browse you kumiki design, AKA frames, as well examples AKA patterns that ship with kumiki
-
-lets open up the eaxmple frame that got created for us, this will launch the kigumi viewer
-- here you can move the camera around
-- select timbers
-- look at the list of timbers and joints
-- and so on
-- if you scroll down, you'll see some options for the viewer, and some other features 
-
-now lets go take a look the patterns that ship with kumiki in the sidebar.
-patterns are simple frames that demo just one joint or concept
-
-- here's a simple miter joint
-- a mortise and tenon joint
-- and here's a goosenceck splice joint
-
-you can also hit the view or duplicate source button to see and modify the source code for the pattern.
-
-I'll let you explore on your own here. Kumiki is being actively developed on so there will be many more patterns (and hence joints) to come
-
-If there's ever a new version of kumiki, it will detect it and you can press a button to update to the latest version directly in the kigumi sidebar.
-
-Now let's make our own design. Kumiki is a code aided design library. All kumiki frames are designed with as code. I'll make no speculations about our future here, but AI is really good at writing code so we'll use AI to generate our kumiki designs.
-
-VSCode ships with the copilot AI coding agent, and if you sign up for an account which gives you enough free tokens to make a simple frame design. Since I ran already out of copilot tokens, I'll be using Claude. You can use any coding agent you want!
-
-Now let's ask the agent to build us a sawhorse.
-
-"let's make a sawhorse out of 5"x5" timbers. Start by creating two 2' parallle feet resting horizontally on the ground 4' apart"
-
-"in the center of these feet, place posts that are 2' tall' to form teh legs of the sawhorse
-
-"then connect the top of the posts with a 6' beam to form the back of the saw horse"
-
-"Lastly, join the middle of the 2 posts with a stretcher to form the belly of the saw horse"
 
 
 
@@ -1236,6 +1194,59 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: END TODONE
+
+:: 5/30 kumiki setup video script
+hello in this video I will show you how to get started with the kumiki timber frame design language and the kigumi viewer. 
+
+If you're just here to see a demo of how kumiki is used, feel free to jump ahead to the stamp in the video.
+
+To get stared with kumiki, you'll need to install VSCode and either UV or python. Once you've installed VSCode, open the extension menu and search for "kumiki" to install the kumiki extension which I already have installed here.
+
+You're ready to get started now. In VSCode choose open folder and then create a new folder that will become your project workspace where all your kumiki designs will go.
+
+Click the Kumiki icon in the sidebar to open the Kigumi extension.
+
+Next hit the initialize project button which will initialize the folder you created with the required files. You only need to do this step once. If you're running into errors at this step, it may be because you did not install UV or python or some other issue. you can try installing python if you installed UV or vice versa.
+
+The initialize project button will create several required files in your project workspace as well as a example design to help you get started.
+
+Once you've initialized your project, the kigumi sidebar will allow you to browse you kumiki design, AKA frames, as well examples AKA patterns that ship with kumiki
+
+lets open up the eaxmple frame that got created for us, this will launch the kigumi viewer
+- here you can move the camera around
+- select timbers
+- look at the list of timbers and joints
+- and so on
+- if you scroll down, you'll see some options for the viewer, and some other features 
+
+now lets go take a look the patterns that ship with kumiki in the sidebar.
+patterns are simple frames that demo just one joint or concept
+
+- here's a simple miter joint
+- a mortise and tenon joint
+- and here's a goosenceck splice joint
+
+you can also hit the view or duplicate source button to see and modify the source code for the pattern.
+
+I'll let you explore on your own here. Kumiki is being actively developed on so there will be many more patterns (and hence joints) to come
+
+If there's ever a new version of kumiki, it will detect it and you can press a button to update to the latest version directly in the kigumi sidebar.
+
+Now let's make our own design. Kumiki is a code aided design library. All kumiki frames are designed with as code. I'll make no speculations about our future here, but AI is really good at writing code so we'll use AI to generate our kumiki designs.
+
+VSCode ships with the copilot AI coding agent, and if you sign up for an account which gives you enough free tokens to make a simple frame design. Since I ran already out of copilot tokens, I'll be using Claude. You can use any coding agent you want!
+
+Now let's ask the agent to build us a sawhorse.
+
+"let's make a sawhorse out of 5"x5" timbers. Start by creating two 2' parallle feet resting horizontally on the ground 4' apart"
+
+"in the center of these feet, place posts that are 2' tall' to form teh legs of the sawhorse
+
+"then connect the top of the posts with a 6' beam to form the back of the saw horse"
+
+"Lastly, join the middle of the 2 posts with a stretcher to form the belly of the saw horse"
+
+
 
 :: 6/21 WEBSITE INSTALL GUIDE
 

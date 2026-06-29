@@ -16,7 +16,7 @@ NOTE: Prism positioning follows the Timber convention:
 from sympy import Matrix, eye, Rational, sqrt
 from kumiki.cutcsg import *
 from kumiki.rule import Orientation, Transform, inches, feet
-from kumiki.timber import Timber, TimberReferenceEnd, TimberFace, TimberLongFace, timber_from_directions
+from kumiki.timber import Timber, TimberEnd, TimberFace, TimberLongFace, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.shavings import chop_lap_on_timber_end, chop_profile_on_timber_face
 from kumiki.joints.workshop.shavings.notching import chop_shoulder_notch_on_timber_face
@@ -250,7 +250,7 @@ def example_lap_cut_on_timber():
     # Create the lap cut CSG (in timber's local coordinates)
     lap_cut_csg = chop_lap_on_timber_end(
         lap_timber=timber,
-        lap_timber_end=TimberReferenceEnd.TOP,
+        lap_timber_end=TimberEnd.TOP,
         lap_timber_face=TimberFace.BACK,
         lap_length=lap_length,
         lap_shoulder_position_from_lap_timber_end=shoulder_distance,
@@ -326,7 +326,7 @@ def example_gooseneck_profile_cut():
     # The profile is positioned so its head is at the timber end
     gooseneck_cut_csg = chop_profile_on_timber_face(
         timber=timber,
-        end=TimberReferenceEnd.TOP,
+        end=TimberEnd.TOP,
         face=TimberFace.RIGHT,
         profile=gooseneck_profiles,
         depth=gooseneck_depth,
@@ -549,7 +549,7 @@ def _create_dovetail_debug_arrangement() -> ButtJointTimberArrangement:
     return ButtJointTimberArrangement(
         butt_timber=butt_timber,
         receiving_timber=receiving_timber,
-        butt_timber_end=TimberReferenceEnd.TOP,
+        butt_timber_end=TimberEnd.TOP,
         front_face_on_butt_timber=TimberLongFace.RIGHT,
     )
 

@@ -11,7 +11,7 @@ from dataclasses import dataclass
 from sympy import Integer
 
 from kumiki.timber import (
-    Timber, TimberReferenceEnd, TimberLongFace,
+    Timber, TimberEnd, TimberLongFace,
     timber_from_directions, normalize_vector,
     RoundTimber, MeshTimber, RegularPolygonTimber,
 )
@@ -166,7 +166,7 @@ def create_canonical_example_butt_joint_timbers(
     return ButtJointTimberArrangement(
         butt_timber=butt_timber,
         receiving_timber=receiving_timber,
-        butt_timber_end=TimberReferenceEnd.TOP,
+        butt_timber_end=TimberEnd.TOP,
         front_face_on_butt_timber=TimberLongFace.RIGHT
     )
 
@@ -221,8 +221,8 @@ def create_canonical_example_splice_joint_timbers(
     return SpliceJointTimberArrangement(
         timber1=timber1,
         timber2=timber2,
-        timber1_end=TimberReferenceEnd.TOP,
-        timber2_end=TimberReferenceEnd.BOTTOM,
+        timber1_end=TimberEnd.TOP,
+        timber2_end=TimberEnd.BOTTOM,
         front_face_on_timber1=TimberLongFace.RIGHT
     )
 
@@ -284,8 +284,8 @@ def create_canonical_example_corner_joint_timbers(
     return CornerJointTimberArrangement(
         timber1=timber1,
         timber2=timber2,
-        timber1_end=TimberReferenceEnd.BOTTOM,
-        timber2_end=TimberReferenceEnd.BOTTOM,
+        timber1_end=TimberEnd.BOTTOM,
+        timber2_end=TimberEnd.BOTTOM,
         front_face_on_timber1=TimberLongFace.RIGHT
     )
 
@@ -523,7 +523,7 @@ def create_canonical_example_opposing_double_butt_joint_timbers(
         butt_timber_1=butt_timber_1,
         butt_timber_2=butt_timber_2,
         receiving_timber=receiving_timber,
-        butt_timber_1_end=TimberReferenceEnd.TOP,
-        butt_timber_2_end=TimberReferenceEnd.TOP,
+        butt_timber_1_end=TimberEnd.TOP,
+        butt_timber_2_end=TimberEnd.TOP,
         front_face_on_butt_timber_1=TimberLongFace.RIGHT,
     )

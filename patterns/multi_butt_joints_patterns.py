@@ -28,7 +28,7 @@ def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
     """
     arrangement = create_canonical_example_opposing_double_butt_joint_timbers(position=position)
     joint = cut_splined_opposing_double_butt_joint(arrangement = arrangement,
-        slot_facing_end_on_receiving_timber = TimberReferenceEnd.TOP,
+        slot_facing_end_on_receiving_timber = TimberEnd.TOP,
         # thickness is in the axis perpendicular to the joint plane
         slot_thickness=inches(1),
         # depth is in the axis of the receiving timber, measured from the face of the butt timber that alines with slot_facing_end_on_receiving_timber

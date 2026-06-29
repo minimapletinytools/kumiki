@@ -7,7 +7,7 @@ representations are converted to floating point values in CAD systems.
 """
 
 from sympy import Rational, pi, Matrix, cos, sin
-from kumiki.timber import Frame, TimberFace, TimberReferenceEnd, create_v3, timber_from_directions
+from kumiki.timber import Frame, TimberFace, TimberEnd, create_v3, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.butt_joints import cut_mortise_and_tenon_joint
 from kumiki.patternbook import Pattern
@@ -51,7 +51,7 @@ def create_all_irrational_examples() -> Frame:
     arrangement = ButtJointTimberArrangement(
         receiving_timber=post,
         butt_timber=beam,
-        butt_timber_end=TimberReferenceEnd.BOTTOM,
+        butt_timber_end=TimberEnd.BOTTOM,
         front_face_on_butt_timber=None,
     )
     joint = cut_mortise_and_tenon_joint(

@@ -458,7 +458,7 @@ def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: in
     
     return create_timber(bottom_position, length, size, length_direction, width_direction, ticket=ticket)
 
-def stretch_timber(timber: Timber, end: TimberReferenceEnd, overlap_length: Numeric, 
+def stretch_timber(timber: Timber, end: TimberEnd, overlap_length: Numeric, 
                   extend_length: Numeric) -> Timber:
     """
     Creates a new timber extending the original timber by a given length.
@@ -470,9 +470,9 @@ def stretch_timber(timber: Timber, end: TimberReferenceEnd, overlap_length: Nume
         overlap_length: Length of timber to overlap with existing timber
         extend_length: Length of timber to extend beyond the end of the original timber (does not include the overlap length)
     """
-    assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
+    assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
     # Calculate new position based on end
-    if end == TimberReferenceEnd.TOP:
+    if end == TimberEnd.TOP:
         # Extend from top
         extension_vector = timber.get_length_direction_global() * (timber.length - overlap_length)
         new_bottom_position = timber.get_bottom_position_global() + extension_vector
@@ -561,8 +561,8 @@ def attach_timber(
     attached_timber_length: Numeric,
     attached_timber_opposite_length: Numeric = Integer(0),
     attached_timber_width_direction: Optional[Direction3D] = None,
-    attached_timber_end_that_points_towards_original_timber: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
-    original_timber_end_to_measure_from_for_length_position: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
+    attached_timber_end_that_points_towards_original_timber: TimberEnd = TimberEnd.BOTTOM,
+    original_timber_end_to_measure_from_for_length_position: TimberEnd = TimberEnd.BOTTOM,
     length_position_measurement: Numeric = Integer(0),
     lateral_offset: Numeric = Integer(0),
     ticket: Optional[Union[TimberTicket, str]] = None,
@@ -593,21 +593,21 @@ def attach_timber(
     # ---- type checks ----
     assert isinstance(original_timber, PerfectTimberWithin), \
         f"original_timber must be a timber (PerfectTimberWithin), got {type(original_timber).__name__}"
-    assert isinstance(attached_timber_end_that_points_towards_original_timber, TimberReferenceEnd), \
-        f"attached_timber_end_that_points_towards_original_timber must be TimberReferenceEnd, got {type(attached_timber_end_that_points_towards_original_timber).__name__}"
-    assert isinstance(original_timber_end_to_measure_from_for_length_position, TimberReferenceEnd), \
-        f"original_timber_end_to_measure_from_for_length_position must be TimberReferenceEnd, got {type(original_timber_end_to_measure_from_for_length_position).__name__}"
+    assert isinstance(attached_timber_end_that_points_towards_original_timber, TimberEnd), \
+        f"attached_timber_end_that_points_towards_original_timber must be TimberEnd, got {type(attached_timber_end_that_points_towards_original_timber).__name__}"
+    assert isinstance(original_timber_end_to_measure_from_for_length_position, TimberEnd), \
+        f"original_timber_end_to_measure_from_for_length_position must be TimberEnd, got {type(original_timber_end_to_measure_from_for_length_position).__name__}"
 
     # point_dir is the direction the attached timber points; length_dir is its +length (bottom->top),
     # which flips when the TOP end is the one sitting against the original timber.
     point_dir = normalize_vector(attached_timber_direction)
-    if attached_timber_end_that_points_towards_original_timber == TimberReferenceEnd.BOTTOM:
+    if attached_timber_end_that_points_towards_original_timber == TimberEnd.BOTTOM:
         length_dir = point_dir
     else:
         length_dir = -point_dir
 
     # ---- reference point: a position on the original timber's centerline, then offset laterally ----
-    if original_timber_end_to_measure_from_for_length_position == TimberReferenceEnd.BOTTOM:
+    if original_timber_end_to_measure_from_for_length_position == TimberEnd.BOTTOM:
         reference = locate_position_on_centerline_from_bottom(original_timber, length_position_measurement).position
     else:  # TOP
         reference = locate_position_on_centerline_from_top(original_timber, length_position_measurement).position
@@ -649,8 +649,8 @@ def attach_plane_aligned_timber(
     attached_timber_angle: Numeric, # angle between the length axis of the original timber and attached timber, note that this flips depending on attached_timber_end_that_points_towards_original_timber
     attached_timber_length: Numeric,
     attached_timber_opposite_length: Numeric = Integer(0),
-    attached_timber_end_that_points_towards_original_timber: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
-    original_timber_end_to_measure_from_for_length_position: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
+    attached_timber_end_that_points_towards_original_timber: TimberEnd = TimberEnd.BOTTOM,
+    original_timber_end_to_measure_from_for_length_position: TimberEnd = TimberEnd.BOTTOM,
     attached_timber_long_face_to_measure_to_for_length_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
     length_position_measurement: Numeric = Integer(0),
     original_timber_face_to_measure_from_for_lateral_position: Union[TimberFace, TimberCenterline] = TimberCenterline.CENTERLINE,
@@ -693,10 +693,10 @@ def attach_plane_aligned_timber(
         f"original_timber must be a timber (PerfectTimberWithin), got {type(original_timber).__name__}"
     assert isinstance(original_timber_long_face_that_attached_timber_points_to, TimberLongFace), \
         f"original_timber_long_face_that_attached_timber_points_to must be TimberLongFace, got {type(original_timber_long_face_that_attached_timber_points_to).__name__}"
-    assert isinstance(attached_timber_end_that_points_towards_original_timber, TimberReferenceEnd), \
-        f"attached_timber_end_that_points_towards_original_timber must be TimberReferenceEnd, got {type(attached_timber_end_that_points_towards_original_timber).__name__}"
-    assert isinstance(original_timber_end_to_measure_from_for_length_position, TimberReferenceEnd), \
-        f"original_timber_end_to_measure_from_for_length_position must be TimberReferenceEnd, got {type(original_timber_end_to_measure_from_for_length_position).__name__}"
+    assert isinstance(attached_timber_end_that_points_towards_original_timber, TimberEnd), \
+        f"attached_timber_end_that_points_towards_original_timber must be TimberEnd, got {type(attached_timber_end_that_points_towards_original_timber).__name__}"
+    assert isinstance(original_timber_end_to_measure_from_for_length_position, TimberEnd), \
+        f"original_timber_end_to_measure_from_for_length_position must be TimberEnd, got {type(original_timber_end_to_measure_from_for_length_position).__name__}"
     assert isinstance(attached_timber_long_face_to_measure_to_for_length_position, (TimberLongFace, TimberCenterline)), \
         f"attached_timber_long_face_to_measure_to_for_length_position must be TimberLongFace or TimberCenterline, got {type(attached_timber_long_face_to_measure_to_for_length_position).__name__}"
     assert isinstance(original_timber_face_to_measure_from_for_lateral_position, (TimberFace, TimberCenterline)), \
@@ -715,7 +715,7 @@ def attach_plane_aligned_timber(
     # point_dir points out of the chosen face at attached_timber_angle from the original length; it
     # is the direction the attached timber extends, independent of which end faces the original.
     point_dir = cos(attached_timber_angle) * l + sin(attached_timber_angle) * a
-    if attached_timber_end_that_points_towards_original_timber == TimberReferenceEnd.BOTTOM:
+    if attached_timber_end_that_points_towards_original_timber == TimberEnd.BOTTOM:
         length_dir = point_dir
     else:  # the TOP end sits on the original-timber side, so +length points back toward it
         length_dir = -point_dir
@@ -779,7 +779,7 @@ def attach_plane_aligned_timber(
     # Measure from the chosen end of the original timber, going into the timber.
     end_face = original_timber_end_to_measure_from_for_length_position
     end_l = get_center_point_on_face_global(end_face, original_timber).dot(l)
-    if end_face == TimberReferenceEnd.TOP:
+    if end_face == TimberEnd.TOP:
         target_l = end_l - length_position_measurement  # into the timber from the top is -l
     else:  # BOTTOM
         target_l = end_l + length_position_measurement  # into the timber from the bottom is +l
@@ -832,8 +832,8 @@ def attach_face_aligned_timber(
     original_timber_long_face_that_attached_timber_points_to: TimberLongFace,
     attached_timber_length: Numeric,
     attached_timber_opposite_length: Numeric = Integer(0),
-    attached_timber_end_that_points_towards_original_timber: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
-    original_timber_end_to_measure_from_for_length_position: TimberReferenceEnd = TimberReferenceEnd.BOTTOM,
+    attached_timber_end_that_points_towards_original_timber: TimberEnd = TimberEnd.BOTTOM,
+    original_timber_end_to_measure_from_for_length_position: TimberEnd = TimberEnd.BOTTOM,
     attached_timber_long_face_to_measure_to_for_length_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
     length_position_measurement: Numeric = Integer(0),
     original_timber_face_to_measure_from_for_lateral_position: Union[TimberFace, TimberCenterline] = TimberCenterline.CENTERLINE,
@@ -1398,7 +1398,7 @@ class ArrangementNames(Enum):
 class ButtJointTimberArrangement:
     butt_timber: TimberLike
     receiving_timber: TimberLike
-    butt_timber_end: TimberReferenceEnd
+    butt_timber_end: TimberEnd
     front_face_on_butt_timber: Optional[TimberLongFace] = None
 
     # this is totally silly. please delete me. We're not doing any hard computations in here...
@@ -1419,8 +1419,8 @@ class ButtJointTimberArrangement:
             return f"butt_timber must be PerfectTimberWithin, got {type(self.butt_timber).__name__}"
         if not isinstance(self.receiving_timber, PerfectTimberWithin):
             return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
-        if not isinstance(self.butt_timber_end, TimberReferenceEnd):
-            return f"butt_timber_end must be TimberReferenceEnd, got {type(self.butt_timber_end).__name__}"
+        if not isinstance(self.butt_timber_end, TimberEnd):
+            return f"butt_timber_end must be TimberEnd, got {type(self.butt_timber_end).__name__}"
         if self.front_face_on_butt_timber is not None and not isinstance(self.front_face_on_butt_timber, TimberLongFace):
             return f"front_face_on_butt_timber must be TimberLongFace or None, got {type(self.front_face_on_butt_timber).__name__}"
         return None
@@ -1469,8 +1469,8 @@ class DoubleButtJointTimberArrangement:
     butt_timber_1: TimberLike
     butt_timber_2: TimberLike
     receiving_timber: TimberLike
-    butt_timber_1_end: TimberReferenceEnd
-    butt_timber_2_end: TimberReferenceEnd
+    butt_timber_1_end: TimberEnd
+    butt_timber_2_end: TimberEnd
     front_face_on_butt_timber_1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
@@ -1481,10 +1481,10 @@ class DoubleButtJointTimberArrangement:
             return f"butt_timber_2 must be PerfectTimberWithin, got {type(self.butt_timber_2).__name__}"
         if not isinstance(self.receiving_timber, PerfectTimberWithin):
             return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
-        if not isinstance(self.butt_timber_1_end, TimberReferenceEnd):
-            return f"butt_timber_1_end must be TimberReferenceEnd, got {type(self.butt_timber_1_end).__name__}"
-        if not isinstance(self.butt_timber_2_end, TimberReferenceEnd):
-            return f"butt_timber_2_end must be TimberReferenceEnd, got {type(self.butt_timber_2_end).__name__}"
+        if not isinstance(self.butt_timber_1_end, TimberEnd):
+            return f"butt_timber_1_end must be TimberEnd, got {type(self.butt_timber_1_end).__name__}"
+        if not isinstance(self.butt_timber_2_end, TimberEnd):
+            return f"butt_timber_2_end must be TimberEnd, got {type(self.butt_timber_2_end).__name__}"
         if self.front_face_on_butt_timber_1 is not None and not isinstance(self.front_face_on_butt_timber_1, TimberLongFace):
             return (
                 "front_face_on_butt_timber_1 must be TimberLongFace or None, "
@@ -1536,8 +1536,8 @@ class DoubleButtJointTimberArrangement:
         # Calculate effective approach directions based on which end of each timber is used
         # If end == TOP, the timber approaches from the -direction
         # If end == BOTTOM, the timber approaches from the +direction
-        approach_dir1 = -dir1 if self.butt_timber_1_end == TimberReferenceEnd.TOP else dir1
-        approach_dir2 = -dir2 if self.butt_timber_2_end == TimberReferenceEnd.TOP else dir2
+        approach_dir1 = -dir1 if self.butt_timber_1_end == TimberEnd.TOP else dir1
+        approach_dir2 = -dir2 if self.butt_timber_2_end == TimberEnd.TOP else dir2
         
         # Pair must approach from opposite directions (antiparallel)
         if not equality_test(approach_dir1.dot(approach_dir2), -1):
@@ -1576,9 +1576,9 @@ class TripleButtJointTimberArrangement:
     main_butt_timber_2: TimberLike
     awk_timber: TimberLike
     receiving_timber: TimberLike
-    main_butt_timber_1_end: TimberReferenceEnd
-    main_butt_timber_2_end: TimberReferenceEnd
-    awk_timber_end: TimberReferenceEnd
+    main_butt_timber_1_end: TimberEnd
+    main_butt_timber_2_end: TimberEnd
+    awk_timber_end: TimberEnd
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
@@ -1590,12 +1590,12 @@ class TripleButtJointTimberArrangement:
             return f"awk_timber must be PerfectTimberWithin, got {type(self.awk_timber).__name__}"
         if not isinstance(self.receiving_timber, PerfectTimberWithin):
             return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
-        if not isinstance(self.main_butt_timber_1_end, TimberReferenceEnd):
-            return f"main_butt_timber_1_end must be TimberReferenceEnd, got {type(self.main_butt_timber_1_end).__name__}"
-        if not isinstance(self.main_butt_timber_2_end, TimberReferenceEnd):
-            return f"main_butt_timber_2_end must be TimberReferenceEnd, got {type(self.main_butt_timber_2_end).__name__}"
-        if not isinstance(self.awk_timber_end, TimberReferenceEnd):
-            return f"awk_timber_end must be TimberReferenceEnd, got {type(self.awk_timber_end).__name__}"
+        if not isinstance(self.main_butt_timber_1_end, TimberEnd):
+            return f"main_butt_timber_1_end must be TimberEnd, got {type(self.main_butt_timber_1_end).__name__}"
+        if not isinstance(self.main_butt_timber_2_end, TimberEnd):
+            return f"main_butt_timber_2_end must be TimberEnd, got {type(self.main_butt_timber_2_end).__name__}"
+        if not isinstance(self.awk_timber_end, TimberEnd):
+            return f"awk_timber_end must be TimberEnd, got {type(self.awk_timber_end).__name__}"
         return None
 
     def __post_init__(self):
@@ -1669,10 +1669,10 @@ class QuadrupleButtJointTimberArrangement:
     awk_1: TimberLike
     awk_2: TimberLike
     receiving_timber: TimberLike
-    main_butt_timber_1_end: TimberReferenceEnd
-    main_butt_timber_2_end: TimberReferenceEnd
-    awk_1_end: TimberReferenceEnd
-    awk_2_end: TimberReferenceEnd
+    main_butt_timber_1_end: TimberEnd
+    main_butt_timber_2_end: TimberEnd
+    awk_1_end: TimberEnd
+    awk_2_end: TimberEnd
 
     def check_types_valid(self) -> Optional[str]:
         """Return None if all types are valid, otherwise an error message for use in assert."""
@@ -1686,14 +1686,14 @@ class QuadrupleButtJointTimberArrangement:
             return f"awk_2 must be PerfectTimberWithin, got {type(self.awk_2).__name__}"
         if not isinstance(self.receiving_timber, PerfectTimberWithin):
             return f"receiving_timber must be PerfectTimberWithin, got {type(self.receiving_timber).__name__}"
-        if not isinstance(self.main_butt_timber_1_end, TimberReferenceEnd):
-            return f"main_butt_timber_1_end must be TimberReferenceEnd, got {type(self.main_butt_timber_1_end).__name__}"
-        if not isinstance(self.main_butt_timber_2_end, TimberReferenceEnd):
-            return f"main_butt_timber_2_end must be TimberReferenceEnd, got {type(self.main_butt_timber_2_end).__name__}"
-        if not isinstance(self.awk_1_end, TimberReferenceEnd):
-            return f"awk_1_end must be TimberReferenceEnd, got {type(self.awk_1_end).__name__}"
-        if not isinstance(self.awk_2_end, TimberReferenceEnd):
-            return f"awk_2_end must be TimberReferenceEnd, got {type(self.awk_2_end).__name__}"
+        if not isinstance(self.main_butt_timber_1_end, TimberEnd):
+            return f"main_butt_timber_1_end must be TimberEnd, got {type(self.main_butt_timber_1_end).__name__}"
+        if not isinstance(self.main_butt_timber_2_end, TimberEnd):
+            return f"main_butt_timber_2_end must be TimberEnd, got {type(self.main_butt_timber_2_end).__name__}"
+        if not isinstance(self.awk_1_end, TimberEnd):
+            return f"awk_1_end must be TimberEnd, got {type(self.awk_1_end).__name__}"
+        if not isinstance(self.awk_2_end, TimberEnd):
+            return f"awk_2_end must be TimberEnd, got {type(self.awk_2_end).__name__}"
         return None
 
     def __post_init__(self):
@@ -1768,15 +1768,15 @@ class CrossCapJointTimberArrangement:
     """A butting post timber "capped" by two crossed timbers.
     """
     post_timber: TimberLike
-    post_timber_end: TimberReferenceEnd
+    post_timber_end: TimberEnd
     cross_timber_1: TimberLike
     cross_timber_2: TimberLike
 
     def check_types_valid(self) -> Optional[str]:
         if not isinstance(self.post_timber, PerfectTimberWithin):
             return f"post_timber must be PerfectTimberWithin, got {type(self.post_timber).__name__}"
-        if not isinstance(self.post_timber_end, TimberReferenceEnd):
-            return f"post_timber_end must be TimberReferenceEnd, got {type(self.post_timber_end).__name__}"
+        if not isinstance(self.post_timber_end, TimberEnd):
+            return f"post_timber_end must be TimberEnd, got {type(self.post_timber_end).__name__}"
         if not isinstance(self.cross_timber_1, PerfectTimberWithin):
             return f"cross_timber_1 must be PerfectTimberWithin, got {type(self.cross_timber_1).__name__}"
         if not isinstance(self.cross_timber_2, PerfectTimberWithin):
@@ -1815,8 +1815,8 @@ class CrossCapJointTimberArrangement:
 class SpliceJointTimberArrangement:
     timber1: TimberLike
     timber2: TimberLike
-    timber1_end: TimberReferenceEnd
-    timber2_end: TimberReferenceEnd 
+    timber1_end: TimberEnd
+    timber2_end: TimberEnd 
     front_face_on_timber1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
@@ -1825,10 +1825,10 @@ class SpliceJointTimberArrangement:
             return f"timber1 must be PerfectTimberWithin, got {type(self.timber1).__name__}"
         if not isinstance(self.timber2, PerfectTimberWithin):
             return f"timber2 must be PerfectTimberWithin, got {type(self.timber2).__name__}"
-        if not isinstance(self.timber1_end, TimberReferenceEnd):
-            return f"timber1_end must be TimberReferenceEnd, got {type(self.timber1_end).__name__}"
-        if not isinstance(self.timber2_end, TimberReferenceEnd):
-            return f"timber2_end must be TimberReferenceEnd, got {type(self.timber2_end).__name__}"
+        if not isinstance(self.timber1_end, TimberEnd):
+            return f"timber1_end must be TimberEnd, got {type(self.timber1_end).__name__}"
+        if not isinstance(self.timber2_end, TimberEnd):
+            return f"timber2_end must be TimberEnd, got {type(self.timber2_end).__name__}"
         if self.front_face_on_timber1 is not None and not isinstance(self.front_face_on_timber1, TimberLongFace):
             return f"front_face_on_timber1 must be TimberLongFace or None, got {type(self.front_face_on_timber1).__name__}"
         return None
@@ -1857,8 +1857,8 @@ class SpliceJointTimberArrangement:
 class CornerJointTimberArrangement:
     timber1: TimberLike
     timber2: TimberLike
-    timber1_end: TimberReferenceEnd
-    timber2_end: TimberReferenceEnd
+    timber1_end: TimberEnd
+    timber2_end: TimberEnd
     front_face_on_timber1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
@@ -1867,10 +1867,10 @@ class CornerJointTimberArrangement:
             return f"timber1 must be PerfectTimberWithin, got {type(self.timber1).__name__}"
         if not isinstance(self.timber2, PerfectTimberWithin):
             return f"timber2 must be PerfectTimberWithin, got {type(self.timber2).__name__}"
-        if not isinstance(self.timber1_end, TimberReferenceEnd):
-            return f"timber1_end must be TimberReferenceEnd, got {type(self.timber1_end).__name__}"
-        if not isinstance(self.timber2_end, TimberReferenceEnd):
-            return f"timber2_end must be TimberReferenceEnd, got {type(self.timber2_end).__name__}"
+        if not isinstance(self.timber1_end, TimberEnd):
+            return f"timber1_end must be TimberEnd, got {type(self.timber1_end).__name__}"
+        if not isinstance(self.timber2_end, TimberEnd):
+            return f"timber2_end must be TimberEnd, got {type(self.timber2_end).__name__}"
         if self.front_face_on_timber1 is not None and not isinstance(self.front_face_on_timber1, TimberLongFace):
             return f"front_face_on_timber1 must be TimberLongFace or None, got {type(self.front_face_on_timber1).__name__}"
         return None
@@ -1966,8 +1966,8 @@ class BraceJointTimberArrangement:
     timber1: TimberLike
     timber2: TimberLike
     brace_timber: TimberLike
-    timber1_end: TimberReferenceEnd
-    timber2_end: TimberReferenceEnd
+    timber1_end: TimberEnd
+    timber2_end: TimberEnd
     front_face_on_timber1: Optional[TimberLongFace] = None
 
     def check_types_valid(self) -> Optional[str]:
@@ -1978,10 +1978,10 @@ class BraceJointTimberArrangement:
             return f"timber2 must be PerfectTimberWithin, got {type(self.timber2).__name__}"
         if not isinstance(self.brace_timber, PerfectTimberWithin):
             return f"brace_timber must be PerfectTimberWithin, got {type(self.brace_timber).__name__}"
-        if not isinstance(self.timber1_end, TimberReferenceEnd):
-            return f"timber1_end must be TimberReferenceEnd, got {type(self.timber1_end).__name__}"
-        if not isinstance(self.timber2_end, TimberReferenceEnd):
-            return f"timber2_end must be TimberReferenceEnd, got {type(self.timber2_end).__name__}"
+        if not isinstance(self.timber1_end, TimberEnd):
+            return f"timber1_end must be TimberEnd, got {type(self.timber1_end).__name__}"
+        if not isinstance(self.timber2_end, TimberEnd):
+            return f"timber2_end must be TimberEnd, got {type(self.timber2_end).__name__}"
         if self.front_face_on_timber1 is not None and not isinstance(self.front_face_on_timber1, TimberLongFace):
             return f"front_face_on_timber1 must be TimberLongFace or None, got {type(self.front_face_on_timber1).__name__}"
         return None

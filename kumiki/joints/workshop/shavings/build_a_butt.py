@@ -77,7 +77,7 @@ def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
 
     mortise_centerline = locate_centerline(mortise_timber)
     tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
-    if tenon_end == TimberReferenceEnd.TOP:
+    if tenon_end == TimberEnd.TOP:
         tenon_end_position = (
             tenon_timber.get_bottom_position_global()
             + tenon_timber.get_length_direction_global() * tenon_timber.length

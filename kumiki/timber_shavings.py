@@ -239,7 +239,7 @@ def create_peg_going_into_face(
 
 def create_wedge_in_timber_end(
     timber: Timber,
-    end: TimberReferenceEnd,
+    end: TimberEnd,
     position: V3,
     shape: WedgeShape
 ) -> Wedge:
@@ -259,7 +259,7 @@ def create_wedge_in_timber_end(
         Wedge object positioned and oriented appropriately in timber's local space
     """
     # Determine wedge position and orientation based on which end
-    if end == TimberReferenceEnd.TOP:
+    if end == TimberEnd.TOP:
         # At top end, wedge points downward into timber (-Z in local space)
         # Position at the top of the timber
         wedge_position = create_v3(

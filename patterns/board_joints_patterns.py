@@ -11,7 +11,7 @@ from kumiki.construction import CornerJointTimberArrangement
 from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame
 from kumiki.rule import feet, inches
 from kumiki.ticket import BoardTicket, TimberTicket
-from kumiki.timber import Board, Frame, Orientation, Timber, TimberReferenceEnd, Transform, create_v3
+from kumiki.timber import Board, Frame, Orientation, Timber, TimberEnd, Transform, create_v3
 
 
 def example_tongue_and_groove(position=None):
@@ -189,25 +189,25 @@ def example_board_in_grooved_frame(
     miter_bl = cut_plain_miter_joint_on_face_aligned_timbers(
         CornerJointTimberArrangement(
             timber1=bot_rail, timber2=left_stile,
-            timber1_end=TimberReferenceEnd.BOTTOM, timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM,
         )
     )
     miter_br = cut_plain_miter_joint_on_face_aligned_timbers(
         CornerJointTimberArrangement(
             timber1=bot_rail, timber2=right_stile,
-            timber1_end=TimberReferenceEnd.TOP, timber2_end=TimberReferenceEnd.BOTTOM,
+            timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.BOTTOM,
         )
     )
     miter_tl = cut_plain_miter_joint_on_face_aligned_timbers(
         CornerJointTimberArrangement(
             timber1=top_rail, timber2=left_stile,
-            timber1_end=TimberReferenceEnd.BOTTOM, timber2_end=TimberReferenceEnd.TOP,
+            timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.TOP,
         )
     )
     miter_tr = cut_plain_miter_joint_on_face_aligned_timbers(
         CornerJointTimberArrangement(
             timber1=top_rail, timber2=right_stile,
-            timber1_end=TimberReferenceEnd.TOP, timber2_end=TimberReferenceEnd.TOP,
+            timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.TOP,
         )
     )
 

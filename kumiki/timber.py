@@ -79,11 +79,11 @@ class TimberFeature(Enum):
             raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberFace. Only values 1-6 are valid faces.")
         return TimberFace(self.value)
     
-    def end(self) -> 'TimberReferenceEnd':
-        """Convert to TimberReferenceEnd. Values 1-2 map to ends."""
+    def end(self) -> 'TimberEnd':
+        """Convert to TimberEnd. Values 1-2 map to ends."""
         if self.value not in range(1, 3):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberReferenceEnd. Only values 1-2 are valid ends.")
-        return TimberReferenceEnd(self.value)
+            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberEnd. Only values 1-2 are valid ends.")
+        return TimberEnd(self.value)
     
     def long_face(self) -> 'TimberLongFace':
         """Convert to TimberLongFace. Values 3-6 map to long faces."""
@@ -194,7 +194,7 @@ class TimberFace(Enum):
             return TimberFace.FRONT
 
 # TODO why is this not just TimberEnd?
-class TimberReferenceEnd(Enum):
+class TimberEnd(Enum):
     TOP = 1
     BOTTOM = 2
     
@@ -315,8 +315,8 @@ class TimberLongEdge(Enum):
 # Type Aliases
 # ============================================================================
 
-# Union type for face-like enums (TimberFace, TimberReferenceEnd, or TimberLongFace)
-SomeTimberFace = Union[TimberFace, TimberReferenceEnd, TimberLongFace]
+# Union type for face-like enums (TimberFace, TimberEnd, or TimberLongFace)
+SomeTimberFace = Union[TimberFace, TimberEnd, TimberLongFace]
 
 
 # ============================================================================
@@ -724,14 +724,14 @@ class PerfectTimberWithin(ABC):
         faces = [TimberFace.RIGHT, TimberFace.LEFT, TimberFace.FRONT, TimberFace.BACK]
         return self._get_closest_oriented_face_from_faces(faces, target_direction).to.long_face()
 
-    def get_closest_oriented_end_face_from_global_direction(self, target_direction: Direction3D) -> TimberReferenceEnd:
+    def get_closest_oriented_end_face_from_global_direction(self, target_direction: Direction3D) -> TimberEnd:
         """
         Find which end face of this timber best aligns with the target direction.
 
         The target_direction should point "outwards" from the desired end face (not into it).
 
         Returns:
-            The TimberReferenceEnd that best aligns with the target direction
+            The TimberEnd that best aligns with the target direction
         """
         faces = [TimberFace.TOP, TimberFace.BOTTOM]
         return self._get_closest_oriented_face_from_faces(faces, target_direction).to.end()
@@ -822,7 +822,7 @@ class PerfectTimberWithin(ABC):
         
         Args:
             global_point: The point to project in global coordinates (3x1 Matrix)
-            face: The face to project onto (can be TimberFace, TimberReferenceEnd, or TimberLongFace)
+            face: The face to project onto (can be TimberFace, TimberEnd, or TimberLongFace)
         """
         # Convert to TimberFace
         face = face.to.face()
@@ -1416,7 +1416,7 @@ class Cutting:
         return result
 
     @staticmethod
-    def make_end_cut(timber: PerfectTimberWithin, end: TimberReferenceEnd, distance_from_end_to_cut: Numeric) -> HalfSpace:
+    def make_end_cut(timber: PerfectTimberWithin, end: TimberEnd, distance_from_end_to_cut: Numeric) -> HalfSpace:
         """
         Create a HalfSpace for an end cut at the specified distance from the end.
         
@@ -1428,8 +1428,8 @@ class Cutting:
         Returns:
             HalfSpace representing the end cut in local coordinates
         """
-        assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
-        if end == TimberReferenceEnd.TOP:
+        assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
+        if end == TimberEnd.TOP:
             return HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(1)), offset=timber.length - distance_from_end_to_cut)
         else:
             return HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(-1)), offset=-distance_from_end_to_cut)
@@ -1437,12 +1437,12 @@ class Cutting:
     @staticmethod
     def make_end_cut_distance_from_bottom(
         timber: PerfectTimberWithin,
-        end: TimberReferenceEnd,
+        end: TimberEnd,
         distance_from_end_to_cut: Numeric,
     ) -> Numeric:
         """Convert distance-from-end to cut-plane distance from timber bottom."""
-        assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
-        if end == TimberReferenceEnd.TOP:
+        assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
+        if end == TimberEnd.TOP:
             return timber.length - distance_from_end_to_cut
         return distance_from_end_to_cut
 

@@ -95,8 +95,8 @@ def create_honeycomb_shed():
             CornerJointTimberArrangement(
                 timber1=mudsills[i],
                 timber2=mudsills[(i + 1) % 6],
-                timber1_end=TimberReferenceEnd.TOP,
-                timber2_end=TimberReferenceEnd.BOTTOM,
+                timber1_end=TimberEnd.TOP,
+                timber2_end=TimberEnd.BOTTOM,
             )
         )
         miter_joints.append(joint)
@@ -156,7 +156,7 @@ def create_honeycomb_shed():
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mudsills[i],
             butt_timber=posts[i],
-            butt_timber_end=TimberReferenceEnd.BOTTOM,
+            butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         )
         joint = cut_mortise_and_tenon_joint(
@@ -214,8 +214,8 @@ def create_honeycomb_shed():
             CornerJointTimberArrangement(
                 timber1=ring_beams[i],
                 timber2=ring_beams[(i + 1) % 6],
-                timber1_end=TimberReferenceEnd.TOP,
-                timber2_end=TimberReferenceEnd.BOTTOM,
+                timber1_end=TimberEnd.TOP,
+                timber2_end=TimberEnd.BOTTOM,
             )
         )
         ring_beam_joints.append(joint)
@@ -242,7 +242,7 @@ def create_honeycomb_shed():
             arrangement = ButtJointTimberArrangement(
                 receiving_timber=ring_beams[i],
                 butt_timber=posts[i],
-                butt_timber_end=TimberReferenceEnd.TOP,
+                butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=None,
             )
             joint = cut_mortise_and_tenon_joint(
@@ -418,7 +418,7 @@ def create_honeycomb_shed():
     #     joint = cut_dropin_dovetail_butt_joint(
     #         dovetail_timber=joist,
     #         receiving_timber=mudsills[i],
-    #         dovetail_timber_end=TimberReferenceEnd.TOP,
+    #         dovetail_timber_end=TimberEnd.TOP,
     #         dovetail_timber_face=TimberLongFace.RIGHT,  # Adjust as needed
     #         receiving_timber_shoulder_inset=dovetail_shoulder_inset,
     #         dovetail_length=dovetail_length,

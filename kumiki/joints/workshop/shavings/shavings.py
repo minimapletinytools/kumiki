@@ -107,7 +107,7 @@ def locate_pat_shoulder_plane_from_centerline_to_reference_face(
     shoulder_distance_from_bottom = mark_distance_from_end_along_centerline(
         reference_plane,
         shoulder_timber,
-        TimberReferenceEnd.BOTTOM,
+        TimberEnd.BOTTOM,
     ).distance
 
     shoulder_length_direction = shoulder_timber.get_length_direction_global()
@@ -150,8 +150,8 @@ def scribe_centerline_onto_centerline(timber: TimberLike) -> Line:
 def check_timber_overlap_for_splice_joint_is_sensible(
     timberA: TimberLike,
     timberB: TimberLike,
-    timberA_end: TimberReferenceEnd,
-    timberB_end: TimberReferenceEnd
+    timberA_end: TimberEnd,
+    timberB_end: TimberEnd
 ) -> Optional[str]:
     """
     Check if two timbers overlap in a sensible way for a splice joint.
@@ -178,13 +178,13 @@ def check_timber_overlap_for_splice_joint_is_sensible(
     
     Example:
         >>> error = check_timber_overlap_for_splice_joint_is_sensible(
-        ...     gooseneck, receiving, TimberReferenceEnd.BOTTOM, TimberReferenceEnd.TOP
+        ...     gooseneck, receiving, TimberEnd.BOTTOM, TimberEnd.TOP
         ... )
         >>> if error:
         ...     print(f"Joint configuration error: {error}")
     """
-    assert isinstance(timberA_end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(timberA_end).__name__}"
-    assert isinstance(timberB_end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(timberB_end).__name__}"
+    assert isinstance(timberA_end, TimberEnd), f"expected TimberEnd, got {type(timberA_end).__name__}"
+    assert isinstance(timberB_end, TimberEnd), f"expected TimberEnd, got {type(timberB_end).__name__}"
     # Get the length directions for both timbers
     timberA_length_direction = timberA.get_length_direction_global()
     timberB_length_direction = timberB.get_length_direction_global()
@@ -201,7 +201,7 @@ def check_timber_overlap_for_splice_joint_is_sensible(
     
     # Get the end positions and directions in world coordinates
     # Note: end_direction points AWAY from the timber (outward from the end)
-    if timberA_end == TimberReferenceEnd.TOP:
+    if timberA_end == TimberEnd.TOP:
         timberA_end_pos = locate_top_center_position(timberA).position
         timberA_end_direction = timberA.get_length_direction_global()  # Points away from timber
         timberA_opposite_end_pos = timberA.get_bottom_position_global()
@@ -210,7 +210,7 @@ def check_timber_overlap_for_splice_joint_is_sensible(
         timberA_end_direction = -timberA.get_length_direction_global()  # Points away from timber
         timberA_opposite_end_pos = locate_top_center_position(timberA).position
     
-    if timberB_end == TimberReferenceEnd.TOP:
+    if timberB_end == TimberEnd.TOP:
         timberB_end_pos = locate_top_center_position(timberB).position
         timberB_end_direction = timberB.get_length_direction_global()  # Points away from timber
         timberB_opposite_end_pos = timberB.get_bottom_position_global()
@@ -292,7 +292,7 @@ def check_timber_overlap_for_splice_joint_is_sensible(
 
 # TODO add nominal dimension variant instead
 # TODO when you add actual dimensions on top of perfect timber within dimensions, you probably want a version that sizes to the actual dimensions...
-def chop_timber_end_with_prism(timber: TimberLike, end: TimberReferenceEnd, distance_from_end_to_cut: Numeric) -> RectangularPrism:
+def chop_timber_end_with_prism(timber: TimberLike, end: TimberEnd, distance_from_end_to_cut: Numeric) -> RectangularPrism:
     """
     Create a RectangularPrism CSG for chopping off material from a timber end (in local coordinates).
     
@@ -314,16 +314,16 @@ def chop_timber_end_with_prism(timber: TimberLike, end: TimberReferenceEnd, dist
     
     Example:
         >>> # Chop everything beyond 2 inches from the top of a timber
-        >>> chop_prism = chop_timber_end_with_prism(my_timber, TimberReferenceEnd.TOP, Rational(2))
+        >>> chop_prism = chop_timber_end_with_prism(my_timber, TimberEnd.TOP, Rational(2))
         >>> # This creates a semi-infinite prism starting 2 inches from the top
     """
-    assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
+    assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
     # In timber local coordinates:
     # - Bottom is at 0
     # - Top is at timber.length
     # - Z-axis points along the length direction (bottom to top)
     
-    if end == TimberReferenceEnd.TOP:
+    if end == TimberEnd.TOP:
         # For TOP end:
         # - Start at (timber.length - distance_from_end_to_cut)
         # - Extend to infinity in the +Z direction (beyond the top)
@@ -345,7 +345,7 @@ def chop_timber_end_with_prism(timber: TimberLike, end: TimberReferenceEnd, dist
     )
 
 
-def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberReferenceEnd, distance_from_end_to_cut: Numeric) -> HalfSpace:
+def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberEnd, distance_from_end_to_cut: Numeric) -> HalfSpace:
     """
     Create a HalfSpace CSG for chopping off material from a timber end (in local coordinates).
     
@@ -367,10 +367,10 @@ def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberReferenceEnd,
     
     Example:
         >>> # Chop everything beyond 2 inches from the top of a timber
-        >>> chop_plane = chop_timber_end_with_half_plane(my_timber, TimberReferenceEnd.TOP, Rational(2))
+        >>> chop_plane = chop_timber_end_with_half_plane(my_timber, TimberEnd.TOP, Rational(2))
         >>> # This creates a half-plane 2 inches from the top, removing everything beyond
     """
-    assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
+    assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
     # In timber local coordinates:
     # - Bottom is at 0
     # - Top is at timber.length
@@ -379,7 +379,7 @@ def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberReferenceEnd,
     # The half-plane is perpendicular to the length direction (Z-axis in local coords)
     # Normal vector in local coordinates is always +Z or -Z
     
-    if end == TimberReferenceEnd.TOP:
+    if end == TimberEnd.TOP:
         # For TOP end:
         # - Cut plane is at (timber.length - distance_from_end_to_cut)
         # - Normal points in +Z direction (away from the timber body, toward the top)
@@ -403,7 +403,7 @@ def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberReferenceEnd,
 
 def chop_lap_on_timber_end(
     lap_timber: TimberLike,
-    lap_timber_end: TimberReferenceEnd,
+    lap_timber_end: TimberEnd,
     lap_timber_face: TimberFace,
     lap_length: Numeric,
     lap_shoulder_position_from_lap_timber_end: Numeric,
@@ -441,15 +441,15 @@ def chop_lap_on_timber_end(
     Example:
         >>> # Create a half-lap joint
         >>> top_lap, top_end_cut = chop_lap_on_timber_end(
-        ...     timber_a, TimberReferenceEnd.TOP,
+        ...     timber_a, TimberEnd.TOP,
         ...     TimberFace.BOTTOM, lap_length=4, lap_depth=2, shoulder_pos=1
         ... )
     """
-    assert isinstance(lap_timber_end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(lap_timber_end).__name__}"
+    assert isinstance(lap_timber_end, TimberEnd), f"expected TimberEnd, got {type(lap_timber_end).__name__}"
     from sympy import Rational
     
     # Step 1: Determine the end positions and shoulder position of the top lap timber
-    if lap_timber_end == TimberReferenceEnd.TOP:
+    if lap_timber_end == TimberEnd.TOP:
         lap_end_pos = locate_top_center_position(lap_timber).position
         lap_direction = lap_timber.get_length_direction_global() 
     else:  # BOTTOM
@@ -468,7 +468,7 @@ def chop_lap_on_timber_end(
     lap_shoulder_distance_from_bottom = ((shoulder_pos_global - lap_timber.get_bottom_position_global()).T * lap_timber.get_length_direction_global())[0, 0]
     
     lap_shoulder_distance_from_end = (lap_timber.length - lap_end_distance_from_bottom
-                                         if lap_timber_end == TimberReferenceEnd.TOP 
+                                         if lap_timber_end == TimberEnd.TOP 
                                          else lap_end_distance_from_bottom)
                                   
     lap_half_plane = chop_timber_end_with_half_plane(lap_timber, lap_timber_end, lap_shoulder_distance_from_end)
@@ -542,9 +542,9 @@ def chop_lap_on_timber_end(
 
 def chop_lap_on_timber_ends(
     top_lap_timber: TimberLike,
-    top_lap_timber_end: TimberReferenceEnd,
+    top_lap_timber_end: TimberEnd,
     bottom_lap_timber: TimberLike,
-    bottom_lap_timber_end: TimberReferenceEnd,
+    bottom_lap_timber_end: TimberEnd,
     top_lap_timber_face: TimberLongFace,
     lap_length: Numeric,
     top_lap_shoulder_position_from_top_lap_shoulder_timber_end: Numeric,
@@ -585,17 +585,17 @@ def chop_lap_on_timber_ends(
     Example:
         >>> # Create a half-lap joint
         >>> (top_lap, top_end), (bottom_lap, bottom_end) = chop_lap_on_timber_ends(
-        ...     timber_a, TimberReferenceEnd.TOP,
-        ...     timber_b, TimberReferenceEnd.BOTTOM,
+        ...     timber_a, TimberEnd.TOP,
+        ...     timber_b, TimberEnd.BOTTOM,
         ...     TimberFace.BOTTOM, lap_length=4, lap_depth=2, shoulder_pos=1
         ... )
     """
 
     # assert the face types are correct
-    assert isinstance(top_lap_timber_end, TimberReferenceEnd), \
-        f"expected TimberReferenceEnd, got {type(top_lap_timber_end).__name__}"
-    assert isinstance(bottom_lap_timber_end, TimberReferenceEnd), \
-        f"expected TimberReferenceEnd, got {type(bottom_lap_timber_end).__name__}"
+    assert isinstance(top_lap_timber_end, TimberEnd), \
+        f"expected TimberEnd, got {type(top_lap_timber_end).__name__}"
+    assert isinstance(bottom_lap_timber_end, TimberEnd), \
+        f"expected TimberEnd, got {type(bottom_lap_timber_end).__name__}"
     assert isinstance(top_lap_timber_face, TimberLongFace), \
         f"expected TimberLongFace, got {type(top_lap_timber_face).__name__}"
 
@@ -650,7 +650,7 @@ def chop_lap_on_timber_ends(
     # - Top timber LAP END → Bottom timber SHOULDER
     
     # Calculate top timber's shoulder and lap end positions in global space
-    if top_lap_timber_end == TimberReferenceEnd.TOP:
+    if top_lap_timber_end == TimberEnd.TOP:
         top_timber_end_pos = locate_top_center_position(top_lap_timber).position
         top_lap_direction = top_lap_timber.get_length_direction_global() 
     else:  # BOTTOM
@@ -669,7 +669,7 @@ def chop_lap_on_timber_ends(
     bottom_shoulder_from_bottom_timber_bottom = safe_dot_product((bottom_shoulder_global - bottom_lap_timber.get_bottom_position_global()), bottom_lap_timber.get_length_direction_global())
     
     # Calculate shoulder distance from bottom timber's reference end
-    if bottom_lap_timber_end == TimberReferenceEnd.TOP:
+    if bottom_lap_timber_end == TimberEnd.TOP:
         # Measuring from top end
         bottom_lap_shoulder_position_from_bottom_timber_end = bottom_lap_timber.length - bottom_shoulder_from_bottom_timber_bottom
     else:  # BOTTOM
@@ -682,7 +682,7 @@ def chop_lap_on_timber_ends(
 
 
 # TODO I think this is cutting on the wrong face...
-def chop_profile_on_timber_face(timber: TimberLike, end: TimberReferenceEnd, face: TimberFace, profile: Union[List[V2], List[List[V2]]], depth: Numeric, profile_y_offset_from_end: Numeric = Integer(0)) -> Union[SolidUnion, ConvexPolygonExtrusion]:
+def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: TimberFace, profile: Union[List[V2], List[List[V2]]], depth: Numeric, profile_y_offset_from_end: Numeric = Integer(0)) -> Union[SolidUnion, ConvexPolygonExtrusion]:
     """
     Create a CSG extrusion of a profile (or multiple profiles) on a timber face.
     See the diagram below for understanding how to interpret the profile in the timber's local space based on the end and face arguments.
@@ -722,7 +722,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberReferenceEnd, fac
         - Each individual profile uses ConvexPolygonExtrusion, so complex non-convex shapes
           should be decomposed into multiple convex profiles
     """
-    assert isinstance(end, TimberReferenceEnd), f"expected TimberReferenceEnd, got {type(end).__name__}"
+    assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
     from sympy import Rational, Matrix
     from kumiki.rule import Orientation, Transform, create_v3, cross_product, safe_normalize_vector as normalize_vector
     from kumiki.cutcsg import ConvexPolygonExtrusion
@@ -756,7 +756,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberReferenceEnd, fac
     # - Origin is at bottom_position (center of bottom face)
     
     # Get Z coordinate based on end
-    if end == TimberReferenceEnd.TOP:
+    if end == TimberEnd.TOP:
         origin_z = timber.length
     else:  # BOTTOM
         origin_z = Rational(0)
@@ -797,7 +797,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberReferenceEnd, fac
     face_normal_local = face.get_direction()  # This gives the outward normal
     
     # Profile Y-axis: points towards the reference end
-    if end == TimberReferenceEnd.TOP:
+    if end == TimberEnd.TOP:
         profile_y_axis = create_v3(0, 0, 1)
     else:  # BOTTOM
         profile_y_axis = create_v3(0, 0, -1)
