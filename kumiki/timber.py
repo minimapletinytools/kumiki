@@ -934,6 +934,30 @@ class PerfectTimberWithin(ABC):
             extend_bot=extend_bot,
             extend_top=extend_top
         )
+
+    def is_face_perfect(self, face: TimberFace) -> bool:
+        """
+        Check if the specified face of the timber is perfect (matches the perfect timber within).
+        
+        Args:
+            face: The TimberFace to check
+        """
+        width_halves, height_halves = self.get_nominal_half_sizes()
+        w_half = self.size[0] / Integer(2)
+        h_half = self.size[1] / Integer(2)
+        
+        if face == TimberFace.TOP or face == TimberFace.BOTTOM:
+            return True  # Length is always perfect
+        elif face == TimberFace.RIGHT:
+            return equality_test(width_halves[0], w_half)
+        elif face == TimberFace.LEFT:
+            return equality_test(width_halves[1], w_half)
+        elif face == TimberFace.FRONT:
+            return equality_test(height_halves[0], h_half)
+        elif face == TimberFace.BACK:
+            return equality_test(height_halves[1], h_half)
+        else:
+            raise ValueError(f"Face {face} is not a long face; only RIGHT, LEFT, FRONT, BACK are valid for this check.")
     
     def is_perfect_timber(self) -> bool:
         """

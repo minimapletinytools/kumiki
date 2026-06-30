@@ -92,12 +92,15 @@ IGNORE-agent prompt examples
 DONE-TimberReferenceEnd -> TimberEnd
 DONE-do setup vid
 
--someway to mke footprint show up more clearly in footprint examples? (probably just render on top of everything?)
 -consider removing the opposite_length or renaming it stickout in attach_timber functions
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
--would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
--reorg all mortise and tenon joint examples
 
+DONE-look into adding support for reference face/edge
+  -add is_perfect_face/edge
+    -we can still have reference face/edge after this, I guess a reference face does'nt actually need to be perfect though that would be tweirdi f you tried to do that.
+
+-reorg all mortise and tenon joint examples
+-test the install cadquery stuff 
 -do shower vid
 -do example cleanup
 -make website
@@ -107,13 +110,12 @@ DONE-do setup vid
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
 -marketing
-  -make basic exampl ecase
+  -make basic example case
   -make program castle joint video
     -make the awful thuma bed video
   -make simple website
   -make some content drip
--stuff to test
-  -test the install cadquery stuff 
+DONE-stuff to test
   DONE-test export step and export STL combined/inidivdual again
   DONE-test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
 
@@ -124,8 +126,8 @@ DONE-do setup vid
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
-
-
+-someway to mke footprint show up more clearly in footprint examples? (probably just render on top of everything?)
+-would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
 
 
 -NOTCHING 
@@ -209,6 +211,10 @@ DONE-do setup vid
     -where 1 CutTimber is just substracted from another timber, useful for making modifications not readily supported... 
     -may as well do a union joint then? (these would really be decorative joints...)
     -or would it be better just to have folsk make custom joints
+  -double butt spline joint should allow timbers to be placed on either side of the spline (top/bottom)
+  -drop in house joint + notching only on one side
+    -update drop in dovetail joint to notch only on one side
+    -ideally mortise and tenon joint can notch only on one side too... so maybe we should just make notching config genericall ysupport this
 
 -do spiral castle design hehe
   -you need the castle joint I guess, time to try out 3 way joints
