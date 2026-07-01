@@ -7,11 +7,33 @@
 
 - do fill_with_boards helper function
 
+def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1: TimberLike, vert_side2: TimberLike,  orientation : Literal["horizontal", "vertical"] = "horizontal", depth : Tuple[Number,Number,Number,Number] = (0,0,0,0), overlap : Number = 0, lateral_offset_from_hor_side1) : List[Board]
+  # assert that hor_side1/2 have parallel length axis, and perpendicular to vert_side1/2
+  # assert all timbers are face aligned
+  # first determine the gap between hor/vert_side1/2 to determine which timbers form the frame
+  # assert that there is >=0 gap between the side pairs
+  # next based on the above, determine which timbers form which sides of the frame
+  # next determine the inside rectangle of the frame
+  # position boards in the inside rectangle of the frame, if horizontal, then top end points to hor_side1 else points to vert_side1, sticking beyond the frame by depth, and overlapping each other by overlap
+  # offset into the normal plane of the frame by lateral_offset_from_hor_side1, specifically, determine the normal plane using the coordinate axis of hor_side1 that is perpendicular to the plane
+
+
 - outdoor shower
   - 4x3 footprint, door on fornt 4' side, lean top awning with taller side on front side
   -BONUS can you do slats instead of tongue and groove
 
--do multi-half-lap joint with video
+-do multi-cross-lap joint with video
+
+def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first_timber : TimberFace, cut_distance_ratios : List[Number] = [])
+
+  # assert at least 2 timbers
+  # assert all timbers have a long face axis that is parallel to starting_face_on_first_timber of timbers[0] (call it starting face)
+  # assert cut_distance_ratios are all in (0,1) and monotically increasing
+  # find the opposite face on timbers[timbers.length()-1] (call it finish face)
+  # set global cut positions in order using cut_distance_ratios based on the distance between starting face and finish face)
+  # if there are not enough cut_distance_ratios, the remaining cut ratios are such taht they are uniform between the last computed cut face (or starting face if none) and the finish face
+  # call cut_cross_lap_joint in order between timber[n] and timber[n+1]
+  # combine all cuts and return
 
 - do the shed from the timber framing book
 
