@@ -20,8 +20,10 @@ populated when ``load_frame_examples=True``).
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, field
+import contextlib
+from dataclasses import dataclass, field, replace
 import inspect
+import math
 from pathlib import Path
 import hashlib
 import importlib.util
@@ -867,5 +869,197 @@ def scan_workspace_index(workspace_root: str) -> Dict[str, Any]:
     side never duplicates any scanning logic.
     """
     return scan_library_index(workspace_root)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Multi-pattern grid: merge a pattern list into a single tiled Frame
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _pattern_frame_xy_extent(frame: Any) -> "tuple[float, float, float, float]":
+    """Return (min_x, min_y, max_x, max_y) of a frame's timbers without triangulating."""
+    min_x = min_y = float("inf")
+    max_x = max_y = float("-inf")
+    for ct in frame.cut_timbers:
+        t = ct.timber
+        bp = t.get_bottom_position_global()
+        ld = t.get_length_direction_global()
+        wd = t.get_width_direction_global()
+        hd = t.get_height_direction_global()
+        length = float(t.length)
+        w = float(t.get_perfect_size()[0])
+        h = float(t.get_perfect_size()[1])
+        for sl in (0.0, length):
+            for sw in (-w / 2, w / 2):
+                for sh in (-h / 2, h / 2):
+                    x = float(bp[0] + ld[0] * sl + wd[0] * sw + hd[0] * sh)
+                    y = float(bp[1] + ld[1] * sl + wd[1] * sw + hd[1] * sh)
+                    if x < min_x: min_x = x
+                    if x > max_x: max_x = x
+                    if y < min_y: min_y = y
+                    if y > max_y: max_y = y
+    if min_x == float("inf"):
+        return (-0.5, -0.5, 0.5, 0.5)
+    return (min_x, min_y, max_x, max_y)
+
+
+def _pattern_grid_offsets(
+    extents: "list[tuple[float, float, float, float]]",
+    padding: float = 0.5,
+) -> "list[tuple[float, float]]":
+    """Return (dx, dy) per pattern to tile frames in a square-ish grid at origin.
+
+    Each frame is centered within its grid cell; the whole grid is centered at (0, 0).
+    """
+    N = len(extents)
+    cols = math.ceil(math.sqrt(N))
+    rows = math.ceil(N / cols)
+
+    widths  = [ex - wx for wx, wy, ex, ey in extents]
+    heights = [ey - wy for wx, wy, ex, ey in extents]
+    cx_list = [(wx + ex) / 2 for wx, wy, ex, ey in extents]
+    cy_list = [(wy + ey) / 2 for wx, wy, ex, ey in extents]
+
+    col_widths  = [0.0] * cols
+    row_heights = [0.0] * rows
+    for i in range(N):
+        col_widths[i % cols]   = max(col_widths[i % cols],   widths[i])
+        row_heights[i // cols] = max(row_heights[i // cols], heights[i])
+
+    col_starts = [0.0] * cols
+    for c in range(1, cols):
+        col_starts[c] = col_starts[c - 1] + col_widths[c - 1] + padding
+
+    row_starts = [0.0] * rows
+    for r in range(1, rows):
+        row_starts[r] = row_starts[r - 1] + row_heights[r - 1] + padding
+
+    total_w = col_starts[-1] + col_widths[-1]
+    total_h = row_starts[-1] + row_heights[-1]
+
+    offsets = []
+    for i in range(N):
+        cell_cx = col_starts[i % cols]   + col_widths[i % cols]   / 2 - total_w / 2
+        cell_cy = row_starts[i // cols]  + row_heights[i // cols] / 2 - total_h / 2
+        offsets.append((cell_cx - cx_list[i], cell_cy - cy_list[i]))
+    return offsets
+
+
+def _translate_frame(frame: Any, dx: float, dy: float) -> Any:
+    """Return a new Frame with every timber, accessory, footprint, and joint shifted by (dx, dy, 0).
+
+    Cuts are stored in LOCAL timber coordinates so they follow the timber automatically.
+    We maintain an old_cut → new_cut identity map so that source_joints.cuttings
+    references are rewritten to point at the new cut objects — serialize_layers uses
+    identity (`is`) checks to match joints to their timbers in the frame.
+    """
+    from sympy import Float, Integer
+    from .rule import Transform, create_v2, create_v3
+    from .timber import CutTimber, Frame
+    from .footprint import Footprint
+
+    offset = create_v3(Float(dx), Float(dy), Integer(0))
+
+    cut_map: Dict[int, Any] = {}  # id(old_cut) → new_cut
+
+    new_cut_timbers = []
+    for ct in frame.cut_timbers:
+        t = ct.timber
+        new_pos = t.get_bottom_position_global() + offset
+        new_timber = replace(t, transform=Transform(position=new_pos, orientation=t.orientation))
+        new_cuts = []
+        for cut in ct.cuts:
+            new_cut = replace(cut, timber=new_timber)
+            cut_map[id(cut)] = new_cut
+            new_cuts.append(new_cut)
+        new_cut_timbers.append(CutTimber(timber=new_timber, cuts=new_cuts))
+
+    new_accessories: List[Any] = []
+    for acc in (frame.accessories or []):
+        if hasattr(acc, "transform"):
+            new_pos_acc = acc.transform.position + offset
+            new_accessories.append(replace(acc, transform=Transform(position=new_pos_acc, orientation=acc.transform.orientation)))
+        else:
+            new_accessories.append(acc)
+
+    new_footprints: List[Any] = []
+    for fp in (getattr(frame, "footprints", None) or []):
+        new_corners = tuple(create_v2(c[0] + Float(dx), c[1] + Float(dy)) for c in fp.corners)
+        new_footprints.append(Footprint(corners=new_corners))
+
+    # Rewrite source_joints so their cuttings dict uses the new cut objects,
+    # preserving the identity relationship that serialize_layers depends on.
+    new_source_joints: List[Any] = []
+    for joint in (getattr(frame, "source_joints", None) or []):
+        old_cuttings = getattr(joint, "cuttings", {})
+        new_cuttings = {name: cut_map.get(id(cut), cut) for name, cut in old_cuttings.items()}
+        new_source_joints.append(replace(joint, cuttings=new_cuttings))
+
+    return Frame(
+        cut_timbers=new_cut_timbers,
+        accessories=new_accessories,
+        footprints=new_footprints,
+        source_joints=new_source_joints if new_source_joints else None,
+    )
+
+
+def build_pattern_grid_frame(pattern_list: List[Any], padding: float = 0.5) -> Any:
+    """Render all patterns and merge into one Frame arranged in a square-ish grid at the origin.
+
+    Each pattern is rendered at origin=(0,0,0). Its XY footprint is computed from
+    timber bounding boxes, and each frame is then translated to its grid cell by
+    rebuilding timbers and accessories at their new positions (rather than post-hoc
+    vertex manipulation). The result is a single Frame that passes through the normal
+    build_real_geometry path, so accessories, joints, and fallback geometry all work.
+    """
+    from sympy import Integer
+    from .rule import create_v3
+    from .timber import Frame
+
+    if not pattern_list:
+        raise ValueError("Pattern list is empty")
+
+    origin = create_v3(Integer(0), Integer(0), Integer(0))
+
+    frames: List[Any] = []
+    for p in pattern_list:
+        try:
+            with contextlib.redirect_stdout(sys.stderr):
+                result = p.lambda_(origin)
+            if hasattr(result, "cut_timbers") and hasattr(result, "accessories"):
+                frames.append(result)
+            else:
+                print(f"[grid] skipping pattern '{getattr(p, 'name', '?')}': lambda returned {type(result).__name__}, expected Frame", file=sys.stderr)
+        except Exception as exc:
+            print(f"[grid] skipping pattern '{getattr(p, 'name', '?')}': {exc}", file=sys.stderr)
+
+    if not frames:
+        raise ValueError("No patterns produced a renderable Frame")
+
+    extents = []
+    for f in frames:
+        try:
+            extents.append(_pattern_frame_xy_extent(f))
+        except Exception:
+            extents.append((-0.5, -0.5, 0.5, 0.5))
+
+    offsets = _pattern_grid_offsets(extents, padding=padding)
+
+    all_cut_timbers: List[Any] = []
+    all_accessories: List[Any] = []
+    all_footprints: List[Any] = []
+    all_source_joints: List[Any] = []
+    for f, (dx, dy) in zip(frames, offsets):
+        translated = _translate_frame(f, dx, dy)
+        all_cut_timbers.extend(translated.cut_timbers)
+        all_accessories.extend(translated.accessories or [])
+        all_footprints.extend(getattr(translated, "footprints", None) or [])
+        all_source_joints.extend(getattr(translated, "source_joints", None) or [])
+
+    return Frame(
+        cut_timbers=all_cut_timbers,
+        accessories=all_accessories,
+        footprints=all_footprints,
+        source_joints=all_source_joints if all_source_joints else None,
+    )
 
 

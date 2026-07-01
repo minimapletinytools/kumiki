@@ -5,9 +5,13 @@
   - do 2x 4x8 tops  and 4x6 legs with 1 4x8 leg for the vise
   -BONUS add well into tray and Us in feet with decorative cuts when you have those
 
+- do fill_with_boards helper function
+
 - outdoor shower
   - 4x3 footprint, door on fornt 4' side, lean top awning with taller side on front side
   -BONUS can you do slats instead of tongue and groove
+
+-do multi-half-lap joint with video
 
 - do the shed from the timber framing book
 
@@ -91,9 +95,10 @@ DONE-cleanup and author new construction pattern
 IGNORE-agent prompt examples
 DONE-TimberReferenceEnd -> TimberEnd
 DONE-do setup vid
-
--consider removing the opposite_length or renaming it stickout in attach_timber functions
+DONE-consider removing the opposite_length or renaming it stickout in attach_timber functions
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
+
+-reorg all mortise and tenon joint examples
 
 DONE-look into adding support for reference face/edge
   -add is_perfect_face/edge

@@ -1103,32 +1103,28 @@ def load_module_from_path(file_path: Path, verbose: bool = False) -> Any:
 
 
 def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
-    """Raise the first 'main'-tagged pattern from a List[Pattern] as a frame.
+    """Render pattern(s) from a List[Pattern] as a single frame.
 
-    Returns (frame, pattern_list) — the list is stored as the "patternbook"
-    equivalent in SlotState so raise_specific_pattern can reload it.
+    Single pattern: raises the first 'main'-tagged pattern at origin.
+    Multiple patterns: delegates to librarian.build_pattern_grid_frame which renders
+    all patterns at origin, computes a square-ish grid layout by translating timbers
+    and accessories, and returns one merged Frame.
     """
     from sympy import Integer
     from kumiki.rule import create_v3
 
-    origin = create_v3(Integer(0), Integer(0), Integer(0))
-
-    # Prefer the first 'main'-tagged pattern; fall back to first pattern overall.
-    target = None
-    for p in pattern_list:
-        if "main" in getattr(p, "tags", []):
-            target = p
-            break
-    if target is None and pattern_list:
-        target = pattern_list[0]
-
-    if target is None:
+    if not pattern_list:
         raise ValueError("Pattern list is empty")
 
-    with contextlib.redirect_stdout(sys.stderr):
-        result = target.lambda_(origin)
-    frame = _coerce_viewable_frame(result, target.name)
-    return frame, pattern_list
+    if len(pattern_list) == 1:
+        origin = create_v3(Integer(0), Integer(0), Integer(0))
+        target = pattern_list[0]
+        with contextlib.redirect_stdout(sys.stderr):
+            result = target.lambda_(origin)
+        return _coerce_viewable_frame(result, target.name), pattern_list
+
+    from kumiki.librarian import build_pattern_grid_frame
+    return build_pattern_grid_frame(pattern_list), pattern_list
 
 
 def _serialize_render_parameters_for_slot(slot_state: SlotState) -> Dict[str, Any]:
@@ -1200,11 +1196,7 @@ def resolve_frame_from_module(
 ) -> "tuple[Any, Optional[Any], List[RenderParameterDescriptor], Dict[str, Any]]":
     """Resolve a frame from a loaded module.
 
-    Returns (frame, patternbook_or_None).
-
-    The module-level ``example`` may be a Frame/PatternBook *instance* (legacy)
-    or a **callable** that returns one (preferred — avoids heavy work at import
-    time).
+    Returns (frame, patternbook_or_None, schema, applied).
     """
     if hasattr(module, "patterns"):
         pattern_list = getattr(module, "patterns")
