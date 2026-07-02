@@ -95,6 +95,7 @@ class Stickout:
     """
     stickout1: Numeric = scalar(0)
     stickout2: Numeric = scalar(0)
+    # TODO don't make these optional types just make them default to CENTER_LINE
     stickoutReference1: Optional['StickoutReference'] = None
     stickoutReference2: Optional['StickoutReference'] = None
     
