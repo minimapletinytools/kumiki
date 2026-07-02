@@ -65,7 +65,6 @@ Please see docs/concepts.md to understand the core concepts and architecture of 
 
 ## General Coding Conventions
 
-- Always use SymPy types (Rational or Float) never Python floats
 - Use math types in `rule.py`
 - ALWAYS run tests after making changes
 - ALWAYS run type checker after making changes
