@@ -140,7 +140,7 @@ def build_double_sawhorse_workbench() -> Frame:
             location_on_timber2=top_beam_centerline_location,
             stickout=top_beam_stickout,
             size=top_beam_size,
-            orientation_width_vector=create_v3(Integer(0), Integer(1), Integer(0)),  # wide in Y, thin in Z
+            orientation_width_vector=create_v3(scalar(0), scalar(1), scalar(0)),  # wide in Y, thin in Z
             ticket=ticket,
         )
 
@@ -168,7 +168,7 @@ def build_double_sawhorse_workbench() -> Frame:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=foot,
                 butt_timber=post,
-                butt_timber_end=TimberReferenceEnd.BOTTOM,
+                butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=peg_face_on_post,
             ),
             tenon_size=post_tenon_size,
@@ -191,7 +191,7 @@ def build_double_sawhorse_workbench() -> Frame:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=beam,
                 butt_timber=post,
-                butt_timber_end=TimberReferenceEnd.TOP,
+                butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
             tenon_size=beam_tenon_size,
@@ -227,7 +227,7 @@ def build_double_sawhorse_workbench() -> Frame:
     tray_half_width = stretcher_size[0] / 2 - tray_border
     tray_csg = chop_profile_on_timber_face(
         timber=stretcher,
-        end=TimberReferenceEnd.BOTTOM,  # the -X end
+        end=TimberEnd.BOTTOM,  # the -X end
         face=TimberFace.FRONT,          # top face of the flat stretcher
         profile=[
             create_v2(-tray_half_width, -tray_near_wall),
@@ -276,7 +276,7 @@ if __name__ == "__main__":
 
     # Sanity-check the spec.
     for name in ("West Foot", "East Foot"):
-        assert by_name[name][2] == (Integer(0), foot_size[1]), f"{name} not resting on ground"
+        assert by_name[name][2] == (scalar(0), foot_size[1]), f"{name} not resting on ground"
     post_names = [n for n in by_name if "Post" in n]
     for name in post_names:
         assert by_name[name][2] == (foot_size[1], foot_size[1] + post_height), f"{name} not on foot top"
