@@ -368,25 +368,25 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     
     # Left side girt (connects back-left post to front-left post)
     # Top of girt aligns with top of back post
-    side_girt_left = join_timbers(
-        timber1=post_back_left,        # Back post (timber1)
-        timber2=post_front_left,       # Front post (timber2)
-        location_on_timber1=post_back_height,   # At top of back post
-        stickout=side_girt_stickout,   # 5" stickout on back, none on front
-        location_on_timber2=post_back_height,    # Same height on front post
-        lateral_offset=0,       # No lateral offset
+    side_girt_left = attach_face_aligned_timber(
+        original_timber=post_back_left,        # Back post
+        original_timber_long_face_that_attached_timber_points_to=post_back_left.get_closest_oriented_long_face_from_global_direction(post_front_left.get_bottom_position_global() - post_back_left.get_bottom_position_global()),
+        attached_timber_length_or_target=post_front_left,      # Front post (target)
+        attached_timber_stickout=side_girt_stickout,   # 5" stickout on back, none on front
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+        length_position_measurement=post_back_height,   # At top of back post
         size=side_girt_size,
         ticket=TimberTicket(path="Left Side Girt", tags=("beam", "girt", "4x4"))
     )
 
     # Right side girt (connects back-right post to front-right post)
-    side_girt_right = join_timbers(
-        timber1=post_back_right,       # Back post (timber1)
-        timber2=post_front_right,      # Front post (timber2)
-        location_on_timber1=post_back_height,   # At top of back post
-        stickout=side_girt_stickout,   # 5" stickout on back, none on front
-        location_on_timber2=post_back_height,    # Same height on front post
-        lateral_offset=0,       # No lateral offset
+    side_girt_right = attach_face_aligned_timber(
+        original_timber=post_back_right,       # Back post
+        original_timber_long_face_that_attached_timber_points_to=post_back_right.get_closest_oriented_long_face_from_global_direction(post_front_right.get_bottom_position_global() - post_back_right.get_bottom_position_global()),
+        attached_timber_length_or_target=post_front_right,     # Front post (target)
+        attached_timber_stickout=side_girt_stickout,   # 5" stickout on back, none on front
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+        length_position_measurement=post_back_height,   # At top of back post
         size=side_girt_size,
         ticket=TimberTicket(path="Right Side Girt", tags=("beam", "girt", "4x4"))
     )
@@ -505,13 +505,13 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     front_girt_stickout = Stickout.symmetric(inches(scalar(3, 2)))  # 1.5 inches
     
     # Front girt connects left front post to right front post
-    front_girt = join_timbers(
-        timber1=post_front_left,       # Left front post (timber1)
-        timber2=post_front_right,      # Right front post (timber2)
-        location_on_timber1=front_girt_height_on_posts,   # 2" below side girts
-        stickout=front_girt_stickout,  # 1.5" stickout on both sides
-        location_on_timber2=front_girt_height_on_posts,   # Same height on right post
-        lateral_offset=0,       # No lateral offset
+    front_girt = attach_face_aligned_timber(
+        original_timber=post_front_left,       # Left front post
+        original_timber_long_face_that_attached_timber_points_to=post_front_left.get_closest_oriented_long_face_from_global_direction(post_front_right.get_bottom_position_global() - post_front_left.get_bottom_position_global()),
+        attached_timber_length_or_target=post_front_right,     # Right front post (target)
+        attached_timber_stickout=front_girt_stickout,  # 1.5" stickout on both sides
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+        length_position_measurement=front_girt_height_on_posts,   # 2" below side girts
         size=front_girt_size,
         ticket=TimberTicket(path="Front Girt", tags=("beam", "girt", "4x4"))
     )
@@ -688,27 +688,25 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     
     # Front top plate (connects left front post to right front post)
     # Sits on top of the front posts
-    top_plate_front = join_timbers(
-        timber1=post_front_left,       # Left front post (timber1)
-        timber2=post_front_right,      # Right front post (timber2)
-        location_on_timber1=post_front_height,   # At top of front post
-        stickout=top_plate_stickout,   # 1 foot stickout on both sides
-        location_on_timber2=post_front_height,   # Same height on right post
-        lateral_offset=0,       # No lateral offset
+    top_plate_front = attach_face_aligned_timber(
+        original_timber=post_front_left,       # Left front post
+        original_timber_long_face_that_attached_timber_points_to=post_front_left.get_closest_oriented_long_face_from_global_direction(post_front_right.get_bottom_position_global() - post_front_left.get_bottom_position_global()),
+        attached_timber_length_or_target=post_front_right,     # Right front post (target)
+        attached_timber_stickout=top_plate_stickout,   # 1 foot stickout on both sides
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+        length_position_measurement=post_front_height,   # At top of front post
         size=top_plate_size,
-        orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket=TimberTicket(path="Front Top Plate", tags=("beam", "4x6"))
     )
 
-    top_plate_back = join_timbers(
-        timber1=post_back_left,        # Left back post (timber1)
-        timber2=post_back_right,       # Right back post (timber2)
-        location_on_timber1=post_back_height+inches(3),    # At top of back post + 3 inches to raise the back beam 2 inches above bottom of side girts
-        stickout=top_plate_stickout,   # 1 foot stickout on both sides
-        location_on_timber2=post_back_height+inches(3),
-        lateral_offset=0,
+    top_plate_back = attach_face_aligned_timber(
+        original_timber=post_back_left,        # Left back post
+        original_timber_long_face_that_attached_timber_points_to=post_back_left.get_closest_oriented_long_face_from_global_direction(post_back_right.get_bottom_position_global() - post_back_left.get_bottom_position_global()),
+        attached_timber_length_or_target=post_back_right,      # Right back post (target)
+        attached_timber_stickout=top_plate_stickout,   # 1 foot stickout on both sides
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+        length_position_measurement=post_back_height+inches(3),    # At top of back post + 3 inches to raise the back beam 2 inches above bottom of side girts
         size=top_plate_size,
-        orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket=TimberTicket(path="Back Top Plate", tags=("beam", "4x6"))
     )
 
