@@ -166,16 +166,10 @@ subsections (omit whichever project wasn't part of this release).
 
 ## Pre-commit: Regenerate agent context bundle
 
-Before committing, always regenerate the bundled usage instructions (combines usage instructions + full API context):
+Before committing, always regenerate the bundled usage instructions:
 
 ```bash
-cat docs/agent_usage_instructions.md docs/agent_context.md > kigumi/.generated/bundled-usage-instructions.md
-```
-
-Also update the `VERSION:X.Y.Z` line at the top of `docs/agent_context.md` to match the new kumiki version:
-
-```bash
-sed -i '' "s/^VERSION:[0-9.]*/VERSION:<new_version>/" docs/agent_context.md
+cat docs/agent_usage_instructions.md > kigumi/.generated/bundled-usage-instructions.md
 ```
 
 ## Commit and tag
