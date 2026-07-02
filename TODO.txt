@@ -135,7 +135,6 @@ DONE-look into adding support for reference face/edge
 -make website
   -get domain D:
 -try and run a full loop agent test on this to see if it all works
-
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
 -marketing
@@ -147,7 +146,6 @@ DONE-look into adding support for reference face/edge
 DONE-stuff to test
   DONE-test export step and export STL combined/inidivdual again
   DONE-test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
-
 -do ticket refactor so that each timber type can have its own ticket?
   -or do we do the derived ticket thing instead?
 -test regular imperfect rectangular timber stuff
@@ -354,7 +352,40 @@ M3.5
 
 :: TODONE 
 
-
+DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
+DONE-poopify more patterns
+DONE-why does pattern viewer say "abc" ?
+DONE-update pattern discovery to just use the new method
+    def _might_contain_patternbook(src: str) -> bool:
+        if re.search(r"^\s*patternbook\s*=", src, flags=re.M):
+            return True
+        if re.search(r"^\s*def\s+create_\w+_patternbook\s*\(", src, flags=re.M):
+            return True
+        if re.search(r"^\s*patterns\s*=", src, flags=re.M):
+            return True
+        return False
+IGNORE/DONE-duplicate source button broke (or mayb enot you need to test it in an actual install)
+DONE-wedged half dovetail joint broke
+DONE-rename housed dovtail to dropin dovetail butt joint
+DONE-have patterns replace the currentyl open viewer, frames create new viewer
+  -or do right click open in new window option
+DONE-add agent notes for timber orientation
+DONE-do attach_timber function
+  DONE-orientation paremetrs
+  DONE-should be able to align feature of existing timber with feature of created timber
+  -do attach_plane_aligned_timber
+  -do attach_timber
+  -test and fix it lol
+DONE-update footprint examples so post on side is correct not in center...
+DONE-cleanup and author new construction pattern
+IGNORE-agent prompt examples
+DONE-TimberReferenceEnd -> TimberEnd
+DONE-do setup vid
+DONE-would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
+  -just do the pattern size scanning thing
+DONE-add number() method to rule.py and then considre changing everything ot Folats
+DONE-reorg all mortise and tenon joint examples
+DONE-change timber and joint name to be a path to support folder path
 DONE/IGNORE-improve erroring on initialize due to missing deps
 DONE/IGNORE-UI layer view 
   -decide on layer view organization

@@ -59,8 +59,3 @@ Kigumi has a separate project scanning flow such that it can be used with the Ku
 ## Developing Kigumi
 
 TODO
-
-
-## FreeCAD and Fusion360 usage
-
-Rendering in FreeCAD and Fusion360 currently requires checking out the entire repo. We do not plan to work around this and support for these tools will be removed soon. 
