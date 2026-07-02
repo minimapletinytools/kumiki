@@ -1,6 +1,6 @@
 :: 6/28 CONTENT PLAN
 
-- double saw horse workbench
+DONE- double saw horse workbench
   - do 2x10 "tray"
   - do 2x 4x8 tops  and 4x6 legs with 1 4x8 leg for the vise
   -BONUS add well into tray and Us in feet with decorative cuts when you have those
@@ -21,6 +21,8 @@ def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1:
 - outdoor shower
   - 4x3 footprint, door on fornt 4' side, lean top awning with taller side on front side
   -BONUS can you do slats instead of tongue and groove
+
+-finish cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon
 
 -do multi-cross-lap joint with video
 
@@ -91,7 +93,6 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 :: TODO
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
-
 -reorg all mortise and tenon joint examples
 -test the install cadquery stuff 
 -do shower vid
