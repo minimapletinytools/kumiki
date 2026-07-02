@@ -125,6 +125,14 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
           cut_ratio=cut_ratio,
       ))
 
+    # TODO we're not done yet! boards that did not have joints cut between them may overlap so we need to make some additional cuts to fix the issue
+    # here is the algorithm
+    # iterate through all boards, starting from the first board and the first cut_ratio, call this board[n] and cut_ratio[n]
+    # draw a half space below cut_ration[n], in this half space region, we want to remove the timber prism (intersected with the cut ratio plane) from all of boards [n+2:]
+    # (rather than doing cut_ratio[n] half space intersected with the timber prism, just construct a new prism that is the timber prism cropped below the cut_ratio[n] plane, as this is more efficient)
+    # next, go from the last board and the last cut ratio, and work backwards
+    # this time, we will do the opposite for all boards [0:n-2], removing the timebr prism, this time cropping the timber prism above the cut_ratio[n] plane 
+
   return make_compound_joint(joints, ticket=JointTicket(joint_type="multi_cross_lap"))
 
 
