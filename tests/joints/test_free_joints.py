@@ -43,12 +43,12 @@ class TestFreeHouseJoint:
             ticket="housed",
         )
 
-        joint = cut_free_house_joint(housing_timber, housed_timber)
+        joint = cut_free_house_joint(housing_timber, [housed_timber])
         assert "housing_timber" in joint.cuttings
-        assert "housed_timber" in joint.cuttings
+        assert "housed_timber_1" in joint.cuttings
 
         housing_rendered = _render_cutting(joint.cuttings["housing_timber"])
-        housed_rendered = _render_cutting(joint.cuttings["housed_timber"])
+        housed_rendered = _render_cutting(joint.cuttings["housed_timber_1"])
 
         # Center of the housed timber — strictly interior to both timbers' prisms
         center_global = create_v3(scalar(0), scalar(0), scalar(10))
@@ -99,7 +99,7 @@ class TestFreeHouseJoint:
         housed_cut_timber = CutTimber(housed_timber_base, cuts=[bottom_half_cut])
         housed_body = housed_cut_timber.render_timber_with_cuts_csg_local()
 
-        joint = cut_free_house_joint(housing_timber, housed_cut_timber)
+        joint = cut_free_house_joint(housing_timber, [housed_cut_timber])
         housing_rendered = _render_cutting(joint.cuttings["housing_timber"])
 
         # --- Point in the UPPER half (global Z = 10.5): CutTimber body ---
@@ -123,3 +123,47 @@ class TestFreeHouseJoint:
             "Z=9.5 should NOT be in the CutTimber body (lower half was cut away)"
         assert housing_rendered.contains_point(housing_local_lower), \
             "Z=9.5 should still be inside the housing (notch does not reach the removed region)"
+
+    def test_free_house_joint_multiple_housed_timbers_notch_union(self, symbolic_mode):
+        """
+        Two housed timbers should produce one housing notch that removes both occupied regions.
+        """
+        housing_timber = create_standard_vertical_timber(
+            height=20, size=(3, 3), position=(0, 0, 0), ticket="housing"
+        )
+
+        housed_timber_1 = timber_from_directions(
+            length=scalar(20),
+            size=Matrix([scalar(1), scalar(1)]),
+            bottom_position=create_v3(scalar(-10), scalar(0), scalar(8)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+            ticket="housed_1",
+        )
+        housed_timber_2 = timber_from_directions(
+            length=scalar(20),
+            size=Matrix([scalar(1), scalar(1)]),
+            bottom_position=create_v3(scalar(-10), scalar(0), scalar(12)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+            ticket="housed_2",
+        )
+
+        joint = cut_free_house_joint(housing_timber, [housed_timber_1, housed_timber_2])
+        assert "housing_timber" in joint.cuttings
+        assert "housed_timber_1" in joint.cuttings
+        assert "housed_timber_2" in joint.cuttings
+
+        housing_rendered = _render_cutting(joint.cuttings["housing_timber"])
+
+        first_center_global = create_v3(scalar(0), scalar(0), scalar(8))
+        second_center_global = create_v3(scalar(0), scalar(0), scalar(12))
+        first_center_housing_local = housing_timber.transform.global_to_local(first_center_global)
+        second_center_housing_local = housing_timber.transform.global_to_local(second_center_global)
+
+        assert not housing_rendered.contains_point(first_center_housing_local)
+        assert not housing_rendered.contains_point(second_center_housing_local)
+
+        away_global = create_v3(scalar(0), scalar(0), scalar(5))
+        away_housing_local = housing_timber.transform.global_to_local(away_global)
+        assert housing_rendered.contains_point(away_housing_local)

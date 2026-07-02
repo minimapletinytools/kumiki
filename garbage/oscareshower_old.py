@@ -395,7 +395,7 @@ def example() -> Frame:
         for i in range(len(wall) - 1)
     ]
     wall_housing_joints = [
-        cut_free_house_joint(housing_timber=post, housed_timber=board)
+        cut_free_house_joint(housing_timber=post, housed_timbers=[board])
         for wall, posts in (
             (left_wall_boards,  [post_front_left,  post_back_left]),
             (right_wall_boards, [post_front_right, post_back_right]),

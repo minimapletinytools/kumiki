@@ -1,3 +1,8 @@
+- can't do inches(inches(...)) without double conversion UGH, may need mega refactor
+- no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
+- probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
+
+
 :: 6/28 CONTENT PLAN
 
 DONE- double saw horse workbench

@@ -8,6 +8,21 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Added
+
+- Added a `multi_cross_lap_post` structure example that weaves three boards and houses them into a round post.
+
+#### Changed
+
+- **Breaking:** `cut_free_house_joint` now accepts `housed_timbers` as a list and builds one housing cut from all housed bodies.
+
+#### Fixed
+
+- Implemented `cut_multi_cross_lap_joint` to build an ordered chain of cross-lap cuts with global boundary ratio placement.
+- Implemented `make_compound_joint` to merge multiple joints while preserving all cuttings/accessories with unique keys.
+
 ## [0.4.0] - 2026-07-02
 
 ### kumiki

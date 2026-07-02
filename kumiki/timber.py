@@ -2133,16 +2133,33 @@ class Joint:
 def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
     """
     Create a compound joint that combines multiple joints together.
-    
+
     The cuttings and accessories from all joints are merged into a single Joint object.
     Numeric suffixes are added to accessory and cutting keys if there are conflicts.
     The tickets of the input joints are ignored.
-    
+
     Args:
         joints: List of Joint objects to combine
         ticket: JointTicket for the compound joint
     """
-    raise NotImplementedError
+    def _add_with_unique_key(target: dict, key: str, value) -> None:
+        if key not in target:
+            target[key] = value
+            return
+        suffix = 2
+        while f"{key}_{suffix}" in target:
+            suffix += 1
+        target[f"{key}_{suffix}"] = value
+
+    merged_cuttings: Dict[str, Cutting] = {}
+    merged_accessories: Dict[str, JointAccessory] = {}
+    for joint in joints:
+        for key, cutting in joint.cuttings.items():
+            _add_with_unique_key(merged_cuttings, key, cutting)
+        for key, accessory in joint.jointAccessories.items():
+            _add_with_unique_key(merged_accessories, key, accessory)
+
+    return Joint(cuttings=merged_cuttings, ticket=ticket, jointAccessories=merged_accessories)
 
 @dataclass(frozen=True)
 class Frame:
@@ -2166,7 +2183,7 @@ class Frame:
 
     @classmethod
     def from_joints(cls, joints: List[Joint],
-                    additional_unjointed_timbers: Optional[List[Timber]] = None,
+                    additional_unjointed_timbers: Optional[List[PerfectTimberWithin]] = None,
                     name: Optional[str] = None) -> 'Frame':
         """
         Create a Frame from a list of joints and optional additional unjointed timbers.
@@ -2176,7 +2193,7 @@ class Frame:
         
         Args:
             joints: List of Joint objects
-            additional_unjointed_timbers: Optional list of Timber objects that don't 
+            additional_unjointed_timbers: Optional list of PerfectTimberWithin objects that don't
                                          participate in any joints (default: empty list)
             name: Optional name for the frame
             
