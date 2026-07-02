@@ -170,7 +170,7 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
 # chatGPT translates this to Japanese as:
 # 小根付き通しほぞの十字相欠き梁組
 # kone-tsuki tōshi-hozo no jūji aigaki harigumi
-def cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon(T
+def cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon(
         # arrangement.cross_timber_1 is always assumed to be the "bottom" in the cross lap joint
         arrangement: CrossCapJointTimberArrangement,
 

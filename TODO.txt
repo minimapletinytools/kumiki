@@ -29,7 +29,7 @@ def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1:
 
 -finish cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon
 
--do multi-cross-lap joint with video
+DONE-do multi-cross-lap joint with video
 
 def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first_timber : TimberFace, cut_distance_ratios : List[Number] = [])
 
