@@ -2,7 +2,7 @@
 Butt Joints Patterns
 """
 
-from sympy import Matrix, Rational, Integer, sqrt, sin, cos, pi
+from sympy import Matrix, sqrt, sin, cos, pi
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -75,25 +75,25 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
     from sympy import sin, cos, Integer
     angle = degrees(138)
     if position is None:
-        position = create_v3(Integer(0), Integer(0), Integer(0))
+        position = create_v3(scalar(0), scalar(0), scalar(0))
 
-    receiving_bottom = position + create_v3(-TIMBER_LENGTH / Rational(2), Integer(0), Integer(0))
+    receiving_bottom = position + create_v3(-TIMBER_LENGTH / scalar(2), scalar(0), scalar(0))
     receiving_timber = _maybe_round_timber(timber_from_directions(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=receiving_bottom,
-        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket="receiving_timber",
     ), use_round_timbers)
 
-    butt_length_direction = create_v3(sin(angle), cos(angle), Integer(0))
+    butt_length_direction = create_v3(sin(angle), cos(angle), scalar(0))
     butt_timber = _maybe_round_timber(timber_from_directions(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=position,
         length_direction=butt_length_direction,
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket="butt_timber",
     ), use_round_timbers)
 
@@ -157,19 +157,19 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=position,
-        length_direction=Matrix([Rational(0), Rational(0), Rational(1)]),
-        width_direction=Matrix([Rational(1), Rational(0), Rational(0)]),
+        length_direction=Matrix([scalar(0), scalar(0), scalar(1)]),
+        width_direction=Matrix([scalar(1), scalar(0), scalar(0)]),
         ticket=TimberTicket("ButtWeird_Receiving"),
     ), use_round_timbers)
 
     # Butt direction (-2, 1, 1)/sqrt(6): travels in -X, +Y, +Z — all three axes.
     # The perpendicular width (1, 2, 0)/sqrt(5) satisfies: (-2)(1)+(1)(2)+(1)(0) = 0.
-    dirB = Matrix([Rational(-2), Rational(1), Rational(1)]) / sqrt6
-    widthB = Matrix([Rational(1), Rational(2), Rational(0)]) / sqrt5
+    dirB = Matrix([scalar(-2), scalar(1), scalar(1)]) / sqrt6
+    widthB = Matrix([scalar(1), scalar(2), scalar(0)]) / sqrt5
 
     # Place the butt timber so its TOP lands exactly at the receiving post's right
     # face (+X) center at mid-height: position + (TIMBER_WIDTH/2, 0, TIMBER_LENGTH/2).
-    right_face_mid = position + Matrix([TIMBER_WIDTH / 2, Rational(0), TIMBER_LENGTH / 2])
+    right_face_mid = position + Matrix([TIMBER_WIDTH / 2, scalar(0), TIMBER_LENGTH / 2])
     butt_bottom = right_face_mid - TIMBER_LENGTH * dirB
 
     butt = _maybe_round_timber(timber_from_directions(
@@ -193,7 +193,7 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
 Example usage of mortise and tenon joint functions
 """
 
-from sympy import Matrix, Rational, Integer
+from sympy import Matrix
 from kumiki.rule import inches, Transform, degrees
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
@@ -294,7 +294,7 @@ def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
     ).to.face()
     
     mortise_shoulder_distance = convert_mortise_shoulder_inset_to_centerline_distance(
-        mortise_shoulder_inset=Rational(0),
+        mortise_shoulder_inset=scalar(0),
         mortise_face=mortise_face,
         receiving_timber=arrangement.receiving_timber,
     )
@@ -411,15 +411,15 @@ def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=Fal
     timber1 = brace_arrangement.timber1
     brace_timber = brace_arrangement.brace_timber
 
-    local_z = create_v3(Integer(0), Integer(0), Integer(1))
-    rotation = Orientation.from_angle_axis(radians(pi / Integer(6)), local_z)
+    local_z = create_v3(scalar(0), scalar(0), scalar(1))
+    rotation = Orientation.from_angle_axis(radians(pi / scalar(6)), local_z)
     rotated_orientation = timber1.orientation * rotation
     rotated_transform = Transform(position=timber1.transform.position, orientation=rotated_orientation)
     mortise_timber = replace(timber1, transform=rotated_transform, ticket=TimberTicket("rotated_mortise"))
 
     peg_params = SimplePegParameters(
         shape=PegShape.SQUARE,
-        peg_positions=[(inches(1), Rational(0))],
+        peg_positions=[(inches(1), scalar(0))],
         size=inches(1, 2)
     )
 
@@ -469,8 +469,8 @@ def example_brace_joint(position=None, use_round_timbers=False):
     brace_timber = join_plane_aligned_on_place_aligned_timbers(
         timber1=timber1,
         timber2=timber2,
-        location_on_timber1=timber1.length / Integer(2),
-        location_on_timber2=timber2.length / Integer(2),
+        location_on_timber1=timber1.length / scalar(2),
+        location_on_timber2=timber2.length / scalar(2),
         stickout=Stickout.nostickout(),
         size=timber1.size,
         orientation_long_face_on_timber1=TimberLongFace.RIGHT,
@@ -505,7 +505,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
         ],
         #depth=inches(4),  # 4" deep into mortise timber
         size=inches(1, 2),  # 0.5" peg diameter/side length
-        peg_orientation = (PegPositionSpace.MORTISE, Rational(0))
+        peg_orientation = (PegPositionSpace.MORTISE, scalar(0))
     )
     
     
@@ -665,12 +665,12 @@ def create_dovetail_butt_joint_example(position: Optional[V3] = None):
 
     joint = cut_dropin_dovetail_butt_joint(
         arrangement=arrangement,
-        receiving_timber_shoulder_inset=inches(Rational(1, 2)),  # 0.5" shoulder inset
+        receiving_timber_shoulder_inset=inches(scalar(1, 2)),  # 0.5" shoulder inset
         dovetail_length=inches(4),                                # 4" long dovetail tenon
-        dovetail_small_width=inches(Rational(3, 2)),             # 1.5" narrow end
+        dovetail_small_width=inches(scalar(3, 2)),             # 1.5" narrow end
         dovetail_large_width=inches(3),                          # 3" wide end
-        dovetail_lateral_offset=Rational(0),                     # Centered
-        dovetail_depth=inches(Rational(5, 2))                    # 2.5" deep cut
+        dovetail_lateral_offset=scalar(0),                     # Centered
+        dovetail_depth=inches(scalar(5, 2))                    # 2.5" deep cut
     )
     
     # Create a frame from the joint
@@ -684,13 +684,13 @@ def create_dovetail_butt_joint_example(position: Optional[V3] = None):
 
 
 def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
-    origin = create_v3(Integer(0), Integer(0), Integer(0))
+    origin = create_v3(scalar(0), scalar(0), scalar(0))
     step = inches(24)
     all_timbers = []
     all_timbers += make_tongue_and_fork_butt_joint_90_example(origin, use_round_timbers)
-    all_timbers += make_tongue_and_fork_butt_joint_angled_example(origin + create_v3(step, Integer(0), Integer(0)), use_round_timbers)
-    all_timbers += make_butt_joint_example(origin + create_v3(step * 2, Integer(0), Integer(0)), use_round_timbers)
-    all_timbers += make_butt_joint_3d_angles_example(origin + create_v3(step * 3, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_tongue_and_fork_butt_joint_angled_example(origin + create_v3(step, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_butt_joint_example(origin + create_v3(step * 2, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_butt_joint_3d_angles_example(origin + create_v3(step * 3, scalar(0), scalar(0)), use_round_timbers)
     return Frame(cut_timbers=all_timbers, name="Butt Joint Patterns")
 
 

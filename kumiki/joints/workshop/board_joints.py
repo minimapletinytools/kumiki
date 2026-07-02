@@ -11,8 +11,7 @@ from sympy import Matrix
 from kumiki.timber import Board, TimberLike, Cutting, Joint, JointTicket
 from kumiki.rule import (
     Numeric,
-    Rational,
-    Integer,
+    scalar,
     Comparison,
     safe_compare,
     equality_test,
@@ -27,8 +26,8 @@ def cut_tongue_and_groove_joint(
     groove_board: Board,
     tongue_depth: Numeric,
     tongue_width: Numeric,
-    tongue_center_offset: Numeric = Rational(0),
-    groove_extra_depth: Numeric = Rational(0),
+    tongue_center_offset: Numeric = scalar(0),
+    groove_extra_depth: Numeric = scalar(0),
 ) -> Joint:
     """
     Cuts a tongue and groove joint between two boards. The tongue and groove run
@@ -83,18 +82,18 @@ def cut_tongue_and_groove_joint(
     groove_x_in_tongue_local = groove_pos_in_tongue_local[0]
     groove_y_in_tongue_local = groove_pos_in_tongue_local[1]
 
-    tongue_half_width = tongue_board.size[0] / Integer(2)
-    tongue_half_thickness = tongue_board.size[1] / Integer(2)
-    groove_half_width = groove_board.size[0] / Integer(2)
-    groove_half_thickness = groove_board.size[1] / Integer(2)
+    tongue_half_width = tongue_board.size[0] / scalar(2)
+    tongue_half_thickness = tongue_board.size[1] / scalar(2)
+    groove_half_width = groove_board.size[0] / scalar(2)
+    groove_half_thickness = groove_board.size[1] / scalar(2)
 
     # side_sign = -1 if groove board is to the LEFT of tongue board (tongue on LEFT face),
     # side_sign = +1 if groove board is to the RIGHT (tongue on RIGHT face).
     if safe_compare(groove_x_in_tongue_local, 0, Comparison.LT):
-        side_sign = Integer(-1)
+        side_sign = scalar(-1)
         x_overlap = (groove_x_in_tongue_local + groove_half_width) - (-tongue_half_width)
     else:
-        side_sign = Integer(1)
+        side_sign = scalar(1)
         x_overlap = tongue_half_width - (groove_x_in_tongue_local - groove_half_width)
 
     if not safe_compare(x_overlap - tongue_depth, 0, Comparison.GE):
@@ -103,8 +102,8 @@ def cut_tongue_and_groove_joint(
         )
 
     # --- Thickness (Y) overlap checks ---
-    tongue_y_low = tongue_center_offset - tongue_width / Integer(2)
-    tongue_y_high = tongue_center_offset + tongue_width / Integer(2)
+    tongue_y_low = tongue_center_offset - tongue_width / scalar(2)
+    tongue_y_high = tongue_center_offset + tongue_width / scalar(2)
 
     groove_y_low = groove_y_in_tongue_local - groove_half_thickness
     groove_y_high = groove_y_in_tongue_local + groove_half_thickness
@@ -134,22 +133,22 @@ def cut_tongue_and_groove_joint(
     #   Z: 0 .. tongue_board.length
     face_x = side_sign * tongue_half_width
     inside_x = face_x - side_sign * tongue_depth
-    ref_x_center = (face_x + inside_x) / Integer(2)
+    ref_x_center = (face_x + inside_x) / scalar(2)
     ref_x_size = tongue_depth
 
     # Top negative cut: covers the region above the tongue, up to the board's top face.
     top_neg_y_low = tongue_y_high
     top_neg_y_high = tongue_board_y_high
     top_neg_y_size = top_neg_y_high - top_neg_y_low
-    top_neg_y_center = (top_neg_y_low + top_neg_y_high) / Integer(2)
+    top_neg_y_center = (top_neg_y_low + top_neg_y_high) / scalar(2)
 
     top_neg_prism = RectangularPrism(
         size=Matrix([ref_x_size, top_neg_y_size]),
         transform=Transform(
-            position=Matrix([ref_x_center, top_neg_y_center, Integer(0)]),
+            position=Matrix([ref_x_center, top_neg_y_center, scalar(0)]),
             orientation=Orientation.identity(),
         ),
-        start_distance=Integer(0),
+        start_distance=scalar(0),
         end_distance=tongue_board.length,
         label="tongue_top_remove",
     )
@@ -158,15 +157,15 @@ def cut_tongue_and_groove_joint(
     bot_neg_y_low = tongue_board_y_low
     bot_neg_y_high = tongue_y_low
     bot_neg_y_size = bot_neg_y_high - bot_neg_y_low
-    bot_neg_y_center = (bot_neg_y_low + bot_neg_y_high) / Integer(2)
+    bot_neg_y_center = (bot_neg_y_low + bot_neg_y_high) / scalar(2)
 
     bot_neg_prism = RectangularPrism(
         size=Matrix([ref_x_size, bot_neg_y_size]),
         transform=Transform(
-            position=Matrix([ref_x_center, bot_neg_y_center, Integer(0)]),
+            position=Matrix([ref_x_center, bot_neg_y_center, scalar(0)]),
             orientation=Orientation.identity(),
         ),
-        start_distance=Integer(0),
+        start_distance=scalar(0),
         end_distance=tongue_board.length,
         label="tongue_bottom_remove",
     )
@@ -188,7 +187,7 @@ def cut_tongue_and_groove_joint(
     # coords so the groove sits exactly where the tongue is, then extend it
     # deeper into the groove board by groove_extra_depth.
     tongue_prism_center_tongue_local = Matrix(
-        [ref_x_center, tongue_center_offset, Integer(0)]
+        [ref_x_center, tongue_center_offset, scalar(0)]
     )
     tongue_prism_center_global = tongue_board.transform.local_to_global(
         tongue_prism_center_tongue_local
@@ -203,7 +202,7 @@ def cut_tongue_and_groove_joint(
     groove_x_size = tongue_depth + groove_extra_depth
     groove_x_center = (
         tongue_prism_center_groove_local[0]
-        + side_sign * groove_extra_depth / Integer(2)
+        + side_sign * groove_extra_depth / scalar(2)
     )
     groove_y_center = tongue_prism_center_groove_local[1]
     groove_y_size = tongue_width
@@ -211,10 +210,10 @@ def cut_tongue_and_groove_joint(
     groove_prism = RectangularPrism(
         size=Matrix([groove_x_size, groove_y_size]),
         transform=Transform(
-            position=Matrix([groove_x_center, groove_y_center, Integer(0)]),
+            position=Matrix([groove_x_center, groove_y_center, scalar(0)]),
             orientation=Orientation.identity(),
         ),
-        start_distance=Integer(0),
+        start_distance=scalar(0),
         end_distance=groove_board.length,
         label="groove",
     )
@@ -226,18 +225,18 @@ def cut_tongue_and_groove_joint(
     groove_outer_face_x = -side_sign * groove_half_width
     groove_mouth_x = (
         tongue_prism_center_groove_local[0]
-        - side_sign * tongue_depth / Integer(2)
+        - side_sign * tongue_depth / scalar(2)
     )
-    trim_x_center = (groove_outer_face_x + groove_mouth_x) / Integer(2)
+    trim_x_center = (groove_outer_face_x + groove_mouth_x) / scalar(2)
     trim_x_size = side_sign * (groove_mouth_x - groove_outer_face_x)
 
     trim_prism = RectangularPrism(
         size=Matrix([trim_x_size, groove_board.size[1]]),
         transform=Transform(
-            position=Matrix([trim_x_center, Integer(0), Integer(0)]),
+            position=Matrix([trim_x_center, scalar(0), scalar(0)]),
             orientation=Orientation.identity(),
         ),
-        start_distance=Integer(0),
+        start_distance=scalar(0),
         end_distance=groove_board.length,
         label="groove_excess_trim",
     )
@@ -262,7 +261,7 @@ def cut_tongue_and_groove_joint(
     )
 
 
-def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_extra_space: Numeric = Rational(0)):
+def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_extra_space: Numeric = scalar(0)):
     """
     fits boards in between the timbers using the board_in_groove_joint
 
@@ -328,22 +327,22 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
     max_z: Numeric
 
     # Seed from the reference board (always at local origin).
-    min_x = -ref.size[0] / Integer(2)
-    max_x =  ref.size[0] / Integer(2)
-    min_y = -board_thickness / Integer(2)
-    max_y =  board_thickness / Integer(2)
-    min_z =  Integer(0)
+    min_x = -ref.size[0] / scalar(2)
+    max_x =  ref.size[0] / scalar(2)
+    min_y = -board_thickness / scalar(2)
+    max_y =  board_thickness / scalar(2)
+    min_z =  scalar(0)
     max_z =  ref.length
 
     for i, b in enumerate(boards[1:], start=1):
         pos_in_ref_local = ref.transform.global_to_local(b.transform.position)
         # Coplanar assertion: Y offset of board bottom in ref local frame must be zero.
-        assert equality_test(pos_in_ref_local[1], Integer(0)), (
+        assert equality_test(pos_in_ref_local[1], scalar(0)), (
             f"board {i} is not coplanar with board 0 "
             f"(Y offset = {pos_in_ref_local[1]} in ref local frame)"
         )
-        x_lo = pos_in_ref_local[0] - b.size[0] / Integer(2)
-        x_hi = pos_in_ref_local[0] + b.size[0] / Integer(2)
+        x_lo = pos_in_ref_local[0] - b.size[0] / scalar(2)
+        x_hi = pos_in_ref_local[0] + b.size[0] / scalar(2)
         z_lo = pos_in_ref_local[2]
         z_hi = pos_in_ref_local[2] + b.length
         min_x = min(min_x, x_lo)
@@ -351,8 +350,8 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
         min_z = min(min_z, z_lo)
         max_z = max(max_z, z_hi)
 
-    x_center = (min_x + max_x) / Integer(2)
-    y_center = (min_y + max_y) / Integer(2)  # = 0 for coplanar boards
+    x_center = (min_x + max_x) / scalar(2)
+    y_center = (min_y + max_y) / scalar(2)  # = 0 for coplanar boards
     x_size   = max_x - min_x
     y_size   = (max_y - min_y) + groove_extra_space
     z_span   = max_z - min_z
@@ -366,7 +365,7 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
             position=Matrix([x_center, y_center, min_z]),
             orientation=Orientation.identity(),
         ),
-        start_distance=Integer(0),
+        start_distance=scalar(0),
         end_distance=z_span,
         label="board_groove",
     )

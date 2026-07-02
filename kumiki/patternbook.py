@@ -9,7 +9,7 @@ from sympy import Rational
 import inspect
 from typing import Any, Dict, List, Tuple, Optional, Callable, Union, Literal, Sequence
 from dataclasses import dataclass, field, replace
-from .rule import V3, create_v3, Transform
+from .rule import V3, create_v3, Transform, scalar
 from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, JointAccessory
 from .cutcsg import CutCSG, translate_csg
 
@@ -234,8 +234,7 @@ class Pattern:
     def raise_at(self, center: Optional[Any] = None, **kwargs: Any) -> Any:
         """Raise this pattern at the given center (defaults to origin)."""
         if center is None:
-            from sympy import Integer
-            center = create_v3(Integer(0), Integer(0), Integer(0))
+            center = create_v3(scalar(0), scalar(0), scalar(0))
         return self.lambda_(center, **kwargs)
 
 
@@ -299,8 +298,7 @@ class PatternBook:
             ValueError: If pattern_name is not found
         """
         if center is None:
-            from sympy import Integer
-            center = create_v3(Integer(0), Integer(0), Integer(0))
+            center = create_v3(scalar(0), scalar(0), scalar(0))
         
         # Find the pattern by name
         for metadata, pattern_lambda in self.patterns:
@@ -388,7 +386,7 @@ class PatternBook:
 
     def raise_patternbook_as_frame(
         self,
-        separation_distance: Union[float, int, Rational] = Rational(2),
+        separation_distance: Union[float, int, Rational] = scalar(2),
         start_center: Optional[V3] = None,
     ) -> Frame:
         """Raise this PatternBook as a single combined Frame.
@@ -437,11 +435,10 @@ class PatternBook:
         start_center: Optional[V3],
     ) -> Tuple[Rational, V3]:
         if start_center is None:
-            from sympy import Integer
-            start_center = create_v3(Integer(0), Integer(0), Integer(0))
+            start_center = create_v3(scalar(0), scalar(0), scalar(0))
 
         if not isinstance(separation_distance, Rational):
-            separation_distance = Rational(separation_distance)
+            separation_distance = scalar(separation_distance)
 
         return separation_distance, start_center
 
@@ -451,11 +448,10 @@ class PatternBook:
         separation_distance: Rational,
         start_center: V3,
     ) -> List[Union[Frame, CutCSG]]:
-        from sympy import Integer
 
         results: List[Union[Frame, CutCSG]] = []
         for i, (_metadata, pattern_lambda) in enumerate(entries):
-            offset = create_v3(Integer(i) * separation_distance, Integer(0), Integer(0))
+            offset = create_v3(scalar(i) * separation_distance, scalar(0), scalar(0))
             center = start_center + offset
             results.append(pattern_lambda(center))
         return results

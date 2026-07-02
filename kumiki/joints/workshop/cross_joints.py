@@ -52,18 +52,17 @@ def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace)
         return locate_bottom_center_position(timber).position
     else:
         # For long faces (LEFT, RIGHT, FRONT, BACK), center is at mid-length
-        from sympy import Rational
-        face_center = timber.get_bottom_position_global() + (timber.length / Rational(2)) * timber.get_length_direction_global()
+        face_center = timber.get_bottom_position_global() + (timber.length / scalar(2)) * timber.get_length_direction_global()
 
         # Offset to the face surface
         if face == TimberFace.RIGHT:
-            face_center = face_center + (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+            face_center = face_center + (timber.size[0] / scalar(2)) * timber.get_width_direction_global()
         elif face == TimberFace.LEFT:
-            face_center = face_center - (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+            face_center = face_center - (timber.size[0] / scalar(2)) * timber.get_width_direction_global()
         elif face == TimberFace.FRONT:
-            face_center = face_center + (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+            face_center = face_center + (timber.size[1] / scalar(2)) * timber.get_height_direction_global()
         else:  # BACK
-            face_center = face_center - (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+            face_center = face_center - (timber.size[1] / scalar(2)) * timber.get_height_direction_global()
 
         return face_center
 
@@ -75,7 +74,7 @@ def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace)
 
 def cut_plain_cross_lap_joint(
     arrangement: CrossJointTimberArrangement,
-    cut_ratio: Numeric = Rational(1, 2),
+    cut_ratio: Numeric = scalar(1, 2),
     notching: Optional[CrossJointScribeNotchingConfig] = CrossJointScribeNotchingConfig.cross_timber_1(),
 ) -> Joint:
     """
@@ -101,7 +100,6 @@ def cut_plain_cross_lap_joint(
     """
     from kumiki.cutcsg import Difference, RectangularPrism, HalfSpace
     from kumiki.rule import safe_dot_product, safe_transform_vector, safe_norm
-    from sympy import Rational
 
     timberA = arrangement.timber1
     timberB = arrangement.timber2
@@ -114,7 +112,7 @@ def cut_plain_cross_lap_joint(
 
     # Verify that the timbers are not parallel (their length directions must differ)
     dot_product = safe_dot_product(timberA.get_length_direction_global(), timberB.get_length_direction_global())
-    assert abs(abs(dot_product) - 1) > Rational(1, 1000000), \
+    assert abs(abs(dot_product) - 1) > scalar(1, 1000000), \
         "Timbers must not be parallel (their length directions must differ)"
 
     # Check that the timbers intersect when extended infinitely
@@ -133,7 +131,7 @@ def cut_plain_cross_lap_joint(
 
     denom = a * c - b * b
 
-    if abs(denom) < Rational(1, 1000000):
+    if abs(denom) < scalar(1, 1000000):
         # Lines are parallel (already checked above)
         t = -safe_dot_product(d1, w) / a if a > 0 else 0
         closest_on_1 = p1 + t * d1
@@ -171,9 +169,8 @@ def cut_plain_cross_lap_joint(
         perpendicular_axis = normalize_vector(perpendicular_axis)
 
         # Get center positions of both timbers
-        from sympy import Rational
-        centerA = timberA.get_bottom_position_global() + timberA.get_length_direction_global() * (timberA.length / Rational(2))
-        centerB = timberB.get_bottom_position_global() + timberB.get_length_direction_global() * (timberB.length / Rational(2))
+        centerA = timberA.get_bottom_position_global() + timberA.get_length_direction_global() * (timberA.length / scalar(2))
+        centerB = timberB.get_bottom_position_global() + timberB.get_length_direction_global() * (timberB.length / scalar(2))
 
         # Vector from timberA center to timberB center
         A_to_B = centerB - centerA
@@ -402,4 +399,4 @@ def cut_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) ->
         AssertionError: If the timbers don't intersect or are parallel.
     """
     # Use cross lap joint with cut_ratio=1 (only cut timber1, not timber2)
-    return cut_plain_cross_lap_joint(arrangement, cut_ratio=Rational(1, 1))
+    return cut_plain_cross_lap_joint(arrangement, cut_ratio=scalar(1, 1))

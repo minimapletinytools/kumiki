@@ -9,8 +9,7 @@ from kumiki.librarian import (
     discover_callable_render_parameters,
     resolve_callable_render_parameters,
 )
-from kumiki.rule import V3, create_v3
-from sympy import Rational
+from kumiki.rule import V3, create_v3, scalar
 
 
 def test_untyped_none_parameter_is_not_exposed_as_render_parameter() -> None:
@@ -40,7 +39,7 @@ def test_optional_v3_parameter_is_exposed_and_coerced() -> None:
         "center": {"x": "1/2", "y": "2", "z": "3"},
     })
     center = resolved["center"]
-    assert center == create_v3(Rational(1, 2), Rational(2), Rational(3))
+    assert center == create_v3(scalar(1, 2), scalar(2), scalar(3))
 
 
 def test_declared_none_parameter_preserves_none_default() -> None:
@@ -57,7 +56,7 @@ def test_declared_none_parameter_preserves_none_default() -> None:
 
 
 def test_explicit_optional_v3_param_round_trips_default() -> None:
-    default = create_v3(Rational(1), Rational(2), Rational(3))
+    default = create_v3(scalar(1), scalar(2), scalar(3))
 
     def build(center=Param(default, kind="v3", optional=True)):
         return center

@@ -5,7 +5,7 @@ Tests for rendering utilities shared across all rendering backends.
 import pytest
 from sympy import Matrix, Rational, Integer
 from kumiki.timber import timber_from_directions, create_v2, create_v3, CutTimber
-from kumiki.rule import Orientation
+from kumiki.rule import Orientation, scalar
 from kumiki.rendering_utils import (
     sympy_to_float,
     matrix_to_floats,
@@ -19,10 +19,10 @@ from tests.testing_shavings import create_standard_vertical_timber, create_stand
 def test_sympy_to_float():
     """Test conversion of SymPy expressions to floats."""
     # Test with Rational
-    assert sympy_to_float(Rational(1, 2)) == 0.5
+    assert sympy_to_float(scalar(1, 2)) == 0.5
     
     # Test with Integer
-    assert sympy_to_float(Integer(42)) == 42.0
+    assert sympy_to_float(scalar(42)) == 42.0
     
     # Test with float
     assert sympy_to_float(3.14) == 3.14
@@ -34,8 +34,8 @@ def test_sympy_to_float():
 def test_matrix_to_floats():
     """Test conversion of SymPy matrix to list of floats."""
     matrix = Matrix([
-        [Rational(1, 2), Rational(3, 4)],
-        [Integer(1), Integer(2)]
+        [scalar(1, 2), scalar(3, 4)],
+        [scalar(1), scalar(2)]
     ])
     
     result = matrix_to_floats(matrix)
@@ -69,8 +69,8 @@ def test_calculate_timber_corners():
     """Test calculation of timber corner positions."""
     # Create a simple timber
     timber = timber_from_directions(
-        length=Rational(100, 1),
-        size=create_v2(Rational(10, 1), Rational(10, 1)),
+        length=scalar(100, 1),
+        size=create_v2(scalar(10, 1), scalar(10, 1)),
         bottom_position=create_v3(0, 0, 0),
         length_direction=create_v3(0, 0, 1),
         width_direction=create_v3(1, 0, 0)
@@ -108,8 +108,8 @@ def test_calculate_structure_extents_empty():
 def test_calculate_structure_extents_single_timber():
     """Test structure extents calculation with single timber."""
     timber = timber_from_directions(
-        length=Rational(100, 1),
-        size=create_v2(Rational(10, 1), Rational(10, 1)),
+        length=scalar(100, 1),
+        size=create_v2(scalar(10, 1), scalar(10, 1)),
         bottom_position=create_v3(0, 0, 0),
         length_direction=create_v3(0, 0, 1),
         width_direction=create_v3(1, 0, 0)
@@ -128,16 +128,16 @@ def test_calculate_structure_extents_multiple_timbers():
     """Test structure extents calculation with multiple timbers."""
     # Create two timbers at different positions
     timber1 = timber_from_directions(
-        length=Rational(100, 1),
-        size=create_v2(Rational(10, 1), Rational(10, 1)),
+        length=scalar(100, 1),
+        size=create_v2(scalar(10, 1), scalar(10, 1)),
         bottom_position=create_v3(0, 0, 0),
         length_direction=create_v3(1, 0, 0),
         width_direction=create_v3(0, 1, 0)
     )
     
     timber2 = timber_from_directions(
-        length=Rational(50, 1),
-        size=create_v2(Rational(10, 1), Rational(10, 1)),
+        length=scalar(50, 1),
+        size=create_v2(scalar(10, 1), scalar(10, 1)),
         bottom_position=create_v3(50, 0, 0),
         length_direction=create_v3(0, 0, 1),
         width_direction=create_v3(1, 0, 0)
@@ -157,8 +157,8 @@ def test_calculate_structure_extents_with_offsets():
     """Test structure extents with timbers at various positions."""
     # Create a timber far from origin
     timber = timber_from_directions(
-        length=Rational(20, 1),
-        size=create_v2(Rational(5, 1), Rational(5, 1)),
+        length=scalar(20, 1),
+        size=create_v2(scalar(5, 1), scalar(5, 1)),
         bottom_position=create_v3(100, 100, 100),
         length_direction=create_v3(0, 0, 1),
         width_direction=create_v3(1, 0, 0)

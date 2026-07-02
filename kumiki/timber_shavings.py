@@ -22,12 +22,12 @@ def _support_value_local(
     dy = direction_local[1]
     dz = direction_local[2]
     return (
-        x_pos * Max(dx, Integer(0))
-        + x_neg * Max(-dx, Integer(0))
-        + y_pos * Max(dy, Integer(0))
-        + y_neg * Max(-dy, Integer(0))
-        + z_max * Max(dz, Integer(0))
-        + z_min * Max(-dz, Integer(0))
+        x_pos * Max(dx, scalar(0))
+        + x_neg * Max(-dx, scalar(0))
+        + y_pos * Max(dy, scalar(0))
+        + y_neg * Max(-dy, scalar(0))
+        + z_max * Max(dz, scalar(0))
+        + z_min * Max(-dz, scalar(0))
     )
 
 
@@ -59,30 +59,30 @@ def get_nominal_support_distance_from_centerline(timber: PerfectTimberWithin, di
     """Support distance from cross-section centerline to nominal support plane."""
     width_halves, height_halves = timber.get_nominal_half_sizes()
     return _support_distance_local(
-        position_local=create_v3(Integer(0), Integer(0), Integer(0)),
-        direction_local=create_v3(direction[0], direction[1], Integer(0)),
+        position_local=create_v3(scalar(0), scalar(0), scalar(0)),
+        direction_local=create_v3(direction[0], direction[1], scalar(0)),
         x_pos=width_halves[0],
         x_neg=width_halves[1],
         y_pos=height_halves[0],
         y_neg=height_halves[1],
-        z_min=Integer(0),
-        z_max=Integer(0),
+        z_min=scalar(0),
+        z_max=scalar(0),
     )
 
 
 def get_perfect_support_distance_from_centerline(timber: PerfectTimberWithin, direction: V2) -> Numeric:
     """Support distance from cross-section centerline to perfect support plane."""
-    w_half = timber.size[0] / Integer(2)
-    h_half = timber.size[1] / Integer(2)
+    w_half = timber.size[0] / scalar(2)
+    h_half = timber.size[1] / scalar(2)
     return _support_distance_local(
-        position_local=create_v3(Integer(0), Integer(0), Integer(0)),
-        direction_local=create_v3(direction[0], direction[1], Integer(0)),
+        position_local=create_v3(scalar(0), scalar(0), scalar(0)),
+        direction_local=create_v3(direction[0], direction[1], scalar(0)),
         x_pos=w_half,
         x_neg=w_half,
         y_pos=h_half,
         y_neg=h_half,
-        z_min=Integer(0),
-        z_max=Integer(0),
+        z_min=scalar(0),
+        z_max=scalar(0),
     )
 
 
@@ -96,15 +96,15 @@ def get_nominal_support_distance(timber: PerfectTimberWithin, position_from_bott
         x_neg=width_halves[1],
         y_pos=height_halves[0],
         y_neg=height_halves[1],
-        z_min=Integer(0),
+        z_min=scalar(0),
         z_max=timber.length,
     )
 
 
 def get_perfect_support_distance(timber: PerfectTimberWithin, position_from_bottom: V3, direction: V3) -> Numeric:
     """Support distance from a 3D local position to perfect support plane."""
-    w_half = timber.size[0] / Integer(2)
-    h_half = timber.size[1] / Integer(2)
+    w_half = timber.size[0] / scalar(2)
+    h_half = timber.size[1] / scalar(2)
     return _support_distance_local(
         position_local=position_from_bottom,
         direction_local=direction,
@@ -112,7 +112,7 @@ def get_perfect_support_distance(timber: PerfectTimberWithin, position_from_bott
         x_neg=w_half,
         y_pos=h_half,
         y_neg=h_half,
-        z_min=Integer(0),
+        z_min=scalar(0),
         z_max=timber.length,
     )
 
@@ -183,7 +183,7 @@ def create_peg_going_into_face(
     if face == TimberLongFace.RIGHT:
         # RIGHT face: offset in +X (width) direction, surface at +width/2
         position_local = create_v3(
-            timber.size[0] / Rational(2),  # At right surface
+            timber.size[0] / scalar(2),  # At right surface
             distance_from_centerline,  # Offset in height direction
             distance_from_bottom
         )
@@ -194,7 +194,7 @@ def create_peg_going_into_face(
     elif face == TimberLongFace.LEFT:
         # LEFT face: offset in -X (width) direction
         position_local = create_v3(
-            -timber.size[0] / Rational(2),  # At left surface
+            -timber.size[0] / scalar(2),  # At left surface
             distance_from_centerline,  # Offset in height direction
             distance_from_bottom
         )
@@ -206,7 +206,7 @@ def create_peg_going_into_face(
         # FRONT face: offset in +Y (height) direction
         position_local = create_v3(
             distance_from_centerline,  # Offset in width direction
-            timber.size[1] / Rational(2),  # At forward surface
+            timber.size[1] / scalar(2),  # At forward surface
             distance_from_bottom
         )
         # Peg points inward (-Y direction in local space)
@@ -217,7 +217,7 @@ def create_peg_going_into_face(
         # BACK face: offset in -Y (height) direction
         position_local = create_v3(
             distance_from_centerline,  # Offset in width direction
-            -timber.size[1] / Rational(2),  # At back surface
+            -timber.size[1] / scalar(2),  # At back surface
             distance_from_bottom
         )
         # Peg points inward (+Y direction in local space)
@@ -426,8 +426,6 @@ def do_xy_cross_section_on_parallel_timbers_overlap(timberA: PerfectTimberWithin
     Returns:
         True if the cross-sections overlap, False otherwise
     """
-    from sympy import Rational
-    
     assert are_vectors_parallel(timberA.get_length_direction_global(), timberB.get_length_direction_global()), "Timbers must be parallel"
 
     # Convert timberB's bottom position into timberA's local space
@@ -436,10 +434,10 @@ def do_xy_cross_section_on_parallel_timbers_overlap(timberA: PerfectTimberWithin
     # In timberA's local space:
     # - timberA's cross section is centered at (0, 0) in XY plane
     # - timberA spans from (-width/2, -height/2) to (width/2, height/2)
-    timberA_x_min = -timberA.size[0] / Rational(2)
-    timberA_x_max = timberA.size[0] / Rational(2)
-    timberA_y_min = -timberA.size[1] / Rational(2)
-    timberA_y_max = timberA.size[1] / Rational(2)
+    timberA_x_min = -timberA.size[0] / scalar(2)
+    timberA_x_max = timberA.size[0] / scalar(2)
+    timberA_y_min = -timberA.size[1] / scalar(2)
+    timberA_y_max = timberA.size[1] / scalar(2)
     
     # timberB's cross section is centered at (timberB_bottom_local.x, timberB_bottom_local.y)
     # We need to transform timberB's width and height directions into timberA's local space
@@ -459,8 +457,8 @@ def do_xy_cross_section_on_parallel_timbers_overlap(timberA: PerfectTimberWithin
     timberB_center_local_xy = create_v2(timberB_bottom_local[0], timberB_bottom_local[1])
     
     # Offset vectors for the corners (in timberA's local XY plane)
-    half_width = timberB.size[0] / Rational(2)
-    half_height = timberB.size[1] / Rational(2)
+    half_width = timberB.size[0] / scalar(2)
+    half_height = timberB.size[1] / scalar(2)
     
     # Corner offsets in timberA's local space
     offset_width_local = create_v2(timberB_width_dir_local[0], timberB_width_dir_local[1]) * half_width

@@ -50,16 +50,16 @@ def create_standard_vertical_timber(
         Timber: A vertical timber extending upward in +Z direction
     """
     if size is None:
-        size = (Rational(4), Rational(6))
+        size = (scalar(4), scalar(6))
     if position is None:
-        position = (Rational(0), Rational(0), Rational(0))
+        position = (scalar(0), scalar(0), scalar(0))
     
     return timber_from_directions(
-        length=Rational(height),
-        size=Matrix([Rational(size[0]), Rational(size[1])]),
-        bottom_position=Matrix([Rational(position[0]), Rational(position[1]), Rational(position[2])]),
-        length_direction=Matrix([Rational(0), Rational(0), Rational(1)]),  # Up
-        width_direction=Matrix([Rational(1), Rational(0), Rational(0)]),   # East
+        length=scalar(height),
+        size=Matrix([scalar(size[0]), scalar(size[1])]),
+        bottom_position=Matrix([scalar(position[0]), scalar(position[1]), scalar(position[2])]),
+        length_direction=Matrix([scalar(0), scalar(0), scalar(1)]),  # Up
+        width_direction=Matrix([scalar(1), scalar(0), scalar(0)]),   # East
         ticket=ticket
     )
 
@@ -86,26 +86,26 @@ def create_standard_horizontal_timber(
         Timber: A horizontal timber
     """
     if size is None:
-        size = (Rational(4), Rational(6))
+        size = (scalar(4), scalar(6))
     if position is None:
-        position = (Rational(0), Rational(0), Rational(0))
+        position = (scalar(0), scalar(0), scalar(0))
     
     # Determine length and width directions based on specified direction
     direction_map = {
-        'x': (Matrix([Rational(1), Rational(0), Rational(0)]), Matrix([Rational(0), Rational(1), Rational(0)])),
-        '+x': (Matrix([Rational(1), Rational(0), Rational(0)]), Matrix([Rational(0), Rational(1), Rational(0)])),
-        '-x': (Matrix([Rational(-1), Rational(0), Rational(0)]), Matrix([Rational(0), Rational(1), Rational(0)])),
-        'y': (Matrix([Rational(0), Rational(1), Rational(0)]), Matrix([Rational(1), Rational(0), Rational(0)])),
-        '+y': (Matrix([Rational(0), Rational(1), Rational(0)]), Matrix([Rational(1), Rational(0), Rational(0)])),
-        '-y': (Matrix([Rational(0), Rational(-1), Rational(0)]), Matrix([Rational(1), Rational(0), Rational(0)])),
+        'x': (Matrix([scalar(1), scalar(0), scalar(0)]), Matrix([scalar(0), scalar(1), scalar(0)])),
+        '+x': (Matrix([scalar(1), scalar(0), scalar(0)]), Matrix([scalar(0), scalar(1), scalar(0)])),
+        '-x': (Matrix([scalar(-1), scalar(0), scalar(0)]), Matrix([scalar(0), scalar(1), scalar(0)])),
+        'y': (Matrix([scalar(0), scalar(1), scalar(0)]), Matrix([scalar(1), scalar(0), scalar(0)])),
+        '+y': (Matrix([scalar(0), scalar(1), scalar(0)]), Matrix([scalar(1), scalar(0), scalar(0)])),
+        '-y': (Matrix([scalar(0), scalar(-1), scalar(0)]), Matrix([scalar(1), scalar(0), scalar(0)])),
     }
     
     length_dir, width_dir = direction_map[direction]
     
     return timber_from_directions(
-        length=Rational(length),
-        size=Matrix([Rational(size[0]), Rational(size[1])]),
-        bottom_position=Matrix([Rational(position[0]), Rational(position[1]), Rational(position[2])]),
+        length=scalar(length),
+        size=Matrix([scalar(size[0]), scalar(size[1])]),
+        bottom_position=Matrix([scalar(position[0]), scalar(position[1]), scalar(position[2])]),
         length_direction=length_dir,
         width_direction=width_dir,
         ticket=ticket
@@ -115,7 +115,7 @@ def create_centered_horizontal_timber(
     direction='x',
     length=100,
     size: Optional[Tuple] = None,
-    zoffset = Integer(0),
+    zoffset = scalar(0),
     name: str = "test_timber"
 ) -> Timber:
     """
@@ -125,13 +125,13 @@ def create_centered_horizontal_timber(
     
     # compute position based on direction
     if direction == 'x' or direction == '+x':
-        position = (Rational(-length/2), Rational(0), Rational(zoffset))
+        position = (scalar(-length/2), scalar(0), scalar(zoffset))
     elif direction == 'y' or direction == '+y':
-        position = (Rational(0), Rational(-length/2), Rational(zoffset))
+        position = (scalar(0), scalar(-length/2), scalar(zoffset))
     elif direction == '-x':
-        position = (Rational(length/2), Rational(0), Rational(zoffset))
+        position = (scalar(length/2), scalar(0), scalar(zoffset))
     elif direction == '-y':
-        position = (Rational(0), Rational(length/2), Rational(zoffset))
+        position = (scalar(0), scalar(length/2), scalar(zoffset))
     else:
         raise ValueError(f"Invalid direction: {direction}")
 
@@ -160,7 +160,7 @@ def assert_is_valid_rotation_matrix(matrix: Matrix, tolerance: float = TOLERANCE
     """
     # Check determinant is 1
     det_val = float(simplify(det(matrix)))
-    assert abs(det_val - Integer(1)) < tolerance, \
+    assert abs(det_val - scalar(1)) < tolerance, \
         f"Rotation matrix determinant should be 1, got {det_val}"
     
     # Check orthogonality: M * M^T = I
@@ -200,7 +200,7 @@ def assert_vectors_parallel(v1: Matrix, v2: Matrix, tolerance: float = TOLERANCE
     
     # Check if dot product is ±1
     dot_product = float(simplify((v1_norm.T * v2_norm)[0, 0]))
-    assert abs(abs(dot_product) - Integer(1)) < tolerance, \
+    assert abs(abs(dot_product) - scalar(1)) < tolerance, \
         f"Vectors should be parallel (|dot product| = 1 for normalized), got {abs(dot_product)}"
 
 
@@ -213,7 +213,7 @@ def assert_vector_normalized(v: Matrix, tolerance: float = TOLERANCE):
         tolerance: Tolerance for float comparison
     """
     magnitude = float(v.norm())
-    assert abs(magnitude - Integer(1)) < tolerance, \
+    assert abs(magnitude - scalar(1)) < tolerance, \
         f"Vector should be normalized (magnitude = 1), got {magnitude}"
 
 

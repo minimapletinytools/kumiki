@@ -6,11 +6,12 @@ to test the precision and alignment of CSG operations when SymPy's exact
 representations are converted to floating point values in CAD systems.
 """
 
-from sympy import Rational, pi, Matrix, cos, sin
+from sympy import pi, Matrix, cos, sin
 from kumiki.timber import Frame, TimberFace, TimberEnd, create_v3, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.butt_joints import cut_mortise_and_tenon_joint
 from kumiki.patternbook import Pattern
+from kumiki.rule import scalar
 
 
 def create_all_irrational_examples() -> Frame:
@@ -22,32 +23,32 @@ def create_all_irrational_examples() -> Frame:
     """
     # Vertical post (mortise timber)
     post = timber_from_directions(
-        length=Rational(96),
-        size=Matrix([Rational(6), Rational(6)]),
-        bottom_position=create_v3(Rational(0), Rational(0), Rational(0)),
-        length_direction=create_v3(Rational(0), Rational(0), Rational(1)),
-        width_direction=create_v3(Rational(1), Rational(0), Rational(0)),
+        length=scalar(96),
+        size=Matrix([scalar(6), scalar(6)]),
+        bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="Vertical Post"
     )
     
     # Angled beam at 37° (tenon timber)
-    angle_37 = pi * Rational(37, 180)  # 37 degrees in radians (irrational, exact)
+    angle_37 = pi * scalar(37, 180)  # 37 degrees in radians (irrational, exact)
     
     # Direction vector at 37° in XY plane
-    length_dir = create_v3(cos(angle_37), sin(angle_37), Rational(0))
-    width_dir = create_v3(Rational(0), Rational(0), Rational(1))
+    length_dir = create_v3(cos(angle_37), sin(angle_37), scalar(0))
+    width_dir = create_v3(scalar(0), scalar(0), scalar(1))
     
     beam = timber_from_directions(
-        length=Rational(60),
-        size=Matrix([Rational(4), Rational(6)]),
-        bottom_position=create_v3(Rational(0), Rational(0), Rational(48)),
+        length=scalar(60),
+        size=Matrix([scalar(4), scalar(6)]),
+        bottom_position=create_v3(scalar(0), scalar(0), scalar(48)),
         length_direction=length_dir,
         width_direction=width_dir,
         ticket="Angled Beam (37°)"
     )
     
     # Create mortise and tenon joint
-    tenon_size = Matrix([Rational(2), Rational(3)])  # width x thickness
+    tenon_size = Matrix([scalar(2), scalar(3)])  # width x thickness
     arrangement = ButtJointTimberArrangement(
         receiving_timber=post,
         butt_timber=beam,
@@ -57,8 +58,8 @@ def create_all_irrational_examples() -> Frame:
     joint = cut_mortise_and_tenon_joint(
         arrangement=arrangement,
         tenon_size=tenon_size,
-        tenon_length=Rational(4),
-        mortise_depth=Rational(4),
+        tenon_length=scalar(4),
+        mortise_depth=scalar(4),
     )
     
     frame = Frame.from_joints([joint], name="Mortise and Tenon at 37°")

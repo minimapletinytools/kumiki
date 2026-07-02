@@ -2,7 +2,7 @@
 Corner Joints Patterns
 """
 
-from sympy import Matrix, Rational, sqrt
+from sympy import Matrix, sqrt
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -127,13 +127,13 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
     sqrt5 = sqrt(5)
 
     # (4,0,3)/5 is a unit vector, elevation ~37° from horizontal in XZ plane
-    dirA = Matrix([Rational(4), Rational(0), Rational(3)]) / 5
-    widthA = Matrix([Rational(0), Rational(1), Rational(0)])  # perp to dirA since dirA has no Y component
+    dirA = Matrix([scalar(4), scalar(0), scalar(3)]) / 5
+    widthA = Matrix([scalar(0), scalar(1), scalar(0)])  # perp to dirA since dirA has no Y component
 
     # (2,4,3)/sqrt(29) — has components in all 3 axes
-    dirB = Matrix([Rational(2), Rational(4), Rational(3)]) / sqrt29
+    dirB = Matrix([scalar(2), scalar(4), scalar(3)]) / sqrt29
     # (-4,2,0)/sqrt(20) = (-2,1,0)/sqrt(5) is perpendicular to dirB: 2*(-2)+4*1+3*0 = 0
-    widthB = Matrix([Rational(-2), Rational(1), Rational(0)]) / sqrt5
+    widthB = Matrix([scalar(-2), scalar(1), scalar(0)]) / sqrt5
 
     timberA = _maybe_round_timber(timber_from_directions(
         length=TIMBER_LENGTH,
@@ -178,7 +178,7 @@ def make_corner_lap_joint_example(position: V3, use_round_timbers=False) -> list
             timber2_end=arrangement.timber2_end,
             front_face_on_timber1=None,
         ),
-        cut_ratio=Rational(1, 2),
+        cut_ratio=scalar(1, 2),
     )
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
@@ -220,9 +220,9 @@ def create_mitered_and_keyed_lap_joint_example(position: Optional[V3] = None):
     joint = cut_mitered_and_keyed_lap_joint(
         arrangement=arrangement,
         num_laps=3,                                          # 3 interlocking fingers
-        lap_thickness=inches(Rational(3, 4)),               # 0.75" thick fingers
-        lap_start_distance_from_reference_miter_face=inches(Rational(1, 2)),  # Start 0.5" from miter face
-        distance_between_lap_and_outside=inches(Rational(1, 2))  # 0.5" inset from outer edge
+        lap_thickness=inches(scalar(3, 4)),               # 0.75" thick fingers
+        lap_start_distance_from_reference_miter_face=inches(scalar(1, 2)),  # Start 0.5" from miter face
+        distance_between_lap_and_outside=inches(scalar(1, 2))  # 0.5" inset from outer edge
     )
     
     # Create a frame from the joint
@@ -251,7 +251,7 @@ def create_mitered_and_keyed_lap_joint_130deg_example(position: Optional[V3] = N
         position: Center position of the joint (V3). Defaults to origin.
     """
     # Create corner joint arrangement with 130-degree angle (convert to radians)
-    angle_130_rad = degrees(Integer(130))
+    angle_130_rad = degrees(scalar(130))
     arrangement = create_canonical_example_corner_joint_timbers(corner_angle=angle_130_rad, position=position)
     
     # Rename timbers for clarity in this joint context
@@ -271,9 +271,9 @@ def create_mitered_and_keyed_lap_joint_130deg_example(position: Optional[V3] = N
     joint = cut_mitered_and_keyed_lap_joint(
         arrangement=arrangement,
         num_laps=3,                                          # 3 interlocking fingers
-        lap_thickness=inches(Rational(3, 4)),               # 0.75" thick fingers
-        lap_start_distance_from_reference_miter_face=inches(Rational(1, 2)),  # Start 0.5" from miter face
-        distance_between_lap_and_outside=inches(Rational(1, 2)), 
+        lap_thickness=inches(scalar(3, 4)),               # 0.75" thick fingers
+        lap_start_distance_from_reference_miter_face=inches(scalar(1, 2)),  # Start 0.5" from miter face
+        distance_between_lap_and_outside=inches(scalar(1, 2)), 
     )
     
     # Create a frame from the joint
@@ -369,7 +369,7 @@ def make_tongue_and_fork_corner_joint_135_example(position: V3, use_round_timber
     Create a tongue-and-fork corner joint at 135 degrees.
     """
     arrangement = create_canonical_example_corner_joint_timbers(
-        corner_angle=degrees(Integer(135)),
+        corner_angle=degrees(scalar(135)),
         position=position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
@@ -378,15 +378,15 @@ def make_tongue_and_fork_corner_joint_135_example(position: V3, use_round_timber
 
 
 def create_all_corner_joint_patterns(use_round_timbers=False) -> Frame:
-    origin = create_v3(Integer(0), Integer(0), Integer(0))
+    origin = create_v3(scalar(0), scalar(0), scalar(0))
     step = inches(24)
     all_timbers = []
     all_timbers += make_miter_joint_example(origin, use_round_timbers)
-    all_timbers += make_miter_joint_face_aligned_example(origin + create_v3(step, Integer(0), Integer(0)), use_round_timbers)
-    all_timbers += make_miter_joint_3d_angles_example(origin + create_v3(step * 2, Integer(0), Integer(0)), use_round_timbers)
-    all_timbers += make_tongue_and_fork_corner_joint_90_example(origin + create_v3(step * 3, Integer(0), Integer(0)), use_round_timbers)
-    all_timbers += make_tongue_and_fork_corner_joint_135_example(origin + create_v3(step * 4, Integer(0), Integer(0)), use_round_timbers)
-    all_timbers += make_corner_lap_joint_example(origin + create_v3(step * 5, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_miter_joint_face_aligned_example(origin + create_v3(step, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_miter_joint_3d_angles_example(origin + create_v3(step * 2, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_tongue_and_fork_corner_joint_90_example(origin + create_v3(step * 3, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_tongue_and_fork_corner_joint_135_example(origin + create_v3(step * 4, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_corner_lap_joint_example(origin + create_v3(step * 5, scalar(0), scalar(0)), use_round_timbers)
     return Frame(cut_timbers=all_timbers, name="Corner Joint Patterns")
 
 

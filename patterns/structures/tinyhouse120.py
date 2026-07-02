@@ -5,7 +5,7 @@ Posts are on the INSIDE of the footprint. Front is the 15' side.
 
 import sys
 
-from sympy import Rational, Integer, sqrt
+from sympy import sqrt
 from typing import Optional
 
 from kumiki import *
@@ -21,8 +21,8 @@ house_width = feet(15)    # X direction (front/back)
 house_depth = feet(8)     # Y direction (sides)
 
 # Lumber sizes (nominal -> actual: 3.5" x 3.5" and 3.5" x 5.5")
-size_4x4 = create_v2(inches(Rational(7, 2)), inches(Rational(7, 2)))
-size_4x6 = create_v2(inches(Rational(7, 2)), inches(Rational(11, 2)))
+size_4x4 = create_v2(inches(scalar(7, 2)), inches(scalar(7, 2)))
+size_4x6 = create_v2(inches(scalar(7, 2)), inches(scalar(11, 2)))
 
 # Post parameters
 post_size = size_4x4
@@ -31,7 +31,7 @@ corner_post_height = feet(11)
 
 # Beam parameters — all horizontal members are 4x6 with 6" (5.5") in Z
 # With orientation_face=TimberFace.TOP, size[0] maps to Z axis
-beam_size = create_v2(inches(Rational(11, 2)), inches(Rational(7, 2)))  # 5.5" in Z, 3.5" across
+beam_size = create_v2(inches(scalar(11, 2)), inches(scalar(7, 2)))  # 5.5" in Z, 3.5" across
 bottom_beam_height = inches(6)   # Bottom of beam at 6" above ground
 mid_beam_height = feet(7)        # Mid-height perimeter beam at 7'
 top_plate_height = feet(11)      # Top plates at 11'
@@ -40,8 +40,8 @@ top_plate_height = feet(11)      # Top plates at 11'
 non_corner_post_height = mid_beam_height + beam_size[0]
 
 # Stud mortise-and-tenon parameters
-stud_tenon_size = create_v2(inches(1), inches(Rational(5, 2)))
-stud_tenon_depth = inches(Rational(5, 2))
+stud_tenon_size = create_v2(inches(1), inches(scalar(5, 2)))
+stud_tenon_depth = inches(scalar(5, 2))
 stud_tenon_outside_offset = inches(1)
 
 
@@ -54,7 +54,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     add_milestone('begin')
     
     if center is None:
-        center = create_v3(Rational(0), Rational(0), Rational(0))
+        center = create_v3(scalar(0), scalar(0), scalar(0))
 
     no_stickout = Stickout.nostickout()
 
@@ -76,10 +76,10 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # FOOTPRINT (counter-clockwise from front-left)
     # ========================================================================
     footprint_corners = [
-        create_v2(center[0] + Rational(0), center[1] + Rational(0)),          # Corner 0: Front-left
-        create_v2(center[0] + house_width, center[1] + Rational(0)),          # Corner 1: Front-right
+        create_v2(center[0] + scalar(0), center[1] + scalar(0)),          # Corner 0: Front-left
+        create_v2(center[0] + house_width, center[1] + scalar(0)),          # Corner 1: Front-right
         create_v2(center[0] + house_width, center[1] + house_depth),          # Corner 2: Back-right
-        create_v2(center[0] + Rational(0), center[1] + house_depth),          # Corner 3: Back-left
+        create_v2(center[0] + scalar(0), center[1] + house_depth),          # Corner 3: Back-left
     ]
     footprint = Footprint(footprint_corners)  # type: ignore[arg-type]
 
@@ -99,9 +99,9 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # ========================================================================
 
     # Spacing for 4 posts on 15' side: corners at ends, so 3 equal gaps
-    front_back_spacing = house_width / Integer(3)
+    front_back_spacing = house_width / scalar(3)
     # Spacing for 3 posts on 8' side: corners at ends, so 2 equal gaps
-    side_spacing = house_depth / Integer(2)
+    side_spacing = house_depth / scalar(2)
 
     # --- Corner posts (11' tall) ---
     post_FL = create_vertical_timber_on_footprint_corner(
@@ -133,7 +133,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         size=post_size, ticket="Front-Middle-Left Post"
     )
     post_FM2 = create_vertical_timber_on_footprint_side(
-        footprint, side_index=0, distance_along_side=Integer(2) * front_back_spacing,
+        footprint, side_index=0, distance_along_side=scalar(2) * front_back_spacing,
         length=non_corner_post_height, location_type=FootprintLocation.INSIDE,
         size=post_size, ticket="Front-Middle-Right Post"
     )
@@ -147,7 +147,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         size=post_size, ticket="Back-Middle-Right Post"
     )
     post_BM2 = create_vertical_timber_on_footprint_side(
-        footprint, side_index=2, distance_along_side=Integer(2) * front_back_spacing,
+        footprint, side_index=2, distance_along_side=scalar(2) * front_back_spacing,
         length=non_corner_post_height, location_type=FootprintLocation.INSIDE,
         size=post_size, ticket="Back-Middle-Left Post"
     )
@@ -183,14 +183,14 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # location_on_timber = height from post bottom where beam centerline is.
     # Beam is 5.5" tall, bottom at 6" means centerline at 6" + 5.5"/2 = 8.75"
     # ========================================================================
-    beam_centerline_height = bottom_beam_height + beam_size[0] / Integer(2)
+    beam_centerline_height = bottom_beam_height + beam_size[0] / scalar(2)
 
     # Front perimeter: FL -> FM1 -> FM2 -> FR
     beam_front_1 = join_face_aligned_on_face_aligned_timbers(
         timber1=post_FL, timber2=post_FM1,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Front Bottom Beam 1"
@@ -199,7 +199,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_FM1, timber2=post_FM2,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Front Bottom Beam 2"
@@ -208,7 +208,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_FM2, timber2=post_FR,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Front Bottom Beam 3"
@@ -219,7 +219,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_FR, timber2=post_MR,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Right Bottom Beam 1"
@@ -228,7 +228,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_MR, timber2=post_BR,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Right Bottom Beam 2"
@@ -239,7 +239,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_BR, timber2=post_BM1,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Back Bottom Beam 1"
@@ -248,7 +248,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_BM1, timber2=post_BM2,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Back Bottom Beam 2"
@@ -257,7 +257,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_BM2, timber2=post_BL,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Back Bottom Beam 3"
@@ -268,7 +268,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_BL, timber2=post_ML,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Left Bottom Beam 1"
@@ -277,7 +277,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_ML, timber2=post_FL,
         location_on_timber1=beam_centerline_height,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Left Bottom Beam 2"
@@ -292,9 +292,9 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     floor_joist_1 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_front_1,
         timber2=beam_back_3,
-        location_on_timber1=beam_front_1.length / Integer(2),
+        location_on_timber1=beam_front_1.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Floor Joist 1",
@@ -302,9 +302,9 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     floor_joist_2 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_front_2,
         timber2=beam_back_2,
-        location_on_timber1=beam_front_2.length / Integer(2),
+        location_on_timber1=beam_front_2.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Floor Joist 2",
@@ -312,9 +312,9 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     floor_joist_3 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_front_3,
         timber2=beam_back_1,
-        location_on_timber1=beam_front_3.length / Integer(2),
+        location_on_timber1=beam_front_3.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Floor Joist 3",
@@ -322,9 +322,9 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     floor_joist_4 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_front_2,
         timber2=beam_back_2,
-        location_on_timber1=Integer(0),
+        location_on_timber1=scalar(0),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Floor Joist FM1-BM",
@@ -334,7 +334,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber2=beam_back_2,
         location_on_timber1=beam_front_2.length,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Floor Joist FM2-BM",
@@ -346,13 +346,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # ========================================================================
     # MID-HEIGHT PERIMETER BEAM at 7' — connects corner posts only
     # ========================================================================
-    mid_beam_centerline = mid_beam_height + beam_size[0] / Integer(2)
+    mid_beam_centerline = mid_beam_height + beam_size[0] / scalar(2)
 
     mid_beam_front = join_face_aligned_on_face_aligned_timbers(
         timber1=post_FL, timber2=post_FR,
         location_on_timber1=mid_beam_centerline,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Mid-Height Front Beam"
@@ -361,7 +361,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_FR, timber2=post_BR,
         location_on_timber1=mid_beam_centerline,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Mid-Height Right Beam"
@@ -370,7 +370,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_BR, timber2=post_BL,
         location_on_timber1=mid_beam_centerline,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Mid-Height Back Beam"
@@ -379,7 +379,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_BL, timber2=post_FL,
         location_on_timber1=mid_beam_centerline,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Mid-Height Left Beam"
@@ -401,7 +401,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber2=mid_beam_back,
         location_on_timber1=loft_beam_front_pos_1,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Loft Beam FM1-BM"
@@ -411,7 +411,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber2=mid_beam_back,
         location_on_timber1=loft_beam_front_pos_2,
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Loft Beam FM2-BM"
@@ -440,7 +440,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_FL, timber2=post_BL,
         location_on_timber1=top_plate_height,
         stickout=top_plate_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=top_plate_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Top Plate Left (Front-to-Back)"
@@ -449,7 +449,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_FR, timber2=post_BR,
         location_on_timber1=top_plate_height,
         stickout=top_plate_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=top_plate_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Top Plate Right (Front-to-Back)"
@@ -460,13 +460,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # F/B plate top = top_plate_height + 5.5"/2
     # L/R plate bottom = F/B plate top - 3"
     # L/R plate centerline = L/R plate bottom + 5.5"/2
-    second_plate_centerline = (top_plate_height + top_plate_size[0] / Integer(2)) - inches(3) + top_plate_size[0] / Integer(2)
+    second_plate_centerline = (top_plate_height + top_plate_size[0] / scalar(2)) - inches(3) + top_plate_size[0] / scalar(2)
 
     top_plate_front = join_face_aligned_on_face_aligned_timbers(
         timber1=post_FL, timber2=post_FR,
         location_on_timber1=second_plate_centerline,
         stickout=top_plate_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=top_plate_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Top Plate Front (Left-to-Right)"
@@ -475,7 +475,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         timber1=post_BL, timber2=post_BR,
         location_on_timber1=second_plate_centerline,
         stickout=top_plate_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=top_plate_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Top Plate Back (Left-to-Right)"
@@ -489,18 +489,18 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # ========================================================================
     lower_stud_front_1 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_front_1, timber2=mid_beam_front,
-        location_on_timber1=beam_front_1.length / Integer(2),
+        location_on_timber1=beam_front_1.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.FRONT,
         ticket="Front Lower Stud 1"
     )
     lower_stud_front_3 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_front_3, timber2=mid_beam_front,
-        location_on_timber1=beam_front_3.length / Integer(2),
+        location_on_timber1=beam_front_3.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.FRONT,
         ticket="Front Lower Stud 3"
@@ -509,18 +509,18 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # Window members in FM1-FM2 bay (replace middle lower stud)
     window_member_upper = join_face_aligned_on_face_aligned_timbers(
         timber1=post_FM1, timber2=post_FM2,
-        location_on_timber1=non_corner_post_height * Rational(4, 5),
+        location_on_timber1=non_corner_post_height * scalar(4, 5),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Front Window Member Upper"
     )
     window_member_lower = join_face_aligned_on_face_aligned_timbers(
         timber1=post_FM1, timber2=post_FM2,
-        location_on_timber1=non_corner_post_height * Rational(2, 5),
+        location_on_timber1=non_corner_post_height * scalar(2, 5),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Front Window Member Lower"
@@ -528,18 +528,18 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     lower_stud_right_1 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_right_1, timber2=mid_beam_right,
-        location_on_timber1=beam_right_1.length / Integer(2),
+        location_on_timber1=beam_right_1.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.RIGHT,
         ticket="Right Lower Stud 1"
     )
     lower_stud_right_2 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_right_2, timber2=mid_beam_right,
-        location_on_timber1=beam_right_2.length / Integer(2),
+        location_on_timber1=beam_right_2.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.RIGHT,
         ticket="Right Lower Stud 2"
@@ -547,27 +547,27 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     lower_stud_back_1 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_back_1, timber2=mid_beam_back,
-        location_on_timber1=beam_back_1.length / Integer(2),
+        location_on_timber1=beam_back_1.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.FRONT,
         ticket="Back Lower Stud 1"
     )
     lower_stud_back_2 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_back_2, timber2=mid_beam_back,
-        location_on_timber1=beam_back_2.length / Integer(2),
+        location_on_timber1=beam_back_2.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.FRONT,
         ticket="Back Lower Stud 2"
     )
     lower_stud_back_3 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_back_3, timber2=mid_beam_back,
-        location_on_timber1=beam_back_3.length / Integer(2),
+        location_on_timber1=beam_back_3.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.FRONT,
         ticket="Back Lower Stud 3"
@@ -575,18 +575,18 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     lower_stud_left_1 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_left_1, timber2=mid_beam_left,
-        location_on_timber1=beam_left_1.length / Integer(2),
+        location_on_timber1=beam_left_1.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.RIGHT,
         ticket="Left Lower Stud 1"
     )
     lower_stud_left_2 = join_face_aligned_on_face_aligned_timbers(
         timber1=beam_left_2, timber2=mid_beam_left,
-        location_on_timber1=beam_left_2.length / Integer(2),
+        location_on_timber1=beam_left_2.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         orientation_face_on_timber1=TimberFace.RIGHT,
         ticket="Left Lower Stud 2"
@@ -614,13 +614,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     upper_studs_front = []
     for i in range(1, 5):
-        frac = Rational(i, 5)
+        frac = scalar(i, 5)
         stud = join_face_aligned_on_face_aligned_timbers(
             timber1=mid_beam_front,
             timber2=top_plate_front,
             location_on_timber1=mid_beam_front.length * frac,
             stickout=no_stickout,
-            lateral_offset_from_timber1=Integer(0),
+            lateral_offset_from_timber1=scalar(0),
             size=post_size,
             orientation_face_on_timber1=TimberFace.FRONT,
             ticket=f"Front Upper Stud {i}"
@@ -629,13 +629,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     upper_studs_back = []
     for i in range(1, 5):
-        frac = Rational(i, 5)
+        frac = scalar(i, 5)
         stud = join_face_aligned_on_face_aligned_timbers(
             timber1=mid_beam_back,
             timber2=top_plate_back,
             location_on_timber1=mid_beam_back.length * frac,
             stickout=no_stickout,
-            lateral_offset_from_timber1=Integer(0),
+            lateral_offset_from_timber1=scalar(0),
             size=post_size,
             orientation_face_on_timber1=TimberFace.FRONT,
             ticket=f"Back Upper Stud {i}"
@@ -644,13 +644,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     upper_studs_right = []
     for i in range(1, 3):
-        frac = Rational(i, 3)
+        frac = scalar(i, 3)
         stud = join_face_aligned_on_face_aligned_timbers(
             timber1=mid_beam_right,
             timber2=top_plate_right,
             location_on_timber1=mid_beam_right.length * frac,
             stickout=no_stickout,
-            lateral_offset_from_timber1=Integer(0),
+            lateral_offset_from_timber1=scalar(0),
             size=post_size,
             orientation_face_on_timber1=TimberFace.RIGHT,
             ticket=f"Right Upper Stud {i}"
@@ -659,13 +659,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     upper_studs_left = []
     for i in range(1, 3):
-        frac = Rational(i, 3)
+        frac = scalar(i, 3)
         stud = join_face_aligned_on_face_aligned_timbers(
             timber1=mid_beam_left,
             timber2=top_plate_left,
             location_on_timber1=mid_beam_left.length * frac,
             stickout=no_stickout,
-            lateral_offset_from_timber1=Integer(0),
+            lateral_offset_from_timber1=scalar(0),
             size=post_size,
             orientation_face_on_timber1=TimberFace.RIGHT,
             ticket=f"Left Upper Stud {i}"
@@ -676,16 +676,16 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # KING POSTS — on the side (L/R) top plates at their midpoints,
     # supporting the ridge beam at the gable ends.
     # ========================================================================
-    king_post_height = feet(Rational(5, 2))
-    king_post_bottom_z = top_plate_height + beam_size[0] / Integer(2)  # top of side plates
+    king_post_height = feet(scalar(5, 2))
+    king_post_bottom_z = top_plate_height + beam_size[0] / scalar(2)  # top of side plates
 
     king_post_left = create_axis_aligned_timber(
-        _lerp_xy(post_FL, post_BL, Rational(1, 2), king_post_bottom_z),
+        _lerp_xy(post_FL, post_BL, scalar(1, 2), king_post_bottom_z),
         king_post_height, post_size,
         TimberFace.TOP, ticket="Left King Post"
     )
     king_post_right = create_axis_aligned_timber(
-        _lerp_xy(post_FR, post_BR, Rational(1, 2), king_post_bottom_z),
+        _lerp_xy(post_FR, post_BR, scalar(1, 2), king_post_bottom_z),
         king_post_height, post_size,
         TimberFace.TOP, ticket="Right King Post"
     )
@@ -696,9 +696,9 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # ========================================================================
     ridge_length = feet(16)
     ridge_bottom_z = king_post_bottom_z + king_post_height  # top of king posts
-    ridge_center_x = center[0] + house_width / Integer(2)
-    ridge_y = center[1] + house_depth / Integer(2)
-    ridge_start_x = ridge_center_x - ridge_length / Integer(2)
+    ridge_center_x = center[0] + house_width / scalar(2)
+    ridge_y = center[1] + house_depth / scalar(2)
+    ridge_start_x = ridge_center_x - ridge_length / scalar(2)
 
     ridge_beam = create_axis_aligned_timber(
         create_v3(ridge_start_x, ridge_y, ridge_bottom_z),
@@ -712,13 +712,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     # - One beam between the midpoints of front/back top plates
     # - One vertical king post from that beam up to the ridge beam
     # ========================================================================
-    top_plate_mid_x = top_plate_front.get_bottom_position_global()[0] + top_plate_front.length / Integer(2)
+    top_plate_mid_x = top_plate_front.get_bottom_position_global()[0] + top_plate_front.length / scalar(2)
     center_support_beam = join_face_aligned_on_face_aligned_timbers(
         timber1=top_plate_front,
         timber2=top_plate_back,
-        location_on_timber1=top_plate_front.length / Integer(2),
+        location_on_timber1=top_plate_front.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=beam_size,
         orientation_face_on_timber1=TimberFace.TOP,
         ticket="Center Ridge Support Beam"
@@ -727,9 +727,9 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     center_king_post = join_face_aligned_on_face_aligned_timbers(
         timber1=center_support_beam,
         timber2=ridge_beam,
-        location_on_timber1=center_support_beam.length / Integer(2),
+        location_on_timber1=center_support_beam.length / scalar(2),
         stickout=no_stickout,
-        lateral_offset_from_timber1=Integer(0),
+        lateral_offset_from_timber1=scalar(0),
         size=post_size,
         ticket="Center King Post"
     )
@@ -745,12 +745,12 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     # Reference surfaces
     ridge_top_z = ridge_bottom_z + beam_size[0]          # top of ridge beam
-    plate_top_z = second_plate_centerline + beam_size[0] / Integer(2)  # top of F/B plates
+    plate_top_z = second_plate_centerline + beam_size[0] / scalar(2)  # top of F/B plates
 
     # Rafter anchor Z: mostly above each member, with ~1" overlap into it.
     # Since rafter depth is 3.5", centerline should be at top + (3.5"/2 - 1")
     embed_depth = inches(1)
-    rafter_vertical_half = rafter_size[0] / Integer(2)
+    rafter_vertical_half = rafter_size[0] / scalar(2)
     rafter_ridge_z = ridge_top_z + rafter_vertical_half - embed_depth
     rafter_plate_z = plate_top_z + rafter_vertical_half - embed_depth
 
@@ -762,10 +762,10 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     front_plate_y = post_FL.get_bottom_position_global()[1]
     back_plate_y = post_BL.get_bottom_position_global()[1]
 
-    rafter_edge_inset = rafter_size[0] / Integer(2)
-    usable_rafter_span_x = ridge_length - Integer(2) * rafter_edge_inset
+    rafter_edge_inset = rafter_size[0] / scalar(2)
+    usable_rafter_span_x = ridge_length - scalar(2) * rafter_edge_inset
 
-    rafter_stickout = Stickout(extra_rafter_length, Integer(0))
+    rafter_stickout = Stickout(extra_rafter_length, scalar(0))
 
     def _rafter_from_join(
         plate: PerfectTimberWithin,
@@ -797,7 +797,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             lateral_offset=lateral_offset,
             stickout=rafter_stickout,
             size=rafter_size,
-            orientation_width_vector=create_v3(Integer(1), Integer(0), Integer(0)),
+            orientation_width_vector=create_v3(scalar(1), scalar(0), scalar(0)),
             ticket=ticket,
         )
 
@@ -805,7 +805,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     rafter_pairs: List[Tuple[PerfectTimberWithin, PerfectTimberWithin]] = []
     rafter_housing_pairs: List[Tuple[PerfectTimberWithin, PerfectTimberWithin]] = []
     for i in range(6):
-        x = ridge_start_x + rafter_edge_inset + i * usable_rafter_span_x / Integer(5)
+        x = ridge_start_x + rafter_edge_inset + i * usable_rafter_span_x / scalar(5)
 
         front_rafter = _rafter_from_join(
             top_plate_front,
@@ -875,7 +875,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     horizontal_member_peg_params = SimplePegParameters(
         shape=PegShape.SQUARE,
-        peg_positions=[(mm(25), Rational(0))],
+        peg_positions=[(mm(25), scalar(0))],
         size=mm(15),
     )
     add_milestone('cutting joints')
@@ -884,7 +884,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         return zero_test(
             safe_dot_product(
                 timber.get_length_direction_global(),
-                create_v3(Integer(0), Integer(0), Integer(1)),
+                create_v3(scalar(0), scalar(0), scalar(1)),
             )
         )
 
@@ -929,12 +929,12 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 dist_into_butt = mark.distance
                 
                 idx = butt_timber.get_size_index_in_long_face_normal_axis(butt_outside_face.to.long_face())
-                timber_half_size = butt_timber.get_size_in_face_normal_axis(butt_outside_face) / Integer(2)
+                timber_half_size = butt_timber.get_size_in_face_normal_axis(butt_outside_face) / scalar(2)
                 thickness = actual_tenon_size[idx]
                 
-                offset_toward_outside = timber_half_size - (dist_into_butt + thickness / Integer(2))
+                offset_toward_outside = timber_half_size - (dist_into_butt + thickness / scalar(2))
                 
-                butt_offset = [Integer(0), Integer(0)]
+                butt_offset = [scalar(0), scalar(0)]
                 if butt_outside_face.to.long_face() in [TimberLongFace.RIGHT, TimberLongFace.FRONT]:
                     butt_offset[idx] = offset_toward_outside
                 else:
@@ -961,7 +961,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 tenon_size=actual_tenon_size,
                 tenon_length=stud_tenon_depth,
                 mortise_depth=stud_tenon_depth,
-                mortise_shoulder_inset=inches(Rational(1, 64)),
+                mortise_shoulder_inset=inches(scalar(1, 64)),
                 tenon_position=tenon_position,
                 peg_parameters=peg_parameters,
             )
@@ -1046,18 +1046,18 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     def _beam_corner_post_tenon_position(beam: PerfectTimberWithin) -> V2:
         tenon_size = _tenon_size_with_long_axis(
             beam,
-            create_v3(Integer(0), Integer(0), Integer(1)),
+            create_v3(scalar(0), scalar(0), scalar(1)),
         )
-        centered_in_top_band = beam.size[0] / Integer(2) - tenon_size[0] / Integer(2)
+        centered_in_top_band = beam.size[0] / scalar(2) - tenon_size[0] / scalar(2)
 
         beam_length_direction = beam.get_length_direction_global()
-        front_back_alignment = abs(safe_dot_product(beam_length_direction, create_v3(Integer(0), Integer(1), Integer(0))))
-        left_right_alignment = abs(safe_dot_product(beam_length_direction, create_v3(Integer(1), Integer(0), Integer(0))))
+        front_back_alignment = abs(safe_dot_product(beam_length_direction, create_v3(scalar(0), scalar(1), scalar(0))))
+        left_right_alignment = abs(safe_dot_product(beam_length_direction, create_v3(scalar(1), scalar(0), scalar(0))))
 
         if front_back_alignment > left_right_alignment:
-            return create_v2(centered_in_top_band, Integer(0))
+            return create_v2(centered_in_top_band, scalar(0))
 
-        return create_v2(centered_in_top_band - tenon_size[0], Integer(0))
+        return create_v2(centered_in_top_band - tenon_size[0], scalar(0))
 
     def _beam_to_corner_post_joint(
         beam: PerfectTimberWithin,
@@ -1151,13 +1151,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             _fat_joint_aligned_to_receiver(window_member, post_FM2, TimberEnd.TOP, label="window_member_to_post")
         )
 
-    corner_post_to_side_plate_tenon_size = create_v2(inches(Rational(3, 2)), inches(3))
-    corner_post_to_side_plate_tenon_length = inches(Rational(9, 2))
-    corner_post_to_side_plate_mortise_depth = inches(Rational(9, 2))
+    corner_post_to_side_plate_tenon_size = create_v2(inches(scalar(3, 2)), inches(3))
+    corner_post_to_side_plate_tenon_length = inches(scalar(9, 2))
+    corner_post_to_side_plate_mortise_depth = inches(scalar(9, 2))
 
-    corner_post_to_cross_plate_tenon_size = create_v2(inches(Rational(3, 2)), inches(1))
-    corner_post_to_cross_plate_tenon_length = inches(Rational(5, 2))
-    corner_post_to_cross_plate_mortise_depth = inches(Rational(5, 2))
+    corner_post_to_cross_plate_tenon_size = create_v2(inches(scalar(3, 2)), inches(1))
+    corner_post_to_cross_plate_tenon_length = inches(scalar(5, 2))
+    corner_post_to_cross_plate_mortise_depth = inches(scalar(5, 2))
 
     corner_top_plate_compound_joints: List[Joint] = []
 
@@ -1232,7 +1232,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 tenon_size=_tenon_size_with_long_axis(stud, long_axis_global),
                 tenon_length=stud_tenon_depth,
                 mortise_depth=stud_tenon_depth,
-                mortise_shoulder_inset=inches(Rational(1, 64)),
+                mortise_shoulder_inset=inches(scalar(1, 64)),
                 peg_parameters=None,
             )
         except Exception as err:
@@ -1247,8 +1247,8 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 f"Face-aligned king-post joint failed for stud='{stud.ticket.name}' beam='{beam.ticket.name}' end='{stud_end}': {err}"
             ) from err
 
-    front_back_axis = create_v3(Integer(0), Integer(1), Integer(0))
-    left_right_axis = create_v3(Integer(1), Integer(0), Integer(0))
+    front_back_axis = create_v3(scalar(0), scalar(1), scalar(0))
+    left_right_axis = create_v3(scalar(1), scalar(0), scalar(0))
 
     king_post_joints: List[Joint] = [
         # Bottom tenons: long side front-to-back.
@@ -1263,15 +1263,15 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     floor_joist_dovetail_shoulder_inset = inches(0)
     floor_joist_dovetail_small_width = inches(2)
-    floor_joist_dovetail_large_width = inches(Rational(5, 2))
-    floor_joist_dovetail_length = inches(Rational(3, 2))
+    floor_joist_dovetail_large_width = inches(scalar(5, 2))
+    floor_joist_dovetail_length = inches(scalar(3, 2))
     floor_joist_dovetail_depth = inches(2)
     
 
-    floor_joist_intermediate_post_tenon_size = create_v2(inches(Rational(11, 4)), inches(1))
+    floor_joist_intermediate_post_tenon_size = create_v2(inches(scalar(11, 4)), inches(1))
     floor_joist_intermediate_post_tenon_position = create_v2(
-        floor_joist_4.size[0] / Integer(2) - floor_joist_intermediate_post_tenon_size[0] / Integer(2),
-        Integer(0),
+        floor_joist_4.size[0] / scalar(2) - floor_joist_intermediate_post_tenon_size[0] / scalar(2),
+        scalar(0),
     )
 
     floor_joist_receivers = [
@@ -1294,7 +1294,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
                 dovetail_large_width=floor_joist_dovetail_large_width,
-                dovetail_lateral_offset=Rational(0),
+                dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
         )
@@ -1310,7 +1310,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
                 dovetail_large_width=floor_joist_dovetail_large_width,
-                dovetail_lateral_offset=Rational(0),
+                dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
         )
@@ -1360,7 +1360,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
                 dovetail_large_width=floor_joist_dovetail_large_width,
-                dovetail_lateral_offset=Rational(0),
+                dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
         )
@@ -1376,7 +1376,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 dovetail_length=floor_joist_dovetail_length,
                 dovetail_small_width=floor_joist_dovetail_small_width,
                 dovetail_large_width=floor_joist_dovetail_large_width,
-                dovetail_lateral_offset=Rational(0),
+                dovetail_lateral_offset=scalar(0),
                 dovetail_depth=floor_joist_dovetail_depth,
             )
         )
@@ -1393,7 +1393,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             dovetail_length=floor_joist_dovetail_length,
             dovetail_small_width=floor_joist_dovetail_small_width,
             dovetail_large_width=floor_joist_dovetail_large_width,
-            dovetail_lateral_offset=Rational(0),
+            dovetail_lateral_offset=scalar(0),
             dovetail_depth=floor_joist_dovetail_depth,
         ),
         cut_dropin_dovetail_butt_joint(
@@ -1407,7 +1407,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             dovetail_length=floor_joist_dovetail_length,
             dovetail_small_width=floor_joist_dovetail_small_width,
             dovetail_large_width=floor_joist_dovetail_large_width,
-            dovetail_lateral_offset=Rational(0),
+            dovetail_lateral_offset=scalar(0),
             dovetail_depth=floor_joist_dovetail_depth,
         ),
     ]

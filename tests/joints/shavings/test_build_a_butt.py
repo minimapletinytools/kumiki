@@ -3,8 +3,8 @@ Tests for build-a-butt-joint shoulder helpers
 """
 
 import pytest
-from sympy import Rational, cos, sin, pi
-from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector, safe_compare, Comparison
+from sympy import cos, sin, pi
+from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector, safe_compare, Comparison, scalar
 from kumiki.timber import (
     TimberEnd,
     timber_from_directions, create_v3
@@ -30,7 +30,7 @@ class TestMeasureMortiseShoulderPlane:
         arrangement = create_canonical_example_butt_joint_timbers()
 
         plane_at_center = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
-            arrangement, Rational(0)
+            arrangement, scalar(0)
         )
         # The plane normal points AWAY from the tenon (into the mortise interior).
         # Tenon runs in +Y, so normal is -Y.
@@ -46,7 +46,7 @@ class TestMeasureMortiseShoulderPlane:
         # The shoulder conceptually moves toward the tenon, so positive distance
         # means the plane point goes away from centerline toward tenon face.
         plane_offset = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
-            arrangement, Rational(1)
+            arrangement, scalar(1)
         )
         expected_offset_point = mortise_center + create_v3(0, -1, 0)
         assert plane_offset.point.equals(expected_offset_point), \
@@ -58,22 +58,21 @@ class TestMeasureMortiseShoulderPlane:
         Mortise timber along +X at origin, tenon timber at 40 degrees in the
         XY plane offset 3" in +Z so the centerlines are skew (non-intersecting).
         """
-        from sympy import Integer
-        angle_rad = radians(Rational(2, 9) * pi)  # 40 degrees
+        angle_rad = radians(scalar(2, 9) * pi)  # 40 degrees
 
         mortise_timber = timber_from_directions(
             length=inches(48), size=create_v2(inches(4), inches(5)),
-            bottom_position=create_v3(-inches(24), Integer(0), Integer(0)),
-            length_direction=create_v3(Integer(1), Integer(0), Integer(0)),
-            width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+            bottom_position=create_v3(-inches(24), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             ticket="mortise"
         )
-        tenon_length_dir = create_v3(cos(angle_rad), sin(angle_rad), Integer(0))
+        tenon_length_dir = create_v3(cos(angle_rad), sin(angle_rad), scalar(0))
         tenon_timber = timber_from_directions(
             length=inches(48), size=create_v2(inches(4), inches(5)),
             bottom_position=create_v3(-inches(24) * cos(angle_rad), -inches(24) * sin(angle_rad), inches(3)),
             length_direction=tenon_length_dir,
-            width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             ticket="tenon"
         )
         arrangement = ButtJointTimberArrangement(
@@ -83,14 +82,14 @@ class TestMeasureMortiseShoulderPlane:
         )
 
         plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
-            arrangement, Rational(0)
+            arrangement, scalar(0)
         )
         # The plane normal should be in the mortise cross-section, pointing
         # toward the tenon (which is offset at +Z=3").
         mortise_length_dir = mortise_timber.get_length_direction_global()
         assert zero_test(safe_dot_product(plane.normal, mortise_length_dir)), \
             "Plane normal should be perpendicular to the mortise length direction"
-        dot_z = safe_dot_product(plane.normal, create_v3(Integer(0), Integer(0), Integer(1)))
+        dot_z = safe_dot_product(plane.normal, create_v3(scalar(0), scalar(0), scalar(1)))
         assert safe_compare(dot_z, 0, Comparison.GE), \
             "Plane normal should have a non-negative Z component (toward the tenon which is at +Z=3)"
 
@@ -101,10 +100,10 @@ class TestMeasureMortiseShoulderPlane:
             arrangement, -inches(1)
         )
         direction_to_tenon = plane_positive.point - plane.point
-        dot_to_tenon = safe_dot_product(direction_to_tenon, create_v3(Integer(0), Integer(0), Integer(1)))
+        dot_to_tenon = safe_dot_product(direction_to_tenon, create_v3(scalar(0), scalar(0), scalar(1)))
         assert safe_compare(dot_to_tenon, 0, Comparison.GE), \
             "Positive distance should offset toward the tenon (which is at +Z)"
         direction_away = plane_negative.point - plane.point
-        dot_away = safe_dot_product(direction_away, create_v3(Integer(0), Integer(0), Integer(1)))
+        dot_away = safe_dot_product(direction_away, create_v3(scalar(0), scalar(0), scalar(1)))
         assert safe_compare(dot_away, 0, Comparison.LE), \
             "Negative distance should offset away from the tenon"

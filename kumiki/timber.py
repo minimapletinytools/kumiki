@@ -3,7 +3,7 @@ Kumiki - Timber types, enums, constants, and core classes
 Contains all core data structures and type definitions for the timber framing system
 """
 
-from sympy import Matrix, Abs, Rational, Integer, Expr, sqrt, simplify, Min, Max
+from sympy import Matrix, Abs, Rational, Expr, sqrt, simplify, Min, Max
 from .rule import *
 from .footprint import *
 from .cutcsg import *
@@ -25,7 +25,7 @@ CSGDifference = Difference
 # Epsilon constants are now imported from rule module
 
 # Thresholds for geometric decisions
-OFFSET_TEST_POINT = Rational(1, 1000)  # Small offset (0.001) for testing inward direction on footprint
+OFFSET_TEST_POINT = scalar(1, 1000)  # Small offset (0.001) for testing inward direction on footprint
 
 # ============================================================================
 # Timber Feature Enums
@@ -131,17 +131,17 @@ class TimberFace(Enum):
     def get_direction(self) -> Direction3D:
         """Get the direction vector for this face in world coordinates."""
         if self == TimberFace.TOP:
-            return create_v3(Integer(0), Integer(0), Integer(1))
+            return create_v3(scalar(0), scalar(0), scalar(1))
         elif self == TimberFace.BOTTOM:
-            return create_v3(Integer(0), Integer(0), Integer(-1))
+            return create_v3(scalar(0), scalar(0), scalar(-1))
         elif self == TimberFace.RIGHT:
-            return create_v3(Integer(1), Integer(0), Integer(0))
+            return create_v3(scalar(1), scalar(0), scalar(0))
         elif self == TimberFace.LEFT:
-            return create_v3(Integer(-1), Integer(0), Integer(0))
+            return create_v3(scalar(-1), scalar(0), scalar(0))
         elif self == TimberFace.FRONT:
-            return create_v3(Integer(0), Integer(1), Integer(0))
+            return create_v3(scalar(0), scalar(1), scalar(0))
         else:  # BACK
-            return create_v3(Integer(0), Integer(-1), Integer(0))
+            return create_v3(scalar(0), scalar(-1), scalar(0))
     
     def is_perpendicular(self, other: 'TimberFace') -> bool:
         """
@@ -365,10 +365,10 @@ def compute_timber_orientation(length_direction: Direction3D, width_direction: D
     if zero_test(safe_norm(face_orthogonal)):
         # Choose an arbitrary orthogonal direction
         # Find a vector that's not parallel to length_norm
-        if Abs(length_norm[0]) < Rational(9, 10):  # Threshold comparison
-            temp_vector = create_v3(Integer(1), Integer(0), Integer(0))
+        if Abs(length_norm[0]) < scalar(9, 10):  # Threshold comparison
+            temp_vector = create_v3(scalar(1), scalar(0), scalar(0))
         else:
-            temp_vector = create_v3(Integer(0), Integer(1), Integer(0))
+            temp_vector = create_v3(scalar(0), scalar(1), scalar(0))
         
         # Project and orthogonalize
         projection = length_norm * (temp_vector.dot(length_norm))
@@ -453,8 +453,8 @@ class PerfectTimberWithin(ABC):
         ref_faces = self.ticket.reference_faces
         assert ref_faces is not None
         valid_names = {f.name for f in TimberLongFace}
-        ptw_w_half = self.size[0] / Integer(2)
-        ptw_h_half = self.size[1] / Integer(2)
+        ptw_w_half = self.size[0] / scalar(2)
+        ptw_h_half = self.size[1] / scalar(2)
         width_halves, height_halves = self.get_nominal_half_sizes()
 
         # TODO consider allowing top/bot ends?
@@ -897,7 +897,7 @@ class PerfectTimberWithin(ABC):
         return RectangularPrism(
             size=self.size,
             transform=Transform.identity(),
-            start_distance=Integer(0),
+            start_distance=scalar(0),
             end_distance=self.length,
             named_features=_timber_face_tags(),
         )
@@ -970,8 +970,8 @@ class PerfectTimberWithin(ABC):
             True if the timber is a perfect timber, False otherwise
         """
         width_halves, height_halves = self.get_nominal_half_sizes()
-        w_half = self.size[0] / Integer(2)
-        h_half = self.size[1] / Integer(2)
+        w_half = self.size[0] / scalar(2)
+        h_half = self.size[1] / scalar(2)
         return (equality_test(width_halves[0], w_half) and
                 equality_test(width_halves[1], w_half) and
                 equality_test(height_halves[0], h_half) and
@@ -1007,8 +1007,8 @@ class Timber(PerfectTimberWithin):
         """
         if self.nominal_half_sizes is not None:
             return self.nominal_half_sizes
-        w_half = self.size[0] / Integer(2)
-        h_half = self.size[1] / Integer(2)
+        w_half = self.size[0] / scalar(2)
+        h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
     
     def _nominal_csg_size_and_offset(self) -> Tuple[V2, V3]:
@@ -1017,10 +1017,10 @@ class Timber(PerfectTimberWithin):
         total_w = width_halves[0] + width_halves[1]
         total_h = height_halves[0] + height_halves[1]
         # Offset: positive means shift toward RIGHT / FRONT
-        offset_x = (width_halves[0] - width_halves[1]) / Integer(2)
-        offset_y = (height_halves[0] - height_halves[1]) / Integer(2)
+        offset_x = (width_halves[0] - width_halves[1]) / scalar(2)
+        offset_y = (height_halves[0] - height_halves[1]) / scalar(2)
         return (create_v2(total_w, total_h),
-                create_v3(offset_x, offset_y, Integer(0)))
+                create_v3(offset_x, offset_y, scalar(0)))
     
     def get_actual_csg_local(self) -> CutCSG:
         """
@@ -1037,7 +1037,7 @@ class Timber(PerfectTimberWithin):
         return RectangularPrism(
             size=nominal_size,
             transform=Transform(position=offset, orientation=Orientation.identity()),
-            start_distance=Integer(0),
+            start_distance=scalar(0),
             end_distance=self.length,
             named_features=_timber_face_tags(),
         )
@@ -1061,7 +1061,7 @@ class Timber(PerfectTimberWithin):
         return RectangularPrism(
             size=nominal_size,
             transform=Transform(position=offset, orientation=Orientation.identity()),
-            start_distance=None if extend_bot else Integer(0),
+            start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length,
             named_features=_timber_face_tags(),
         )
@@ -1090,8 +1090,8 @@ class Board(PerfectTimberWithin):
         Returns:
             Tuple of (V2(right_half, left_half), V2(front_half, back_half))
         """
-        w_half = self.size[0] / Integer(2)
-        h_half = self.size[1] / Integer(2)
+        w_half = self.size[0] / scalar(2)
+        h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
     
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
@@ -1163,7 +1163,7 @@ class RoundTimber(PerfectTimberWithin):
         Returns:
             Tuple of (V2(d/2, d/2), V2(d/2, d/2))
         """
-        half_d = self.diameter / Integer(2)
+        half_d = self.diameter / scalar(2)
         return (create_v2(half_d, half_d), create_v2(half_d, half_d))
     
     def get_actual_csg_local(self) -> CutCSG:
@@ -1177,10 +1177,10 @@ class RoundTimber(PerfectTimberWithin):
         """
         from .cutcsg import Cylinder
         return Cylinder(
-            radius=self.diameter / Integer(2),
-            axis_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Local Z-axis
-            position=create_v3(Integer(0), Integer(0), Integer(0)),  # Origin in local coords
-            start_distance=Integer(0),
+            radius=self.diameter / scalar(2),
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Local Z-axis
+            position=create_v3(scalar(0), scalar(0), scalar(0)),  # Origin in local coords
+            start_distance=scalar(0),
             end_distance=self.length
         )
     
@@ -1199,10 +1199,10 @@ class RoundTimber(PerfectTimberWithin):
         """
         from .cutcsg import Cylinder
         return Cylinder(
-            radius=self.diameter / Integer(2),
-            axis_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Local Z-axis
-            position=create_v3(Integer(0), Integer(0), Integer(0)),  # Origin in local coords
-            start_distance=None if extend_bot else Integer(0),
+            radius=self.diameter / scalar(2),
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Local Z-axis
+            position=create_v3(scalar(0), scalar(0), scalar(0)),  # Origin in local coords
+            start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length
         )
 
@@ -1219,8 +1219,8 @@ class MeshTimber(PerfectTimberWithin):
     TODO: Add mesh_csg field and override get_actual_csg_local()
     """
     def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
-        w_half = self.size[0] / Integer(2)
-        h_half = self.size[1] / Integer(2)
+        w_half = self.size[0] / scalar(2)
+        h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
 
     def can_be_extended_for_joints(self) -> bool:
@@ -1275,11 +1275,11 @@ class RegularPolygonTimber(PerfectTimberWithin):
         assert self.num_sides >= 3, "RegularPolygonTimber must have at least 3 sides"
         from sympy import pi, cos, sin
         # Use the smaller dimension of size as the diameter of the inscribed circle
-        radius = min(self.size[0], self.size[1]) / Integer(2)
+        radius = min(self.size[0], self.size[1]) / scalar(2)
         vertices = []
         # start at (1,0) and go counterclockwise
         for i in range(self.num_sides):
-            angle = radians(Integer(2) * pi * i / self.num_sides)
+            angle = radians(scalar(2) * pi * i / self.num_sides)
             x = radius * cos(angle)
             y = radius * sin(angle)
             vertices.append(Matrix([x, y]))
@@ -1294,8 +1294,8 @@ class RegularPolygonTimber(PerfectTimberWithin):
         Returns:
             Tuple of (V2(w/2, w/2), V2(h/2, h/2))
         """
-        w_half = self.size[0] / Integer(2)
-        h_half = self.size[1] / Integer(2)
+        w_half = self.size[0] / scalar(2)
+        h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
     
     def get_actual_csg_local(self) -> CutCSG:
@@ -1311,7 +1311,7 @@ class RegularPolygonTimber(PerfectTimberWithin):
         return ConvexPolygonExtrusion(
             points=self._compute_polygon_vertices(),
             transform=Transform.identity(),
-            start_distance=Integer(0),
+            start_distance=scalar(0),
             end_distance=self.length
         )
     
@@ -1332,7 +1332,7 @@ class RegularPolygonTimber(PerfectTimberWithin):
         return ConvexPolygonExtrusion(
             points=self._compute_polygon_vertices(),
             transform=Transform.identity(),
-            start_distance=None if extend_bot else Integer(0),
+            start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length
         )
 
@@ -1382,7 +1382,7 @@ class Cutting:
         """Return the top end cut HalfSpace derived from distance metadata."""
         if self.maybe_top_end_cut_distance_from_bottom is not None:
             return HalfSpace(
-                normal=create_v3(Integer(0), Integer(0), Integer(1)),
+                normal=create_v3(scalar(0), scalar(0), scalar(1)),
                 offset=self.maybe_top_end_cut_distance_from_bottom,
             )
         return None
@@ -1391,7 +1391,7 @@ class Cutting:
         """Return the bottom end cut HalfSpace derived from distance metadata."""
         if self.maybe_bottom_end_cut_distance_from_bottom is not None:
             return HalfSpace(
-                normal=create_v3(Integer(0), Integer(0), Integer(-1)),
+                normal=create_v3(scalar(0), scalar(0), scalar(-1)),
                 offset=-self.maybe_bottom_end_cut_distance_from_bottom,
             )
         return None
@@ -1454,9 +1454,9 @@ class Cutting:
         """
         assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
         if end == TimberEnd.TOP:
-            return HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(1)), offset=timber.length - distance_from_end_to_cut)
+            return HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=timber.length - distance_from_end_to_cut)
         else:
-            return HalfSpace(normal=create_v3(Integer(0), Integer(0), Integer(-1)), offset=-distance_from_end_to_cut)
+            return HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(-1)), offset=-distance_from_end_to_cut)
 
     @staticmethod
     def make_end_cut_distance_from_bottom(
@@ -1505,7 +1505,7 @@ def _create_extended_rectangular_prism(
     return RectangularPrism(
         size=size,
         transform=Transform.identity(),
-        start_distance=None if extend_bot else Integer(0),
+        start_distance=None if extend_bot else scalar(0),
         end_distance=None if extend_top else length,
         named_features=_timber_face_tags(),
     )
@@ -1675,12 +1675,12 @@ class CutTimber:
         from .cutcsg import RectangularPrism, HalfSpace
         
         # Start with the timber's original bounds (in local coordinates)
-        min_z = Rational(0)
+        min_z = scalar(0)
         max_z = self.timber.length
         
         # Get timber half-sizes for the four corner edges
-        half_width = self.timber.size[0] / Rational(2)
-        half_height = self.timber.size[1] / Rational(2)
+        half_width = self.timber.size[0] / scalar(2)
+        half_height = self.timber.size[1] / scalar(2)
         
         # The four corner edges in local coordinates are at:
         # (-half_width, -half_height, z), (half_width, -half_height, z),
@@ -1759,11 +1759,11 @@ class CutTimber:
         from .cutcsg import RectangularPrism, HalfSpace, Difference
         
         # Start with the timber's original bounds (in local coordinates)
-        min_z = Rational(0)
+        min_z = scalar(0)
         max_z = self.timber.length
         
         # Length direction in local coordinates (always +Z)
-        length_direction_local = Matrix([Rational(0), Rational(0), Rational(1)])
+        length_direction_local = Matrix([scalar(0), scalar(0), scalar(1)])
         
         # Try analytical approach first for simple HalfSpace cuts
         can_use_analytical = True
@@ -1823,7 +1823,7 @@ class CutTimber:
         # Find actual min Z (bottom bound)
         for i in range(num_length_samples + 1):
             z_float = float(min_z) + (float(max_z) - float(min_z)) * (i / num_length_samples)
-            z = Rational(int(z_float * 1000), 1000)  # Round to 3 decimal places for speed
+            z = scalar(int(z_float * 1000), 1000)  # Round to 3 decimal places for speed
             
             # Sample points in the cross-section
             found_point_at_z = False
@@ -1831,8 +1831,8 @@ class CutTimber:
                 if found_point_at_z:
                     break
                 for iy in range(-num_cross_section_samples, num_cross_section_samples + 1):
-                    x = half_width * Rational(ix, num_cross_section_samples)
-                    y = half_height * Rational(iy, num_cross_section_samples)
+                    x = half_width * scalar(ix, num_cross_section_samples)
+                    y = half_height * scalar(iy, num_cross_section_samples)
                     
                     test_point = Matrix([x, y, z])
                     if cut_csg.contains_point(test_point):
@@ -1846,7 +1846,7 @@ class CutTimber:
         # Find actual max Z (top bound)
         for i in range(num_length_samples + 1):
             z_float = float(max_z) - (float(max_z) - float(min_z)) * (i / num_length_samples)
-            z = Rational(int(z_float * 1000), 1000)  # Round to 3 decimal places for speed
+            z = scalar(int(z_float * 1000), 1000)  # Round to 3 decimal places for speed
             
             # Sample points in the cross-section
             found_point_at_z = False
@@ -1854,8 +1854,8 @@ class CutTimber:
                 if found_point_at_z:
                     break
                 for iy in range(-num_cross_section_samples, num_cross_section_samples + 1):
-                    x = half_width * Rational(ix, num_cross_section_samples)
-                    y = half_height * Rational(iy, num_cross_section_samples)
+                    x = half_width * scalar(ix, num_cross_section_samples)
+                    y = half_height * scalar(iy, num_cross_section_samples)
                     
                     test_point = Matrix([x, y, z])
                     if cut_csg.contains_point(test_point):
@@ -1961,11 +1961,11 @@ class Peg(JointAccessory):
             )
         else:  # PegShape.ROUND
             # Round peg - use Cylinder
-            radius = self.size / Integer(2)
+            radius = self.size / scalar(2)
             return Cylinder(
-                axis_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+                axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
                 radius=radius,
-                position=create_v3(Integer(0), Integer(0), Integer(0)),
+                position=create_v3(scalar(0), scalar(0), scalar(0)),
                 start_distance=-self.stickout_length,
                 end_distance=self.forward_length
             )
@@ -2006,7 +2006,7 @@ class Wedge(JointAccessory):
     tip_width: Numeric
     height: Numeric
     length: Numeric
-    stickout_length: Numeric = Integer(0)
+    stickout_length: Numeric = scalar(0)
     
     @property
     def width(self) -> Numeric:
@@ -2036,8 +2036,8 @@ class Wedge(JointAccessory):
         # Create trapezoid polygon in XZ plane
         # Points are (x, z) where x is X coordinate and y (2D) is Z coordinate
         # Ordered counter-clockwise when viewed from +Y
-        half_base_width = self.base_width / Rational(2)
-        half_tip_width = self.tip_width / Rational(2)
+        half_base_width = self.base_width / scalar(2)
+        half_tip_width = self.tip_width / scalar(2)
         
         # Calculate width at stickout position (z = -stickout_length)
         # The taper goes from base_width at z=0 to tip_width at z=length
@@ -2046,11 +2046,11 @@ class Wedge(JointAccessory):
         if has_stickout:
             # Width at z = -stickout_length
             stickout_width = self.base_width + (self.tip_width - self.base_width) * (-self.stickout_length) / self.length
-            half_stickout_width = stickout_width / Rational(2)
+            half_stickout_width = stickout_width / scalar(2)
             base_z = -self.stickout_length
         else:
             half_stickout_width = half_base_width
-            base_z = Integer(0)
+            base_z = scalar(0)
         
         trapezoid_points = [
             create_v2(-half_stickout_width, base_z),      # Bottom-left (base with stickout)
@@ -2061,16 +2061,16 @@ class Wedge(JointAccessory):
         
         # Rotate transform so that +Y goes to +Z
         # This rotates around X axis by +90° (pi/2 radians)
-        x_axis = create_v3(Integer(1), Integer(0), Integer(0))
-        rotation_orientation = Orientation.from_axis_angle(x_axis, radians(pi / Integer(2)))
+        x_axis = create_v3(scalar(1), scalar(0), scalar(0))
+        rotation_orientation = Orientation.from_axis_angle(x_axis, radians(pi / scalar(2)))
         
         wedge_transform = Transform(
-            position=create_v3(Integer(0), Integer(0), Integer(0)),
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
             orientation=rotation_orientation
         )
         
         # Extrusion extends along Y from -height/2 to height/2
-        half_height = self.height / Rational(2)
+        half_height = self.height / scalar(2)
         
         return ConvexPolygonExtrusion(
             points=trapezoid_points,
@@ -2102,11 +2102,11 @@ class Sticker(JointAccessory):
 
     def render_csg_local(self) -> CutCSG:
         # Ball diameter = size, shaft diameter = size/2, shaft length = 2*size
-        ball_radius = self.size / Integer(2)
-        shaft_radius = self.size / Integer(4)
-        shaft_length = self.size * Integer(2)
-        axis_z = create_v3(Integer(0), Integer(0), Integer(1))
-        origin = create_v3(Integer(0), Integer(0), Integer(0))
+        ball_radius = self.size / scalar(2)
+        shaft_radius = self.size / scalar(4)
+        shaft_length = self.size * scalar(2)
+        axis_z = create_v3(scalar(0), scalar(0), scalar(1))
+        origin = create_v3(scalar(0), scalar(0), scalar(0))
         ball = Cylinder(
             position=origin,
             axis_direction=axis_z,
@@ -2119,7 +2119,7 @@ class Sticker(JointAccessory):
             position=shaft_position,
             axis_direction=axis_z,
             radius=shaft_radius,
-            start_distance=Integer(0),
+            start_distance=scalar(0),
             end_distance=shaft_length,
         )
         return SolidUnion(children=[ball, shaft])

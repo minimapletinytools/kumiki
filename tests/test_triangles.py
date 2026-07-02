@@ -1,7 +1,7 @@
 import pytest
-from sympy import Integer, Rational
 
 from kumiki import (
+    scalar,
     ConvexPolygonExtrusion,
     Cylinder,
     Difference,
@@ -30,10 +30,10 @@ class TestTriangles:
 
     def test_triangulate_rectangular_prism_bounds(self):
         prism = RectangularPrism(
-            size=create_v2(Rational(2), Rational(4)),
+            size=create_v2(scalar(2), scalar(4)),
             transform=Transform.identity(),
-            start_distance=Integer(0),
-            end_distance=Integer(6),
+            start_distance=scalar(0),
+            end_distance=scalar(6),
         )
 
         triangle_mesh = triangulate_cutcsg(prism)
@@ -49,10 +49,10 @@ class TestTriangles:
 
     def test_triangulate_infinite_prism_uses_fake_extent(self):
         prism = RectangularPrism(
-            size=create_v2(Rational(2), Rational(2)),
+            size=create_v2(scalar(2), scalar(2)),
             transform=Transform.identity(),
             start_distance=None,
-            end_distance=Integer(5),
+            end_distance=scalar(5),
         )
 
         bounds = triangulate_cutcsg(prism).mesh.bounds
@@ -62,8 +62,8 @@ class TestTriangles:
 
     def test_triangulate_half_space_uses_larger_fake_extent(self):
         half_space = HalfSpace(
-            normal=create_v3(Integer(0), Integer(0), Integer(1)),
-            offset=Integer(3),
+            normal=create_v3(scalar(0), scalar(0), scalar(1)),
+            offset=scalar(3),
         )
 
         bounds = triangulate_cutcsg(half_space).mesh.bounds
@@ -76,13 +76,13 @@ class TestTriangles:
     def test_triangulate_convex_polygon_extrusion_bounds(self):
         extrusion = ConvexPolygonExtrusion(
             points=[
-                create_v2(Integer(0), Integer(0)),
-                create_v2(Integer(2), Integer(0)),
-                create_v2(Integer(1), Integer(2)),
+                create_v2(scalar(0), scalar(0)),
+                create_v2(scalar(2), scalar(0)),
+                create_v2(scalar(1), scalar(2)),
             ],
             transform=Transform.identity(),
-            start_distance=Integer(1),
-            end_distance=Integer(4),
+            start_distance=scalar(1),
+            end_distance=scalar(4),
         )
 
         triangle_mesh = triangulate_cutcsg(extrusion)
@@ -96,17 +96,17 @@ class TestTriangles:
 
     def test_triangulate_difference_reduces_volume(self):
         base = RectangularPrism(
-            size=create_v2(Rational(4), Rational(4)),
+            size=create_v2(scalar(4), scalar(4)),
             transform=Transform.identity(),
-            start_distance=Integer(0),
-            end_distance=Integer(4),
+            start_distance=scalar(0),
+            end_distance=scalar(4),
         )
         subtract = Cylinder(
-            axis_direction=create_v3(Integer(0), Integer(0), Integer(1)),
-            radius=Rational(1),
-            position=create_v3(Integer(0), Integer(0), Integer(0)),
-            start_distance=Integer(0),
-            end_distance=Integer(4),
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            radius=scalar(1),
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            start_distance=scalar(0),
+            end_distance=scalar(4),
         )
 
         mesh = triangulate_cutcsg(Difference(base=base, subtract=[subtract])).mesh
@@ -117,19 +117,19 @@ class TestTriangles:
 
     def test_triangulate_union_grows_volume(self):
         prism_a = RectangularPrism(
-            size=create_v2(Rational(2), Rational(2)),
+            size=create_v2(scalar(2), scalar(2)),
             transform=Transform.identity(),
-            start_distance=Integer(0),
-            end_distance=Integer(2),
+            start_distance=scalar(0),
+            end_distance=scalar(2),
         )
         prism_b = RectangularPrism(
-            size=create_v2(Rational(2), Rational(2)),
+            size=create_v2(scalar(2), scalar(2)),
             transform=Transform(
-                position=create_v3(Rational(1), Integer(0), Integer(0)),
+                position=create_v3(scalar(1), scalar(0), scalar(0)),
                 orientation=Orientation.identity(),
             ),
-            start_distance=Integer(0),
-            end_distance=Integer(2),
+            start_distance=scalar(0),
+            end_distance=scalar(2),
         )
 
         mesh = triangulate_cutcsg(SolidUnion(children=[prism_a, prism_b])).mesh
@@ -139,16 +139,16 @@ class TestTriangles:
 
     def test_raw_raycast_first_hits_top_face(self):
         prism = RectangularPrism(
-            size=create_v2(Rational(2), Rational(2)),
+            size=create_v2(scalar(2), scalar(2)),
             transform=Transform.identity(),
-            start_distance=Integer(0),
-            end_distance=Integer(2),
+            start_distance=scalar(0),
+            end_distance=scalar(2),
         )
 
         hit = raw_raycast_first(
             prism,
-            origin=create_v3(Integer(0), Integer(0), Integer(5)),
-            direction=create_v3(Integer(0), Integer(0), Integer(-1)),
+            origin=create_v3(scalar(0), scalar(0), scalar(5)),
+            direction=create_v3(scalar(0), scalar(0), scalar(-1)),
         )
 
         assert hit is not None
@@ -158,16 +158,16 @@ class TestTriangles:
 
     def test_raw_raycast_first_miss_returns_none(self):
         prism = RectangularPrism(
-            size=create_v2(Rational(2), Rational(2)),
+            size=create_v2(scalar(2), scalar(2)),
             transform=Transform.identity(),
-            start_distance=Integer(0),
-            end_distance=Integer(2),
+            start_distance=scalar(0),
+            end_distance=scalar(2),
         )
 
         hit = raw_raycast_first(
             prism,
-            origin=create_v3(Integer(5), Integer(5), Integer(5)),
-            direction=create_v3(Integer(1), Integer(0), Integer(0)),
+            origin=create_v3(scalar(5), scalar(5), scalar(5)),
+            direction=create_v3(scalar(1), scalar(0), scalar(0)),
         )
 
         assert hit is None

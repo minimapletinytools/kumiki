@@ -33,9 +33,11 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
   # set global cut positions in order using cut_distance_ratios based on the distance between starting face and finish face)
   # if there are not enough cut_distance_ratios, the remaining cut ratios are such taht they are uniform between the last computed cut face (or starting face if none) and the finish face
   # call cut_cross_lap_joint in order between timber[n] and timber[n+1]
-  # combine all cuts and return
+  # combine all cuts and return 
 
 - do the shed from the timber framing book
+  - add a helper function for cerating imperfect rectangular timber from reference edge
+  - need to finish generic notching and partial notching
 
 :: 5/30 kumiki intro script
 

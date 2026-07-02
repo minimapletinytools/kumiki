@@ -8,7 +8,6 @@ live in construction.py.
 
 from typing import Optional, Tuple
 from dataclasses import dataclass
-from sympy import Integer
 
 from kumiki.timber import (
     Timber, TimberEnd, TimberLongFace,
@@ -16,7 +15,7 @@ from kumiki.timber import (
     RoundTimber, MeshTimber, RegularPolygonTimber,
 )
 from kumiki.rule import (
-    V2, V3, Numeric, create_v2, create_v3, inches, radians,
+    V2, V3, Numeric, create_v2, create_v3, inches, radians, scalar,
 )
 from kumiki.construction import (
     ButtJointTimberArrangement,
@@ -133,32 +132,32 @@ def create_canonical_example_butt_joint_timbers(
         position: Center position of the joint. Defaults to origin.
     """
     if position is None:
-        position = create_v3(Integer(0), Integer(0), Integer(0))
+        position = create_v3(scalar(0), scalar(0), scalar(0))
     resolved_size, resolved_length = _resolve_canonical_timber_dimensions(timber_size, timber_length)
     resolved_timber_config = _resolve_canonical_timber_config(timber_config)
     
     # Receiving timber: runs along X axis, center at position
     # Center at position means bottom_position is at position - length/2 in length direction
-    receiving_bottom = position + create_v3(-resolved_length / Integer(2), Integer(0), Integer(0))
+    receiving_bottom = position + create_v3(-resolved_length / scalar(2), scalar(0), scalar(0))
     receiving_timber = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=receiving_bottom,
-        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),  # +X direction
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),  # +X direction
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="receiving_timber",
         timber_config=resolved_timber_config,
     )
     
     # Butt timber: runs along Y axis, center at position
     # The butt timber's top end meets the receiving timber
-    butt_bottom = position + create_v3(Integer(0), -resolved_length / Integer(2), Integer(0))
+    butt_bottom = position + create_v3(scalar(0), -resolved_length / scalar(2), scalar(0))
     butt_timber = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=butt_bottom,
-        length_direction=create_v3(Integer(0), Integer(1), Integer(0)),  # +Y direction
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        length_direction=create_v3(scalar(0), scalar(1), scalar(0)),  # +Y direction
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="butt_timber",
         timber_config=resolved_timber_config,
     )
@@ -188,19 +187,19 @@ def create_canonical_example_splice_joint_timbers(
         position: Center position of the joint. Defaults to origin.
     """
     if position is None:
-        position = create_v3(Integer(0), Integer(0), Integer(0))
+        position = create_v3(scalar(0), scalar(0), scalar(0))
     resolved_size, resolved_length = _resolve_canonical_timber_dimensions(timber_size, timber_length)
     resolved_timber_config = _resolve_canonical_timber_config(timber_config)
     
     # timber1: to the left of position (runs in +X direction from left)
     # Centerline intersects position means the TOP end is at position
-    timber1_bottom = position + create_v3(-resolved_length, Integer(0), Integer(0))
+    timber1_bottom = position + create_v3(-resolved_length, scalar(0), scalar(0))
     timber1 = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=timber1_bottom,
-        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),  # +X direction
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),  # +X direction
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="timber1",
         timber_config=resolved_timber_config,
     )
@@ -212,8 +211,8 @@ def create_canonical_example_splice_joint_timbers(
         length=resolved_length,
         size=resolved_size,
         bottom_position=timber2_bottom,
-        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),  # +X direction
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),  # +X direction
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="timber2",
         timber_config=resolved_timber_config,
     )
@@ -249,10 +248,10 @@ def create_canonical_example_corner_joint_timbers(
     
     # Default to 90 degrees (pi/2 radians)
     if corner_angle is None:
-        corner_angle = radians(pi / Integer(2))
+        corner_angle = radians(pi / scalar(2))
     
     if position is None:
-        position = create_v3(Integer(0), Integer(0), Integer(0))
+        position = create_v3(scalar(0), scalar(0), scalar(0))
     resolved_size, resolved_length = _resolve_canonical_timber_dimensions(timber_size, timber_length)
     resolved_timber_config = _resolve_canonical_timber_config(timber_config)
     
@@ -261,8 +260,8 @@ def create_canonical_example_corner_joint_timbers(
         length=resolved_length,
         size=resolved_size,
         bottom_position=position,
-        length_direction=create_v3(Integer(0), Integer(1), Integer(0)),  # +Y direction
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        length_direction=create_v3(scalar(0), scalar(1), scalar(0)),  # +Y direction
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="timber1",
         timber_config=resolved_timber_config,
     )
@@ -270,13 +269,13 @@ def create_canonical_example_corner_joint_timbers(
     # timber2: rotated CLOCKWISE around +Z axis by corner_angle from +Y direction
     # Clockwise rotation by angle θ: (0,1,0) -> (sin(θ), cos(θ), 0)
     # At θ=90°: sin(90°)=1, cos(90°)=0 -> (1, 0, 0) = +X direction ✓
-    timber2_length_direction = create_v3(sin(corner_angle), cos(corner_angle), Integer(0))
+    timber2_length_direction = create_v3(sin(corner_angle), cos(corner_angle), scalar(0))
     timber2 = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=position,
         length_direction=timber2_length_direction,
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="timber2",
         timber_config=resolved_timber_config,
     )
@@ -308,7 +307,7 @@ def create_canonical_example_right_angle_corner_joint_timbers(
     """
     from sympy import pi
     return create_canonical_example_corner_joint_timbers(
-        corner_angle=radians(pi / Integer(2)),
+        corner_angle=radians(pi / scalar(2)),
         position=position,
         timber_size=timber_size,
         timber_length=timber_length,
@@ -317,7 +316,7 @@ def create_canonical_example_right_angle_corner_joint_timbers(
 
 
 def create_canonical_example_cross_joint_timbers(
-    lateral_offset: Numeric = Integer(0),
+    lateral_offset: Numeric = scalar(0),
     position: Optional[V3] = None,
     timber_size: Optional[V2] = None,
     timber_length: Optional[Numeric] = None,
@@ -335,32 +334,32 @@ def create_canonical_example_cross_joint_timbers(
         position: Center position of the joint. Defaults to origin.
     """
     if position is None:
-        position = create_v3(Integer(0), Integer(0), Integer(0))
+        position = create_v3(scalar(0), scalar(0), scalar(0))
     resolved_size, resolved_length = _resolve_canonical_timber_dimensions(timber_size, timber_length)
     resolved_timber_config = _resolve_canonical_timber_config(timber_config)
     
     # timber1: points in +X direction, centerpoint at position
     # If centerpoint is at position and length is L, bottom is at position + (-L/2, 0, 0)
-    timber1_bottom = position + create_v3(-resolved_length / Integer(2), Integer(0), Integer(0))
+    timber1_bottom = position + create_v3(-resolved_length / scalar(2), scalar(0), scalar(0))
     timber1 = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=timber1_bottom,
-        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),  # +X direction
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),  # +X direction
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="timber1",
         timber_config=resolved_timber_config,
     )
     
     # timber2: points in +Y direction, centerpoint at position + (0, 0, lateral_offset)
     # If centerpoint is at position + (0, 0, lateral_offset) and length is L, bottom is at position + (0, -L/2, lateral_offset)
-    timber2_bottom = position + create_v3(Integer(0), -resolved_length / Integer(2), lateral_offset)
+    timber2_bottom = position + create_v3(scalar(0), -resolved_length / scalar(2), lateral_offset)
     timber2 = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=timber2_bottom,
-        length_direction=create_v3(Integer(0), Integer(1), Integer(0)),  # +Y direction
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),   # RIGHT face points in +Z
+        length_direction=create_v3(scalar(0), scalar(1), scalar(0)),  # +Y direction
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),   # RIGHT face points in +Z
         ticket="timber2",
         timber_config=resolved_timber_config,
     )
@@ -399,7 +398,7 @@ def create_canonical_example_brace_joint_timbers(
     from sympy import sqrt
     
     if position is None:
-        position = create_v3(Integer(0), Integer(0), Integer(0))
+        position = create_v3(scalar(0), scalar(0), scalar(0))
     resolved_size, resolved_length = _resolve_canonical_timber_dimensions(timber_size, timber_length)
     resolved_timber_config = _resolve_canonical_timber_config(timber_config)
     
@@ -416,16 +415,16 @@ def create_canonical_example_brace_joint_timbers(
     # Calculate midpoints of timber1 and timber2
     # timber1 midpoint: position + (length/2) * (0, 1, 0) = position + (0, length/2, 0)
     timber1_midpoint = position + create_v3(
-        Integer(0),
-        resolved_length / Integer(2),
-        Integer(0)
+        scalar(0),
+        resolved_length / scalar(2),
+        scalar(0)
     )
     
     # timber2 midpoint: position + (length/2) * (1, 0, 0) = position + (length/2, 0, 0)
     timber2_midpoint = position + create_v3(
-        resolved_length / Integer(2),
-        Integer(0),
-        Integer(0)
+        resolved_length / scalar(2),
+        scalar(0),
+        scalar(0)
     )
     
     # Calculate brace direction (from timber1 midpoint to timber2 midpoint)
@@ -435,7 +434,7 @@ def create_canonical_example_brace_joint_timbers(
     
     # Calculate the length of the brace (distance between midpoints)
     # Distance = sqrt((length/2)^2 + (length/2)^2) = length / sqrt(2)
-    brace_length = resolved_length / sqrt(Integer(2))
+    brace_length = resolved_length / sqrt(scalar(2))
     
     # Create the brace timber
     # Bottom position is at timber1's midpoint
@@ -446,7 +445,7 @@ def create_canonical_example_brace_joint_timbers(
         size=resolved_size,
         bottom_position=timber1_midpoint,
         length_direction=brace_length_direction,
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # RIGHT face points in +Z
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # RIGHT face points in +Z
         ticket="brace_timber",
         timber_config=resolved_timber_config,
     )
@@ -479,42 +478,42 @@ def create_canonical_example_opposing_double_butt_joint_timbers(
         position: Center position of the joint. Defaults to origin.
     """
     if position is None:
-        position = create_v3(Integer(0), Integer(0), Integer(0))
+        position = create_v3(scalar(0), scalar(0), scalar(0))
     resolved_size, resolved_length = _resolve_canonical_timber_dimensions(timber_size, timber_length)
     resolved_timber_config = _resolve_canonical_timber_config(timber_config)
 
     # Receiving timber (post): runs along X axis, center at position
-    receiving_bottom = position + create_v3(-resolved_length / Integer(2), Integer(0), Integer(0))
+    receiving_bottom = position + create_v3(-resolved_length / scalar(2), scalar(0), scalar(0))
     receiving_timber = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=receiving_bottom,
-        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket="receiving_timber",
         timber_config=resolved_timber_config,
     )
 
     # butt_timber_1: runs along +Y, TOP end meets post center
-    butt1_bottom = position + create_v3(Integer(0), -resolved_length / Integer(2), Integer(0))
+    butt1_bottom = position + create_v3(scalar(0), -resolved_length / scalar(2), scalar(0))
     butt_timber_1 = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=butt1_bottom,
-        length_direction=create_v3(Integer(0), Integer(1), Integer(0)),
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+        length_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket="butt_timber_1",
         timber_config=resolved_timber_config,
     )
 
     # butt_timber_2: runs along -Y, TOP end meets post center (antiparallel to butt_timber_1)
-    butt2_bottom = position + create_v3(Integer(0), resolved_length / Integer(2), Integer(0))
+    butt2_bottom = position + create_v3(scalar(0), resolved_length / scalar(2), scalar(0))
     butt_timber_2 = _create_configurable_example_timber(
         length=resolved_length,
         size=resolved_size,
         bottom_position=butt2_bottom,
-        length_direction=create_v3(Integer(0), Integer(-1), Integer(0)),
-        width_direction=create_v3(Integer(0), Integer(0), Integer(1)),
+        length_direction=create_v3(scalar(0), scalar(-1), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket="butt_timber_2",
         timber_config=resolved_timber_config,
     )

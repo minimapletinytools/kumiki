@@ -30,12 +30,32 @@ Avoid `safe_*` variants in general unless it's being used for some top level geo
 '''
 
 import sympy as sp
-from sympy import Matrix, cos, sin, pi, Float, Rational, Integer, Abs, S, sympify, Expr
+from sympy import Matrix, cos, sin, pi, Float, Rational, Abs, S, sympify, Expr
 from typing import Optional, Union
 from dataclasses import dataclass, field
 from enum import Enum
 import warnings
 
+
+def scalar(numerator, denominator=1):
+    """
+    Create a Rational scalar value.
+    
+    Args:
+        numerator: The numerator (can be int, float, str, or Rational)
+        denominator: The denominator (default=1)
+    
+    Returns:
+        Rational value
+    
+    Examples:
+        scalar(3)             # 3
+        scalar(1, 2)          # 1/2
+        scalar(2.5)           # 2.5 (converted to Rational)
+        scalar("1.5")         # 1.5 from string
+        scalar("1/32")        # Parses fraction string
+    """
+    return Rational(numerator, denominator)
 
 # ============================================================================
 # Global Numeric Mode
@@ -88,7 +108,7 @@ Numeric = Union[Expr, int]
 # Precision for all numeric evaluation — single constant to tune globally.
 GIRAFFE_EVALF_PRECISION = 10
 # Epsilon constants for numerical comparisons
-EPSILON_GENERIC = Float('1e-8')      # Generic epsilon threshold for float comparisons, make sure this is larger than GIRAFFE_EVALF_PRECISION to avoid false positives
+EPSILON_GENERIC = scalar('1e-8')      # Generic epsilon threshold for float comparisons, make sure this is larger than GIRAFFE_EVALF_PRECISION to avoid false positives
 EPSILON_FLOAT = 1e-10                # Epsilon for plain Python float comparisons (used in safe_compare)
 COMPLEX_NUM_NODES_THRESHOLD = 50  # Max number of nodes in expression tree before considering it complex
 # In SMART mode, we can apply an explicit node budget guard while running in
@@ -141,7 +161,7 @@ def giraffe_evalf(expr):
     """
     if hasattr(expr, 'evalf'):
         result = expr.evalf(GIRAFFE_EVALF_PRECISION)
-        # Ensure we always return a Float (e.g. Integer(0).evalf() returns Zero)
+        # Ensure we always return a Float (e.g. scalar(0).evalf() returns Zero)
         if not isinstance(result, Float):
             return Float(float(result), GIRAFFE_EVALF_PRECISION)
         return result
@@ -305,7 +325,7 @@ class Transform:
     def identity(cls) -> 'Transform':
         """Create an identity transform at origin with identity orientation."""
         return cls(
-            position=create_v3(Integer(0), Integer(0), Integer(0)),
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
             orientation=Orientation.identity()
         )
     
@@ -413,9 +433,9 @@ class Transform:
         
         # K = [[0, -kz, ky], [kz, 0, -kx], [-ky, kx, 0]]
         K = Matrix([
-            [Integer(0), -kz, ky],
-            [kz, Integer(0), -kx],
-            [-ky, kx, Integer(0)]
+            [scalar(0), -kz, ky],
+            [kz, scalar(0), -kx],
+            [-ky, kx, scalar(0)]
         ])
         
         # K² = K * K
@@ -423,7 +443,7 @@ class Transform:
         
         # R = I + sin(θ)K + (1 - cos(θ))K²
         I = eye(3)
-        rotation_matrix = I + sin(radians) * K + (Integer(1) - cos(radians)) * K_squared
+        rotation_matrix = I + sin(radians) * K + (scalar(1) - cos(radians)) * K_squared
         
         # To rotate around an axis not through origin:
         # 1. Translate so axis passes through origin
@@ -466,7 +486,7 @@ def giraffe_norm(vec: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART):
     # Manual sum of squares — avoids SymPy matrix .norm() which triggers
     # slow property checking on complex expressions.
     # In SMART+float mode, collapse partial sums when node budget is exceeded.
-    sum_sq = Integer(0)
+    sum_sq = scalar(0)
     if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
         for c in vec:
             sum_sq = sum_sq + c * c
@@ -583,7 +603,7 @@ def giraffe_dot_product(vec1: Matrix, vec2: Matrix, collapse_mode: CollapseMode 
     assert len(vec1_values) == len(vec2_values), "Vectors must have the same number of elements"
 
     if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
-        result = Integer(0)
+        result = scalar(0)
         for v1, v2 in zip(vec1_values, vec2_values):
             result = result + v1 * v2
             if is_complex_expr(result, SMART_NODE_GUARD_MAX_NODES):
@@ -607,7 +627,7 @@ def giraffe_transform_vector(matrix: Matrix, vector: Matrix, collapse_mode: Coll
         row = []
         for k in range(len(vec_data[0])):
             if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
-                elem = Integer(0)
+                elem = scalar(0)
                 for j in range(len(vec_data)):
                     elem = elem + mat_data[i][j] * vec_data[j][k]
                     if is_complex_expr(elem, SMART_NODE_GUARD_MAX_NODES):
@@ -654,7 +674,7 @@ def giraffe_normalize_vector(vec: Matrix, collapse_mode: CollapseMode = Collapse
         for component in vec:
             comp_val = float(giraffe_evalf(component)) / norm_val
             frac = Fraction(comp_val).limit_denominator(10**9)
-            normalized.append(Rational(frac.numerator, frac.denominator))
+            normalized.append(scalar(frac.numerator, frac.denominator))
         return Matrix(normalized)
 
     # For exact symbolic norms (sqrt, Rational, Integer) — divide exactly
@@ -813,7 +833,7 @@ def degrees(angle: Numeric) -> Numeric:
         degrees(45)           # 45 degrees = pi/4 radians
         degrees(180)          # 180 degrees = pi radians
     """
-    return angle * pi / Rational(180)
+    return angle * pi / scalar(180)
 
 
 # ============================================================================
@@ -821,9 +841,9 @@ def degrees(angle: Numeric) -> Numeric:
 # ============================================================================
 
 # Conversion factors to meters (exact Rationals)
-INCH_TO_METER = Rational(254, 10000)      # 0.0254 m (exact by definition)
-FOOT_TO_METER = Rational(3048, 10000)     # 0.3048 m (exact by definition)
-SHAKU_TO_METER = Rational(10, 33)         # ~0.303030... m (1 shaku = 10/33 m, traditional)
+INCH_TO_METER = scalar(254, 10000)      # 0.0254 m (exact by definition)
+FOOT_TO_METER = scalar(3048, 10000)     # 0.3048 m (exact by definition)
+SHAKU_TO_METER = scalar(10, 33)         # ~0.303030... m (1 shaku = 10/33 m, traditional)
 
 # Note: The traditional Japanese shaku is defined as 10/33 meters
 # This gives approximately 303.03mm, and ensures exact rational arithmetic
@@ -851,7 +871,7 @@ def inches(numerator, denominator=1):
         inches("1.5")        # 1.5 inches from string
         inches("1/32")       # Parses fraction string
     """
-    return Rational(numerator, denominator) * INCH_TO_METER
+    return scalar(numerator, denominator) * INCH_TO_METER
 
 
 def feet(numerator, denominator=1):
@@ -870,7 +890,7 @@ def feet(numerator, denominator=1):
         feet(1, 2)           # 1/2 foot
         feet(6.5)            # 6.5 feet (converted to Rational)
     """
-    return Rational(numerator, denominator) * FOOT_TO_METER
+    return scalar(numerator, denominator) * FOOT_TO_METER
 
 
 def mm(numerator, denominator=1):
@@ -889,7 +909,7 @@ def mm(numerator, denominator=1):
         mm(1, 2)             # 1/2 millimeter
         mm(25.4)             # 25.4 millimeters (converted to Rational)
     """
-    return Rational(numerator, denominator) / 1000
+    return scalar(numerator, denominator) / 1000
 
 
 def cm(numerator, denominator=1):
@@ -908,7 +928,7 @@ def cm(numerator, denominator=1):
         cm(1, 2)             # 1/2 centimeter
         cm(2.54)             # 2.54 centimeters (converted to Rational)
     """
-    return Rational(numerator, denominator) / 100
+    return scalar(numerator, denominator) / 100
 
 
 def m(numerator, denominator=1):
@@ -927,7 +947,7 @@ def m(numerator, denominator=1):
         m(1, 2)              # 1/2 meter
         m(2.5)               # 2.5 meters (converted to Rational)
     """
-    return Rational(numerator, denominator)
+    return scalar(numerator, denominator)
 
 
 def shaku(numerator, denominator=1):
@@ -949,7 +969,7 @@ def shaku(numerator, denominator=1):
         shaku(3, 2)          # 3/2 shaku (1.5 shaku)
         shaku(2.5)           # 2.5 shaku (converted to Rational)
     """
-    return Rational(numerator, denominator) * SHAKU_TO_METER
+    return scalar(numerator, denominator) * SHAKU_TO_METER
 
 
 def sun(numerator, denominator=1):
@@ -971,7 +991,7 @@ def sun(numerator, denominator=1):
         sun(5)               # 5 sun
         sun(1, 2)            # 1/2 sun
     """
-    return Rational(numerator, denominator) * SHAKU_TO_METER / 10
+    return scalar(numerator, denominator) * SHAKU_TO_METER / 10
 
 
 def bu(numerator, denominator=1):
@@ -993,7 +1013,7 @@ def bu(numerator, denominator=1):
         bu(5)                # 5 bu
         bu(1, 2)             # 1/2 bu
     """
-    return Rational(numerator, denominator) * SHAKU_TO_METER / 100
+    return scalar(numerator, denominator) * SHAKU_TO_METER / 100
 
 
 # ============================================================================
@@ -1151,11 +1171,11 @@ class Orientation:
         k = safe_normalize_vector(axis)
         kx, ky, kz = k[0], k[1], k[2]
         K = Matrix([
-            [Integer(0), -kz, ky],
-            [kz, Integer(0), -kx],
-            [-ky, kx, Integer(0)]
+            [scalar(0), -kz, ky],
+            [kz, scalar(0), -kx],
+            [-ky, kx, scalar(0)]
         ])
-        R = eye(3) + sin(radians) * K + (Integer(1) - cos(radians)) * K * K
+        R = eye(3) + sin(radians) * K + (scalar(1) - cos(radians)) * K * K
         return cls(R)
         
     
@@ -1225,13 +1245,13 @@ class Orientation:
         # Rodrigues' rotation formula: R = I + sin(θ)K + (1 - cos(θ))K²
         # where K is the skew-symmetric cross-product matrix of k
         K = Matrix([
-            [Integer(0), -kz, ky],
-            [kz, Integer(0), -kx],
-            [-ky, kx, Integer(0)]
+            [scalar(0), -kz, ky],
+            [kz, scalar(0), -kx],
+            [-ky, kx, scalar(0)]
         ])
         K_squared = K * K
         I = Matrix.eye(3)
-        rotation_matrix = I + sin(radians) * K + (Integer(1) - cos(radians)) * K_squared
+        rotation_matrix = I + sin(radians) * K + (scalar(1) - cos(radians)) * K_squared
         
         return cls(rotation_matrix)
             

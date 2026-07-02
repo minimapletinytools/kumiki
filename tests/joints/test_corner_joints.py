@@ -3,7 +3,7 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, Float, Rational, pi
+from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -123,7 +123,7 @@ class TestMiterJoint:
         self.assert_miter_joint_end_positions_on_boundaries(joint, timberA, timberB)
 
         # check that the "corner" point of the miter is contained on the boundary of both half plane
-        corner_point_global = create_v3(Rational(-3), Rational(-3), Rational(0))
+        corner_point_global = create_v3(scalar(-3), scalar(-3), scalar(0))
         corner_point_local_A = timberA.transform.global_to_local(corner_point_global)
         corner_point_local_B = timberB.transform.global_to_local(corner_point_global)
         assert joint.cuttings["timberA"].negative_csg is not None
@@ -135,7 +135,7 @@ class TestMiterJoint:
         # This point is at (0, -3, 0) in global coordinates, which is:
         # - On the "cut away" side of timber A (should NOT be contained)
         # - On the "kept" side of timber B (should be contained)
-        bottom_point_A_after_cutting_global = create_v3(Rational(0), Rational(-3), Rational(0))
+        bottom_point_A_after_cutting_global = create_v3(scalar(0), scalar(-3), scalar(0))
         bottom_point_A_after_cutting_local_A = timberA.transform.global_to_local(bottom_point_A_after_cutting_global)
         bottom_point_A_after_cutting_local_B = timberB.transform.global_to_local(bottom_point_A_after_cutting_global)
         assert joint.cuttings["timberA"].negative_csg is not None
@@ -212,18 +212,18 @@ class TestMiterJoint:
     def test_miter_joint_on_parallel_timbers_produces_perpendicular_cuts(self):
         """cut_plain_miter_joint (base function) accepts parallel timbers and produces end cuts perpendicular to the timber axis."""
         timberA = timber_from_directions(
-            length=Rational(100),
-            size=Matrix([Rational(6), Rational(6)]),
-            bottom_position=Matrix([Rational(0), Rational(0), Rational(0)]),
-            length_direction=Matrix([Rational(1), Rational(0), Rational(0)]),
-            width_direction=Matrix([Rational(0), Rational(1), Rational(0)]),
+            length=scalar(100),
+            size=Matrix([scalar(6), scalar(6)]),
+            bottom_position=Matrix([scalar(0), scalar(0), scalar(0)]),
+            length_direction=Matrix([scalar(1), scalar(0), scalar(0)]),
+            width_direction=Matrix([scalar(0), scalar(1), scalar(0)]),
         )
         timberB = timber_from_directions(
-            length=Rational(100),
-            size=Matrix([Rational(6), Rational(6)]),
-            bottom_position=Matrix([Rational(0), Rational(0), Rational(10)]),
-            length_direction=Matrix([Rational(1), Rational(0), Rational(0)]),
-            width_direction=Matrix([Rational(0), Rational(1), Rational(0)]),
+            length=scalar(100),
+            size=Matrix([scalar(6), scalar(6)]),
+            bottom_position=Matrix([scalar(0), scalar(0), scalar(10)]),
+            length_direction=Matrix([scalar(1), scalar(0), scalar(0)]),
+            width_direction=Matrix([scalar(0), scalar(1), scalar(0)]),
         )
 
         arrangement = CornerJointTimberArrangement(
@@ -254,14 +254,14 @@ class TestTongueAndForkJoint:
         if face == TimberFace.BOTTOM:
             return locate_bottom_center_position(timber).position
 
-        center = timber.get_bottom_position_global() + timber.get_length_direction_global() * (timber.length / Rational(2))
+        center = timber.get_bottom_position_global() + timber.get_length_direction_global() * (timber.length / scalar(2))
         if face == TimberFace.RIGHT:
-            return center + timber.get_width_direction_global() * (timber.size[0] / Rational(2))
+            return center + timber.get_width_direction_global() * (timber.size[0] / scalar(2))
         if face == TimberFace.LEFT:
-            return center - timber.get_width_direction_global() * (timber.size[0] / Rational(2))
+            return center - timber.get_width_direction_global() * (timber.size[0] / scalar(2))
         if face == TimberFace.FRONT:
-            return center + timber.get_height_direction_global() * (timber.size[1] / Rational(2))
-        return center - timber.get_height_direction_global() * (timber.size[1] / Rational(2))
+            return center + timber.get_height_direction_global() * (timber.size[1] / scalar(2))
+        return center - timber.get_height_direction_global() * (timber.size[1] / scalar(2))
 
     def test_tongue_and_fork_joint_structure_and_opposing_face_end_cuts(self):
         tongue_timber = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
@@ -344,8 +344,8 @@ class TestTongueAndForkJoint:
         )
         joint_shifted = cut_tongue_and_fork_corner_joint(
             arrangement_b,
-            tongue_thickness=Rational(2),
-            tongue_position=Rational(2),
+            tongue_thickness=scalar(2),
+            tongue_position=scalar(2),
         )
 
         plane_normal = arrangement_a.compute_normalized_timber_cross_product()
@@ -354,8 +354,8 @@ class TestTongueAndForkJoint:
 
         sample_point_global = (
             tongue_timber_a.get_bottom_position_global()
-            + tongue_timber_a.get_length_direction_global() * Rational(1)
-            + tongue_normal * Rational(0)
+            + tongue_timber_a.get_length_direction_global() * scalar(1)
+            + tongue_normal * scalar(0)
         )
 
         centered_render = _render_cutting(joint_centered.cuttings["tongue_timber"])
@@ -380,7 +380,7 @@ class TestTongueAndForkJoint:
 
         tongue_non_plane = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
         fork_non_plane = timber_from_directions(
-            length=Rational(100),
+            length=scalar(100),
             size=create_v2(6, 6),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 1, 1),
@@ -467,7 +467,7 @@ def _make_right_angle_arrangement(front_face=TimberLongFace.RIGHT, position=None
 def _make_angled_arrangement(angle_deg, front_face=TimberLongFace.RIGHT, position=None):
     from dataclasses import replace as dc_replace
     arrangement = create_canonical_example_corner_joint_timbers(
-        corner_angle=degrees(Integer(angle_deg)), position=position
+        corner_angle=degrees(scalar(angle_deg)), position=position
     )
     timberA = dc_replace(arrangement.timber1, ticket=TimberTicket("timberA"))
     timberB = dc_replace(arrangement.timber2, ticket=TimberTicket("timberB"))
@@ -532,9 +532,9 @@ class TestMiteredAndKeyedLapJoint:
         joint = cut_mitered_and_keyed_lap_joint(
             arrangement=arrangement,
             num_laps=num_laps,
-            lap_thickness=inches(Rational(3, 4)),
-            lap_start_distance_from_reference_miter_face=inches(Rational(1, 2)),
-            distance_between_lap_and_outside=inches(Rational(1, 2)),
+            lap_thickness=inches(scalar(3, 4)),
+            lap_start_distance_from_reference_miter_face=inches(scalar(1, 2)),
+            distance_between_lap_and_outside=inches(scalar(1, 2)),
         )
 
         _assert_joint_structure(joint, num_keys=num_laps - 1, num_laps=num_laps)

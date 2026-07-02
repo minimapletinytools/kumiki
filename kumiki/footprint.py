@@ -4,7 +4,7 @@ Footprint class for Kumiki - Represents the 2D footprint of a structure
 
 from enum import Enum
 from typing import List, Tuple
-from sympy import Matrix, Rational
+from sympy import Matrix
 from dataclasses import dataclass
 from .rule import *
 
@@ -58,7 +58,7 @@ def _segment_to_segment_distance(seg1_start: V2, seg1_end: V2,
     
     if (ccw(p1x, p1y, p3x, p3y, p4x, p4y) != ccw(p2x, p2y, p3x, p3y, p4x, p4y) and
         ccw(p1x, p1y, p2x, p2y, p3x, p3y) != ccw(p1x, p1y, p2x, p2y, p4x, p4y)):
-        return Integer(0)
+        return scalar(0)
     
     # Segments don't intersect, find minimum distance among endpoints
     distances = [
@@ -306,11 +306,11 @@ class Footprint:
         
         # Test if this perpendicular points inward by checking if a point
         # slightly offset in this direction is inside the polygon
-        midpoint_x = (start[0] + end[0]) / Rational(2)
-        midpoint_y = (start[1] + end[1]) / Rational(2)
+        midpoint_x = (start[0] + end[0]) / scalar(2)
+        midpoint_y = (start[1] + end[1]) / scalar(2)
         
         # Create a test point offset slightly in the perpendicular direction
-        offset = Rational(1, 1000)  # Small offset for testing
+        offset = scalar(1, 1000)  # Small offset for testing
         test_x = midpoint_x + left_perp_x * offset
         test_y = midpoint_y + left_perp_y * offset
         
@@ -320,10 +320,10 @@ class Footprint:
         # Check if test point is inside
         if self.contains_point(test_point):
             # Left perpendicular points inward
-            return create_v3(left_perp_x, left_perp_y, Integer(0))
+            return create_v3(left_perp_x, left_perp_y, scalar(0))
         else:
             # Right perpendicular points inward
-            return create_v3(dy, -dx, Integer(0))
+            return create_v3(dy, -dx, scalar(0))
     
     def nearest_boundary_from_line(self, line_start: V2, line_end: V2) -> Tuple[int, Tuple[V2, V2], Numeric]:
         """

@@ -19,7 +19,7 @@ stretcher_size = Matrix([inches(4), inches(4)])  # 4x4
 plate_size = Matrix([inches(4), inches(6)])  # 4x6 with 6" in Y
 
 # Define dimensions
-footprint_width = feet(Rational(7, 2))  # 3.5 feet in X
+footprint_width = feet(scalar(7, 2))  # 3.5 feet in X
 footprint_length = feet(2)  # 2 feet in Y
 beam_length = feet(2)  # 2 feet in Y direction
 post_height = feet(2)  # 2 feet tall
@@ -30,7 +30,7 @@ tenon_thickness = inches(1)
 tenon_width = inches(3)
 tenon_length = inches(3)
 mortise_depth = tenon_length + inches(0.25)
-peg_diameter = inches(Rational(5, 8))
+peg_diameter = inches(scalar(5, 8))
 peg_distance_from_shoulder = inches(1)
 
 
@@ -49,7 +49,7 @@ def create_sawhorse() -> Frame:
     
     # Create left beam (4x6, runs in Y direction, 6" dimension in Z)
     left_beam = create_axis_aligned_timber(
-        bottom_position=create_v3(-beam_offset_x, -beam_length / 2, Rational(0)),
+        bottom_position=create_v3(-beam_offset_x, -beam_length / 2, scalar(0)),
         length=beam_length,
         size=beam_size,
         length_direction=TimberFace.FRONT,  # Y direction
@@ -59,7 +59,7 @@ def create_sawhorse() -> Frame:
     
     # Create right beam (4x6, runs in Y direction, 6" dimension in Z)
     right_beam = create_axis_aligned_timber(
-        bottom_position=create_v3(beam_offset_x, -beam_length / 2, Rational(0)),
+        bottom_position=create_v3(beam_offset_x, -beam_length / 2, scalar(0)),
         length=beam_length,
         size=beam_size,
         length_direction=TimberFace.FRONT,  # Y direction
@@ -69,7 +69,7 @@ def create_sawhorse() -> Frame:
     
     # Create left post (4x4, vertical, centered on left beam)
     left_post = create_axis_aligned_timber(
-        bottom_position=create_v3(-beam_offset_x, Rational(0), beam_size[1]),  # Start at top of beam
+        bottom_position=create_v3(-beam_offset_x, scalar(0), beam_size[1]),  # Start at top of beam
         length=post_height,
         size=post_size,
         length_direction=TimberFace.TOP,    # Z direction
@@ -79,7 +79,7 @@ def create_sawhorse() -> Frame:
     
     # Create right post (4x4, vertical, centered on right beam)
     right_post = create_axis_aligned_timber(
-        bottom_position=create_v3(beam_offset_x, Rational(0), beam_size[1]),  # Start at top of beam
+        bottom_position=create_v3(beam_offset_x, scalar(0), beam_size[1]),  # Start at top of beam
         length=post_height,
         size=post_size,
         length_direction=TimberFace.TOP,    # Z direction
@@ -93,7 +93,7 @@ def create_sawhorse() -> Frame:
     stretcher_length = 2 * beam_offset_x  # Distance between post centers
     
     stretcher = create_axis_aligned_timber(
-        bottom_position=create_v3(-beam_offset_x, Rational(0), stretcher_z_position),
+        bottom_position=create_v3(-beam_offset_x, scalar(0), stretcher_z_position),
         length=stretcher_length,
         size=stretcher_size,
         length_direction=TimberFace.RIGHT,  # X direction
@@ -105,7 +105,7 @@ def create_sawhorse() -> Frame:
     plate_z_position = beam_size[1] + post_height  # Top of posts
     
     plate = create_axis_aligned_timber(
-        bottom_position=create_v3(-plate_length / 2, Rational(0), plate_z_position),
+        bottom_position=create_v3(-plate_length / 2, scalar(0), plate_z_position),
         length=plate_length,
         size=plate_size,
         length_direction=TimberFace.RIGHT,  # X direction (5ft long)
@@ -123,10 +123,10 @@ def create_sawhorse() -> Frame:
     # Base peg parameters: 5/8" diameter, 1" from shoulder, centered on tenon
     base_peg_params = SimplePegParameters(
         shape=PegShape.ROUND,
-        peg_positions=[(peg_distance_from_shoulder, Rational(0))],  # 1" from shoulder, centered
+        peg_positions=[(peg_distance_from_shoulder, scalar(0))],  # 1" from shoulder, centered
         size=peg_diameter,
         depth=None,  # Through peg
-        tenon_hole_offset=Rational(0)
+        tenon_hole_offset=scalar(0)
     )
     
     # Joint 1 & 2: Posts into beams
@@ -168,7 +168,7 @@ def create_sawhorse() -> Frame:
     # side kicks outward on the BOTTOM, giving the joint pull-out resistance.
     # The tenon passes all the way through the post (4" thick) with extra stickout
     # past the far face, and is locked with a wedge driven in from the far side.
-    dovetail_depth_for_stretcher = inches(Rational(1, 2))
+    dovetail_depth_for_stretcher = inches(scalar(1, 2))
     stretcher_tenon_depth = post_size[0] + inches(1)  # through post + 1" stickout
     stretcher_wedge_params = DovetailTenonWedgeAccessoryParameters(
         wedge_from_receiving_timber_side=True,

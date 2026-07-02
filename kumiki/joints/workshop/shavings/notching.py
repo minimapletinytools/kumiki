@@ -10,7 +10,7 @@ import warnings
 from dataclasses import dataclass, replace
 from typing import Optional, Union
 
-from sympy import Abs, Max, Min, Rational, acos
+from sympy import Abs, Max, Min, acos
 
 from kumiki.construction import ButtJointTimberArrangement, ArrangementNames
 from kumiki.cutcsg import (
@@ -274,7 +274,7 @@ def _projected_perfect_cross_section_span_along_global_direction(
     """Projected full cross-section span of a timber along a global direction."""
     direction_local = safe_transform_vector(timber.orientation.matrix.T, direction_global)
     direction_local_2d = create_v2(direction_local[0], direction_local[1])
-    return Integer(2) * get_perfect_support_distance_from_centerline(timber, direction_local_2d)
+    return scalar(2) * get_perfect_support_distance_from_centerline(timber, direction_local_2d)
 
 
 def does_shoulder_plane_need_notching(
@@ -314,7 +314,7 @@ def does_shoulder_plane_need_notching(
     if check_against_nominal_size:
         face_half_size = mortise_timber.get_half_nominal_size_in_face_normal_axis(mortise_face)
     else:
-        face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / Integer(2)
+        face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / scalar(2)
     return (
         mortise_shoulder_distance_from_centerline < face_half_size
         and not zero_test(face_half_size - mortise_shoulder_distance_from_centerline)
@@ -326,7 +326,7 @@ def chop_shoulder_notch_aligned_with_timber(
     butting_timber: TimberLike,
     butting_timber_end: TimberEnd,
     distance_from_centerline: Numeric,
-    notch_wall_relief_cut_angle_radians: Numeric = Integer(0),
+    notch_wall_relief_cut_angle_radians: Numeric = scalar(0),
 ) -> Union[RectangularPrism, SolidUnion]:
     """
     Create a shoulder notch on notch_timber at a given distance from its centerline,
@@ -375,8 +375,8 @@ def chop_shoulder_notch_aligned_with_timber(
         notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT),
         notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT),
     )
-    notch_span = max_size * sqrt(Integer(2))
-    notch_depth = max_size * sqrt(Integer(2)) / Integer(2)
+    notch_span = max_size * sqrt(scalar(2))
+    notch_depth = max_size * sqrt(scalar(2)) / scalar(2)
 
     cross_section_span_on_notch_length = _projected_perfect_cross_section_span_along_global_direction(
         butting_timber,
@@ -389,7 +389,7 @@ def chop_shoulder_notch_aligned_with_timber(
     if not zero_test(approach_dot_depth):
         shift_along_length = notch_depth * Abs(approach_dot_length / approach_dot_depth)
     else:
-        shift_along_length = Integer(0)
+        shift_along_length = scalar(0)
 
     notch_width = cross_section_span_on_notch_length + shift_along_length
 
@@ -397,7 +397,7 @@ def chop_shoulder_notch_aligned_with_timber(
         notch_timber.orientation.matrix.T,
         approach_direction_global,
     )
-    notch_length_dir_local = create_v3(Integer(0), Integer(0), Integer(1))
+    notch_length_dir_local = create_v3(scalar(0), scalar(0), scalar(1))
 
     prism_orientation = Orientation.from_z_and_x(approach_direction_local, notch_length_dir_local)
     prism_position_local = notch_timber.transform.global_to_local(intersection_global)
@@ -405,7 +405,7 @@ def chop_shoulder_notch_aligned_with_timber(
     notch_prism = RectangularPrism(
         size=create_v2(notch_width, notch_span),
         transform=Transform(position=prism_position_local, orientation=prism_orientation),
-        start_distance=Integer(0),
+        start_distance=scalar(0),
         end_distance=notch_depth,
     )
 
@@ -416,8 +416,8 @@ def chop_shoulder_notch_aligned_with_timber(
     span_direction_local = cross_product(approach_direction_local, notch_length_dir_local)
     span_direction_local = normalize_vector(span_direction_local)
 
-    corner_point_1 = prism_position_local + notch_length_dir_local * (notch_width / Rational(2))
-    corner_point_2 = prism_position_local - notch_length_dir_local * (notch_width / Rational(2))
+    corner_point_1 = prism_position_local + notch_length_dir_local * (notch_width / scalar(2))
+    corner_point_2 = prism_position_local - notch_length_dir_local * (notch_width / scalar(2))
 
     axis_1 = Axis(position=corner_point_1, direction=span_direction_local)
     axis_2 = Axis(position=corner_point_2, direction=span_direction_local)
@@ -446,12 +446,12 @@ def chop_shoulder_notch_on_timber_face(
     distance_along_timber: Numeric,
     notch_width: Numeric,
     notch_depth: Numeric,
-    notch_wall_relief_cut_angle: Numeric = Integer(0),
+    notch_wall_relief_cut_angle: Numeric = scalar(0),
 ) -> Union[RectangularPrism, SolidUnion]:
     """
     Create a rectangular shoulder notch on a timber face with optional angled walls.
     """
-    from sympy import Rational, cos
+    from sympy import cos
 
     if notch_face == TimberFace.TOP or notch_face == TimberFace.BOTTOM:
         raise ValueError("Cannot cut shoulder notch on end faces (TOP or BOTTOM)")
@@ -476,75 +476,75 @@ def chop_shoulder_notch_on_timber_face(
 
     if notch_face == TimberFace.FRONT:
         cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT)
-        position = create_v3(Integer(0), half_face_offset - notch_depth, distance_along_timber)
+        position = create_v3(scalar(0), half_face_offset - notch_depth, distance_along_timber)
         orientation = Orientation.from_z_and_x(
-            create_v3(Integer(0), Integer(1), Integer(0)),
-            create_v3(Integer(0), Integer(0), Integer(1)),
+            create_v3(scalar(0), scalar(1), scalar(0)),
+            create_v3(scalar(0), scalar(0), scalar(1)),
         )
         prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
-            Integer(0),
+            scalar(0),
             half_face_offset - notch_depth,
-            distance_along_timber + notch_width / Rational(2),
+            distance_along_timber + notch_width / scalar(2),
         )
         corner_point_2 = create_v3(
-            Integer(0),
+            scalar(0),
             half_face_offset - notch_depth,
-            distance_along_timber - notch_width / Rational(2),
+            distance_along_timber - notch_width / scalar(2),
         )
     elif notch_face == TimberFace.BACK:
         cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT)
-        position = create_v3(Integer(0), -half_face_offset + notch_depth, distance_along_timber)
+        position = create_v3(scalar(0), -half_face_offset + notch_depth, distance_along_timber)
         orientation = Orientation.from_z_and_x(
-            create_v3(Integer(0), Integer(-1), Integer(0)),
-            create_v3(Integer(0), Integer(0), Integer(1)),
+            create_v3(scalar(0), scalar(-1), scalar(0)),
+            create_v3(scalar(0), scalar(0), scalar(1)),
         )
         prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
-            Integer(0),
+            scalar(0),
             -half_face_offset + notch_depth,
-            distance_along_timber + notch_width / Rational(2),
+            distance_along_timber + notch_width / scalar(2),
         )
         corner_point_2 = create_v3(
-            Integer(0),
+            scalar(0),
             -half_face_offset + notch_depth,
-            distance_along_timber - notch_width / Rational(2),
+            distance_along_timber - notch_width / scalar(2),
         )
     elif notch_face == TimberFace.RIGHT:
         cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT)
-        position = create_v3(half_face_offset - notch_depth, Integer(0), distance_along_timber)
+        position = create_v3(half_face_offset - notch_depth, scalar(0), distance_along_timber)
         orientation = Orientation.from_z_and_x(
-            create_v3(Integer(1), Integer(0), Integer(0)),
-            create_v3(Integer(0), Integer(0), Integer(1)),
+            create_v3(scalar(1), scalar(0), scalar(0)),
+            create_v3(scalar(0), scalar(0), scalar(1)),
         )
         prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
             half_face_offset - notch_depth,
-            Integer(0),
-            distance_along_timber + notch_width / Rational(2),
+            scalar(0),
+            distance_along_timber + notch_width / scalar(2),
         )
         corner_point_2 = create_v3(
             half_face_offset - notch_depth,
-            Integer(0),
-            distance_along_timber - notch_width / Rational(2),
+            scalar(0),
+            distance_along_timber - notch_width / scalar(2),
         )
     else:
         cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT)
-        position = create_v3(-half_face_offset + notch_depth, Integer(0), distance_along_timber)
+        position = create_v3(-half_face_offset + notch_depth, scalar(0), distance_along_timber)
         orientation = Orientation.from_z_and_x(
-            create_v3(Integer(-1), Integer(0), Integer(0)),
-            create_v3(Integer(0), Integer(0), Integer(1)),
+            create_v3(scalar(-1), scalar(0), scalar(0)),
+            create_v3(scalar(0), scalar(0), scalar(1)),
         )
         prism_size = create_v2(notch_width, cross_span)
         corner_point_1 = create_v3(
             -half_face_offset + notch_depth,
-            Integer(0),
-            distance_along_timber + notch_width / Rational(2),
+            scalar(0),
+            distance_along_timber + notch_width / scalar(2),
         )
         corner_point_2 = create_v3(
             -half_face_offset + notch_depth,
-            Integer(0),
-            distance_along_timber - notch_width / Rational(2),
+            scalar(0),
+            distance_along_timber - notch_width / scalar(2),
         )
 
     notch_additional_depth = timber.get_half_nominal_size_in_face_normal_axis(notch_face)
@@ -552,7 +552,7 @@ def chop_shoulder_notch_on_timber_face(
     notch_prism = RectangularPrism(
         size=prism_size,
         transform=Transform(position=position, orientation=orientation),
-        start_distance=Integer(0),
+        start_distance=scalar(0),
         end_distance=notch_depth + notch_additional_depth,
     )
 
@@ -562,9 +562,9 @@ def chop_shoulder_notch_on_timber_face(
     angle_rad = degrees(notch_wall_relief_cut_angle)
 
     if notch_face == TimberFace.FRONT or notch_face == TimberFace.BACK:
-        axis_direction = create_v3(Integer(1), Integer(0), Integer(0))
+        axis_direction = create_v3(scalar(1), scalar(0), scalar(0))
     else:
-        axis_direction = create_v3(Integer(0), Integer(1), Integer(0))
+        axis_direction = create_v3(scalar(0), scalar(1), scalar(0))
 
     axis_1 = Axis(position=corner_point_1, direction=axis_direction)
     axis_2 = Axis(position=corner_point_2, direction=axis_direction)
@@ -608,7 +608,7 @@ def chop_notch_for_butt_joint_arrangement(
     mortise_shoulder_distance_from_centerline: Numeric,
     # the min is taken between this parameter and the angle the butt timber
     # approaches the shoulder plane at (both in radians)
-    notch_wall_min_relief_cut_angle: Numeric = Integer(0),
+    notch_wall_min_relief_cut_angle: Numeric = scalar(0),
     use_receiving_timber_nominal_size_for_butting_timber_relief_depth: bool = True,
 ) -> ShoulderNotchCSGGeometry | None:
     """
@@ -693,7 +693,7 @@ def chop_notch_for_butt_joint_arrangement(
     if use_receiving_timber_nominal_size_for_butting_timber_relief_depth:
         far_face_half_size = receiving_timber.get_half_nominal_size_in_face_normal_axis(far_face)
     else:
-        far_face_half_size = receiving_timber.get_size_in_face_normal_axis(far_face) / Integer(2)
+        far_face_half_size = receiving_timber.get_size_in_face_normal_axis(far_face) / scalar(2)
     receiving_extent_in_approach = (
         mortise_shoulder_distance_from_centerline + far_face_half_size
     )
@@ -725,10 +725,10 @@ def chop_notch_for_butt_joint_arrangement(
     butt_prism_in_butt_local = RectangularPrism(
         size=butt_timber.size,
         transform=Transform(
-            position=create_v3(Integer(0), Integer(0), joint_center_butt_z),
+            position=create_v3(scalar(0), scalar(0), joint_center_butt_z),
             orientation=Orientation.from_z_and_x(
-                create_v3(Integer(0), Integer(0), Integer(1)),
-                create_v3(Integer(1), Integer(0), Integer(0)),
+                create_v3(scalar(0), scalar(0), scalar(1)),
+                create_v3(scalar(1), scalar(0), scalar(0)),
             ),
         ),
         start_distance=-butt_extent_along_centerline - extra,

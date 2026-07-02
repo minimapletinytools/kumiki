@@ -3,7 +3,7 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, Float, Rational, pi
+from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -35,11 +35,11 @@ class TestFreeHouseJoint:
         # 1×1 horizontal +X housed timber; bottom at (-10, 0, 10), length 20
         # Crosses the housing at global Z=10, Y ∈ [-0.5, 0.5]
         housed_timber = timber_from_directions(
-            length=Rational(20),
-            size=Matrix([Rational(1), Rational(1)]),
-            bottom_position=create_v3(Rational(-10), Rational(0), Rational(10)),
-            length_direction=create_v3(Rational(1), Rational(0), Rational(0)),
-            width_direction=create_v3(Rational(0), Rational(1), Rational(0)),
+            length=scalar(20),
+            size=Matrix([scalar(1), scalar(1)]),
+            bottom_position=create_v3(scalar(-10), scalar(0), scalar(10)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
             ticket="housed",
         )
 
@@ -51,7 +51,7 @@ class TestFreeHouseJoint:
         housed_rendered = _render_cutting(joint.cuttings["housed_timber"])
 
         # Center of the housed timber — strictly interior to both timbers' prisms
-        center_global = create_v3(Rational(0), Rational(0), Rational(10))
+        center_global = create_v3(scalar(0), scalar(0), scalar(10))
         housing_local = housing_timber.transform.global_to_local(center_global)
         housed_local = housed_timber.transform.global_to_local(center_global)
 
@@ -61,7 +61,7 @@ class TestFreeHouseJoint:
         assert housed_rendered.contains_point(housed_local)
 
         # Point well away from the notch must still be inside the housing timber
-        away_global = create_v3(Rational(0), Rational(0), Rational(5))
+        away_global = create_v3(scalar(0), scalar(0), scalar(5))
         housing_local_away = housing_timber.transform.global_to_local(away_global)
         assert housing_rendered.contains_point(housing_local_away)
 
@@ -81,11 +81,11 @@ class TestFreeHouseJoint:
         # 2×2 horizontal +X base timber; bottom at (-10, 0, 10), length 20
         # local x = global Y, local y = global Z, local z = global X
         housed_timber_base = timber_from_directions(
-            length=Rational(20),
-            size=Matrix([Rational(2), Rational(2)]),
-            bottom_position=create_v3(Rational(-10), Rational(0), Rational(10)),
-            length_direction=create_v3(Rational(1), Rational(0), Rational(0)),
-            width_direction=create_v3(Rational(0), Rational(1), Rational(0)),
+            length=scalar(20),
+            size=Matrix([scalar(2), scalar(2)]),
+            bottom_position=create_v3(scalar(-10), scalar(0), scalar(10)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
             ticket="housed_base",
         )
 
@@ -94,7 +94,7 @@ class TestFreeHouseJoint:
         # Remaining body: local_y > 0 → global Z ∈ (10, 11].
         bottom_half_cut = Cutting(
             timber=housed_timber_base,
-            negative_csg=HalfSpace(normal=Matrix([Rational(0), Rational(-1), Rational(0)]), offset=Rational(0)),
+            negative_csg=HalfSpace(normal=Matrix([scalar(0), scalar(-1), scalar(0)]), offset=scalar(0)),
         )
         housed_cut_timber = CutTimber(housed_timber_base, cuts=[bottom_half_cut])
         housed_body = housed_cut_timber.render_timber_with_cuts_csg_local()
@@ -104,7 +104,7 @@ class TestFreeHouseJoint:
 
         # --- Point in the UPPER half (global Z = 10.5): CutTimber body ---
         # The notch must remove this region from the housing.
-        upper_global = create_v3(Rational(0), Rational(0), Rational(21, 2))  # Z = 10.5
+        upper_global = create_v3(scalar(0), scalar(0), scalar(21, 2))  # Z = 10.5
         housing_local_upper = housing_timber.transform.global_to_local(upper_global)
         housed_local_upper = housed_timber_base.transform.global_to_local(upper_global)
 
@@ -115,7 +115,7 @@ class TestFreeHouseJoint:
 
         # --- Point in the LOWER half (global Z = 9.5): was cut from CutTimber ---
         # The housing must NOT be notched here.
-        lower_global = create_v3(Rational(0), Rational(0), Rational(19, 2))  # Z = 9.5
+        lower_global = create_v3(scalar(0), scalar(0), scalar(19, 2))  # Z = 9.5
         housing_local_lower = housing_timber.transform.global_to_local(lower_global)
         housed_local_lower = housed_timber_base.transform.global_to_local(lower_global)
 

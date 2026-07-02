@@ -57,16 +57,18 @@ from kumiki import *
 
 ## Numeric Values
 
-- **Always use SymPy types (Rational or Float) -- never Python floats.**
+- **Always use rule types (rule.py) -- never Python floats.**
 - Use the `inches()` and `feet()` helpers for imperial measurements:
   ```python
   inches(3)               # 3 inches
   inches(3, 2)            # 3/2 inches = 1.5"
-  feet(Rational(7, 2))    # 3.5 feet
+  feet(7, 2)    # 3.5 feet
+  scalar(7,2)           # 3.5
+  scalar(3.5)           # also OK
   ```
 - Use `mm()`, `cm()` and `m()` for metric
 - Use `degrees()` and `radians()` for angles
-- Use `Matrix([...])` for vectors, always with `Rational` or `Integer` values.
+- Use `Matrix([...])` for vectors, always with `scalar` values
 
 ## Creating Timbers
 

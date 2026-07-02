@@ -3,7 +3,7 @@ Tests for double butt joint construction functions.
 """
 
 from dataclasses import replace
-from sympy import Rational, Abs
+from sympy import Abs
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
@@ -49,7 +49,7 @@ class TestSplinedOpposingDoubleButtJoint:
 
         receiving_center_global = (
             arrangement.receiving_timber.get_bottom_position_global()
-            + arrangement.receiving_timber.get_length_direction_global() * arrangement.receiving_timber.length / Rational(2)
+            + arrangement.receiving_timber.get_length_direction_global() * arrangement.receiving_timber.length / scalar(2)
         )
 
         slot_direction_global = arrangement.receiving_timber.get_face_direction_global(TimberEnd.TOP)
@@ -63,12 +63,12 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_direction_global
         )
         slot_depth_axis_dimension = arrangement.butt_timber_1.get_size_in_face_normal_axis(slot_face_on_butt_1)
-        default_slot_depth = slot_depth_axis_dimension / Rational(2)
+        default_slot_depth = slot_depth_axis_dimension / scalar(2)
 
         # Use the slot center point implied by default parameters in the joint function.
         slot_sample_point_global = receiving_center_global + slot_direction_global * (
-            slot_depth_axis_dimension / Rational(2) - default_slot_depth / Rational(2)
-        ) + joint_plane_normal_global * Rational(0)
+            slot_depth_axis_dimension / scalar(2) - default_slot_depth / scalar(2)
+        ) + joint_plane_normal_global * scalar(0)
 
         for key in ["receiving_timber", "butt_timber_1", "butt_timber_2"]:
             cut_timber = joint.cuttings[key]
@@ -98,7 +98,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_depth=inches(2),
             spline_length=inches(12),
             slot_facing_end_on_receiving_timber=TimberEnd.TOP,
-            shoulder_symmetric_inset=Rational(0),
+            shoulder_symmetric_inset=scalar(0),
         )
         joint_inset = cut_splined_opposing_double_butt_joint(
             arrangement,
@@ -128,7 +128,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_depth=inches(2),
             spline_length=inches(12),
             slot_facing_end_on_receiving_timber=TimberEnd.TOP,
-            shoulder_symmetric_inset=Rational(0),
+            shoulder_symmetric_inset=scalar(0),
         )
         joint_inset = cut_splined_opposing_double_butt_joint(
             arrangement,
@@ -150,9 +150,9 @@ class TestSplinedOpposingDoubleButtJoint:
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
         peg_parameters = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(inches(2), Rational(0))],
+            peg_positions=[(inches(2), scalar(0))],
             size=inches(1),
-            tenon_hole_offset=Rational(0),
+            tenon_hole_offset=scalar(0),
         )
 
         joint = cut_splined_opposing_double_butt_joint(
@@ -184,9 +184,9 @@ class TestSplinedOpposingDoubleButtJoint:
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
         peg_parameters = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(inches(2), Rational(0))],
+            peg_positions=[(inches(2), scalar(0))],
             size=inches(1),
-            tenon_hole_offset=Rational(0),
+            tenon_hole_offset=scalar(0),
         )
 
         joint = cut_splined_opposing_double_butt_joint(
@@ -216,13 +216,13 @@ class TestSplinedOpposingDoubleButtJoint:
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
         peg_parameters_no_offset = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(inches(2), Rational(0))],
+            peg_positions=[(inches(2), scalar(0))],
             size=inches(1),
-            tenon_hole_offset=Rational(0),
+            tenon_hole_offset=scalar(0),
         )
         peg_parameters_offset = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(inches(2), Rational(0))],
+            peg_positions=[(inches(2), scalar(0))],
             size=inches(1),
             tenon_hole_offset=inches(1),
         )
@@ -265,9 +265,9 @@ class TestSplinedOpposingDoubleButtJoint:
         spline_extra_depth = inches(1)
         peg_parameters = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(inches(2), Rational(0))],
+            peg_positions=[(inches(2), scalar(0))],
             size=inches(1),
-            tenon_hole_offset=Rational(0),
+            tenon_hole_offset=scalar(0),
         )
 
         joint = cut_splined_opposing_double_butt_joint(
@@ -291,7 +291,7 @@ class TestSplinedOpposingDoubleButtJoint:
             TimberEnd.TOP
         )
         non_extra_spline_center_global = (
-            spline.transform.position - slot_direction_global * spline_extra_depth / Rational(2)
+            spline.transform.position - slot_direction_global * spline_extra_depth / scalar(2)
         )
 
         peg_face_on_butt_1 = arrangement.front_face_on_butt_timber_1
@@ -306,4 +306,4 @@ class TestSplinedOpposingDoubleButtJoint:
         actual_spline_lateral_position = safe_dot_product(spline.transform.position, lateral_axis)
 
         assert zero_test(peg_lateral_position - spline_lateral_position)
-        assert zero_test(Abs(actual_spline_lateral_position - spline_lateral_position) - spline_extra_depth / Rational(2))
+        assert zero_test(Abs(actual_spline_lateral_position - spline_lateral_position) - spline_extra_depth / scalar(2))

@@ -9,6 +9,7 @@ from sympy import Matrix
 from kumiki.footprint import *
 from kumiki.footprint import _segment_to_segment_distance
 from kumiki import create_v2
+from kumiki.rule import scalar
 from tests.testing_shavings import create_test_footprint
 
 
@@ -118,12 +119,12 @@ class TestFootprint:
         footprint = Footprint(tuple(corners))
         
         # Point closest to corner 0
-        idx, corner = footprint.nearest_corner(create_v2(Rational("0.1"), Rational("0.1")))
+        idx, corner = footprint.nearest_corner(create_v2(scalar("0.1"), scalar("0.1")))
         assert idx == 0
         assert corner == corners[0]
         
         # Point closest to corner 2
-        idx, corner = footprint.nearest_corner(create_v2(Rational("1.9"), Rational("1.9")))
+        idx, corner = footprint.nearest_corner(create_v2(scalar("1.9"), scalar("1.9")))
         assert idx == 2
         assert corner == corners[2]
     
@@ -138,13 +139,13 @@ class TestFootprint:
         footprint = Footprint(tuple(corners))
         
         # Point closest to first side (bottom edge)
-        idx, side, dist = footprint.nearest_boundary(create_v2(1, Rational("-0.5")))
+        idx, side, dist = footprint.nearest_boundary(create_v2(1, scalar("-0.5")))
         assert idx == 0
         assert side == (corners[0], corners[1])
         assert abs(dist - 0.5) < 1e-6
         
         # Point closest to third side (top edge)
-        idx, side, dist = footprint.nearest_boundary(create_v2(1, Rational("2.5")))
+        idx, side, dist = footprint.nearest_boundary(create_v2(1, scalar("2.5")))
         assert idx == 2
         assert side == (corners[2], corners[3])
         assert abs(dist - 0.5) < 1e-6
@@ -164,24 +165,24 @@ class TestFootprint:
         # Returns Direction3D (V3)
         normal = footprint.get_inward_normal(0)
         assert zero_test(normal[0])
-        assert normal[1] == Integer(1)
+        assert normal[1] == scalar(1)
         assert zero_test(normal[2])
         
         # Test right edge (should point left/inward: x-)
         normal = footprint.get_inward_normal(1)
-        assert normal[0] == Integer(-1)
+        assert normal[0] == scalar(-1)
         assert zero_test(normal[1])
         assert zero_test(normal[2])
         
         # Test top edge (should point down/inward: y-)
         normal = footprint.get_inward_normal(2)
         assert zero_test(normal[0])
-        assert normal[1] == Integer(-1)
+        assert normal[1] == scalar(-1)
         assert zero_test(normal[2])
         
         # Test left edge (should point right/inward: x+)
         normal = footprint.get_inward_normal(3)
-        assert normal[0] == Integer(1)
+        assert normal[0] == scalar(1)
         assert zero_test(normal[1])
         assert zero_test(normal[2])
     
@@ -258,8 +259,8 @@ class TestFootprint:
         footprint = Footprint(tuple(corners))
         
         # Horizontal line parallel to bottom edge, 0.5 units above
-        line_start = create_v2(1, Rational("0.5"))
-        line_end = create_v2(3, Rational("0.5"))
+        line_start = create_v2(1, scalar("0.5"))
+        line_end = create_v2(3, scalar("0.5"))
         
         idx, side, dist = footprint.nearest_boundary_from_line(line_start, line_end)
         

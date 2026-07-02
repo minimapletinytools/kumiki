@@ -3,8 +3,7 @@ Tests for the PatternBook module
 """
 
 import pytest
-from sympy import Integer, Rational
-from kumiki.rule import V3, create_v3, create_v2, inches, Transform, Orientation
+from kumiki.rule import V3, create_v3, create_v2, inches, Transform, Orientation, scalar
 from kumiki.timber import timber_from_directions, Frame, CutTimber, CSGAccessory
 from kumiki.cutcsg import RectangularPrism
 from kumiki.patternbook import PatternMetadata, PatternBook, PatternLambda
@@ -85,8 +84,8 @@ def test_pattern_book_creation_with_csg():
         return RectangularPrism(
             size=create_v2(size, size),
             transform=Transform(position=center, orientation=Orientation.identity()),
-            start_distance=-size / Integer(2),
-            end_distance=size / Integer(2)
+            start_distance=-size / scalar(2),
+            end_distance=size / scalar(2)
         )
     
     # Create pattern book
@@ -233,8 +232,8 @@ def test_raise_patternbook_as_frame_wraps_single_csg_pattern_as_accessory():
         return RectangularPrism(
             size=create_v2(size, size),
             transform=Transform(position=center, orientation=Orientation.identity()),
-            start_distance=-size / Integer(2),
-            end_distance=size / Integer(2)
+            start_distance=-size / scalar(2),
+            end_distance=size / scalar(2)
         )
 
     metadata = PatternMetadata(pattern_name="box", pattern_type="csg")
@@ -268,8 +267,8 @@ def test_raise_patternbook_as_frame_combines_frame_and_csg_patterns():
         return RectangularPrism(
             size=create_v2(size, size),
             transform=Transform(position=center, orientation=Orientation.identity()),
-            start_distance=-size / Integer(2),
-            end_distance=size / Integer(2)
+            start_distance=-size / scalar(2),
+            end_distance=size / scalar(2)
         )
 
     patterns: list[tuple[PatternMetadata, PatternLambda]] = [
@@ -303,8 +302,8 @@ def test_raise_pattern_group_mixed_types():
         return RectangularPrism(
             size=create_v2(size, size),
             transform=Transform(position=center, orientation=Orientation.identity()),
-            start_distance=-size / Integer(2),
-            end_distance=size / Integer(2)
+            start_distance=-size / scalar(2),
+            end_distance=size / scalar(2)
         )
     
     # Create pattern book with mixed types in same group

@@ -3,7 +3,6 @@ Tests for shoulder notching helpers in kumiki.joints.workshop.notching.
 """
 
 from dataclasses import replace
-from sympy import Rational
 
 from kumiki.cutcsg import Difference, Intersection
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
@@ -18,7 +17,7 @@ from kumiki.joints.workshop.shavings.notching import (
     chop_scribe_notch,
     does_shoulder_plane_need_notching,
 )
-from kumiki.rule import create_v2, safe_normalize_vector as normalize_vector
+from kumiki.rule import create_v2, safe_normalize_vector as normalize_vector, scalar
 from kumiki.timber import (
     TimberFace,
     TimberEnd,
@@ -76,25 +75,25 @@ class TestShoulderNotchingDecision:
         mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
             -tenon_end_direction
         ).to.face()
-        face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / Rational(2)
+        face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / scalar(2)
 
-        assert does_shoulder_plane_need_notching(aligned_arrangement, face_half_size - Rational(1))
+        assert does_shoulder_plane_need_notching(aligned_arrangement, face_half_size - scalar(1))
         assert not does_shoulder_plane_need_notching(aligned_arrangement, face_half_size)
 
         non_plane_mortise = timber_from_directions(
-            length=Rational(100),
-            size=create_v2(Rational(6), Rational(6)),
-            bottom_position=create_v3(-Rational(50), Rational(0), Rational(0)),
-            length_direction=create_v3(Rational(1), Rational(0), Rational(0)),
-            width_direction=create_v3(Rational(0), Rational(0), Rational(1)),
+            length=scalar(100),
+            size=create_v2(scalar(6), scalar(6)),
+            bottom_position=create_v3(-scalar(50), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             ticket="non_plane_mortise",
         )
         non_plane_tenon = timber_from_directions(
-            length=Rational(100),
-            size=create_v2(Rational(4), Rational(4)),
-            bottom_position=create_v3(Rational(0), Rational(0), Rational(0)),
-            length_direction=create_v3(Rational(0), Rational(1), Rational(0)),
-            width_direction=normalize_vector(create_v3(Rational(1), Rational(0), Rational(1))),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+            width_direction=normalize_vector(create_v3(scalar(1), scalar(0), scalar(1))),
             ticket="non_plane_tenon",
         )
         non_plane_arrangement = ButtJointTimberArrangement(
@@ -104,7 +103,7 @@ class TestShoulderNotchingDecision:
         )
 
         assert not are_timbers_plane_aligned(non_plane_mortise, non_plane_tenon)
-        assert does_shoulder_plane_need_notching(non_plane_arrangement, Rational(100))
+        assert does_shoulder_plane_need_notching(non_plane_arrangement, scalar(100))
 
 
 class TestChopNotchForButtJointArrangement:
@@ -128,7 +127,7 @@ class TestChopNotchForButtJointArrangement:
 
         # Mortise is 6x6, so nominal entry face half-size = 3.
         # An inset shoulder at distance 2 from the centerline (< 3) requires notching.
-        inset_distance = Rational(2)
+        inset_distance = scalar(2)
         geom = chop_notch_for_butt_joint_arrangement(
             arrangement, inset_distance
         )
@@ -161,23 +160,23 @@ class TestChopNotchForButtJointArrangement:
 class TestChopScribeNotch:
     def test_returns_pair_in_cut_timber_local_space(self):
         timber_to_be_cut = create_standard_vertical_timber(
-            height=Rational(20),
-            size=(Rational(4), Rational(6)),
-            position=(Rational(0), Rational(0), Rational(0)),
+            height=scalar(20),
+            size=(scalar(4), scalar(6)),
+            position=(scalar(0), scalar(0), scalar(0)),
             ticket="timber_to_be_cut",
         )
         timber_to_be_scribed = replace(
             timber_from_directions(
-                length=Rational(20),
-                size=create_v2(Rational(4), Rational(4)),
-                bottom_position=create_v3(Rational(0), Rational(0), Rational(0)),
-                length_direction=create_v3(Rational(0), Rational(0), Rational(1)),
-                width_direction=create_v3(Rational(1), Rational(0), Rational(0)),
+                length=scalar(20),
+                size=create_v2(scalar(4), scalar(4)),
+                bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+                length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
                 ticket="timber_to_be_scribed",
             ),
             nominal_half_sizes=(
-                create_v2(Rational(3), Rational(3)),
-                create_v2(Rational(4), Rational(4)),
+                create_v2(scalar(3), scalar(3)),
+                create_v2(scalar(4), scalar(4)),
             ),
         )
 
@@ -188,8 +187,8 @@ class TestChopScribeNotch:
 
         assert isinstance(scribed_overlap_csg_local, Intersection)
         assert isinstance(scribe_notch_csg_local, Difference)
-        assert scribed_overlap_csg_local.contains_point(create_v3(Rational(1), Rational(5, 2), Rational(10)))
-        assert scribe_notch_csg_local.contains_point(create_v3(Rational(5, 2), Rational(0), Rational(10)))
+        assert scribed_overlap_csg_local.contains_point(create_v3(scalar(1), scalar(5, 2), scalar(10)))
+        assert scribe_notch_csg_local.contains_point(create_v3(scalar(5, 2), scalar(0), scalar(10)))
 
 
 class TestMultiTimberScribeNotchingConfig:

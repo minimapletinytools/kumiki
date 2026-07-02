@@ -1,25 +1,25 @@
 """Tests for board joint functions."""
 
 import pytest
-from sympy import Integer, Matrix, Rational
+from sympy import Matrix
 
 from kumiki.joints.workshop.board_joints import (
     cut_board_in_grooved_rectangular_frame_joint,
     cut_tongue_and_groove_joint,
 )
 from kumiki.ticket import BoardTicket, TimberTicket
-from kumiki.rule import equality_test
+from kumiki.rule import equality_test, scalar
 from kumiki.timber import Board, Orientation, Timber, Transform, create_v3
 from kumiki.cutcsg import RectangularPrism, SolidUnion
 
 
 def _make_boards(
     *,
-    board_width=Rational(20),
-    board_thickness=Rational(10),
-    board_length=Rational(100),
-    overlap=Rational(2),
-    y_offset=Rational(0),
+    board_width=scalar(20),
+    board_thickness=scalar(10),
+    board_length=scalar(100),
+    overlap=scalar(2),
+    y_offset=scalar(0),
     groove_on_left=False,
 ):
     """Build a (tongue_board, groove_board) pair offset along X to overlap."""
@@ -36,7 +36,7 @@ def _make_boards(
         length=board_length,
         size=Matrix([board_width, board_thickness]),
         transform=Transform(
-            position=create_v3(center_offset_x, y_offset, Integer(0)),
+            position=create_v3(center_offset_x, y_offset, scalar(0)),
             orientation=Orientation.identity(),
         ),
         ticket=BoardTicket(name="groove_board"),
@@ -59,8 +59,8 @@ class TestTongueAndGrooveJoint:
         joint = cut_tongue_and_groove_joint(
             tongue_board=tongue_board,
             groove_board=groove_board,
-            tongue_depth=Rational(2),
-            tongue_width=Rational(4),
+            tongue_depth=scalar(2),
+            tongue_width=scalar(4),
         )
 
         assert joint.ticket.joint_type == "tongue_and_groove"
@@ -83,8 +83,8 @@ class TestTongueAndGrooveJoint:
         assert len(groove_union.children) == 2
         groove_prism = groove_union.children[0]
         assert isinstance(groove_prism, RectangularPrism)
-        assert groove_prism.size[0] == Rational(2)  # tongue_depth
-        assert groove_prism.size[1] == Rational(4)  # tongue_width
+        assert groove_prism.size[0] == scalar(2)  # tongue_depth
+        assert groove_prism.size[1] == scalar(4)  # tongue_width
         trim_prism = groove_union.children[1]
         assert isinstance(trim_prism, RectangularPrism)
         # Trim spans the full board thickness.
@@ -96,8 +96,8 @@ class TestTongueAndGrooveJoint:
         joint = cut_tongue_and_groove_joint(
             tongue_board=tongue_board,
             groove_board=groove_board,
-            tongue_depth=Rational(2),
-            tongue_width=Rational(4),
+            tongue_depth=scalar(2),
+            tongue_width=scalar(4),
         )
 
         # Groove prism's X center should sit on the LEFT side of tongue board
@@ -123,9 +123,9 @@ class TestTongueAndGrooveJoint:
         joint = cut_tongue_and_groove_joint(
             tongue_board=tongue_board,
             groove_board=groove_board,
-            tongue_depth=Rational(2),
-            tongue_width=Rational(4),
-            tongue_center_offset=Rational(1),
+            tongue_depth=scalar(2),
+            tongue_width=scalar(4),
+            tongue_center_offset=scalar(1),
         )
 
         groove_cut = joint.cuttings[groove_board.ticket.name]
@@ -135,7 +135,7 @@ class TestTongueAndGrooveJoint:
         assert isinstance(groove_prism, RectangularPrism)
         # Groove Y center should follow the tongue's Y center (offset by 1)
         # in the groove board's local frame (boards share Y origin here).
-        assert groove_prism.transform.position[1] == Rational(1)
+        assert groove_prism.transform.position[1] == scalar(1)
 
     def test_tongue_and_groove_with_extra_depth(self, tongue_groove_boards):
         tongue_board, groove_board = tongue_groove_boards
@@ -143,9 +143,9 @@ class TestTongueAndGrooveJoint:
         joint = cut_tongue_and_groove_joint(
             tongue_board=tongue_board,
             groove_board=groove_board,
-            tongue_depth=Rational(2),
-            tongue_width=Rational(4),
-            groove_extra_depth=Rational(1),
+            tongue_depth=scalar(2),
+            tongue_width=scalar(4),
+            groove_extra_depth=scalar(1),
         )
 
         groove_cut = joint.cuttings[groove_board.ticket.name]
@@ -154,43 +154,43 @@ class TestTongueAndGrooveJoint:
         groove_prism = groove_union.children[0]
         assert isinstance(groove_prism, RectangularPrism)
         # Groove X-size grows by groove_extra_depth.
-        assert groove_prism.size[0] == Rational(3)  # tongue_depth + extra
+        assert groove_prism.size[0] == scalar(3)  # tongue_depth + extra
 
     def test_insufficient_overlap_warns(self):
         # Boards only overlap by 1 but tongue_depth is 3 → warning expected.
-        tongue_board, groove_board = _make_boards(overlap=Rational(1))
+        tongue_board, groove_board = _make_boards(overlap=scalar(1))
         with pytest.warns(UserWarning, match="does not overlap tongue board enough"):
             cut_tongue_and_groove_joint(
                 tongue_board=tongue_board,
                 groove_board=groove_board,
-                tongue_depth=Rational(3),
-                tongue_width=Rational(4),
+                tongue_depth=scalar(3),
+                tongue_width=scalar(4),
             )
 
     def test_no_thickness_overlap_raises(self):
         # Shift groove board far enough in Y that boards don't overlap in thickness at all.
-        tongue_board, groove_board = _make_boards(y_offset=Rational(20))
+        tongue_board, groove_board = _make_boards(y_offset=scalar(20))
         with pytest.raises(AssertionError, match="does not overlap tongue board at all"):
             cut_tongue_and_groove_joint(
                 tongue_board=tongue_board,
                 groove_board=groove_board,
-                tongue_depth=Rational(2),
-                tongue_width=Rational(4),
+                tongue_depth=scalar(2),
+                tongue_width=scalar(4),
             )
 
     def test_misoriented_board_warns(self):
         # Thicker than wide → warning.
         tongue_board = Board(
-            length=Rational(100),
-            size=Matrix([Rational(5), Rational(10)]),  # width 5 < thickness 10
+            length=scalar(100),
+            size=Matrix([scalar(5), scalar(10)]),  # width 5 < thickness 10
             transform=Transform.identity(),
             ticket=BoardTicket(name="tongue_board"),
         )
         groove_board = Board(
-            length=Rational(100),
-            size=Matrix([Rational(5), Rational(10)]),
+            length=scalar(100),
+            size=Matrix([scalar(5), scalar(10)]),
             transform=Transform(
-                position=create_v3(Rational(3), Integer(0), Integer(0)),
+                position=create_v3(scalar(3), scalar(0), scalar(0)),
                 orientation=Orientation.identity(),
             ),
             ticket=BoardTicket(name="groove_board"),
@@ -199,15 +199,15 @@ class TestTongueAndGrooveJoint:
             cut_tongue_and_groove_joint(
                 tongue_board=tongue_board,
                 groove_board=groove_board,
-                tongue_depth=Rational(1),
-                tongue_width=Rational(2),
+                tongue_depth=scalar(1),
+                tongue_width=scalar(2),
             )
 
 
 class TestBoardInGroovedRectangularFrameJoint:
     """Tests for cut_board_in_grooved_rectangular_frame_joint."""
 
-    def _make_frame(self, *, n_boards=2, groove_extra_space=Rational(0)):
+    def _make_frame(self, *, n_boards=2, groove_extra_space=scalar(0)):
         """
         Build a panel of *n_boards* side-by-side boards and four surrounding
         frame timbers, all with identity orientation for simplicity.
@@ -215,17 +215,17 @@ class TestBoardInGroovedRectangularFrameJoint:
         Board dimensions: width=10, thickness=2, length=20.
         Frame timbers: 3×3 cross-section.
         """
-        board_width     = Rational(10)
-        board_thickness = Rational(2)
-        board_length    = Rational(20)
-        timber_size     = Matrix([Rational(3), Rational(3)])
+        board_width     = scalar(10)
+        board_thickness = scalar(2)
+        board_length    = scalar(20)
+        timber_size     = Matrix([scalar(3), scalar(3)])
 
         boards = [
             Board(
                 length=board_length,
                 size=Matrix([board_width, board_thickness]),
                 transform=Transform(
-                    position=create_v3(board_width * Integer(i), Integer(0), Integer(0)),
+                    position=create_v3(board_width * scalar(i), scalar(0), scalar(0)),
                     orientation=Orientation.identity(),
                 ),
                 ticket=BoardTicket(name=f"board_{i}"),
@@ -233,19 +233,19 @@ class TestBoardInGroovedRectangularFrameJoint:
             for i in range(n_boards)
         ]
 
-        panel_half_w = board_width * n_boards / Integer(2)
+        panel_half_w = board_width * n_boards / scalar(2)
 
         top_timber = Timber(
-            length=Rational(5),
+            length=scalar(5),
             size=timber_size,
             transform=Transform(
-                position=create_v3(Integer(0), Integer(0), board_length),
+                position=create_v3(scalar(0), scalar(0), board_length),
                 orientation=Orientation.identity(),
             ),
             ticket=TimberTicket(name="top"),
         )
         bot_timber = Timber(
-            length=Rational(5),
+            length=scalar(5),
             size=timber_size,
             transform=Transform.identity(),
             ticket=TimberTicket(name="bottom"),
@@ -254,7 +254,7 @@ class TestBoardInGroovedRectangularFrameJoint:
             length=board_length,
             size=timber_size,
             transform=Transform(
-                position=create_v3(-panel_half_w, Integer(0), Integer(0)),
+                position=create_v3(-panel_half_w, scalar(0), scalar(0)),
                 orientation=Orientation.identity(),
             ),
             ticket=TimberTicket(name="left"),
@@ -263,7 +263,7 @@ class TestBoardInGroovedRectangularFrameJoint:
             length=board_length,
             size=timber_size,
             transform=Transform(
-                position=create_v3(panel_half_w, Integer(0), Integer(0)),
+                position=create_v3(panel_half_w, scalar(0), scalar(0)),
                 orientation=Orientation.identity(),
             ),
             ticket=TimberTicket(name="right"),
@@ -304,8 +304,8 @@ class TestBoardInGroovedRectangularFrameJoint:
         Side timbers share the reference board's orientation so the prism
         size is not permuted by adopt_csg; we can check size[1] directly.
         """
-        board_thickness = Rational(2)
-        joint, _, _ = self._make_frame(groove_extra_space=Rational(0))
+        board_thickness = scalar(2)
+        joint, _, _ = self._make_frame(groove_extra_space=scalar(0))
 
         left_prism = joint.cuttings["left"].negative_csg
         assert isinstance(left_prism, RectangularPrism)
@@ -313,8 +313,8 @@ class TestBoardInGroovedRectangularFrameJoint:
 
     def test_groove_extra_space_widens_groove(self):
         """Groove Y-size grows by groove_extra_space."""
-        board_thickness = Rational(2)
-        extra           = Rational(1, 4)
+        board_thickness = scalar(2)
+        extra           = scalar(1, 4)
         joint, _, _ = self._make_frame(groove_extra_space=extra)
 
         left_prism = joint.cuttings["left"].negative_csg
@@ -324,9 +324,9 @@ class TestBoardInGroovedRectangularFrameJoint:
     def test_groove_width_spans_full_panel(self):
         """Groove X-size equals total panel width (n_boards × board_width)."""
         n   = 3
-        bw  = Rational(10)
+        bw  = scalar(10)
         joint, _, _ = self._make_frame(n_boards=n)
 
         left_prism = joint.cuttings["left"].negative_csg
         assert isinstance(left_prism, RectangularPrism)
-        assert equality_test(left_prism.size[0], bw * Integer(n))
+        assert equality_test(left_prism.size[0], bw * scalar(n))

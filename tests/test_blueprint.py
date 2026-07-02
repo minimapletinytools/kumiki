@@ -11,7 +11,6 @@ from typing import Any, cast
 from xml.etree import ElementTree
 
 import pytest
-from sympy import Integer
 
 from kumiki.blueprint import (
     export_cut_timber_stl,
@@ -22,7 +21,7 @@ from kumiki.blueprint import (
     _THREEMF_AVAILABLE,
 )
 from kumiki.timber import CutTimber, Frame, Peg, PegShape, Timber, timber_from_directions
-from kumiki.rule import Transform, create_v3, create_v2
+from kumiki.rule import Transform, create_v3, create_v2, scalar
 
 
 # ---------------------------------------------------------------------------
@@ -32,11 +31,11 @@ from kumiki.rule import Transform, create_v3, create_v2
 def _simple_timber(name: str = "test_timber") -> Timber:
     """A small axis-aligned timber for export tests."""
     return timber_from_directions(
-        bottom_position=create_v3(Integer(0), Integer(0), Integer(0)),
-        length=Integer(2),
-        size=create_v2(Integer(1), Integer(1)),
-        length_direction=create_v3(Integer(1), Integer(0), Integer(0)),
-        width_direction=create_v3(Integer(0), Integer(1), Integer(0)),
+        bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+        length=scalar(2),
+        size=create_v2(scalar(1), scalar(1)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
         ticket=name,
     )
 
@@ -48,11 +47,11 @@ def _simple_cut_timber(name: str = "test_timber") -> CutTimber:
 def _simple_frame() -> Frame:
     t1 = _simple_timber("beam")
     t2 = timber_from_directions(
-        bottom_position=create_v3(Integer(0), Integer(0), Integer(0)),
-        length=Integer(3),
-        size=create_v2(Integer(1), Integer(1)),
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+        length=scalar(3),
+        size=create_v2(scalar(1), scalar(1)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="post",
     )
     return Frame(cut_timbers=[CutTimber(t1), CutTimber(t2)], name="TestFrame")
@@ -62,10 +61,10 @@ def _simple_frame_with_accessory() -> Frame:
     frame = _simple_frame()
     peg = Peg(
         transform=Transform.identity(),
-        size=Integer(1),
+        size=scalar(1),
         shape=PegShape.ROUND,
-        forward_length=Integer(1),
-        stickout_length=Integer(0),
+        forward_length=scalar(1),
+        stickout_length=scalar(0),
     )
     return Frame(cut_timbers=frame.cut_timbers, accessories=[peg], name="TestFrameWithAccessory")
 

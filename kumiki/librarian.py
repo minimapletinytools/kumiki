@@ -35,6 +35,7 @@ from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple,
 from sympy import Float, Rational
 
 from .librarian_analysis import ModuleStaticInfo, analyze_file
+from .rule import scalar
 from .patternbook import Pattern
 
 
@@ -49,7 +50,7 @@ class Param:
 
     Use as a callable default value, e.g.:
 
-        def build_frame(width=Param(Rational(2), description="Timber width")):
+        def build_frame(width=Param(scalar(2), description="Timber width")):
             ...
     """
 
@@ -308,11 +309,11 @@ def _coerce_bool(value: Any, param_name: str) -> bool:
 
 def _coerce_number(value: Any, param_name: str) -> Any:
     if isinstance(value, bool):
-        return Rational(1 if value else 0)
+        return scalar(1 if value else 0)
     if isinstance(value, int):
-        return Rational(value)
+        return scalar(value)
     if isinstance(value, float):
-        return Rational(str(value))
+        return scalar(str(value))
     if isinstance(value, (Rational, Float)):
         return value
     if _looks_like_sympy_number(value):
@@ -322,10 +323,10 @@ def _coerce_number(value: Any, param_name: str) -> Any:
         if not stripped:
             raise ValueError(f"Parameter '{param_name}' expects a non-empty number")
         try:
-            return Rational(stripped)
+            return scalar(stripped)
         except Exception:
             try:
-                return Float(stripped)
+                return scalar(stripped)
             except Exception as exc:
                 raise ValueError(
                     f"Parameter '{param_name}' expects a numeric value, got '{value}'"
@@ -334,7 +335,7 @@ def _coerce_number(value: Any, param_name: str) -> Any:
 
 
 def _coerce_v3(value: Any, param_name: str) -> Any:
-    from .rule import create_v3
+    from .rule import create_v3, scalar
 
     if _looks_like_v3_value(value):
         return create_v3(
@@ -952,12 +953,11 @@ def _translate_frame(frame: Any, dx: float, dy: float) -> Any:
     references are rewritten to point at the new cut objects — serialize_layers uses
     identity (`is`) checks to match joints to their timbers in the frame.
     """
-    from sympy import Float, Integer
     from .rule import Transform, create_v2, create_v3
     from .timber import CutTimber, Frame
     from .footprint import Footprint
 
-    offset = create_v3(Float(dx), Float(dy), Integer(0))
+    offset = create_v3(scalar(dx), scalar(dy), scalar(0))
 
     cut_map: Dict[int, Any] = {}  # id(old_cut) → new_cut
 
@@ -983,7 +983,7 @@ def _translate_frame(frame: Any, dx: float, dy: float) -> Any:
 
     new_footprints: List[Any] = []
     for fp in (getattr(frame, "footprints", None) or []):
-        new_corners = tuple(create_v2(c[0] + Float(dx), c[1] + Float(dy)) for c in fp.corners)
+        new_corners = tuple(create_v2(c[0] + scalar(dx), c[1] + scalar(dy)) for c in fp.corners)
         new_footprints.append(Footprint(corners=new_corners))
 
     # Rewrite source_joints so their cuttings dict uses the new cut objects,
@@ -1011,14 +1011,13 @@ def build_pattern_grid_frame(pattern_list: List[Any], padding: float = 0.5) -> A
     vertex manipulation). The result is a single Frame that passes through the normal
     build_real_geometry path, so accessories, joints, and fallback geometry all work.
     """
-    from sympy import Integer
     from .rule import create_v3
     from .timber import Frame
 
     if not pattern_list:
         raise ValueError("Pattern list is empty")
 
-    origin = create_v3(Integer(0), Integer(0), Integer(0))
+    origin = create_v3(scalar(0), scalar(0), scalar(0))
 
     frames: List[Any] = []
     for p in pattern_list:

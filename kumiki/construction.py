@@ -82,19 +82,19 @@ class Stickout:
     
     Examples:
         # Symmetric stickout from centerline
-        s = Stickout.symmetric(Rational(1, 5))  # Both sides extend 0.2m from centerline
+        s = Stickout.symmetric(scalar(1, 5))  # Both sides extend 0.2m from centerline
         
         # No stickout
         s = Stickout.nostickout()  # Both sides are 0
         
         # Asymmetric stickout
-        s = Stickout(Rational(1, 10), Rational(2, 5))  # Left extends 0.1m, right extends 0.4m from centerline
+        s = Stickout(scalar(1, 10), scalar(2, 5))  # Left extends 0.1m, right extends 0.4m from centerline
         
         # Stickout from outside faces
-        s = Stickout(Rational(1, 10), Rational(1, 5), StickoutReference.OUTSIDE, StickoutReference.OUTSIDE)
+        s = Stickout(scalar(1, 10), scalar(1, 5), StickoutReference.OUTSIDE, StickoutReference.OUTSIDE)
     """
-    stickout1: Numeric = Integer(0)
-    stickout2: Numeric = Integer(0)
+    stickout1: Numeric = scalar(0)
+    stickout2: Numeric = scalar(0)
     stickoutReference1: Optional['StickoutReference'] = None
     stickoutReference2: Optional['StickoutReference'] = None
     
@@ -129,7 +129,7 @@ class Stickout:
         Returns:
             Stickout instance with stickout1 = stickout2 = 0
         """
-        return cls(Integer(0), Integer(0))
+        return cls(scalar(0), scalar(0))
 
 
 # ============================================================================
@@ -248,11 +248,11 @@ def create_vertical_timber_on_footprint_corner(footprint: Footprint, corner_inde
     timber_depth = size[1]   # Height direction (Y-axis of timber)
     
     # Vertical direction (length)
-    length_direction = create_v3(Integer(0), Integer(0), Integer(1))
+    length_direction = create_v3(scalar(0), scalar(0), scalar(1))
     
     # Align timber face direction with outgoing boundary side
     # Face direction is in the XY plane along the outgoing side
-    width_direction = create_v3(outgoing_dir_normalized[0], outgoing_dir_normalized[1], Integer(0))
+    width_direction = create_v3(outgoing_dir_normalized[0], outgoing_dir_normalized[1], scalar(0))
     
     # Calculate bottom position based on location type
     # Keep corner coordinates exact
@@ -267,22 +267,21 @@ def create_vertical_timber_on_footprint_corner(footprint: Footprint, corner_inde
     prev_len = sqrt(prev_len_sq)
     prev_dir_normalized = prev_dir / prev_len
 
-    from sympy import Rational
     if location_type == FootprintLocation.INSIDE:
         # Center-origin timber: move center inward by half size in both axes.
-        offset_x = timber_width / Rational(2) * outgoing_dir_normalized[0] + timber_depth / Rational(2) * prev_dir_normalized[0]
-        offset_y = timber_width / Rational(2) * outgoing_dir_normalized[1] + timber_depth / Rational(2) * prev_dir_normalized[1]
-        bottom_position = create_v3(corner_x + offset_x, corner_y + offset_y, Integer(0))
+        offset_x = timber_width / scalar(2) * outgoing_dir_normalized[0] + timber_depth / scalar(2) * prev_dir_normalized[0]
+        offset_y = timber_width / scalar(2) * outgoing_dir_normalized[1] + timber_depth / scalar(2) * prev_dir_normalized[1]
+        bottom_position = create_v3(corner_x + offset_x, corner_y + offset_y, scalar(0))
 
     elif location_type == FootprintLocation.OUTSIDE:
         # Center-origin timber: move center outward by half size in both axes.
-        offset_x = -timber_width / Rational(2) * outgoing_dir_normalized[0] - timber_depth / Rational(2) * prev_dir_normalized[0]
-        offset_y = -timber_width / Rational(2) * outgoing_dir_normalized[1] - timber_depth / Rational(2) * prev_dir_normalized[1]
-        bottom_position = create_v3(corner_x + offset_x, corner_y + offset_y, Integer(0))
+        offset_x = -timber_width / scalar(2) * outgoing_dir_normalized[0] - timber_depth / scalar(2) * prev_dir_normalized[0]
+        offset_y = -timber_width / scalar(2) * outgoing_dir_normalized[1] - timber_depth / scalar(2) * prev_dir_normalized[1]
+        bottom_position = create_v3(corner_x + offset_x, corner_y + offset_y, scalar(0))
 
     else:  # CENTER
         # Center of bottom face lies on the boundary corner.
-        bottom_position = create_v3(corner_x, corner_y, Integer(0))
+        bottom_position = create_v3(corner_x, corner_y, scalar(0))
     
     return create_timber(bottom_position, length, size, length_direction, width_direction, ticket=ticket)
 
@@ -354,36 +353,34 @@ def create_vertical_timber_on_footprint_side(footprint: Footprint, side_index: i
     timber_depth = size[1]   # Depth perpendicular to boundary side
     
     # Vertical direction (length)
-    length_direction = create_v3(Integer(0), Integer(0), Integer(1))
+    length_direction = create_v3(scalar(0), scalar(0), scalar(1))
     
     # Face direction is parallel to the boundary side
-    width_direction = create_v3(side_dir_normalized[0], side_dir_normalized[1], Integer(0))
+    width_direction = create_v3(side_dir_normalized[0], side_dir_normalized[1], scalar(0))
     
     # Calculate bottom position based on location type
     if location_type == FootprintLocation.CENTER:
         # Center of bottom face is on the point
         # No offset needed since timber local origin is at center of bottom face
-        bottom_position = create_v3(point_x, point_y, Integer(0))
+        bottom_position = create_v3(point_x, point_y, scalar(0))
         
     elif location_type == FootprintLocation.INSIDE:
         # One edge of bottom face lies on boundary side
         # Center of that edge is at the point
         # Post extends inside (in direction of inward normal)
         # Offset the center by half depth in the inward direction
-        from sympy import Rational
-        bottom_position = create_v3(point_x + inward_x * timber_depth / Rational(2), 
-                                         point_y + inward_y * timber_depth / Rational(2), 
-                                         Integer(0))
+        bottom_position = create_v3(point_x + inward_x * timber_depth / scalar(2), 
+                                         point_y + inward_y * timber_depth / scalar(2), 
+                                         scalar(0))
         
     else:  # OUTSIDE
         # One edge of bottom face lies on boundary side
         # Center of that edge is at the point
         # Post extends outside (opposite of inward normal)
         # Offset the center by half depth in the outward direction
-        from sympy import Rational
-        bottom_position = create_v3(point_x - inward_x * timber_depth / Rational(2), 
-                                         point_y - inward_y * timber_depth / Rational(2), 
-                                         Integer(0))
+        bottom_position = create_v3(point_x - inward_x * timber_depth / scalar(2), 
+                                         point_y - inward_y * timber_depth / scalar(2), 
+                                         scalar(0))
     
     return create_timber(bottom_position, length, size, length_direction, width_direction, ticket=ticket)
 
@@ -430,7 +427,7 @@ def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: in
     inward_normal = footprint.get_inward_normal(corner_index)
     
     # Face direction is up (Z+)
-    width_direction = create_v3(Integer(0), Integer(0), Integer(1))
+    width_direction = create_v3(scalar(0), scalar(0), scalar(1))
     
     # The timber's orientation will be:
     #   X-axis (width/size[0]) = width_direction = (0, 0, 1) = vertical (up)
@@ -441,19 +438,17 @@ def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: in
     
     # Calculate bottom position based on location type
     # Start at the start_point on the boundary side - keep exact
-    bottom_position = create_v3(start_point[0], start_point[1], Integer(0))
+    bottom_position = create_v3(start_point[0], start_point[1], scalar(0))
     
     # Apply offset based on location type
     if location_type == FootprintLocation.INSIDE:
         # Position so one edge lies on the boundary side, timber extends inward
         # Move the centerline inward by half the timber height (perpendicular dimension)
-        from sympy import Rational
-        bottom_position = bottom_position + inward_normal * (timber_height / Rational(2))
+        bottom_position = bottom_position + inward_normal * (timber_height / scalar(2))
     elif location_type == FootprintLocation.OUTSIDE:
         # Position so one edge lies on the boundary side, timber extends outward
         # Move the centerline outward by half the timber height (perpendicular dimension)
-        from sympy import Rational
-        bottom_position = bottom_position - inward_normal * (timber_height / Rational(2))
+        bottom_position = bottom_position - inward_normal * (timber_height / scalar(2))
     # For CENTER, no offset needed - centerline is already on the boundary side
     
     return create_timber(bottom_position, length, size, length_direction, width_direction, ticket=ticket)
@@ -559,12 +554,12 @@ def attach_timber(
     size: V2, 
     attached_timber_direction: Direction3D,
     attached_timber_length: Numeric,
-    attached_timber_opposite_length: Numeric = Integer(0),
+    attached_timber_opposite_length: Numeric = scalar(0),
     attached_timber_width_direction: Optional[Direction3D] = None,
     attached_timber_end_that_points_towards_original_timber: TimberEnd = TimberEnd.BOTTOM,
     original_timber_end_to_measure_from_for_length_position: TimberEnd = TimberEnd.BOTTOM,
-    length_position_measurement: Numeric = Integer(0),
-    lateral_offset: Numeric = Integer(0),
+    length_position_measurement: Numeric = scalar(0),
+    lateral_offset: Numeric = scalar(0),
     ticket: Optional[Union[TimberTicket, str]] = None,
 ):
     """
@@ -612,7 +607,7 @@ def attach_timber(
     else:  # TOP
         reference = locate_position_on_centerline_from_top(original_timber, length_position_measurement).position
 
-    if lateral_offset != Integer(0):
+    if lateral_offset != scalar(0):
         # lateral direction = original length axis CROSS the attached timber's length axis
         original_length_dir = original_timber.get_length_direction_global()
         assert not are_vectors_parallel(length_dir, original_length_dir), \
@@ -622,11 +617,11 @@ def attach_timber(
 
     # ---- extend along the pointing direction and build the timber ----
     attached_total_length = attached_timber_length + attached_timber_opposite_length
-    assert safe_compare(attached_total_length, Integer(0), Comparison.GT), \
+    assert safe_compare(attached_total_length, scalar(0), Comparison.GT), \
         "attached timber total length (attached_timber_length + attached_timber_opposite_length) must be positive"
 
-    center = reference + point_dir * (attached_timber_length - attached_timber_opposite_length) / Integer(2)
-    bottom_position = center - length_dir * (attached_total_length / Integer(2))
+    center = reference + point_dir * (attached_timber_length - attached_timber_opposite_length) / scalar(2)
+    bottom_position = center - length_dir * (attached_total_length / scalar(2))
 
     # default the width direction to the original timber's length (its TOP face direction)
     width_direction = attached_timber_width_direction if attached_timber_width_direction is not None \
@@ -648,14 +643,14 @@ def attach_plane_aligned_timber(
     original_timber_long_face_that_attached_timber_points_to: TimberLongFace,
     attached_timber_angle: Numeric, # angle between the length axis of the original timber and attached timber, note that this flips depending on attached_timber_end_that_points_towards_original_timber
     attached_timber_length: Numeric,
-    attached_timber_opposite_length: Numeric = Integer(0),
+    attached_timber_opposite_length: Numeric = scalar(0),
     attached_timber_end_that_points_towards_original_timber: TimberEnd = TimberEnd.BOTTOM,
     original_timber_end_to_measure_from_for_length_position: TimberEnd = TimberEnd.BOTTOM,
     attached_timber_long_face_to_measure_to_for_length_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
-    length_position_measurement: Numeric = Integer(0),
+    length_position_measurement: Numeric = scalar(0),
     original_timber_face_to_measure_from_for_lateral_position: Union[TimberFace, TimberCenterline] = TimberCenterline.CENTERLINE,
     attached_timber_long_face_to_measure_to_for_lateral_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
-    lateral_position_measurement: Numeric = Integer(0),
+    lateral_position_measurement: Numeric = scalar(0),
     ticket: Optional[Union[TimberTicket, str]] = None,
 ) -> Timber:
     """
@@ -753,19 +748,19 @@ def attach_plane_aligned_timber(
     height_dir = normalize_vector(cross_product(length_dir, width_dir))
 
     attached_total_length = attached_timber_length + attached_timber_opposite_length
-    assert safe_compare(attached_total_length, Integer(0), Comparison.GT), \
+    assert safe_compare(attached_total_length, scalar(0), Comparison.GT), \
         "attached timber total length (attached_timber_length + attached_timber_opposite_length) must be positive"
 
     def _attached_long_face_normal_and_half(face: TimberLongFace) -> Tuple[Direction3D, Numeric]:
         """Outward global normal and center-to-face half size for a long face of the attached timber."""
         if face == TimberLongFace.RIGHT:
-            return width_dir, size[0] / Integer(2)
+            return width_dir, size[0] / scalar(2)
         elif face == TimberLongFace.LEFT:
-            return -width_dir, size[0] / Integer(2)
+            return -width_dir, size[0] / scalar(2)
         elif face == TimberLongFace.FRONT:
-            return height_dir, size[1] / Integer(2)
+            return height_dir, size[1] / scalar(2)
         else:  # BACK
-            return -height_dir, size[1] / Integer(2)
+            return -height_dir, size[1] / scalar(2)
 
     O = original_timber.get_bottom_position_global()
 
@@ -773,7 +768,7 @@ def attach_plane_aligned_timber(
     # The timber extends attached_timber_length / attached_timber_opposite_length along point_dir
     # from the plane through the original centerline perpendicular to a, so the center's
     # a-coordinate shifts by (length - opposite)/2 times the a-component of point_dir.
-    center_a = O.dot(a) + (attached_timber_length - attached_timber_opposite_length) / Integer(2) * point_dir.dot(a)
+    center_a = O.dot(a) + (attached_timber_length - attached_timber_opposite_length) / scalar(2) * point_dir.dot(a)
 
     # ---- length-position-axis coordinate (along l) ----
     # Measure from the chosen end of the original timber, going into the timber.
@@ -800,7 +795,7 @@ def attach_plane_aligned_timber(
         into_sign_t = -orig_lat_normal.dot(t)  # positive measurement goes into the original timber
     else:  # CENTERLINE
         from_t = O.dot(t)
-        into_sign_t = Integer(1)
+        into_sign_t = scalar(1)
     target_t = from_t + lateral_position_measurement * into_sign_t
     if isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, TimberLongFace):
         lat_normal, lat_half = _attached_long_face_normal_and_half(attached_timber_long_face_to_measure_to_for_lateral_position)
@@ -815,7 +810,7 @@ def attach_plane_aligned_timber(
     # ---- reconstruct the center in global coordinates and build the timber ----
     # (a, l, t) is an orthonormal basis, so a global point equals the sum of its coords times the axes.
     center = center_a * a + center_l * l + center_t * t
-    bottom_position = center - length_dir * (attached_total_length / Integer(2))
+    bottom_position = center - length_dir * (attached_total_length / scalar(2))
 
     return create_timber(
         bottom_position=bottom_position,
@@ -831,14 +826,14 @@ def attach_face_aligned_timber(
     size: V2, # always width, height in the local coordinates of the created attached timber
     original_timber_long_face_that_attached_timber_points_to: TimberLongFace,
     attached_timber_length: Numeric,
-    attached_timber_opposite_length: Numeric = Integer(0),
+    attached_timber_opposite_length: Numeric = scalar(0),
     attached_timber_end_that_points_towards_original_timber: TimberEnd = TimberEnd.BOTTOM,
     original_timber_end_to_measure_from_for_length_position: TimberEnd = TimberEnd.BOTTOM,
     attached_timber_long_face_to_measure_to_for_length_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
-    length_position_measurement: Numeric = Integer(0),
+    length_position_measurement: Numeric = scalar(0),
     original_timber_face_to_measure_from_for_lateral_position: Union[TimberFace, TimberCenterline] = TimberCenterline.CENTERLINE,
     attached_timber_long_face_to_measure_to_for_lateral_position: Union[TimberLongFace, TimberCenterline] = TimberCenterline.CENTERLINE,
-    lateral_position_measurement: Numeric = Integer(0),
+    lateral_position_measurement: Numeric = scalar(0),
     ticket: Optional[Union[TimberTicket, str]] = None,
 ) -> Timber:
     """
@@ -898,7 +893,7 @@ def attach_face_aligned_timber(
 def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin, 
                 location_on_timber1: Numeric,
                 location_on_timber2: Optional[Numeric] = None,
-                lateral_offset: Numeric = Integer(0),
+                lateral_offset: Numeric = scalar(0),
                 stickout: Stickout = Stickout.nostickout(),
                 size: Optional[V2] = None,
                 orientation_width_vector: Optional[Direction3D] = None, 
@@ -919,7 +914,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
         lateral_offset: Lateral offset of the joining timber perpendicular to the direct 
                        centerline-to-centerline path. The offset direction is determined by the
                        cross product of timber1's length direction and the joining direction.
-                       Defaults to Integer(0) (no offset).
+                       Defaults to scalar(0) (no offset).
         stickout: How much the joining timber extends beyond each connection point (both sides).
                   Always measured from centerlines in this function.
                   Defaults to Stickout.nostickout() if not provided.
@@ -983,7 +978,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
         # Dot product of the created timber's face direction with timber1's length direction
         dot_product = Abs(width_direction.dot(timber1.get_length_direction_global()))
         
-        if dot_product < Rational(1, 2):  # < 0.5, meaning more perpendicular than parallel
+        if dot_product < scalar(1, 2):  # < 0.5, meaning more perpendicular than parallel
             # The created timber is joining perpendicular to timber1
             # Its X dimension (width, along width_direction) should match the dimension 
             # of the face it's joining to on timber1, which is timber1's width (size[0])
@@ -1003,7 +998,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     timber_length = centerline_distance + stickout.stickout1 + stickout.stickout2
     
     # Apply lateral offset
-    if lateral_offset != Integer(0):
+    if lateral_offset != scalar(0):
         # Calculate offset direction (cross product of length vectors)
         offset_dir = normalize_vector(cross_product(timber1.get_length_direction_global(), length_direction))
     
@@ -1012,7 +1007,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     bottom_pos = pos1 - length_direction * stickout.stickout1
     
     # Apply offset to bottom position as well (if any offset was applied to center)
-    if lateral_offset != Integer(0):
+    if lateral_offset != scalar(0):
         bottom_pos += offset_dir * lateral_offset
     
     return create_timber(bottom_pos, timber_length, size, length_direction, width_direction, ticket=ticket)
@@ -1023,7 +1018,7 @@ def join_plane_aligned_on_place_aligned_timbers(timber1: PerfectTimberWithin, ti
                                                 stickout: Stickout,
                                                 size: V2,
                                                 # lateral offset (in the axis perpendicular to the face parallel plane) from feature_to_mark_on_joining_timber
-                                                lateral_offset_from_timber1: Numeric = Integer(0),
+                                                lateral_offset_from_timber1: Numeric = scalar(0),
                                                 feature_to_mark_on_joining_timber: Optional[TimberFeature] = None,
                                                 # if None, set to some arbitrary face of timber1 on the parallel face plane
                                                 orientation_long_face_on_timber1: Optional[TimberLongFace] = None, 
@@ -1083,7 +1078,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
                                                 location_on_timber1: Numeric,
                                                 stickout: Stickout,
                                                 size: V2,
-                                                lateral_offset_from_timber1: Numeric = Integer(0),
+                                                lateral_offset_from_timber1: Numeric = scalar(0),
                                                 feature_to_mark_on_joining_timber: Optional[TimberFeature] = None,
                                                 orientation_face_on_timber1: Optional[TimberFace] = None, 
                                                 ticket: Optional[Union[TimberTicket, str]] = None) -> Timber:
@@ -1097,7 +1092,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
         stickout: How much the joining timber extends beyond each connection point
         size: Cross-sectional size (width, height) of the joining timber
         lateral_offset_from_timber1: Lateral offset from timber1's centerline reference.
-                        Defaults to Integer(0).
+                        Defaults to scalar(0).
         feature_to_mark_on_joining_timber: Optional feature on the create timber to use as the reference for the lateral offset.
                                            It is intended for you to use the locate_face or locate_long_edge functions to create a plane or line on a timber.
                                            If not provided, uses the centerline. If a plane is provided, the "origin" of the plane is used for longitudinal positioning (i.e. location_on_timber1). In the case of locate_face, the origin aligns with the center of the created timber.
@@ -1131,7 +1126,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
     
     # Intentionally do not clamp the projected location. Callers may rely on
     # measurements beyond timber2's nominal extents.
-    #location_on_timber2 = max(Integer(0), min(timber2.length, location_on_timber2))
+    #location_on_timber2 = max(scalar(0), min(timber2.length, location_on_timber2))
     
     # Calculate position on timber2 to determine joining direction
     pos2 = locate_position_on_centerline_from_bottom(timber2, location_on_timber2).position
@@ -1161,8 +1156,8 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
     height_direction = normalize_vector(cross_product(joining_direction, width_direction))
     
     # Now convert feature-relative measurements to centerline-relative measurements
-    longitudinal_offset = Rational(0)
-    lateral_offset_adjustment = Rational(0)
+    longitudinal_offset = scalar(0)
+    lateral_offset_adjustment = scalar(0)
     
     # Convert TimberFeature enum to geometric object if provided
     feature_geometry = None
@@ -1172,7 +1167,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
         temp_timber_center = pos1  # Arbitrary position for temp timber
         temp_timber = create_timber(
             bottom_position=temp_timber_center,
-            length=Rational(1),  # Arbitrary length
+            length=scalar(1),  # Arbitrary length
             size=size,
             length_direction=joining_direction,
             width_direction=width_direction
@@ -1224,20 +1219,20 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
             if safe_compare(width_dot, 0, Comparison.GT):
                 # RIGHT face (normal = +width_direction)
                 longitudinal_offset = size[0] / 2
-                lateral_offset_adjustment = Rational(0)
+                lateral_offset_adjustment = scalar(0)
             else:
                 # LEFT face (normal = -width_direction)
                 longitudinal_offset = -size[0] / 2
-                lateral_offset_adjustment = Rational(0)
+                lateral_offset_adjustment = scalar(0)
         else:
             # Normal is aligned with height_direction (FRONT/BACK faces)
             if safe_compare(height_dot, 0, Comparison.GT):
                 # FRONT face (normal = +height_direction)
-                longitudinal_offset = Rational(0)
+                longitudinal_offset = scalar(0)
                 lateral_offset_adjustment = size[1] / 2
             else:
                 # BACK face (normal = -height_direction)
-                longitudinal_offset = Rational(0)
+                longitudinal_offset = scalar(0)
                 lateral_offset_adjustment = -size[1] / 2
     
     elif isinstance(feature_geometry, Line):
@@ -1265,7 +1260,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
                                    height_offset * height_direction.dot(lateral_direction)
         
         # No longitudinal offset for edge lines (they run along the length)
-        longitudinal_offset = Rational(0)
+        longitudinal_offset = scalar(0)
     
     # Adjust location_on_timber1 for longitudinal offset (along joining_direction)
     # The longitudinal offset affects where along timber1's length we measure from
@@ -1330,18 +1325,18 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
     if stickout.stickoutReference1 == StickoutReference.INSIDE:
         # INSIDE: Extends from the face closest to timber2
         # Add half the perpendicular size
-        centerline_stickout1 = stickout.stickout1 + perpendicular_size / Rational(2)
+        centerline_stickout1 = stickout.stickout1 + perpendicular_size / scalar(2)
     elif stickout.stickoutReference1 == StickoutReference.OUTSIDE:
         # OUTSIDE: Extends from the face away from timber2
         # Subtract half the perpendicular size
-        centerline_stickout1 = stickout.stickout1 - perpendicular_size / Rational(2)
+        centerline_stickout1 = stickout.stickout1 - perpendicular_size / scalar(2)
     
     if stickout.stickoutReference2 == StickoutReference.INSIDE:
         # INSIDE: Extends from the face closest to timber1
-        centerline_stickout2 = stickout.stickout2 + perpendicular_size / Rational(2)
+        centerline_stickout2 = stickout.stickout2 + perpendicular_size / scalar(2)
     elif stickout.stickoutReference2 == StickoutReference.OUTSIDE:
         # OUTSIDE: Extends from the face away from timber1
-        centerline_stickout2 = stickout.stickout2 - perpendicular_size / Rational(2)
+        centerline_stickout2 = stickout.stickout2 - perpendicular_size / scalar(2)
     
     # Create a new Stickout with CENTER_LINE reference
     centerline_stickout = Stickout(

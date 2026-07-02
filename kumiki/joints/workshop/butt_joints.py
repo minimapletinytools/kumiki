@@ -86,18 +86,17 @@ def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace)
         return locate_bottom_center_position(timber).position
     else:
         # For long faces (LEFT, RIGHT, FRONT, BACK), center is at mid-length
-        from sympy import Rational
-        face_center = timber.get_bottom_position_global() + (timber.length / Rational(2)) * timber.get_length_direction_global()
+        face_center = timber.get_bottom_position_global() + (timber.length / scalar(2)) * timber.get_length_direction_global()
 
         # Offset to the face surface
         if face == TimberFace.RIGHT:
-            face_center = face_center + (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+            face_center = face_center + (timber.size[0] / scalar(2)) * timber.get_width_direction_global()
         elif face == TimberFace.LEFT:
-            face_center = face_center - (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+            face_center = face_center - (timber.size[0] / scalar(2)) * timber.get_width_direction_global()
         elif face == TimberFace.FRONT:
-            face_center = face_center + (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+            face_center = face_center + (timber.size[1] / scalar(2)) * timber.get_height_direction_global()
         else:  # BACK
-            face_center = face_center - (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+            face_center = face_center - (timber.size[1] / scalar(2)) * timber.get_height_direction_global()
 
         return face_center
 
@@ -268,7 +267,7 @@ def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJoi
 def cut_tongue_and_fork_butt_joint(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
-    tongue_position: Numeric = Rational(0),
+    tongue_position: Numeric = scalar(0),
 ) -> Joint:
     """
     Creates a plain tongue-and-fork butt joint.
@@ -319,14 +318,14 @@ def cut_tongue_and_fork_butt_joint(
 
     tongue_normal_dimension = tongue_timber.get_size_in_face_normal_axis(tongue_normal_face)
     if tongue_thickness is None:
-        tongue_thickness = tongue_normal_dimension / Rational(3)
+        tongue_thickness = tongue_normal_dimension / scalar(3)
 
     assert safe_compare(tongue_thickness, 0, Comparison.GT), "tongue_thickness must be greater than 0"
     assert safe_compare(tongue_normal_dimension - tongue_thickness, 0, Comparison.GE), \
         "tongue_thickness must be <= the tongue timber size in the shared plane normal axis"
 
-    half_tongue_dimension = tongue_normal_dimension / Rational(2)
-    half_tongue_thickness = tongue_thickness / Rational(2)
+    half_tongue_dimension = tongue_normal_dimension / scalar(2)
+    half_tongue_thickness = tongue_thickness / scalar(2)
     assert safe_compare(half_tongue_dimension - (Abs(tongue_position) + half_tongue_thickness), 0, Comparison.GE), \
         "tongue_position and tongue_thickness place the tongue outside the tongue timber boundary"
 
@@ -345,7 +344,7 @@ def cut_tongue_and_fork_butt_joint(
         butt_timber_end=tongue_end,
     )
     fork_entry_long_face = fork_timber.get_closest_oriented_long_face_from_global_direction(-tongue_end_direction)
-    fork_shoulder_distance = fork_timber.get_size_in_face_normal_axis(fork_entry_long_face) / Rational(2)
+    fork_shoulder_distance = fork_timber.get_size_in_face_normal_axis(fork_entry_long_face) / scalar(2)
 
     shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
         butt_arrangement_for_shoulder, fork_shoulder_distance
@@ -412,7 +411,7 @@ def cut_tongue_and_fork_butt_joint(
         "Fork slot depth must be > 0; check timber arrangement and end selections"
 
     fork_slot_end_overshoot = max(fork_timber.size[0], fork_timber.size[1])
-    fork_slot_back_extension = max(fork_timber.size[0], fork_timber.size[1]) * Rational(2)
+    fork_slot_back_extension = max(fork_timber.size[0], fork_timber.size[1]) * scalar(2)
     fork_slot_prism_global = RectangularPrism(
         size=create_v2(tongue_width, tongue_thickness),
         transform=marking_space.transform,
@@ -525,7 +524,7 @@ class WedgeParameters:
     depth: Numeric
     width_axis: Direction3D
     positions: List[Numeric]
-    expand_mortise: Numeric = Rational(0)
+    expand_mortise: Numeric = scalar(0)
 
 
 # ============================================================================
@@ -539,7 +538,7 @@ def cut_mortise_and_tenon_joint(
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
 
-    mortise_shoulder_distance_from_centerline: Numeric = Rational(0),
+    mortise_shoulder_distance_from_centerline: Numeric = scalar(0),
 
     tenon_position: Optional[V2] = None,
     wedge_parameters: Optional[WedgeParameters] = None,
@@ -594,7 +593,7 @@ def cut_mortise_and_tenon_joint(
 
     # Default tenon_position to centered (0, 0)
     if tenon_position is None:
-        tenon_position = Matrix([Rational(0), Rational(0)])
+        tenon_position = Matrix([scalar(0), scalar(0)])
 
     # Validation for round tenon mode
     if use_round_tenon:
@@ -649,15 +648,15 @@ def cut_mortise_and_tenon_joint(
     from sympy import Abs, sqrt
 
     # Back-extension from shoulder so prism fully contains tenon at oblique angles
-    sin_angle_sq = Integer(1) - cos_angle * cos_angle
-    sin_angle_safe = Rational(1, 10000) if safe_zero_test(sin_angle_sq) else sqrt(Abs(sin_angle_sq))
+    sin_angle_sq = scalar(1) - cos_angle * cos_angle
+    sin_angle_safe = scalar(1, 10000) if safe_zero_test(sin_angle_sq) else sqrt(Abs(sin_angle_sq))
     back_extension = max(tenon_size[0], tenon_size[1]) / sin_angle_safe
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
 
     if use_round_tenon:
         # Round tenon: use cylinder with diameter = tenon_size[0]
-        tenon_radius = tenon_size[0] / Integer(2)
+        tenon_radius = tenon_size[0] / scalar(2)
         axis_direction_global = normalize_vector(tenon_end_direction)
         tenon_prism_global = Cylinder(
             axis_direction=axis_direction_global,
@@ -697,7 +696,7 @@ def cut_mortise_and_tenon_joint(
         joint_angle_axis_index = tenon_timber.get_size_index_in_long_face_normal_axis(joint_angle_axis_face)
 
         mortise_hole_length_oblique_direction = mortise_timber.get_face_direction_global(mortise_oblique_end)
-        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_angle_safe / Rational(2)
+        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_angle_safe / scalar(2)
 
         # Crop 1: far end of prism perpendicular to mortise face
         mortise_hole_end_crop_global = HalfSpace(
@@ -740,7 +739,7 @@ def cut_mortise_and_tenon_joint(
     if do_cropping:
         if use_round_tenon:
             # Round mortise hole at an angle: use cylinder
-            mortise_radius = tenon_size[0] / Integer(2)
+            mortise_radius = tenon_size[0] / scalar(2)
             axis_direction_global = normalize_vector(-mortise_face_normal)
             mortise_hole_prism_global = Cylinder(
                 axis_direction=axis_direction_global,
@@ -776,7 +775,7 @@ def cut_mortise_and_tenon_joint(
     else:
         if use_round_tenon:
             # Round mortise hole: use cylinder with same diameter as tenon
-            mortise_radius = tenon_size[0] / Integer(2)
+            mortise_radius = tenon_size[0] / scalar(2)
             axis_direction_global = normalize_vector(-mortise_face_normal)
             mortise_hole_prism_global = Cylinder(
                 axis_direction=axis_direction_global,
@@ -806,7 +805,7 @@ def cut_mortise_and_tenon_joint(
         arrangement,
         mortise_shoulder_distance_from_centerline,
         # pass pi/2 so the relief angle naturally follows the butt approach angle
-        notch_wall_min_relief_cut_angle=_pi / Rational(2),
+        notch_wall_min_relief_cut_angle=_pi / scalar(2),
     )
 
     # -------------------------------------------------------------------------
@@ -862,12 +861,12 @@ def cut_mortise_and_tenon_joint(
         def _build_peg_hole_global(center_global: V3, orientation_global: Orientation, depth: Numeric, label: str) -> CutCSG:
             if peg_parameters.shape == PegShape.ROUND:
                 # Cylinder axis is the Z column of the orientation in global space.
-                axis_direction_global = orientation_global.matrix * create_v3(Integer(0), Integer(0), Integer(1))
+                axis_direction_global = orientation_global.matrix * create_v3(scalar(0), scalar(0), scalar(1))
                 return Cylinder(
                     axis_direction=axis_direction_global,
-                    radius=peg_size / Integer(2),
+                    radius=peg_size / scalar(2),
                     position=center_global,
-                    start_distance=Rational(0),
+                    start_distance=scalar(0),
                     end_distance=depth,
                     label=label,
                 )
@@ -877,7 +876,7 @@ def cut_mortise_and_tenon_joint(
                     position=center_global,
                     orientation=orientation_global,
                 ),
-                start_distance=Rational(0),
+                start_distance=scalar(0),
                 end_distance=depth,
                 label=label,
             )
@@ -950,7 +949,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
     tenon_position: Optional[V2] = None,
-    mortise_shoulder_inset: Numeric = Rational(0),
+    mortise_shoulder_inset: Numeric = scalar(0),
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
     crop_tenon_to_mortise_orientation_on_angled_joints = False,
@@ -1029,7 +1028,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
     tenon_position: Optional[V2] = None,
-    mortise_shoulder_inset: Numeric = Rational(0),
+    mortise_shoulder_inset: Numeric = scalar(0),
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
     use_round_tenon: bool = False,
@@ -1084,7 +1083,7 @@ def cut_round_mortise_and_tenon_joint(
     diameter: Numeric,
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
-    mortise_shoulder_distance_from_centerline: Numeric = Rational(0),
+    mortise_shoulder_distance_from_centerline: Numeric = scalar(0),
 ) -> Joint:
     """
     Creates a simplified round mortise and tenon joint with any orientation.
@@ -1119,7 +1118,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     diameter: Numeric,
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
-    mortise_shoulder_inset: Numeric = Rational(0),
+    mortise_shoulder_inset: Numeric = scalar(0),
 ) -> Joint:
     """
     Creates a simplified round mortise and tenon joint for plane-aligned timbers.
@@ -1177,9 +1176,9 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     tenon_size: V2,
     tenon_depth: Numeric,
     dovetail_depth: Numeric,
-    tenon_lateral_offset: Numeric = Rational(0),
-    receiving_timber_mortise_extra_depth: Numeric = Rational(0),
-    mortise_shoulder_inset: Numeric = Rational(0),
+    tenon_lateral_offset: Numeric = scalar(0),
+    receiving_timber_mortise_extra_depth: Numeric = scalar(0),
+    mortise_shoulder_inset: Numeric = scalar(0),
     wedge_accessory_parameters: Optional[DovetailTenonWedgeAccessoryParameters] = None,
 ) -> Joint:
     """
@@ -1329,7 +1328,7 @@ def cut_dropin_dovetail_butt_joint(
     dovetail_length: Numeric,
     dovetail_small_width: Numeric,
     dovetail_large_width: Numeric,
-    dovetail_lateral_offset: Numeric = Rational(0),
+    dovetail_lateral_offset: Numeric = scalar(0),
     dovetail_depth: Optional[Numeric] = None
 ) -> Joint:
     """
@@ -1413,7 +1412,7 @@ def cut_dropin_dovetail_butt_joint(
 
     if dovetail_depth is None:
         # Default: half the timber dimension perpendicular to the dovetail face
-        dovetail_depth = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.to.face()) / Rational(2)
+        dovetail_depth = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.to.face()) / scalar(2)
 
     # ========================================================================
     # Create the dovetail profile (simple trapezoid)
@@ -1426,11 +1425,11 @@ def cut_dropin_dovetail_butt_joint(
 
     dovetail_profile = [
         # Tip (narrow end at the timber end)
-        Matrix([-dovetail_small_width / Rational(2) + dovetail_lateral_offset, 0]),
-        Matrix([dovetail_small_width / Rational(2) + dovetail_lateral_offset, 0]),
+        Matrix([-dovetail_small_width / scalar(2) + dovetail_lateral_offset, 0]),
+        Matrix([dovetail_small_width / scalar(2) + dovetail_lateral_offset, 0]),
         # Base (wide end)
-        Matrix([dovetail_large_width / Rational(2) + dovetail_lateral_offset, dovetail_length]),
-        Matrix([-dovetail_large_width / Rational(2) + dovetail_lateral_offset, dovetail_length]),
+        Matrix([dovetail_large_width / scalar(2) + dovetail_lateral_offset, dovetail_length]),
+        Matrix([-dovetail_large_width / scalar(2) + dovetail_lateral_offset, dovetail_length]),
     ]
 
 
@@ -1447,7 +1446,7 @@ def cut_dropin_dovetail_butt_joint(
     marking = mark_distance_from_end_along_centerline(face_plane, dovetail_timber, dovetail_timber_end)
     shoulder_distance_from_end = marking.distance - receiving_timber_shoulder_inset
 
-    offset_to_dovetail_face = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face) / Rational(2) * dovetail_timber.get_face_direction_global(dovetail_timber_face)
+    offset_to_dovetail_face = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face) / scalar(2) * dovetail_timber.get_face_direction_global(dovetail_timber_face)
 
     marking_transform_position = dovetail_timber.get_bottom_position_global() + shoulder_distance_from_end * dovetail_timber.get_length_direction_global() + offset_to_dovetail_face
     marking_transform_orientation = orientation_pointing_towards_face_sitting_on_face(towards_face=dovetail_timber_end.to.face(), sitting_face=dovetail_timber_face.to.face())

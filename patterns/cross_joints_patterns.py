@@ -2,7 +2,7 @@
 Cross Joints Patterns
 """
 
-from sympy import Matrix, Rational, sqrt
+from sympy import Matrix, sqrt
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -146,7 +146,7 @@ def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[
             timber2=timberB,
             front_face_on_timber1=TimberLongFace.FRONT,
         ),
-        cut_ratio=Rational(1, 2),
+        cut_ratio=scalar(1, 2),
     )
 
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
@@ -154,11 +154,11 @@ def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[
 
 
 def create_all_cross_joint_patterns(use_round_timbers=False) -> Frame:
-    origin = create_v3(Integer(0), Integer(0), Integer(0))
+    origin = create_v3(scalar(0), scalar(0), scalar(0))
     step = inches(24)
     all_timbers = []
     all_timbers += make_house_joint_example(origin, use_round_timbers)
-    all_timbers += make_cross_lap_joint_example(origin + create_v3(step, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_cross_lap_joint_example(origin + create_v3(step, scalar(0), scalar(0)), use_round_timbers)
     return Frame(cut_timbers=all_timbers, name="Cross Joint Patterns")
 
 

@@ -3,7 +3,6 @@ Tests for shavings.py - Helper functions for joint validation
 """
 
 import pytest
-from sympy import Rational
 from kumiki.joints.workshop.shavings.shavings import (
     check_timber_overlap_for_splice_joint_is_sensible, 
     chop_timber_end_with_prism,
@@ -14,7 +13,7 @@ from kumiki.joints.workshop.shavings.shavings import (
 )
 from kumiki.joints.workshop.shavings.notching import chop_shoulder_notch_on_timber_face
 from kumiki.timber import timber_from_directions, TimberEnd, TimberFace, TimberLongFace
-from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel
+from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel, scalar
 from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace
 from kumiki.measuring import mark_distance_from_end_along_centerline
 
@@ -211,7 +210,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timberB = timber_from_directions(
             length=timber_length,
             size=timber_size,
-            bottom_position=create_v3(0, 0, timber_length * Rational(5, 2)),  # Start at 2.5*L
+            bottom_position=create_v3(0, 0, timber_length * scalar(5, 2)),  # Start at 2.5*L
             length_direction=create_v3(0, 0, -1),  # Pointing down, so TOP is at 1.5*L
             width_direction=create_v3(1, 0, 0),
             ticket="timberB"
@@ -411,8 +410,8 @@ class TestChopTimberEndWithPrism:
     def test_chop_with_rational_distances(self):
         """Test that the function works with Rational arithmetic."""
         timber = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(2), Rational(2)),
+            length=scalar(10),
+            size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0),
@@ -420,11 +419,11 @@ class TestChopTimberEndWithPrism:
         )
         
         # Chop 1/3 from the top
-        chop_distance = Rational(1, 3)
+        chop_distance = scalar(1, 3)
         prism = chop_timber_end_with_prism(timber, TimberEnd.TOP, chop_distance)
         
         # Should get exact rational arithmetic
-        expected_start = Rational(10) - Rational(1, 3)
+        expected_start = scalar(10) - scalar(1, 3)
         assert prism.start_distance == expected_start
         assert prism.end_distance is None
 
@@ -479,8 +478,8 @@ class TestChopTimberEndWithHalfspace:
     def test_chop_with_rational_distances(self):
         """Test that the function works with Rational arithmetic."""
         timber = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(2), Rational(2)),
+            length=scalar(10),
+            size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0),
@@ -488,11 +487,11 @@ class TestChopTimberEndWithHalfspace:
         )
         
         # Chop 1/3 from the top
-        chop_distance = Rational(1, 3)
+        chop_distance = scalar(1, 3)
         half_plane = chop_timber_end_with_half_plane(timber, TimberEnd.TOP, chop_distance)
         
         # Should get exact rational arithmetic
-        expected_offset = Rational(10) - Rational(1, 3)
+        expected_offset = scalar(10) - scalar(1, 3)
         assert half_plane.offset == expected_offset
         assert half_plane.normal == create_v3(0, 0, 1)
 
@@ -625,7 +624,7 @@ class TestChopShoulderNotchOnTimberFace:
         # Notch parameters
         notch_depth = inches(1)    # 1" deep into the timber
         notch_width = inches(4)    # 4" wide along timber length
-        notch_center = timber_length / Rational(2)  # Middle of timber (24" from bottom)
+        notch_center = timber_length / scalar(2)  # Middle of timber (24" from bottom)
         
         # Test each long face
         long_faces = [TimberFace.LEFT, TimberFace.RIGHT, TimberFace.FRONT, TimberFace.BACK]
@@ -646,8 +645,8 @@ class TestChopShoulderNotchOnTimberFace:
             # Define test points on each face at the middle of the timber
             # All points are at the center height (notch_center) and centered on the timber cross-section
             # but offset to be on the surface of each face
-            half_width = timber_width / Rational(2)
-            half_height = timber_height / Rational(2)
+            half_width = timber_width / scalar(2)
+            half_height = timber_height / scalar(2)
             
             # Points on each face (on the surface, at the middle of timber length)
             test_points = {
@@ -897,8 +896,8 @@ class TestScribeFaceOnCenterline:
         """Test that the function works correctly with exact Rational arithmetic."""
         # Create timber_a vertical with Rational dimensions
         timber_a = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(2), Rational(2)),
+            length=scalar(10),
+            size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),  # Pointing up
             width_direction=create_v3(1, 0, 0),
@@ -908,9 +907,9 @@ class TestScribeFaceOnCenterline:
         
         # Create timber_b horizontal with its BACK face (pointing down) intersecting timber_a's centerline
         timber_b = timber_from_directions(
-            length=Rational(20),
-            size=create_v2(Rational(3), Rational(3)),
-            bottom_position=create_v3(Rational(-5), 0, Rational(7) + Rational(3)/2),  # BACK face at z=7
+            length=scalar(20),
+            size=create_v2(scalar(3), scalar(3)),
+            bottom_position=create_v3(scalar(-5), 0, scalar(7) + scalar(3)/2),  # BACK face at z=7
             length_direction=create_v3(1, 0, 0),  # Pointing east
             width_direction=create_v3(0, 1, 0),
             ticket="timber_b"
@@ -931,7 +930,7 @@ class TestScribeFaceOnCenterline:
         # - Intersection: -1 * (z - 7) = 0 => z = 7
         # - From line: 10 - t = 7 => t = 3
         # - Positive means going into the timber from the TOP end
-        expected_distance = Rational(3)
+        expected_distance = scalar(3)
         assert distance == expected_distance, \
             f"Expected exact rational {expected_distance}, got {distance}"
     

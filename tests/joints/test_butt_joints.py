@@ -3,7 +3,7 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, Float, Rational, pi
+from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -88,7 +88,7 @@ class TestButtJoint:
             pytest.fail(f"Failed to render cut timber: {e}")
 
         # pick a point that's on the boundary of the butt joint
-        joint_point_global = create_v3(Rational(0), Rational(3), Rational(0))
+        joint_point_global = create_v3(scalar(0), scalar(3), scalar(0))
 
         assert _render_cutting(joint.cuttings["receiving_timber"]).is_point_on_boundary(timberA.transform.global_to_local(joint_point_global))
         assert _render_cutting(joint.cuttings["butt_timber"]).is_point_on_boundary(timberB.transform.global_to_local(joint_point_global))
@@ -140,7 +140,7 @@ class TestButtJoint:
         import random
         
         # Create a random timber length between 50 and 150 units
-        random_length = Rational(random.randint(50, 150))
+        random_length = scalar(random.randint(50, 150))
         
         # Create two perpendicular timbers
         # timberA (receiving) extends along +X
@@ -256,7 +256,7 @@ Tests for mortise and tenon joint construction functions
 
 import pytest
 from typing import List
-from sympy import Matrix, Rational, Integer, simplify, sin, cos, pi
+from sympy import Matrix, simplify, sin, cos, pi
 from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, zero_test, safe_compare, Comparison, safe_dot_product, safe_normalize_vector as normalize_vector
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace,
@@ -336,8 +336,8 @@ def sample_points_in_box(center: V3, size: V3, num_samples: int = 5) -> List[V3]
     
     # Sample along each axis
     for i in range(num_samples):
-        t = Rational(i, num_samples - 1) if num_samples > 1 else Rational(1, 2)
-        offset = (t - Rational(1, 2)) * 2  # Map [0,1] to [-1, 1]
+        t = scalar(i, num_samples - 1) if num_samples > 1 else scalar(1, 2)
+        offset = (t - scalar(1, 2)) * 2  # Map [0,1] to [-1, 1]
         
         # Sample along X axis
         points.append(center + Matrix([half_size[0] * offset, 0, 0]))
@@ -371,8 +371,8 @@ class TestMortiseAndTenonGeometry:
         """
         tenon_timber, mortise_timber = simple_T_configuration
         
-        mortise_depth = Rational(5)
-        tenon_length = Rational(4)
+        mortise_depth = scalar(5)
+        tenon_length = scalar(4)
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
             butt_timber=tenon_timber,
@@ -381,7 +381,7 @@ class TestMortiseAndTenonGeometry:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
             tenon_length=tenon_length,
             mortise_depth=mortise_depth,
         )
@@ -390,12 +390,12 @@ class TestMortiseAndTenonGeometry:
         tenon_csg = _render_cutting(joint.cuttings["tenon_timber"])
         mortise_csg = _render_cutting(joint.cuttings["mortise_timber"])
 
-        joint_shoulder_global = create_v3(Rational(0), Rational(0), Rational(3))
+        joint_shoulder_global = create_v3(scalar(0), scalar(0), scalar(3))
         
         # Verify basic tenon geometry: tenon should exist from z=0 upward
         # Test that center points are in the tenon at the bottom
-        for z in [Rational(0), Rational(1), Rational(2), Rational(3)]:
-            point_global = joint_shoulder_global - create_v3(Rational(0), Rational(0), z)
+        for z in [scalar(0), scalar(1), scalar(2), scalar(3)]:
+            point_global = joint_shoulder_global - create_v3(scalar(0), scalar(0), z)
             point_tenon_local = tenon_timber.transform.global_to_local(point_global)
             point_mortise_local = mortise_timber.transform.global_to_local(point_global)
             assert tenon_csg.contains_point(point_tenon_local), \
@@ -403,8 +403,8 @@ class TestMortiseAndTenonGeometry:
             assert not mortise_csg.contains_point(point_mortise_local), \
                 f"Point at z={z} should not be in mortise centerline"
         
-        for z in [Rational(4.2), Rational(4.8)]:
-            point_global = joint_shoulder_global - create_v3(Rational(0), Rational(0), z)
+        for z in [scalar(4.2), scalar(4.8)]:
+            point_global = joint_shoulder_global - create_v3(scalar(0), scalar(0), z)
             point_tenon_local = tenon_timber.transform.global_to_local(point_global)
             point_mortise_local = mortise_timber.transform.global_to_local(point_global)
             assert not tenon_csg.contains_point(point_tenon_local), \
@@ -412,9 +412,9 @@ class TestMortiseAndTenonGeometry:
             assert not mortise_csg.contains_point(point_mortise_local), \
                 f"Point at z={z} should not be in mortise centerline"
         
-        # TODO change back to Rational(5) it's failing due to numeric precision issues in contains_point
-        for z in [Rational(51, 10), Rational(6)]:
-            point_global = joint_shoulder_global - create_v3(Rational(0), Rational(0), z)
+        # TODO change back to scalar(5) it's failing due to numeric precision issues in contains_point
+        for z in [scalar(51, 10), scalar(6)]:
+            point_global = joint_shoulder_global - create_v3(scalar(0), scalar(0), z)
             point_tenon_local = tenon_timber.transform.global_to_local(point_global)
             point_mortise_local = mortise_timber.transform.global_to_local(point_global)
             assert not tenon_csg.contains_point(point_tenon_local), \
@@ -435,9 +435,9 @@ class TestMortiseAndTenonGeometry:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(5),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(5),
         )
 
         tenon_negative_csg = joint.cuttings["tenon_timber"].negative_csg
@@ -445,7 +445,7 @@ class TestMortiseAndTenonGeometry:
         assert isinstance(tenon_negative_csg.base, HalfSpace)
 
         shoulder_half_space_local = tenon_negative_csg.base
-        epsilon = Rational(1, 100)
+        epsilon = scalar(1, 100)
         behind_shoulder_half_space_local = HalfSpace(
             normal=-shoulder_half_space_local.normal,
             offset=-shoulder_half_space_local.offset + epsilon,
@@ -458,9 +458,9 @@ class TestMortiseAndTenonGeometry:
 
         # Probe a small grid of points behind the shoulder; none should lie in the
         # overlap if nothing behind the shoulder is being removed.
-        x_values = [Rational(-2), Rational(0), Rational(2)]
-        y_values = [Rational(-2), Rational(0), Rational(2)]
-        z_values = [Rational(4), Rational(5), Rational(10)]
+        x_values = [scalar(-2), scalar(0), scalar(2)]
+        y_values = [scalar(-2), scalar(0), scalar(2)]
+        z_values = [scalar(4), scalar(5), scalar(10)]
         for x in x_values:
             for y in y_values:
                 for z in z_values:
@@ -482,15 +482,15 @@ class TestPegStuff:
         """Test that peg is perpendicular to the face it goes through."""
         tenon_timber, mortise_timber = simple_T_configuration
         
-        peg_depth = Rational(7)
-        distance_from_shoulder = Rational(2)
+        peg_depth = scalar(7)
+        distance_from_shoulder = scalar(2)
         mortise_timber_x_size = mortise_timber.size[0]
-        shoulder_plane_x_global = mortise_timber_x_size / Rational(2)
+        shoulder_plane_x_global = mortise_timber_x_size / scalar(2)
         peg_params = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(distance_from_shoulder, Rational(0))],
+            peg_positions=[(distance_from_shoulder, scalar(0))],
             depth=peg_depth,
-            size=Rational(1, 2)
+            size=scalar(1, 2)
         )
         
         arrangement = ButtJointTimberArrangement(
@@ -501,9 +501,9 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(4),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
             peg_parameters=peg_params,
         )
 
@@ -523,8 +523,8 @@ class TestPegStuff:
         # check that the peg is orthogonal to get_face_direction(TimberFace.FRONT)
         assert_vectors_parallel(peg.transform.orientation.matrix[:, 2], tenon_timber.get_face_direction_global(TimberFace.FRONT))
         f"Peg forward_length should match specified depth. Expected {peg_depth}, got {peg.forward_length}"
-        assert peg.stickout_length == peg_depth * Rational(1, 2), \
-            f"Peg stickout_length should be half of forward_length by default. Expected {peg_depth * Rational(1, 2)}, got {peg.stickout_length}"
+        assert peg.stickout_length == peg_depth * scalar(1, 2), \
+            f"Peg stickout_length should be half of forward_length by default. Expected {peg_depth * scalar(1, 2)}, got {peg.stickout_length}"
 
         # check that the peg is positioned at the correct distance from the shoulder
         assert peg.transform.position[2] == shoulder_plane_x_global - distance_from_shoulder
@@ -545,10 +545,10 @@ class TestPegStuff:
         """Test points on peg hole boundary using is_point_on_boundary()."""
         tenon_timber, mortise_timber = simple_T_configuration
         
-        peg_size = Rational(1, 2)
+        peg_size = scalar(1, 2)
         peg_params = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(Rational(2), Rational(0))],
+            peg_positions=[(scalar(2), scalar(0))],
             depth=None,
             size=peg_size
         )
@@ -561,9 +561,9 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(4),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
             peg_parameters=peg_params,
         )
         
@@ -573,9 +573,9 @@ class TestPegStuff:
 
         # Sample points within the peg's CSG
         peg_center_points = [
-            peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, Rational(1)]),  # 1 unit along peg
-            peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, Rational(2)]),  # 2 units along peg
-            peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, Rational(3)]),  # 3 units along peg
+            peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, scalar(1)]),  # 1 unit along peg
+            peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, scalar(2)]),  # 2 units along peg
+            peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, scalar(3)]),  # 3 units along peg
         ]
         
         for point_local in peg_center_points:
@@ -589,11 +589,11 @@ class TestPegStuff:
         half_size = peg_size / 2
         
         # Point on the edge of the square peg at z=1
-        point_on_edge = peg.transform.position + peg.transform.orientation.matrix * Matrix([half_size, 0, Rational(1)])
+        point_on_edge = peg.transform.position + peg.transform.orientation.matrix * Matrix([half_size, 0, scalar(1)])
         point_on_edge_peg_local = peg.transform.orientation.matrix.T * (point_on_edge - peg.transform.position)
 
         # see that the peg total length is equal to 1.5 times the mortise width
-        assert peg.forward_length + peg.stickout_length == Rational(3, 2) * mortise_timber.size[0]
+        assert peg.forward_length + peg.stickout_length == scalar(3, 2) * mortise_timber.size[0]
         
         # This point should be on the boundary of the peg
         assert peg_csg.contains_point(point_on_edge_peg_local), \
@@ -606,7 +606,7 @@ class TestPegStuff:
         
         for i in range(0,10):
             # Test that a point inside the peg hole is NOT contained in the timber CSGs
-            point_in_peg_hole = peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, Rational(i)])
+            point_in_peg_hole = peg.transform.position + peg.transform.orientation.matrix * Matrix([0, 0, scalar(i)])
             point_in_peg_hole_tenon_local = tenon_timber.transform.global_to_local(point_in_peg_hole)
             point_in_peg_hole_mortise_local = mortise_timber.transform.global_to_local(point_in_peg_hole)
             
@@ -628,12 +628,12 @@ class TestPegStuff:
         peg_params = SimplePegParameters(
             shape=PegShape.ROUND,
             peg_positions=[
-                (Rational(1), Rational(0)),
-                (Rational(2), Rational(1, 2)),
-                (Rational(3), Rational(-1, 2))
+                (scalar(1), scalar(0)),
+                (scalar(2), scalar(1, 2)),
+                (scalar(3), scalar(-1, 2))
             ],
-            depth=Rational(5),
-            size=Rational(1, 2)
+            depth=scalar(5),
+            size=scalar(1, 2)
         )
         
         arrangement = ButtJointTimberArrangement(
@@ -644,9 +644,9 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(4),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
             peg_parameters=peg_params,
         )
         
@@ -662,7 +662,7 @@ class TestPegStuff:
         # Each peg should have correct depth
         for peg in joint.jointAccessories.values():
             assert isinstance(peg, Peg), "Expected peg to be a Peg instance"
-            assert peg.forward_length == Rational(5), \
+            assert peg.forward_length == scalar(5), \
                 f"Each peg should have depth 5, got {peg.forward_length}"
     
     # 🐪
@@ -682,9 +682,9 @@ class TestPegStuff:
         )
         peg_params = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(Rational(2), Rational(0))],
+            peg_positions=[(scalar(2), scalar(0))],
             depth=None,  # auto: computed from chord through mortise timber
-            size=Rational(1, 2),
+            size=scalar(1, 2),
         )
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber,
@@ -694,9 +694,9 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(4),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
             peg_parameters=peg_params,
         )
         peg = joint.jointAccessories["peg_0"]
@@ -713,15 +713,15 @@ class TestPegStuff:
         """Test that tenon_hole_offset shifts the peg hole in the tenon towards the shoulder."""
         tenon_timber, mortise_timber = simple_T_configuration
         
-        distance_from_shoulder = Rational(2)
-        offset = Rational(1, 4)  # 0.25 units offset
+        distance_from_shoulder = scalar(2)
+        offset = scalar(1, 4)  # 0.25 units offset
         
         # Create joint with offset
         peg_params_with_offset = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(distance_from_shoulder, Rational(0))],
-            depth=Rational(5),
-            size=Rational(1, 2),
+            peg_positions=[(distance_from_shoulder, scalar(0))],
+            depth=scalar(5),
+            size=scalar(1, 2),
             tenon_hole_offset=offset
         )
         
@@ -733,26 +733,26 @@ class TestPegStuff:
         )
         joint_with_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(4),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
             peg_parameters=peg_params_with_offset,
         )
         
         # Create joint without offset for comparison
         peg_params_no_offset = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(distance_from_shoulder, Rational(0))],
-            depth=Rational(5),
-            size=Rational(1, 2),
-            tenon_hole_offset=Rational(0)
+            peg_positions=[(distance_from_shoulder, scalar(0))],
+            depth=scalar(5),
+            size=scalar(1, 2),
+            tenon_hole_offset=scalar(0)
         )
         
         joint_no_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(4),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
             peg_parameters=peg_params_no_offset,
         )
         
@@ -779,10 +779,10 @@ class TestPegStuff:
 
         peg_params = SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(inches(1), Rational(0))],
+            peg_positions=[(inches(1), scalar(0))],
             size=inches(1, 2),
             depth=inches(4),
-            peg_orientation=(PegPositionSpace.MORTISE, Rational(0)),
+            peg_orientation=(PegPositionSpace.MORTISE, scalar(0)),
         )
 
         arrangement = ButtJointTimberArrangement(
@@ -833,9 +833,9 @@ class TestMortiseAndTenonCSGHierarchy:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(5),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(5),
         )
         csg = _render_cutting(joint.cuttings["tenon_timber"])
 
@@ -874,9 +874,9 @@ class TestMortiseAndTenonCSGHierarchy:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_length=Rational(4),
-            mortise_depth=Rational(5),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(5),
         )
         csg = _render_cutting(joint.cuttings["mortise_timber"])
 
@@ -944,9 +944,9 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         tenon_timber = arrangement.butt_timber
         mortise_timber = arrangement.receiving_timber
 
-        tenon_depth = Rational(4)
-        dovetail_depth = Rational(1)
-        tenon_size = Matrix([Rational(2), Rational(2)])
+        tenon_depth = scalar(4)
+        dovetail_depth = scalar(1)
+        tenon_size = Matrix([scalar(2), scalar(2)])
 
         joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
             arrangement=arrangement,
@@ -956,7 +956,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
             dovetail_depth=dovetail_depth,
             wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
                 wedge_angle=_degrees(8),
-                wedge_base_extra_length=Rational(1, 2),
+                wedge_base_extra_length=scalar(1, 2),
             ),
         )
 
@@ -984,27 +984,27 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
 
         # Shoulder at z=3 (mortise top face).
         # Above the shoulder: deep in tenon body, untouched.
-        for z in [Rational(10), Rational(50)]:
-            pt = create_v3(Rational(0), Rational(0), z)
+        for z in [scalar(10), scalar(50)]:
+            pt = create_v3(scalar(0), scalar(0), z)
             pt_local = tenon_timber.transform.global_to_local(pt)
             assert tenon_csg.contains_point(pt_local), \
                 f"tenon body should remain at z={z}"
 
         # Past the shoulder (z<3) and far from the dovetail footprint (a corner
         # of the butt cross-section): the shoulder cut should have removed this.
-        cut_corner = create_v3(Rational(19, 10), Rational(19, 10), Rational(2))
+        cut_corner = create_v3(scalar(19, 10), scalar(19, 10), scalar(2))
         cut_corner_local = tenon_timber.transform.global_to_local(cut_corner)
         assert not tenon_csg.contains_point(cut_corner_local), \
             "butt corner past the shoulder should be cut"
 
         # Past the tenon tip (z < -1) on the centerline: end cut should remove this.
-        past_tip = create_v3(Rational(0), Rational(0), Rational(-3, 2))
+        past_tip = create_v3(scalar(0), scalar(0), scalar(-3, 2))
         past_tip_local = tenon_timber.transform.global_to_local(past_tip)
         assert not tenon_csg.contains_point(past_tip_local), \
             "tenon material past the tip should be cut"
 
         # Mortise body away from the cavity remains.
-        mortise_far = create_v3(Rational(40), Rational(0), Rational(0))
+        mortise_far = create_v3(scalar(40), scalar(0), scalar(0))
         mortise_far_local = mortise_timber.transform.global_to_local(mortise_far)
         assert mortise_csg.contains_point(mortise_far_local)
 
@@ -1014,9 +1014,9 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
             arrangement=arrangement,
             dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
-            tenon_depth=Rational(4),
-            dovetail_depth=Rational(1),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_depth=scalar(4),
+            dovetail_depth=scalar(1),
         )
         assert len(joint.jointAccessories) == 0
         # Both timbers still render to valid CSGs.
@@ -1028,13 +1028,13 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         arrangement = self._make_arrangement(simple_T_configuration)
         receiving_timber = arrangement.receiving_timber
 
-        tenon_depth = Rational(4)
-        base_extra = Rational(1, 2)
-        dovetail_depth = Rational(1)
+        tenon_depth = scalar(4)
+        base_extra = scalar(1, 2)
+        dovetail_depth = scalar(1)
 
         shoulder_result = compute_butt_joint_shoulder(
             arrangement=arrangement,
-            distance_from_centerline=Integer(0),
+            distance_from_centerline=scalar(0),
             up_direction=arrangement.butt_timber.get_height_direction_global(),
         )
 
@@ -1042,7 +1042,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
             arrangement=arrangement,
             shoulder_result=shoulder_result,
             dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
-            tenon_size=Matrix([Rational(2), Rational(2)]),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
             tenon_depth=tenon_depth,
             dovetail_depth=dovetail_depth,
             wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
@@ -1063,7 +1063,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         slot_candidates = [
             child for child in geo.mortise_negative_csg.children
             if isinstance(child, ConvexPolygonExtrusion)
-            and all(safe_compare(p[1], Integer(0), Comparison.GE) for p in child.points)
+            and all(safe_compare(p[1], scalar(0), Comparison.GE) for p in child.points)
         ]
         assert len(slot_candidates) == 1
 
@@ -1137,10 +1137,10 @@ class TestHousedDovetailButtJoint:
 
         joint = cut_dropin_dovetail_butt_joint(
             arrangement=arrangement,
-            receiving_timber_shoulder_inset=Rational(1),
-            dovetail_length=Rational(4),
-            dovetail_small_width=Rational(2),
-            dovetail_large_width=Rational(4),
+            receiving_timber_shoulder_inset=scalar(1),
+            dovetail_length=scalar(4),
+            dovetail_small_width=scalar(2),
+            dovetail_large_width=scalar(4),
         )
 
         # ---- structure ----
@@ -1180,35 +1180,35 @@ class TestHousedDovetailButtJoint:
         # ---- walk a line along the dovetail timber centerline ----
 
         # Well inside the beam body (far from joint, x=-50)
-        assert in_dt(create_v3(Rational(-50), 0, Rational(50)))
+        assert in_dt(create_v3(scalar(-50), 0, scalar(50)))
         # Past the dovetail end (x=5, well beyond TOP at x=0)
-        assert not in_dt(create_v3(Rational(5), 0, Rational(50)))
+        assert not in_dt(create_v3(scalar(5), 0, scalar(50)))
 
         # ---- walk a line perpendicular to the dovetail face at x=-1 ----
         # At x=-1 (in the housing region between shoulder x=-3 and end x=0):
         #   profile width ≈ 3, Z ∈ [48.5, 51.5], Y depth ∈ [0, 4]
 
         # Inside the dovetail tenon: y=1 ∈ [0,4], z=50 ∈ [48.5,51.5]
-        tenon_pt = create_v3(Rational(-1), Rational(1), Rational(50))
+        tenon_pt = create_v3(scalar(-1), scalar(1), scalar(50))
         assert in_dt(tenon_pt), "Point inside dovetail tenon should be in dovetail timber"
         assert not in_recv(tenon_pt), "Point inside dovetail socket should not be in receiving timber"
 
         # On the opposite side of the dovetail depth: y=-1 ∉ [0,4]
-        void_pt = create_v3(Rational(-1), Rational(-1), Rational(50))
+        void_pt = create_v3(scalar(-1), scalar(-1), scalar(50))
         assert not in_dt(void_pt), "Point in housing void should not be in dovetail timber"
         assert in_recv(void_pt), "Point outside socket should still be in receiving timber"
 
         # Outside the dovetail width: z=53 ∉ [48.5,51.5]
-        outside_width_pt = create_v3(Rational(-1), Rational(1), Rational(53))
+        outside_width_pt = create_v3(scalar(-1), scalar(1), scalar(53))
         assert not in_dt(outside_width_pt), "Point outside dovetail width should not be in dovetail timber"
         assert in_recv(outside_width_pt), "Point outside socket width should be in receiving timber"
 
         # ---- receiving timber body far from the joint ----
-        assert in_recv(create_v3(0, 0, Rational(10)))
-        assert not in_dt(create_v3(0, 0, Rational(10)))
+        assert in_recv(create_v3(0, 0, scalar(10)))
+        assert not in_dt(create_v3(0, 0, scalar(10)))
 
         # ---- before shoulder, full cross-section is intact ----
-        body_near_shoulder = create_v3(Rational(-5), Rational(-1), Rational(50))
+        body_near_shoulder = create_v3(scalar(-5), scalar(-1), scalar(50))
         assert in_dt(body_near_shoulder), "Full cross-section before shoulder should be intact"
 
     def test_multiple_orientations(self):
@@ -1240,10 +1240,10 @@ class TestHousedDovetailButtJoint:
 
             joint = cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement,
-                receiving_timber_shoulder_inset=Rational(1),
-                dovetail_length=Rational(3),
-                dovetail_small_width=Rational(3, 2),
-                dovetail_large_width=Rational(3),
+                receiving_timber_shoulder_inset=scalar(1),
+                dovetail_length=scalar(3),
+                dovetail_small_width=scalar(3, 2),
+                dovetail_large_width=scalar(3),
             )
 
             assert len(joint.cuttings) == 2
@@ -1257,10 +1257,10 @@ class TestHousedDovetailButtJoint:
 
         joint = cut_dropin_dovetail_butt_joint(
             arrangement=arrangement,
-            receiving_timber_shoulder_inset=Rational(0),
-            dovetail_length=Rational(3),
-            dovetail_small_width=Rational(3, 2),
-            dovetail_large_width=Rational(3),
+            receiving_timber_shoulder_inset=scalar(0),
+            dovetail_length=scalar(3),
+            dovetail_small_width=scalar(3, 2),
+            dovetail_large_width=scalar(3),
         )
 
         recv_neg_csg = joint.cuttings[arrangement.receiving_timber.ticket.name].negative_csg
@@ -1274,33 +1274,33 @@ class TestHousedDovetailButtJoint:
 
         with pytest.raises(ValueError, match="dovetail_length must be positive"):
             cut_dropin_dovetail_butt_joint(
-                arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
-                dovetail_length=Rational(0), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(3),
+                arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
+                dovetail_length=scalar(0), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(3),
             )
 
         with pytest.raises(ValueError, match="dovetail_small_width must be positive"):
             cut_dropin_dovetail_butt_joint(
-                arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
-                dovetail_length=Rational(3), dovetail_small_width=Rational(-1), dovetail_large_width=Rational(3),
+                arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(-1), dovetail_large_width=scalar(3),
             )
 
         with pytest.raises(ValueError, match="dovetail_large_width.*must be greater"):
             cut_dropin_dovetail_butt_joint(
-                arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
-                dovetail_length=Rational(3), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(1),
+                arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(1),
             )
 
         with pytest.raises(ValueError, match="receiving_timber_shoulder_inset must be non-negative"):
             cut_dropin_dovetail_butt_joint(
-                arrangement=arrangement, receiving_timber_shoulder_inset=Rational(-1),
-                dovetail_length=Rational(3), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(3),
+                arrangement=arrangement, receiving_timber_shoulder_inset=scalar(-1),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(3),
             )
 
         with pytest.raises(ValueError, match="dovetail_depth must be positive"):
             cut_dropin_dovetail_butt_joint(
-                arrangement=arrangement, receiving_timber_shoulder_inset=Rational(1, 2),
-                dovetail_length=Rational(3), dovetail_small_width=Rational(3, 2), dovetail_large_width=Rational(3),
-                dovetail_depth=Rational(0),
+                arrangement=arrangement, receiving_timber_shoulder_inset=scalar(1, 2),
+                dovetail_length=scalar(3), dovetail_small_width=scalar(3, 2), dovetail_large_width=scalar(3),
+                dovetail_depth=scalar(0),
             )
 
     def test_parallel_face_raises(self):
@@ -1323,8 +1323,8 @@ class TestHousedDovetailButtJoint:
         with pytest.raises(ValueError, match="perpendicular to receiving timber length"):
             cut_dropin_dovetail_butt_joint(
                 arrangement=arrangement,
-                receiving_timber_shoulder_inset=Rational(1),
-                dovetail_length=Rational(3),
-                dovetail_small_width=Rational(3, 2),
-                dovetail_large_width=Rational(3),
+                receiving_timber_shoulder_inset=scalar(1),
+                dovetail_length=scalar(3),
+                dovetail_small_width=scalar(3, 2),
+                dovetail_large_width=scalar(3),
             )

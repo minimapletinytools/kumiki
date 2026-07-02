@@ -5,13 +5,13 @@ Tests for timber_shavings module (random timber-related helpers).
 import pytest
 from kumiki.timber_shavings import *
 from kumiki.timber import *
-from kumiki.rule import create_v3, create_v2, radians
+from kumiki.rule import create_v3, create_v2, radians, scalar
 from tests.testing_shavings import (
     create_standard_vertical_timber,
     create_standard_horizontal_timber,
     create_centered_horizontal_timber,
 )
-from sympy import Rational, sqrt, simplify
+from sympy import sqrt, simplify
 
 
 class TestFindOpposingFaceOnAnotherTimber:
@@ -202,58 +202,58 @@ class TestSupportDistance:
     """Tests for support-plane distance helpers in timber_shavings."""
 
     def test_perfect_support_distance_from_centerline_axis(self):
-        t = create_standard_vertical_timber(size=(Rational(4), Rational(6)))
-        assert get_perfect_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(2)
-        assert get_perfect_support_distance_from_centerline(t, create_v2(0, 1)) == Rational(3)
-        assert get_perfect_support_distance_from_centerline(t, create_v2(-1, 0)) == Rational(2)
+        t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
+        assert get_perfect_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(2)
+        assert get_perfect_support_distance_from_centerline(t, create_v2(0, 1)) == scalar(3)
+        assert get_perfect_support_distance_from_centerline(t, create_v2(-1, 0)) == scalar(2)
 
     def test_perfect_support_distance_from_centerline_diagonal(self):
-        t = create_standard_vertical_timber(size=(Rational(4), Rational(6)))
+        t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         result = get_perfect_support_distance_from_centerline(t, create_v2(1, 1))
-        expected = Rational(5) / sqrt(2)
+        expected = scalar(5) / sqrt(2)
         assert simplify(result - expected) == 0
 
     def test_nominal_support_distance_from_centerline_asymmetric(self):
         t = Timber(
-            length=Rational(100),
-            size=create_v2(Rational(4), Rational(6)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
             nominal_half_sizes=(
-                create_v2(Rational(3), Rational(1)),
-                create_v2(Rational(4), Rational(2)),
+                create_v2(scalar(3), scalar(1)),
+                create_v2(scalar(4), scalar(2)),
             ),
         )
-        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(3)
-        assert get_nominal_support_distance_from_centerline(t, create_v2(-1, 0)) == Rational(1)
-        assert get_nominal_support_distance_from_centerline(t, create_v2(0, 1)) == Rational(4)
-        assert get_nominal_support_distance_from_centerline(t, create_v2(0, -1)) == Rational(2)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(3)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(-1, 0)) == scalar(1)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(0, 1)) == scalar(4)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(0, -1)) == scalar(2)
 
     def test_nominal_and_perfect_from_centerline_differ_when_asymmetric(self):
         t = Timber(
-            length=Rational(100),
-            size=create_v2(Rational(4), Rational(6)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
             nominal_half_sizes=(
-                create_v2(Rational(3), Rational(1)),
-                create_v2(Rational(4), Rational(2)),
+                create_v2(scalar(3), scalar(1)),
+                create_v2(scalar(4), scalar(2)),
             ),
         )
-        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(3)
-        assert get_perfect_support_distance_from_centerline(t, create_v2(1, 0)) == Rational(2)
+        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(3)
+        assert get_perfect_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(2)
 
     def test_perfect_support_distance_from_position_3d(self):
-        t = create_standard_vertical_timber(height=Rational(100), size=(Rational(4), Rational(6)))
-        assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, 1)) == Rational(90)
-        assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, -1)) == Rational(10)
+        t = create_standard_vertical_timber(height=scalar(100), size=(scalar(4), scalar(6)))
+        assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, 1)) == scalar(90)
+        assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, -1)) == scalar(10)
 
     def test_nominal_support_distance_from_position_3d_asymmetric(self):
         t = Timber(
-            length=Rational(100),
-            size=create_v2(Rational(4), Rational(6)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
             nominal_half_sizes=(
-                create_v2(Rational(3), Rational(1)),
-                create_v2(Rational(4), Rational(2)),
+                create_v2(scalar(3), scalar(1)),
+                create_v2(scalar(4), scalar(2)),
             ),
         )
         # Along +x, support plane is at x=+3; from x=-1 distance is 4.
@@ -262,7 +262,7 @@ class TestSupportDistance:
             position_from_bottom=create_v3(-1, 0, 0),
             direction=create_v3(1, 0, 0),
         )
-        assert result == Rational(4)
+        assert result == scalar(4)
         
 
 
@@ -289,40 +289,40 @@ class TestPeg:
         
         peg = Peg(
             transform=Transform(position=position, orientation=orientation),
-            size=Rational(2),
+            size=scalar(2),
             shape=PegShape.SQUARE,
-            forward_length=Rational(10),
-            stickout_length=Rational(1)
+            forward_length=scalar(10),
+            stickout_length=scalar(1)
         )
         
         assert peg.transform.orientation == orientation
         assert peg.transform.position == position
-        assert peg.size == Rational(2)
+        assert peg.size == scalar(2)
         assert peg.shape == PegShape.SQUARE
-        assert peg.forward_length == Rational(10)
-        assert peg.stickout_length == Rational(1)
+        assert peg.forward_length == scalar(10)
+        assert peg.stickout_length == scalar(1)
     
     def test_peg_is_frozen(self):
         """Test that Peg is immutable."""
         peg = Peg(
             transform=Transform.identity(),
-            size=Rational(2),
+            size=scalar(2),
             shape=PegShape.ROUND,
-            forward_length=Rational(10),
-            stickout_length=Rational(1)
+            forward_length=scalar(10),
+            stickout_length=scalar(1)
         )
         
         with pytest.raises(Exception):  # FrozenInstanceError
-            peg.size = Rational(3)  # type: ignore
+            peg.size = scalar(3)  # type: ignore
     
     def test_peg_render_csg_local_square(self):
         """Test rendering square peg CSG in local space."""
         peg = Peg(
             transform=Transform.identity(),
-            size=Rational(2),
+            size=scalar(2),
             shape=PegShape.SQUARE,
-            forward_length=Rational(10),
-            stickout_length=Rational(1)
+            forward_length=scalar(10),
+            stickout_length=scalar(1)
         )
         
         csg = peg.render_csg_local()
@@ -332,19 +332,19 @@ class TestPeg:
         assert isinstance(csg, RectangularPrism)
         
         # Verify dimensions
-        assert csg.size[0] == Rational(2)  # width
-        assert csg.size[1] == Rational(2)  # height
-        assert csg.start_distance == Rational(-1)  # stickout_length
-        assert csg.end_distance == Rational(10)  # forward_length
+        assert csg.size[0] == scalar(2)  # width
+        assert csg.size[1] == scalar(2)  # height
+        assert csg.start_distance == scalar(-1)  # stickout_length
+        assert csg.end_distance == scalar(10)  # forward_length
     
     def test_peg_render_csg_local_round(self):
         """Test rendering round peg CSG in local space."""
         peg = Peg(
             transform=Transform.identity(),
-            size=Rational(4),
+            size=scalar(4),
             shape=PegShape.ROUND,
-            forward_length=Rational(12),
-            stickout_length=Rational(2)
+            forward_length=scalar(12),
+            stickout_length=scalar(2)
         )
         
         csg = peg.render_csg_local()
@@ -354,9 +354,9 @@ class TestPeg:
         assert isinstance(csg, Cylinder)
         
         # Verify dimensions
-        assert csg.radius == Rational(2)  # diameter / 2
-        assert csg.start_distance == Rational(-2)  # stickout_length
-        assert csg.end_distance == Rational(12)  # forward_length
+        assert csg.radius == scalar(2)  # diameter / 2
+        assert csg.start_distance == scalar(-2)  # stickout_length
+        assert csg.end_distance == scalar(12)  # forward_length
 
 
 class TestWedge:
@@ -369,53 +369,53 @@ class TestWedge:
         
         wedge = Wedge(
             transform=Transform(position=position, orientation=orientation),
-            base_width=Rational(5),
-            tip_width=Rational(1),
-            height=Rational(2),
-            length=Rational(10)
+            base_width=scalar(5),
+            tip_width=scalar(1),
+            height=scalar(2),
+            length=scalar(10)
         )
         
         assert wedge.transform.orientation == orientation
         assert wedge.transform.position == position
-        assert wedge.base_width == Rational(5)
-        assert wedge.tip_width == Rational(1)
-        assert wedge.height == Rational(2)
-        assert wedge.length == Rational(10)
+        assert wedge.base_width == scalar(5)
+        assert wedge.tip_width == scalar(1)
+        assert wedge.height == scalar(2)
+        assert wedge.length == scalar(10)
     
     def test_wedge_width_property(self):
         """Test that width property is an alias for base_width."""
         wedge = Wedge(
             transform=Transform.identity(),
-            base_width=Rational(5),
-            tip_width=Rational(1),
-            height=Rational(2),
-            length=Rational(10)
+            base_width=scalar(5),
+            tip_width=scalar(1),
+            height=scalar(2),
+            length=scalar(10)
         )
         
         assert wedge.width == wedge.base_width
-        assert wedge.width == Rational(5)
+        assert wedge.width == scalar(5)
     
     def test_wedge_is_frozen(self):
         """Test that Wedge is immutable."""
         wedge = Wedge(
             transform=Transform.identity(),
-            base_width=Rational(5),
-            tip_width=Rational(1),
-            height=Rational(2),
-            length=Rational(10)
+            base_width=scalar(5),
+            tip_width=scalar(1),
+            height=scalar(2),
+            length=scalar(10)
         )
         
         with pytest.raises(Exception):  # FrozenInstanceError
-            wedge.base_width = Rational(6)  # type: ignore
+            wedge.base_width = scalar(6)  # type: ignore
     
     def test_wedge_render_csg_local(self):
         """Test rendering wedge CSG in local space."""
         wedge = Wedge(
             transform=Transform.identity(),
-            base_width=Rational(5),
-            tip_width=Rational(1),
-            height=Rational(2),
-            length=Rational(10)
+            base_width=scalar(5),
+            tip_width=scalar(1),
+            height=scalar(2),
+            length=scalar(10)
         )
         
         csg = wedge.render_csg_local()
@@ -432,8 +432,8 @@ class TestCreatePegGoingIntoFace:
     def setup_method(self):
         """Create a standard vertical timber for testing."""
         self.timber = timber_from_directions(
-            length=Rational(100),
-            size=create_v2(Rational(10), Rational(15)),
+            length=scalar(100),
+            size=create_v2(scalar(10), scalar(15)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
@@ -444,93 +444,93 @@ class TestCreatePegGoingIntoFace:
         peg = create_peg_going_into_face(
             timber=self.timber,
             face=TimberLongFace.RIGHT,
-            distance_from_bottom=Rational(50),
-            distance_from_centerline=Rational(0),
-            peg_size=Rational(2),
+            distance_from_bottom=scalar(50),
+            distance_from_centerline=scalar(0),
+            peg_size=scalar(2),
             peg_shape=PegShape.ROUND,
-            forward_length=Rational(8),
-            stickout_length=Rational(1)
+            forward_length=scalar(8),
+            stickout_length=scalar(1)
         )
         
-        assert peg.size == Rational(2)
+        assert peg.size == scalar(2)
         assert peg.shape == PegShape.ROUND
-        assert peg.forward_length == Rational(8)
-        assert peg.stickout_length == Rational(1)
+        assert peg.forward_length == scalar(8)
+        assert peg.stickout_length == scalar(1)
         
         # Position should be at the right surface (width/2 = 5)
-        assert peg.transform.position[0] == Rational(5)  # X = width/2
-        assert peg.transform.position[1] == Rational(0)  # Y = distance_from_centerline
-        assert peg.transform.position[2] == Rational(50)  # Z = distance_from_bottom
+        assert peg.transform.position[0] == scalar(5)  # X = width/2
+        assert peg.transform.position[1] == scalar(0)  # Y = distance_from_centerline
+        assert peg.transform.position[2] == scalar(50)  # Z = distance_from_bottom
     
     def test_peg_into_left_face(self):
         """Test creating a peg going into the LEFT face."""
         peg = create_peg_going_into_face(
             timber=self.timber,
             face=TimberLongFace.LEFT,
-            distance_from_bottom=Rational(30),
-            distance_from_centerline=Rational(2),
-            peg_size=Rational(2),
+            distance_from_bottom=scalar(30),
+            distance_from_centerline=scalar(2),
+            peg_size=scalar(2),
             peg_shape=PegShape.ROUND,
-            forward_length=Rational(8),
-            stickout_length=Rational(1)
+            forward_length=scalar(8),
+            stickout_length=scalar(1)
         )
         
         # Position should be at the left surface (-width/2 = -5)
-        assert peg.transform.position[0] == Rational(-5)  # X = -width/2
-        assert peg.transform.position[1] == Rational(2)  # Y = distance_from_centerline
-        assert peg.transform.position[2] == Rational(30)  # Z = distance_from_bottom
+        assert peg.transform.position[0] == scalar(-5)  # X = -width/2
+        assert peg.transform.position[1] == scalar(2)  # Y = distance_from_centerline
+        assert peg.transform.position[2] == scalar(30)  # Z = distance_from_bottom
     
     def test_peg_into_forward_face(self):
         """Test creating a peg going into the FRONT face."""
         peg = create_peg_going_into_face(
             timber=self.timber,
             face=TimberLongFace.FRONT,
-            distance_from_bottom=Rational(40),
-            distance_from_centerline=Rational(-1),
-            peg_size=Rational(2),
+            distance_from_bottom=scalar(40),
+            distance_from_centerline=scalar(-1),
+            peg_size=scalar(2),
             peg_shape=PegShape.ROUND,
-            forward_length=Rational(8),
-            stickout_length=Rational(1)
+            forward_length=scalar(8),
+            stickout_length=scalar(1)
         )
         
         # Position should be at the forward surface (height/2 = 7.5)
-        assert peg.transform.position[0] == Rational(-1)  # X = distance_from_centerline
-        assert peg.transform.position[1] == Rational(15, 2)  # Y = height/2 = 7.5
-        assert peg.transform.position[2] == Rational(40)  # Z = distance_from_bottom
+        assert peg.transform.position[0] == scalar(-1)  # X = distance_from_centerline
+        assert peg.transform.position[1] == scalar(15, 2)  # Y = height/2 = 7.5
+        assert peg.transform.position[2] == scalar(40)  # Z = distance_from_bottom
     
     def test_peg_into_back_face(self):
         """Test creating a peg going into the BACK face."""
         peg = create_peg_going_into_face(
             timber=self.timber,
             face=TimberLongFace.BACK,
-            distance_from_bottom=Rational(60),
-            distance_from_centerline=Rational(3),
-            peg_size=Rational(2),
+            distance_from_bottom=scalar(60),
+            distance_from_centerline=scalar(3),
+            peg_size=scalar(2),
             peg_shape=PegShape.ROUND,
-            forward_length=Rational(8),
-            stickout_length=Rational(1)
+            forward_length=scalar(8),
+            stickout_length=scalar(1)
         )
         
         # Position should be at the back surface (-height/2 = -7.5)
-        assert peg.transform.position[0] == Rational(3)  # X = distance_from_centerline
-        assert peg.transform.position[1] == Rational(-15, 2)  # Y = -height/2 = -7.5
-        assert peg.transform.position[2] == Rational(60)  # Z = distance_from_bottom
+        assert peg.transform.position[0] == scalar(3)  # X = distance_from_centerline
+        assert peg.transform.position[1] == scalar(-15, 2)  # Y = -height/2 = -7.5
+        assert peg.transform.position[2] == scalar(60)  # Z = distance_from_bottom
     
     def test_square_peg(self):
         """Test creating a square peg."""
         peg = create_peg_going_into_face(
             timber=self.timber,
             face=TimberLongFace.RIGHT,
-            distance_from_bottom=Rational(50),
-            distance_from_centerline=Rational(0),
-            peg_size=Rational(3),
+            distance_from_bottom=scalar(50),
+            distance_from_centerline=scalar(0),
+            peg_size=scalar(3),
             peg_shape=PegShape.SQUARE,
-            forward_length=Rational(8),
-            stickout_length=Rational(1)
+            forward_length=scalar(8),
+            stickout_length=scalar(1)
         )
         
         assert peg.shape == PegShape.SQUARE
-        assert peg.size == Rational(3)
+        assert peg.size == scalar(3)
 
 
 class TestProjectGlobalPointOntoTimberFace:
@@ -540,15 +540,15 @@ class TestProjectGlobalPointOntoTimberFace:
         """Test projecting a point onto the top face of an axis-aligned timber."""
         # Create a simple vertical timber
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Z-up
             width_direction=create_v3(1, 0, 0)      # X-right
         )
         
         # Project a point in the middle of the timber onto the top face
-        global_point = create_v3(0, 0, Rational("0.5"))  # Halfway up the timber
+        global_point = create_v3(0, 0, scalar("0.5"))  # Halfway up the timber
         projected_global = timber.project_global_point_onto_timber_face_global(global_point, TimberFace.TOP)
         
         # The projected point should be at the top face (Z = length = 2)
@@ -560,28 +560,28 @@ class TestProjectGlobalPointOntoTimberFace:
     def test_project_onto_bottom_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the bottom face."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
         )
         
         # Project a point onto the bottom face
-        global_point = create_v3(Rational("0.05"), Rational("0.1"), Rational("0.5"))
+        global_point = create_v3(scalar("0.05"), scalar("0.1"), scalar("0.5"))
         projected_global = timber.project_global_point_onto_timber_face_global(global_point, TimberFace.BOTTOM)
         
         # Bottom face is at Z = -length/2 = -1 in local coords
         # In global coords, that's 0,0,-1 relative to bottom_position (0,0,0)
         # So the projected point should maintain X,Y but be at Z = -1
-        expected_global = create_v3(Rational("0.05"), Rational("0.1"), -1)
+        expected_global = create_v3(scalar("0.05"), scalar("0.1"), -1)
         assert projected_global == expected_global
     
     def test_project_onto_right_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the right face."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
@@ -593,32 +593,32 @@ class TestProjectGlobalPointOntoTimberFace:
         
         # Right face is at X = width/2 = 0.1 in local coords
         # In global coords (axis-aligned), that's 0.1, 0, 0
-        expected_global = create_v3(Rational("0.1"), 0, 0)
+        expected_global = create_v3(scalar("0.1"), 0, 0)
         assert projected_global == expected_global
     
     def test_project_onto_left_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the left face."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
         )
         
         # Project a point onto the left face
-        global_point = create_v3(Rational("0.05"), Rational("0.1"), Rational("0.5"))
+        global_point = create_v3(scalar("0.05"), scalar("0.1"), scalar("0.5"))
         projected_global = timber.project_global_point_onto_timber_face_global(global_point, TimberFace.LEFT)
         
         # Left face is at X = -width/2 = -0.1 in local coords
-        expected_global = create_v3(Rational("-0.1"), Rational("0.1"), Rational("0.5"))
+        expected_global = create_v3(scalar("-0.1"), scalar("0.1"), scalar("0.5"))
         assert projected_global == expected_global
     
     def test_project_onto_front_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the front face."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
@@ -629,51 +629,51 @@ class TestProjectGlobalPointOntoTimberFace:
         projected_global = timber.project_global_point_onto_timber_face_global(global_point, TimberFace.FRONT)
         
         # Front face is at Y = height/2 = 0.15 in local coords
-        expected_global = create_v3(0, Rational("0.15"), 0)
+        expected_global = create_v3(0, scalar("0.15"), 0)
         assert projected_global == expected_global
     
     def test_project_onto_back_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the back face."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
         )
         
         # Project a point onto the back face
-        global_point = create_v3(Rational("0.05"), Rational("0.05"), Rational("0.5"))
+        global_point = create_v3(scalar("0.05"), scalar("0.05"), scalar("0.5"))
         projected_global = timber.project_global_point_onto_timber_face_global(global_point, TimberFace.BACK)
         
         # Back face is at Y = -height/2 = -0.15 in local coords
-        expected_global = create_v3(Rational("0.05"), Rational("-0.15"), Rational("0.5"))
+        expected_global = create_v3(scalar("0.05"), scalar("-0.15"), scalar("0.5"))
         assert projected_global == expected_global
     
     def test_project_point_already_on_face(self, symbolic_mode):
         """Test that projecting a point already on the face returns the same point."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
         )
         
         # Point already on the top face (Z = 1 in global coords)
-        global_point = create_v3(Rational("0.05"), Rational("0.1"), 1)
+        global_point = create_v3(scalar("0.05"), scalar("0.1"), 1)
         projected_global = timber.project_global_point_onto_timber_face_global(global_point, TimberFace.TOP)
         
         # Should return the same point in global coords
-        expected_global = create_v3(Rational("0.05"), Rational("0.1"), 1)
+        expected_global = create_v3(scalar("0.05"), scalar("0.1"), 1)
         assert projected_global == expected_global
     
     def test_project_onto_rotated_timber(self, symbolic_mode):
         """Test projecting onto a face of a rotated timber."""
         # Create a timber pointing east (along X-axis)
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 0, 0),   # X-direction (east)
             width_direction=create_v3(0, 1, 0)      # Y-direction (north)
@@ -692,8 +692,8 @@ class TestProjectGlobalPointOntoTimberFace:
     def test_project_with_offset_bottom_position(self, symbolic_mode):
         """Test projection on a timber with non-zero bottom position."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(5, 10, 20),  # Offset position
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
@@ -710,8 +710,8 @@ class TestProjectGlobalPointOntoTimberFace:
     def test_project_accepts_timber_reference_end(self, symbolic_mode):
         """Test that the method accepts TimberEnd as well as TimberFace."""
         timber = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
@@ -733,17 +733,17 @@ class TestCreateWedgeInTimberEnd:
     def setup_method(self):
         """Create a standard vertical timber for testing."""
         self.timber = timber_from_directions(
-            length=Rational(100),
-            size=create_v2(Rational(10), Rational(15)),
+            length=scalar(100),
+            size=create_v2(scalar(10), scalar(15)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
         )
         self.wedge_spec = WedgeShape(
-            base_width=Rational(5),
-            tip_width=Rational(1),
-            height=Rational(2),
-            length=Rational(10)
+            base_width=scalar(5),
+            tip_width=scalar(1),
+            height=scalar(2),
+            length=scalar(10)
         )
     
     def test_wedge_at_top_end(self):
@@ -751,34 +751,34 @@ class TestCreateWedgeInTimberEnd:
         wedge = create_wedge_in_timber_end(
             timber=self.timber,
             end=TimberEnd.TOP,
-            position=create_v3(Rational(2), Rational(3), 0),
+            position=create_v3(scalar(2), scalar(3), 0),
             shape=self.wedge_spec
         )
         
-        assert wedge.base_width == Rational(5)
-        assert wedge.tip_width == Rational(1)
-        assert wedge.height == Rational(2)
-        assert wedge.length == Rational(10)
-        assert wedge.width == Rational(5)  # Test width property
+        assert wedge.base_width == scalar(5)
+        assert wedge.tip_width == scalar(1)
+        assert wedge.height == scalar(2)
+        assert wedge.length == scalar(10)
+        assert wedge.width == scalar(5)  # Test width property
         
         # Position should be at the top end (Z = length)
-        assert wedge.transform.position[0] == Rational(2)  # X from position
-        assert wedge.transform.position[1] == Rational(3)  # Y from position
-        assert wedge.transform.position[2] == Rational(100)  # Z = timber length
+        assert wedge.transform.position[0] == scalar(2)  # X from position
+        assert wedge.transform.position[1] == scalar(3)  # Y from position
+        assert wedge.transform.position[2] == scalar(100)  # Z = timber length
     
     def test_wedge_at_bottom_end(self):
         """Test creating a wedge at the BOTTOM end."""
         wedge = create_wedge_in_timber_end(
             timber=self.timber,
             end=TimberEnd.BOTTOM,
-            position=create_v3(Rational(-1), Rational(2), 0),
+            position=create_v3(scalar(-1), scalar(2), 0),
             shape=self.wedge_spec
         )
         
         # Position should be at the bottom end (Z = 0)
-        assert wedge.transform.position[0] == Rational(-1)  # X from position
-        assert wedge.transform.position[1] == Rational(2)  # Y from position
-        assert wedge.transform.position[2] == Rational(0)  # Z = 0 (bottom)
+        assert wedge.transform.position[0] == scalar(-1)  # X from position
+        assert wedge.transform.position[1] == scalar(2)  # Y from position
+        assert wedge.transform.position[2] == scalar(0)  # Z = 0 (bottom)
     
     def test_wedge_at_centerline(self):
         """Test creating a wedge at the timber centerline."""
@@ -790,9 +790,9 @@ class TestCreateWedgeInTimberEnd:
         )
         
         # Position should be at center of top end
-        assert wedge.transform.position[0] == Rational(0)
-        assert wedge.transform.position[1] == Rational(0)
-        assert wedge.transform.position[2] == Rational(100)
+        assert wedge.transform.position[0] == scalar(0)
+        assert wedge.transform.position[1] == scalar(0)
+        assert wedge.transform.position[2] == scalar(100)
 
 
 class TestWedgeShape:
@@ -801,28 +801,28 @@ class TestWedgeShape:
     def test_wedge_shape_creation(self):
         """Test WedgeShape creation."""
         shape = WedgeShape(
-            base_width=Rational(6),
-            tip_width=Rational(2),
-            height=Rational(3),
-            length=Rational(12)
+            base_width=scalar(6),
+            tip_width=scalar(2),
+            height=scalar(3),
+            length=scalar(12)
         )
         
-        assert shape.base_width == Rational(6)
-        assert shape.tip_width == Rational(2)
-        assert shape.height == Rational(3)
-        assert shape.length == Rational(12)
+        assert shape.base_width == scalar(6)
+        assert shape.tip_width == scalar(2)
+        assert shape.height == scalar(3)
+        assert shape.length == scalar(12)
     
     def test_wedge_shape_is_frozen(self):
         """Test that WedgeShape is immutable."""
         shape = WedgeShape(
-            base_width=Rational(5),
-            tip_width=Rational(1),
-            height=Rational(2),
-            length=Rational(10)
+            base_width=scalar(5),
+            tip_width=scalar(1),
+            height=scalar(2),
+            length=scalar(10)
         )
         
         with pytest.raises(Exception):  # FrozenInstanceError
-            shape.base_width = Rational(7)  # type: ignore
+            shape.base_width = scalar(7)  # type: ignore
 
 
 class TestTimberRelationshipHelpers:
@@ -833,16 +833,16 @@ class TestTimberRelationshipHelpers:
         from kumiki.timber_shavings import are_timbers_parallel
         # Create two timbers with parallel length directions
         timber1 = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Z-up
             width_direction=create_v3(1, 0, 0)      # X-right
         )
         
         timber2 = timber_from_directions(
-            length=Rational(3),
-            size=create_v2(Rational("0.15"), Rational("0.25")),
+            length=scalar(3),
+            size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(2, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Same direction
             width_direction=create_v3(0, 1, 0)      # Different face direction
@@ -853,8 +853,8 @@ class TestTimberRelationshipHelpers:
         
         # Create a timber with opposite direction (still parallel)
         timber3 = timber_from_directions(
-            length=Rational("1.5"),
-            size=create_v2(Rational("0.1"), Rational("0.2")),
+            length=scalar("1.5"),
+            size=create_v2(scalar("0.1"), scalar("0.2")),
             bottom_position=create_v3(-1, 0, 0),
             length_direction=create_v3(0, 0, -1),  # Opposite direction
             width_direction=create_v3(1, 0, 0)
@@ -865,8 +865,8 @@ class TestTimberRelationshipHelpers:
         
         # Create a timber with perpendicular direction
         timber4 = timber_from_directions(
-            length=Rational("2.5"),
-            size=create_v2(Rational("0.3"), Rational("0.3")),
+            length=scalar("2.5"),
+            size=create_v2(scalar("0.3"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
             length_direction=create_v3(1, 0, 0),   # Perpendicular
             width_direction=create_v3(0, 0, 1)
@@ -880,16 +880,16 @@ class TestTimberRelationshipHelpers:
         from kumiki.timber_shavings import are_timbers_orthogonal
         # Create two timbers with perpendicular length directions
         timber1 = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Z-up
             width_direction=create_v3(1, 0, 0)      # X-right
         )
         
         timber2 = timber_from_directions(
-            length=Rational(3),
-            size=create_v2(Rational("0.15"), Rational("0.25")),
+            length=scalar(3),
+            size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(2, 0, 0),
             length_direction=create_v3(1, 0, 0),   # X-right (perpendicular to timber1)
             width_direction=create_v3(0, 0, 1)      # Z-up
@@ -900,8 +900,8 @@ class TestTimberRelationshipHelpers:
         
         # Create a timber with parallel direction
         timber3 = timber_from_directions(
-            length=Rational("1.5"),
-            size=create_v2(Rational("0.1"), Rational("0.2")),
+            length=scalar("1.5"),
+            size=create_v2(scalar("0.1"), scalar("0.2")),
             bottom_position=create_v3(-1, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Same as timber1
             width_direction=create_v3(1, 0, 0)
@@ -912,8 +912,8 @@ class TestTimberRelationshipHelpers:
         
         # Test with Y-direction
         timber4 = timber_from_directions(
-            length=Rational("2.5"),
-            size=create_v2(Rational("0.3"), Rational("0.3")),
+            length=scalar("2.5"),
+            size=create_v2(scalar("0.3"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
             length_direction=create_v3(0, 1, 0),   # Y-forward (perpendicular to timber1)
             width_direction=create_v3(1, 0, 0)
@@ -927,8 +927,8 @@ class TestTimberRelationshipHelpers:
         from kumiki.timber_shavings import are_timbers_face_aligned
         # Create a reference timber with standard orientation
         timber1 = timber_from_directions(
-            length=Rational(2),
-            size=create_v2(Rational("0.2"), Rational("0.3")),
+            length=scalar(2),
+            size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Z-up
             width_direction=create_v3(1, 0, 0)      # X-right
@@ -937,8 +937,8 @@ class TestTimberRelationshipHelpers:
         
         # Test 1: Timber with same orientation - should be face-aligned
         timber2 = timber_from_directions(
-            length=Rational(3),
-            size=create_v2(Rational("0.15"), Rational("0.25")),
+            length=scalar(3),
+            size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(2, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Same as timber1
             width_direction=create_v3(1, 0, 0)      # Same as timber1
@@ -948,8 +948,8 @@ class TestTimberRelationshipHelpers:
         # Test 2: Timber rotated 90° around Z - should be face-aligned  
         # (length stays Z, but face becomes Y, height becomes -X)
         timber3 = timber_from_directions(
-            length=Rational("1.5"),
-            size=create_v2(Rational("0.1"), Rational("0.2")),
+            length=scalar("1.5"),
+            size=create_v2(scalar("0.1"), scalar("0.2")),
             bottom_position=create_v3(-1, 0, 0),
             length_direction=create_v3(0, 0, 1),   # Same Z
             width_direction=create_v3(0, 1, 0)      # Y direction
@@ -959,8 +959,8 @@ class TestTimberRelationshipHelpers:
         # Test 3: Timber rotated 90° around X - should be face-aligned
         # (length becomes -Y, face stays X, height becomes Z) 
         timber4 = timber_from_directions(
-            length=Rational("2.5"),
-            size=create_v2(Rational("0.3"), Rational("0.3")),
+            length=scalar("2.5"),
+            size=create_v2(scalar("0.3"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
             length_direction=create_v3(0, -1, 0),  # -Y direction
             width_direction=create_v3(1, 0, 0)      # Same X
@@ -970,8 +970,8 @@ class TestTimberRelationshipHelpers:
         # Test 4: Timber with perpendicular orientation but face-aligned
         # (length becomes X, face becomes Z, height becomes Y)
         timber5 = timber_from_directions(
-            length=Rational("1.8"),
-            size=create_v2(Rational("0.2"), Rational("0.2")),
+            length=scalar("1.8"),
+            size=create_v2(scalar("0.2"), scalar("0.2")),
             bottom_position=create_v3(0, 2, 0),
             length_direction=create_v3(1, 0, 0),   # X direction  
             width_direction=create_v3(0, 0, 1)      # Z direction
@@ -989,11 +989,11 @@ class TestTimberRelationshipHelpers:
         
         # This creates a timber whose directions don't align with any cardinal axes
         timber6 = timber_from_directions(
-            length=Rational(1),
-            size=create_v2(Rational("0.1"), Rational("0.1")),
+            length=scalar(1),
+            size=create_v2(scalar("0.1"), scalar("0.1")),
             bottom_position=create_v3(0, 0, 2),
-            length_direction=create_v3(Float(sin45*cos30), Float(sin45*sin30), Float(cos45)),  # Complex 3D direction
-            width_direction=create_v3(Float(cos45*cos30), Float(cos45*sin30), Float(-sin45))    # Perpendicular complex direction
+            length_direction=create_v3(scalar(sin45*cos30), scalar(sin45*sin30), scalar(cos45)),  # Complex 3D direction
+            width_direction=create_v3(scalar(cos45*cos30), scalar(cos45*sin30), scalar(-sin45))    # Perpendicular complex direction
         )
         assert not are_timbers_face_aligned(timber1, timber6)
         
@@ -1002,11 +1002,11 @@ class TestTimberRelationshipHelpers:
         cos45_xy = math.cos(math.pi/4)
         sin45_xy = math.sin(math.pi/4)
         timber7 = timber_from_directions(
-            length=Rational(1),
-            size=create_v2(Rational("0.1"), Rational("0.1")),
+            length=scalar(1),
+            size=create_v2(scalar("0.1"), scalar("0.1")),
             bottom_position=create_v3(0, 0, 2),
-            length_direction=create_v3(Float(cos45_xy), Float(sin45_xy), 0),  # 45° in XY plane
-            width_direction=create_v3(Float(-sin45_xy), Float(cos45_xy), 0)    # Perpendicular in XY
+            length_direction=create_v3(scalar(cos45_xy), scalar(sin45_xy), 0),  # 45° in XY plane
+            width_direction=create_v3(scalar(-sin45_xy), scalar(cos45_xy), 0)    # Perpendicular in XY
         )
         # This SHOULD be face-aligned because height direction = [0,0,1] = timber1.get_length_direction_global()
         assert are_timbers_face_aligned(timber1, timber7)
@@ -1024,12 +1024,11 @@ class TestTimberRelationshipHelpers:
     def testare_timbers_parallel_rational(self):
         """Test are_timbers_parallel with rational (exact) values."""
         from kumiki.timber_shavings import are_timbers_parallel
-        from sympy import Rational
         
         # Create timbers with exact rational directions
         timber1 = timber_from_directions(
             length=2,
-            size=create_v2(Rational(1, 5), Rational(3, 10)),
+            size=create_v2(scalar(1, 5), scalar(3, 10)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
@@ -1037,7 +1036,7 @@ class TestTimberRelationshipHelpers:
         
         timber2 = timber_from_directions(
             length=3,
-            size=create_v2(Rational(1, 10), Rational(1, 4)),
+            size=create_v2(scalar(1, 10), scalar(1, 4)),
             bottom_position=create_v3(2, 0, 0),
             length_direction=create_v3(0, 0, 1),  # Parallel
             width_direction=create_v3(0, 1, 0)
@@ -1048,8 +1047,8 @@ class TestTimberRelationshipHelpers:
         
         # Test anti-parallel (should still be parallel)
         timber3 = timber_from_directions(
-            length=Rational(3, 2),
-            size=create_v2(Rational(1, 10), Rational(1, 5)),
+            length=scalar(3, 2),
+            size=create_v2(scalar(1, 10), scalar(1, 5)),
             bottom_position=create_v3(-1, 0, 0),
             length_direction=create_v3(0, 0, -1),  # Anti-parallel
             width_direction=create_v3(1, 0, 0)
@@ -1060,7 +1059,7 @@ class TestTimberRelationshipHelpers:
         # Test perpendicular (should not be parallel)
         timber4 = timber_from_directions(
             length=2,
-            size=create_v2(Rational(3, 10), Rational(3, 10)),
+            size=create_v2(scalar(3, 10), scalar(3, 10)),
             bottom_position=create_v3(1, 1, 0),
             length_direction=create_v3(1, 0, 0),  # Perpendicular
             width_direction=create_v3(0, 0, 1)
@@ -1079,11 +1078,11 @@ class TestTimberRelationshipHelpers:
         # Slightly off parallel (within tolerance)
         small_angle = 1e-11
         timber2 = timber_from_directions(
-            length=Rational(3),
-            size=create_v2(Rational("0.15"), Rational("0.25")),
-            bottom_position=create_v3(Rational(2), Rational(0), Rational(0)),
-            length_direction=create_v3(Float(math.sin(small_angle)), Rational(0), Float(math.cos(small_angle))),
-            width_direction=create_v3(Float(math.cos(small_angle)), Rational(0), Float(-math.sin(small_angle)))
+            length=scalar(3),
+            size=create_v2(scalar("0.15"), scalar("0.25")),
+            bottom_position=create_v3(scalar(2), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(math.sin(small_angle)), scalar(0), scalar(math.cos(small_angle))),
+            width_direction=create_v3(scalar(math.cos(small_angle)), scalar(0), scalar(-math.sin(small_angle)))
         )
         
         # Should be parallel (fuzzy comparison)
@@ -1092,12 +1091,11 @@ class TestTimberRelationshipHelpers:
     def testare_timbers_orthogonal_rational(self):
         """Test are_timbers_orthogonal with rational (exact) values."""
         from kumiki.timber_shavings import are_timbers_orthogonal
-        from sympy import Rational
         
         # Create timbers with exact rational perpendicular directions
         timber1 = timber_from_directions(
             length=2,
-            size=create_v2(Rational(1, 5), Rational(3, 10)),
+            size=create_v2(scalar(1, 5), scalar(3, 10)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
@@ -1105,7 +1103,7 @@ class TestTimberRelationshipHelpers:
         
         timber2 = timber_from_directions(
             length=3,
-            size=create_v2(Rational(15, 100), Rational(1, 4)),
+            size=create_v2(scalar(15, 100), scalar(1, 4)),
             bottom_position=create_v3(2, 0, 0),
             length_direction=create_v3(1, 0, 0),  # Perpendicular
             width_direction=create_v3(0, 0, 1)
@@ -1116,8 +1114,8 @@ class TestTimberRelationshipHelpers:
         
         # Test non-orthogonal
         timber3 = timber_from_directions(
-            length=Rational(3, 2),
-            size=create_v2(Rational(1, 10), Rational(1, 5)),
+            length=scalar(3, 2),
+            size=create_v2(scalar(1, 10), scalar(1, 5)),
             bottom_position=create_v3(-1, 0, 0),
             length_direction=create_v3(0, 0, 1),  # Parallel to timber1
             width_direction=create_v3(1, 0, 0)
@@ -1134,13 +1132,13 @@ class TestTimberRelationshipHelpers:
         timber1 = create_standard_vertical_timber(height=2, size=(0.2, 0.3), position=(0, 0, 0))
         
         # Nearly perpendicular (within numeric fallback test tolerance)
-        small_offset = Rational(1e-20)
+        small_offset = scalar(1e-20)
         timber2 = timber_from_directions(
-            length=Rational(3),
-            size=create_v2(Rational("0.15"), Rational("0.25")),
-            bottom_position=create_v3(Rational(2), Rational(0), Rational(0)),
-            length_direction=create_v3(Rational(1), Rational(0), small_offset),
-            width_direction=create_v3(Rational(0), Rational(1), Rational(0))
+            length=scalar(3),
+            size=create_v2(scalar("0.15"), scalar("0.25")),
+            bottom_position=create_v3(scalar(2), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), small_offset),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0))
         )
         
         # Should be orthogonal (fuzzy comparison)
@@ -1152,7 +1150,7 @@ class TestTimberRelationshipHelpers:
         # Create two face-aligned timbers using exact rational values
         timber1 = timber_from_directions(
             length=2,  # Integer
-            size=create_v2(Rational(1, 5), Rational(3, 10)),  # Exact rationals
+            size=create_v2(scalar(1, 5), scalar(3, 10)),  # Exact rationals
             bottom_position=create_v3(0, 0, 0),  # Integers
             length_direction=create_v3(0, 0, 1),   # Vertical - integers
             width_direction=create_v3(1, 0, 0)      # East - integers
@@ -1160,7 +1158,7 @@ class TestTimberRelationshipHelpers:
         
         timber2 = timber_from_directions(
             length=3,  # Integer
-            size=create_v2(Rational(3, 20), Rational(1, 4)),  # Exact rationals
+            size=create_v2(scalar(3, 20), scalar(1, 4)),  # Exact rationals
             bottom_position=create_v3(2, 0, 0),  # Integers
             length_direction=create_v3(1, 0, 0),   # East (perpendicular to timber1) - integers
             width_direction=create_v3(0, 0, 1)      # Up - integers
@@ -1173,7 +1171,7 @@ class TestTimberRelationshipHelpers:
         # Using a timber rotated in 3D such that none of its axes align with timber1's axes
         timber3 = timber_from_directions(
             length=2,  # Integer
-            size=create_v2(Rational(1, 5), Rational(1, 5)),  # Exact rationals
+            size=create_v2(scalar(1, 5), scalar(1, 5)),  # Exact rationals
             bottom_position=create_v3(3, 3, 0),  # Integers
             length_direction=create_v3(1, 1, 1),   # 3D diagonal (will be normalized to Float)
             width_direction=create_v3(1, -1, 0)     # Perpendicular in 3D (will be normalized to Float)
@@ -1186,17 +1184,16 @@ class TestTimberRelationshipHelpers:
         assert not result
         
         # Test with tolerance parameter (no warning)
-        assert are_timbers_face_aligned(timber1, timber2, tolerance=Float(1e-10))
+        assert are_timbers_face_aligned(timber1, timber2, tolerance=scalar(1e-10))
 
     def test_do_xy_cross_section_on_parallel_timbers_overlap(self):
         """Test do_xy_cross_section_on_parallel_timbers_overlap function."""
         from kumiki.timber_shavings import do_xy_cross_section_on_parallel_timbers_overlap
-        from sympy import Rational
         
         # Test 1: Two aligned timbers that overlap
         timber1 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
@@ -1204,8 +1201,8 @@ class TestTimberRelationshipHelpers:
         )
         
         timber2 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(5, 0, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
@@ -1217,8 +1214,8 @@ class TestTimberRelationshipHelpers:
         
         # Test 2: Two aligned timbers that don't overlap (separated in Y)
         timber3 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(5, 10, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
@@ -1230,8 +1227,8 @@ class TestTimberRelationshipHelpers:
         
         # Test 3: Two rotated timbers that overlap
         timber4 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
@@ -1239,8 +1236,8 @@ class TestTimberRelationshipHelpers:
         )
         
         timber5 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 0, 1),  # Rotated 90 degrees
@@ -1252,8 +1249,8 @@ class TestTimberRelationshipHelpers:
         
         # Test 4: Timbers that just touch at edge (should overlap)
         timber6 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
@@ -1263,9 +1260,9 @@ class TestTimberRelationshipHelpers:
         # timber6 spans Y: -2 to 2
         # timber7 at Y=4 spans Y: 2 to 6, so they just touch
         timber7 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
-            bottom_position=create_v3(0, Rational(4), 0),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(0, scalar(4), 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
             ticket='timber7'
@@ -1276,9 +1273,9 @@ class TestTimberRelationshipHelpers:
         
         # Test 5: Timbers with small gap (should not overlap)
         timber8 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
-            bottom_position=create_v3(0, Rational(4) + Rational('0.01'), 0),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(0, scalar(4) + scalar('0.01'), 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
             ticket='timber8'
@@ -1289,8 +1286,8 @@ class TestTimberRelationshipHelpers:
         
         # Test 6: Anti-parallel timbers (same direction but opposite ends)
         timber9 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
@@ -1298,8 +1295,8 @@ class TestTimberRelationshipHelpers:
         )
         
         timber10 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(20, 0, 0),
             length_direction=create_v3(-1, 0, 0),  # Opposite direction
             width_direction=create_v3(0, 1, 0),
@@ -1311,8 +1308,8 @@ class TestTimberRelationshipHelpers:
         
         # Test 7: Offset rotated timbers
         timber11 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(6)),  # 4 wide, 6 high
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(6)),  # 4 wide, 6 high
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0),
@@ -1321,9 +1318,9 @@ class TestTimberRelationshipHelpers:
         
         # Rotated 90 degrees and offset
         timber12 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(6), Rational(4)),  # 6 wide, 4 high
-            bottom_position=create_v3(Rational(4), 0, 0),  # Offset in X
+            length=scalar(10),
+            size=create_v2(scalar(6), scalar(4)),  # 6 wide, 4 high
+            bottom_position=create_v3(scalar(4), 0, 0),  # Offset in X
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(0, 1, 0),  # Rotated 90 degrees
             ticket='timber12'
@@ -1337,8 +1334,8 @@ class TestTimberRelationshipHelpers:
         
         # Test 8: Assertion error for non-parallel timbers
         timber13 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(1, 0, 0),
             width_direction=create_v3(0, 1, 0),
@@ -1346,8 +1343,8 @@ class TestTimberRelationshipHelpers:
         )
         
         timber14 = timber_from_directions(
-            length=Rational(10),
-            size=create_v2(Rational(4), Rational(4)),
+            length=scalar(10),
+            size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
             length_direction=create_v3(0, 1, 0),  # Perpendicular
             width_direction=create_v3(1, 0, 0),

@@ -3,7 +3,6 @@ Construction Examples - Testing join_face_aligned_on_face_aligned_timbers
 with different reference features
 """
 
-from sympy import Rational
 from kumiki import *
 from kumiki.patternbook import Pattern
 
@@ -11,7 +10,7 @@ def inches(value):
     """Convert inches to meters using exact rational arithmetic."""
     # 1 inch = 0.0254 meters exactly
     # So value inches = value * 0.0254 = value * 254/10000 = value * 127/5000
-    return Rational(value) * Rational(254, 10000)
+    return scalar(value) * scalar(254, 10000)
 
 def make_join_face_aligned_on_face_aligned_timbers_example():
     """
@@ -28,8 +27,8 @@ def make_join_face_aligned_on_face_aligned_timbers_example():
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="Post_Left"
     )
     
@@ -38,8 +37,8 @@ def make_join_face_aligned_on_face_aligned_timbers_example():
         length=post_height,
         size=post_size,
         bottom_position=create_v3(feet(4), 0, 0),
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="Post_Right"
     )
     
@@ -81,8 +80,8 @@ def make_attach_face_aligned_timber_example():
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="Post",
     )
 
@@ -127,8 +126,8 @@ def make_attach_face_aligned_timber_flush_example():
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="Post",
     )
 
@@ -170,8 +169,8 @@ def make_attach_plane_aligned_timber_brace_example():
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="Post",
     )
 
@@ -210,15 +209,15 @@ def make_attach_timber_example():
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
         ticket="Post",
     )
 
     attached = attach_timber(
         original_timber=post,
         size=attached_size,
-        attached_timber_direction=create_v3(Integer(2), Integer(1), Integer(1)),  # arbitrary
+        attached_timber_direction=create_v3(scalar(2), scalar(1), scalar(1)),  # arbitrary
         attached_timber_length=feet(3),
         original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
         length_position_measurement=inches(24),
@@ -258,7 +257,7 @@ def make_footprint_vertical_example():
     cut_timbers = []
     for i, location in enumerate([FootprintLocation.INSIDE, FootprintLocation.OUTSIDE, FootprintLocation.CENTER]):
         origin_x = spacing * i
-        footprint = _square_footprint(origin_x, Integer(0), side)
+        footprint = _square_footprint(origin_x, scalar(0), side)
         footprints.append(footprint)
         # a post on each of the 4 corners, placed inside / outside / on-center of the corner
         for corner in range(4):
@@ -287,7 +286,7 @@ def make_footprint_horizontal_example():
     cut_timbers = []
     for i, location in enumerate([FootprintLocation.INSIDE, FootprintLocation.OUTSIDE, FootprintLocation.CENTER]):
         origin_x = spacing * i
-        footprint = _square_footprint(origin_x, Integer(0), side)
+        footprint = _square_footprint(origin_x, scalar(0), side)
         footprints.append(footprint)
         # a mudsill on each of the 4 sides
         for side_index in range(4):

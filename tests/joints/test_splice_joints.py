@@ -3,7 +3,7 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, Float, Rational, pi
+from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -73,7 +73,7 @@ class TestSpliceJoint:
         timberB = create_standard_vertical_timber(height=100, size=(4, 4), position=(0, 0, 100))
         
         # Specify splice point at z=120 (not the midpoint)
-        splice_point = Matrix([Rational(0), Rational(0), Rational(120)])
+        splice_point = Matrix([scalar(0), scalar(0), scalar(120)])
         
         joint = cut_plain_butt_splice_joint_on_aligned_timbers(
             SpliceJointTimberArrangement(
@@ -95,21 +95,21 @@ class TestSpliceJoint:
         """Test splice joint with two aligned timbers with opposite orientations."""
         # TimberA points in +X direction
         timberA = timber_from_directions(
-            length=Rational(60),
-            size=Matrix([Rational(6), Rational(6)]),
-            bottom_position=Matrix([Rational(0), Rational(0), Rational(0)]),
-            length_direction=Matrix([Rational(1), Rational(0), Rational(0)]),
-            width_direction=Matrix([Rational(0), Rational(1), Rational(0)])
+            length=scalar(60),
+            size=Matrix([scalar(6), scalar(6)]),
+            bottom_position=Matrix([scalar(0), scalar(0), scalar(0)]),
+            length_direction=Matrix([scalar(1), scalar(0), scalar(0)]),
+            width_direction=Matrix([scalar(0), scalar(1), scalar(0)])
         )
         
         # TimberB points in -X direction (opposite orientation)
         # Bottom is at x=100, top at x=40
         timberB = timber_from_directions(
-            length=Rational(60),
-            size=Matrix([Rational(6), Rational(6)]),
-            bottom_position=Matrix([Rational(100), Rational(0), Rational(0)]),
-            length_direction=Matrix([Rational(-1), Rational(0), Rational(0)]),
-            width_direction=Matrix([Rational(0), Rational(1), Rational(0)])
+            length=scalar(60),
+            size=Matrix([scalar(6), scalar(6)]),
+            bottom_position=Matrix([scalar(100), scalar(0), scalar(0)]),
+            length_direction=Matrix([scalar(-1), scalar(0), scalar(0)]),
+            width_direction=Matrix([scalar(0), scalar(1), scalar(0)])
         )
         
         # Create splice joint (should meet in the middle at x=50)
@@ -134,19 +134,19 @@ class TestSpliceJoint:
         """Test that non-aligned (non-parallel) timbers raise a ValueError."""
         # Create two perpendicular timbers
         timberA = timber_from_directions(
-            length=Rational(50),
-            size=Matrix([Rational(4), Rational(4)]),
-            bottom_position=Matrix([Rational(0), Rational(0), Rational(0)]),
-            length_direction=Matrix([Rational(1), Rational(0), Rational(0)]),
-            width_direction=Matrix([Rational(0), Rational(1), Rational(0)])
+            length=scalar(50),
+            size=Matrix([scalar(4), scalar(4)]),
+            bottom_position=Matrix([scalar(0), scalar(0), scalar(0)]),
+            length_direction=Matrix([scalar(1), scalar(0), scalar(0)]),
+            width_direction=Matrix([scalar(0), scalar(1), scalar(0)])
         )
         
         timberB = timber_from_directions(
-            length=Rational(50),
-            size=Matrix([Rational(4), Rational(4)]),
-            bottom_position=Matrix([Rational(50), Rational(0), Rational(0)]),
-            length_direction=Matrix([Rational(0), Rational(1), Rational(0)]),  # Perpendicular!
-            width_direction=Matrix([Rational(1), Rational(0), Rational(0)])
+            length=scalar(50),
+            size=Matrix([scalar(4), scalar(4)]),
+            bottom_position=Matrix([scalar(50), scalar(0), scalar(0)]),
+            length_direction=Matrix([scalar(0), scalar(1), scalar(0)]),  # Perpendicular!
+            width_direction=Matrix([scalar(1), scalar(0), scalar(0)])
         )
         
         # Should raise ValueError
@@ -171,7 +171,6 @@ class TestSpliceLapJoint:
         1. Points outside the ends on centerline are not contained
         2. Points along a line perpendicular to the lap face show correct containment
         """
-        from sympy import Rational
         
         # Create two aligned timbers meeting end-to-end
         timber_length = 20
@@ -255,7 +254,7 @@ class TestSpliceLapJoint:
         # Test 3: Walk perpendicular to top lap face checking containment at different depths
         # Pick a point in the lap region on the cut face of timberA
         # The lap_depth defaults to half of timberA's height: 4/2 = 2
-        lap_depth = Rational(4) / 2  # 2
+        lap_depth = scalar(4) / 2  # 2
         
         # Choose x_in_lap to be in the overlap region where both timbers have laps
         # TimberA lap: x=18-shoulder_distance to x=18, then lap extends beyond
@@ -275,7 +274,7 @@ class TestSpliceLapJoint:
         # - TimberB remains at global Z in [0, +2]
         
         # At z=-epsilon: Just inside timberA's kept region (BACK side), should be in timberA but not in timberB
-        epsilon = Rational(1, 10)  # Small offset
+        epsilon = scalar(1, 10)  # Small offset
         point_in_A = create_v3(x_in_lap, 0, -epsilon)  # Just below Z=0 (in timberA's kept region)
         point_in_A_local = timberA.transform.global_to_local(point_in_A)
         point_in_A_as_B_local = timberB.transform.global_to_local(point_in_A)

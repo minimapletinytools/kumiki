@@ -10,6 +10,7 @@ import math
 import sympy as sp
 from sympy import Matrix, pi, simplify, Abs, eye, det, Rational, Integer, cos, sin, sqrt
 from kumiki.rule import (
+    scalar,
     Orientation,
     Transform,
     Axis,
@@ -657,67 +658,67 @@ class TestDimensionalHelpers:
     def test_inches_integer(self):
         """Test inches with integer input."""
         result = inches(1)
-        expected = Rational(1) * INCH_TO_METER
+        expected = scalar(1) * INCH_TO_METER
         assert result == expected
     
     def test_inches_fraction(self):
         """Test inches with fractional input (1/32 inch)."""
         result = inches(1, 32)
-        expected = Rational(1, 32) * INCH_TO_METER
+        expected = scalar(1, 32) * INCH_TO_METER
         assert result == expected
     
     def test_inches_float(self):
         """Test inches with float input (converts to Rational)."""
         result = inches(3.5)
-        expected = Rational(7, 2) * INCH_TO_METER
+        expected = scalar(7, 2) * INCH_TO_METER
         assert result == expected
     
     def test_inches_string(self):
         """Test inches with string input."""
         result = inches("1.5")
-        expected = Rational(3, 2) * INCH_TO_METER
+        expected = scalar(3, 2) * INCH_TO_METER
         assert result == expected
     
     def test_inches_fraction_string(self):
         """Test inches with fraction string."""
         result = inches("1/32")
-        expected = Rational(1, 32) * INCH_TO_METER
+        expected = scalar(1, 32) * INCH_TO_METER
         assert result == expected
     
     def test_feet_integer(self):
         """Test feet with integer input."""
         result = feet(8)
-        expected = Rational(8) * FOOT_TO_METER
+        expected = scalar(8) * FOOT_TO_METER
         assert result == expected
     
     def test_feet_fraction(self):
         """Test feet with fractional input."""
         result = feet(1, 2)
-        expected = Rational(1, 2) * FOOT_TO_METER
+        expected = scalar(1, 2) * FOOT_TO_METER
         assert result == expected
     
     def test_feet_float(self):
         """Test feet with float input."""
         result = feet(6.5)
-        expected = Rational(13, 2) * FOOT_TO_METER
+        expected = scalar(13, 2) * FOOT_TO_METER
         assert result == expected
     
     def test_mm_integer(self):
         """Test millimeters with integer input."""
         result = mm(90)
-        expected = Rational(90, 1000)
+        expected = scalar(90, 1000)
         assert result == expected
     
     def test_mm_fraction(self):
         """Test millimeters with fractional input."""
         result = mm(1, 2)
-        expected = Rational(1, 2000)
+        expected = scalar(1, 2000)
         assert result == expected
     
     def test_mm_float(self):
         """Test millimeters with Rational input for exact comparison."""
         # Use exact Rational instead of float to avoid binary representation issues
-        result = mm(Rational(254, 10))  # Exactly 25.4mm
+        result = mm(scalar(254, 10))  # Exactly 25.4mm
         # Float conversion creates exact Rational from binary representation
         assert isinstance(result, Rational)
         # Check it equals exactly 1 inch
@@ -727,49 +728,49 @@ class TestDimensionalHelpers:
     def test_cm_integer(self):
         """Test centimeters with integer input."""
         result = cm(9)
-        expected = Rational(9, 100)
+        expected = scalar(9, 100)
         assert result == expected
     
     def test_cm_fraction(self):
         """Test centimeters with fractional input."""
         result = cm(1, 2)
-        expected = Rational(1, 200)
+        expected = scalar(1, 200)
         assert result == expected
     
     def test_m_integer(self):
         """Test meters with integer input."""
         result = m(1)
-        expected = Rational(1)
+        expected = scalar(1)
         assert result == expected
     
     def test_m_fraction(self):
         """Test meters with fractional input."""
         result = m(1, 2)
-        expected = Rational(1, 2)
+        expected = scalar(1, 2)
         assert result == expected
     
     def test_m_float(self):
         """Test meters with float input."""
         result = m(2.5)
-        expected = Rational(5, 2)
+        expected = scalar(5, 2)
         assert result == expected
     
     def test_shaku_integer(self):
         """Test shaku with integer input."""
         result = shaku(1)
-        expected = Rational(1) * SHAKU_TO_METER
+        expected = scalar(1) * SHAKU_TO_METER
         assert result == expected
     
     def test_shaku_fraction(self):
         """Test shaku with fractional input."""
         result = shaku(3, 2)
-        expected = Rational(3, 2) * SHAKU_TO_METER
+        expected = scalar(3, 2) * SHAKU_TO_METER
         assert result == expected
     
     def test_shaku_float(self):
         """Test shaku with float input."""
         result = shaku(2.5)
-        expected = Rational(5, 2) * SHAKU_TO_METER
+        expected = scalar(5, 2) * SHAKU_TO_METER
         assert result == expected
     
     def test_sun_integer(self):
@@ -781,7 +782,7 @@ class TestDimensionalHelpers:
     def test_sun_fraction(self):
         """Test sun with fractional input."""
         result = sun(1, 2)
-        expected = Rational(1, 2) * SHAKU_TO_METER / 10
+        expected = scalar(1, 2) * SHAKU_TO_METER / 10
         assert result == expected
     
     def test_sun_multiple(self):
@@ -799,7 +800,7 @@ class TestDimensionalHelpers:
     def test_bu_fraction(self):
         """Test bu with fractional input."""
         result = bu(1, 2)
-        expected = Rational(1, 2) * SHAKU_TO_METER / 100
+        expected = scalar(1, 2) * SHAKU_TO_METER / 100
         assert result == expected
     
     def test_bu_multiple(self):
@@ -831,7 +832,7 @@ class TestDimensionalHelpers:
     def test_conversion_consistency(self):
         """Test that 1 inch equals 25.4 mm exactly."""
         result_inch = inches(1)
-        result_mm = mm(Rational(254, 10))  # 25.4 mm
+        result_mm = mm(scalar(254, 10))  # 25.4 mm
         assert result_inch == result_mm
     
     def test_practical_example_imperial(self):
@@ -845,8 +846,8 @@ class TestDimensionalHelpers:
         assert isinstance(height, Rational)
         
         # Verify exact metric values
-        assert width == Rational(381, 10000)  # Exactly 38.1mm
-        assert height == Rational(889, 10000)  # Exactly 88.9mm
+        assert width == scalar(381, 10000)  # Exactly 38.1mm
+        assert height == scalar(889, 10000)  # Exactly 88.9mm
     
     def test_practical_example_metric(self):
         """Test a practical carpentry example with metric units."""
@@ -856,7 +857,7 @@ class TestDimensionalHelpers:
         
         assert isinstance(width, Rational)
         assert isinstance(height, Rational)
-        assert width == Rational(9, 100)  # 0.09 meters
+        assert width == scalar(9, 100)  # 0.09 meters
     
     def test_practical_example_japanese(self):
         """Test a practical carpentry example with Japanese traditional units."""
@@ -869,7 +870,7 @@ class TestDimensionalHelpers:
         
         # Verify they're equal and exact
         assert width == height
-        assert width == Rational(4) * SHAKU_TO_METER / 10
+        assert width == scalar(4) * SHAKU_TO_METER / 10
 
 
 class TestTransformRotateAroundAxis:
@@ -879,21 +880,21 @@ class TestTransformRotateAroundAxis:
         """Test rotation around Z axis through origin by 90 degrees."""
         # Create a transform at (1, 0, 0) with identity orientation
         transform = Transform(
-            position=create_v3(Integer(1), Integer(0), Integer(0)),
+            position=create_v3(scalar(1), scalar(0), scalar(0)),
             orientation=Orientation.identity()
         )
         
         # Create Z axis through origin
         z_axis = Axis(
-            position=create_v3(Integer(0), Integer(0), Integer(0)),
-            direction=create_v3(Integer(0), Integer(0), Integer(1))
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            direction=create_v3(scalar(0), scalar(0), scalar(1))
         )
         
         # Rotate 90 degrees counterclockwise around Z axis
         rotated = transform.rotate_around_axis(z_axis, radians(pi / 2))
         
         # Position should move from (1, 0, 0) to (0, 1, 0)
-        expected_pos = create_v3(Integer(0), Integer(1), Integer(0))
+        expected_pos = create_v3(scalar(0), scalar(1), scalar(0))
         diff = simplify(rotated.position - expected_pos)
         for i in range(3):
             assert abs(float(diff[i])) < 1e-10, f"Position mismatch at index {i}"
@@ -909,30 +910,30 @@ class TestTransformRotateAroundAxis:
         """Test rotation around X axis through origin by 180 degrees."""
         # Create a transform at (0, 1, 0) with identity orientation
         transform = Transform(
-            position=create_v3(Integer(0), Integer(1), Integer(0)),
+            position=create_v3(scalar(0), scalar(1), scalar(0)),
             orientation=Orientation.identity()
         )
         
         # Create X axis through origin
         x_axis = Axis(
-            position=create_v3(Integer(0), Integer(0), Integer(0)),
-            direction=create_v3(Integer(1), Integer(0), Integer(0))
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            direction=create_v3(scalar(1), scalar(0), scalar(0))
         )
         
         # Rotate 180 degrees around X axis
         rotated = transform.rotate_around_axis(x_axis, radians(pi))
         
         # Position should move from (0, 1, 0) to (0, -1, 0)
-        expected_pos = create_v3(Integer(0), Integer(-1), Integer(0))
+        expected_pos = create_v3(scalar(0), scalar(-1), scalar(0))
         diff = simplify(rotated.position - expected_pos)
         for i in range(3):
             assert abs(float(diff[i])) < 1e-10
         
         # Orientation should be rotated by 180 degrees around X
         expected_matrix = Matrix([
-            [Integer(1), Integer(0), Integer(0)],
-            [Integer(0), Integer(-1), Integer(0)],
-            [Integer(0), Integer(0), Integer(-1)]
+            [scalar(1), scalar(0), scalar(0)],
+            [scalar(0), scalar(-1), scalar(0)],
+            [scalar(0), scalar(0), scalar(-1)]
         ])
         expected_orient = Orientation(expected_matrix)
         diff_orient = simplify(rotated.orientation.matrix - expected_orient.matrix)
@@ -944,14 +945,14 @@ class TestTransformRotateAroundAxis:
         """Test rotation around Z axis NOT through origin."""
         # Create a transform at (2, 0, 0)
         transform = Transform(
-            position=create_v3(Integer(2), Integer(0), Integer(0)),
+            position=create_v3(scalar(2), scalar(0), scalar(0)),
             orientation=Orientation.identity()
         )
         
         # Create Z axis through (1, 0, 0) - offset from origin
         z_axis = Axis(
-            position=create_v3(Integer(1), Integer(0), Integer(0)),
-            direction=create_v3(Integer(0), Integer(0), Integer(1))
+            position=create_v3(scalar(1), scalar(0), scalar(0)),
+            direction=create_v3(scalar(0), scalar(0), scalar(1))
         )
         
         # Rotate 90 degrees counterclockwise
@@ -959,7 +960,7 @@ class TestTransformRotateAroundAxis:
         # After rotation, should be at (1, 1, 0)
         rotated = transform.rotate_around_axis(z_axis, radians(pi / 2))
         
-        expected_pos = create_v3(Integer(1), Integer(1), Integer(0))
+        expected_pos = create_v3(scalar(1), scalar(1), scalar(0))
         diff = simplify(rotated.position - expected_pos)
         for i in range(3):
             assert abs(float(diff[i])) < 1e-10
@@ -968,21 +969,21 @@ class TestTransformRotateAroundAxis:
         """Test rotation around Y axis offset from origin."""
         # Create a transform at (1, 0, 0)
         transform = Transform(
-            position=create_v3(Integer(1), Integer(0), Integer(0)),
+            position=create_v3(scalar(1), scalar(0), scalar(0)),
             orientation=Orientation.identity()
         )
         
         # Create Y axis through (1, 0, 0) - axis passes through the point
         y_axis = Axis(
-            position=create_v3(Integer(1), Integer(0), Integer(0)),
-            direction=create_v3(Integer(0), Integer(1), Integer(0))
+            position=create_v3(scalar(1), scalar(0), scalar(0)),
+            direction=create_v3(scalar(0), scalar(1), scalar(0))
         )
         
         # Rotate 90 degrees - point is ON the axis, so should not move
         rotated = transform.rotate_around_axis(y_axis, radians(pi / 2))
         
         # Position should stay at (1, 0, 0)
-        expected_pos = create_v3(Integer(1), Integer(0), Integer(0))
+        expected_pos = create_v3(scalar(1), scalar(0), scalar(0))
         diff = simplify(rotated.position - expected_pos)
         for i in range(3):
             assert abs(float(diff[i])) < 1e-10
@@ -990,17 +991,17 @@ class TestTransformRotateAroundAxis:
     def test_rotate_zero_angle(self):
         """Test that rotation by 0 degrees returns unchanged transform."""
         transform = Transform(
-            position=create_v3(Integer(1), Integer(2), Integer(3)),
+            position=create_v3(scalar(1), scalar(2), scalar(3)),
             orientation=Orientation.rotate_left()
         )
         
         axis = Axis(
-            position=create_v3(Integer(5), Integer(6), Integer(7)),
-            direction=create_v3(Integer(0), Integer(0), Integer(1))
+            position=create_v3(scalar(5), scalar(6), scalar(7)),
+            direction=create_v3(scalar(0), scalar(0), scalar(1))
         )
         
         # Rotate by 0 degrees
-        rotated = transform.rotate_around_axis(axis, radians(Integer(0)))
+        rotated = transform.rotate_around_axis(axis, radians(scalar(0)))
         
         # Should be essentially unchanged
         pos_diff = simplify(rotated.position - transform.position)
@@ -1016,14 +1017,14 @@ class TestTransformRotateAroundAxis:
         """Test rotation around arbitrary axis preserves distance from axis."""
         # Point at (2, 0, 0)
         transform = Transform(
-            position=create_v3(Integer(2), Integer(0), Integer(0)),
+            position=create_v3(scalar(2), scalar(0), scalar(0)),
             orientation=Orientation.identity()
         )
         
         # Axis through (1, 1, 1) in direction (1, 1, 1)
         axis = Axis(
-            position=create_v3(Integer(1), Integer(1), Integer(1)),
-            direction=create_v3(Integer(1), Integer(1), Integer(1))
+            position=create_v3(scalar(1), scalar(1), scalar(1)),
+            direction=create_v3(scalar(1), scalar(1), scalar(1))
         )
         
         # Rotate by 120 degrees
@@ -1052,20 +1053,20 @@ class TestTransformRotateAroundAxis:
         """Test that non-unit axis directions are normalized correctly."""
         # Use a non-unit axis direction (2, 0, 0) which should behave same as (1, 0, 0)
         transform = Transform(
-            position=create_v3(Integer(0), Integer(1), Integer(0)),
+            position=create_v3(scalar(0), scalar(1), scalar(0)),
             orientation=Orientation.identity()
         )
         
         axis = Axis(
-            position=create_v3(Integer(0), Integer(0), Integer(0)),
-            direction=create_v3(Integer(2), Integer(0), Integer(0))
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            direction=create_v3(scalar(2), scalar(0), scalar(0))
         )
         
         # Rotate 90 degrees around (2, 0, 0) - should be same as rotating around (1, 0, 0)
         rotated = transform.rotate_around_axis(axis, radians(pi / 2))
         
         # Position should move from (0, 1, 0) to (0, 0, 1)
-        expected_pos = create_v3(Integer(0), Integer(0), Integer(1))
+        expected_pos = create_v3(scalar(0), scalar(0), scalar(1))
         diff = simplify(rotated.position - expected_pos)
         for i in range(3):
             assert abs(float(diff[i])) < 1e-10
@@ -1075,29 +1076,29 @@ class TestTransformRotateAroundAxis:
         # Start with a transform that's already rotated
         initial_orientation = Orientation.rotate_left()  # 90° around Z
         transform = Transform(
-            position=create_v3(Integer(0), Integer(1), Integer(0)),
+            position=create_v3(scalar(0), scalar(1), scalar(0)),
             orientation=initial_orientation
         )
         
         axis = Axis(
-            position=create_v3(Integer(0), Integer(0), Integer(0)),
-            direction=create_v3(Integer(0), Integer(0), Integer(1))
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            direction=create_v3(scalar(0), scalar(0), scalar(1))
         )
         
         # Rotate 90° around Z again
         rotated = transform.rotate_around_axis(axis, radians(pi / 2))
         
         # Position should move from (0, 1, 0) to (-1, 0, 0)
-        expected_pos = create_v3(Integer(-1), Integer(0), Integer(0))
+        expected_pos = create_v3(scalar(-1), scalar(0), scalar(0))
         diff = simplify(rotated.position - expected_pos)
         for i in range(3):
             assert abs(float(diff[i])) < 1e-10
         
         # Orientation should be 180° around Z (two 90° rotations)
         expected_matrix = Matrix([
-            [Integer(-1), Integer(0), Integer(0)],
-            [Integer(0), Integer(-1), Integer(0)],
-            [Integer(0), Integer(0), Integer(1)]
+            [scalar(-1), scalar(0), scalar(0)],
+            [scalar(0), scalar(-1), scalar(0)],
+            [scalar(0), scalar(0), scalar(1)]
         ])
         expected_orient = Orientation(expected_matrix)
         diff_orient = simplify(rotated.orientation.matrix - expected_orient.matrix)
@@ -1108,13 +1109,13 @@ class TestTransformRotateAroundAxis:
     def test_rotate_full_circle(self):
         """Test that rotating 360 degrees returns to original (approximately)."""
         transform = Transform(
-            position=create_v3(Integer(1), Integer(2), Integer(3)),
+            position=create_v3(scalar(1), scalar(2), scalar(3)),
             orientation=Orientation.rotate_left()
         )
         
         axis = Axis(
-            position=create_v3(Integer(0), Integer(1), Integer(0)),
-            direction=create_v3(Integer(0), Integer(1), Integer(0))
+            position=create_v3(scalar(0), scalar(1), scalar(0)),
+            direction=create_v3(scalar(0), scalar(1), scalar(0))
         )
         
         # Rotate full circle (2*pi radians)
@@ -1133,13 +1134,13 @@ class TestTransformRotateAroundAxis:
     def test_rotate_orientation_matrix_stays_valid(self):
         """Test that the rotated orientation matrix remains a valid rotation matrix."""
         transform = Transform(
-            position=create_v3(Integer(1), Integer(2), Integer(3)),
+            position=create_v3(scalar(1), scalar(2), scalar(3)),
             orientation=Orientation.rotate_left()
         )
         
         axis = Axis(
-            position=create_v3(Integer(2), Integer(3), Integer(4)),
-            direction=create_v3(Integer(1), Integer(1), Integer(1))
+            position=create_v3(scalar(2), scalar(3), scalar(4)),
+            direction=create_v3(scalar(1), scalar(1), scalar(1))
         )
         
         # Rotate by some arbitrary angle
@@ -1155,12 +1156,12 @@ class TestTransformRotateAroundAxis:
 
 class TestIsComplexExpr:
     def test_simple_rational_is_not_complex(self):
-        assert is_complex_expr(Rational(1, 2)) is False
+        assert is_complex_expr(scalar(1, 2)) is False
 
 
 class TestGiraffeEvalf:
     def test_evaluates_rational(self):
-        result = giraffe_evalf(Rational(1, 3))
+        result = giraffe_evalf(scalar(1, 3))
         assert isinstance(result, sp.Float)
         assert abs(float(result) - 1/3) < 10**(-GIRAFFE_EVALF_PRECISION + 2)
 
@@ -1169,27 +1170,27 @@ class TestGiraffeEvalf:
         assert abs(float(result) - 1.41421356237) < 1e-8
 
     def test_evaluates_plain_int(self):
-        result = giraffe_evalf(Integer(42))
+        result = giraffe_evalf(scalar(42))
         assert float(result) == 42.0
 
 
 class TestCollapseMode:
     def test_smart_preserves_simple_in_symbolic_mode(self, symbolic_mode):
         from kumiki.rule import _collapse_scalar
-        expr = Rational(1, 2)
+        expr = scalar(1, 2)
         result = _collapse_scalar(expr, CollapseMode.SMART)
-        assert result == Rational(1, 2)
+        assert result == scalar(1, 2)
 
     def test_always_collapses_simple(self):
         from kumiki.rule import _collapse_scalar
-        expr = Rational(1, 2)
+        expr = scalar(1, 2)
         result = _collapse_scalar(expr, CollapseMode.ALWAYS)
         assert isinstance(result, sp.Float)
 
     def test_never_preserves_complex(self):
         from kumiki.rule import _collapse_scalar
         # sin(1) is flagged as complex by is_complex_expr
-        expr = sin(Integer(1)) + cos(Integer(2))
+        expr = sin(scalar(1)) + cos(scalar(2))
         result = _collapse_scalar(expr, CollapseMode.NEVER)
         assert result is expr  # unchanged
 
@@ -1198,7 +1199,7 @@ class TestSmartNodeGuardControls:
     @staticmethod
     def _make_medium_complex_expr():
         # Keep expression unevaluated so node-count heuristics can trigger in SMART mode.
-        terms = [Rational(i, i + 1) * Rational(i + 2, i + 3) for i in range(1, 13)]
+        terms = [scalar(i, i + 1) * scalar(i + 2, i + 3) for i in range(1, 13)]
         return sp.Add(*terms, evaluate=False)
 
     def test_can_toggle_guard(self):
@@ -1253,7 +1254,7 @@ class TestSmartNodeGuardControls:
 class TestPrune:
     @staticmethod
     def _make_medium_complex_expr():
-        terms = [Rational(i, i + 1) * Rational(i + 2, i + 3) for i in range(1, 13)]
+        terms = [scalar(i, i + 1) * scalar(i + 2, i + 3) for i in range(1, 13)]
         return sp.Add(*terms, evaluate=False)
 
     def test_prune_scalar_respects_smart_mode(self, float_mode):
@@ -1276,10 +1277,10 @@ class TestPrune:
             set_smart_node_guard_enabled(True)
             set_smart_node_guard_max_nodes(5)
             expr = self._make_medium_complex_expr()
-            mat = Matrix([[expr], [Rational(1, 2)]])
+            mat = Matrix([[expr], [scalar(1, 2)]])
             result = prune(mat)
             assert isinstance(result[0], sp.Float)
-            assert result[1] == Rational(1, 2)
+            assert result[1] == scalar(1, 2)
         finally:
             set_smart_node_guard_enabled(original_enabled)
             set_smart_node_guard_max_nodes(original_threshold)
@@ -1329,33 +1330,33 @@ class TestSafeDet:
 
 class TestSafeSimplify:
     def test_simplify_leaves_rational_unchanged(self):
-        x = Rational(1, 2) + Rational(1, 3)
-        assert safe_simplify(x) == Rational(5, 6)
+        x = scalar(1, 2) + scalar(1, 3)
+        assert safe_simplify(x) == scalar(5, 6)
 
 
 class TestSafeCompare:
     def test_gt_positive(self):
-        assert safe_compare(Rational(1, 2), 0, Comparison.GT) == True
+        assert safe_compare(scalar(1, 2), 0, Comparison.GT) == True
 
     def test_two_arg_equality(self):
-        assert safe_compare(Rational(1, 2), Rational(1, 2), Comparison.EQ) == True
+        assert safe_compare(scalar(1, 2), scalar(1, 2), Comparison.EQ) == True
 
     def test_two_arg_gt(self):
-        assert safe_compare(Rational(3, 4), Rational(1, 4), Comparison.GT) == True
+        assert safe_compare(scalar(3, 4), scalar(1, 4), Comparison.GT) == True
 
 
 class TestSafeEqualityTest:
     def test_equal_rationals(self):
-        assert safe_equality_test(Rational(1, 2), Rational(1, 2)) == True
+        assert safe_equality_test(scalar(1, 2), scalar(1, 2)) == True
 
     def test_zero_test(self):
-        assert safe_zero_test(Integer(0)) == True
-        assert safe_zero_test(Rational(1, 2)) == False
+        assert safe_zero_test(scalar(0)) == True
+        assert safe_zero_test(scalar(1, 2)) == False
 
 
 class TestEqualityTest:
     def test_equal_rationals(self):
-        assert equality_test(Rational(1, 2), Rational(1, 2)) == True
+        assert equality_test(scalar(1, 2), scalar(1, 2)) == True
 
 
 class TestDegrees:

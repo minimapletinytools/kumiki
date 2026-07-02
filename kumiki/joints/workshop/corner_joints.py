@@ -57,18 +57,17 @@ def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace)
         return locate_bottom_center_position(timber).position
     else:
         # For long faces (LEFT, RIGHT, FRONT, BACK), center is at mid-length
-        from sympy import Rational
-        face_center = timber.get_bottom_position_global() + (timber.length / Rational(2)) * timber.get_length_direction_global()
+        face_center = timber.get_bottom_position_global() + (timber.length / scalar(2)) * timber.get_length_direction_global()
 
         # Offset to the face surface
         if face == TimberFace.RIGHT:
-            face_center = face_center + (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+            face_center = face_center + (timber.size[0] / scalar(2)) * timber.get_width_direction_global()
         elif face == TimberFace.LEFT:
-            face_center = face_center - (timber.size[0] / Rational(2)) * timber.get_width_direction_global()
+            face_center = face_center - (timber.size[0] / scalar(2)) * timber.get_width_direction_global()
         elif face == TimberFace.FRONT:
-            face_center = face_center + (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+            face_center = face_center + (timber.size[1] / scalar(2)) * timber.get_height_direction_global()
         else:  # BACK
-            face_center = face_center - (timber.size[1] / Rational(2)) * timber.get_height_direction_global()
+            face_center = face_center - (timber.size[1] / scalar(2)) * timber.get_height_direction_global()
 
         return face_center
 
@@ -219,24 +218,24 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # Compute the angle between the timber directions
     cos_angle = safe_dot_product(normA, normB)
     # Clamp to [-1, 1] to avoid numerical issues with acos
-    cos_angle_clamped = max(prune(Rational(-1)), min(prune(Rational(1)), cos_angle))
+    cos_angle_clamped = max(prune(scalar(-1)), min(prune(scalar(1)), cos_angle))
     # angle = acos(cos_angle_clamped)  # angle between centerlines
     # For offset calculation, we need sin(angle/2)
     # sin(angle/2) = sqrt((1 - cos(angle)) / 2)
-    sin_half_angle_sq = (Rational(1) - cos_angle_clamped) / Rational(2)
-    sin_half_angle = sqrt(sin_half_angle_sq) if safe_compare(sin_half_angle_sq, 0, Comparison.GT) else Rational(1)
+    sin_half_angle_sq = (scalar(1) - cos_angle_clamped) / scalar(2)
+    sin_half_angle = sqrt(sin_half_angle_sq) if safe_compare(sin_half_angle_sq, 0, Comparison.GT) else scalar(1)
 
     # For each timber, calculate the offset distance from centerline to outer corner
     # This is the distance from the centerline to the farthest corner of the cross-section,
     # projected along the bisector direction
-    half_width_A = timberA.size[0] / Rational(2)
-    half_height_A = timberA.size[1] / Rational(2)
+    half_width_A = timberA.size[0] / scalar(2)
+    half_height_A = timberA.size[1] / scalar(2)
     # Outer corner distance: sqrt((half_width)^2 + (half_height)^2)
-    outer_corner_dist_A = sqrt(half_width_A ** Rational(2) + half_height_A ** Rational(2))
+    outer_corner_dist_A = sqrt(half_width_A ** scalar(2) + half_height_A ** scalar(2))
 
-    half_width_B = timberB.size[0] / Rational(2)
-    half_height_B = timberB.size[1] / Rational(2)
-    outer_corner_dist_B = sqrt(half_width_B ** Rational(2) + half_height_B ** Rational(2))
+    half_width_B = timberB.size[0] / scalar(2)
+    half_height_B = timberB.size[1] / scalar(2)
+    outer_corner_dist_B = sqrt(half_width_B ** scalar(2) + half_height_B ** scalar(2))
 
     # Offset the miter plane along the bisector (which is in the miter plane)
     # For a timber with outer corner distance d and joint half-angle α:
@@ -246,8 +245,8 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
         offset_dist_B = outer_corner_dist_B / sin_half_angle
     else:
         # Degenerate case: parallel timbers or very shallow angle, use large offset
-        offset_dist_A = outer_corner_dist_A * Rational(100)
-        offset_dist_B = outer_corner_dist_B * Rational(100)
+        offset_dist_A = outer_corner_dist_A * scalar(100)
+        offset_dist_B = outer_corner_dist_B * scalar(100)
 
     # Move the intersection point along the bisector direction (within the miter plane)
     # to get the actual cut position at the timber tips
@@ -326,7 +325,7 @@ def cut_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimber
 def cut_tongue_and_fork_corner_joint(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
-    tongue_position: Numeric = Rational(0),
+    tongue_position: Numeric = scalar(0),
 ) -> Joint:
     """
     Creates a plain tongue-and-fork corner joint (corner bridle style).
@@ -383,14 +382,14 @@ def cut_tongue_and_fork_corner_joint(
 
     tongue_normal_dimension = tongue_timber.get_size_in_face_normal_axis(tongue_normal_face)
     if tongue_thickness is None:
-        tongue_thickness = tongue_normal_dimension / Rational(3)
+        tongue_thickness = tongue_normal_dimension / scalar(3)
 
     assert safe_compare(tongue_thickness, 0, Comparison.GT), "tongue_thickness must be greater than 0"
     assert safe_compare(tongue_normal_dimension - tongue_thickness, 0, Comparison.GE), \
         "tongue_thickness must be <= the tongue timber size in the shared plane normal axis"
 
-    half_tongue_dimension = tongue_normal_dimension / Rational(2)
-    half_tongue_thickness = tongue_thickness / Rational(2)
+    half_tongue_dimension = tongue_normal_dimension / scalar(2)
+    half_tongue_thickness = tongue_thickness / scalar(2)
     assert safe_compare(half_tongue_dimension - (Abs(tongue_position) + half_tongue_thickness), 0, Comparison.GE), \
         "tongue_position and tongue_thickness place the tongue outside the tongue timber boundary"
 
@@ -411,7 +410,7 @@ def cut_tongue_and_fork_corner_joint(
     )
     # Push the shoulder plane from the fork's centerline to its entry face
     fork_entry_long_face = fork_timber.get_closest_oriented_long_face_from_global_direction(-tongue_end_direction)
-    fork_shoulder_distance = fork_timber.get_size_in_face_normal_axis(fork_entry_long_face) / Rational(2)
+    fork_shoulder_distance = fork_timber.get_size_in_face_normal_axis(fork_entry_long_face) / scalar(2)
 
     shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
         butt_arrangement_for_shoulder, fork_shoulder_distance
@@ -477,7 +476,7 @@ def cut_tongue_and_fork_corner_joint(
 
     # Fork slot uses the same orientation as the tongue prism so the slot
     # receives the tongue correctly at any joint angle
-    fork_slot_back_extension = max(fork_timber.size[0], fork_timber.size[1]) * Rational(2)
+    fork_slot_back_extension = max(fork_timber.size[0], fork_timber.size[1]) * scalar(2)
     fork_slot_prism_global = RectangularPrism(
         size=create_v2(tongue_width, tongue_thickness),
         transform=marking_space.transform,
@@ -575,7 +574,7 @@ def cut_tongue_and_fork_corner_joint(
 def cut_plain_tongue_and_fork_joint(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
-    tongue_position: Numeric = Rational(0),
+    tongue_position: Numeric = scalar(0),
 ) -> Joint:
     """Compatibility alias for `cut_tongue_and_fork_corner_joint`."""
     return cut_tongue_and_fork_corner_joint(
@@ -585,7 +584,7 @@ def cut_plain_tongue_and_fork_joint(
     )
 
 
-def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ratio: Numeric = Rational(1, 2)) -> Joint:
+def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ratio: Numeric = scalar(1, 2)) -> Joint:
     """
     Creates a corner-lap joint between two corner timbers with trimmed ends.
 
@@ -795,12 +794,12 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
 
     # Clamp to [-1, 1] to avoid numerical issues with acos
     from sympy import Max, Min
-    dot_product_clamped = Max(Rational(-1), Min(Rational(1), dot_product))
+    dot_product_clamped = Max(scalar(-1), Min(scalar(1), dot_product))
     angle = acos(dot_product_clamped)
 
     # Validate angle is between 45 and 135 degrees
-    min_angle = radians(pi / Integer(4))  # 45 degrees
-    max_angle = radians(Rational(3) * pi / Integer(4))  # 135 degrees
+    min_angle = radians(pi / scalar(4))  # 45 degrees
+    max_angle = radians(scalar(3) * pi / scalar(4))  # 135 degrees
 
     if angle < min_angle or angle > max_angle:
         raise ValueError(
@@ -826,19 +825,19 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
         # We want: margin + num_laps * thickness + margin = miter_face_depth
         # With equal margins: 2*margin + num_laps*thickness = miter_face_depth
         # Let's use: margin = thickness, so: (num_laps + 2)*thickness = miter_face_depth
-        lap_thickness_final = miter_face_depth / (num_laps + Integer(2))
+        lap_thickness_final = miter_face_depth / (num_laps + scalar(2))
         lap_start_distance_final = lap_thickness_final
 
     elif lap_thickness is None:
         # Only start distance given, calculate thickness
         assert lap_start_distance_from_reference_miter_face is not None  # Type narrowing
         remaining_depth: Numeric = miter_face_depth - lap_start_distance_from_reference_miter_face
-        lap_thickness_final = remaining_depth / Integer(num_laps+1)
+        lap_thickness_final = remaining_depth / scalar(num_laps+1)
         lap_start_distance_final = lap_start_distance_from_reference_miter_face
     elif lap_start_distance_from_reference_miter_face is None:
         # Only thickness given, calculate start distance
         total_lap_depth: Numeric = lap_thickness * num_laps
-        lap_start_distance_final = (miter_face_depth - total_lap_depth) / Rational(2)
+        lap_start_distance_final = (miter_face_depth - total_lap_depth) / scalar(2)
         lap_thickness_final = lap_thickness
     else:
         # Both provided
@@ -847,7 +846,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
 
     # Default distance_between_lap_and_outside
     if distance_between_lap_and_outside is None:
-        distance_between_lap_and_outside = miter_face_width * Rational(1, 5)
+        distance_between_lap_and_outside = miter_face_width * scalar(1, 5)
 
 
     # ========================================================================
@@ -924,23 +923,23 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
     marking_position = timberA.get_bottom_position_global()
     marking_position = marking_position + timberA.get_length_direction_global() * centerline_marking.distance
 
-    marking_position_on_centerline = marking_position + timberA_miter_face_normal * (-timberA.get_size_in_face_normal_axis(timberA_reference_miter_face.to.face()) / Rational(2))
+    marking_position_on_centerline = marking_position + timberA_miter_face_normal * (-timberA.get_size_in_face_normal_axis(timberA_reference_miter_face.to.face()) / scalar(2))
 
     # Compute the angle between the two timbers to get the correct scale factor
     # The half-angle is the angle between the diagonal and either timber's length direction
     from sympy import acos, sin, sqrt
     cos_angle = safe_dot_product(directionA, directionB)
     timber_angle = acos(cos_angle)  # Angle between the two timbers
-    half_angle = timber_angle / Rational(2)  # Angle between diagonal and timber length
+    half_angle = timber_angle / scalar(2)  # Angle between diagonal and timber length
 
     # Scale factor for moving along diagonal to achieve perpendicular offset
     # For 90° joint: half_angle = 45°, scale = 1/sin(45°) = sqrt(2)
     # For 180° joint: half_angle = 90°, scale = 1/sin(90°) = 1
     # For 135° joint: half_angle = 67.5°, scale = 1/sin(67.5°)
-    diagonal_scale_factor = Rational(1) / sin(half_angle)
+    diagonal_scale_factor = scalar(1) / sin(half_angle)
 
     # Move to the inner shoulder edge along the diagonal direction
-    inner_edge_offset = timberA.get_size_in_face_normal_axis(timberA_inner_face_enum) / Rational(2)
+    inner_edge_offset = timberA.get_size_in_face_normal_axis(timberA_inner_face_enum) / scalar(2)
     diagonal_offset = inner_edge_offset * diagonal_scale_factor
     marking_position = marking_position_on_centerline - diagonal_direction * diagonal_offset
 
@@ -1020,7 +1019,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
         finger_prism_global = RectangularPrism(
             size=finger_size,
             transform=finger_transform_global,
-            start_distance=Integer(0),
+            start_distance=scalar(0),
             end_distance=finger_length
         )
 
@@ -1106,7 +1105,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
     if key_width is None:
         key_width = lap_thickness_final
     if key_thickness is None:
-        key_thickness = lap_thickness_final / Rational(3)
+        key_thickness = lap_thickness_final / scalar(3)
 
 
     key_depth = miter_face_width/sin(half_angle)-distance_between_lap_and_outside/sin(half_angle)
@@ -1166,7 +1165,7 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
             tip_width=key_width,  # Same as base_width for rectangular shape
             height=key_thickness,
             length=key_depth,
-            stickout_length=key_depth*Rational(1,4)
+            stickout_length=key_depth*scalar(1,4)
         )
         key_wedges.append(key_wedge)
 

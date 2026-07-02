@@ -3,7 +3,7 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, Float, Rational, pi
+from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -43,7 +43,7 @@ class TestHouseJoint:
         assert joint.cuttings["timberA"].get_maybe_bottom_end_cut() is None
 
         # test that the origin point lies in the housed timber but not the housing timber
-        origin = create_v3(Rational(0), Rational(0), Rational(0))
+        origin = create_v3(scalar(0), scalar(0), scalar(0))
         assert not _render_cutting(joint.cuttings["timberA"]).contains_point(housing_timber.transform.global_to_local(origin))
         assert _render_cutting(joint.cuttings["timberB"]).contains_point(housed_timber.transform.global_to_local(origin))
         
@@ -60,11 +60,11 @@ class TestHouseJoint:
         
         # Create housed timber (horizontal beam intersecting the post)
         housed_timber = timber_from_directions(
-            length=Rational(80),
-            size=Matrix([Rational(6), Rational(6)]),  # 6 x 6 beam
-            bottom_position=Matrix([Rational(-20), Rational(0), Rational(100)]),
-            length_direction=Matrix([Rational(1), Rational(0), Rational(0)]),  # Horizontal
-            width_direction=Matrix([Rational(0), Rational(1), Rational(0)])
+            length=scalar(80),
+            size=Matrix([scalar(6), scalar(6)]),  # 6 x 6 beam
+            bottom_position=Matrix([scalar(-20), scalar(0), scalar(100)]),
+            length_direction=Matrix([scalar(1), scalar(0), scalar(0)]),  # Horizontal
+            width_direction=Matrix([scalar(0), scalar(1), scalar(0)])
         )
         
         # Create the housed joint
@@ -156,7 +156,7 @@ class TestCrossLapJoint:
         assert joint.cuttings["timberB"].get_maybe_bottom_end_cut() is None
 
         # test that the origin point lies on the boundary of both timbers
-        origin = create_v3(Rational(0), Rational(0), Rational(0))
+        origin = create_v3(scalar(0), scalar(0), scalar(0))
         assert _render_cutting(joint.cuttings["timberA"]).contains_point(timberA.transform.global_to_local(origin))
         assert _render_cutting(joint.cuttings["timberB"]).contains_point(timberB.transform.global_to_local(origin))
 
@@ -164,12 +164,12 @@ class TestCrossLapJoint:
         assert _render_cutting(joint.cuttings["timberB"]).is_point_on_boundary(timberB.transform.global_to_local(origin))
 
         # above origin
-        origin = create_v3(Rational(0), Rational(0), Rational(1))
+        origin = create_v3(scalar(0), scalar(0), scalar(1))
         assert _render_cutting(joint.cuttings["timberA"]).contains_point(timberA.transform.global_to_local(origin))
         assert not _render_cutting(joint.cuttings["timberB"]).contains_point(timberB.transform.global_to_local(origin))
 
         # below origin
-        origin = create_v3(Rational(0), Rational(0), Rational(-1))
+        origin = create_v3(scalar(0), scalar(0), scalar(-1))
         assert not _render_cutting(joint.cuttings["timberA"]).contains_point(timberA.transform.global_to_local(origin))
         assert _render_cutting(joint.cuttings["timberB"]).contains_point(timberB.transform.global_to_local(origin))
 

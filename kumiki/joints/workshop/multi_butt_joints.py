@@ -48,9 +48,9 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
                                            # the slot extends this much beyond the spline on each end for clearance
                                            slot_symmetric_extra_length=mm(3),
                                            # inset the shoulder plane on both sides by this amount, flush with faces of receiving timber if 0
-                                           shoulder_symmetric_inset=Rational(0),
+                                           shoulder_symmetric_inset=scalar(0),
                                            # offset the slot by this much, measured relative to receiving timber centerline in the axis perpendicular to the joint plane
-                                           slot_lateral_offset=Rational(0),
+                                           slot_lateral_offset=scalar(0),
                                            # optional peg setup; pegs will be drilled through each butt timber and the spline
                                            peg_parameters: Optional[SimplePegParameters] = None,
                                            ) -> Joint:
@@ -108,7 +108,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     slot_thickness_axis_dimension = butt_timber_1.get_size_in_direction_3d(joint_plane_normal_global)
 
     if spline_extra_depth is None:
-        spline_extra_depth = slot_depth / Rational(4)
+        spline_extra_depth = slot_depth / scalar(4)
 
     assert safe_compare(slot_thickness, 0, Comparison.GT), "slot_thickness must be > 0"
     assert safe_compare(slot_depth, 0, Comparison.GT), "slot_depth must be > 0"
@@ -123,7 +123,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     assert safe_compare(spline_extra_depth, 0, Comparison.GE), "spline_extra_depth must be >= 0"
     assert safe_compare(slot_symmetric_extra_length, 0, Comparison.GE), "slot_symmetric_extra_length must be >= 0"
 
-    slot_length = spline_length + Rational(2) * slot_symmetric_extra_length
+    slot_length = spline_length + scalar(2) * slot_symmetric_extra_length
     assert safe_compare(slot_length, 0, Comparison.GT), "slot_length must be > 0"
 
     def _locate_butt_end_center_global(timber: TimberLike, end: TimberEnd) -> V3:
@@ -136,18 +136,18 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
 
     entry_face_point_1_global = (
         butt_end_center_1_global
-        + slot_face_direction_1 * (butt_timber_1.get_size_in_face_normal_axis(slot_face_on_butt_1) / Rational(2))
+        + slot_face_direction_1 * (butt_timber_1.get_size_in_face_normal_axis(slot_face_on_butt_1) / scalar(2))
     )
     entry_face_point_2_global = (
         butt_end_center_2_global
-        + slot_face_direction_2 * (butt_timber_2.get_size_in_face_normal_axis(slot_face_on_butt_2) / Rational(2))
+        + slot_face_direction_2 * (butt_timber_2.get_size_in_face_normal_axis(slot_face_on_butt_2) / scalar(2))
     )
 
-    slot_center_from_butt_1_global = entry_face_point_1_global - slot_direction_global * (slot_depth / Rational(2))
-    slot_center_from_butt_2_global = entry_face_point_2_global - slot_direction_global * (slot_depth / Rational(2))
+    slot_center_from_butt_1_global = entry_face_point_1_global - slot_direction_global * (slot_depth / scalar(2))
+    slot_center_from_butt_2_global = entry_face_point_2_global - slot_direction_global * (slot_depth / scalar(2))
     slot_center_global = (
         slot_center_from_butt_1_global + slot_center_from_butt_2_global
-    ) / Rational(2) + joint_plane_normal_global * slot_lateral_offset
+    ) / scalar(2) + joint_plane_normal_global * slot_lateral_offset
 
     slot_marking_orientation_global = Orientation.from_z_and_y(
         z_direction=butt_length_direction_global,
@@ -161,8 +161,8 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     slot_negative_csg_global = RectangularPrism(
         size=create_v2(slot_thickness, slot_depth),
         transform=slot_marking_transform_global,
-        start_distance=-(slot_length / Rational(2)),
-        end_distance=slot_length / Rational(2),
+        start_distance=-(slot_length / scalar(2)),
+        end_distance=slot_length / scalar(2),
     )
 
     extended_slot_negative_csg_global = RectangularPrism(
@@ -171,8 +171,8 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
             position=slot_marking_transform_global.position + slot_direction_global * (effective_slot_depth - slot_depth) / 2,
             orientation=slot_marking_transform_global.orientation,
         ),
-        start_distance=-(slot_length / Rational(2)),
-        end_distance=slot_length / Rational(2),
+        start_distance=-(slot_length / scalar(2)),
+        end_distance=slot_length / scalar(2),
     )
 
     def _make_shoulder_end_cut(timber: TimberLike, timber_end: TimberEnd) -> HalfSpace:
@@ -224,7 +224,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
             receiving_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(
                 -butt_end_direction_global
             )
-            receiving_face_half_size = receiving_timber.get_size_in_face_normal_axis(receiving_face) / Rational(2)
+            receiving_face_half_size = receiving_timber.get_size_in_face_normal_axis(receiving_face) / scalar(2)
             shoulder_distance_from_centerline = receiving_face_half_size - shoulder_symmetric_inset
 
             assert safe_compare(shoulder_distance_from_centerline, 0, Comparison.GE), (
@@ -312,7 +312,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
             # The peg goes from the entry face, through the timber, to the exit face.
             peg_depth = butt_timber.get_size_in_face_normal_axis(peg_face_on_butt)
             actual_depth = peg_parameters.depth if peg_parameters.depth is not None else peg_depth
-            stickout = actual_depth * Rational(1, 2)
+            stickout = actual_depth * scalar(1, 2)
 
             # Away-from-joint axis: from the shoulder toward the main butt body.
             butt_end_direction = butt_timber.get_face_direction_global(butt_end)
@@ -343,7 +343,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
                 butt_timber.get_face_direction_global(butt_end)
             )
             shoulder_distance_from_centerline = (
-                receiving_timber.get_size_in_face_normal_axis(receiving_face_towards_butt) / Rational(2)
+                receiving_timber.get_size_in_face_normal_axis(receiving_face_towards_butt) / scalar(2)
             ) - shoulder_symmetric_inset
             assert safe_compare(shoulder_distance_from_centerline, 0, Comparison.GE), (
                 "shoulder_symmetric_inset is too large for peg shoulder reference"
@@ -395,7 +395,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
                         position=peg_face_pos_global,
                         orientation=peg_orientation_global,
                     ),
-                    start_distance=Rational(0),
+                    start_distance=scalar(0),
                     end_distance=actual_depth,
                 )
                 butt_negative_parts.append(
@@ -410,7 +410,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
                         position=peg_face_pos_with_offset_global,
                         orientation=peg_orientation_global,
                     ),
-                    start_distance=Rational(0),
+                    start_distance=scalar(0),
                     end_distance=actual_depth,
                 )
                 peg_holes_in_spline_local.append(
@@ -460,8 +460,8 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     spline_positive_csg = RectangularPrism(
         size=create_v2(slot_thickness, effective_slot_depth),
         transform=Transform.identity(),
-        start_distance=-(spline_length / Integer(2)),
-        end_distance=spline_length / Integer(2),
+        start_distance=-(spline_length / scalar(2)),
+        end_distance=spline_length / scalar(2),
     )
 
     if peg_holes_in_spline_local:
@@ -495,7 +495,7 @@ def cut_castle_joint(
         cross_beam_waist_thickness: Numeric,
 
         # location of the cross lap cut measured from the bottom of cross_timber_2, 0 means the cut is at the bottom of cross_timber_2 (relative to the joint)
-        cross_lap_cut_ratio: Numeric = Rational(1, 2),
+        cross_lap_cut_ratio: Numeric = scalar(1, 2),
 
         miter_cross_beams_if_overlapping_outside_post: bool = True,
 

@@ -101,7 +101,7 @@ def cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJoint
 def cut_basic_tongue_and_fork_corner_joint(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
-    tongue_position: Numeric = Rational(0),
+    tongue_position: Numeric = scalar(0),
 ) -> Joint:
     """
     Creates a tongue-and-fork corner joint (corner bridle style).
@@ -130,7 +130,7 @@ def cut_basic_tongue_and_fork_corner_joint(
 def cut_basic_tongue_and_fork_joint(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
-    tongue_position: Numeric = Rational(0),
+    tongue_position: Numeric = scalar(0),
 ) -> Joint:
     """Compatibility alias for `cut_basic_tongue_and_fork_corner_joint`."""
     return cut_basic_tongue_and_fork_corner_joint(
@@ -143,7 +143,7 @@ def cut_basic_tongue_and_fork_joint(
 def cut_basic_tongue_and_fork_butt_joint(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
-    tongue_position: Numeric = Rational(0),
+    tongue_position: Numeric = scalar(0),
 ) -> Joint:
     """
     Creates a tongue-and-fork butt joint.
@@ -297,7 +297,7 @@ def cut_basic_splined_opposing_double_butt_joint(
 
     default_peg_parameters = SimplePegParameters(
         shape=PegShape.SQUARE,
-        peg_positions=[(mm(30), Rational(0))],
+        peg_positions=[(mm(30), scalar(0))],
         size=mm(15),
     )
 
@@ -319,11 +319,11 @@ def cut_basic_splined_opposing_double_butt_joint(
 
     slot_thickness = receiving_timber.get_size_in_direction_3d(
         joint_plane_normal_global
-    ) / Rational(3)
-    slot_depth = butt_timber_1.get_size_in_face_normal_axis(slot_face_on_butt_1) / Rational(2)
+    ) / scalar(3)
+    slot_depth = butt_timber_1.get_size_in_face_normal_axis(slot_face_on_butt_1) / scalar(2)
     spline_length = receiving_timber.get_size_in_direction_3d(
         butt_length_direction_global
-    ) * Integer(4)
+    ) * scalar(4)
 
     return cut_splined_opposing_double_butt_joint(
         arrangement=arrangement_with_peg_face,
@@ -333,8 +333,8 @@ def cut_basic_splined_opposing_double_butt_joint(
         slot_facing_end_on_receiving_timber=slot_facing_end_on_receiving_timber,
         spline_extra_depth=None,
         slot_symmetric_extra_length=mm(3),
-        shoulder_symmetric_inset=Rational(0),
-        slot_lateral_offset=Rational(0),
+        shoulder_symmetric_inset=scalar(0),
+        slot_lateral_offset=scalar(0),
         peg_parameters=default_peg_parameters,
     )
 
@@ -403,8 +403,8 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
 
     mortise_timber_entry_face = joint_side_mortise_timber_face.to.long_face().rotate_right().to.face()
 
-    tenon_mortise_length_size = tenon_timber.get_size_in_face_normal_axis(mortise_length_on_tenon_timber_face)*Rational(3,4)
-    tenon_mortise_width_size = mortise_timber.get_size_in_face_normal_axis(joint_side_mortise_timber_face)*Rational(1,3)
+    tenon_mortise_length_size = tenon_timber.get_size_in_face_normal_axis(mortise_length_on_tenon_timber_face)*scalar(3,4)
+    tenon_mortise_width_size = mortise_timber.get_size_in_face_normal_axis(joint_side_mortise_timber_face)*scalar(1,3)
 
     if mortise_length_on_tenon_timber_face == TimberLongFace.FRONT or mortise_length_on_tenon_timber_face == TimberLongFace.BACK:
         tenon_size = Matrix([tenon_mortise_length_size, tenon_mortise_width_size])
@@ -415,7 +415,7 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
     tenon_length = mortise_timber.get_size_in_face_normal_axis(mortise_timber_entry_face)
     mortise_depth = tenon_length
 
-    tenon_position = create_v2(Rational(0), Rational(0))
+    tenon_position = create_v2(scalar(0), scalar(0))
     peg_parameters = None
     front_face_on_butt_timber = None
     if use_peg:
@@ -425,7 +425,7 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
             peg_positions=[cast(Tuple[Numeric, Numeric], (tenon_length / 3, 0))],
             size=inches(1, 2),
             depth=None,
-            tenon_hole_offset=inches(Rational(1, 16))
+            tenon_hole_offset=inches(scalar(1, 16))
         )
 
     arrangement = ButtJointTimberArrangement(
@@ -475,10 +475,10 @@ def cut_basic_lapped_gooseneck_joint(
     assert isinstance(gooseneck_timber, Timber), f"expected Timber, got {type(gooseneck_timber).__name__}"
     assert isinstance(receiving_timber, Timber), f"expected Timber, got {type(receiving_timber).__name__}"
     width = gooseneck_timber.get_size_in_face_normal_axis(gooseneck_timber_face.rotate_right())
-    gooseneck_length = width*Rational(2)
-    gooseneck_small_width = width*Rational(1, 4)
-    gooseneck_large_width = width*Rational(1, 2)
-    gooseneck_head_length = width*Rational(1, 2)
+    gooseneck_length = width*scalar(2)
+    gooseneck_small_width = width*scalar(1, 4)
+    gooseneck_large_width = width*scalar(1, 2)
+    gooseneck_head_length = width*scalar(1, 2)
     gooseneck_timber_end = TimberEnd.BOTTOM if receiving_timber_end == TimberEnd.TOP else TimberEnd.TOP
 
     return cut_lapped_gooseneck_joint(
@@ -532,9 +532,9 @@ def cut_basic_dropin_dovetail_butt_joint(
     assert isinstance(dovetail_timber, Timber), f"expected Timber, got {type(dovetail_timber).__name__}"
     assert isinstance(receiving_timber, Timber), f"expected Timber, got {type(receiving_timber).__name__}"
     width = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right())
-    dovetail_length = width/Integer(2)
-    dovetail_small_width = width*Rational(1, 2)
-    dovetail_large_width = width*Rational(2, 3)
+    dovetail_length = width/scalar(2)
+    dovetail_small_width = width*scalar(1, 2)
+    dovetail_large_width = width*scalar(2, 3)
 
     return cut_dropin_dovetail_butt_joint(
         arrangement=ButtJointTimberArrangement(

@@ -27,6 +27,6 @@ def cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon(
         mortise_depth: Optional[Numeric] = None,
 
         # location of the cross lap cut measured from the bottom of cross_timber_2, 0 means the cut is at the bottom of cross_timber_2 (relative to the joint)
-        cross_lap_cut_ratio: Numeric = Rational(1, 2),
+        cross_lap_cut_ratio: Numeric = scalar(1, 2),
         ):
     raise NotImplementedError("cross lap beam assembly on post with stepped mortise and tenon not implemented yet")

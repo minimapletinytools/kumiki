@@ -330,7 +330,7 @@ def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
 def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
     """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
     from kumiki.cutcsg import adopt_csg
-    from kumiki.rule import Transform
+    from kumiki.rule import Transform, scalar
     from kumiki.triangles import triangulate_cutcsg
 
     global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
@@ -1110,14 +1110,13 @@ def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
     all patterns at origin, computes a square-ish grid layout by translating timbers
     and accessories, and returns one merged Frame.
     """
-    from sympy import Integer
     from kumiki.rule import create_v3
 
     if not pattern_list:
         raise ValueError("Pattern list is empty")
 
     if len(pattern_list) == 1:
-        origin = create_v3(Integer(0), Integer(0), Integer(0))
+        origin = create_v3(scalar(0), scalar(0), scalar(0))
         target = pattern_list[0]
         with contextlib.redirect_stdout(sys.stderr):
             result = target.lambda_(origin)
@@ -2109,9 +2108,8 @@ def _raise_specific_pattern(
             skip_first_parameter=True,
         )
 
-        from sympy import Integer
         from kumiki.rule import create_v3
-        origin = create_v3(Integer(0), Integer(0), Integer(0))
+        origin = create_v3(scalar(0), scalar(0), scalar(0))
         with contextlib.redirect_stdout(sys.stderr):
             pattern_result = pattern_lambda(origin, **applied_render_parameters)
         frame = _coerce_viewable_frame(pattern_result, f"Pattern '{pattern.name}'")

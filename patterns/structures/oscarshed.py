@@ -3,7 +3,6 @@ Oscar's Shed - A simple timber frame shed structure
 Built using the Kumiki API
 """
 
-from sympy import Rational
 from typing import Optional
 import sys
 sys.path.append('..')
@@ -33,7 +32,7 @@ post_front_height = feet(5)   # Height of front posts
 
 # Timber size definitions using dimensional helpers
 # Format: (vertical dimension, horizontal depth)
-small_timber_size = create_v2(inches(4), inches(Rational(5, 2)))   # 4" vertical x 2.5" depth
+small_timber_size = create_v2(inches(4), inches(scalar(5, 2)))   # 4" vertical x 2.5" depth
 med_timber_size = create_v2(inches(4), inches(4))                   # 4" x 4"
 big_timber_size = create_v2(inches(6), inches(4))                   # 6" vertical x 4" depth
 
@@ -52,7 +51,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     
     # Default center to origin if not provided
     if center is None:
-        center = create_v3(Rational(0), Rational(0), Rational(0))
+        center = create_v3(scalar(0), scalar(0), scalar(0))
     
     # ============================================================================
     # BUILD THE STRUCTURE
@@ -61,10 +60,10 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Create the footprint (rectangular, counter-clockwise from bottom-left)
     # Offset by center position (only x and y components)
     footprint_corners = [
-        create_v2(center[0] + Rational(0), center[1] + Rational(0)),     # Corner 0: Front-left
-        create_v2(center[0] + base_width, center[1] + Rational(0)),      # Corner 1: Front-right
+        create_v2(center[0] + scalar(0), center[1] + scalar(0)),     # Corner 0: Front-left
+        create_v2(center[0] + base_width, center[1] + scalar(0)),      # Corner 1: Front-right
         create_v2(center[0] + base_width, center[1] + base_length),      # Corner 2: Back-right
-        create_v2(center[0] + Rational(0), center[1] + base_length)      # Corner 3: Back-left
+        create_v2(center[0] + scalar(0), center[1] + base_length)      # Corner 3: Back-left
     ]
     footprint = Footprint(footprint_corners)  # type: ignore[arg-type]
 
@@ -260,7 +259,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     mortise_depth = inches(3.5)
     
     # Front-left post (left side, offset +1" towards center/right)
-    tenon_offset_left = Matrix([inches(1), Rational(0)])  # +1" in X
+    tenon_offset_left = Matrix([inches(1), scalar(0)])  # +1" in X
     joint_post_front_left = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_front,
@@ -275,7 +274,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     )
     
     # Front-right post (right side, offset -1" towards center/left)
-    tenon_offset_right = Matrix([inches(-1), Rational(0)])  # -1" in X
+    tenon_offset_right = Matrix([inches(-1), scalar(0)])  # -1" in X
     joint_post_front_right = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=mudsill_front,
@@ -364,7 +363,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
 
     # Side girt stickout: 5 inches on back side, 0 on front side
     side_girt_stickout_back = inches(5)  # 5 inches
-    side_girt_stickout = Stickout(side_girt_stickout_back, Rational(0))  # Asymmetric: 5" on back, 0 on front
+    side_girt_stickout = Stickout(side_girt_stickout_back, scalar(0))  # Asymmetric: 5" on back, 0 on front
     
     
     # Left side girt (connects back-left post to front-left post)
@@ -401,9 +400,9 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Mortise depth: 4.5 inches
     # No peg
     
-    side_girt_back_tenon_size = Matrix([inches(Rational(3, 2)), inches(3)])  # 1.5" x 3"
-    side_girt_back_tenon_length = inches(Rational(9, 2))  # 4.5 inches
-    side_girt_back_mortise_depth = inches(Rational(9, 2))  # 4.5 inches (through mortise)
+    side_girt_back_tenon_size = Matrix([inches(scalar(3, 2)), inches(3)])  # 1.5" x 3"
+    side_girt_back_tenon_length = inches(scalar(9, 2))  # 4.5 inches
+    side_girt_back_mortise_depth = inches(scalar(9, 2))  # 4.5 inches (through mortise)
     
     # Back left post TOP end meets left side girt BOTTOM end
     joint_side_girt_left_back = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -447,10 +446,10 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Peg parameters: 5/8" square peg, 1" from shoulder, on centerline
     side_girt_peg_params_left = SimplePegParameters(
         shape=PegShape.SQUARE,
-        peg_positions=[(inches(1), Rational(0))],  # 1" from shoulder, centered
-        size=inches(Rational(5, 8)),  # 5/8" square
-        depth=inches(Rational(7, 2)),
-        tenon_hole_offset=inches(Rational(1, 16))
+        peg_positions=[(inches(1), scalar(0))],  # 1" from shoulder, centered
+        size=inches(scalar(5, 8)),  # 5/8" square
+        depth=inches(scalar(7, 2)),
+        tenon_hole_offset=inches(scalar(1, 16))
     )
     # Right side uses the same peg params (peg face comes from arrangement)
     side_girt_peg_params_right = side_girt_peg_params_left
@@ -503,7 +502,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     front_girt_height_on_posts = post_back_height - front_girt_drop
     
     # Front girt stickout: symmetric on both ends (left and right)
-    front_girt_stickout = Stickout.symmetric(inches(Rational(3, 2)))  # 1.5 inches
+    front_girt_stickout = Stickout.symmetric(inches(scalar(3, 2)))  # 1.5 inches
     
     # Front girt connects left front post to right front post
     front_girt = join_timbers(
@@ -525,7 +524,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     
     # Calculate split positions
     # First split: left section ends where middle section begins
-    first_split_distance = (front_girt.length - middle_section_width) / Rational(2)
+    first_split_distance = (front_girt.length - middle_section_width) / scalar(2)
     # Second split: middle section ends (measured from front girt start)
     second_split_distance = first_split_distance + middle_section_width
     
@@ -551,10 +550,10 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Gooseneck parameters
     gooseneck_length = inches(3)
     gooseneck_narrow_width = inches(1)  # 1 inch
-    gooseneck_wide_width = inches(Rational(3, 2))  # 1.25 inches
+    gooseneck_wide_width = inches(scalar(3, 2))  # 1.25 inches
     gooseneck_head_length = inches(1.5)  # 1 inch
-    gooseneck_depth = inches(Rational(3, 2))  # 1.5 inches (reasonable default)
-    lap_length = inches(Rational(1, 2))  # 1.5 inches (reasonable default)
+    gooseneck_depth = inches(scalar(3, 2))  # 1.5 inches (reasonable default)
+    lap_length = inches(scalar(1, 2))  # 1.5 inches (reasonable default)
     
     # Left gooseneck joint: middle section BOTTOM end meets left section TOP end
     front_girt_gooseneck_joint_left = cut_lapped_gooseneck_joint(
@@ -570,7 +569,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         gooseneck_large_width=gooseneck_wide_width,
         gooseneck_head_length=gooseneck_head_length,
         lap_length=lap_length,
-        gooseneck_lateral_offset=Rational(0),
+        gooseneck_lateral_offset=scalar(0),
         gooseneck_depth=gooseneck_depth
     )
     
@@ -588,7 +587,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         gooseneck_large_width=gooseneck_wide_width,
         gooseneck_head_length=gooseneck_head_length,
         lap_length=lap_length,
-        gooseneck_lateral_offset=Rational(0),
+        gooseneck_lateral_offset=scalar(0),
         gooseneck_depth=gooseneck_depth
     )
     
@@ -607,10 +606,10 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Peg parameters: 5/8" square peg, 1" from shoulder, on centerline
     front_girt_peg_params = SimplePegParameters(
         shape=PegShape.SQUARE,
-        peg_positions=[(inches(1), Rational(0))],  # 1" from shoulder, centered
-        size=inches(Rational(5, 8)),  # 5/8" square
-        depth=inches(Rational(7, 2)),
-        tenon_hole_offset=inches(Rational(1, 16))
+        peg_positions=[(inches(1), scalar(0))],  # 1" from shoulder, centered
+        size=inches(scalar(5, 8)),  # 5/8" square
+        depth=inches(scalar(7, 2)),
+        tenon_hole_offset=inches(scalar(1, 16))
     )
     
     # Left end: Front girt left piece BOTTOM meets left front post
@@ -697,7 +696,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         location_on_timber2=post_front_height,   # Same height on right post
         lateral_offset=0,       # No lateral offset
         size=top_plate_size,
-        orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),
+        orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket=TimberTicket(name="Front Top Plate", tags=("beam", "4x6"))
     )
 
@@ -709,7 +708,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         location_on_timber2=post_back_height+inches(3),
         lateral_offset=0,
         size=top_plate_size,
-        orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),
+        orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),
         ticket=TimberTicket(name="Back Top Plate", tags=("beam", "4x6"))
     )
 
@@ -803,9 +802,9 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Mortise depth: 2.5 inches
     # No peg
     
-    corner_post_to_beam_tenon_size = Matrix([inches(Rational(3, 2)), inches(1)])  # 1" front to back, 1.5" side to side
-    corner_post_to_beam_tenon_length = inches(Rational(5, 2))  # 2.5 inches
-    corner_post_to_beam_mortise_depth = inches(Rational(5, 2))  # 2.5 inches
+    corner_post_to_beam_tenon_size = Matrix([inches(scalar(3, 2)), inches(1)])  # 1" front to back, 1.5" side to side
+    corner_post_to_beam_tenon_length = inches(scalar(5, 2))  # 2.5 inches
+    corner_post_to_beam_mortise_depth = inches(scalar(5, 2))  # 2.5 inches
     
     # Back left corner post TOP end meets back top plate
     joint_back_left_post_to_beam = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -844,13 +843,13 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Calculate spacing: 3 joists with 4 equal gaps (left side, 2 between joists, right side)
     num_joists = 3
     num_gaps = 4
-    gap_spacing = (base_width - num_joists * joist_width) / Rational(num_gaps)
+    gap_spacing = (base_width - num_joists * joist_width) / scalar(num_gaps)
     
     # Joist positions along X axis (from left edge, which is where mudsills start)
     joist_positions_along_mudsill = [
-        gap_spacing + joist_width / Rational(2),                      # Joist 1
-        Rational(2) * gap_spacing + Rational(3, 2) * joist_width,     # Joist 2
-        Rational(3) * gap_spacing + Rational(5, 2) * joist_width      # Joist 3
+        gap_spacing + joist_width / scalar(2),                      # Joist 1
+        scalar(2) * gap_spacing + scalar(3, 2) * joist_width,     # Joist 2
+        scalar(3) * gap_spacing + scalar(5, 2) * joist_width      # Joist 3
     ]
     
     # No stickout on joists (flush with mudsills)
@@ -862,7 +861,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # To align tops: joist_offset = (mudsill_height - joist_height) / 2
     mudsill_height = big_timber_size[0]  # 6" vertical
     joist_height = med_timber_size[0]    # 4" vertical
-    joist_vertical_offset = (mudsill_height - joist_height) / Rational(2)  # = 1"
+    joist_vertical_offset = (mudsill_height - joist_height) / scalar(2)  # = 1"
     
     # Create the 3 joists
     joists = []
@@ -879,7 +878,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             location_on_timber2=mudsill_back.length - location_along_mudsill,    # Reversed distance along back mudsill (measured from opposite end)
             lateral_offset=joist_vertical_offset,     # Offset upward to align tops
             size=joist_size,
-            orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),  # Face up
+            orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),  # Face up
             ticket=TimberTicket(name=f"Joist {i}", tags=("joist", "4x4"))
         )
         joists.append(joist)
@@ -890,8 +889,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # ============================================================================
     
     # Dovetail parameters
-    dovetail_shoulder_inset = inches(Rational(1, 2))  # 1/2 inch shoulder inset
-    dovetail_small_width = inches(Rational(3, 2))     # 1.5 inch small width
+    dovetail_shoulder_inset = inches(scalar(1, 2))  # 1/2 inch shoulder inset
+    dovetail_small_width = inches(scalar(3, 2))     # 1.5 inch small width
     dovetail_large_width = inches(2)                   # 2 inch large width
     dovetail_length = inches(2)                        # 2 inch long
     dovetail_depth = inches(2)                         # 2 inch deep
@@ -913,7 +912,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             dovetail_length=dovetail_length,
             dovetail_small_width=dovetail_small_width,
             dovetail_large_width=dovetail_large_width,
-            dovetail_lateral_offset=Rational(0),
+            dovetail_lateral_offset=scalar(0),
             dovetail_depth=dovetail_depth
         )
         
@@ -929,7 +928,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             dovetail_length=dovetail_length,
             dovetail_small_width=dovetail_small_width,
             dovetail_large_width=dovetail_large_width,
-            dovetail_lateral_offset=Rational(0),
+            dovetail_lateral_offset=scalar(0),
             dovetail_depth=dovetail_depth
         )
         
@@ -950,12 +949,12 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # With 5 rafters, there are 4 gaps between centerlines
     
     num_rafters = 5
-    rafter_centerline_spacing = (top_plate_front.length - rafter_width) / Rational(num_rafters-1)
+    rafter_centerline_spacing = (top_plate_front.length - rafter_width) / scalar(num_rafters-1)
     
     # Rafter positions along the top plates (X axis)
     rafter_positions_along_top_plate = []
     for i in range(num_rafters):
-        position = rafter_width / Rational(2) + i * rafter_centerline_spacing
+        position = rafter_width / scalar(2) + i * rafter_centerline_spacing
         rafter_positions_along_top_plate.append(position)
     
     # Rafters have 12" stickout and are offset upwards by 3 inches from top plate centerlines
@@ -977,7 +976,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             location_on_timber2=location_along_top_plate,  # Same position on front top plate
             lateral_offset=rafter_vertical_offset,
             size=rafter_size,
-            orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),  # Face up
+            orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),  # Face up
             ticket=TimberTicket(name=f"Rafter {i}", tags=("rafter", "4x4"))
         )
         rafters.append(rafter)

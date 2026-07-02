@@ -3,8 +3,8 @@ Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
 """
 
-from sympy import Matrix, Rational
-from kumiki.rule import inches, Transform
+from sympy import Matrix
+from kumiki.rule import inches, Transform, scalar
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, timber_from_directions,
@@ -229,9 +229,9 @@ def example_basic_dropin_dovetail_butt_joint(position=None):
     # Face perpendicular to receiving timber length (X): use RIGHT (normal +Z) on butt timber
     dovetail_timber_face = TimberLongFace.RIGHT
     width = arrangement.butt_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right())
-    dovetail_length = width / Integer(2)
-    dovetail_small_width = width * Rational(1, 2)
-    dovetail_large_width = width * Rational(2, 3)
+    dovetail_length = width / scalar(2)
+    dovetail_small_width = width * scalar(1, 2)
+    dovetail_large_width = width * scalar(2, 3)
     receiving_timber_shoulder_inset = inches(1)  # 1 inch inset
 
     joint = cut_basic_dropin_dovetail_butt_joint(

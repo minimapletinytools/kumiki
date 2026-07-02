@@ -31,7 +31,7 @@ peg_draw_bore_offset = mm(2)
 def build_frame() -> Frame:
     # Side timbers run in +Y, at x = +/- side_spacing/2.
     left_side = create_axis_aligned_timber(
-        bottom_position=create_v3(-side_spacing / 2, -side_length / 2, Rational(0)),
+        bottom_position=create_v3(-side_spacing / 2, -side_length / 2, scalar(0)),
         length=side_length,
         size=timber_size,
         length_direction=TimberFace.FRONT,
@@ -39,7 +39,7 @@ def build_frame() -> Frame:
         ticket="Left Side",
     )
     right_side = create_axis_aligned_timber(
-        bottom_position=create_v3(side_spacing / 2, -side_length / 2, Rational(0)),
+        bottom_position=create_v3(side_spacing / 2, -side_length / 2, scalar(0)),
         length=side_length,
         size=timber_size,
         length_direction=TimberFace.FRONT,
@@ -54,7 +54,7 @@ def build_frame() -> Frame:
     cross_y_back = -cross_y_front
 
     back_cross = create_axis_aligned_timber(
-        bottom_position=create_v3(-cross_length / 2, cross_y_back, Rational(0)),
+        bottom_position=create_v3(-cross_length / 2, cross_y_back, scalar(0)),
         length=cross_length,
         size=timber_size,
         length_direction=TimberFace.RIGHT,
@@ -62,7 +62,7 @@ def build_frame() -> Frame:
         ticket="Back Cross",
     )
     front_cross = create_axis_aligned_timber(
-        bottom_position=create_v3(-cross_length / 2, cross_y_front, Rational(0)),
+        bottom_position=create_v3(-cross_length / 2, cross_y_front, scalar(0)),
         length=cross_length,
         size=timber_size,
         length_direction=TimberFace.RIGHT,
@@ -75,7 +75,7 @@ def build_frame() -> Frame:
     # the side timber from the front, in global +Y on the back cross and -Y on the front cross).
     peg_params = SimplePegParameters(
         shape=PegShape.ROUND,
-        peg_positions=[(tenon_length / 2, Rational(0))],
+        peg_positions=[(tenon_length / 2, scalar(0))],
         size=peg_diameter,
         depth=None,                                # through peg
         tenon_hole_offset=peg_draw_bore_offset,    # draw-bore offset pulls the joint tight

@@ -121,8 +121,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
 
     # Approximate overlap check: centerlines should be close
     max_dimension = max(timberA.size[0], timberA.size[1], timberB.size[0], timberB.size[1])
-    from sympy import Rational
-    if centerline_distance > max_dimension / Rational(2):
+    if centerline_distance > max_dimension / scalar(2):
         warnings.warn(f"Timber cross sections may not overlap (centerline distance: {float(centerline_distance)}). Check joint geometry.")
 
     # Calculate distance from each timber end to the splice point
@@ -204,17 +203,16 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
     bottom_lap_timber_end = arrangement.timber2_end
     top_lap_timber_face = arrangement.front_face_on_timber1 if arrangement.front_face_on_timber1 is not None else TimberLongFace.FRONT
 
-    from sympy import Rational
 
     # Calculate default lap_depth if not provided
     if lap_depth is None:
         # Use half the thickness in the axis perpendicular to top_lap_timber_face
         if top_lap_timber_face == TimberLongFace.LEFT or top_lap_timber_face == TimberLongFace.RIGHT:
             # Face is on Y-axis, so thickness is in Y direction (height)
-            lap_depth = top_lap_timber.size[1] / Rational(2)
+            lap_depth = top_lap_timber.size[1] / scalar(2)
         else:  # TOP or BOTTOM
             # Face is on Z-axis (end face), use the smaller of width/height
-            lap_depth = min(top_lap_timber.size[0], top_lap_timber.size[1]) / Rational(2)
+            lap_depth = min(top_lap_timber.size[0], top_lap_timber.size[1]) / scalar(2)
 
     # Create the CSG cuts using the helper function
     # Returns tuples of (lap_prism, end_cut) for each timber
@@ -280,8 +278,8 @@ def cut_lapped_gooseneck_joint(
     gooseneck_small_width: Numeric,
     gooseneck_large_width: Numeric,
     gooseneck_head_length: Numeric,
-    lap_length: Numeric = Rational(0), # 0 just means no lap
-    gooseneck_lateral_offset: Numeric = Rational(0),
+    lap_length: Numeric = scalar(0), # 0 just means no lap
+    gooseneck_lateral_offset: Numeric = scalar(0),
     gooseneck_depth: Optional[Numeric] = None
 ) -> Joint:
     """
@@ -389,7 +387,7 @@ def cut_lapped_gooseneck_joint(
         # Default to half the dimension perpendicular to the specified face
         gooseneck_depth = gooseneck_timber.get_size_in_face_normal_axis(
             gooseneck_timber_face.to.face()
-        ) / Rational(2)
+        ) / scalar(2)
 
     # ========================================================================
     # Calculate lap positions and depths

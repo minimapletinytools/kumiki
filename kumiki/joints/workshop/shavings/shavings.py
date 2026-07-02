@@ -314,7 +314,7 @@ def chop_timber_end_with_prism(timber: TimberLike, end: TimberEnd, distance_from
     
     Example:
         >>> # Chop everything beyond 2 inches from the top of a timber
-        >>> chop_prism = chop_timber_end_with_prism(my_timber, TimberEnd.TOP, Rational(2))
+        >>> chop_prism = chop_timber_end_with_prism(my_timber, TimberEnd.TOP, scalar(2))
         >>> # This creates a semi-infinite prism starting 2 inches from the top
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
@@ -367,7 +367,7 @@ def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberEnd, distance
     
     Example:
         >>> # Chop everything beyond 2 inches from the top of a timber
-        >>> chop_plane = chop_timber_end_with_half_plane(my_timber, TimberEnd.TOP, Rational(2))
+        >>> chop_plane = chop_timber_end_with_half_plane(my_timber, TimberEnd.TOP, scalar(2))
         >>> # This creates a half-plane 2 inches from the top, removing everything beyond
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
@@ -446,7 +446,6 @@ def chop_lap_on_timber_end(
         ... )
     """
     assert isinstance(lap_timber_end, TimberEnd), f"expected TimberEnd, got {type(lap_timber_end).__name__}"
-    from sympy import Rational
     
     # Step 1: Determine the end positions and shoulder position of the top lap timber
     if lap_timber_end == TimberEnd.TOP:
@@ -502,12 +501,12 @@ def chop_lap_on_timber_end(
             # Keep lap_depth on RIGHT side, remove from LEFT side
             # Remove from x = -size[0]/2 to x = +size[0]/2 - lap_depth
             removal_width = lap_timber.size[0] - lap_depth
-            x_offset = -lap_timber.size[0] / Rational(2) + removal_width / Rational(2)
+            x_offset = -lap_timber.size[0] / scalar(2) + removal_width / scalar(2)
         else:  # LEFT
             # Keep lap_depth on LEFT side, remove from RIGHT side
             # Remove from x = -size[0]/2 + lap_depth to x = +size[0]/2
             removal_width = lap_timber.size[0] - lap_depth
-            x_offset = lap_timber.size[0] / Rational(2) - removal_width / Rational(2)
+            x_offset = lap_timber.size[0] / scalar(2) - removal_width / scalar(2)
         
         lap_prism = RectangularPrism(
             size=create_v2(removal_width, lap_timber.size[1]),
@@ -523,12 +522,12 @@ def chop_lap_on_timber_end(
             # Keep lap_depth on FRONT side, remove from BACK side
             # Remove from y = -size[1]/2 to y = +size[1]/2 - lap_depth
             removal_height = lap_timber.size[1] - lap_depth
-            y_offset = -lap_timber.size[1] / Rational(2) + removal_height / Rational(2)
+            y_offset = -lap_timber.size[1] / scalar(2) + removal_height / scalar(2)
         else:  # BACK
             # Keep lap_depth on BACK side, remove from FRONT side
             # Remove from y = -size[1]/2 + lap_depth to y = +size[1]/2
             removal_height = lap_timber.size[1] - lap_depth
-            y_offset = lap_timber.size[1] / Rational(2) - removal_height / Rational(2)
+            y_offset = lap_timber.size[1] / scalar(2) - removal_height / scalar(2)
         
         lap_prism = RectangularPrism(
             size=create_v2(lap_timber.size[0], removal_height),
@@ -682,7 +681,7 @@ def chop_lap_on_timber_ends(
 
 
 # TODO I think this is cutting on the wrong face...
-def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: TimberFace, profile: Union[List[V2], List[List[V2]]], depth: Numeric, profile_y_offset_from_end: Numeric = Integer(0)) -> Union[SolidUnion, ConvexPolygonExtrusion]:
+def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: TimberFace, profile: Union[List[V2], List[List[V2]]], depth: Numeric, profile_y_offset_from_end: Numeric = scalar(0)) -> Union[SolidUnion, ConvexPolygonExtrusion]:
     """
     Create a CSG extrusion of a profile (or multiple profiles) on a timber face.
     See the diagram below for understanding how to interpret the profile in the timber's local space based on the end and face arguments.
@@ -723,7 +722,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
           should be decomposed into multiple convex profiles
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
-    from sympy import Rational, Matrix
+    from sympy import Matrix
     from kumiki.rule import Orientation, Transform, create_v3, cross_product, safe_normalize_vector as normalize_vector
     from kumiki.cutcsg import ConvexPolygonExtrusion
     
@@ -759,12 +758,12 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
     if end == TimberEnd.TOP:
         origin_z = timber.length
     else:  # BOTTOM
-        origin_z = Rational(0)
+        origin_z = scalar(0)
     
     # Get X and Y offset based on face
     # The face determines where on the cross-section the origin is
-    half_width = timber.size[0] / Rational(2)
-    half_height = timber.size[1] / Rational(2)
+    half_width = timber.size[0] / scalar(2)
+    half_height = timber.size[1] / scalar(2)
     
     if face == TimberFace.TOP or face == TimberFace.BOTTOM:
         # For end faces, we can't really position a profile "on" them in the way described
@@ -772,15 +771,15 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
         raise ValueError(f"Face cannot be an end face (TOP or BOTTOM), got {face}")
     elif face == TimberFace.RIGHT:
         origin_x = half_width
-        origin_y = Rational(0)
+        origin_y = scalar(0)
     elif face == TimberFace.LEFT:
         origin_x = -half_width
-        origin_y = Rational(0)
+        origin_y = scalar(0)
     elif face == TimberFace.FRONT:
-        origin_x = Rational(0)
+        origin_x = scalar(0)
         origin_y = half_height
     else:  # BACK
-        origin_x = Rational(0)
+        origin_x = scalar(0)
         origin_y = -half_height
     
     origin_local = create_v3(origin_x, origin_y, origin_z)
@@ -831,7 +830,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
         points=translated_profile,
         transform=profile_transform,
         start_distance=-depth,
-        end_distance=Rational(0),
+        end_distance=scalar(0),
     )
     
     return extrusion

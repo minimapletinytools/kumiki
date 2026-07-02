@@ -232,7 +232,7 @@ def build_dovetail_shoulder_geometery(
     """
     from kumiki.cutcsg import ConvexPolygonExtrusion
 
-    if safe_compare(dovetail_depth, Integer(0), Comparison.LE):
+    if safe_compare(dovetail_depth, scalar(0), Comparison.LE):
         raise ValueError(f"dovetail_depth must be positive, got {dovetail_depth}")
 
     receiving_timber = arrangement.receiving_timber
@@ -246,19 +246,19 @@ def build_dovetail_shoulder_geometery(
     z_axis_global = create_v3(orientation_matrix[0, 2], orientation_matrix[1, 2], orientation_matrix[2, 2])
 
     shoulder_height = receiving_timber.get_size_in_direction_3d(y_axis_global)
-    half_height = shoulder_height / Rational(2)
+    half_height = shoulder_height / scalar(2)
 
     shoulder_span = butt_timber.get_size_in_direction_3d(z_axis_global)
-    half_span = shoulder_span / Rational(2)
+    half_span = shoulder_span / scalar(2)
 
     # Keep a rectangular butt-side section so this geometry includes part of the
     # butt timber itself before transitioning along the dovetail ramp.
-    butt_side_thickness = butt_timber.get_size_in_direction_3d(x_axis_global) / Rational(2)
+    butt_side_thickness = butt_timber.get_size_in_direction_3d(x_axis_global) / scalar(2)
 
     profile_points = [
         create_v2(-butt_side_thickness, -half_height),
         create_v2(-butt_side_thickness, half_height),
-        create_v2(Integer(0), half_height),
+        create_v2(scalar(0), half_height),
         create_v2(dovetail_depth, -half_height),
     ]
 
@@ -366,16 +366,16 @@ def dovetail_tenon_geometry(
            ^^^ tenon_depth
     """ 
 
-    if safe_compare(tenon_depth, Integer(0), Comparison.LE):
+    if safe_compare(tenon_depth, scalar(0), Comparison.LE):
         raise ValueError(f"tenon_depth must be positive, got {tenon_depth}")
-    if safe_compare(dovetail_depth, Integer(0), Comparison.LT):
+    if safe_compare(dovetail_depth, scalar(0), Comparison.LT):
         raise ValueError(f"dovetail_depth must be non-negative, got {dovetail_depth}")
-    if safe_compare(receiving_timber_mortise_extra_depth, Integer(0), Comparison.LT):
+    if safe_compare(receiving_timber_mortise_extra_depth, scalar(0), Comparison.LT):
         raise ValueError(
             "receiving_timber_mortise_extra_depth must be non-negative, "
             f"got {receiving_timber_mortise_extra_depth}"
         )
-    if safe_compare(tenon_size[0], Integer(0), Comparison.LE) or safe_compare(tenon_size[1], Integer(0), Comparison.LE):
+    if safe_compare(tenon_size[0], scalar(0), Comparison.LE) or safe_compare(tenon_size[1], scalar(0), Comparison.LE):
         raise ValueError(f"tenon_size values must be positive, got {tenon_size}")
 
 
@@ -423,7 +423,7 @@ def dovetail_tenon_geometry(
     # receiving timber's cross-section.
     receiving_length_dir = arrangement.receiving_timber.get_length_direction_global()
     top_dot_receiving_length = safe_dot_product(top_face_dir, receiving_length_dir)
-    if not (zero_test(top_dot_receiving_length - Integer(1)) or zero_test(top_dot_receiving_length + Integer(1))):
+    if not (zero_test(top_dot_receiving_length - scalar(1)) or zero_test(top_dot_receiving_length + scalar(1))):
         raise AssertionError(
             f"dovetail_top_side_on_butt_timber ({dovetail_top_side_on_butt_timber}) must point "
             f"along the receiving timber's length axis (dot product was {top_dot_receiving_length}, "
@@ -447,7 +447,7 @@ def dovetail_tenon_geometry(
     shoulder_origin = shoulder_result.marking_space.transform.position
 
     # Move to the dovetail_top_side face at the shoulder (centered laterally on the butt timber).
-    butt_half_in_top_dir = tenon_timber.get_size_in_direction_3d(top_face_dir) / Rational(2)
+    butt_half_in_top_dir = tenon_timber.get_size_in_direction_3d(top_face_dir) / scalar(2)
     top_face_center_at_shoulder = shoulder_origin + top_face_dir * butt_half_in_top_dir
 
     # Apply the lateral offset (perpendicular axis on the tenon timber).
@@ -468,7 +468,7 @@ def dovetail_tenon_geometry(
         orientation=extrusion_orientation,
     )
 
-    half_lateral = tenon_lateral_dim / Rational(2)
+    half_lateral = tenon_lateral_dim / scalar(2)
 
     # ---- Positive tenon prism (the dovetail-shaped solid the tenon should be) ----
     # Top edge (flush with dovetail_top_side) runs at Y = 0 from X = 0 to X = tenon_depth.
@@ -477,9 +477,9 @@ def dovetail_tenon_geometry(
     tenon_bottom_at_shoulder = -tenon_top_to_bottom_dim
     tenon_bottom_at_tip = -(tenon_top_to_bottom_dim + dovetail_depth)
     tenon_profile_points = [
-        create_v2(Integer(0), tenon_bottom_at_shoulder),
-        create_v2(Integer(0), Integer(0)),
-        create_v2(tenon_depth, Integer(0)),
+        create_v2(scalar(0), tenon_bottom_at_shoulder),
+        create_v2(scalar(0), scalar(0)),
+        create_v2(tenon_depth, scalar(0)),
         create_v2(tenon_depth, tenon_bottom_at_tip),
     ]
     positive_tenon = ConvexPolygonExtrusion(
@@ -558,17 +558,17 @@ def dovetail_tenon_geometry(
 
         # Profile points (CW in math orientation) in the extrusion frame X-Y plane.
         wedge_profile_points = [
-            create_v2(x_base, Integer(0)),
+            create_v2(x_base, scalar(0)),
             create_v2(x_base, h_base),
             create_v2(x_tip, h_tip),
-            create_v2(x_tip, Integer(0)),
+            create_v2(x_tip, scalar(0)),
         ]
 
         wedge_slot_profile_points = [
-            create_v2(x_base_slot, Integer(0)),
+            create_v2(x_base_slot, scalar(0)),
             create_v2(x_base_slot, h_base),
             create_v2(x_tip, h_tip),
-            create_v2(x_tip, Integer(0)),
+            create_v2(x_tip, scalar(0)),
         ]
 
         # Accessory geometry is rendered in its own local frame; the CSGAccessory.transform
@@ -603,9 +603,9 @@ def dovetail_tenon_geometry(
         dovetail_depth * mortise_total_depth / tenon_depth
     )
     mortise_profile_points = [
-        create_v2(Integer(0), tenon_bottom_at_shoulder),
-        create_v2(Integer(0), Integer(0)),
-        create_v2(mortise_total_depth, Integer(0)),
+        create_v2(scalar(0), tenon_bottom_at_shoulder),
+        create_v2(scalar(0), scalar(0)),
+        create_v2(mortise_total_depth, scalar(0)),
         create_v2(mortise_total_depth, mortise_bottom_at_tip),
     ]
 
@@ -671,14 +671,14 @@ class SimplePegParameters:
     peg_positions: List[Tuple[Numeric, Numeric]]
     size: Numeric
     depth: Optional[Numeric] = None
-    tenon_hole_offset: Numeric = Rational(0)
+    tenon_hole_offset: Numeric = scalar(0)
     peg_position_space: Tuple[PegPositionSpace, PegPositionSpace] = (
         PegPositionSpace.TENON,
         PegPositionSpace.TENON,
     )
     peg_orientation: Tuple[PegPositionSpace, Numeric] = (
         PegPositionSpace.TENON,
-        Rational(0),
+        scalar(0),
     )
 
 
@@ -842,7 +842,7 @@ def compute_peg_positions(
         box_mins = [
             -mortise_timber.size[0] / 2,
             -mortise_timber.size[1] / 2,
-            Integer(0),
+            scalar(0),
         ]
         box_maxs = [
             mortise_timber.size[0] / 2,
@@ -884,7 +884,7 @@ def compute_peg_positions(
             peg_depth = peg_parameters.depth
         else:
             peg_depth = t_exit - t_enter
-        stickout_length = peg_depth * Rational(1, 2)
+        stickout_length = peg_depth * scalar(1, 2)
 
         results.append(PegPositionResult(
             tenon_face_position_global=peg_pos_on_tenon_face_global,

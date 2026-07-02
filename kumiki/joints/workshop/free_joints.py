@@ -48,8 +48,8 @@ def cut_free_house_joint(housing_timber: TimberLike, housed_timber: Union[Timber
         housed_aabb = housed_prism_in_housing.get_aabb()
 
         # Housing_timber cross-section half-extents (in its own local space).
-        half_w = housing_timber.size[0] / Rational(2)
-        half_h = housing_timber.size[1] / Rational(2)
+        half_w = housing_timber.size[0] / scalar(2)
+        half_h = housing_timber.size[1] / scalar(2)
 
         def _take_max(a: Numeric, b: Numeric) -> Numeric:
             return a if safe_compare(a, b, Comparison.GE) else b

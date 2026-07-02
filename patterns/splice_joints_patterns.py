@@ -2,7 +2,7 @@
 Splice Joints Patterns
 """
 
-from sympy import Matrix, Rational, sqrt
+from sympy import Matrix, sqrt
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -173,11 +173,11 @@ def create_simple_gooseneck_example(position: Optional[V3] = None):
 
 
 def create_all_splice_joint_patterns(use_round_timbers=False) -> Frame:
-    origin = create_v3(Integer(0), Integer(0), Integer(0))
+    origin = create_v3(scalar(0), scalar(0), scalar(0))
     step = inches(24)
     all_timbers = []
     all_timbers += make_splice_joint_example(origin, use_round_timbers)
-    all_timbers += make_splice_lap_joint_example(origin + create_v3(step, Integer(0), Integer(0)), use_round_timbers)
+    all_timbers += make_splice_lap_joint_example(origin + create_v3(step, scalar(0), scalar(0)), use_round_timbers)
     return Frame(cut_timbers=all_timbers, name="Splice Joint Patterns")
 
 

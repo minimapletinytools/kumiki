@@ -13,9 +13,9 @@ NOTE: Prism positioning follows the Timber convention:
 - So a prism at position=(0,0,0) with size=[1,1] spans X=[-0.5,0.5], Y=[-0.5,0.5]
 """
 
-from sympy import Matrix, eye, Rational, sqrt
+from sympy import Matrix, eye, sqrt
 from kumiki.cutcsg import *
-from kumiki.rule import Orientation, Transform, inches, feet
+from kumiki.rule import Orientation, Transform, inches, feet, scalar
 from kumiki.timber import Timber, TimberEnd, TimberFace, TimberLongFace, timber_from_directions
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.shavings import chop_lap_on_timber_end, chop_profile_on_timber_face
@@ -99,7 +99,7 @@ def example_cube_with_halfspace_cut():
     # When used in Difference, it removes points where z < 0.5
     halfspace = HalfSpace(
         normal=Matrix([0, 0, 1]),  # Normal pointing up (+Z)
-        offset=Rational(1, 2)  # Plane at Z = 0.5
+        offset=scalar(1, 2)  # Plane at Z = 0.5
     )
     
     # Create the difference (remove bottom half)
@@ -123,8 +123,8 @@ def example_cube_at_position():
     """
     cube = RectangularPrism(
         size=Matrix([1, 1]),  # 1m x 1m cross-section
-        start_distance=Rational(-1, 2),   # Start at Z=-0.5 (relative to position Z=1)
-        end_distance=Rational(1, 2),      # End at Z=0.5 (relative to position Z=1)
+        start_distance=scalar(-1, 2),   # Start at Z=-0.5 (relative to position Z=1)
+        end_distance=scalar(1, 2),      # End at Z=0.5 (relative to position Z=1)
         transform=Transform(
             position=Matrix([2, 3, 1]),  # Center at (2, 3, 1)
             orientation=Orientation(eye(3))  # Identity orientation
@@ -185,7 +185,7 @@ def example_hexagon_extrusion():
     """
     # Create regular hexagon with radius 0.5m
     # Vertices at angles: 0°, 60°, 120°, 180°, 240°, 300°
-    radius = Rational(1, 2)  # 0.5 meters
+    radius = scalar(1, 2)  # 0.5 meters
     
     hexagon_points = [
         Matrix([radius, 0]),                           # 0°
@@ -224,8 +224,8 @@ def example_lap_cut_on_timber():
     """
     # Convert inches and feet to meters
     # 1 inch = 0.0254 meters, 1 foot = 0.3048 meters
-    inch = Rational(254, 10000)  # 0.0254 meters
-    foot = Rational(3048, 10000)  # 0.3048 meters
+    inch = scalar(254, 10000)  # 0.0254 meters
+    foot = scalar(3048, 10000)  # 0.3048 meters
     
     # Create a 4"x4"x4' timber
     timber_width = 4 * inch  # 4"
@@ -384,7 +384,7 @@ def example_shoulder_notch_on_timber():
     # Define notch parameters
     notch_depth = inches(1)    # 1" deep into the timber
     notch_width = inches(4)    # 4" wide along timber length
-    notch_center = timber_length / Rational(2)  # Center of timber (2' from bottom)
+    notch_center = timber_length / scalar(2)  # Center of timber (2' from bottom)
     
     # Create the shoulder notch CSG (in timber's local coordinates)
     notch_cut_csg = chop_shoulder_notch_on_timber_face(
@@ -584,7 +584,7 @@ def example_dovetail_tenon_geometry_raw():
         tenon_size=Matrix([inches(2), inches(2)]),
         tenon_depth=inches(5),
         dovetail_depth=inches(1),
-        tenon_lateral_offset=Rational(0),
+        tenon_lateral_offset=scalar(0),
         receiving_timber_mortise_extra_depth=inches(1, 2),
         wedge_accessory_parameters = DovetailTenonWedgeAccessoryParameters(
             #wedge_from_receiving_timber_side: bool = False

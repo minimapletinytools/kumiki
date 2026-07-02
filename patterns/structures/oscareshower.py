@@ -1,4 +1,3 @@
-from sympy import Rational
 from kumiki import *
 from kumiki.ticket import BoardTicket
 
@@ -8,12 +7,12 @@ base_width = feet(3)
 base_depth = feet(4)
 
 # 4x4 post: nominal 4x4, actual 3.5" x 3.5"
-post_size = create_v2(inches(Rational(7, 2)), inches(Rational(7, 2)))
+post_size = create_v2(inches(scalar(7, 2)), inches(scalar(7, 2)))
 post_height = feet(8)
 
 # 4x6 member: actual 3.5" x 5.5", 5.5" in vertical axis
 # size[0] = 5.5" (vertical/Z), size[1] = 3.5" (horizontal/depth)
-member_size = create_v2(inches(Rational(11, 2)), inches(Rational(7, 2)))
+member_size = create_v2(inches(scalar(11, 2)), inches(scalar(7, 2)))
 beam_floor_gap = inches(3)  # gap from floor to bottom of beam
 beam_center_height = beam_floor_gap + member_size[0] / 2  # 3" + 2.75" = 5.75" from floor
 
@@ -31,10 +30,10 @@ side_girt_height = top_plate_back_height - member_size[0] - inches(1)
 
 def example() -> Frame:
     footprint_corners = [
-        create_v2(Rational(0), Rational(0)),    # Corner 0: front-left
-        create_v2(base_width, Rational(0)),      # Corner 1: front-right
+        create_v2(scalar(0), scalar(0)),    # Corner 0: front-left
+        create_v2(base_width, scalar(0)),      # Corner 1: front-right
         create_v2(base_width, base_depth),       # Corner 2: back-right
-        create_v2(Rational(0), base_depth),      # Corner 3: back-left
+        create_v2(scalar(0), base_depth),      # Corner 3: back-left
     ]
     footprint = Footprint(footprint_corners)
 
@@ -133,22 +132,22 @@ def example() -> Frame:
     #   peg    5/8" square, 1" from shoulder, draw-bore offset 1/16"
     joint_tenon_size    = Matrix([inches(2), inches(1)])
     joint_tenon_length  = inches(2)
-    joint_mortise_depth = inches(Rational(5, 2))
+    joint_mortise_depth = inches(scalar(5, 2))
 
     peg_params = SimplePegParameters(
         shape=PegShape.SQUARE,
-        peg_positions=[(inches(1), Rational(0))],  # 1" from shoulder, centered
-        size=inches(Rational(5, 8)),                # 5/8" square
+        peg_positions=[(inches(1), scalar(0))],  # 1" from shoulder, centered
+        size=inches(scalar(5, 8)),                # 5/8" square
         depth=None,                                 # through peg
-        tenon_hole_offset=inches(Rational(1, 16)),  # draw-bore
+        tenon_hole_offset=inches(scalar(1, 16)),  # draw-bore
     )
 
     # Tenon position from bottom of beam (floor beams only):
     #   beam half-height = 2.75", tenon half-height = 1"
     #   default center = -1.75" (-7/4") from beam centerline
     #   offset  center = +0.25" (+1/4") – prevents adjacent tenons from crossing inside the post
-    tenon_pos_default = Matrix([inches(Rational(-7, 4)), Rational(0)])
-    tenon_pos_offset  = Matrix([inches(Rational( 1, 4)), Rational(0)])
+    tenon_pos_default = Matrix([inches(scalar(-7, 4)), scalar(0)])
+    tenon_pos_offset  = Matrix([inches(scalar( 1, 4)), scalar(0)])
 
     def fat_joint(receiving, butt, end, face, tenon_pos=None):
         return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -203,14 +202,14 @@ def example() -> Frame:
     # All 4 pieces share the same size vector; for vertical pieces size[0]=3.5"
     # runs in X, for horizontal rails size[0]=3.5" runs in Z (join_timbers picks
     # up left_vert's length direction +Z as the rail's width direction).
-    door_stock = create_v2(inches(Rational(7, 2)), inches(Rational(3, 4)))  # 3.5" wide, 3/4" thick
-    door_y = inches(1) + inches(Rational(3, 4)) / 2                         # center: 1" inset + 3/8"
+    door_stock = create_v2(inches(scalar(7, 2)), inches(scalar(3, 4)))  # 3.5" wide, 3/4" thick
+    door_y = inches(1) + inches(scalar(3, 4)) / 2                         # center: 1" inset + 3/8"
 
     beam_top_z  = beam_floor_gap + member_size[0]               # top of front floor beam = 8.5"
     plate_bot_z = top_plate_front_height - member_size[0] / 2   # bottom of front top plate = 93.25"
 
     # Left vertical: floor-beam top → top-plate bottom, 1/2" gap from left post's inner face
-    left_vert_x = post_size[0] + inches(Rational(1, 2)) + door_stock[0] / 2  # 3.5 + 0.5 + 1.75 = 5.75"
+    left_vert_x = post_size[0] + inches(scalar(1, 2)) + door_stock[0] / 2  # 3.5 + 0.5 + 1.75 = 5.75"
     door_left_vert = create_axis_aligned_timber(
         bottom_position=create_v3(left_vert_x, door_y, beam_top_z),
         length=plate_bot_z - beam_top_z,
@@ -222,7 +221,7 @@ def example() -> Frame:
 
     # Right vertical: starts 2" above the floor beam, 58" long,
     # 1/2" gap from the right post's inner face (symmetric placement)
-    right_vert_x     = base_width - post_size[0] - inches(Rational(1, 2)) - door_stock[0] / 2
+    right_vert_x     = base_width - post_size[0] - inches(scalar(1, 2)) - door_stock[0] / 2
     right_vert_bot_z = beam_top_z + inches(2)
     right_vert_len   = inches(64)
     door_right_vert = create_axis_aligned_timber(
@@ -260,12 +259,12 @@ def example() -> Frame:
     # so the mortise doesn't blow out the end of the vertical stock.
     #   bottom rail: inside = top edge; tenon center = +0.75" in local X (+Z)
     #   top rail:    inside = bottom edge; tenon center = -0.75" in local X (+Z)
-    door_tenon_size    = Matrix([inches(2), inches(Rational(1, 4))])
-    door_tenon_length  = inches(Rational(3, 2))   # 1.5" into the vertical piece
+    door_tenon_size    = Matrix([inches(2), inches(scalar(1, 4))])
+    door_tenon_length  = inches(scalar(3, 2))   # 1.5" into the vertical piece
     door_mortise_depth = inches(2)
 
-    door_tenon_pos_bot = Matrix([ inches(Rational(3, 4)), Rational(0)])
-    door_tenon_pos_top = Matrix([-inches(Rational(3, 4)), Rational(0)])
+    door_tenon_pos_bot = Matrix([ inches(scalar(3, 4)), scalar(0)])
+    door_tenon_pos_top = Matrix([-inches(scalar(3, 4)), scalar(0)])
 
     def door_joint(receiving, rail, end, tenon_pos):
         return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -291,10 +290,10 @@ def example() -> Frame:
     # mortise_shoulder_distance_from_centerline = beam/plate half-depth + 1/4" gap:
     #   bottom: shoulder 1/4" above beam top face  → +3" from beam centerline
     #   top:    shoulder 1/4" below plate bot face → -3" from plate centerline
-    hinge_clearance    = member_size[0] / 2 + inches(Rational(1, 4))  # 2.75" + 0.25" = 3"
-    hinge_tenon_length = inches(Rational(3, 2))   # 1.5" pivot depth
+    hinge_clearance    = member_size[0] / 2 + inches(scalar(1, 4))  # 2.75" + 0.25" = 3"
+    hinge_tenon_length = inches(scalar(3, 2))   # 1.5" pivot depth
     hinge_mortise_depth = hinge_tenon_length
-    hinge_diameter = inches(Rational(3, 5))
+    hinge_diameter = inches(scalar(3, 5))
 
     hinge_bot = cut_round_mortise_and_tenon_joint(
         arrangement=ButtJointTimberArrangement(
@@ -327,10 +326,10 @@ def example() -> Frame:
     # Each end extends 3/8" into a vertical groove in the corner posts (housed joint).
     # Adjacent boards overlap 1/4" for tongue-and-groove joints.
     # Board width is solved so N boards fill each wall height exactly.
-    post_housing_depth = inches(Rational(3, 8))
-    tongue_depth_tg    = inches(Rational(1, 4))
-    tongue_width_tg    = inches(Rational(1, 4))
-    board_thickness_w  = inches(Rational(3, 4))
+    post_housing_depth = inches(scalar(3, 8))
+    tongue_depth_tg    = inches(scalar(1, 4))
+    tongue_width_tg    = inches(scalar(1, 4))
+    board_thickness_w  = inches(scalar(3, 4))
 
     side_girt_bot_z  = side_girt_height - member_size[0] / 2
     back_plate_bot_z = top_plate_back_height - member_size[0] / 2

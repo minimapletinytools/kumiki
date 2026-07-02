@@ -5,10 +5,9 @@ This file contains one example function for each double butt joint type.
 Each joint is created from 4"x5" timbers that are 4' long.
 """
 
-from sympy import Rational
 from typing import Union
 
-from kumiki.rule import V3, create_v3
+from kumiki.rule import V3, create_v3, scalar
 from kumiki.timber import *
 from kumiki.joints.workshop.multi_butt_joints import cut_splined_opposing_double_butt_joint
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
@@ -46,7 +45,7 @@ def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
         # one 15 mm square peg, 30 mm from shoulder
         peg_parameters=SimplePegParameters(
             shape=PegShape.SQUARE,
-            peg_positions=[(mm(30), Rational(0))],
+            peg_positions=[(mm(30), scalar(0))],
             size=mm(15),
         ),
     )

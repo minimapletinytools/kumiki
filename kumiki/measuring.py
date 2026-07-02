@@ -344,10 +344,10 @@ class DistanceFromCornerAlongEdge(Marking):
     def locate(self) -> Point:
         edge_line = locate_edge(self.timber, self.edge)
         if self.end == TimberEnd.TOP:
-            end_position = edge_line.point + edge_line.direction * (self.timber.length / Integer(2))
+            end_position = edge_line.point + edge_line.direction * (self.timber.length / scalar(2))
             into_direction = -self.timber.get_length_direction_global()
         else:
-            end_position = edge_line.point - edge_line.direction * (self.timber.length / Integer(2))
+            end_position = edge_line.point - edge_line.direction * (self.timber.length / scalar(2))
             into_direction = self.timber.get_length_direction_global()
         return Point(end_position + into_direction * self.distance)
 
@@ -567,7 +567,7 @@ def locate_into_face(distance: Numeric, face: SomeTimberFace, timber: PerfectTim
 
     return UnsignedPlane(timber.get_face_direction_global(face), point_on_plane)
 
-def locate_plane_from_edge_in_direction(timber: PerfectTimberWithin, edge: EdgeOrCenterline, direction: Direction3D, distance: Numeric = Integer(0)) -> Plane:
+def locate_plane_from_edge_in_direction(timber: PerfectTimberWithin, edge: EdgeOrCenterline, direction: Direction3D, distance: Numeric = scalar(0)) -> Plane:
     """
     Return a Plane that is parallel to the given edge, has `direction` as its
     normal, and sits `distance` away from the edge in that direction.
@@ -647,10 +647,10 @@ def mark_distance_from_corner_along_edge_by_intersecting_plane(plane: Union[Unsi
         edge_line = locate_edge(timber, edge)
 
     if end == TimberEnd.TOP:
-        end_position = edge_line.point + edge_line.direction * (timber.length / Integer(2))
+        end_position = edge_line.point + edge_line.direction * (timber.length / scalar(2))
         into_timber_direction = -timber.get_length_direction_global()
     else:  # BOTTOM
-        end_position = edge_line.point - edge_line.direction * (timber.length / Integer(2))
+        end_position = edge_line.point - edge_line.direction * (timber.length / scalar(2))
         into_timber_direction = timber.get_length_direction_global()
 
     numerator = safe_dot_product(plane.normal, (plane.point - end_position))
@@ -691,9 +691,9 @@ def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: 
         raise ValueError(f"Lines are parallel - no intersection exists")
 
     if end == TimberEnd.TOP:
-        edge_end_position = edge_line.point + edge_line.direction * (timber.length / Integer(2))
+        edge_end_position = edge_line.point + edge_line.direction * (timber.length / scalar(2))
     else:  # BOTTOM
-        edge_end_position = edge_line.point - edge_line.direction * (timber.length / Integer(2))
+        edge_end_position = edge_line.point - edge_line.direction * (timber.length / scalar(2))
     
     # Solve for closest points on two 3D lines using the standard formula
     # Line 1 (given line): line.point + s * line.direction
@@ -711,7 +711,7 @@ def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: 
     denominator = a * c - b * b
     
     if zero_test(denominator):
-        t = Rational(0)
+        t = scalar(0)
     else:
         t = (a * e - b * d) / denominator
 
