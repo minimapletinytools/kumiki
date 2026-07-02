@@ -109,7 +109,7 @@ def make_attach_face_aligned_timber_example():
         accessories=[]
     )
 
-def make_attach_face_aligned_timber_stickout_example(reference: StickoutReference):
+def make_attach_face_aligned_timber_stickout_example(reference: StickoutReference, stickout_length = feet(0)):
     """
     Two 4"x4" vertical posts 3' apart; a 4"x4" timber attached out of the first post's RIGHT
     face at mid-height and extended to the second (target) post, using the same
@@ -143,7 +143,7 @@ def make_attach_face_aligned_timber_stickout_example(reference: StickoutReferenc
     target_post = timber_from_directions(
         length=post_height,
         size=post_size,
-        bottom_position=create_v3(span, 1, 0),
+        bottom_position=create_v3(span, 0, 0),
         length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
         # rotated 45 degrees about its own axis
         width_direction=normalize_vector(create_v3(scalar(1), scalar(1), scalar(0))),
@@ -155,11 +155,61 @@ def make_attach_face_aligned_timber_stickout_example(reference: StickoutReferenc
         size=attached_size,
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
         attached_timber_length_or_target=target_post,
-        attached_timber_stickout=Stickout.symmetric(scalar(0), reference),
+        attached_timber_stickout=Stickout.symmetric(stickout_length, reference),
         # attach at mid-height
         original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
         length_position_measurement=feet(2),
         ticket=f"Attached_{reference.name}",
+    )
+
+    return Frame(
+        cut_timbers=[
+            CutTimber(post),
+            CutTimber(target_post),
+            CutTimber(attached),
+        ],
+        accessories=[]
+    )
+
+def make_attach_face_aligned_timber_target_projection_example():
+    """
+    this example demonstrates how `attached_timber_length_or_target` parameter functions when target is not in the same plane as the attached timber.
+    The target timber is projected on the attached timber's plane to determine the length of the attached timber.
+    """
+    post_size = create_v2(inches(4), inches(4))
+    post_height = feet(4)
+    attached_size = create_v2(inches(4), inches(4))
+    span = feet(3)
+
+    post = timber_from_directions(
+        length=post_height,
+        size=post_size,
+        bottom_position=create_v3(0, 0, 0),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        ticket="Post",
+    )
+
+    target_post = timber_from_directions(
+        length=post_height,
+        size=post_size,
+        bottom_position=create_v3(span, inches(8), 0),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        # rotated 45 degrees about its own axis
+        width_direction=normalize_vector(create_v3(scalar(1), scalar(1), scalar(0))),
+        ticket="Target_Post",
+    )
+
+    attached = attach_face_aligned_timber(
+        original_timber=post,
+        size=attached_size,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=target_post,
+        attached_timber_stickout=Stickout.nostickout(),
+        # attach at mid-height
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+        length_position_measurement=feet(2),
+        ticket="Attached_Timber",
     )
 
     return Frame(
@@ -365,6 +415,8 @@ patterns = [
     Pattern(path="construction/attach_face_aligned_timber/stickout/inside", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.INSIDE), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber/stickout/outside", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.OUTSIDE), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber/stickout/centerline", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_face_aligned_timber/stickout/centerline_with_stickout", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE, stickout_length=feet(1)), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_face_aligned_timber/make_attach_face_aligned_timber_target_projection_example", lambda_=lambda center: make_attach_face_aligned_timber_target_projection_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_plane_aligned_timber_brace", lambda_=lambda center: make_attach_plane_aligned_timber_brace_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_timber", lambda_=lambda center: make_attach_timber_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/footprint/vertical", lambda_=lambda center: make_footprint_vertical_example(), pattern_type='frame', tags=['main']),
