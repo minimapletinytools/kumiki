@@ -122,7 +122,7 @@ DONE-do setup vid
 DONE-consider removing the opposite_length or renaming it stickout in attach_timber functions
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
 
--reorg all mortise and tenon joint examples
+
 
 DONE-look into adding support for reference face/edge
   -add is_perfect_face/edge

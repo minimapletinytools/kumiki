@@ -391,12 +391,12 @@ def create_all_corner_joint_patterns(use_round_timbers=False) -> Frame:
 
 
 patterns = [
-    Pattern(path="corner_joints/cut_plain_miter_joint", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_example(center), name="Plain Miter Joint"), pattern_type='frame', tags=['main']),
-    Pattern(path="corner_joints/cut_plain_miter_joint_face_aligned", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_face_aligned_example(center), name="Plain Miter Joint (Face Aligned)"), pattern_type='frame'),
-    Pattern(path="corner_joints/cut_plain_miter_joint_3d", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_3d_angles_example(center), name="Plain Miter Joint (3D)"), pattern_type='frame'),
-    Pattern(path="corner_joints/cut_tongue_and_fork_corner_joint_90", lambda_=lambda center: Frame(cut_timbers=make_tongue_and_fork_corner_joint_90_example(center), name="Tongue and Fork Corner Joint 90°"), pattern_type='frame'),
-    Pattern(path="corner_joints/cut_tongue_and_fork_corner_joint_135", lambda_=lambda center: Frame(cut_timbers=make_tongue_and_fork_corner_joint_135_example(center), name="Tongue and Fork Corner Joint 135°"), pattern_type='frame'),
+    Pattern(path="corner_joints/plain_miter_joint/cut_plain_miter_joint", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_example(center), name="Plain Miter Joint"), pattern_type='frame', tags=['main']),
+    Pattern(path="corner_joints/plain_miter_joint/cut_plain_miter_joint_face_aligned", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_face_aligned_example(center), name="Plain Miter Joint (Face Aligned)"), pattern_type='frame'),
+    Pattern(path="corner_joints/plain_miter_joint/cut_plain_miter_joint_3d", lambda_=lambda center: Frame(cut_timbers=make_miter_joint_3d_angles_example(center), name="Plain Miter Joint (3D)"), pattern_type='frame'),
+    Pattern(path="corner_joints/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_90", lambda_=lambda center: Frame(cut_timbers=make_tongue_and_fork_corner_joint_90_example(center), name="Tongue and Fork Corner Joint 90°"), pattern_type='frame'),
+    Pattern(path="corner_joints/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_135", lambda_=lambda center: Frame(cut_timbers=make_tongue_and_fork_corner_joint_135_example(center), name="Tongue and Fork Corner Joint 135°"), pattern_type='frame'),
     Pattern(path="corner_joints/cut_plain_corner_lap_joint", lambda_=lambda center: Frame(cut_timbers=make_corner_lap_joint_example(center), name="Plain Corner Lap Joint"), pattern_type='frame'),
-    Pattern(path="corner_joints/cut_mitered_and_keyed_lap_joint_90", lambda_=make_pattern_from_frame(create_mitered_and_keyed_lap_joint_example), pattern_type='frame'),
-    Pattern(path="corner_joints/cut_mitered_and_keyed_lap_joint_130", lambda_=make_pattern_from_frame(create_mitered_and_keyed_lap_joint_130deg_example), pattern_type='frame'),
+    Pattern(path="corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_90", lambda_=make_pattern_from_frame(create_mitered_and_keyed_lap_joint_example), pattern_type='frame'),
+    Pattern(path="corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_130", lambda_=make_pattern_from_frame(create_mitered_and_keyed_lap_joint_130deg_example), pattern_type='frame'),
 ]
