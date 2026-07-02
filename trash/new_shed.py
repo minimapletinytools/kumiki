@@ -4,7 +4,7 @@ A creative variation with 6 sides and dramatic roof pitch!
 Built using the Kumiki API
 """
 
-from sympy import Rational, cos, sin, pi, sqrt
+from sympy import cos, sin, pi, sqrt
 from dataclasses import replace
 import sys
 sys.path.append('..')
@@ -53,7 +53,7 @@ def create_honeycomb_shed():
     
     footprint_corners = []
     for i in range(6):
-        angle = radians(Rational(i, 3) * pi)  # 60° increments
+        angle = radians(scalar(i, 3) * pi)  # 60° increments
         x = hex_radius * cos(angle)
         y = hex_radius * sin(angle)
         footprint_corners.append(create_v2(x, y))
@@ -144,7 +144,7 @@ def create_honeycomb_shed():
     # ============================================================================
     
     print("Creating post-mudsill mortise and tenon joints...")
-    tenon_size = Matrix([inches(2), inches(Rational(3, 2))])  # 2" x 1.5"
+    tenon_size = Matrix([inches(2), inches(3, 2)])  # 2" x 1.5"
     tenon_length = inches(3)
     mortise_depth = inches(3.5)
     
@@ -195,9 +195,9 @@ def create_honeycomb_shed():
             location_on_timber1=height_i,  # Top of post i
             stickout=beam_stickout,
             location_on_timber2=height_next,  # Top of post next
-            lateral_offset=Rational(0),
+            lateral_offset=0,
             size=ring_beam_size,
-            orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),  # Face up
+            orientation_width_vector=create_v3(0, 0, 1),  # Face up
             ticket=f"Ring Beam {i}"
         )
         ring_beams.append(ring_beam)
@@ -225,7 +225,7 @@ def create_honeycomb_shed():
     # ============================================================================
     
     print("Creating post-ring beam mortise and tenon joints...")
-    beam_tenon_size = Matrix([inches(2), inches(Rational(3, 2))])
+    beam_tenon_size = Matrix([inches(2), inches(3, 2)])
     beam_tenon_length = inches(3)
     beam_mortise_depth = inches(3.5)
     
@@ -264,18 +264,18 @@ def create_honeycomb_shed():
     
     print("Creating central hub post...")
     # Calculate center point (should be origin for regular hexagon)
-    center_point = create_v3(Rational(0), Rational(0), Rational(0))
+    center_point = create_v3(0, 0, 0)
     
     # Hub post is extra tall and thick
     hub_post_size = create_v2(inches(6), inches(6))  # 6" x 6"
-    hub_height = (post_front_height + post_back_height) / Rational(2) + inches(12)  # Average height + 12"
+    hub_height = (post_front_height + post_back_height) / 2 + inches(12)  # Average height + 12"
     
     hub_post = timber_from_directions(
         length=hub_height,
         size=hub_post_size,
         bottom_position=center_point,
-        length_direction=create_v3(Integer(0), Integer(0), Integer(1)),  # Vertical
-        width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+        length_direction=create_v3(0, 0, 1),  # Vertical
+        width_direction=create_v3(1, 0, 0),
         ticket="Central Hub Post"
     )
 
@@ -297,14 +297,14 @@ def create_honeycomb_shed():
         print(f"  Rafter {i}...")
         # Calculate position on hub post for this rafter
         # Rafters should meet at the hub at approximately the average height
-        hub_height_for_rafter = (post_front_height + post_back_height) / Rational(2)
+        hub_height_for_rafter = (post_front_height + post_back_height) / 2
         
         # Position on ring beam post
         post_height = post_front_height if i in front_corners else post_back_height
         
         # Create rafter from hub to post i top
         # We'll use a simple approach: create timber from hub to post top
-        rafter_stickout = Stickout(Rational(0), inches(12))  # 12" stickout at outer end
+        rafter_stickout = Stickout(0, inches(12))  # 12" stickout at outer end
         
         rafter = join_timbers(
             timber1=hub_post,
@@ -312,9 +312,9 @@ def create_honeycomb_shed():
             location_on_timber1=hub_height_for_rafter,
             stickout=rafter_stickout,
             location_on_timber2=post_height,
-            lateral_offset=Rational(0),
+            lateral_offset=0,
             size=rafter_size,
-            orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),  # Face up
+            orientation_width_vector=create_v3(0, 0, 1),  # Face up
             ticket=f"Radial Rafter {i}"
         )
         rafters.append(rafter)
@@ -336,7 +336,7 @@ def create_honeycomb_shed():
         
         # End at midpoint of ring beam
         ring_beam_length = ring_beams[i].length
-        brace_end_position = ring_beam_length / Rational(2)
+        brace_end_position = ring_beam_length / 2
         
         brace = join_timbers(
             timber1=posts[i],
@@ -344,9 +344,9 @@ def create_honeycomb_shed():
             location_on_timber1=brace_start_height,
             stickout=Stickout.nostickout(),
             location_on_timber2=brace_end_position,
-            lateral_offset=Rational(0),
+            lateral_offset=0,
             size=brace_size,
-            orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),
+            orientation_width_vector=create_v3(0, 0, 1),
             ticket=f"Knee Brace {i}"
         )
         braces.append(brace)
@@ -375,24 +375,24 @@ def create_honeycomb_shed():
         print(f"  Joist {i}...")
         # Each joist runs from the hub (bottom) to mudsill i
         # Position along mudsill at midpoint
-        mudsill_midpoint = mudsills[i].length / Rational(2)
+        mudsill_midpoint = mudsills[i].length / 2
         
         # Joists should be flush with top of mudsills
         mudsill_height = large_timber_size[0]
         joist_height = med_timber_size[0]
-        joist_offset = (mudsill_height - joist_height) / Rational(2)
+        joist_offset = (mudsill_height - joist_height) / 2
         
-        joist_stickout = Stickout(Rational(0), Rational(0))  # No stickout
+        joist_stickout = Stickout(0, 0)  # No stickout
         
         joist = join_timbers(
             timber1=hub_post,
             timber2=mudsills[i],
-            location_on_timber1=Rational(0),  # At bottom of hub
+            location_on_timber1=0,  # At bottom of hub
             stickout=joist_stickout,
             location_on_timber2=mudsill_midpoint,
             lateral_offset=joist_offset,
             size=joist_size,
-            orientation_width_vector=create_v3(Integer(0), Integer(0), Integer(1)),
+            orientation_width_vector=create_v3(0, 0, 1),
             ticket=f"Floor Joist {i}"
         )
         joists.append(joist)
@@ -405,8 +405,8 @@ def create_honeycomb_shed():
     # TEMPORARILY COMMENTED OUT - Testing if dovetail joints cause freeze
     joist_joints = []
     
-    # dovetail_shoulder_inset = inches(Rational(1, 2))
-    # dovetail_small_width = inches(Rational(3, 2))
+    # dovetail_shoulder_inset = inches(1, 2)
+    # dovetail_small_width = inches(3, 2)
     # dovetail_large_width = inches(2)
     # dovetail_length = inches(2)
     # dovetail_depth = inches(2)
@@ -424,7 +424,7 @@ def create_honeycomb_shed():
     #         dovetail_length=dovetail_length,
     #         dovetail_small_width=dovetail_small_width,
     #         dovetail_large_width=dovetail_large_width,
-    #         dovetail_lateral_offset=Rational(0),
+    #         dovetail_lateral_offset=0,
     #         dovetail_depth=dovetail_depth
     #     )
     #     joist_joints.append(joint)
@@ -457,9 +457,7 @@ def create_honeycomb_shed():
         name="Honeycomb Shed"
     )
 
-
 example = create_honeycomb_shed
-
 
 # ============================================================================
 # Main execution (when run as standalone script)
@@ -494,7 +492,7 @@ if __name__ == "__main__":
     print(f"Posts: 6 corner posts + 1 central hub post")
     print(f"  - Front 3 posts: {post_front_height} tall")
     print(f"  - Back 3 posts: {post_back_height} tall")
-    print(f"  - Central hub: {((post_front_height + post_back_height) / Rational(2) + inches(12))} tall")
+    print(f"  - Central hub: {((post_front_height + post_back_height) / 2 + inches(12))} tall")
     print(f"Ring Beams: 6 (forming hexagonal top ring with miter joints)")
     print(f"  - 6\" stickout on each end for dramatic overhang")
     print(f"Rafters: 6 radial rafters from central hub to corners")

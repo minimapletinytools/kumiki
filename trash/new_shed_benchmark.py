@@ -10,7 +10,6 @@ import sys
 import time
 from pathlib import Path
 
-
 def run_benchmark(num_runs: int = 3):
     """
     Run the benchmark multiple times and report statistics.
@@ -103,7 +102,6 @@ def run_benchmark(num_runs: int = 3):
             print(f"  Run {i}: {t:.2f}s")
     
     print("\n" + "=" * 60)
-
 
 if __name__ == "__main__":
     # Allow command-line argument for number of runs

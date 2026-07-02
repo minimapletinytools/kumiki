@@ -44,15 +44,15 @@ def _back_y_at_height(z_height: Numeric) -> Numeric:
 
 
 def _create_side_rails(origin: V3, x_offset: Numeric, side_label: str) -> tuple[Timber, Timber]:
-    apex_global = origin + create_v3(x_offset, Integer(0), ladder_height)
-    front_bottom_global = origin + create_v3(x_offset, -side_stringer_base_depth / 2, Integer(0))
-    back_bottom_global = origin + create_v3(x_offset, side_stringer_base_depth / 2, Integer(0))
+    apex_global = origin + create_v3(x_offset, 0, ladder_height)
+    front_bottom_global = origin + create_v3(x_offset, -side_stringer_base_depth / 2, 0)
+    back_bottom_global = origin + create_v3(x_offset, side_stringer_base_depth / 2, 0)
 
     front_length_direction = normalize_vector(apex_global - front_bottom_global)
     back_length_direction = normalize_vector(apex_global - back_bottom_global)
 
     # Width points out of the side-frame plane (X), keeping members plane-aligned in YZ.
-    width_direction = create_v3(Integer(1), Integer(0), Integer(0))
+    width_direction = create_v3(1, 0, 0)
 
     front_rail = timber_from_directions(
         length=ladder_height,
@@ -84,15 +84,15 @@ def _create_half_rung_between_parallel_stringers(
     pair_label: str,
 ) -> Timber:
     z_height = first_step_height + step_spacing * step_index
-    half_rung_length = side_frame_spacing / Rational(2) + step_tenon_length
+    half_rung_length = side_frame_spacing / 2 + step_tenon_length
 
     if from_left:
-        rung_bottom = origin + create_v3(-side_frame_spacing / Rational(2), y_position, z_height)
-        length_direction = create_v3(Integer(1), Integer(0), Integer(0))
+        rung_bottom = origin + create_v3(-side_frame_spacing / 2, y_position, z_height)
+        length_direction = create_v3(1, 0, 0)
         side_text = "Left"
     else:
-        rung_bottom = origin + create_v3(side_frame_spacing / Rational(2), y_position, z_height)
-        length_direction = create_v3(Integer(-1), Integer(0), Integer(0))
+        rung_bottom = origin + create_v3(side_frame_spacing / 2, y_position, z_height)
+        length_direction = create_v3(-1, 0, 0)
         side_text = "Right"
 
     return timber_from_directions(
@@ -111,10 +111,10 @@ def _create_half_rung_between_parallel_stringers(
 
 def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
     if origin is None:
-        origin = create_v3(Integer(0), Integer(0), Integer(0))
+        origin = create_v3(0, 0, 0)
 
-    left_x = -side_frame_spacing / Rational(2)
-    right_x = side_frame_spacing / Rational(2)
+    left_x = -side_frame_spacing / 2
+    right_x = side_frame_spacing / 2
 
     left_front_rail, left_back_rail = _create_side_rails(origin, left_x, "Left")
     right_front_rail, right_back_rail = _create_side_rails(origin, right_x, "Right")
@@ -194,8 +194,8 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,
             mortise_depth=step_tenon_length,
-            tenon_position=create_v2(Integer(0), Integer(0)),
-            mortise_shoulder_inset=Integer(0),
+            tenon_position=create_v2(0, 0),
+            mortise_shoulder_inset=0,
             peg_parameters=None,
         )
 
@@ -208,8 +208,8 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,
             mortise_depth=step_tenon_length,
-            tenon_position=create_v2(Integer(0), Integer(0)),
-            mortise_shoulder_inset=Integer(0),
+            tenon_position=create_v2(0, 0),
+            mortise_shoulder_inset=0,
             peg_parameters=None,
         )
 
@@ -222,8 +222,8 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,
             mortise_depth=step_tenon_length,
-            tenon_position=create_v2(Integer(0), Integer(0)),
-            mortise_shoulder_inset=Integer(0),
+            tenon_position=create_v2(0, 0),
+            mortise_shoulder_inset=0,
             peg_parameters=None,
         )
 
@@ -236,8 +236,8 @@ def create_ladder_frame(origin: Optional[V3] = None) -> Frame:
             tenon_size=step_tenon_size,
             tenon_length=step_tenon_length,
             mortise_depth=step_tenon_length,
-            tenon_position=create_v2(Integer(0), Integer(0)),
-            mortise_shoulder_inset=Integer(0),
+            tenon_position=create_v2(0, 0),
+            mortise_shoulder_inset=0,
             peg_parameters=None,
         )
 

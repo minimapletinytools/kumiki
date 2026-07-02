@@ -15,13 +15,12 @@ from kumiki import *
 def cut_basic_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     return cut_mitered_and_keyed_lap_joint(arrangement)
 
-
 # -----------------------------------------------------------------------------
 # Dimensions
 # -----------------------------------------------------------------------------
 
 shed_length = feet(4)
-shed_depth = feet(Rational(5, 2))
+shed_depth = feet(5, 2)
 wall_height = feet(2)
 roof_rise = inches(14)
 
@@ -39,19 +38,18 @@ post_to_mudsill_tenon_length = inches(1, 2)
 post_to_plate_tenon_size = create_v2(inches(1), inches(1))
 post_to_plate_tenon_length = inches(1)
 
-
 # -----------------------------------------------------------------------------
 # Timber creation helpers
 # -----------------------------------------------------------------------------
 
 def _create_base_frame(origin: V3) -> tuple[Timber, Timber, Timber, Timber]:
-    x_min = -shed_length / Rational(2)
-    x_max = shed_length / Rational(2)
-    y_min = -shed_depth / Rational(2)
-    y_max = shed_depth / Rational(2)
+    x_min = -shed_length / 2
+    x_max = shed_length / 2
+    y_min = -shed_depth / 2
+    y_max = shed_depth / 2
 
     base_front = create_axis_aligned_timber(
-        bottom_position=origin + create_v3(x_min, y_min, Integer(0)),
+        bottom_position=origin + create_v3(x_min, y_min, 0),
         length=shed_length,
         size=base_size,
         length_direction=TimberFace.RIGHT,
@@ -60,7 +58,7 @@ def _create_base_frame(origin: V3) -> tuple[Timber, Timber, Timber, Timber]:
     )
 
     base_back = create_axis_aligned_timber(
-        bottom_position=origin + create_v3(x_min, y_max, Integer(0)),
+        bottom_position=origin + create_v3(x_min, y_max, 0),
         length=shed_length,
         size=base_size,
         length_direction=TimberFace.RIGHT,
@@ -69,7 +67,7 @@ def _create_base_frame(origin: V3) -> tuple[Timber, Timber, Timber, Timber]:
     )
 
     base_left = create_axis_aligned_timber(
-        bottom_position=origin + create_v3(x_min, y_min, Integer(0)),
+        bottom_position=origin + create_v3(x_min, y_min, 0),
         length=shed_depth,
         size=base_size,
         length_direction=TimberFace.FRONT,
@@ -78,7 +76,7 @@ def _create_base_frame(origin: V3) -> tuple[Timber, Timber, Timber, Timber]:
     )
 
     base_right = create_axis_aligned_timber(
-        bottom_position=origin + create_v3(x_max, y_min, Integer(0)),
+        bottom_position=origin + create_v3(x_max, y_min, 0),
         length=shed_depth,
         size=base_size,
         length_direction=TimberFace.FRONT,
@@ -88,10 +86,9 @@ def _create_base_frame(origin: V3) -> tuple[Timber, Timber, Timber, Timber]:
 
     return base_front, base_back, base_left, base_right
 
-
 def _create_side_posts(origin: V3) -> list[Timber]:
-    x_positions = [-shed_length / Rational(2), Integer(0), shed_length / Rational(2)]
-    y_positions = [-shed_depth / Rational(2), shed_depth / Rational(2)]
+    x_positions = [-shed_length / 2, 0, shed_length / 2]
+    y_positions = [-shed_depth / 2, shed_depth / 2]
 
     posts: list[Timber] = []
     for y_pos in y_positions:
@@ -100,7 +97,7 @@ def _create_side_posts(origin: V3) -> list[Timber]:
             x_tag = "Left" if x_pos < 0 else ("Center" if x_pos == 0 else "Right")
             posts.append(
                 create_axis_aligned_timber(
-                    bottom_position=origin + create_v3(x_pos, y_pos, Integer(0)),
+                    bottom_position=origin + create_v3(x_pos, y_pos, 0),
                     length=wall_height,
                     size=post_size,
                     length_direction=TimberFace.TOP,
@@ -111,12 +108,11 @@ def _create_side_posts(origin: V3) -> list[Timber]:
 
     return posts
 
-
 def _create_top_plates(origin: V3) -> tuple[Timber, Timber]:
-    x_min = -shed_length / Rational(2)
+    x_min = -shed_length / 2
 
     plate_front = create_axis_aligned_timber(
-        bottom_position=origin + create_v3(x_min, -shed_depth / Rational(2), wall_height),
+        bottom_position=origin + create_v3(x_min, -shed_depth / 2, wall_height),
         length=shed_length,
         size=plate_size,
         length_direction=TimberFace.RIGHT,
@@ -125,7 +121,7 @@ def _create_top_plates(origin: V3) -> tuple[Timber, Timber]:
     )
 
     plate_back = create_axis_aligned_timber(
-        bottom_position=origin + create_v3(x_min, shed_depth / Rational(2), wall_height),
+        bottom_position=origin + create_v3(x_min, shed_depth / 2, wall_height),
         length=shed_length,
         size=plate_size,
         length_direction=TimberFace.RIGHT,
@@ -135,11 +131,10 @@ def _create_top_plates(origin: V3) -> tuple[Timber, Timber]:
 
     return plate_front, plate_back
 
-
 def _create_roof_rafters(origin: V3) -> list[Timber]:
-    x_min = -shed_length / Rational(2)
-    x_max = shed_length / Rational(2)
-    x_positions = [x_min, Integer(0), x_max]
+    x_min = -shed_length / 2
+    x_max = shed_length / 2
+    x_positions = [x_min, 0, x_max]
     x_labels = ["Left", "Center", "Right"]
 
     ridge_z = wall_height + roof_rise + rafter_lift
@@ -147,9 +142,9 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
 
     rafters: list[Timber] = []
     for x_pos, x_label in zip(x_positions, x_labels):
-        front_plate_point = origin + create_v3(x_pos, -shed_depth / Rational(2), plate_z)
-        back_plate_point = origin + create_v3(x_pos, shed_depth / Rational(2), plate_z)
-        ridge_point = origin + create_v3(x_pos, Integer(0), ridge_z)
+        front_plate_point = origin + create_v3(x_pos, -shed_depth / 2, plate_z)
+        back_plate_point = origin + create_v3(x_pos, shed_depth / 2, plate_z)
+        ridge_point = origin + create_v3(x_pos, 0, ridge_z)
 
         front_vec = ridge_point - front_plate_point
         back_vec = ridge_point - back_plate_point
@@ -163,7 +158,7 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
                 size=rafter_size,
                 bottom_position=front_bottom,
                 length_direction=normalize_vector(front_vec),
-                width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+                width_direction=create_v3(1, 0, 0),
                 ticket=f"SillyShed Front Rafter {x_label}",
             )
         )
@@ -174,13 +169,12 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
                 size=rafter_size,
                 bottom_position=back_bottom,
                 length_direction=normalize_vector(back_vec),
-                width_direction=create_v3(Integer(1), Integer(0), Integer(0)),
+                width_direction=create_v3(1, 0, 0),
                 ticket=f"SillyShed Back Rafter {x_label}",
             )
         )
 
     return rafters
-
 
 # -----------------------------------------------------------------------------
 # Joint helpers
@@ -193,14 +187,12 @@ def _find_post(posts: list[Timber], side: str, x_tag: str) -> Timber:
             return post
     raise ValueError(f"Post not found: {target_name}")
 
-
 def _find_rafter(rafters: list[Timber], side: str, x_tag: str) -> Timber:
     target_name = f"SillyShed {side} Rafter {x_tag}"
     for rafter in rafters:
         if rafter.ticket.name == target_name:
             return rafter
     raise ValueError(f"Rafter not found: {target_name}")
-
 
 def _build_joints(
     base_front: Timber,
@@ -257,7 +249,7 @@ def _build_joints(
                     tenon_size=post_to_mudsill_tenon_size,
                     tenon_length=post_to_mudsill_tenon_length,
                     mortise_depth=post_to_mudsill_tenon_length,
-                    tenon_position=create_v2(Integer(0), Integer(0)),
+                    tenon_position=create_v2(0, 0),
                 )
             )
 
@@ -275,7 +267,7 @@ def _build_joints(
                     tenon_size=post_to_plate_tenon_size,
                     tenon_length=post_to_plate_tenon_length,
                     mortise_depth=post_to_plate_tenon_length,
-                    tenon_position=create_v2(Integer(0), Integer(0)),
+                    tenon_position=create_v2(0, 0),
                 )
             )
 
@@ -300,14 +292,13 @@ def _build_joints(
 
     return joints
 
-
 # -----------------------------------------------------------------------------
 # Main builder
 # -----------------------------------------------------------------------------
 
 def create_sillyshed_frame(origin: Optional[V3] = None) -> Frame:
     if origin is None:
-        origin = create_v3(Integer(0), Integer(0), Integer(0))
+        origin = create_v3(0, 0, 0)
 
     base_front, base_back, base_left, base_right = _create_base_frame(origin)
     posts = _create_side_posts(origin)
@@ -327,9 +318,7 @@ def create_sillyshed_frame(origin: Optional[V3] = None) -> Frame:
 
     return Frame.from_joints(joints=joints, name="Silly Shed Frame")
 
-
 def create_all_sillyshed_examples() -> Frame:
     return create_sillyshed_frame()
-
 
 example = create_all_sillyshed_examples

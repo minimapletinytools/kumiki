@@ -8,17 +8,14 @@ Layout summary:
 - Hallway: 8m long with 8 total posts (2 shared with the fence).
 """
 
-from sympy import Rational
 from typing import Optional
 
 from kumiki import *
-
 
 # Timber sizes (metric)
 post_size = Matrix([cm(10), cm(10)])
 beam_size = Matrix([cm(10), cm(15)])
 plate_size = Matrix([cm(10), cm(15)])
-
 
 # Overall dimensions
 fence_width = m(5)
@@ -27,8 +24,7 @@ rear_support_offset = cm(50)
 
 regular_post_height = m(2)
 entry_post_height = m(3)
-rear_support_post_height = regular_post_height / Rational(2)
-
+rear_support_post_height = regular_post_height / 2
 
 # Beam height offsets
 fence_beam_bottom_z = cm(10)
@@ -51,24 +47,22 @@ roof_front_back_run = cm(90)
 roof_rise = cm(40)
 
 beam_tenon_size = Matrix([cm(4), cm(4)])
-beam_tenon_length_into_post = post_size[0] / Rational(2)
+beam_tenon_length_into_post = post_size[0] / 2
 post_tenon_size = Matrix([cm(4), cm(4)])
-post_tenon_length_into_plate = plate_size[0] / Rational(2)
-
+post_tenon_length_into_plate = plate_size[0] / 2
 
 def _offset_position(x: Numeric, y: Numeric, z: Numeric, center: V3) -> V3:
     return create_v3(center[0] + x, center[1] + y, center[2] + z)
 
-
 def create_gateway(center: Optional[V3] = None) -> Frame:
     if center is None:
-        center = create_v3(Rational(0), Rational(0), Rational(0))
+        center = create_v3(0, 0, 0)
 
     one_meter = m(1)
-    zero = Rational(0)
+    zero = 0
 
     # Fence front posts: x=0..5m, y=0
-    front_fence_x_positions = [one_meter * Rational(i) for i in range(6)]
+    front_fence_x_positions = [one_meter * scalar(i) for i in range(6)]
 
     # Entrance posts are the two middle fence posts (index 2 and 3)
     entry_left_x = front_fence_x_positions[2]
@@ -109,9 +103,9 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
 
     # Hallway has 8 total posts; 2 are shared with the entry posts.
     # Use 4 rows (2 posts each) across y=0..-8m.
-    hallway_row_count = Rational(4)
-    hallway_step = hallway_length / (hallway_row_count - Rational(1))
-    hallway_row_y_positions = [-(hallway_step * Rational(i)) for i in range(4)]
+    hallway_row_count = 4
+    hallway_step = hallway_length / (hallway_row_count - 1)
+    hallway_row_y_positions = [-(hallway_step * scalar(i)) for i in range(4)]
 
     hallway_left_x = entry_left_x
     hallway_right_x = entry_right_x
@@ -185,7 +179,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
             fence_top_outer_plate_segments.append(
                 create_axis_aligned_timber(
                     bottom_position=_offset_position(x_start - outer_fence_top_plate_overhang, zero, regular_post_height, center),
-                    length=segment_length + outer_fence_top_plate_overhang * Rational(2),
+                    length=segment_length + outer_fence_top_plate_overhang * 2,
                     size=plate_size,
                     length_direction=TimberFace.RIGHT,
                     width_direction=TimberFace.FRONT,
@@ -299,7 +293,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
 
     entry_top_plate = create_axis_aligned_timber(
         bottom_position=_offset_position(entry_left_x - entry_top_plate_overhang, zero, entry_plate_z, center),
-        length=(entry_right_x - entry_left_x) + entry_top_plate_overhang * Rational(2),
+        length=(entry_right_x - entry_left_x) + entry_top_plate_overhang * 2,
         size=plate_size,
         length_direction=TimberFace.RIGHT,
         width_direction=TimberFace.FRONT,
@@ -358,12 +352,12 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         ticket="Roof Back Eave Plate",
     )
 
-    roof_rafter_x_positions = [roof_left_x, (entry_left_x + entry_right_x) / Rational(2), roof_right_x]
+    roof_rafter_x_positions = [roof_left_x, (entry_left_x + entry_right_x) / 2, roof_right_x]
     roof_front_rafters = []
     roof_back_rafters = []
     for rafter_index, rafter_x in enumerate(roof_rafter_x_positions, start=1):
-        front_vec = create_v3(Rational(0), roof_front_y, roof_eave_z - roof_ridge_z)
-        back_vec = create_v3(Rational(0), roof_back_y, roof_eave_z - roof_ridge_z)
+        front_vec = create_v3(0, roof_front_y, roof_eave_z - roof_ridge_z)
+        back_vec = create_v3(0, roof_back_y, roof_eave_z - roof_ridge_z)
 
         roof_front_rafters.append(
             create_timber(
@@ -371,7 +365,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
                 length=vector_magnitude(front_vec),
                 size=beam_size,
                 length_direction=normalize_vector(front_vec),
-                width_direction=create_v3(Rational(1), Rational(0), Rational(0)),
+                width_direction=create_v3(1, 0, 0),
                 ticket=f"Roof Front Rafter {rafter_index}",
             )
         )
@@ -381,7 +375,7 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
                 length=vector_magnitude(back_vec),
                 size=beam_size,
                 length_direction=normalize_vector(back_vec),
-                width_direction=create_v3(Rational(1), Rational(0), Rational(0)),
+                width_direction=create_v3(1, 0, 0),
                 ticket=f"Roof Back Rafter {rafter_index}",
             )
         )
@@ -396,14 +390,14 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
     for brace_x, brace_y, brace_name in brace_specs:
         brace_start_z = roof_base_z + roof_support_height - cm(5)
         brace_end_z = roof_eave_z + cm(5)
-        brace_vec = create_v3(Rational(0), brace_y, brace_end_z - brace_start_z)
+        brace_vec = create_v3(0, brace_y, brace_end_z - brace_start_z)
         roof_braces.append(
             create_timber(
                 bottom_position=_offset_position(brace_x, zero, brace_start_z, center),
                 length=vector_magnitude(brace_vec),
                 size=Matrix([cm(8), cm(8)]),
                 length_direction=normalize_vector(brace_vec),
-                width_direction=create_v3(Rational(1), Rational(0), Rational(0)),
+                width_direction=create_v3(1, 0, 0),
                 ticket=brace_name,
             )
         )
@@ -556,15 +550,12 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         name="Gateway",
     )
 
-
 example = create_gateway
-
 
 def main() -> Frame:
     frame = create_gateway()
     print(f"Created '{frame.name}' with {len(frame.cut_timbers)} timbers")
     return frame
-
 
 if __name__ == "__main__":
     main()
