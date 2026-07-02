@@ -89,8 +89,8 @@ def make_attach_face_aligned_timber_example():
         original_timber=post,
         size=beam_size,
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-        attached_timber_length=feet(4),
-        attached_timber_opposite_length=feet(2),
+        attached_timber_length_or_target=feet(4),
+        attached_timber_stickout=Stickout(feet(2)),
         # position 48" up from the bottom, measured to the beam centerline
         original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
         length_position_measurement=feet(2),
@@ -105,6 +105,68 @@ def make_attach_face_aligned_timber_example():
         cut_timbers=[
             CutTimber(post),
             CutTimber(beam),
+        ],
+        accessories=[]
+    )
+
+def make_attach_face_aligned_timber_stickout_example(reference: StickoutReference):
+    """
+    Two 4"x4" vertical posts 3' apart; a 4"x4" timber attached out of the first post's RIGHT
+    face at mid-height and extended to the second (target) post, using the same
+    StickoutReference on both ends (stickout values 0):
+
+    - CENTER_LINE: runs from the first post's centerline to the target's centerline
+    - INSIDE: spans just between the two posts (flush with the first post's RIGHT face,
+      touching the near boundary of the target's silhouette)
+    - OUTSIDE: passes through both posts (flush with the first post's LEFT face, touching the
+      far boundary of the target's silhouette)
+
+    The target post sits in the plane the attached timber extends into, but is rotated 45
+    degrees about its own vertical axis: its INSIDE/OUTSIDE references are therefore the
+    projected corner edges of its silhouette, which the attached timber's centerline just
+    touches.
+    """
+    post_size = create_v2(inches(4), inches(4))
+    post_height = feet(4)
+    attached_size = create_v2(inches(4), inches(4))
+    span = feet(3)
+
+    post = timber_from_directions(
+        length=post_height,
+        size=post_size,
+        bottom_position=create_v3(0, 0, 0),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        ticket="Post",
+    )
+
+    target_post = timber_from_directions(
+        length=post_height,
+        size=post_size,
+        bottom_position=create_v3(span, 1, 0),
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
+        # rotated 45 degrees about its own axis
+        width_direction=normalize_vector(create_v3(scalar(1), scalar(1), scalar(0))),
+        ticket="Target_Post",
+    )
+
+    attached = attach_face_aligned_timber(
+        original_timber=post,
+        size=attached_size,
+        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+        attached_timber_length_or_target=target_post,
+        attached_timber_stickout=Stickout.symmetric(scalar(0), reference),
+        # attach at mid-height
+        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+        length_position_measurement=feet(2),
+        ticket=f"Attached_{reference.name}",
+    )
+
+    return Frame(
+        cut_timbers=[
+            CutTimber(post),
+            CutTimber(target_post),
+            CutTimber(attached),
         ],
         accessories=[]
     )
@@ -135,7 +197,7 @@ def make_attach_face_aligned_timber_flush_example():
         original_timber=post,
         size=attached_size,
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-        attached_timber_length=feet(3),
+        attached_timber_length_or_target=feet(3),
         # length: the attached timber's RIGHT face is flush (0") with the post's TOP end
         original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
         attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.RIGHT,
@@ -179,7 +241,7 @@ def make_attach_plane_aligned_timber_brace_example():
         size=brace_size,
         original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
         attached_timber_angle=pi / 4,  # 45 degrees up-and-out
-        attached_timber_length=feet(3),
+        attached_timber_length_or_target=feet(3),
         original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
         length_position_measurement=inches(24),
         ticket="Brace",
@@ -300,6 +362,9 @@ patterns = [
     Pattern(path="construction/join_face_aligned_on_face_aligned_timbers", lambda_=lambda center: make_join_face_aligned_on_face_aligned_timbers_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber", lambda_=lambda center: make_attach_face_aligned_timber_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_face_aligned_timber_flush", lambda_=lambda center: make_attach_face_aligned_timber_flush_example(), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_face_aligned_timber/stickout/inside", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.INSIDE), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_face_aligned_timber/stickout/outside", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.OUTSIDE), pattern_type='frame', tags=['main']),
+    Pattern(path="construction/attach_face_aligned_timber/stickout/centerline", lambda_=lambda center: make_attach_face_aligned_timber_stickout_example(StickoutReference.CENTER_LINE), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_plane_aligned_timber_brace", lambda_=lambda center: make_attach_plane_aligned_timber_brace_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/attach_timber", lambda_=lambda center: make_attach_timber_example(), pattern_type='frame', tags=['main']),
     Pattern(path="construction/footprint/vertical", lambda_=lambda center: make_footprint_vertical_example(), pattern_type='frame', tags=['main']),

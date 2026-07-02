@@ -1795,7 +1795,7 @@ class TestAttachFaceAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
+            attached_timber_length_or_target=scalar(5),
             ticket="Beam",
         )
         # length runs out the RIGHT (+X) face of the post
@@ -1814,7 +1814,7 @@ class TestAttachFaceAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
+            attached_timber_length_or_target=scalar(5),
             length_position_measurement=scalar(4),
             original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,
             attached_timber_long_face_to_measure_to_for_lateral_position=TimberCenterline.CENTERLINE,
@@ -1830,8 +1830,8 @@ class TestAttachFaceAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
-            attached_timber_opposite_length=scalar(1),
+            attached_timber_length_or_target=scalar(5),
+            attached_timber_stickout=Stickout(scalar(1)),
         )
         assert simplify(beam.length - scalar(6)) == 0
         # bottom end (toward the original) is 1 on the far side of the post centerline
@@ -1843,8 +1843,8 @@ class TestAttachFaceAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
-            attached_timber_opposite_length=scalar(1),
+            attached_timber_length_or_target=scalar(5),
+            attached_timber_stickout=Stickout(scalar(1)),
             attached_timber_end_that_points_towards_original_timber=TimberEnd.TOP,
         )
         assert simplify(beam.length - scalar(6)) == 0
@@ -1860,7 +1860,7 @@ class TestAttachFaceAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
+            attached_timber_length_or_target=scalar(5),
             length_position_measurement=scalar(4),
             attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.LEFT,
         )
@@ -1878,7 +1878,7 @@ class TestAttachFaceAlignedTimber:
                 original_timber=post,
                 size=create_v2(scalar(2), scalar(3)),
                 original_timber_long_face_that_attached_timber_points_to=face,
-                attached_timber_length=scalar(5),
+                attached_timber_length_or_target=scalar(5),
             )
             assert are_timbers_face_aligned(post, beam), f"not face aligned for {face}"
             # the beam points out of the chosen face
@@ -1894,7 +1894,7 @@ class TestAttachFaceAlignedTimber:
                 original_timber=post,
                 size=create_v2(scalar(2), scalar(3)),
                 original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-                attached_timber_length=scalar(5),
+                attached_timber_length_or_target=scalar(5),
                 # RIGHT face normal is the attach axis, not a lateral face
                 original_timber_face_to_measure_from_for_lateral_position=TimberFace.RIGHT,
                 lateral_position_measurement=scalar(1),
@@ -1909,7 +1909,7 @@ class TestAttachFaceAlignedTimber:
                 original_timber=post,
                 size=create_v2(scalar(2), scalar(3)),
                 original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-                attached_timber_length=scalar(5),
+                attached_timber_length_or_target=scalar(5),
                 # length-face on the width axis -> wants width along the post length...
                 attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.RIGHT,
                 length_position_measurement=scalar(4),
@@ -1925,7 +1925,7 @@ class TestAttachFaceAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
+            attached_timber_length_or_target=scalar(5),
             attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.FRONT,
         )
         self._assert_v3(beam_fb.get_width_direction_global(), 0, 0, 1)
@@ -1934,13 +1934,159 @@ class TestAttachFaceAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
+            attached_timber_length_or_target=scalar(5),
             attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.RIGHT,
         )
         self._assert_v3(beam_rl.get_width_direction_global(), 0, -1, 0)
         # both remain face-aligned with the post regardless of the chosen orientation
         assert are_timbers_face_aligned(post, beam_fb)
         assert are_timbers_face_aligned(post, beam_rl)
+
+    def _make_far_post(self):
+        # A second vertical 2x2 post with its centerline at x=10: faces at x=9 and x=11.
+        return timber_from_directions(
+            length=scalar(10),
+            size=create_v2(scalar(2), scalar(2)),
+            bottom_position=create_v3(10, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="FarPost",
+        )
+
+    def test_extend_to_target_references(self, symbolic_mode):
+        # a target timber instead of a numeric length: stickoutReference2 picks which feature
+        # of the target the beam extends to
+        post = self._make_post()
+        far_post = self._make_far_post()
+        for ref2, end_x in [
+            (StickoutReference.CENTER_LINE, scalar(10)),
+            (StickoutReference.INSIDE, scalar(9)),   # near face, facing back at the post
+            (StickoutReference.OUTSIDE, scalar(11)), # far face, flush through the far post
+        ]:
+            beam = attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(scalar(2), scalar(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length_or_target=far_post,
+                attached_timber_stickout=Stickout(scalar(0), scalar(0), StickoutReference.CENTER_LINE, ref2),
+            )
+            # starts at the post centerline and ends on the far post's reference feature
+            self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
+            assert simplify(beam.length - end_x) == 0, f"length for {ref2}: got {beam.length}, expected {end_x}"
+
+    def test_extend_to_target_with_stickout2(self, symbolic_mode):
+        post = self._make_post()
+        far_post = self._make_far_post()
+        beam = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(scalar(2), scalar(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length_or_target=far_post,
+            attached_timber_stickout=Stickout(scalar(0), scalar(1), StickoutReference.CENTER_LINE, StickoutReference.INSIDE),
+        )
+        # 1 beyond the far post's near face at x=9
+        self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
+        assert simplify(beam.length - scalar(10)) == 0
+
+    def test_stickout1_references(self, symbolic_mode):
+        # stickoutReference1 picks which feature of the original timber the start end sits on
+        post = self._make_post()
+        for ref1, start_x in [
+            (StickoutReference.CENTER_LINE, scalar(0)),
+            (StickoutReference.INSIDE, scalar(1)),   # flush with the RIGHT face the beam points out of
+            (StickoutReference.OUTSIDE, scalar(-1)), # flush with the LEFT face, passing through the post
+        ]:
+            beam = attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(scalar(2), scalar(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length_or_target=scalar(5),
+                attached_timber_stickout=Stickout(scalar(0), scalar(0), ref1, StickoutReference.CENTER_LINE),
+            )
+            self._assert_v3(beam.get_bottom_position_global(), start_x, 0, 0)
+            assert simplify(beam.length - (scalar(5) - start_x)) == 0, f"length for {ref1}: got {beam.length}"
+
+    def test_stickout1_extends_beyond_reference(self, symbolic_mode):
+        post = self._make_post()
+        beam = attach_face_aligned_timber(
+            original_timber=post,
+            size=create_v2(scalar(2), scalar(3)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_length_or_target=scalar(5),
+            attached_timber_stickout=Stickout(scalar(1, 2), scalar(0), StickoutReference.INSIDE, StickoutReference.CENTER_LINE),
+        )
+        # half a unit back from the RIGHT face at x=1
+        self._assert_v3(beam.get_bottom_position_global(), scalar(1, 2), 0, 0)
+        assert simplify(beam.length - scalar(9, 2)) == 0
+
+    def test_extend_to_rotated_target(self, symbolic_mode):
+        # a target post rotated 45 degrees about its own axis: INSIDE/OUTSIDE reference the
+        # near/far corner edges of its projected silhouette rather than its (diagonal) faces
+        post = self._make_post()
+        rotated_post = timber_from_directions(
+            length=scalar(10),
+            size=create_v2(scalar(2), scalar(2)),
+            bottom_position=create_v3(10, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=normalize_vector(create_v3(1, 1, 0)),
+            ticket="RotatedPost",
+        )
+        for ref2, end_x in [
+            (StickoutReference.CENTER_LINE, scalar(10)),
+            (StickoutReference.INSIDE, 10 - sqrt(2)),   # near corner edge of the silhouette
+            (StickoutReference.OUTSIDE, 10 + sqrt(2)),  # far corner edge of the silhouette
+        ]:
+            beam = attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(scalar(2), scalar(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length_or_target=rotated_post,
+                attached_timber_stickout=Stickout(scalar(0), scalar(0), StickoutReference.CENTER_LINE, ref2),
+            )
+            self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
+            assert simplify(beam.length - end_x) == 0, f"length for {ref2}: got {beam.length}, expected {end_x}"
+
+    def test_extend_to_target_parallel_to_lateral_axis(self, symbolic_mode):
+        # a target timber running along Y (parallel to the lateral axis t): its centerline
+        # projects to a single *point* on the attachment plane, which is dropped perpendicularly
+        # onto the attached timber's length axis
+        post = self._make_post()
+        cross_beam = timber_from_directions(
+            length=scalar(10),
+            size=create_v2(scalar(2), scalar(2)),
+            bottom_position=create_v3(7, -5, 3),  # centerline: x=7, z=3, running along +Y
+            length_direction=create_v3(0, 1, 0),
+            width_direction=create_v3(1, 0, 0),
+            ticket="CrossBeam",
+        )
+        for ref2, end_x in [
+            (StickoutReference.CENTER_LINE, scalar(7)),
+            (StickoutReference.INSIDE, scalar(6)),   # near boundary of the projected cross-section
+            (StickoutReference.OUTSIDE, scalar(8)),  # far boundary of the projected cross-section
+        ]:
+            beam = attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(scalar(2), scalar(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length_or_target=cross_beam,
+                attached_timber_stickout=Stickout(scalar(0), scalar(0), StickoutReference.CENTER_LINE, ref2),
+            )
+            # the cross beam's z-offset (3) is irrelevant: the projected point is dropped
+            # perpendicularly onto the attached centerline, which runs along +X at z=0
+            self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
+            assert simplify(beam.length - end_x) == 0, f"length for {ref2}: got {beam.length}, expected {end_x}"
+
+    def test_numeric_length_ignores_stickout2_with_warning(self, symbolic_mode):
+        post = self._make_post()
+        with pytest.warns(UserWarning):
+            beam = attach_face_aligned_timber(
+                original_timber=post,
+                size=create_v2(scalar(2), scalar(3)),
+                original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+                attached_timber_length_or_target=scalar(5),
+                attached_timber_stickout=Stickout(scalar(0), scalar(2)),
+            )
+        assert simplify(beam.length - scalar(5)) == 0
 
 
 class TestAttachPlaneAlignedTimber:
@@ -1968,8 +2114,8 @@ class TestAttachPlaneAlignedTimber:
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-            attached_timber_length=scalar(5),
-            attached_timber_opposite_length=scalar(1),
+            attached_timber_length_or_target=scalar(5),
+            attached_timber_stickout=Stickout(scalar(1)),
             length_position_measurement=scalar(4),
             original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,
             attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.BACK,
@@ -1993,7 +2139,7 @@ class TestAttachPlaneAlignedTimber:
             size=create_v2(scalar(2), scalar(2)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
             attached_timber_angle=pi / 4,
-            attached_timber_length=scalar(6),
+            attached_timber_length_or_target=scalar(6),
         )
         ld = brace.get_length_direction_global()
         assert simplify(ld[0] - ld[2]) == 0      # equal +X and +Z components
@@ -2010,7 +2156,7 @@ class TestAttachPlaneAlignedTimber:
             size=create_v2(scalar(2), scalar(2)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
             attached_timber_angle=pi / 4,
-            attached_timber_length=scalar(6),
+            attached_timber_length_or_target=scalar(6),
         )
         bottom = attach_plane_aligned_timber(
             attached_timber_end_that_points_towards_original_timber=TimberEnd.BOTTOM, **kw)
@@ -2019,6 +2165,59 @@ class TestAttachPlaneAlignedTimber:
         lb, lt = bottom.get_length_direction_global(), top.get_length_direction_global()
         # the two length directions are exact opposites
         self._assert_v3(lb, -lt[0], -lt[1], -lt[2])
+
+    def test_extend_to_target_centerline_at_angle(self, symbolic_mode):
+        # a 45-degree brace out the RIGHT face, extended to a second post's centerline at x=10:
+        # the far-end centerline point must land exactly on that centerline (projected onto the
+        # attachment plane)
+        post = self._make_post()
+        far_post = timber_from_directions(
+            length=scalar(10),
+            size=create_v2(scalar(2), scalar(2)),
+            bottom_position=create_v3(10, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="FarPost",
+        )
+        brace = attach_plane_aligned_timber(
+            original_timber=post,
+            size=create_v2(scalar(2), scalar(2)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_angle=pi / 4,
+            attached_timber_length_or_target=far_post,
+        )
+        # the default length-position pins the brace *center* at the post-bottom height (z=0),
+        # so the brace runs from (0,0,-5) on the post centerline to (10,0,5) on the far post's
+        assert simplify(brace.length - 10 * sqrt(2)) == 0
+        self._assert_v3(brace.get_bottom_position_global(), 0, 0, -5)
+        self._assert_v3(locate_top_center_position(brace).position, 10, 0, 5)
+
+    def test_extend_to_target_couples_with_center_positioning(self, symbolic_mode):
+        # extending at an angle to a *horizontal* target makes the touch condition depend on the
+        # solved length itself (the length-position measurement pins the brace center, which
+        # moves as the length grows): the far-end centerline point must still land exactly on
+        # the target centerline height
+        post = self._make_post()
+        beam_above = timber_from_directions(
+            length=scalar(40),
+            size=create_v2(scalar(2), scalar(2)),
+            bottom_position=create_v3(0, 0, 15),
+            length_direction=create_v3(1, 0, 0),
+            width_direction=create_v3(0, 0, 1),
+            ticket="BeamAbove",
+        )
+        brace = attach_plane_aligned_timber(
+            original_timber=post,
+            size=create_v2(scalar(2), scalar(2)),
+            original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
+            attached_timber_angle=pi / 4,
+            attached_timber_length_or_target=beam_above,
+        )
+        # brace center pinned at z=0 (default length-position) with its far end touching z=15
+        # forces a span from (0,0,-15) to (30,0,15)
+        self._assert_v3(locate_top_center_position(brace).position, 30, 0, 15)
+        self._assert_v3(brace.get_bottom_position_global(), 0, 0, -15)
+        assert simplify(brace.length - 30 * sqrt(2)) == 0
 
 
 class TestAttachTimber:
