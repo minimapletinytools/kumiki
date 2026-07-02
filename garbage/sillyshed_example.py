@@ -183,14 +183,14 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
 def _find_post(posts: list[Timber], side: str, x_tag: str) -> Timber:
     target_name = f"SillyShed Post {side} {x_tag}"
     for post in posts:
-        if post.ticket.name == target_name:
+        if post.ticket.path == target_name:
             return post
     raise ValueError(f"Post not found: {target_name}")
 
 def _find_rafter(rafters: list[Timber], side: str, x_tag: str) -> Timber:
     target_name = f"SillyShed {side} Rafter {x_tag}"
     for rafter in rafters:
-        if rafter.ticket.name == target_name:
+        if rafter.ticket.path == target_name:
             return rafter
     raise ValueError(f"Rafter not found: {target_name}")
 

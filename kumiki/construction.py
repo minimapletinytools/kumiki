@@ -520,8 +520,8 @@ def split_timber(
         f"Split distance {distance_from_bottom} must be between 0 and {timber.length}"
     
     # Determine tickets for the split timbers
-    bottom_ticket = ticket1 if ticket1 is not None else f"{timber.ticket.name}_bottom"
-    top_ticket = ticket2 if ticket2 is not None else f"{timber.ticket.name}_top"
+    bottom_ticket = ticket1 if ticket1 is not None else f"{timber.ticket.path}/bottom"
+    top_ticket = ticket2 if ticket2 is not None else f"{timber.ticket.path}/top"
     
     # Create first timber (bottom part)
     bottom_timber = timber_from_directions(

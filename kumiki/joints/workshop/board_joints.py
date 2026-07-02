@@ -254,8 +254,8 @@ def cut_tongue_and_groove_joint(
 
     return Joint(
         cuttings={
-            tongue_board.ticket.name: tongue_cutting,
-            groove_board.ticket.name: groove_cutting,
+            tongue_board.ticket.path: tongue_cutting,
+            groove_board.ticket.path: groove_cutting,
         },
         ticket=JointTicket(joint_type="tongue_and_groove"),
     )
@@ -313,7 +313,7 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
     for t in all_frame_timbers:
         assert are_timbers_face_aligned(t, ref), (
             f"all frame timbers must be face-aligned with the boards, "
-            f"but timber '{t.ticket.name}' is not"
+            f"but timber '{t.ticket.path}' is not"
         )
 
     # Compute the bounding box of all boards in the reference board's local frame.
@@ -377,7 +377,7 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
         groove_in_timber_local = adopt_csg(
             ref.transform, timber.transform, groove_prism_ref_local
         )
-        cuttings[timber.ticket.name] = Cutting(
+        cuttings[timber.ticket.path] = Cutting(
             timber=timber,
             negative_csg=groove_in_timber_local,
             label="board_in_grooved_frame",
@@ -385,7 +385,7 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
 
     # Include boards as uncut members so the returned joint can form a complete frame.
     for board in boards:
-        cuttings[board.ticket.name] = Cutting(
+        cuttings[board.ticket.path] = Cutting(
             timber=board,
             negative_csg=None,
             label="board_in_grooved_frame",

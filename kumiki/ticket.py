@@ -1,8 +1,9 @@
 """Ticket system for hierarchical naming and metadata.
 
 Tickets are immutable labels that can be attached to timbers, joints, accessories,
-and feature concepts. The base class contains shared hierarchy behavior and
-subclasses represent concrete ticket categories.
+and feature concepts. The path field encodes hierarchy using '/' as a separator,
+e.g. "posts/frontleft" or "door/boards/1". Folders are implicit in the path and
+will be rendered as actual folders in the layer view.
 """
 
 from abc import ABC, abstractmethod
@@ -25,17 +26,20 @@ class Ticket(ABC):
     """Base ticket shared by all ticket categories.
 
     The category is represented by the concrete subclass rather than an enum field.
+
+    path: hierarchical identifier using '/' as separator.
+          e.g. "posts/frontleft", "door/boards/1"
+          The last segment is the display name; preceding segments are folder names.
     """
 
-    name: str = "[no-name]"
-    parent: Optional["Ticket"] = None
+    path: str = "[no-name]"
     # Runtime-only identifier for the Kumiki viewer. It has no meaning outside
     # the viewer runtime and should not be used as persistent data.
     kumiki_id: int = field(default_factory=_next_kumiki_id, init=False, compare=False, repr=False)
 
-@dataclass(frozen=True)
-class FolderTicket(Ticket):
-    """Ticket that represents a grouping node in the hierarchy."""
+    def get_name(self) -> str:
+        """Return the display name: the last segment of the path."""
+        return self.path.rsplit("/", 1)[-1]
 
 
 @dataclass(frozen=True)

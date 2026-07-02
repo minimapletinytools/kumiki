@@ -2410,7 +2410,7 @@ class TestCSGNaming:
             size=Matrix([scalar(4), scalar(6)]),
             length=scalar(100),
             transform=Transform.identity(),
-            ticket=TimberTicket(name="test_timber"),
+            ticket=TimberTicket(path="test_timber"),
         )
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(50))
         cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=hs.offset, label="my_joint")
@@ -2426,7 +2426,7 @@ class TestCSGNaming:
             size=Matrix([scalar(4), scalar(6)]),
             length=scalar(100),
             transform=Transform.identity(),
-            ticket=TimberTicket(name="test_timber"),
+            ticket=TimberTicket(path="test_timber"),
         )
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(50))
         cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=hs.offset)

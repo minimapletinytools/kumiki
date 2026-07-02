@@ -144,7 +144,7 @@ def _joint_accessory_to_trimesh(accessory: JointAccessory) -> "trimesh.Trimesh":
     transform = getattr(accessory, "transform", None)
     if transform is None:
         raise ValueError(
-            f"Accessory '{accessory.ticket.name}' does not define a global transform"
+            f"Accessory '{accessory.ticket.path}' does not define a global transform"
         )
     global_csg = adopt_csg(transform, Transform.identity(), local_csg)
     return triangulate_cutcsg(global_csg).mesh
@@ -199,7 +199,7 @@ def export_frame_stl(
 
     meshes: list[trimesh.Trimesh] = []
     for i, ct in enumerate(frame.cut_timbers):
-        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
+        name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
         mesh = _cut_timber_to_trimesh(ct)
         meshes.append(mesh)
         dest = output_dir / f"{name}.stl"
@@ -208,7 +208,7 @@ def export_frame_stl(
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
-            ticket_name = accessory.ticket.name
+            ticket_name = accessory.ticket.path
             if ticket_name and ticket_name != "[no-name]":
                 base_name = ticket_name
             else:
@@ -253,7 +253,7 @@ def export_frame_obj(
 
     meshes: list[trimesh.Trimesh] = []
     for i, ct in enumerate(frame.cut_timbers):
-        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
+        name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
         mesh = _cut_timber_to_trimesh(ct)
         meshes.append(mesh)
         dest = output_dir / f"{name}.obj"
@@ -262,7 +262,7 @@ def export_frame_obj(
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
-            ticket_name = accessory.ticket.name
+            ticket_name = accessory.ticket.path
             if ticket_name and ticket_name != "[no-name]":
                 base_name = ticket_name
             else:
@@ -320,7 +320,7 @@ def export_frame_3mf(
         return candidate
 
     for i, ct in enumerate(frame.cut_timbers):
-        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
+        name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
         mesh = _cut_timber_to_trimesh(ct)
         dest = output_dir / f"{name}.stl"
         mesh.export(str(dest), file_type="stl")
@@ -329,7 +329,7 @@ def export_frame_3mf(
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
-            ticket_name = accessory.ticket.name
+            ticket_name = accessory.ticket.path
             if ticket_name and ticket_name != "[no-name]":
                 base_name = ticket_name
             else:
@@ -687,7 +687,7 @@ def export_cut_timber_step(cut_timber: CutTimber, filepath: Union[str, Path]) ->
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
     global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
     shape = _csg_to_ocp(global_csg)
-    body_name = cut_timber.timber.ticket.name or filepath.stem
+    body_name = cut_timber.timber.ticket.path or filepath.stem
     _write_step(shape, str(filepath), name=body_name)
 
 
@@ -738,7 +738,7 @@ def export_frame_step(
         return candidate
 
     for i, ct in enumerate(frame.cut_timbers):
-        name = _next_available_name(ct.timber.ticket.name or f"timber_{i}")
+        name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
         local_csg = ct.render_timber_with_cuts_csg_local()
         global_csg = adopt_csg(ct.timber.transform, Transform.identity(), local_csg)
         shape = _csg_to_ocp(global_csg)
@@ -750,7 +750,7 @@ def export_frame_step(
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
-            ticket_name = accessory.ticket.name
+            ticket_name = accessory.ticket.path
             if ticket_name and ticket_name != "[no-name]":
                 base_name = ticket_name
             else:
@@ -759,7 +759,7 @@ def export_frame_step(
             transform = getattr(accessory, "transform", None)
             if transform is None:
                 raise ValueError(
-                    f"Accessory '{accessory.ticket.name}' does not define a global transform"
+                    f"Accessory '{accessory.ticket.path}' does not define a global transform"
                 )
             local_csg = accessory.render_csg_local()
             global_csg = adopt_csg(transform, Transform.identity(), local_csg)

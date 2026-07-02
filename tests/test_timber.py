@@ -943,7 +943,7 @@ class TestFrameFromJoints:
         assert len(frame.accessories) == 0
         
         # Verify each timber appears once
-        timber_names = [ct.timber.ticket.name for ct in frame.cut_timbers]
+        timber_names = [ct.timber.ticket.path for ct in frame.cut_timbers]
         assert "Timber 1" in timber_names
         assert "Timber 2" in timber_names
     
@@ -1087,12 +1087,12 @@ class TestFrameFromJoints:
         # Verify both timbers are in the frame
         assert len(frame.cut_timbers) == 2
         
-        timber_names = [ct.timber.ticket.name for ct in frame.cut_timbers]
+        timber_names = [ct.timber.ticket.path for ct in frame.cut_timbers]
         assert "Jointed Timber" in timber_names
         assert "Unjointed Timber" in timber_names
         
         # Verify unjointed timber has no cuts
-        unjointed_ct = [ct for ct in frame.cut_timbers if ct.timber.ticket.name == "Unjointed Timber"][0]
+        unjointed_ct = [ct for ct in frame.cut_timbers if ct.timber.ticket.path == "Unjointed Timber"][0]
         assert len(unjointed_ct.cuts) == 0
     
     def test_from_joints_warns_on_different_timbers_same_name(self):
@@ -1278,11 +1278,11 @@ class TestFrameBoundingBox:
         frame = Frame.from_joints([joint])
         
         # Verify that timberB has cuts applied
-        cut_timberB = next(ct for ct in frame.cut_timbers if ct.timber.ticket.name == "TimberB")
+        cut_timberB = next(ct for ct in frame.cut_timbers if ct.timber.ticket.path == "TimberB")
         assert len(cut_timberB.cuts) > 0, "TimberB should have cuts applied"
         
         # Receiving timber carries a no-op cut in strict one-cut-per-member mode.
-        cut_timberA = next(ct for ct in frame.cut_timbers if ct.timber.ticket.name == "TimberA")
+        cut_timberA = next(ct for ct in frame.cut_timbers if ct.timber.ticket.path == "TimberA")
         assert len(cut_timberA.cuts) == 1, "TimberA should have one no-op cutting"
         assert cut_timberA.cuts[0].negative_csg is None
         

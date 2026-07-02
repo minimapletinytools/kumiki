@@ -176,8 +176,8 @@ def serialize_vector(vec: Any) -> Any:
 
 
 def get_timber_display_name(timber: Any) -> str:
-    if hasattr(timber, "ticket") and hasattr(timber.ticket, "name"):
-        return timber.ticket.name
+    if hasattr(timber, "ticket") and hasattr(timber.ticket, "path"):
+        return timber.ticket.path
     if hasattr(timber, "name"):
         return timber.name
     return type(timber).__name__
@@ -1110,7 +1110,7 @@ def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
     all patterns at origin, computes a square-ish grid layout by translating timbers
     and accessories, and returns one merged Frame.
     """
-    from kumiki.rule import create_v3
+    from kumiki.rule import create_v3, scalar
 
     if not pattern_list:
         raise ValueError("Pattern list is empty")
@@ -2108,7 +2108,7 @@ def _raise_specific_pattern(
             skip_first_parameter=True,
         )
 
-        from kumiki.rule import create_v3
+        from kumiki.rule import create_v3, scalar
         origin = create_v3(scalar(0), scalar(0), scalar(0))
         with contextlib.redirect_stdout(sys.stderr):
             pattern_result = pattern_lambda(origin, **applied_render_parameters)

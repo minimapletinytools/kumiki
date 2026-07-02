@@ -27,7 +27,7 @@ def _make_boards(
         length=board_length,
         size=Matrix([board_width, board_thickness]),
         transform=Transform.identity(),
-        ticket=BoardTicket(name="tongue_board"),
+        ticket=BoardTicket(path="tongue_board"),
     )
     center_offset_x = board_width - overlap
     if groove_on_left:
@@ -39,7 +39,7 @@ def _make_boards(
             position=create_v3(center_offset_x, y_offset, scalar(0)),
             orientation=Orientation.identity(),
         ),
-        ticket=BoardTicket(name="groove_board"),
+        ticket=BoardTicket(path="groove_board"),
     )
     return tongue_board, groove_board
 
@@ -65,11 +65,11 @@ class TestTongueAndGrooveJoint:
 
         assert joint.ticket.joint_type == "tongue_and_groove"
         assert len(joint.cuttings) == 2
-        assert tongue_board.ticket.name in joint.cuttings
-        assert groove_board.ticket.name in joint.cuttings
+        assert tongue_board.ticket.path in joint.cuttings
+        assert groove_board.ticket.path in joint.cuttings
 
-        tongue_cut = joint.cuttings[tongue_board.ticket.name]
-        groove_cut = joint.cuttings[groove_board.ticket.name]
+        tongue_cut = joint.cuttings[tongue_board.ticket.path]
+        groove_cut = joint.cuttings[groove_board.ticket.path]
         assert tongue_cut.label == "tongue_and_groove"
         assert groove_cut.label == "tongue_and_groove"
 
@@ -102,7 +102,7 @@ class TestTongueAndGrooveJoint:
 
         # Groove prism's X center should sit on the LEFT side of tongue board
         # (negative X) because the groove board is on the left.
-        tongue_cut = joint.cuttings[tongue_board.ticket.name]
+        tongue_cut = joint.cuttings[tongue_board.ticket.path]
         tongue_union = tongue_cut.negative_csg
         assert isinstance(tongue_union, SolidUnion)
         first_remove = tongue_union.children[0]
@@ -110,7 +110,7 @@ class TestTongueAndGrooveJoint:
         assert first_remove.transform.position[0] < 0
 
         # And the groove cavity sits on the RIGHT face of the groove board.
-        groove_cut = joint.cuttings[groove_board.ticket.name]
+        groove_cut = joint.cuttings[groove_board.ticket.path]
         groove_union = groove_cut.negative_csg
         assert isinstance(groove_union, SolidUnion)
         groove_prism = groove_union.children[0]
@@ -128,7 +128,7 @@ class TestTongueAndGrooveJoint:
             tongue_center_offset=scalar(1),
         )
 
-        groove_cut = joint.cuttings[groove_board.ticket.name]
+        groove_cut = joint.cuttings[groove_board.ticket.path]
         groove_union = groove_cut.negative_csg
         assert isinstance(groove_union, SolidUnion)
         groove_prism = groove_union.children[0]
@@ -148,7 +148,7 @@ class TestTongueAndGrooveJoint:
             groove_extra_depth=scalar(1),
         )
 
-        groove_cut = joint.cuttings[groove_board.ticket.name]
+        groove_cut = joint.cuttings[groove_board.ticket.path]
         groove_union = groove_cut.negative_csg
         assert isinstance(groove_union, SolidUnion)
         groove_prism = groove_union.children[0]
@@ -184,7 +184,7 @@ class TestTongueAndGrooveJoint:
             length=scalar(100),
             size=Matrix([scalar(5), scalar(10)]),  # width 5 < thickness 10
             transform=Transform.identity(),
-            ticket=BoardTicket(name="tongue_board"),
+            ticket=BoardTicket(path="tongue_board"),
         )
         groove_board = Board(
             length=scalar(100),
@@ -193,7 +193,7 @@ class TestTongueAndGrooveJoint:
                 position=create_v3(scalar(3), scalar(0), scalar(0)),
                 orientation=Orientation.identity(),
             ),
-            ticket=BoardTicket(name="groove_board"),
+            ticket=BoardTicket(path="groove_board"),
         )
         with pytest.warns(UserWarning, match="thicker than it is wide"):
             cut_tongue_and_groove_joint(
@@ -228,7 +228,7 @@ class TestBoardInGroovedRectangularFrameJoint:
                     position=create_v3(board_width * scalar(i), scalar(0), scalar(0)),
                     orientation=Orientation.identity(),
                 ),
-                ticket=BoardTicket(name=f"board_{i}"),
+                ticket=BoardTicket(path=f"board_{i}"),
             )
             for i in range(n_boards)
         ]
@@ -242,13 +242,13 @@ class TestBoardInGroovedRectangularFrameJoint:
                 position=create_v3(scalar(0), scalar(0), board_length),
                 orientation=Orientation.identity(),
             ),
-            ticket=TimberTicket(name="top"),
+            ticket=TimberTicket(path="top"),
         )
         bot_timber = Timber(
             length=scalar(5),
             size=timber_size,
             transform=Transform.identity(),
-            ticket=TimberTicket(name="bottom"),
+            ticket=TimberTicket(path="bottom"),
         )
         left_timber = Timber(
             length=board_length,
@@ -257,7 +257,7 @@ class TestBoardInGroovedRectangularFrameJoint:
                 position=create_v3(-panel_half_w, scalar(0), scalar(0)),
                 orientation=Orientation.identity(),
             ),
-            ticket=TimberTicket(name="left"),
+            ticket=TimberTicket(path="left"),
         )
         right_timber = Timber(
             length=board_length,
@@ -266,7 +266,7 @@ class TestBoardInGroovedRectangularFrameJoint:
                 position=create_v3(panel_half_w, scalar(0), scalar(0)),
                 orientation=Orientation.identity(),
             ),
-            ticket=TimberTicket(name="right"),
+            ticket=TimberTicket(path="right"),
         )
 
         joint = cut_board_in_grooved_rectangular_frame_joint(
@@ -285,7 +285,7 @@ class TestBoardInGroovedRectangularFrameJoint:
 
         assert joint.ticket.joint_type == "board_in_grooved_frame"
         expected_frame_keys = {"top", "bottom", "left", "right"}
-        expected_board_keys = {b.ticket.name for b in boards}
+        expected_board_keys = {b.ticket.path for b in boards}
         assert set(joint.cuttings.keys()) == expected_frame_keys | expected_board_keys
 
         for key in expected_frame_keys:

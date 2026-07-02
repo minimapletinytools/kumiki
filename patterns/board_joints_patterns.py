@@ -30,7 +30,7 @@ def example_tongue_and_groove(position=None):
         length=board_length,
         size=Matrix([board_width, board_thickness]),
         transform=Transform(position=position, orientation=Orientation.identity()),
-        ticket=BoardTicket(name="tongue_board"),
+        ticket=BoardTicket(path="tongue_board"),
     )
 
     groove_board = Board(
@@ -40,7 +40,7 @@ def example_tongue_and_groove(position=None):
             position=position + create_v3(center_offset_x, inches(0), inches(0)),
             orientation=Orientation.identity(),
         ),
-        ticket=BoardTicket(name="groove_board"),
+        ticket=BoardTicket(path="groove_board"),
     )
 
     return cut_tongue_and_groove_joint(
@@ -91,7 +91,7 @@ def example_board_in_grooved_frame(
             position=create_v3(member_size / 2, inches(0), inches(0)),
             orientation=stile_orient,
         ),
-        ticket=TimberTicket(name="left_stile"),
+        ticket=TimberTicket(path="left_stile"),
     )
     right_stile = Timber(
         length=frame_height,
@@ -100,7 +100,7 @@ def example_board_in_grooved_frame(
             position=create_v3(frame_width - member_size / 2, inches(0), inches(0)),
             orientation=stile_orient,
         ),
-        ticket=TimberTicket(name="right_stile"),
+        ticket=TimberTicket(path="right_stile"),
     )
 
     # Rails: run in X (full frame width). local Z = global X, local X = global Z.
@@ -112,7 +112,7 @@ def example_board_in_grooved_frame(
             position=create_v3(inches(0), inches(0), member_size / 2),
             orientation=rail_orient,
         ),
-        ticket=TimberTicket(name="bottom_rail"),
+        ticket=TimberTicket(path="bottom_rail"),
     )
     top_rail = Timber(
         length=frame_width,
@@ -121,7 +121,7 @@ def example_board_in_grooved_frame(
             position=create_v3(inches(0), inches(0), frame_height - member_size / 2),
             orientation=rail_orient,
         ),
-        ticket=TimberTicket(name="top_rail"),
+        ticket=TimberTicket(path="top_rail"),
     )
 
     if board_orientation == "vertical":
@@ -141,7 +141,7 @@ def example_board_in_grooved_frame(
                     ),
                     orientation=Orientation.identity(),
                 ),
-                ticket=BoardTicket(name=f"board_{i + 1}"),
+                ticket=BoardTicket(path=f"board_{i + 1}"),
             )
             for i in range(n_boards)
         ]
@@ -172,7 +172,7 @@ def example_board_in_grooved_frame(
                     ),
                     orientation=board_orient,
                 ),
-                ticket=BoardTicket(name=f"board_{i + 1}"),
+                ticket=BoardTicket(path=f"board_{i + 1}"),
             )
             for i in range(n_boards)
         ]

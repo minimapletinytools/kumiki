@@ -338,7 +338,7 @@ class TestStepOscarshed:
         SKIP_BOUNDS_CHECK = {"Front Girt Left", "Front Girt Middle"}
 
         for ct in oscarshed_frame.cut_timbers:
-            name = ct.timber.ticket.name
+            name = ct.timber.ticket.path
 
             # Expected bounds from timber corners (metres → mm)
             corners_mm = []

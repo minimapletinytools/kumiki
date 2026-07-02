@@ -268,7 +268,7 @@ def main():
     
     for i, cut_timber in enumerate(frame.cut_timbers):
         timber = cut_timber.timber
-        print(f"{i+1}. {timber.ticket.name}")
+        print(f"{i+1}. {timber.ticket.path}")
         print(f"   Length: {float(timber.length):.3f}m ({float(timber.length) / 0.0254:.1f} inches)")
         print(f"   Size: {float(timber.size[0]):.3f}m x {float(timber.size[1]):.3f}m "
               f"({float(timber.size[0]) / 0.0254:.1f}\" x {float(timber.size[1]) / 0.0254:.1f}\")")

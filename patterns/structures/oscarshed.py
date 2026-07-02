@@ -77,25 +77,25 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Length is automatically calculated from boundary side
     mudsill_front = create_horizontal_timber_on_footprint(
         footprint, 0, FootprintLocation.INSIDE, mudsill_size,
-        ticket=TimberTicket(name="Front Mudsill", tags=("mudsill", "4x6"))
+        ticket=TimberTicket(path="Front Mudsill", tags=("mudsill", "4x6"))
     )
 
     # Right mudsill (corner 1 to corner 2) - along Y axis
     mudsill_right = create_horizontal_timber_on_footprint(
         footprint, 1, FootprintLocation.INSIDE, mudsill_size,
-        ticket=TimberTicket(name="Right Mudsill", tags=("mudsill", "4x6"))
+        ticket=TimberTicket(path="Right Mudsill", tags=("mudsill", "4x6"))
     )
 
     # Back mudsill (corner 2 to corner 3) - along X axis
     mudsill_back = create_horizontal_timber_on_footprint(
         footprint, 2, FootprintLocation.INSIDE, mudsill_size,
-        ticket=TimberTicket(name="Back Mudsill", tags=("mudsill", "4x6"))
+        ticket=TimberTicket(path="Back Mudsill", tags=("mudsill", "4x6"))
     )
 
     # Left mudsill (corner 3 to corner 0) - along Y axis
     mudsill_left = create_horizontal_timber_on_footprint(
         footprint, 3, FootprintLocation.INSIDE, mudsill_size,
-        ticket=TimberTicket(name="Left Mudsill", tags=("mudsill", "4x6"))
+        ticket=TimberTicket(path="Left Mudsill", tags=("mudsill", "4x6"))
     )
 
     # ============================================================================
@@ -170,7 +170,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         length=post_front_height,
         location_type=FootprintLocation.INSIDE,
         size=post_size,
-        ticket=TimberTicket(name="Front Left Post", tags=("post", "4x4"))
+        ticket=TimberTicket(path="Front Left Post", tags=("post", "4x4"))
     )
 
     # Front-right post (on front boundary side, inset from right corner)
@@ -181,7 +181,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         length=post_front_height,
         location_type=FootprintLocation.INSIDE,
         size=post_size,
-        ticket=TimberTicket(name="Front Right Post", tags=("post", "4x4"))
+        ticket=TimberTicket(path="Front Right Post", tags=("post", "4x4"))
     )
 
     # Back-right post (on back boundary side, inset from right corner)
@@ -193,7 +193,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         length=post_back_height,
         location_type=FootprintLocation.INSIDE,
         size=post_size,
-        ticket=TimberTicket(name="Back Right Post", tags=("post", "4x4"))
+        ticket=TimberTicket(path="Back Right Post", tags=("post", "4x4"))
     )
 
     # Back-left post (on back boundary side, inset from left corner)
@@ -204,7 +204,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         length=post_back_height,
         location_type=FootprintLocation.INSIDE,
         size=post_size,
-        ticket=TimberTicket(name="Back Left Post", tags=("post", "4x4"))
+        ticket=TimberTicket(path="Back Left Post", tags=("post", "4x4"))
     )
 
     # ============================================================================
@@ -229,7 +229,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         length=post_back_height,
         location_type=FootprintLocation.INSIDE,
         size=post_size,
-        ticket=TimberTicket(name="Back Middle-Right Post", tags=("post", "4x4"))
+        ticket=TimberTicket(path="Back Middle-Right Post", tags=("post", "4x4"))
     )
 
     # Middle-left post (3rd from right)
@@ -242,7 +242,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         length=post_back_height,
         location_type=FootprintLocation.INSIDE,
         size=post_size,
-        ticket=TimberTicket(name="Back Middle-Left Post", tags=("post", "4x4"))
+        ticket=TimberTicket(path="Back Middle-Left Post", tags=("post", "4x4"))
     )
 
     # ============================================================================
@@ -376,7 +376,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         location_on_timber2=post_back_height,    # Same height on front post
         lateral_offset=0,       # No lateral offset
         size=side_girt_size,
-        ticket=TimberTicket(name="Left Side Girt", tags=("beam", "girt", "4x4"))
+        ticket=TimberTicket(path="Left Side Girt", tags=("beam", "girt", "4x4"))
     )
 
     # Right side girt (connects back-right post to front-right post)
@@ -388,7 +388,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         location_on_timber2=post_back_height,    # Same height on front post
         lateral_offset=0,       # No lateral offset
         size=side_girt_size,
-        ticket=TimberTicket(name="Right Side Girt", tags=("beam", "girt", "4x4"))
+        ticket=TimberTicket(path="Right Side Girt", tags=("beam", "girt", "4x4"))
     )
 
     # ============================================================================
@@ -513,7 +513,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         location_on_timber2=front_girt_height_on_posts,   # Same height on right post
         lateral_offset=0,       # No lateral offset
         size=front_girt_size,
-        ticket=TimberTicket(name="Front Girt", tags=("beam", "girt", "4x4"))
+        ticket=TimberTicket(path="Front Girt", tags=("beam", "girt", "4x4"))
     )
     
     # ============================================================================
@@ -533,14 +533,14 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         front_girt,
         second_split_distance,
         ticket1="Front Girt Left+Middle (temp)",
-        ticket2=TimberTicket(name="Front Girt Right", tags=("beam", "girt", "4x4"))
+        ticket2=TimberTicket(path="Front Girt Right", tags=("beam", "girt", "4x4"))
     )
 
     front_girt_left, front_girt_middle = split_timber(
         front_girt_left_and_middle,
         first_split_distance,
-        ticket1=TimberTicket(name="Front Girt Left", tags=("beam", "girt", "4x4")),
-        ticket2=TimberTicket(name="Front Girt Middle", tags=("beam", "girt", "4x4"))
+        ticket1=TimberTicket(path="Front Girt Left", tags=("beam", "girt", "4x4")),
+        ticket2=TimberTicket(path="Front Girt Middle", tags=("beam", "girt", "4x4"))
     )
     
     # Create gooseneck joints
@@ -647,21 +647,21 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     
     # The left piece gets cuts from mortise & tenon joint and left gooseneck joint
     front_girt_left_cuts = []
-    front_girt_left_cuts.append(joint_front_girt_left.cuttings[front_girt_left.ticket.name])  # Tenon cuts
-    front_girt_left_cuts.append(front_girt_gooseneck_joint_left.cuttings[front_girt_left.ticket.name])  # Gooseneck cuts
+    front_girt_left_cuts.append(joint_front_girt_left.cuttings[front_girt_left.ticket.path])  # Tenon cuts
+    front_girt_left_cuts.append(front_girt_gooseneck_joint_left.cuttings[front_girt_left.ticket.path])  # Gooseneck cuts
     
     # The middle piece gets cuts from both gooseneck joints
     front_girt_middle_cuts = []
     # Middle piece is referenced in both joints, need to check which one has it
-    if front_girt_middle.ticket.name in front_girt_gooseneck_joint_left.cuttings:
-        front_girt_middle_cuts.append(front_girt_gooseneck_joint_left.cuttings[front_girt_middle.ticket.name])
-    if front_girt_middle.ticket.name in front_girt_gooseneck_joint_right.cuttings:
-        front_girt_middle_cuts.append(front_girt_gooseneck_joint_right.cuttings[front_girt_middle.ticket.name])
+    if front_girt_middle.ticket.path in front_girt_gooseneck_joint_left.cuttings:
+        front_girt_middle_cuts.append(front_girt_gooseneck_joint_left.cuttings[front_girt_middle.ticket.path])
+    if front_girt_middle.ticket.path in front_girt_gooseneck_joint_right.cuttings:
+        front_girt_middle_cuts.append(front_girt_gooseneck_joint_right.cuttings[front_girt_middle.ticket.path])
     
     # The right piece gets cuts from mortise & tenon joint and right gooseneck joint
     front_girt_right_cuts = []
-    front_girt_right_cuts.append(joint_front_girt_right.cuttings[front_girt_right.ticket.name])  # Tenon cuts
-    front_girt_right_cuts.append(front_girt_gooseneck_joint_right.cuttings[front_girt_right.ticket.name])  # Gooseneck cuts
+    front_girt_right_cuts.append(joint_front_girt_right.cuttings[front_girt_right.ticket.path])  # Tenon cuts
+    front_girt_right_cuts.append(front_girt_gooseneck_joint_right.cuttings[front_girt_right.ticket.path])  # Gooseneck cuts
     
     # Create CutTimbers for the split pieces with all their cuts
     pct_front_girt_left = CutTimber(front_girt_left, cuts=front_girt_left_cuts)
@@ -697,7 +697,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         lateral_offset=0,       # No lateral offset
         size=top_plate_size,
         orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),
-        ticket=TimberTicket(name="Front Top Plate", tags=("beam", "4x6"))
+        ticket=TimberTicket(path="Front Top Plate", tags=("beam", "4x6"))
     )
 
     top_plate_back = join_timbers(
@@ -709,7 +709,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         lateral_offset=0,
         size=top_plate_size,
         orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),
-        ticket=TimberTicket(name="Back Top Plate", tags=("beam", "4x6"))
+        ticket=TimberTicket(path="Back Top Plate", tags=("beam", "4x6"))
     )
 
     # ============================================================================
@@ -879,7 +879,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             lateral_offset=joist_vertical_offset,     # Offset upward to align tops
             size=joist_size,
             orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),  # Face up
-            ticket=TimberTicket(name=f"Joist {i}", tags=("joist", "4x4"))
+            ticket=TimberTicket(path=f"Joist {i}", tags=("joist", "4x4"))
         )
         joists.append(joist)
 
@@ -977,7 +977,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             lateral_offset=rafter_vertical_offset,
             size=rafter_size,
             orientation_width_vector=create_v3(scalar(0), scalar(0), scalar(1)),  # Face up
-            ticket=TimberTicket(name=f"Rafter {i}", tags=("rafter", "4x4"))
+            ticket=TimberTicket(path=f"Rafter {i}", tags=("rafter", "4x4"))
         )
         rafters.append(rafter)
 
@@ -1076,7 +1076,7 @@ if __name__ == "__main__":
     
     print(f"\nCreated {len(frame.cut_timbers)} timbers and {len(frame.accessories)} accessories:")
     for ct in frame.cut_timbers:
-        print(f"  - {ct.timber.ticket.name}")
+        print(f"  - {ct.timber.ticket.path}")
     if frame.accessories:
         print(f"\nAccessories:")
         for acc in frame.accessories:

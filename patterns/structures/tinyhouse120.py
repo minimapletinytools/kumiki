@@ -63,7 +63,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     def _describe_timber(label: str, timber: PerfectTimberWithin) -> str:
         return (
-            f"{label}: ticket={timber.ticket.name}, "
+            f"{label}: ticket={timber.ticket.path}, "
             f"bottom={_format_debug_value(timber.get_bottom_position_global())}, "
             f"length={_format_debug_value(timber.length)}, "
             f"length_dir={_format_debug_value(timber.get_length_direction_global())}, "
@@ -974,7 +974,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             print(_describe_timber("butt_timber", butt_timber), file=sys.stderr, flush=True)
             print(_describe_timber("receiving_timber", receiving_timber), file=sys.stderr, flush=True)
             raise AssertionError(
-                f"Face-aligned joint failed for label='{label}' butt='{butt_timber.ticket.name}' receiving='{receiving_timber.ticket.name}' end='{butt_timber_end}': {err}"
+                f"Face-aligned joint failed for label='{label}' butt='{butt_timber.ticket.path}' receiving='{receiving_timber.ticket.path}' end='{butt_timber_end}': {err}"
             ) from err
 
     def _wall_stud_joint(stud: PerfectTimberWithin, beam: PerfectTimberWithin, stud_end: TimberEnd) -> Joint:
@@ -1244,7 +1244,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             print(_describe_timber("stud", stud), file=sys.stderr, flush=True)
             print(_describe_timber("beam", beam), file=sys.stderr, flush=True)
             raise AssertionError(
-                f"Face-aligned king-post joint failed for stud='{stud.ticket.name}' beam='{beam.ticket.name}' end='{stud_end}': {err}"
+                f"Face-aligned king-post joint failed for stud='{stud.ticket.path}' beam='{beam.ticket.path}' end='{stud_end}': {err}"
             ) from err
 
     front_back_axis = create_v3(scalar(0), scalar(1), scalar(0))

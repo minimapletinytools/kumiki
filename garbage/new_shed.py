@@ -473,7 +473,7 @@ if __name__ == "__main__":
     
     print(f"\nCreated {len(frame.cut_timbers)} timbers and {len(frame.accessories)} accessories:")
     for ct in frame.cut_timbers:
-        print(f"  - {ct.timber.ticket.name}")
+        print(f"  - {ct.timber.ticket.path}")
     if frame.accessories:
         print(f"\nAccessories:")
         for acc in frame.accessories:

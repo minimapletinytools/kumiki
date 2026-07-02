@@ -132,7 +132,7 @@ def find_opposing_face_on_another_timber(reference_timber: PerfectTimberWithin, 
 
     # assert that the target_face is parallel to the reference_face
     assert are_vectors_parallel(reference_timber.get_face_direction_global(reference_face), target_timber.get_face_direction_global(target_face)), \
-        f"Target face {target_face} is not parallel to reference face {reference_face} on timber {reference_timber.ticket.name}"
+        f"Target face {target_face} is not parallel to reference face {reference_face} on timber {reference_timber.ticket.path}"
     
     return target_face
 

@@ -1145,14 +1145,14 @@ class TestHousedDovetailButtJoint:
 
         # ---- structure ----
         assert len(joint.cuttings) == 2
-        assert dovetail_timber.ticket.name in joint.cuttings
-        assert receiving_timber.ticket.name in joint.cuttings
+        assert dovetail_timber.ticket.path in joint.cuttings
+        assert receiving_timber.ticket.path in joint.cuttings
         assert joint.ticket is not None
         assert joint.ticket.joint_type == "housed_dovetail_butt"
         assert len(joint.jointAccessories) == 0
 
-        dt_cut = joint.cuttings[dovetail_timber.ticket.name]
-        recv_cut = joint.cuttings[receiving_timber.ticket.name]
+        dt_cut = joint.cuttings[dovetail_timber.ticket.path]
+        recv_cut = joint.cuttings[receiving_timber.ticket.path]
 
         # Dovetail timber: 1 cut, end cut at TOP, negative CSG = Difference(housing, profile)
         assert isinstance(dt_cut, Cutting)
@@ -1263,7 +1263,7 @@ class TestHousedDovetailButtJoint:
             dovetail_large_width=scalar(3),
         )
 
-        recv_neg_csg = joint.cuttings[arrangement.receiving_timber.ticket.name].negative_csg
+        recv_neg_csg = joint.cuttings[arrangement.receiving_timber.ticket.path].negative_csg
         assert not isinstance(recv_neg_csg, SolidUnion), \
             "With zero inset, receiving negative CSG should be the socket alone (no SolidUnion)"
 

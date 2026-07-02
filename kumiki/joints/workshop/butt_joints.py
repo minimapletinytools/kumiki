@@ -935,8 +935,8 @@ def cut_mortise_and_tenon_joint(
 
     return Joint(
         cuttings={
-            tenon_timber.ticket.name: tenon_cut_timber,
-            mortise_timber.ticket.name: mortise_cut_timber,
+            tenon_timber.ticket.path: tenon_cut_timber,
+            mortise_timber.ticket.path: mortise_cut_timber,
         },
         ticket=JointTicket(joint_type="mortise_and_tenon"),
         jointAccessories=joint_accessories,
@@ -1309,8 +1309,8 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
 
     return Joint(
         cuttings={
-            tenon_timber.ticket.name: tenon_cut,
-            mortise_timber.ticket.name: mortise_cut,
+            tenon_timber.ticket.path: tenon_cut,
+            mortise_timber.ticket.path: mortise_cut,
         },
         ticket=JointTicket(joint_type="wedged_half_dovetail_mortise_and_tenon"),
         jointAccessories=joint_accessories,
@@ -1547,8 +1547,8 @@ def cut_dropin_dovetail_butt_joint(
 
     return Joint(
         cuttings={
-            dovetail_timber.ticket.name: dovetail_timber_cut_obj,
-            receiving_timber.ticket.name: receiving_timber_cut_obj
+            dovetail_timber.ticket.path: dovetail_timber_cut_obj,
+            receiving_timber.ticket.path: receiving_timber_cut_obj
         },
         ticket=JointTicket(joint_type="housed_dovetail_butt"),
         jointAccessories={},

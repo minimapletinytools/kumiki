@@ -601,18 +601,18 @@ def chop_lap_on_timber_ends(
     # Assert that the 2 timbers are face aligned
     assert are_timbers_face_aligned(top_lap_timber, bottom_lap_timber), \
         f"Timbers must be face-aligned for a splice lap joint. " \
-        f"{top_lap_timber.ticket.name} and {bottom_lap_timber.ticket.name} orientations are not related by 90-degree rotations."
+        f"{top_lap_timber.ticket.path} and {bottom_lap_timber.ticket.path} orientations are not related by 90-degree rotations."
     
     # Assert the 2 timbers are parallel (either same direction or opposite)
     assert are_vectors_parallel(top_lap_timber.get_length_direction_global(), bottom_lap_timber.get_length_direction_global()), \
         f"Timbers must be parallel for a splice lap joint. " \
-        f"{top_lap_timber.ticket.name} length_direction {top_lap_timber.get_length_direction_global().T} and " \
-        f"{bottom_lap_timber.ticket.name} length_direction {bottom_lap_timber.get_length_direction_global().T} are not parallel."
+        f"{top_lap_timber.ticket.path} length_direction {top_lap_timber.get_length_direction_global().T} and " \
+        f"{bottom_lap_timber.ticket.path} length_direction {bottom_lap_timber.get_length_direction_global().T} are not parallel."
     
     # Assert the 2 timber cross sections overlap at least a little
     assert do_xy_cross_section_on_parallel_timbers_overlap(top_lap_timber, bottom_lap_timber), \
         f"Timber cross sections should overlap for a splice lap joint or there is nothing to cut! " \
-        f"{top_lap_timber.ticket.name} and {bottom_lap_timber.ticket.name} cross sections do not overlap."
+        f"{top_lap_timber.ticket.path} and {bottom_lap_timber.ticket.path} cross sections do not overlap."
 
     
     top_lap_prism, top_end_cut = chop_lap_on_timber_end(top_lap_timber, top_lap_timber_end, top_lap_timber_face.to.face(), lap_length, top_lap_shoulder_position_from_top_lap_shoulder_timber_end, lap_depth)

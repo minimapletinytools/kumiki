@@ -336,7 +336,7 @@ def _ensure_ticket(ticket: Optional[Union[TimberTicket, str]]) -> TimberTicket:
     if ticket is None:
         return TimberTicket()
     elif isinstance(ticket, str):
-        return TimberTicket(name=ticket)
+        return TimberTicket(path=ticket)
     else:
         return ticket
 
@@ -471,7 +471,7 @@ class PerfectTimberWithin(ABC):
             )
             nominal_half, ptw_half = _face_to_nominal_and_ptw[face_name]
             assert equality_test(nominal_half, ptw_half), (
-                f"Reference face {face_name} on timber '{self.ticket.name}' is not coincident: "
+                f"Reference face {face_name} on timber '{self.ticket.path}' is not coincident: "
                 f"nominal half-size ({nominal_half}) != PTW half-size ({ptw_half})"
             )
 
@@ -1618,7 +1618,7 @@ class CutTimber:
     @property
     def name(self) -> str:
         """Get the name from the underlying timber's ticket."""
-        return self.timber.ticket.name
+        return self.timber.ticket.path
 
     # this one returns the timber without cuts where ends with joints are infinite in length
     def _extended_timber_without_cuts_csg_local(self) -> CutCSG:
@@ -2214,7 +2214,7 @@ class Frame:
         # Build a mapping from name to list of timber references
         name_to_timber_refs: Dict[str, List[PerfectTimberWithin]] = {}
         for timber_id, timber in timber_ref_to_timber.items():
-            timber_name = timber.ticket.name
+            timber_name = timber.ticket.path
             if timber_name is not None:
                 if timber_name not in name_to_timber_refs:
                     name_to_timber_refs[timber_name] = []
@@ -2389,11 +2389,11 @@ class Frame:
     
     def _check_timber_no_python_floats(self, timber: PerfectTimberWithin):
         """Check a single timber for float values."""
-        self._check_numeric_value_no_python_floats(timber.length, f"Timber '{timber.ticket.name}' length")
-        self._check_vector_no_python_floats(timber.size, f"Timber '{timber.ticket.name}' size")
-        self._check_vector_no_python_floats(timber.transform.position, f"Timber '{timber.ticket.name}' transform.position")
+        self._check_numeric_value_no_python_floats(timber.length, f"Timber '{timber.ticket.path}' length")
+        self._check_vector_no_python_floats(timber.size, f"Timber '{timber.ticket.path}' size")
+        self._check_vector_no_python_floats(timber.transform.position, f"Timber '{timber.ticket.path}' transform.position")
         # Note: orientation.matrix is checked as part of the matrix
-        self._check_matrix_no_python_floats(timber.transform.orientation.matrix, f"Timber '{timber.ticket.name}' transform.orientation")
+        self._check_matrix_no_python_floats(timber.transform.orientation.matrix, f"Timber '{timber.ticket.path}' transform.orientation")
     
     def _check_accessory_no_python_floats(self, accessory: JointAccessory):
         """Check an accessory for float values."""

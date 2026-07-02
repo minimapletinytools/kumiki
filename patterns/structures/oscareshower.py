@@ -363,7 +363,7 @@ def example() -> Frame:
                 length=blen,
                 size=bsize,
                 transform=Transform(position=create_v3(px, py, z), orientation=orient),
-                ticket=BoardTicket(name=f"{prefix} {i + 1}"),
+                ticket=BoardTicket(path=f"{prefix} {i + 1}"),
             ))
         return bds
 
@@ -417,4 +417,4 @@ if __name__ == "__main__":
     frame = example()
     print(f"Timbers: {len(frame.cut_timbers)}")
     for ct in frame.cut_timbers:
-        print(f"  - {ct.timber.ticket.name}")
+        print(f"  - {ct.timber.ticket.path}")

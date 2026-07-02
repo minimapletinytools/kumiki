@@ -834,7 +834,7 @@ class TestJoinTimbers:
         for timber in base_timbers:
             top_face_z = timber.get_bottom_position_global()[2] + timber.get_height_direction_global()[2] * timber.size[1]
             expected_top_z = base_z + timber_size[1]  # base_z + height
-            assert simplify(top_face_z - expected_top_z) == 0, f"Base timber {timber.ticket.name} not at expected height"
+            assert simplify(top_face_z - expected_top_z) == 0, f"Base timber {timber.ticket.path} not at expected height"
         
         # Test joining multiple base timbers to the beam
         joining_timbers = []
@@ -1046,7 +1046,7 @@ class TestJoinTimbers:
                 magnitude = float((diff.T * diff)[0, 0] ** scalar("0.5"))
                 
                 assert magnitude > 1e-6, \
-                    f"Beams {beam_i.ticket.name} and {beam_j.ticket.name} should be at different positions, " \
+                    f"Beams {beam_i.ticket.path} and {beam_j.ticket.path} should be at different positions, " \
                     f"but positions differ by only {magnitude}"
         
         # Verify specific geometric properties
@@ -1602,7 +1602,7 @@ class TestSplitTimber:
         assert bottom_timber.get_bottom_position_global() == create_v3(scalar(0), scalar(0), scalar(0))
         assert bottom_timber.get_length_direction_global() == create_v3(scalar(0), scalar(0), scalar(1))
         assert bottom_timber.get_width_direction_global() == create_v3(scalar(1), scalar(0), scalar(0))
-        assert bottom_timber.ticket.name == "Test Timber_bottom"
+        assert bottom_timber.ticket.path == "Test Timber/bottom"
         
         # Check top timber
         assert top_timber.length == scalar(7)
@@ -1611,7 +1611,7 @@ class TestSplitTimber:
         assert top_timber.get_bottom_position_global() == create_v3(scalar(0), scalar(0), scalar(3))
         assert top_timber.get_length_direction_global() == create_v3(scalar(0), scalar(0), scalar(1))
         assert top_timber.get_width_direction_global() == create_v3(scalar(1), scalar(0), scalar(0))
-        assert top_timber.ticket.name == "Test Timber_top"
+        assert top_timber.ticket.path == "Test Timber/top"
     
     def test_split_timber_horizontal(self, symbolic_mode):
         """Test splitting a horizontal timber"""
