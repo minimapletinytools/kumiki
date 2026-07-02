@@ -41,10 +41,12 @@ kigumi enforces this at runtime and will refuse to start if they diverge.
    - `git checkout main`
    - `git pull --ff-only`
 3. Apply requested bump.
-4. Update `CHANGELOG.md` (see below).
-5. Commit on `main`.
-6. Create tag(s).
-7. Push commit and tag(s) to origin.
+4. If `minor`/`major`: update hardcoded kumiki version fixtures in kigumi tests (see below) and
+   run `cd kigumi && npm run test:unit` to confirm.
+5. Update `CHANGELOG.md` (see below).
+6. Commit on `main`.
+7. Create tag(s).
+8. Push commit and tag(s) to origin.
 
 ## Exact bump logic
 
@@ -132,6 +134,38 @@ NODE
 
 Tag: `kigumi-v<new_version>`
 
+## Minor/major bumps: update hardcoded version fixtures in kigumi tests
+
+**When bumping `minor` or `major` (i.e. the shared major.minor changes), kigumi's
+`installOrUpdateKumiki` version-coupling check will reject any test fixture that hardcodes a
+kumiki version from the *old* major.minor line.** This has caused CI failures before (kigumi
+0.4.0 release: tests mocked a `python -c ... m.version("kumiki")` response of `0.3.2`/`0.3.0`,
+which failed the coupling check against the new `0.4` line).
+
+Before committing, on any `minor`/`major` bump:
+
+```bash
+grep -rn "m\.version(\"kumiki\")" -A3 kigumi/__tests__/ | grep -oE "[0-9]+\.[0-9]+\.[0-9]+"
+```
+
+This surfaces version strings returned by mocked `spawn`/subprocess calls simulating an
+installed kumiki (typically in `kigumi/__tests__/project-initializer.test.js`, near
+`createMockChildProcess({ stdoutText: '<version>\n' })` following a
+`snippet.includes('m.version("kumiki")')` check). Any fixture version whose major.minor doesn't
+match the **new** kumiki version must be bumped to the new major.minor line (e.g. `0.3.2` →
+`0.4.0`), preserving relative ordering where a test asserts an upgrade from one version to a
+later one (e.g. `0.3.0` → `0.3.2` becomes `0.4.0` → `0.4.1`, not both the same value, if the
+test is specifically checking that an upgrade path works).
+
+After editing, run the kigumi unit tests locally before committing:
+
+```bash
+cd kigumi && npm run test:unit
+```
+
+This check is a no-op (nothing to change) for patch-only bumps, since patch bumps don't change
+the major.minor line the coupling check keys off of.
+
 ## Updating CHANGELOG.md
 
 `CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). One shared
@@ -186,7 +220,8 @@ Single-target messages:
 Commands:
 
 ```bash
-git add pyproject.toml kumiki/__init__.py kigumi/package.json docs/agent_context.md kigumi/.generated/bundled-usage-instructions.md CHANGELOG.md
+git add pyproject.toml kumiki/__init__.py kigumi/package.json kigumi/.generated/bundled-usage-instructions.md CHANGELOG.md
+# also add kigumi/__tests__/project-initializer.test.js (or wherever fixtures were updated) if this was a minor/major bump
 git commit -m "<message>"
 git tag -a "kumiki-vX.Y.Z" -m "Release kumiki vX.Y.Z"
 git tag -a "kigumi-vA.B.C" -m "Release kigumi vA.B.C"
