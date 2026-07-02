@@ -41,9 +41,10 @@ kigumi enforces this at runtime and will refuse to start if they diverge.
    - `git checkout main`
    - `git pull --ff-only`
 3. Apply requested bump.
-4. Commit on `main`.
-5. Create tag(s).
-6. Push commit and tag(s) to origin.
+4. Update `CHANGELOG.md` (see below).
+5. Commit on `main`.
+6. Create tag(s).
+7. Push commit and tag(s) to origin.
 
 ## Exact bump logic
 
@@ -131,6 +132,38 @@ NODE
 
 Tag: `kigumi-v<new_version>`
 
+## Updating CHANGELOG.md
+
+`CHANGELOG.md` follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). One shared
+changelog covers both projects; each release entry has `### kumiki` / `### kigumi`
+subsections (omit whichever project wasn't part of this release).
+
+1. Find the baseline to diff from — the most recent existing tag of either project:
+   ```bash
+   git tag --list 'kumiki-v*' 'kigumi-v*' --sort=-creatordate | head -1
+   ```
+2. Review what changed since that tag, scoped to each project's directory:
+   ```bash
+   git log --oneline <last_tag>..HEAD -- kumiki/ tests/ patterns/
+   git log --oneline <last_tag>..HEAD -- kigumi/
+   ```
+3. Read the current `[Unreleased]` section in `CHANGELOG.md`. The user may have already hand-written
+   entries there for important changes — do not duplicate anything already listed. Summarize only
+   what's *not* already covered.
+4. Write a **concise** summary using Keep a Changelog subheadings as needed (`Added`, `Changed`,
+   `Fixed`, `Removed`, `Deprecated`, `Security`). It's fine to omit minor/internal changes — capture
+   the major points: new features, notable fixes, and especially breaking changes.
+   - **Breaking changes are mandatory to document.** For any breaking API change, add a short
+     migration note (old call → new call, or what to rename/replace) directly under the entry.
+5. Rewrite `CHANGELOG.md`:
+   - Move the (now-filled-in) `[Unreleased]` content into a new dated section: `## [X.Y.Z] - YYYY-MM-DD`
+     (use today's date). If both projects bumped to different versions in a patch-only release,
+     title the section after whichever bump is the "headline" one, or use both, e.g.
+     `## [kumiki 0.3.7 / kigumi 0.3.6] - YYYY-MM-DD` — use judgment; most releases bump both to the
+     same version and a single version number in the header is fine.
+   - Insert a fresh, empty `## [Unreleased]` section above it (just the heading, no subheadings —
+     add those only when something is actually added there).
+
 ## Pre-commit: Regenerate agent context bundle
 
 Before committing, always regenerate the bundled usage instructions (combines usage instructions + full API context):
@@ -159,7 +192,7 @@ Single-target messages:
 Commands:
 
 ```bash
-git add pyproject.toml kumiki/__init__.py kigumi/package.json docs/agent_context.md kigumi/.generated/bundled-usage-instructions.md
+git add pyproject.toml kumiki/__init__.py kigumi/package.json docs/agent_context.md kigumi/.generated/bundled-usage-instructions.md CHANGELOG.md
 git commit -m "<message>"
 git tag -a "kumiki-vX.Y.Z" -m "Release kumiki vX.Y.Z"
 git tag -a "kigumi-vA.B.C" -m "Release kigumi vA.B.C"
