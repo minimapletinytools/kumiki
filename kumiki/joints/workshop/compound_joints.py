@@ -34,12 +34,7 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
   Weave a chain of N timbers together with N-1 cross-lap joints, cut in order between
   timbers[n] and timbers[n+1].
 
-  All timbers must share a common "stacking axis": a long-face axis (RIGHT/LEFT or
-  FRONT/BACK) that is parallel across every timber in the list, regardless of how each
-  timber is otherwise rotated about that axis. starting_face_on_first_timber names the
-  face on timbers[0] at the "start" of that axis; the corresponding face on timbers[-1]
-  (the one facing the same way as starting_face_on_first_timber) is the "finish" face,
-  and its opposite is where the stack ends.
+  All timbers must share a common "stacking axis": a long-face axis that is parallel across every timber in the list. starting_face_on_first_timber names one of these faces on timbers[0] called the "starting" face and the opposing face on timbers[-1] is called the "finish" face.
 
   cut_distance_ratios places the N-1 cut boundaries (one per pair of adjacent timbers)
   along that start-to-finish axis, as fractions of the total distance between the
@@ -48,12 +43,8 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
   remaining boundaries are spaced uniformly between the last explicit ratio (or the
   starting face, if none were given) and the finish face.
 
-  Each of these ratios is a *global* position along the stacking axis, not the local
-  cut_ratio parameter of the underlying cut_plain_cross_lap_joint call (which is defined
-  relative to the two faces of that specific pair, per its own 0=timber2-fully-cut /
-  1=timber1-fully-cut convention). This function converts each global boundary position
-  into the local cut_ratio needed to actually land the cut there, so the printed/passed
-  cut_ratio for a given pair will generally differ from the global ratio that produced it.
+  Each of these ratios is relative to the starting and finish face, NOT the local
+  cut_ratio parameter of the underlying cut_plain_cross_lap_joint call. 
 
   Args:
       timbers: Ordered chain of at least 2 timbers to weave together.
@@ -125,13 +116,53 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
           cut_ratio=cut_ratio,
       ))
 
-    # TODO we're not done yet! boards that did not have joints cut between them may overlap so we need to make some additional cuts to fix the issue
-    # here is the algorithm
-    # iterate through all boards, starting from the first board and the first cut_ratio, call this board[n] and cut_ratio[n]
-    # draw a half space below cut_ration[n], in this half space region, we want to remove the timber prism (intersected with the cut ratio plane) from all of boards [n+2:]
-    # (rather than doing cut_ratio[n] half space intersected with the timber prism, just construct a new prism that is the timber prism cropped below the cut_ratio[n] plane, as this is more efficient)
-    # next, go from the last board and the last cut ratio, and work backwards
-    # this time, we will do the opposite for all boards [0:n-2], removing the timebr prism, this time cropping the timber prism above the cut_ratio[n] plane 
+  from kumiki.cutcsg import adopt_csg, Difference, HalfSpace as _HalfSpace
+
+  # --- Fill-in cuts for non-adjacent board pairs ---
+  # Boards that share no direct cross-lap joint can still collide outside their
+  # pairwise intersection region (where neither joint trimmed them).
+  # We fix this by adding extra cuts for every non-adjacent pair (timbers[n], timbers[n+k], k>=2).
+  #
+  # Forward pass: timbers[n] "owns" the start-side below cut_coord[n].
+  # Boards further up the stack (timbers[n+2:]) must not intrude there.
+  for n in range(num_boundaries):
+      source = timbers[n]
+      cut_coord = cut_position_coords[n]
+      R = source.transform.orientation.matrix
+      t_dot_axis = safe_dot_product(source.transform.position, axis_direction)
+      # axis_direction expressed in source's local coordinate frame
+      local_axis = safe_transform_vector(R.T, axis_direction)
+      # Prism of source cropped to start-side: Difference(prism, above-cut-half-space)
+      above_hs = _HalfSpace(normal=local_axis, offset=cut_coord - t_dot_axis)
+      source_prism_below = Difference(source.get_actual_csg_local(), [above_hs])
+      for target_idx in range(n + 2, len(timbers)):
+          target = timbers[target_idx]
+          neg_csg = adopt_csg(source.transform, target.transform, source_prism_below)
+          joints.append(Joint(
+              cuttings={f"fill_fwd_{n}_{target_idx}": Cutting(timber=target, negative_csg=neg_csg)},
+              ticket=JointTicket(joint_type="multi_cross_lap_fill"),
+              jointAccessories={},
+          ))
+
+  # Backward pass: timbers[n+1] "owns" the finish-side above cut_coord[n].
+  # Boards further down the stack (timbers[0:n]) must not intrude there.
+  for n in range(num_boundaries):
+      source = timbers[n + 1]
+      cut_coord = cut_position_coords[n]
+      R = source.transform.orientation.matrix
+      t_dot_axis = safe_dot_product(source.transform.position, axis_direction)
+      local_axis = safe_transform_vector(R.T, axis_direction)
+      # Prism of source cropped to finish-side: Difference(prism, below-cut-half-space)
+      below_hs = _HalfSpace(normal=-local_axis, offset=t_dot_axis - cut_coord)
+      source_prism_above = Difference(source.get_actual_csg_local(), [below_hs])
+      for target_idx in range(0, n):
+          target = timbers[target_idx]
+          neg_csg = adopt_csg(source.transform, target.transform, source_prism_above)
+          joints.append(Joint(
+              cuttings={f"fill_bwd_{n}_{target_idx}": Cutting(timber=target, negative_csg=neg_csg)},
+              ticket=JointTicket(joint_type="multi_cross_lap_fill"),
+              jointAccessories={},
+          ))
 
   return make_compound_joint(joints, ticket=JointTicket(joint_type="multi_cross_lap"))
 
@@ -139,7 +170,7 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
 # chatGPT translates this to Japanese as:
 # 小根付き通しほぞの十字相欠き梁組
 # kone-tsuki tōshi-hozo no jūji aigaki harigumi
-def cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon(
+def cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon(T
         # arrangement.cross_timber_1 is always assumed to be the "bottom" in the cross lap joint
         arrangement: CrossCapJointTimberArrangement,
 
