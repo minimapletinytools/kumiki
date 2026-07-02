@@ -90,43 +90,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 :: TODO
-DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
-DONE-poopify more patterns
-DONE-why does pattern viewer say "abc" ?
-DONE-update pattern discovery to just use the new method
-    def _might_contain_patternbook(src: str) -> bool:
-        if re.search(r"^\s*patternbook\s*=", src, flags=re.M):
-            return True
-        if re.search(r"^\s*def\s+create_\w+_patternbook\s*\(", src, flags=re.M):
-            return True
-        if re.search(r"^\s*patterns\s*=", src, flags=re.M):
-            return True
-        return False
-IGNORE/DONE-duplicate source button broke (or mayb enot you need to test it in an actual install)
-DONE-wedged half dovetail joint broke
-DONE-rename housed dovtail to dropin dovetail butt joint
-DONE-have patterns replace the currentyl open viewer, frames create new viewer
-  -or do right click open in new window option
-DONE-add agent notes for timber orientation
-DONE-do attach_timber function
-  DONE-orientation paremetrs
-  DONE-should be able to align feature of existing timber with feature of created timber
-  -do attach_plane_aligned_timber
-  -do attach_timber
-  -test and fix it lol
-DONE-update footprint examples so post on side is correct not in center...
-DONE-cleanup and author new construction pattern
-IGNORE-agent prompt examples
-DONE-TimberReferenceEnd -> TimberEnd
-DONE-do setup vid
-DONE-consider removing the opposite_length or renaming it stickout in attach_timber functions
 -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
-
-
-
-DONE-look into adding support for reference face/edge
-  -add is_perfect_face/edge
-    -we can still have reference face/edge after this, I guess a reference face does'nt actually need to be perfect though that would be tweirdi f you tried to do that.
 
 -reorg all mortise and tenon joint examples
 -test the install cadquery stuff 
@@ -351,6 +315,10 @@ M3.5
 
 
 :: TODONE 
+
+DONE-look into adding support for reference face/edge
+  -add is_perfect_face/edge
+    -we can still have reference face/edge after this, I guess a reference face does'nt actually need to be perfect though that would be tweirdi f you tried to do that.
 
 DONE-the scroll to top button is gone and the refresh viewer button should stay IN the viewer
 DONE-poopify more patterns
