@@ -1,7 +1,7 @@
 """
-Kumiki - Notching helpers
+Kumiki - Relief helpers
 
-Shared helper functions for shoulder-plane calculations and notch CSG generation.
+Shared helper functions for shoulder-plane calculations and relief CSG generation.
 """
 
 from __future__ import annotations
@@ -65,93 +65,93 @@ def warn_if_arrangement_timbers_imperfect(arrangement) -> None:
         warnings.warn(IMPERFECT_TIMBER_WARNING, stacklevel=2)
 
 @dataclass(frozen=True)
-class CrossJointScribeNotchingConfig:
+class CrossJointScribeReliefConfig:
     """
-    Configuration for cross joint notching
+    Configuration for cross joint relief
     "Scribe" here means one timber is scribed onto the other and completely cut away
     """
     timber_to_be_scribed: ArrangementNames
 
     @staticmethod
     def cross_timber_1():
-        return CrossJointScribeNotchingConfig(
+        return CrossJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.cross_timber_1,
         )
 
     @staticmethod
     def cross_timber_2():
-        return CrossJointScribeNotchingConfig(
+        return CrossJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.cross_timber_2,
         )
 
 
 @dataclass(frozen=True)
-class ButtJointScribeNotchingConfig:
+class ButtJointScribeReliefConfig:
     """
-    Configuration for butt joint notching
+    Configuration for butt joint relief
     "Scribe" here means one timber is scribed onto the other and completely cut away
     """
     timber_to_be_scribed: ArrangementNames
 
     @staticmethod
     def butt_timber():
-        return ButtJointScribeNotchingConfig(
+        return ButtJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.butt_timber,
         )
 
     @staticmethod
     def receiving_timber():
-        return ButtJointScribeNotchingConfig(
+        return ButtJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.receiving_timber,
         )
 
 
 @dataclass(frozen=True)
-class SpliceJointScribeNotchingConfig:
+class SpliceJointScribeReliefConfig:
     """
-    Configuration for splice joint notching
+    Configuration for splice joint relief
     "Scribe" here means one timber is scribed onto the other and completely cut away
     """
     timber_to_be_scribed: ArrangementNames
 
     @staticmethod
     def timber1():
-        return SpliceJointScribeNotchingConfig(
+        return SpliceJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.timber1,
         )
 
     @staticmethod
     def timber2():
-        return SpliceJointScribeNotchingConfig(
+        return SpliceJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.timber2,
         )
 
 
 @dataclass(frozen=True)
-class CornerJointScribeNotchingConfig:
+class CornerJointScribeReliefConfig:
     """
-    Configuration for corner joint notching
+    Configuration for corner joint relief
     "Scribe" here means one timber is scribed onto the other and completely cut away
     """
     timber_to_be_scribed: ArrangementNames
 
     @staticmethod
     def timber1():
-        return CornerJointScribeNotchingConfig(
+        return CornerJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.timber1,
         )
 
     @staticmethod
     def timber2():
-        return CornerJointScribeNotchingConfig(
+        return CornerJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.timber2,
         )
 
 
 @dataclass(frozen=True)
-class DoubleButtJointScribeNotchingConfig:
+class DoubleButtJointScribeReliefConfig:
     """
-    Configuration for double butt joint notching.
+    Configuration for double butt joint relief.
 
     ``first_timber_to_be_scribed`` is scribed first, then
     ``second_timber_to_be_scribed`` is scribed onto the remaining timber.
@@ -164,16 +164,16 @@ class DoubleButtJointScribeNotchingConfig:
         first_timber_to_be_scribed: ArrangementNames,
         second_timber_to_be_scribed: ArrangementNames,
     ):
-        return DoubleButtJointScribeNotchingConfig(
+        return DoubleButtJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
         )
 
 
 @dataclass(frozen=True)
-class TripleButtJointScribeNotchingConfig:
+class TripleButtJointScribeReliefConfig:
     """
-    Configuration for triple butt joint notching.
+    Configuration for triple butt joint relief.
 
     ``first_timber_to_be_scribed`` is scribed first, then
     ``second_timber_to_be_scribed``, then ``third_timber_to_be_scribed``.
@@ -188,7 +188,7 @@ class TripleButtJointScribeNotchingConfig:
         second_timber_to_be_scribed: ArrangementNames,
         third_timber_to_be_scribed: ArrangementNames,
     ):
-        return TripleButtJointScribeNotchingConfig(
+        return TripleButtJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
             third_timber_to_be_scribed=third_timber_to_be_scribed,
@@ -196,9 +196,9 @@ class TripleButtJointScribeNotchingConfig:
 
 
 @dataclass(frozen=True)
-class QuadrupleButtJointScribeNotchingConfig:
+class QuadrupleButtJointScribeReliefConfig:
     """
-    Configuration for quadruple butt joint notching.
+    Configuration for quadruple butt joint relief.
 
     ``first_timber_to_be_scribed`` is scribed first, then
     ``second_timber_to_be_scribed``, ``third_timber_to_be_scribed``, and
@@ -216,7 +216,7 @@ class QuadrupleButtJointScribeNotchingConfig:
         third_timber_to_be_scribed: ArrangementNames,
         fourth_timber_to_be_scribed: ArrangementNames,
     ):
-        return QuadrupleButtJointScribeNotchingConfig(
+        return QuadrupleButtJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
             third_timber_to_be_scribed=third_timber_to_be_scribed,
@@ -225,9 +225,9 @@ class QuadrupleButtJointScribeNotchingConfig:
 
 
 @dataclass(frozen=True)
-class CrossCapJointScribeNotchingConfig:
+class CrossCapJointScribeReliefConfig:
     """
-    Configuration for cross-cap joint notching.
+    Configuration for cross-cap joint relief.
 
     ``first_timber_to_be_scribed`` is scribed first, then
     ``second_timber_to_be_scribed`` is scribed onto the remaining timber.
@@ -240,16 +240,16 @@ class CrossCapJointScribeNotchingConfig:
         first_timber_to_be_scribed: ArrangementNames,
         second_timber_to_be_scribed: ArrangementNames,
     ):
-        return CrossCapJointScribeNotchingConfig(
+        return CrossCapJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
         )
 
 
 @dataclass(frozen=True)
-class BraceJointScribeNotchingConfig:
+class BraceJointScribeReliefConfig:
     """
-    Configuration for brace joint notching.
+    Configuration for brace joint relief.
 
     The 2 braced timbers are always scribed onto the brace timber.
     """
@@ -261,7 +261,7 @@ class BraceJointScribeNotchingConfig:
         first_timber_to_be_scribed: ArrangementNames,
         second_timber_to_be_scribed: ArrangementNames,
     ):
-        return BraceJointScribeNotchingConfig(
+        return BraceJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
         )
@@ -442,6 +442,7 @@ def chop_shoulder_notch_aligned_with_timber(
 
 def chop_shoulder_notch_on_timber_face(
     timber: TimberLike,
+    # TODO TimberLongFace
     notch_face: TimberFace,
     distance_along_timber: Numeric,
     notch_width: Numeric,
@@ -589,9 +590,9 @@ def chop_shoulder_notch_on_timber_face(
 
 
 @dataclass(frozen=True)
-class ShoulderNotchCSGGeometry:
+class ShoulderReliefCSGGeometry:
     """
-    CSG geometry produced by ``chop_notch_for_butt_joint_arrangement``.
+    CSG geometry produced by ``chop_relief_for_butt_joint_arrangement``.
 
     - ``receiving_timber_notch_negative_CSG``: cut applied to the receiving
       (mortise) timber, expressed in that timber's local frame.
@@ -603,14 +604,14 @@ class ShoulderNotchCSGGeometry:
     butting_timber_relief_negative_CSG: CutCSG | None
 
 
-def chop_notch_for_butt_joint_arrangement(
+def chop_relief_for_butt_joint_arrangement(
     arrangement: ButtJointTimberArrangement,
     mortise_shoulder_distance_from_centerline: Numeric,
     # the min is taken between this parameter and the angle the butt timber
     # approaches the shoulder plane at (both in radians)
     notch_wall_min_relief_cut_angle: Numeric = scalar(0),
     use_receiving_timber_nominal_size_for_butting_timber_relief_depth: bool = True,
-) -> ShoulderNotchCSGGeometry | None:
+) -> ShoulderReliefCSGGeometry | None:
     """
     Compute the shoulder notch on the receiving timber AND the matching
     relief cut on the butting timber for a butt-joint arrangement.
@@ -747,13 +748,13 @@ def chop_notch_for_butt_joint_arrangement(
         subtract=[notch_in_butt_local, butt_prism_in_butt_local],
     )
 
-    return ShoulderNotchCSGGeometry(
+    return ShoulderReliefCSGGeometry(
         receiving_timber_notch_negative_CSG=receiving_timber_notch_local,
         butting_timber_relief_negative_CSG=relief_in_butt_local,
     )
 
 
-def chop_scribe_notch(
+def chop_scribe_relief(
     timber_to_be_scribed: TimberLike,
     timber_to_be_cut: TimberLike,
 ) -> tuple[CutCSG, CutCSG]:
@@ -781,7 +782,7 @@ def chop_scribe_notch(
     )
 
     # seems to create triangulation artifacts when used on circular timbers with trimesh right now :(
-    scribed_notch_global = Intersection(
+    scribed_relief_global = Intersection(
         left=Difference(
             timber_to_be_scribed_actual_csg_global,
             subtract=[timber_to_be_scribed_perfect_csg_global],
@@ -790,31 +791,31 @@ def chop_scribe_notch(
     )
 
 
-    cut_notch_global = Difference(
+    cut_relief_global = Difference(
         base=timber_to_be_scribed_actual_csg_global,
         subtract=[timber_to_be_cut_perfect_csg_global],
     )
 
 
-    scribed_notch_in_scribed_local = adopt_csg(
-        None, timber_to_be_scribed.transform, scribed_notch_global
+    scribed_relief_in_scribed_local = adopt_csg(
+        None, timber_to_be_scribed.transform, scribed_relief_global
     )
-    cut_notch_in_cut_local = adopt_csg(
-        None, timber_to_be_cut.transform, cut_notch_global
+    cut_relief_in_cut_local = adopt_csg(
+        None, timber_to_be_cut.transform, cut_relief_global
     )
 
-    return scribed_notch_in_scribed_local, cut_notch_in_cut_local
+    return scribed_relief_in_scribed_local, cut_relief_in_cut_local
 
 
-def chop_scribe_notch_and_apply(
+def chop_scribe_relief_and_apply(
     timber_to_be_scribed: TimberLike,
     timber_to_be_scribed_cutting: Cutting,
     timber_to_be_cut: TimberLike,
     timber_to_be_cut_cutting: Cutting,
 ) -> tuple[Cutting, Cutting]:
     """
-    Apply scribe notches from ``chop_scribe_notch`` to the given cuttings, unioning the
-    new notch CSGs into each cutting's existing ``negative_csg``.
+    Apply scribe relief cuts from ``chop_scribe_relief`` to the given cuttings, unioning the
+    new relief CSGs into each cutting's existing ``negative_csg``.
 
     Returns ``(updated_cut_cutting, updated_scribed_cutting)`` (matching the order of
     the early-return path when both timbers are perfect).
@@ -822,7 +823,7 @@ def chop_scribe_notch_and_apply(
     if timber_to_be_scribed.is_perfect_timber() and timber_to_be_cut.is_perfect_timber():
         return timber_to_be_cut_cutting, timber_to_be_scribed_cutting
 
-    scribed_notch_csg_local, cut_notch_csg_local = chop_scribe_notch(
+    scribed_relief_csg_local, cut_relief_csg_local = chop_scribe_relief(
         timber_to_be_scribed=timber_to_be_scribed,
         timber_to_be_cut=timber_to_be_cut,
     )
@@ -835,13 +836,13 @@ def chop_scribe_notch_and_apply(
     updated_scribed_cutting = replace(
         timber_to_be_scribed_cutting,
         negative_csg=_union_into(
-            timber_to_be_scribed_cutting.negative_csg, scribed_notch_csg_local
+            timber_to_be_scribed_cutting.negative_csg, scribed_relief_csg_local
         ),
     )
     updated_cut_cutting = replace(
         timber_to_be_cut_cutting,
         negative_csg=_union_into(
-            timber_to_be_cut_cutting.negative_csg, cut_notch_csg_local
+            timber_to_be_cut_cutting.negative_csg, cut_relief_csg_local
         ),
     )
 

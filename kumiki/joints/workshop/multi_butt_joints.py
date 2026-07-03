@@ -11,7 +11,7 @@ from .shavings.build_a_butt import (
     SimplePegParameters,
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
 )
-from .shavings.notching import (
+from .shavings.relief import (
     chop_shoulder_notch_aligned_with_timber,
     warn_if_arrangement_timbers_imperfect,
 )

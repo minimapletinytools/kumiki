@@ -92,7 +92,7 @@ def make_splice_joint_example(position: V3, use_round_timbers=False) -> list[Cut
 def make_splice_lap_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
     """
     Create a splice lap joint example.
-    Two timbers meet end-to-end with interlocking lap notches.
+    Two timbers meet end-to-end with interlocking lap relief cuts.
 
     Args:
         position: Center position of the joint (V3)

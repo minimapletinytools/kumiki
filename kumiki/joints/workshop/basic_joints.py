@@ -242,7 +242,7 @@ def cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) ->
 
 def cut_basic_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """
-    Creates a house (dado/housing) joint where the housing timber is notched to receive the housed timber.
+    Creates a house (dado/housing) joint where the housing timber is relieved to receive the housed timber.
 
     Only the housing timber is cut; the housed timber is unaffected. Convenience wrapper; see
     `cut_plain_cross_lap_house_joint` for details.

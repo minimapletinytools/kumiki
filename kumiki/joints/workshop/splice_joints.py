@@ -10,7 +10,7 @@ from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
 from .shavings.shavings import draw_gooseneck_polygon
-from .shavings.notching import warn_if_arrangement_timbers_imperfect
+from .shavings.relief import warn_if_arrangement_timbers_imperfect
 from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, mark_distance_from_face_in_normal_direction
 
 
@@ -167,7 +167,7 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
     lap_depth: Optional[Numeric] = None
 ) -> Joint:
     """
-    Creates a splice lap joint between two parallel timber ends with interlocking notches.
+    Creates a splice lap joint between two parallel timber ends with interlocking relief cuts.
 
     One timber has material removed from the specified face; the other has material
     removed from the opposite face. Timbers must be parallel and face-aligned.

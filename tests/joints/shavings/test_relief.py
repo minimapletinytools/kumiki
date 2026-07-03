@@ -1,20 +1,20 @@
 """
-Tests for shoulder notching helpers in kumiki.joints.workshop.notching.
+Tests for the shoulder-notch and relief-cut helpers in kumiki.joints.workshop.relief.
 """
 
 from dataclasses import replace
 
 from kumiki.cutcsg import Difference, Intersection
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
-from kumiki.joints.workshop.shavings.notching import (
-    BraceJointScribeNotchingConfig,
-    CrossCapJointScribeNotchingConfig,
-    DoubleButtJointScribeNotchingConfig,
-    QuadrupleButtJointScribeNotchingConfig,
-    ShoulderNotchCSGGeometry,
-    TripleButtJointScribeNotchingConfig,
-    chop_notch_for_butt_joint_arrangement,
-    chop_scribe_notch,
+from kumiki.joints.workshop.shavings.relief import (
+    BraceJointScribeReliefConfig,
+    CrossCapJointScribeReliefConfig,
+    DoubleButtJointScribeReliefConfig,
+    QuadrupleButtJointScribeReliefConfig,
+    ShoulderReliefCSGGeometry,
+    TripleButtJointScribeReliefConfig,
+    chop_relief_for_butt_joint_arrangement,
+    chop_scribe_relief,
     does_shoulder_plane_need_notching,
 )
 from kumiki.rule import create_v2, safe_normalize_vector as normalize_vector, scalar
@@ -106,8 +106,8 @@ class TestShoulderNotchingDecision:
         assert does_shoulder_plane_need_notching(non_plane_arrangement, scalar(100))
 
 
-class TestChopNotchForButtJointArrangement:
-    """Tests for chop_notch_for_butt_joint_arrangement."""
+class TestChopReliefForButtJointArrangement:
+    """Tests for chop_relief_for_butt_joint_arrangement."""
 
     def test_returns_geometry_for_inset_shoulder(self, simple_T_configuration):
         """
@@ -128,11 +128,11 @@ class TestChopNotchForButtJointArrangement:
         # Mortise is 6x6, so nominal entry face half-size = 3.
         # An inset shoulder at distance 2 from the centerline (< 3) requires notching.
         inset_distance = scalar(2)
-        geom = chop_notch_for_butt_joint_arrangement(
+        geom = chop_relief_for_butt_joint_arrangement(
             arrangement, inset_distance
         )
         assert geom is not None
-        assert isinstance(geom, ShoulderNotchCSGGeometry)
+        assert isinstance(geom, ShoulderReliefCSGGeometry)
         # The receiving timber notch should be a prism or union of prisms.
         assert isinstance(
             geom.receiving_timber_notch_negative_CSG, (RectangularPrism, SolidUnion)
@@ -152,12 +152,12 @@ class TestChopNotchForButtJointArrangement:
             entry_face
         )
         assert (
-            chop_notch_for_butt_joint_arrangement(arrangement, face_half_size)
+            chop_relief_for_butt_joint_arrangement(arrangement, face_half_size)
             is None
         )
 
 
-class TestChopScribeNotch:
+class TestChopScribeRelief:
     def test_returns_pair_in_cut_timber_local_space(self):
         timber_to_be_cut = create_standard_vertical_timber(
             height=scalar(20),
@@ -180,20 +180,20 @@ class TestChopScribeNotch:
             ),
         )
 
-        scribed_overlap_csg_local, scribe_notch_csg_local = chop_scribe_notch(
+        scribed_overlap_csg_local, scribe_relief_csg_local = chop_scribe_relief(
             timber_to_be_scribed=timber_to_be_scribed,
             timber_to_be_cut=timber_to_be_cut,
         )
 
         assert isinstance(scribed_overlap_csg_local, Intersection)
-        assert isinstance(scribe_notch_csg_local, Difference)
+        assert isinstance(scribe_relief_csg_local, Difference)
         assert scribed_overlap_csg_local.contains_point(create_v3(scalar(1), scalar(5, 2), scalar(10)))
-        assert scribe_notch_csg_local.contains_point(create_v3(scalar(5, 2), scalar(0), scalar(10)))
+        assert scribe_relief_csg_local.contains_point(create_v3(scalar(5, 2), scalar(0), scalar(10)))
 
 
-class TestMultiTimberScribeNotchingConfig:
+class TestMultiTimberScribeReliefConfig:
     def test_double_butt_uses_with_order(self):
-        config = DoubleButtJointScribeNotchingConfig.with_order(
+        config = DoubleButtJointScribeReliefConfig.with_order(
             ArrangementNames.butt_timber_1,
             ArrangementNames.butt_timber_2,
         )
@@ -202,7 +202,7 @@ class TestMultiTimberScribeNotchingConfig:
         assert config.second_timber_to_be_scribed == ArrangementNames.butt_timber_2
 
     def test_triple_butt_uses_with_order(self):
-        config = TripleButtJointScribeNotchingConfig.with_order(
+        config = TripleButtJointScribeReliefConfig.with_order(
             ArrangementNames.main_butt_timber_1,
             ArrangementNames.main_butt_timber_2,
             ArrangementNames.awk_timber,
@@ -213,7 +213,7 @@ class TestMultiTimberScribeNotchingConfig:
         assert config.third_timber_to_be_scribed == ArrangementNames.awk_timber
 
     def test_quadruple_butt_uses_with_order(self):
-        config = QuadrupleButtJointScribeNotchingConfig.with_order(
+        config = QuadrupleButtJointScribeReliefConfig.with_order(
             ArrangementNames.main_butt_timber_1,
             ArrangementNames.main_butt_timber_2,
             ArrangementNames.awk_1,
@@ -226,7 +226,7 @@ class TestMultiTimberScribeNotchingConfig:
         assert config.fourth_timber_to_be_scribed == ArrangementNames.awk_2
 
     def test_cross_cap_uses_with_order(self):
-        config = CrossCapJointScribeNotchingConfig.with_order(
+        config = CrossCapJointScribeReliefConfig.with_order(
             ArrangementNames.cross_timber_1,
             ArrangementNames.cross_timber_2,
         )
@@ -235,7 +235,7 @@ class TestMultiTimberScribeNotchingConfig:
         assert config.second_timber_to_be_scribed == ArrangementNames.cross_timber_2
 
     def test_brace_uses_with_order(self):
-        config = BraceJointScribeNotchingConfig.with_order(
+        config = BraceJointScribeReliefConfig.with_order(
             ArrangementNames.timber1,
             ArrangementNames.brace_timber,
         )

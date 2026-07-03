@@ -11,7 +11,7 @@ from kumiki.joints.workshop.shavings.shavings import (
     scribe_face_plane_onto_centerline,
     scribe_centerline_onto_centerline
 )
-from kumiki.joints.workshop.shavings.notching import chop_shoulder_notch_on_timber_face
+from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face
 from kumiki.timber import timber_from_directions, TimberEnd, TimberFace, TimberLongFace
 from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel, scalar
 from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace

@@ -104,7 +104,7 @@ def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutT
 def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
     """
     Create a cross lap joint where two timbers cross each other.
-    Each timber is notched halfway through (cut_ratio=0.5) so they fit together flush.
+    Each timber has a relief cut halfway through (cut_ratio=0.5) so they fit together flush.
     TimberA is positioned lower, TimberB is positioned higher, and they overlap in the middle.
 
     Args:

@@ -25,7 +25,7 @@ class TestFreeHouseJoint:
         """
         A 1×1 housed timber enters halfway into a 3×3 housing timber.
         Points strictly inside the housed timber's body must not be inside
-        the cut housing timber (they were removed to accommodate the notch).
+        the cut housing timber (they were removed to accommodate the relief cut).
         """
         # 3×3 vertical housing timber (local x=global X, y=global Y, z=global Z)
         housing_timber = create_standard_vertical_timber(
@@ -55,21 +55,21 @@ class TestFreeHouseJoint:
         housing_local = housing_timber.transform.global_to_local(center_global)
         housed_local = housed_timber.transform.global_to_local(center_global)
 
-        # Notch was cut → point is no longer inside the housing timber
+        # Relief was cut → point is no longer inside the housing timber
         assert not housing_rendered.contains_point(housing_local)
         # The housed timber itself is untouched
         assert housed_rendered.contains_point(housed_local)
 
-        # Point well away from the notch must still be inside the housing timber
+        # Point well away from the relief cut must still be inside the housing timber
         away_global = create_v3(scalar(0), scalar(0), scalar(5))
         housing_local_away = housing_timber.transform.global_to_local(away_global)
         assert housing_rendered.contains_point(housing_local_away)
 
     # 🐪
-    def test_free_house_joint_cut_timber_notch_matches_actual_body(self, symbolic_mode):
+    def test_free_house_joint_cut_timber_relief_matches_actual_body(self, symbolic_mode):
         """
         A 2×2 CutTimber with its lower-Z half removed is housed in a 3×3 timber.
-        The notch must match the CutTimber's remaining body (upper Z half only),
+        The relief must match the CutTimber's remaining body (upper Z half only),
         so the lower Z region is not removed from the housing even though the full
         prism overlaps there.
         """
@@ -103,7 +103,7 @@ class TestFreeHouseJoint:
         housing_rendered = _render_cutting(joint.cuttings["housing_timber"])
 
         # --- Point in the UPPER half (global Z = 10.5): CutTimber body ---
-        # The notch must remove this region from the housing.
+        # The relief must remove this region from the housing.
         upper_global = create_v3(scalar(0), scalar(0), scalar(21, 2))  # Z = 10.5
         housing_local_upper = housing_timber.transform.global_to_local(upper_global)
         housed_local_upper = housed_timber_base.transform.global_to_local(upper_global)
@@ -111,10 +111,10 @@ class TestFreeHouseJoint:
         assert housed_body.contains_point(housed_local_upper), \
             "Z=10.5 should be inside the CutTimber body (upper half kept)"
         assert not housing_rendered.contains_point(housing_local_upper), \
-            "Z=10.5 should have been removed from the housing (notch matches CutTimber body)"
+            "Z=10.5 should have been removed from the housing (relief matches CutTimber body)"
 
         # --- Point in the LOWER half (global Z = 9.5): was cut from CutTimber ---
-        # The housing must NOT be notched here.
+        # The housing must NOT be relieved here.
         lower_global = create_v3(scalar(0), scalar(0), scalar(19, 2))  # Z = 9.5
         housing_local_lower = housing_timber.transform.global_to_local(lower_global)
         housed_local_lower = housed_timber_base.transform.global_to_local(lower_global)
@@ -122,11 +122,11 @@ class TestFreeHouseJoint:
         assert not housed_body.contains_point(housed_local_lower), \
             "Z=9.5 should NOT be in the CutTimber body (lower half was cut away)"
         assert housing_rendered.contains_point(housing_local_lower), \
-            "Z=9.5 should still be inside the housing (notch does not reach the removed region)"
+            "Z=9.5 should still be inside the housing (relief does not reach the removed region)"
 
-    def test_free_house_joint_multiple_housed_timbers_notch_union(self, symbolic_mode):
+    def test_free_house_joint_multiple_housed_timbers_relief_union(self, symbolic_mode):
         """
-        Two housed timbers should produce one housing notch that removes both occupied regions.
+        Two housed timbers should produce one housing relief that removes both occupied regions.
         """
         housing_timber = create_standard_vertical_timber(
             height=20, size=(3, 3), position=(0, 0, 0), ticket="housing"

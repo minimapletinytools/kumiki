@@ -1,306 +1,709 @@
 {
   "entries": {
-    "patterns/CSG_debug_examples.py": {
+    "patterns/CSG_debug_patterns.py": {
       "chosen_frame_kind": null,
       "chosen_frame_name": null,
       "frames": [],
       "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_CSG_debug_examples",
+      "module_name": "giraffe_librarian_dynamic_CSG_debug_patterns",
       "multiple_frames": false,
       "patternbook": {
-        "groups": [
-          "angled_shoulder_notch",
-          "csg",
-          "cube_cutout",
-          "dovetail_shoulder_geometry_raw",
-          "dovetail_tenon_geometry_raw",
-          "gooseneck_profile",
-          "halfspace_cut",
-          "hexagon_extrusion",
-          "lap_cut_timber",
-          "positioned_cube",
-          "shoulder_notch",
-          "shoulder_notch_raw",
-          "union_cubes"
-        ],
-        "loaded": true,
-        "names": [
+        "pattern_names": [
           "cube_cutout",
           "halfspace_cut",
           "positioned_cube",
           "union_cubes",
           "hexagon_extrusion",
           "lap_cut_timber",
-          "gooseneck_profile",
-          "shoulder_notch",
+          "gooseneck_profile_cut",
+          "shoulder_notch_on_timber",
+          "chop_shoulder_notch_raw",
           "angled_shoulder_notch",
-          "shoulder_notch_raw",
           "dovetail_shoulder_geometry_raw",
           "dovetail_tenon_geometry_raw"
         ],
-        "static_entries": [
+        "patterns": [
           {
-            "kind": "factory",
-            "lineno": 677,
-            "name": "create_csg_examples_patternbook"
+            "path": "csg_debug/cube_cutout",
+            "pattern_type": "csg",
+            "tags": [
+              "main",
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/halfspace_cut",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/positioned_cube",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/union_cubes",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/hexagon_extrusion",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/lap_cut_timber",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/gooseneck_profile_cut",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/shoulder_notch_on_timber",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/chop_shoulder_notch_raw",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/angled_shoulder_notch",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/dovetail_shoulder_geometry_raw",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/dovetail_tenon_geometry_raw",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
           }
         ]
       },
-      "relative_path": "CSG_debug_examples.py",
-      "sha256": "cbf25663cf3088701942ad6f063278aad3438a70a81d429eff061b8a8c8bf518",
+      "relative_path": "CSG_debug_patterns.py",
+      "sha256": "2c2e34012aaa43ff1d73bc449933a28c28b8ce82b9808fc2083355424248c7b8",
       "warnings": []
     },
-    "patterns/basic_joints_examples.py": {
+    "patterns/basic_joints_patterns.py": {
       "chosen_frame_kind": null,
       "chosen_frame_name": null,
       "frames": [],
       "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_basic_joints_examples",
+      "module_name": "giraffe_librarian_dynamic_basic_joints_patterns",
       "multiple_frames": false,
       "patternbook": {
-        "groups": [
-          "basic_joints",
-          "butt",
-          "corner",
-          "cross",
-          "end",
-          "house",
-          "japanese",
-          "lap",
-          "miter",
-          "mortise_tenon",
-          "splice"
+        "pattern_names": [
+          "basic_miter_joint",
+          "basic_miter_joint_face_aligned",
+          "basic_tongue_and_fork_corner_joint",
+          "basic_butt_joint",
+          "basic_butt_splice_joint",
+          "basic_cross_lap_joint",
+          "basic_house_joint",
+          "basic_splined_opposing_double_butt_joint",
+          "basic_splice_lap_joint",
+          "basic_mortise_and_tenon",
+          "with_peg",
+          "basic_lapped_gooseneck_joint",
+          "basic_dropin_dovetail_butt_joint",
+          "basic_mitered_and_keyed_lap_joint"
         ],
-        "loaded": true,
-        "names": [
-          "basic_miter",
-          "basic_miter_face_aligned",
-          "basic_tongue_fork",
-          "basic_butt",
-          "basic_butt_splice",
-          "basic_cross_lap",
-          "basic_house",
-          "basic_splined_double_butt",
-          "basic_splice_lap",
-          "basic_mortise_tenon",
-          "basic_mortise_tenon_peg",
-          "basic_gooseneck",
-          "basic_dovetail",
-          "basic_mitered_keyed_lap"
-        ],
-        "static_entries": [
+        "patterns": [
           {
-            "kind": "function",
-            "lineno": 265,
-            "name": "create_basic_joints_patternbook"
+            "path": "basic_joints/basic_miter_joint",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "basic_joints/basic_miter_joint_face_aligned",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_tongue_and_fork_corner_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_butt_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_butt_splice_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_cross_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_house_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_splined_opposing_double_butt_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_splice_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "basic_joints/basic_mortise_and_tenon/with_peg",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_lapped_gooseneck_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_dropin_dovetail_butt_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "basic_joints/basic_mitered_and_keyed_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
-      "relative_path": "basic_joints_examples.py",
-      "sha256": "eec82e1f0b685fcfa8e013f1ccbd0f94c3cf6bb47a568827b621c9e7ce5ee387",
+      "relative_path": "basic_joints_patterns.py",
+      "sha256": "51bd5bddb2ec890289e4c2dcd4a576c024837d61ea4741af9ac185fc3e810920",
       "warnings": []
     },
-    "patterns/construction_examples.py": {
-      "chosen_frame_kind": null,
-      "chosen_frame_name": null,
-      "frames": [],
-      "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_construction_examples",
-      "multiple_frames": false,
-      "patternbook": {
-        "groups": [
-          "centerline",
-          "construction"
-        ],
-        "loaded": true,
-        "names": [
-          "posts_with_beam_centerline"
-        ],
-        "static_entries": [
-          {
-            "kind": "function",
-            "lineno": 68,
-            "name": "create_construction_patternbook"
-          }
-        ]
-      },
-      "relative_path": "construction_examples.py",
-      "sha256": "3356c0d2575ad5423227dcbab60834d7fed3b5cbd75fb07e0172e7cfef1c10e2",
-      "warnings": []
-    },
-    "patterns/double_butt_joints_example.py": {
+    "patterns/board_joints_patterns.py": {
       "chosen_frame_kind": "function",
-      "chosen_frame_name": "make_splined_opposing_double_butt_joint_example",
+      "chosen_frame_name": "example_board_in_grooved_frame",
       "frames": [
         {
           "kind": "function",
-          "lineno": 19,
-          "name": "make_splined_opposing_double_butt_joint_example"
+          "lineno": 56,
+          "name": "example_board_in_grooved_frame"
         }
       ],
       "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_double_butt_joints_example",
+      "module_name": "giraffe_librarian_dynamic_board_joints_patterns",
       "multiple_frames": false,
       "patternbook": {
-        "groups": [
-          "butt",
-          "double_butt_joints",
-          "splined_opposing"
+        "pattern_names": [
+          "tongue_and_groove",
+          "board_in_grooved_frame"
         ],
-        "loaded": true,
-        "names": [
-          "splined_opposing_double_butt_joint"
-        ],
-        "static_entries": [
+        "patterns": [
           {
-            "kind": "function",
-            "lineno": 56,
-            "name": "create_double_butt_joints_patternbook"
+            "path": "board_joints/tongue_and_groove",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "board_joints/board_in_grooved_frame",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
           }
         ]
       },
-      "relative_path": "double_butt_joints_example.py",
-      "sha256": "758b07b1b321a37d8b894ae559c7df3de11979eb42b40e64a485e94b3b9bae11",
+      "relative_path": "board_joints_patterns.py",
+      "sha256": "aa8b1c0b1f239e9a8b43fb83d4e70a1422a2d722c46980e3f4fab2a2894a872d",
       "warnings": []
     },
-    "patterns/irrational_angles_example.py": {
+    "patterns/butt_joints_patterns.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_all_butt_joint_patterns",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 686,
+          "name": "create_all_butt_joint_patterns"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_butt_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": {
+        "pattern_names": [
+          "tongue_and_fork_butt_joint_90",
+          "tongue_and_fork_butt_joint_angled",
+          "plain_butt_joint",
+          "plain_butt_joint_3d",
+          "mortise_and_tenon_basic",
+          "mortise_and_tenon_basic_face_aligned",
+          "mortise_and_tenon_round_face_aligned",
+          "mortise_and_tenon_basic_face_aligned_round_timbers",
+          "mortise_and_tenon_through_tenon",
+          "mortise_and_tenon_inset_shoulder",
+          "mortise_and_tenon_double_angled",
+          "brace_joint_mortise_and_tenon",
+          "wedged_half_dovetail_mortise_and_tenon",
+          "half_dovetail_mortise_and_tenon_no_wedge",
+          "cut_dropin_dovetail_butt_joint"
+        ],
+        "patterns": [
+          {
+            "path": "butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_90",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/plain_butt_joint/plain_butt_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/plain_butt_joint/plain_butt_joint_3d",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_basic",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_basic_face_aligned",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_round_face_aligned",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_basic_face_aligned_round_timbers",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_through_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_double_angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/wedged_half_dovetail_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/half_dovetail_mortise_and_tenon_no_wedge",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/cut_dropin_dovetail_butt_joint",
+            "pattern_type": "frame",
+            "tags": []
+          }
+        ]
+      },
+      "relative_path": "butt_joints_patterns.py",
+      "sha256": "0b488679c20a55cabdea6881d0f4d1035c21ce8c40400c9f52af93251f1e46c3",
+      "warnings": []
+    },
+    "patterns/compound_joints_patterns.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_compound_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "compound_joints_patterns.py",
+      "sha256": "1d1a224621c51e9cb4b989086d919f312a752f9cea14ba95a56b4346fe70373d",
+      "warnings": []
+    },
+    "patterns/construction_patterns.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_construction_patterns",
+      "multiple_frames": false,
+      "patternbook": {
+        "pattern_names": [
+          "join_face_aligned_on_face_aligned_timbers",
+          "attach_face_aligned_timber",
+          "attach_face_aligned_timber_flush",
+          "inside",
+          "outside",
+          "centerline",
+          "centerline_with_stickout",
+          "make_attach_face_aligned_timber_target_projection_example",
+          "attach_plane_aligned_timber_brace",
+          "attach_timber",
+          "vertical",
+          "horizontal"
+        ],
+        "patterns": [
+          {
+            "path": "construction/join_face_aligned_on_face_aligned_timbers",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_face_aligned_timber",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_face_aligned_timber_flush",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_face_aligned_timber/stickout/inside",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_face_aligned_timber/stickout/outside",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_face_aligned_timber/stickout/centerline",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_face_aligned_timber/stickout/centerline_with_stickout",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_face_aligned_timber/make_attach_face_aligned_timber_target_projection_example",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_plane_aligned_timber_brace",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/attach_timber",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/footprint/vertical",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "construction/footprint/horizontal",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          }
+        ]
+      },
+      "relative_path": "construction_patterns.py",
+      "sha256": "a8edc2f1c8fe54c55f41f4b89937833c84a298b032664fda13690b370722b552",
+      "warnings": []
+    },
+    "patterns/corner_joints_patterns.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_all_corner_joint_patterns",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 380,
+          "name": "create_all_corner_joint_patterns"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_corner_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": {
+        "pattern_names": [
+          "cut_plain_miter_joint",
+          "cut_plain_miter_joint_face_aligned",
+          "cut_plain_miter_joint_3d",
+          "cut_tongue_and_fork_corner_joint_90",
+          "cut_tongue_and_fork_corner_joint_135",
+          "cut_plain_corner_lap_joint",
+          "cut_mitered_and_keyed_lap_joint_90",
+          "cut_mitered_and_keyed_lap_joint_130"
+        ],
+        "patterns": [
+          {
+            "path": "corner_joints/plain_miter_joint/cut_plain_miter_joint",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "corner_joints/plain_miter_joint/cut_plain_miter_joint_face_aligned",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "corner_joints/plain_miter_joint/cut_plain_miter_joint_3d",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "corner_joints/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_90",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "corner_joints/tongue_and_fork_corner_joint/cut_tongue_and_fork_corner_joint_135",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "corner_joints/cut_plain_corner_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_90",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "corner_joints/mitered_and_keyed_lap_joint/cut_mitered_and_keyed_lap_joint_130",
+            "pattern_type": "frame",
+            "tags": []
+          }
+        ]
+      },
+      "relative_path": "corner_joints_patterns.py",
+      "sha256": "fef5e5866dce0199c38d9617f303a144e5173c10809403bc12506aa8264a108f",
+      "warnings": []
+    },
+    "patterns/cross_joints_patterns.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_all_cross_joint_patterns",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 156,
+          "name": "create_all_cross_joint_patterns"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_cross_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": {
+        "pattern_names": [
+          "cut_plain_cross_lap_house_joint",
+          "cut_plain_cross_lap_joint"
+        ],
+        "patterns": [
+          {
+            "path": "cross_joints/cut_plain_cross_lap_house_joint",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "cross_joints/cut_plain_cross_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
+          }
+        ]
+      },
+      "relative_path": "cross_joints_patterns.py",
+      "sha256": "64d22654ab3bc16f21e405b7accb645f04d66b0741ecedf278206eeb8b1fc0d7",
+      "warnings": []
+    },
+    "patterns/decorative_joints_patterns.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_decorative_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "decorative_joints_patterns.py",
+      "sha256": "08534f6018e0554fe911162477462ded050385b8fb476077810552620f9aa62f",
+      "warnings": []
+    },
+    "patterns/free_joints_patterns.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_free_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "free_joints_patterns.py",
+      "sha256": "71774041f33e47b0bc324ce39bd3e01dd31360f0426b7b80b5177b0e5c693ed1",
+      "warnings": []
+    },
+    "patterns/irrational_angles_patterns.py": {
       "chosen_frame_kind": "function",
       "chosen_frame_name": "create_all_irrational_examples",
       "frames": [
         {
           "kind": "function",
-          "lineno": 34,
+          "lineno": 17,
           "name": "create_all_irrational_examples"
         }
       ],
       "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_irrational_angles_example",
+      "module_name": "giraffe_librarian_dynamic_irrational_angles_patterns",
       "multiple_frames": false,
       "patternbook": {
-        "groups": [
-          "irrational_angles",
-          "test_examples"
+        "pattern_names": [
+          "mortise_and_tenon_37_degrees"
         ],
-        "loaded": true,
-        "names": [
-          "irrational_angles_test"
-        ],
-        "static_entries": [
+        "patterns": [
           {
-            "kind": "function",
-            "lineno": 16,
-            "name": "create_irrational_angles_patternbook"
+            "path": "irrational_angles/mortise_and_tenon_37_degrees",
+            "pattern_type": "frame",
+            "tags": [
+              "main",
+              "poop"
+            ]
           }
         ]
       },
-      "relative_path": "irrational_angles_example.py",
-      "sha256": "fefef9634b8a6e330d00a97227b9282f0eb8545bca5adc4e28fb334551c756be",
+      "relative_path": "irrational_angles_patterns.py",
+      "sha256": "b1fc500dfce5fa565d22d40345e448b4c4bb38b3d50d115ecc9a671df6db06ca",
       "warnings": []
     },
-    "patterns/japanese_joints_example.py": {
+    "patterns/multi_butt_joints_patterns.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "make_splined_opposing_double_butt_joint_example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 18,
+          "name": "make_splined_opposing_double_butt_joint_example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_multi_butt_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": {
+        "pattern_names": [
+          "splined_opposing_double_butt_joint"
+        ],
+        "patterns": [
+          {
+            "path": "multi_butt_joints/splined_opposing_double_butt_joint",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          }
+        ]
+      },
+      "relative_path": "multi_butt_joints_patterns.py",
+      "sha256": "6787d46324352efde054dfab351aa0c66e27999984452175fae07b9bc63c0656",
+      "warnings": []
+    },
+    "patterns/patternbook_patterns.py": {
       "chosen_frame_kind": null,
       "chosen_frame_name": null,
       "frames": [],
       "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_japanese_joints_example",
+      "module_name": "giraffe_librarian_dynamic_patternbook_patterns",
       "multiple_frames": false,
       "patternbook": {
-        "groups": [
-          "butt",
-          "corner",
-          "dovetail",
-          "end",
-          "gooseneck",
-          "japanese_joints",
-          "miter"
-        ],
-        "loaded": true,
-        "names": [
-          "gooseneck_simple",
-          "dovetail_butt",
-          "mitered_keyed_lap",
-          "mitered_keyed_lap_130deg"
-        ],
-        "static_entries": [
-          {
-            "kind": "function",
-            "lineno": 29,
-            "name": "create_japanese_joints_patternbook"
-          }
-        ]
-      },
-      "relative_path": "japanese_joints_example.py",
-      "sha256": "3ea7bdf1be16b0859d9113bc09986a0c39f01bd9125ad23ef83f5091854c869b",
-      "warnings": []
-    },
-    "patterns/mortise_and_tenon_joint_examples.py": {
-      "chosen_frame_kind": null,
-      "chosen_frame_name": null,
-      "frames": [],
-      "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_mortise_and_tenon_joint_examples",
-      "multiple_frames": false,
-      "patternbook": {
-        "groups": [
-          "basic",
-          "basic_face_aligned",
-          "basic_face_aligned_round",
-          "brace",
-          "butt",
-          "corner",
-          "double_angled",
-          "inset_shoulder_face_aligned",
-          "mortise_tenon",
-          "round_face_aligned",
-          "through_face_aligned",
-          "wedged_half_dovetail"
-        ],
-        "loaded": true,
-        "names": [
-          "basic_4x4",
-          "basic_face_aligned",
-          "round_face_aligned",
-          "basic_face_aligned_two_round_timbers",
-          "through_tenon_face_aligned",
-          "inset_shoulder_face_aligned",
-          "brace_joint",
-          "double_angled",
-          "wedged_half_dovetail",
-          "half_dovetail_no_wedge"
-        ],
-        "static_entries": [
-          {
-            "kind": "function",
-            "lineno": 431,
-            "name": "create_mortise_and_tenon_patternbook"
-          }
-        ]
-      },
-      "relative_path": "mortise_and_tenon_joint_examples.py",
-      "sha256": "0a644cc24d086756635488a9ace8f84bf4e1ac0de8f14a3e1538153f5a144d2a",
-      "warnings": []
-    },
-    "patterns/patternbook_example.py": {
-      "chosen_frame_kind": null,
-      "chosen_frame_name": null,
-      "frames": [],
-      "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_patternbook_example",
-      "multiple_frames": false,
-      "patternbook": {
-        "groups": [
-          "a",
-          "b",
-          "e",
-          "m",
-          "o",
-          "p",
-          "s",
-          "t",
-          "x"
-        ],
-        "loaded": true,
-        "names": [
+        "pattern_names": [
           "short_post",
           "tall_post",
           "wide_post",
@@ -311,186 +714,255 @@
           "medium_box",
           "large_box"
         ],
-        "static_entries": [
+        "patterns": [
           {
-            "kind": "function",
-            "lineno": 11,
-            "name": "create_simple_post_pattern"
+            "path": "patternbook_examples/short_post",
+            "pattern_type": "frame",
+            "tags": [
+              "main",
+              "poop"
+            ]
           },
           {
-            "kind": "function",
-            "lineno": 84,
-            "name": "create_beam_patterns"
+            "path": "patternbook_examples/tall_post",
+            "pattern_type": "frame",
+            "tags": [
+              "poop"
+            ]
           },
           {
-            "kind": "function",
-            "lineno": 156,
-            "name": "create_csg_box_patterns"
+            "path": "patternbook_examples/wide_post",
+            "pattern_type": "frame",
+            "tags": [
+              "poop"
+            ]
           },
           {
-            "kind": "function",
-            "lineno": 281,
-            "name": "create_patternbook_example_patternbook"
+            "path": "patternbook_examples/small_beam",
+            "pattern_type": "frame",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "patternbook_examples/medium_beam",
+            "pattern_type": "frame",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "patternbook_examples/large_beam",
+            "pattern_type": "frame",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "patternbook_examples/small_box",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "patternbook_examples/medium_box",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "patternbook_examples/large_box",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
           }
         ]
       },
-      "relative_path": "patternbook_example.py",
-      "sha256": "6bf621409688f1e20bd895d9257f38cd5a135f48755c113d7f529cddd76474ab",
+      "relative_path": "patternbook_patterns.py",
+      "sha256": "ede7088428a5d1323608f728dfce2d15ae39d3d650f4105d42cf7e5dbf550d95",
       "warnings": []
     },
-    "patterns/plain_joints_example.py": {
-      "chosen_frame_kind": null,
-      "chosen_frame_name": null,
-      "frames": [],
+    "patterns/splice_joints_patterns.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "create_all_splice_joint_patterns",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 175,
+          "name": "create_all_splice_joint_patterns"
+        }
+      ],
       "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_plain_joints_example",
+      "module_name": "giraffe_librarian_dynamic_splice_joints_patterns",
       "multiple_frames": false,
       "patternbook": {
-        "groups": [
-          "butt",
-          "corner",
-          "corner_lap",
-          "cross",
-          "cross_lap",
-          "end",
-          "house",
-          "miter",
-          "plain_joints",
-          "splice",
-          "splice_lap",
-          "tongue_and_fork"
+        "pattern_names": [
+          "plain_butt_splice_joint",
+          "plain_splice_lap_joint",
+          "lapped_gooseneck_splice_joint"
         ],
-        "loaded": true,
-        "names": [
-          "miter_joint",
-          "miter_joint_face_aligned",
-          "miter_joint_3d_angles",
-          "butt_joint",
-          "butt_joint_3d_angles",
-          "tongue_and_fork_corner_joint_90",
-          "tongue_and_fork_corner_joint_135",
-          "tongue_and_fork_butt_joint_90",
-          "tongue_and_fork_butt_joint_138",
-          "splice_joint",
-          "splice_lap_joint",
-          "house_joint",
-          "cross_lap_joint",
-          "corner_lap_joint"
-        ],
-        "static_entries": [
+        "patterns": [
           {
-            "kind": "function",
-            "lineno": 557,
-            "name": "create_plain_joints_patternbook"
+            "path": "splice_joints/plain_butt_splice_joint",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "splice_joints/plain_splice_lap_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "splice_joints/lapped_gooseneck_splice_joint",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
-      "relative_path": "plain_joints_example.py",
-      "sha256": "e1b3cb9a4b64a4fa192d233496be743a54eafc023772a9c8214d5fe8642a502f",
+      "relative_path": "splice_joints_patterns.py",
+      "sha256": "179cf007fa1f94511ea3b11961ffcd9bc6d9cc0d69c6039a8706543715491d36",
+      "warnings": []
+    },
+    "patterns/structures/doublesawhorseworkbench.py": {
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 88,
+          "name": "build_double_sawhorse_workbench"
+        },
+        {
+          "kind": "var",
+          "lineno": 252,
+          "name": "example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_doublesawhorseworkbench",
+      "multiple_frames": true,
+      "patternbook": null,
+      "relative_path": "structures/doublesawhorseworkbench.py",
+      "sha256": "b79d65326f7c8d9b7deddae9162852f5b27441096a21e25f3d57a6a41b1a1de9",
       "warnings": []
     },
     "patterns/structures/horsey_example.py": {
-      "chosen_frame_kind": "function",
-      "chosen_frame_name": "create_sawhorse",
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
       "frames": [
         {
           "kind": "function",
           "lineno": 37,
           "name": "create_sawhorse"
+        },
+        {
+          "kind": "var",
+          "lineno": 259,
+          "name": "example"
         }
       ],
       "load_error": null,
       "module_name": "giraffe_librarian_dynamic_structures_horsey_example",
-      "multiple_frames": false,
+      "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/horsey_example.py",
-      "sha256": "629dd52b50a88063c74a26f544f53ef3cb8eb89347e259c1121792f47d066b24",
+      "sha256": "c48cdfbcb31903363b51cca2e13eaa76eeb8d9c87aa3381b2d4dd4902da0324f",
+      "warnings": []
+    },
+    "patterns/structures/multi_cross_lap_post.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 33,
+          "name": "example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_multi_cross_lap_post",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/multi_cross_lap_post.py",
+      "sha256": "ff4fa5d7b78f5cbd218e88a831917fc6b2a82db01aa26816590e90ac5ea3cea0",
       "warnings": []
     },
     "patterns/structures/my_cute_frame.py": {
-      "chosen_frame_kind": "function",
-      "chosen_frame_name": "build_frame",
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
       "frames": [
         {
           "kind": "function",
           "lineno": 31,
           "name": "build_frame"
+        },
+        {
+          "kind": "var",
+          "lineno": 108,
+          "name": "example"
         }
       ],
       "load_error": null,
       "module_name": "giraffe_librarian_dynamic_structures_my_cute_frame",
-      "multiple_frames": false,
+      "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/my_cute_frame.py",
-      "sha256": "0a9e0a449ed610eeca56e0bce5a205328af0f5fe97a59c08755d9858c21772f2",
+      "sha256": "1b4a6402c4668346793a16b1cc60908af3abc1c5df68dd5c156246fe2963958d",
       "warnings": []
     },
     "patterns/structures/oscarshed.py": {
-      "chosen_frame_kind": "function",
-      "chosen_frame_name": "create_oscarshed",
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
       "frames": [
         {
           "kind": "function",
-          "lineno": 41,
+          "lineno": 40,
           "name": "create_oscarshed"
+        },
+        {
+          "kind": "var",
+          "lineno": 1062,
+          "name": "example"
         }
       ],
       "load_error": null,
       "module_name": "giraffe_librarian_dynamic_structures_oscarshed",
-      "multiple_frames": false,
+      "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/oscarshed.py",
-      "sha256": "0d3d0094fd4332e5bece9b7afd79d8df1d000a0ee1f9fa3a45f61b55f8b74747",
+      "sha256": "ce5ec8311262f37cf6dc51dbdefdea89ffe088996d99cf5c605aeb614bad6255",
       "warnings": []
     },
     "patterns/structures/tinyhouse120.py": {
-      "chosen_frame_kind": "function",
-      "chosen_frame_name": "create_tinyhouse120",
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
       "frames": [
         {
           "kind": "function",
           "lineno": 49,
           "name": "create_tinyhouse120"
+        },
+        {
+          "kind": "var",
+          "lineno": 1489,
+          "name": "example"
         }
       ],
       "load_error": null,
       "module_name": "giraffe_librarian_dynamic_structures_tinyhouse120",
-      "multiple_frames": false,
+      "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/tinyhouse120.py",
-      "sha256": "4500bc41e7d6a661b79b7047c87289a0adcd9b4cf218a554faaa42378ef6d272",
-      "warnings": []
-    },
-    "patterns/tongue_and_groove_joint_example.py": {
-      "chosen_frame_kind": null,
-      "chosen_frame_name": null,
-      "frames": [],
-      "load_error": null,
-      "module_name": "giraffe_librarian_dynamic_tongue_and_groove_joint_example",
-      "multiple_frames": false,
-      "patternbook": {
-        "groups": [
-          "boards",
-          "tongue_groove"
-        ],
-        "loaded": true,
-        "names": [
-          "tongue_and_groove"
-        ],
-        "static_entries": [
-          {
-            "kind": "function",
-            "lineno": 51,
-            "name": "create_tongue_and_groove_patternbook"
-          }
-        ]
-      },
-      "relative_path": "tongue_and_groove_joint_example.py",
-      "sha256": "458fb249e5f3e36ee7132c136b61a33a5cfa56811cda6a0c4714843866121512",
+      "sha256": "dd689e0e206a6c68a014b0fa10298fdc8367c939cf5079e513f097defc013eba",
       "warnings": []
     }
   },
-  "generated_at": "2026-06-19T18:42:46.753813+00:00",
+  "generated_at": "2026-07-03T20:26:03.683330+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

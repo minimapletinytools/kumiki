@@ -208,7 +208,7 @@ Joints also contain a dictionary of `JointAccessory` which are additional *thing
 
 ## Relief cuts
 
-While basing joints are based on the `PerfectTimberWithin` ensures fits on the joint features themselves, there may be wood beyond the perfect timber within. In these cases, some of this wood extraneous to the joint may need to be removed for the joint to come together. This material is referred to as the "relief material" or sometimes the imperfect material or extraneous material. Almost all joints will make "relief cuts" to accomplish this. In most cases, the relief cuts needed can be fully determined from just the joint arrangement and can be made using the set of utility methods and classes provided in notching.py. Joint functions are still responsible to make their own relief cuts. If the relief cut is being made on the receiving timber of a butt joint, the process may be referred to as "notching"
+While basing joints are based on the `PerfectTimberWithin` ensures fits on the joint features themselves, there may be wood beyond the perfect timber within. In these cases, some of this wood extraneous to the joint may need to be removed for the joint to come together. This material is referred to as the "relief material" or sometimes the imperfect material or extraneous material. Almost all joints will make "relief cuts" to accomplish this. In most cases, the relief cuts needed can be fully determined from just the joint arrangement and can be made using the set of utility methods and classes provided in relief.py. Joint functions are still responsible to make their own relief cuts. If the relief cut is being made on the receiving timber of a butt joint, the process may be referred to as "notching"
 
 ## Joint Tags
 

@@ -288,7 +288,7 @@ if __name__ == "__main__":
     for name in ("West Foot", "East Foot"):
         assert cuts_by_name[name] == 2, f"{name} should have 2 mortise cuts"
     for name in post_names:
-        assert cuts_by_name[name] == 3, f"{name} should have 2 tenons + 1 lap notch"
+        assert cuts_by_name[name] == 3, f"{name} should have 2 tenons + 1 lap relief"
     for name in ("South Top Beam", "North Top Beam"):
         assert cuts_by_name[name] == 2, f"{name} should have 2 mortise cuts"
     assert by_name["Stretcher"] == ((-footprint_x / 2 - stretcher_stickout,
@@ -297,7 +297,7 @@ if __name__ == "__main__":
                                     (stretcher_center_z - stretcher_size[1] / 2,
                                      stretcher_center_z + stretcher_size[1] / 2)), \
         "stretcher extents wrong"
-    assert cuts_by_name["Stretcher"] == 5, "stretcher should have 4 lap notches + tray"
+    assert cuts_by_name["Stretcher"] == 5, "stretcher should have 4 lap relief cuts + tray"
     assert len(frame.accessories) == 4, "expected one peg per post-to-foot joint"
     print(f"All layout checks passed. {len(frame.accessories)} pegs. "
           f"Work surface height: {fmt(by_name['South Top Beam'][2][1])}")

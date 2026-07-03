@@ -7,7 +7,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.notching import CrossJointScribeNotchingConfig, chop_scribe_notch_and_apply, warn_if_arrangement_timbers_imperfect
+from .shavings.relief import CrossJointScribeReliefConfig, chop_scribe_relief_and_apply, warn_if_arrangement_timbers_imperfect
 from kumiki.measuring import locate_top_center_position, locate_bottom_center_position
 
 
@@ -75,12 +75,12 @@ def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace)
 def cut_plain_cross_lap_joint(
     arrangement: CrossJointTimberArrangement,
     cut_ratio: Numeric = scalar(1, 2),
-    notching: Optional[CrossJointScribeNotchingConfig] = CrossJointScribeNotchingConfig.cross_timber_1(),
+    relief: Optional[CrossJointScribeReliefConfig] = CrossJointScribeReliefConfig.cross_timber_1(),
 ) -> Joint:
     """
     Creates a cross-lap joint between two intersecting timbers.
 
-    Each timber has a notch cut into it so they interlock at their crossing point,
+    Each timber has a portion relieved from it so they interlock at their crossing point,
     maintaining a flush outer face on both sides. By default material removal is split
     equally (half from each timber).
 
@@ -347,19 +347,19 @@ def cut_plain_cross_lap_joint(
 
     cuttings: dict[str, Cutting] = {"timberA": cut_timberA, "timberB": cut_timberB}
 
-    if notching is not None:
-        if notching.timber_to_be_scribed == ArrangementNames.cross_timber_1:
+    if relief is not None:
+        if relief.timber_to_be_scribed == ArrangementNames.cross_timber_1:
             scribed_key, cut_key = "timberA", "timberB"
             scribed_timber, cut_timber = timberA, timberB
-        elif notching.timber_to_be_scribed == ArrangementNames.cross_timber_2:
+        elif relief.timber_to_be_scribed == ArrangementNames.cross_timber_2:
             scribed_key, cut_key = "timberB", "timberA"
             scribed_timber, cut_timber = timberB, timberA
         else:
             raise AssertionError(
-                f"Unsupported cross-joint notching target: {notching.timber_to_be_scribed}"
+                f"Unsupported cross-joint relief target: {relief.timber_to_be_scribed}"
             )
 
-        updated_cut_cutting, updated_scribed_cutting = chop_scribe_notch_and_apply(
+        updated_cut_cutting, updated_scribed_cutting = chop_scribe_relief_and_apply(
             timber_to_be_scribed=scribed_timber,
             timber_to_be_scribed_cutting=cuttings[scribed_key],
             timber_to_be_cut=cut_timber,
@@ -380,7 +380,7 @@ def cut_plain_cross_lap_joint(
 
 def cut_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
     """
-    Creates a house (dado/housing) joint where the housing timber is notched to receive the housed timber.
+    Creates a house (dado/housing) joint where the housing timber is relieved to receive the housed timber.
 
     Only the housing timber is cut (timber1); the housed timber (timber2) is not modified.
     Implemented as a cross-lap joint with cut_ratio=1.
@@ -388,9 +388,9 @@ def cut_plain_cross_lap_house_joint(arrangement: CrossJointTimberArrangement) ->
     Note this different from cut_free_house_joint in the way it handles relief cuts on the non-ptw parts of the timbers.
 
     Args:
-        arrangement: Cross-joint arrangement where timber1 is the housing timber (to be notched)
+        arrangement: Cross-joint arrangement where timber1 is the housing timber (to be relieved)
                      and timber2 is the housed timber (remains uncut). front_face_on_timber1
-                     specifies the notch face; if None, chosen automatically.
+                     specifies the relief face; if None, chosen automatically.
 
     Returns:
         Joint object containing both timbers.

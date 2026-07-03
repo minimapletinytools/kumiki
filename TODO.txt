@@ -1,4 +1,11 @@
-IGNORE- can't do inches(inches(...)) without double conversion UGH, may need mega refactor
+
+:: 7/2/2026 arrangement
+
+each timber in each joint has an assembly constrain, these trace prism in R6 (directions and angles) that it can move. More specifically, it contains bounds in each direction and angle in which it can move (or could be unbounded in one or both directions). there is currently an AssemblyFreedom class but lets make it more generic, having said taht, we don't expect to support rotational freedoms yet so feel free to NotImplemented for anything requiring rotational freedom specifi logic
+
+IN the future, we may want a more complex shape in R6, e.g. requires twisting and moving at the same time to move, or move firs,t then twist, then move etc, so please make some basic allowances for this, but for now we'll keep assemblies simple.
+
+
 
 
 :: 7/2/2026 NOTCHING PLAN V2
@@ -130,8 +137,18 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 :: TODO
 
--change wedge half dovetail joint to use angle rather than big/small size
--rename notching.py to relief.py
+DONE-reorg all mortise and tenon joint examples
+DONE-stuff to test
+  DONE-test export step and export STL combined/inidivdual again
+  DONE-test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
+IGNORE/DONE-change wedge half dovetail joint to use angle rather than big/small size
+DONE-rename notching.py to relief.py
+IGNORE- can't do inches(inches(...)) without double conversion UGH, may need mega refactor
+
+
+-updtae won't work for kumiki when using locla install (v.999) as it fails the version check when you try to update kumiki... so allow it to go from inocmpatbily to incompatible version and output an error unless it was v.999 or something
+
+
 -test frame scanning fixes
 -test the install cadquery stuff 
 
@@ -140,7 +157,6 @@ kumiki currently has limited support for "boards" for more general purpose woodw
   -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
   -"Example Frames" -> "Examples"
 
--updtae won't work for kumiki when using locla install (v.999) as it fails the version check when you try to update kumiki... so allow it to go from inocmpatbily to incompatible version and output an error unless it was v.999 or something
 -do example cleanup
 -make website
   -get domain D:
@@ -153,10 +169,6 @@ kumiki currently has limited support for "boards" for more general purpose woodw
     -make the awful thuma bed video
   -make simple website
   -make some content drip
-DONE-reorg all mortise and tenon joint examples
-DONE-stuff to test
-  DONE-test export step and export STL combined/inidivdual again
-  DONE-test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
 -do ticket refactor so that each timber type can have its own ticket?
   -or do we do the derived ticket thing instead?
 -test regular imperfect rectangular timber stuff

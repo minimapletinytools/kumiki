@@ -85,7 +85,7 @@ Joints involve creating CSG cuts on one or more timbers. A typical joint impleme
     - it is often useful to convert back and forth from global and local coordinates. Make sure local coordinates are always clearly marked with the `<timber_name>_local` postfix to avoid confusion
     - there are many helper methods to do this, please see other joints for examples
 6. Repeat steps 3–5 until all cuts are done
-7. Add notch cuts--in most casees, the standard notching pattern for the arrangement will be sufficient (see notching pattern below)
+7. Add relief cuts--in most casees, the standard relief pattern for the arrangement will be sufficient (see relief pattern below)
 8. If the joint is at the end of any one of the timbers, set `maybe_top/bottom_end_cut_distance_from_bottom` for that timber to allow the proper rough end cuts to be generated
 9. Return a joint object containing the cuts
 
@@ -98,7 +98,7 @@ Function naming rules:
 Argument rules:
 - the retun type of all cut_ functions should be `Joint`
 - the first argument should always be an `arrangement: Arrangement` object containing all the timbers and parameters for the joint.
-- the last argument should alwasy be the notching configuration object IF notching is supported
+- the last argument should alwasy be the relief configuration object IF relief is supported
 
 Variable naming rules:
 - ALWAYS postfix markings in global space with `_global`
@@ -112,15 +112,17 @@ Use nested functions to create local variable scopes where helpful (especially t
 In general, any assumption or constraint on the input parameters should be asserted with an informative error message. 
 The arrangement classes have several built in checks to help with this. 
 
-### the notching pattern
+### the relief pattern
 
-A notch is a cutout timbers in a joint to create clearance. 
+A relief cut is a cutout in a timber in a joint to create clearance.
 
-Notching timbers is needed such that timbers that extend beyond their perfect timber within (imperfect timbers) can be joined together consistently without collision. It is also used when insetting a timber into the face of another timber. Almost all joints will need notching.
+Relief cuts are needed such that timbers that extend beyond their perfect timber within (imperfect timbers) can be joined together consistently without collision. They are also used when insetting a timber into the face of another timber. Almost all joints will need relief cuts.
 
-The `notching.py` file contains sets of notching utility methods including a set of scribe-based notching utilities that should work for almost all joints.
+The `relief.py` file contains sets of relief utility methods including a set of scribe-based relief utilities that should work for almost all joints.
 
-Joints should only notch if necessary (i.e. input timber is imperfect or there is an inset) to avoid CSG bloat.
+Joints should only add relief cuts if necessary (i.e. input timber is imperfect or there is an inset) to avoid CSG bloat.
+
+Note: when a relief cut is made specifically on the receiving timber of a butt joint arrangement, it may be referred to as a "shoulder notch" instead — see `chop_shoulder_notch_on_timber_face`, `chop_shoulder_notch_aligned_with_timber`, and `does_shoulder_plane_need_notching` in `relief.py`.
 
 ### the build-a-butt-joint-pattern
 

@@ -42,7 +42,7 @@ patterns don't need to change their import style.
 - must follow the joint style guide
 - must have "descriptive" doc strings
     - what is a descriptive docstring? One high bar might be that it is specific enough that an AI agent should be able to reconstruct the joint function identically from just the docstring. However docstrings should also be written to be easily parseable by impatient humans as well.
-- must support "notching", relief cuts such that parts of timber that extend beyond their perfect timber within do not intersect
+- must support relief cuts such that parts of timber that extend beyond their perfect timber within do not intersect
 - must have a patterns for each of its common use scenarios
 - must contain at least the following 🐪 tests
     - one parameter validation test

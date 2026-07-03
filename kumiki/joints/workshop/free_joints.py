@@ -43,7 +43,7 @@ def cut_free_house_joint(
             # if housed_timber is a CutTimber
             # The volume to remove from the housing_timber is the CutTimber's actual body shape:
             #   housed_prism - (cuts on the housed_timber that intersect the housing_timber)
-            # This correctly models the notch matching the housed piece including any mortises in it.
+            # This correctly models the relief cut matching the housed piece including any mortises in it.
 
             # Housed timber's actual prism in housing_timber's local space
             housed_prism_in_housing = adopt_csg(
