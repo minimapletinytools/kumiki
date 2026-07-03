@@ -60,6 +60,10 @@ class AccessoryTicket(Ticket):
 class BoardTicket(TimberTicket):
     """Ticket metadata for board-like members."""
 
+# TODO this is wrong
+# use R6 DOF for each direction and orientation axis
+# each timber in each joint has its on freedom
+# in addition, there should be a "freed after" amount which is to say, the joint is "diassambled" after certain condition are met in each dof, this will simply be an amount in each DOF after which the joint is free
 @dataclass(frozen=True)
 class AssemblyFreedom:
     """Assembly DOF in global space (up to two allowed insertion directions)."""

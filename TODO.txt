@@ -1,11 +1,24 @@
 
 :: 7/2/2026 arrangement
 
-each timber in each joint has an assembly constrain, these trace prism in R6 (directions and angles) that it can move. More specifically, it contains bounds in each direction and angle in which it can move (or could be unbounded in one or both directions). there is currently an AssemblyFreedom class but lets make it more generic, having said taht, we don't expect to support rotational freedoms yet so feel free to NotImplemented for anything requiring rotational freedom specifi logic
+each timber in each joint has an assembly constrain, these trace prism in R6 (directions and angles) that it can move. More specifically, it contains half or unbounded direction and angle in which it can move. there is currently an AssemblyFreedom that is wrong, the assembly freedom is per timber per joint, so the joint ticket should contain a map from its timbers to its freedoms. we don't expect to support rotational freedoms yet so feel free to NotImplemented for anything requiring rotational freedom specifi logic. IN the future, we may want a more complex shape in R6 rather than just half/full intervals, e.g. requires twisting and moving at the same time to move, or move firs,t then twist, then move etc, so please make some basic allowances for this, but for now we'll keep assemblies simple as just half or full intervals from 0
 
-IN the future, we may want a more complex shape in R6, e.g. requires twisting and moving at the same time to move, or move firs,t then twist, then move etc, so please make some basic allowances for this, but for now we'll keep assemblies simple.
+Assemblies on joints are added viat he ticket class, they have the assembly freedom and an order, then this needs to get thrown into an assembly solver. the assembly solver does the following
 
+- iterate through orders from small to big
+  - collect all joints for each given order
+  - for each timber in that joint, we attempt to "move" the timber in one of the DOFs in its Assembly Freedom
+    - order DOF derictions based on other timbers in the same order, choose directions away from the other timbers in its order and then away from timbers in higher orders, and prioritize DOFs that tend to be planar with the timbers in that order
+    - for each DOF direction in that timber, attempt to move it in that direction, by the freed after boundary * dissamebly_multiplier
+      - for each joint that that timber is also a part of (excluding the one we are currently in)
+        - for ecah other timebr in that joint, if that timber shares the same DOF, then omit it, otherwise attempt to move the timbers in that joint in that direction 
+          -"attempt to move" is a recursive algorithm, repeat this algorithm until all timebrs have been moved
+            -if any timbers that got moved are of > assembly order, output a warning
+            -if a loop is detected, continue up to 6 loops, after which fail saying unsolveable and try to output some info explaining why the constraint can't be solved
 
+In the kigumi viewer, now we want to allow previewing assemblies. Add a "assembly preview timeline" at the bottom, put marks in the timeline for each order, sliding the bar then dissamebles each other one at a time,
+set dissamebly_multiplier to be 1.5 and make it configurable via the options in kigumi
+add an option to show the assembly timeline and have it on by default
 
 
 :: 7/2/2026 NOTCHING PLAN V2
@@ -145,8 +158,10 @@ IGNORE/DONE-change wedge half dovetail joint to use angle rather than big/small 
 DONE-rename notching.py to relief.py
 IGNORE- can't do inches(inches(...)) without double conversion UGH, may need mega refactor
 
-
 -updtae won't work for kumiki when using locla install (v.999) as it fails the version check when you try to update kumiki... so allow it to go from inocmpatbily to incompatible version and output an error unless it was v.999 or something
+-fix automation integration tests 
+  supports session refresh/log/camera/screenshot automation commands: traced this to kigumi.captureScreenshot being called with timeoutMs: 0. In both frame-view-session.js and viewer.js, the timeout guard is if (timeoutMs > 0) { setTimeout(...) } — so 0 doesn't mean "fast fail," it means no safety timeout at all, and the call waits forever for a captureScreenshotResult message from the webview. Session logs show everything up through the explicit refresh succeeding, then dead silence for the rest of the 90s budget — so it's genuinely hanging on that webview round-trip, not just slow. I did not determine why the webview never posts back (could be a real product bug, or a screenshot/canvas limitation specific to this sandboxed environment) — that would need webview devtools/console access to pin down further. Want me to dig into that one too?
+
 
 
 -test frame scanning fixes
