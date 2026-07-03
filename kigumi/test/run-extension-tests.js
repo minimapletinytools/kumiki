@@ -39,16 +39,28 @@ async function main() {
   const extensionTestsPath = path.resolve(__dirname, 'suite', 'index.js');
   const { suite, grep } = parseArgs(process.argv.slice(2));
 
+  // @vscode/test-electron spawns the downloaded VS Code binary with
+  // Object.assign({}, process.env, extensionTestsEnv) (see innerRunTests in
+  // its runTest.js) — so process.env itself must be clean, not just our copy
+  // of it, or ELECTRON_RUN_AS_NODE leaks back in via the first source object.
+  // If it's set in the calling shell — common when running under tools that
+  // embed Electron, e.g. some agent sandboxes/CI runners — the spawned VS
+  // Code binary starts as a plain Node process instead of the Electron GUI
+  // app and immediately crashes trying to require() its own launch args.
+  delete process.env.ELECTRON_RUN_AS_NODE;
+
+  const extensionTestsEnv = {
+    ...process.env,
+    KIGUMI_ENABLE_TEST_COMMANDS: '1',
+    KIGUMI_EXT_TEST_SUITE: suite,
+    KIGUMI_EXT_TEST_GREP: grep,
+  };
+
   try {
     await runTests({
       extensionDevelopmentPath,
       extensionTestsPath,
-      extensionTestsEnv: {
-        ...process.env,
-        KIGUMI_ENABLE_TEST_COMMANDS: '1',
-        KIGUMI_EXT_TEST_SUITE: suite,
-        KIGUMI_EXT_TEST_GREP: grep,
-      },
+      extensionTestsEnv,
       launchArgs: [
         path.resolve(extensionDevelopmentPath, '..'),
         '--disable-extensions',
