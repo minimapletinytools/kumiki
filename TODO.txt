@@ -157,8 +157,7 @@ DONE-stuff to test
 IGNORE/DONE-change wedge half dovetail joint to use angle rather than big/small size
 DONE-rename notching.py to relief.py
 IGNORE- can't do inches(inches(...)) without double conversion UGH, may need mega refactor
-
--updtae won't work for kumiki when using locla install (v.999) as it fails the version check when you try to update kumiki... so allow it to go from inocmpatbily to incompatible version and output an error unless it was v.999 or something
+DONE-updtae won't work for kumiki when using locla install (v.999) as it fails the version check when you try to update kumiki... so allow it to go from inocmpatbily to incompatible version and output an error unless it was v.999 or something
 -fix automation integration tests 
   supports session refresh/log/camera/screenshot automation commands: traced this to kigumi.captureScreenshot being called with timeoutMs: 0. In both frame-view-session.js and viewer.js, the timeout guard is if (timeoutMs > 0) { setTimeout(...) } — so 0 doesn't mean "fast fail," it means no safety timeout at all, and the call waits forever for a captureScreenshotResult message from the webview. Session logs show everything up through the explicit refresh succeeding, then dead silence for the rest of the 90s budget — so it's genuinely hanging on that webview round-trip, not just slow. I did not determine why the webview never posts back (could be a real product bug, or a screenshot/canvas limitation specific to this sandboxed environment) — that would need webview devtools/console access to pin down further. Want me to dig into that one too?
 

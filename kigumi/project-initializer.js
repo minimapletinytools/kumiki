@@ -639,12 +639,15 @@ async function installOrUpdateKumiki(workspaceRoot, pythonPath, isLocalDev) {
     const kumikiVersion = await getInstalledKumikiVersion(workspaceRoot, pythonPath);
     summary.push(`Installed Kumiki version: ${kumikiVersion}`);
 
-    if (kumikiVersion !== 'unknown') {
-        const [kMajor, kMinor] = getKigumiVersion().split('.').map(Number);
+    const kigumiVersion = getKigumiVersion();
+    const [kMajor, kMinor] = kigumiVersion.split('.').map(Number);
+    if (kMinor === 999) {
+        summary.push(`Local dev kigumi build (${kigumiVersion}); skipping kumiki version compatibility check.`);
+    } else if (kumikiVersion !== 'unknown') {
         const [iMajor, iMinor] = kumikiVersion.split('.').map(Number);
         if (iMajor !== kMajor || iMinor !== kMinor) {
             throw new Error(
-                `kumiki version mismatch after install: installed ${kumikiVersion} but kigumi ${getKigumiVersion()} requires ${kMajor}.${kMinor}.x. ` +
+                `kumiki version mismatch after install: installed ${kumikiVersion} but kigumi ${kigumiVersion} requires ${kMajor}.${kMinor}.x. ` +
                 `This should not happen — please report it.`
             );
         }
