@@ -320,10 +320,9 @@ class TestStepOscarshed:
         But the bounds should be within ~100mm of the expected corners — NOT
         off by thousands (which would indicate a broken half-space or transform).
         """
-        from kumiki.blueprint import _csg_to_ocp, _OCP_AVAILABLE
+        from kumiki.blueprint import _csg_to_ocp, _OCP_AVAILABLE, sympy_to_float
         from kumiki.cutcsg import adopt_csg
         from kumiki.rule import Transform
-        from kumiki.rendering_utils import sympy_to_float
         from kumiki.timber import TimberCorner
         _Bnd = importlib.import_module("OCP.Bnd")
         _BRepBndLib = importlib.import_module("OCP.BRepBndLib")

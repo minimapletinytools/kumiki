@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from kumiki.librarian_index import (
+from kumiki.librarian import (
     PATTERN_INDEX_SCHEMA_VERSION,
     SearchRoot,
     build_pattern_index,

@@ -1,16 +1,35 @@
 """
 Librarian: discovery and loading of kumiki frame examples and pattern books.
 
-Discovery is **AST-driven** (see :mod:`kumiki.librarian_analysis`). 
+This module owns the full librarian stack:
 
-Files are only imported when their runtime objects are needed:
+* **AST-driven discovery** — a pure-AST static analyzer identifies module-level
+  entries that produce a ``Frame`` or pattern list, without importing the
+  file. Recognition is type-based, not name-based, and resolves identifiers
+  through the file's ``import`` statements (aliased imports like ``from
+  kumiki import Frame as F`` are handled correctly).
 
-* Patternbook files are imported during scan so we can enumerate their pattern
-  and group names.
-* Frame files are *not* imported during a scan — the analyzer reports only the
-  filename plus a chosen entry name (the **last** module-level frame value or
-  frame-returning function in source order).  Frame loading is the runner's
-  job and happens on demand.
+* **Scanning** — files are only imported when their runtime objects are
+  needed. Patternbook files are imported during scan so we can enumerate
+  their pattern and group names. Frame files are *not* imported during a
+  scan — the analyzer reports only the filename plus a chosen entry name
+  (the **last** module-level frame value or frame-returning function in
+  source order). Frame loading is the runner's job and happens on demand.
+
+* **Pattern index files** — a JSON cache (per file sha256) summarizing every
+  kumiki source file's frames and patternbooks under a root. Used both as a
+  build-time artifact shipped with the kumiki wheel
+  (``kumiki/_pattern_index.json``) and as a workspace-side cache
+  (``<workspace>/.kigumi/pattern_index.json``).
+
+* **Layered search roots** — workspace, the installed ``kumiki`` package
+  directory, and any explicitly declared kumiki-aware dependencies, in that
+  order. Dependencies are gated by both an explicit declaration in
+  ``.kigumi/config.json`` and an ``importlib.metadata`` ``Requires-Dist``
+  relationship with ``kumiki``.
+
+The JS bridge never reads any of this directly — it always goes through the
+librarian CLI (:mod:`kumiki.librarian_cli`).
 """
 
 from __future__ import annotations
@@ -19,10 +38,13 @@ import ast
 import contextlib
 from dataclasses import dataclass, field, replace
 import inspect
+import importlib.metadata
+import importlib.util
+import json
 import math
+from datetime import datetime, timezone
 from pathlib import Path
 import hashlib
-import importlib.util
 import sys
 import textwrap
 import traceback
@@ -30,7 +52,6 @@ from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple,
 
 from sympy import Float, Rational
 
-from .librarian_analysis import ModuleStaticInfo, analyze_file
 from .rule import scalar
 from .patternbook import Pattern
 
@@ -38,6 +59,281 @@ from .patternbook import Pattern
 _DYNAMIC_MODULE_PREFIX = "giraffe_librarian_dynamic"
 
 _PARAM_KIND_VALUES: Tuple[str, ...] = ("number", "boolean", "string", "enum", "v3")
+
+
+# ---------------------------------------------------------------------------
+# AST-driven static analysis (no imports)
+# ---------------------------------------------------------------------------
+#
+# Identifies module-level entries that produce a ``Frame`` or ``PatternBook``
+# — either by typed annotation, by known constructor call, or by function
+# return annotation. Detection is done without importing the file.
+# Recognition is **type-based, not name-based**: the local identifier is
+# irrelevant.
+#
+# The analyzer resolves identifiers through the file's ``import`` statements
+# so aliased imports (``from kumiki import Frame as F``) are handled
+# correctly.
+#
+# Frames and patternbooks are only detected when they refer to kumiki's
+# canonical ``Frame``/``PatternBook`` symbols. We accept any kumiki submodule
+# path (``kumiki``, ``kumiki.timber``, ``kumiki.patternbook``, etc.) as a
+# valid provider — kumiki re-exports both at the top level.
+
+# Canonical type names we recognize.  Module-of-origin checks are restricted to
+# kumiki and its submodules; any other origin is ignored.
+_FRAME_NAME = "Frame"
+
+
+@dataclass(frozen=True)
+class StaticEntry:
+    """A single module-level frame or patternbook entry."""
+    name: str
+    kind: str  # "var" | "function" | "factory"
+    lineno: int
+
+
+@dataclass
+class ModuleStaticInfo:
+    """Result of statically analyzing a single source file."""
+    file_path: str
+    frames: List[StaticEntry] = field(default_factory=list)
+    pattern_lists: List[StaticEntry] = field(default_factory=list)
+    parse_error: Optional[str] = None
+
+    @property
+    def has_anything(self) -> bool:
+        return bool(self.frames) or bool(self.pattern_lists)
+
+    @property
+    def chosen_frame(self) -> Optional[StaticEntry]:
+        return self.frames[-1] if self.frames else None
+
+    @property
+    def multiple_frames(self) -> bool:
+        return len(self.frames) > 1
+
+
+def _is_kumiki_module(module_name: Optional[str]) -> bool:
+    if not module_name:
+        return False
+    return module_name == "kumiki" or module_name.startswith("kumiki.")
+
+
+def _collect_kumiki_aliases(tree: ast.Module) -> dict[str, str]:
+    """Map local identifier -> canonical kumiki symbol name.
+
+    Only module-level ``import`` / ``from ... import`` statements are inspected.
+    The mapping contains entries like ``{"F": "Frame", "PB": "PatternBook"}``.
+    Symbols not from kumiki, and kumiki names other than ``Frame``/``PatternBook``,
+    are ignored.
+
+    ``from kumiki[...] import *`` is treated as bringing ``Frame`` and
+    ``PatternBook`` into scope under their canonical names — kumiki re-exports
+    both at the top level via star imports in its package ``__init__``.
+    """
+    aliases: dict[str, str] = {}
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom):
+            if not _is_kumiki_module(node.module):
+                continue
+            for alias in node.names:
+                if alias.name == "*":
+                    aliases[_FRAME_NAME] = _FRAME_NAME
+                    continue
+                if alias.name == _FRAME_NAME:
+                    local = alias.asname or alias.name
+                    aliases[local] = alias.name
+    return aliases
+
+
+def _annotation_target(annotation: Optional[ast.expr], aliases: dict[str, str]) -> Optional[str]:
+    """If ``annotation`` ultimately references a kumiki ``Frame``,
+    return the canonical name; else ``None``.
+
+    Handles bare names (``Frame``), attribute access (``kumiki.Frame``,
+    ``kumiki.timber.Frame``), and string-form annotations (``"Frame"``).
+    Stripping of ``Optional[...]`` / ``list[...]`` / etc. is intentionally not
+    done — entries are only counted when the value *is* a Frame,
+    not a container of them.
+    """
+    if annotation is None:
+        return None
+    # PEP 563 string-form: "Frame"
+    if isinstance(annotation, ast.Constant) and isinstance(annotation.value, str):
+        text = annotation.value.strip()
+        if text in aliases:
+            return aliases[text]
+        if text == _FRAME_NAME:
+            return text
+        # accept dotted forms like "kumiki.Frame"
+        tail = text.rsplit(".", 1)[-1]
+        if tail == _FRAME_NAME:
+            return tail
+        return None
+    if isinstance(annotation, ast.Name):
+        return aliases.get(annotation.id)
+    if isinstance(annotation, ast.Attribute):
+        # Walk attribute chain, ensure root is "kumiki"
+        attr = annotation
+        parts: List[str] = []
+        while isinstance(attr, ast.Attribute):
+            parts.append(attr.attr)
+            attr = attr.value
+        if isinstance(attr, ast.Name) and attr.id == "kumiki":
+            if parts and parts[0] == _FRAME_NAME:
+                return parts[0]
+    return None
+
+
+def _call_target(call: ast.Call, aliases: dict[str, str]) -> Optional[str]:
+    """If ``call`` is a constructor or classmethod of ``Frame``,
+    return the canonical name; else ``None``.
+
+    Recognizes ``Frame(...)``, ``Frame.from_joints(...)``, ``kumiki.Frame(...)``,
+    ``kumiki.timber.Frame.from_joints(...)``, and the aliased equivalents.
+    """
+    func = call.func
+    # Direct: Frame(...) or alias F(...)
+    if isinstance(func, ast.Name):
+        canonical = aliases.get(func.id)
+        if canonical == _FRAME_NAME:
+            return canonical
+        return None
+    # Attribute: X.method(...) or kumiki[.sub].Frame(...)
+    if isinstance(func, ast.Attribute):
+        # Case A: <Frame-or-alias>.classmethod(...)
+        if isinstance(func.value, ast.Name):
+            canonical = aliases.get(func.value.id)
+            if canonical == _FRAME_NAME:
+                return canonical
+        # Case B: kumiki[.sub].Frame(...) — last attr is Frame, root is "kumiki"
+        parts: List[str] = []
+        node: ast.expr = func
+        while isinstance(node, ast.Attribute):
+            parts.append(node.attr)
+            node = node.value
+        if isinstance(node, ast.Name) and node.id == "kumiki":
+            for candidate in parts:
+                if candidate == _FRAME_NAME:
+                    return candidate
+    return None
+
+
+def _is_pattern_list_assignment(node: ast.Assign) -> bool:
+    """True if this is a module-level `patterns = [...]` assignment."""
+    if not isinstance(node.value, (ast.List, ast.Call)):
+        return False
+    for target in node.targets:
+        for name in _record_target_names(target):
+            if name == "patterns":
+                return True
+    return False
+
+
+def _is_pattern_list_ann_assign(node: ast.AnnAssign) -> bool:
+    """True if this is a module-level `patterns: ... = [...]` annotation."""
+    return (
+        isinstance(node.target, ast.Name)
+        and node.target.id == "patterns"
+    )
+
+
+def _record_target_names(target: ast.expr) -> List[str]:
+    """Extract simple identifier targets from an assignment LHS."""
+    names: List[str] = []
+    if isinstance(target, ast.Name):
+        names.append(target.id)
+    elif isinstance(target, (ast.Tuple, ast.List)):
+        for elt in target.elts:
+            names.extend(_record_target_names(elt))
+    return names
+
+
+def analyze_source(source: str, file_path: str) -> ModuleStaticInfo:
+    """Analyze raw source text and return its static info."""
+    info = ModuleStaticInfo(file_path=file_path)
+    try:
+        tree = ast.parse(source, filename=file_path)
+    except SyntaxError as exc:
+        info.parse_error = f"SyntaxError: {exc}"
+        return info
+
+    aliases = _collect_kumiki_aliases(tree)
+
+    for node in tree.body:
+        # Typed assignment: name: Frame = ...
+        if isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            canonical = _annotation_target(node.annotation, aliases)
+            if canonical == _FRAME_NAME:
+                info.frames.append(StaticEntry(node.target.id, "var", node.lineno))
+                continue
+            # Also accept call-on-rhs even when annotated to something else
+            if isinstance(node.value, ast.Call):
+                rhs = _call_target(node.value, aliases)
+                if rhs == _FRAME_NAME:
+                    info.frames.append(StaticEntry(node.target.id, "var", node.lineno))
+            # patterns: List[Pattern] = [...] annotated assignment
+            if _is_pattern_list_ann_assign(node):
+                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
+            continue
+
+        # Untyped assignment: name = Frame(...) / Frame.from_joints(...)
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.Call):
+            canonical = _call_target(node.value, aliases)
+            if canonical == _FRAME_NAME:
+                for target in node.targets:
+                    for name in _record_target_names(target):
+                        info.frames.append(StaticEntry(name, "var", node.lineno))
+                continue
+            # Check for patterns = [...] (new pattern list system)
+            if _is_pattern_list_assignment(node):
+                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
+            continue
+
+        # patterns = [...] list literal assignment
+        if isinstance(node, ast.Assign) and isinstance(node.value, ast.List):
+            if _is_pattern_list_assignment(node):
+                info.pattern_lists.append(StaticEntry("patterns", "var", node.lineno))
+            continue
+
+        # Recognize example/build_frame assignments even if the RHS isn't a Frame() call
+        if isinstance(node, ast.Assign):
+            for target in node.targets:
+                for name in _record_target_names(target):
+                    if name == "example" or name == "build_frame":
+                        info.frames.append(StaticEntry(name, "var", node.lineno))
+            continue
+
+        # def name(...) -> Frame: ...
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            canonical = _annotation_target(node.returns, aliases)
+            if canonical == _FRAME_NAME:
+                info.frames.append(StaticEntry(node.name, "function", node.lineno))
+            # Also recognize build_frame() even without explicit Frame annotation
+            elif node.name == "build_frame":
+                info.frames.append(StaticEntry(node.name, "function", node.lineno))
+            # Also recognize example() even without explicit Frame annotation
+            elif node.name == "example":
+                info.frames.append(StaticEntry(node.name, "function", node.lineno))
+
+    return info
+
+
+def analyze_file(file_path: str) -> ModuleStaticInfo:
+    """Read and analyze a single source file."""
+    info = ModuleStaticInfo(file_path=file_path)
+    try:
+        source = Path(file_path).read_text(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        info.parse_error = f"OSError: {exc}"
+        return info
+    return analyze_source(source, file_path)
+
+
+# ---------------------------------------------------------------------------
+# Author-facing render parameters
+# ---------------------------------------------------------------------------
 
 
 @dataclass(frozen=True)
@@ -518,8 +814,7 @@ def _load_workspace_skip_extras(root_folder: Path) -> Tuple[frozenset[str], Tupl
     if not config_path.exists():
         return frozenset(), ()
     try:
-        import json as _json
-        data = _json.loads(config_path.read_text())
+        data = json.loads(config_path.read_text())
     except (OSError, ValueError):
         return frozenset(), ()
     if not isinstance(data, dict):
@@ -827,6 +1122,289 @@ def scan_workspace_index(workspace_root: str) -> Dict[str, Any]:
     return scan_library_index(workspace_root)
 
 
+# ---------------------------------------------------------------------------
+# Pattern index files (JSON cache, keyed by per-file sha256)
+# ---------------------------------------------------------------------------
+
+
+PATTERN_INDEX_SCHEMA_VERSION = 1
+WORKSPACE_INDEX_RELATIVE_PATH = ".kigumi/pattern_index.json"
+PACKAGE_INDEX_FILENAME = "_pattern_index.json"
+
+
+def _entry_from_static(static_frames: Iterable[StaticEntry]) -> List[Dict[str, Any]]:
+    return [
+        {"name": entry.name, "kind": entry.kind, "lineno": entry.lineno}
+        for entry in static_frames
+    ]
+
+
+def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
+    static = rec.static_info
+    frames = list(static.frames) if static else []
+    chosen = static.chosen_frame if static else None
+
+    entry: Dict[str, Any] = {
+        "relative_path": rec.relative_path,
+        "module_name": rec.module_name,
+        "sha256": rec.content_sha256,
+        "frames": _entry_from_static(frames),
+        "chosen_frame_name": chosen.name if chosen is not None else None,
+        "chosen_frame_kind": chosen.kind if chosen is not None else None,
+        "multiple_frames": bool(static and static.multiple_frames),
+        "warnings": list(rec.warnings or []),
+        "load_error": rec.load_error,
+        "patternbook": None,
+    }
+
+    return entry
+
+
+def build_pattern_index(
+    root_folder: str,
+    *,
+    prior_index: Optional[Dict[str, Any]] = None,
+    load_patternbooks: bool = True,
+) -> Dict[str, Any]:
+    """Build a pattern index dict for *root_folder*.
+
+    When *prior_index* is supplied, entries whose source ``sha256`` still
+    matches are reused verbatim — which avoids re-importing unchanged modules.
+
+    Frame files are never imported here; only pattern-list files are imported.
+    """
+    root = Path(root_folder).resolve()
+    if not root.exists() or not root.is_dir():
+        raise ValueError(f"Folder does not exist or is not a directory: {root_folder}")
+
+    prior_entries: Dict[str, Dict[str, Any]] = {}
+    if prior_index and isinstance(prior_index.get("entries"), dict):
+        prior_entries = prior_index["entries"]
+
+    entries: Dict[str, Dict[str, Any]] = {}
+    for file_path in _discover_python_files(root):
+        try:
+            relative_path = str(file_path.relative_to(root))
+        except ValueError:
+            relative_path = str(file_path)
+
+        sha = _file_sha256(file_path)
+        cached = prior_entries.get(relative_path)
+        if (
+            cached is not None
+            and sha is not None
+            and cached.get("sha256") == sha
+        ):
+            entries[relative_path] = cached
+            continue
+
+        # No reusable cache: do a real scan of just this file.
+        static = analyze_file(str(file_path))
+        if not static.has_anything:
+            continue
+
+        record = _scan_single_file(root, file_path)
+        entries[relative_path] = _entry_from_record(record)
+
+    return {
+        "schema_version": PATTERN_INDEX_SCHEMA_VERSION,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "root_folder": str(root),
+        "entries": entries,
+    }
+
+
+def write_pattern_index(path: str, index: Dict[str, Any]) -> None:
+    path_obj = Path(path)
+    path_obj.parent.mkdir(parents=True, exist_ok=True)
+    path_obj.write_text(json.dumps(index, indent=2, sort_keys=True))
+
+
+def read_pattern_index(path: str) -> Optional[Dict[str, Any]]:
+    path_obj = Path(path)
+    if not path_obj.exists():
+        return None
+    try:
+        data = json.loads(path_obj.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    if data.get("schema_version") != PATTERN_INDEX_SCHEMA_VERSION:
+        return None
+    return data
+
+
+def refresh_pattern_index(root_folder: str, index_path: str) -> Dict[str, Any]:
+    """Read the index at *index_path*, refresh it against *root_folder*, write it back."""
+    prior = read_pattern_index(index_path)
+    new_index = build_pattern_index(root_folder, prior_index=prior)
+    write_pattern_index(index_path, new_index)
+    return new_index
+
+
+# ---------------------------------------------------------------------------
+# Layered search roots
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class SearchRoot:
+    name: str
+    kind: str  # "workspace" | "kumiki" | "dep"
+    root_path: Path
+
+
+def _kumiki_package_root() -> Optional[Path]:
+    spec = importlib.util.find_spec("kumiki")
+    if spec is None or spec.origin is None:
+        return None
+    return Path(spec.origin).resolve().parent
+
+
+def _dep_package_root(dist_name: str) -> Optional[Path]:
+    try:
+        dist = importlib.metadata.distribution(dist_name)
+    except importlib.metadata.PackageNotFoundError:
+        return None
+    # Prefer top_level.txt
+    try:
+        top_text = dist.read_text("top_level.txt") or ""
+    except Exception:
+        top_text = ""
+    top_pkgs = [line.strip() for line in top_text.splitlines() if line.strip()]
+    if not top_pkgs:
+        top_pkgs = [dist_name.replace("-", "_")]
+    for top_pkg in top_pkgs:
+        spec = importlib.util.find_spec(top_pkg)
+        if spec is None or spec.origin is None:
+            continue
+        return Path(spec.origin).resolve().parent
+    return None
+
+
+def _dep_requires_kumiki(dist_name: str) -> bool:
+    if dist_name.lower() == "kumiki":
+        return True
+    try:
+        dist = importlib.metadata.distribution(dist_name)
+    except importlib.metadata.PackageNotFoundError:
+        return False
+    requires = dist.requires or []
+    for req in requires:
+        # ``req`` looks like ``"kumiki>=0.1; python_version >= '3.10'"`` etc.
+        head = req.split(";", 1)[0].strip()
+        # Strip extras: ``kumiki[extra]>=0.1`` → ``kumiki``
+        name = head.split("[", 1)[0]
+        for sep in ("=", "<", ">", "!", "~", " "):
+            name = name.split(sep, 1)[0]
+        if name.strip().lower() == "kumiki":
+            return True
+    return False
+
+
+def _read_workspace_config(workspace_root: Path) -> Dict[str, Any]:
+    config_path = workspace_root / ".kigumi" / "config.json"
+    if not config_path.exists():
+        return {}
+    try:
+        data = json.loads(config_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def discover_search_roots(
+    workspace_root: str,
+    *,
+    extra_dependency_names: Optional[Iterable[str]] = None,
+) -> List[SearchRoot]:
+    """Return ordered search roots: workspace, kumiki, then declared deps.
+
+    A declared dependency is included only if it is both (a) listed in the
+    workspace's ``.kigumi/config.json`` (key ``kumiki_dependencies``) or
+    passed via *extra_dependency_names*, **and** (b) its installed metadata's
+    ``Requires-Dist`` lists ``kumiki``.
+    """
+    workspace_path = Path(workspace_root).resolve()
+    roots: List[SearchRoot] = [
+        SearchRoot(name="workspace", kind="workspace", root_path=workspace_path)
+    ]
+
+    kumiki_root = _kumiki_package_root()
+    if kumiki_root is not None and kumiki_root != workspace_path:
+        roots.append(SearchRoot(name="kumiki", kind="kumiki", root_path=kumiki_root))
+
+    config = _read_workspace_config(workspace_path)
+    declared = list(config.get("kumiki_dependencies") or [])
+    if extra_dependency_names:
+        for name in extra_dependency_names:
+            if name not in declared:
+                declared.append(name)
+
+    for dep_name in declared:
+        if dep_name.lower() == "kumiki":
+            continue
+        if not _dep_requires_kumiki(dep_name):
+            continue
+        dep_root = _dep_package_root(dep_name)
+        if dep_root is None:
+            continue
+        roots.append(SearchRoot(name=dep_name, kind="dep", root_path=dep_root))
+
+    return roots
+
+
+# ---------------------------------------------------------------------------
+# Per-root index resolution (bundled-or-build)
+# ---------------------------------------------------------------------------
+
+
+def load_or_build_pattern_index_for_root(root: SearchRoot) -> Dict[str, Any]:
+    """Return a pattern index for *root*.
+
+    For kumiki/dep roots, prefer a bundled ``_pattern_index.json`` if it
+    exists and is valid; otherwise scan the root.  For workspace roots we
+    always scan (the workspace cache is managed via
+    :func:`refresh_pattern_index` separately).
+    """
+    if root.kind in ("kumiki", "dep"):
+        bundled = root.root_path / PACKAGE_INDEX_FILENAME
+        cached = read_pattern_index(str(bundled))
+        if cached is not None:
+            return cached
+    return build_pattern_index(str(root.root_path))
+
+
+def scan_all_roots(
+    workspace_root: str,
+    *,
+    extra_dependency_names: Optional[Iterable[str]] = None,
+) -> Dict[str, Any]:
+    """Aggregate per-root pattern indexes in search-path order.
+
+    The aggregated payload preserves every entry; conflicts (same chosen frame
+    name across roots) are not collapsed — the UI decides what to surface.
+    """
+    roots = discover_search_roots(
+        workspace_root, extra_dependency_names=extra_dependency_names
+    )
+    per_root: List[Dict[str, Any]] = []
+    for root in roots:
+        index = load_or_build_pattern_index_for_root(root)
+        per_root.append({
+            "name": root.name,
+            "kind": root.kind,
+            "root_path": str(root.root_path),
+            "index": index,
+        })
+    return {
+        "schema_version": PATTERN_INDEX_SCHEMA_VERSION,
+        "workspace_root": str(Path(workspace_root).resolve()),
+        "roots": per_root,
+    }
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Multi-pattern grid: merge a pattern list into a single tiled Frame
 # ──────────────────────────────────────────────────────────────────────────────
@@ -1015,5 +1593,3 @@ def build_pattern_grid_frame(pattern_list: List[Any], padding: float = 0.5) -> A
         footprints=all_footprints,
         source_joints=all_source_joints if all_source_joints else None,
     )
-
-

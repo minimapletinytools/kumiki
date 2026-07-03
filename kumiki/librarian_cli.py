@@ -30,15 +30,13 @@ def _emit(payload: Dict[str, Any]) -> None:
 
 def _run(action: str, argv: list[str]) -> Dict[str, Any]:
     from kumiki.librarian import (
-        scan_library_index,
-        scan_specific_files_index,
-        scan_workspace_index,
-    )
-    from kumiki.librarian_index import (
         build_pattern_index,
         discover_search_roots,
         refresh_pattern_index,
         scan_all_roots,
+        scan_library_index,
+        scan_specific_files_index,
+        scan_workspace_index,
     )
 
     if action == "scan-workspace":

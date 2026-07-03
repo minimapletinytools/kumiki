@@ -1,6 +1,6 @@
 """Tests for the pure-AST kumiki librarian analyzer."""
 
-from kumiki.librarian_analysis import analyze_source
+from kumiki.librarian import analyze_source
 
 
 def test_typed_frame_assignment_detected():

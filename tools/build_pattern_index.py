@@ -27,7 +27,7 @@ def _ensure_repo_on_path() -> Path:
 
 def build(repo_root: Path | None = None) -> Path:
     repo_root = repo_root or _ensure_repo_on_path()
-    from kumiki.librarian_index import (
+    from kumiki.librarian import (
         PACKAGE_INDEX_FILENAME,
         PATTERN_INDEX_SCHEMA_VERSION,
         build_pattern_index,
