@@ -1,6 +1,17 @@
-- can't do inches(inches(...)) without double conversion UGH, may need mega refactor
-- no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
-- probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
+IGNORE- can't do inches(inches(...)) without double conversion UGH, may need mega refactor
+
+
+:: 7/2/2026 NOTCHING PLAN V2
+
+rename notching to relief?
+
+per face end notching helpers: basically, end notching can be done on a per face basis, there are many relief modes. the angle one, and then one where it's completely flat for a bit followed by a rounded relief to the nominal size, etc
+
+face aligned butt notching helpers: in face aligned case, we can once again split notching into top/bottom side of butt joint relief using various styles. in order to support some of styles in the timber framing book, these should be set so that it crops off after a certain point? (i.e. we only want to notch stuff above the tenon) <- maybe not, I think this is maybe a joint detai rather than a notching detail
+
+non-face aligned ubtt notching helpers: in this case, as a reasonable fallback, we can use the face aligned butt notching helpers and enhance the width of the notch by the sin/cos of the angle of the timber and both long faces that the timber enters in.
+
+
 
 
 :: 6/28 CONTENT PLAN
@@ -47,6 +58,9 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
 - do the shed from the timber framing book
   - add a helper function for cerating imperfect rectangular timber from reference edge
   - need to finish generic notching and partial notching
+
+
+- tusked morties and tenon oint
 
 :: 5/30 kumiki intro script
 
@@ -99,10 +113,15 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 :: TODO
--get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
--reorg all mortise and tenon joint examples
+-test frame scanning fixes
 -test the install cadquery stuff 
--do shower vid
+
+-do reorg on patterns and eaxmples again
+  -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
+  -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
+  -"Example Frames" -> "Examples"
+
+-updtae won't work for kumiki when using locla install (v.999) as it fails the version check when you try to update kumiki... so allow it to go from inocmpatbily to incompatible version and output an error unless it was v.999 or something
 -do example cleanup
 -make website
   -get domain D:
@@ -115,6 +134,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
     -make the awful thuma bed video
   -make simple website
   -make some content drip
+DONE-reorg all mortise and tenon joint examples
 DONE-stuff to test
   DONE-test export step and export STL combined/inidivdual again
   DONE-test initialize dependency bootstrapping again (you switched it to use uv and python 3.13)
@@ -127,7 +147,8 @@ DONE-stuff to test
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
 -someway to mke footprint show up more clearly in footprint examples? (probably just render on top of everything?)
 -would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
-
+- no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
+- probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
 
 -NOTCHING 
   -do scribe notching on all joints (followup content yee)
