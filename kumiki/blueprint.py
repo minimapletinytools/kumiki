@@ -26,11 +26,15 @@ from .cutcsg import (
     adopt_csg,
 )
 from .rule import Transform
-from .rendering_utils import sympy_to_float
 from .timber import CutTimber, Frame, JointAccessory
 
 import numpy as np
 import trimesh
+from sympy import Expr
+
+
+def sympy_to_float(value: Union[Expr, float, int]) -> float:
+    return float(value)
 
 BRepPrimAPI_MakeBox = cast(Any, None)
 BRepPrimAPI_MakeCylinder = cast(Any, None)
