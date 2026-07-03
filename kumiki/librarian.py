@@ -1,9 +1,9 @@
 """
 Librarian: discovery and loading of kumiki frame examples and pattern books.
 
-Discovery is **AST-driven** (see :mod:`kumiki.librarian_analysis`); the regex
-prefilter has been removed.  Files are only imported when their runtime objects
-are needed:
+Discovery is **AST-driven** (see :mod:`kumiki.librarian_analysis`). 
+
+Files are only imported when their runtime objects are needed:
 
 * Patternbook files are imported during scan so we can enumerate their pattern
   and group names.
@@ -11,10 +11,6 @@ are needed:
   filename plus a chosen entry name (the **last** module-level frame value or
   frame-returning function in source order).  Frame loading is the runner's
   job and happens on demand.
-
-The legacy ``LibrarianModuleRecord`` / ``LibrarianScanResult`` shape is
-preserved for backward compatibility (notably ``scan_result.examples`` is still
-populated when ``load_frame_examples=True``).
 """
 
 from __future__ import annotations
@@ -443,7 +439,6 @@ class LibrarianModuleRecord:
     relative_path: str
     module_name: str
     pattern_list: Optional[List[Pattern]] = None
-    example: Optional[Any] = None
     warnings: List[str] = field(default_factory=list)
     load_error: Optional[str] = None
     load_error_traceback: Optional[str] = None
@@ -471,14 +466,6 @@ class LibrarianScanResult:
             for module in self.modules
             if module.pattern_list is not None
         ]
-
-    @property
-    def examples(self) -> Dict[str, Any]:
-        return {
-            module.relative_path: module.example
-            for module in self.modules
-            if module.example is not None
-        }
 
 
 # ---------------------------------------------------------------------------
@@ -662,11 +649,6 @@ def _resolve_pattern_list(module: Any, warnings: List[str]) -> Optional[List[Pat
     return patterns if patterns else None
 
 
-def _resolve_example(module: Any) -> Optional[Any]:
-    """Return the legacy module-level ``example`` attribute if present."""
-    return getattr(module, "example", None)
-
-
 # ---------------------------------------------------------------------------
 # Per-file analysis (no imports)
 # ---------------------------------------------------------------------------
@@ -687,8 +669,6 @@ def might_contain_kumiki_frame(file_path: str) -> bool:
 def _scan_single_file(
     root: Path,
     file_path: Path,
-    *,
-    load_frame_examples: bool,
 ) -> LibrarianModuleRecord:
     try:
         relative_path = str(file_path.relative_to(root))
@@ -707,9 +687,7 @@ def _scan_single_file(
     if not static_info.has_anything:
         return record
 
-    needs_import = bool(static_info.pattern_lists) or (
-        load_frame_examples and bool(static_info.frames)
-    )
+    needs_import = bool(static_info.pattern_lists)
     if not needs_import:
         return record
 
@@ -725,21 +703,13 @@ def _scan_single_file(
 
     if static_info.pattern_lists:
         record.pattern_list = _resolve_pattern_list(module, record.warnings)
-    if load_frame_examples and static_info.frames:
-        record.example = _resolve_example(module)
     return record
 
 
-def scan_library_folder(
-    folder_path: str,
-    *,
-    load_frame_examples: bool = False,
-) -> LibrarianScanResult:
+def scan_library_folder(folder_path: str) -> LibrarianScanResult:
     """Scan *folder_path* recursively.
 
-    By default frame files are not imported — only their static info is
-    captured.  Pass ``load_frame_examples=True`` to import frame files and
-    populate ``record.example`` (used by the FreeCAD example runner).
+    Frame files are not imported — only their static info is captured.
     """
     root_folder = Path(folder_path).resolve()
     if not root_folder.exists() or not root_folder.is_dir():
@@ -747,9 +717,7 @@ def scan_library_folder(
 
     result = LibrarianScanResult(root_folder=str(root_folder))
     for file_path in _discover_python_files(root_folder):
-        record = _scan_single_file(
-            root_folder, file_path, load_frame_examples=load_frame_examples
-        )
+        record = _scan_single_file(root_folder, file_path)
         result.modules.append(record)
     return result
 
@@ -757,16 +725,12 @@ def scan_library_folder(
 def scan_specific_files(
     file_paths: List[str],
     root_folder: str,
-    *,
-    load_frame_examples: bool = False,
 ) -> LibrarianScanResult:
     root = Path(root_folder).resolve()
     result = LibrarianScanResult(root_folder=str(root))
     for fp_str in file_paths:
         file_path = Path(fp_str).resolve()
-        record = _scan_single_file(
-            root, file_path, load_frame_examples=load_frame_examples
-        )
+        record = _scan_single_file(root, file_path)
         result.modules.append(record)
     return result
 
@@ -794,15 +758,6 @@ def _frame_record_for_index(
         "chosen_frame_kind": chosen_kind,
         "all_frame_names": all_frame_names,
         "multiple_frames": bool(static and static.multiple_frames),
-        # Back-compat: previously the JS bridge inferred these from regex.
-        "has_example": any(
-            e.kind == "var" and e.name == "example"
-            for e in (static.frames if static else [])
-        ),
-        "has_build_frame": any(
-            e.kind == "function" and e.name == "build_frame"
-            for e in (static.frames if static else [])
-        ),
         "content_sha256": rec.content_sha256,
         "load_error": rec.load_error,
         "warnings": list(rec.warnings or []),

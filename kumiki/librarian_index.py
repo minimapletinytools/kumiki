@@ -30,10 +30,8 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .librarian import (
     LibrarianModuleRecord,
-    LibrarianScanResult,
     _discover_python_files,
     _file_sha256,
-    _make_dynamic_module_name,
     _scan_single_file,
 )
 from .librarian_analysis import StaticEntry, analyze_file
@@ -125,11 +123,7 @@ def build_pattern_index(
         if not static.has_anything:
             continue
 
-        record = _scan_single_file(
-            root,
-            file_path,
-            load_frame_examples=False,
-        )
+        record = _scan_single_file(root, file_path)
         entries[relative_path] = _entry_from_record(record)
 
     return {
@@ -168,32 +162,6 @@ def refresh_pattern_index(root_folder: str, index_path: str) -> Dict[str, Any]:
     write_pattern_index(index_path, new_index)
     return new_index
 
-
-# ---------------------------------------------------------------------------
-# Index → flat scan-result shim (for legacy consumers)
-# ---------------------------------------------------------------------------
-
-
-def scan_result_from_index(index: Dict[str, Any]) -> LibrarianScanResult:
-    """Best-effort reconstruction of a ``LibrarianScanResult`` from an index.
-
-    Patternbook *objects* are not rebuilt — only their cached name lists.  This
-    is sufficient for the JSON shape consumed by the kigumi bridge.
-    """
-    root = index.get("root_folder") or ""
-    result = LibrarianScanResult(root_folder=root)
-    entries = index.get("entries") or {}
-    for relative_path, entry in entries.items():
-        record = LibrarianModuleRecord(
-            relative_path=relative_path,
-            module_name=entry.get("module_name")
-            or _make_dynamic_module_name(Path(root), Path(root) / relative_path),
-            content_sha256=entry.get("sha256"),
-            warnings=list(entry.get("warnings") or []),
-            load_error=entry.get("load_error"),
-        )
-        result.modules.append(record)
-    return result
 
 
 # ---------------------------------------------------------------------------

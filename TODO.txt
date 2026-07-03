@@ -10,6 +10,8 @@ DONE- double saw horse workbench
   - do 2x 4x8 tops  and 4x6 legs with 1 4x8 leg for the vise
   -BONUS add well into tray and Us in feet with decorative cuts when you have those
 
+DONE-do multi-cross-lap joint with video
+
 - do fill_with_boards helper function
 
 def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1: TimberLike, vert_side2: TimberLike,  orientation : Literal["horizontal", "vertical"] = "horizontal", depth : Tuple[Number,Number,Number,Number] = (0,0,0,0), overlap : Number = 0, lateral_offset_from_hor_side1) : List[Board]
@@ -29,7 +31,7 @@ def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1:
 
 -finish cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon
 
-DONE-do multi-cross-lap joint with video
+
 
 def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first_timber : TimberFace, cut_distance_ratios : List[Number] = [])
 
