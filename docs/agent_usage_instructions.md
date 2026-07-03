@@ -183,6 +183,10 @@ Common automation loop example:
 5. `kigumi.automationGetCameraState`
 6. `kigumi.captureScreenshot`
 
+# Updating Kumiki
+
+Breaking API changes should always be accompanied by a minor version bump, however patch version bumps my introduce breaking behavior changes. In any case, refer to the [CHANGELOG.md](https://github.com/minimapletinytools/kumiki/blob/main/CHANGELOG.md) to see what breaking changes were introduced and fix accordingly. There may also be API deprecations. If deprecated API usage is detected, always update to the suggested new API.
+
 # Common Design Patterns
 
 ## locating (measuring) and marking

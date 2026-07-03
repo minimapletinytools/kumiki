@@ -6,6 +6,8 @@ As Kumiki is a CoAD library, it is well suited for usage with AI agents.
 
 Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki designs!
 
+Kumiki is in BETA, try it out! There are many more features to come and expect frequent breaking changes accompanied by a minor version bump. The AI agent should be able to easily address any breaking API changes based on the changelog.
+
 ## setup
 
 Kumiki is best used with Kigumi. To install Kigumi, install [VSCode](https://code.visualstudio.com/) and install the [Kigumi](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi) extension.
