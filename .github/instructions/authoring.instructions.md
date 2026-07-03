@@ -156,3 +156,18 @@ Additional tests (not required but encouraged):
 Do not write too many tests that aren't actually testing geometry. We want quality over quantity. Look for tests marked with `# 🐪` for examples of good tests. In particular, look at the ones in `test_plain_joints.py`
 
 Tests marked with a `# 🐪` have been hand verified to be relevant, never mark tests as `# 🐪` unless the user gives the ok. Never delete tests marked with `# 🐪` and be more cautious when modifying them. In contrast, tests not marked with a `# 🐪` can be deleted and rewritten.
+
+
+## Authoring Patterns and Example Frames
+
+Patterns are simple examples demonstrating joints or other deconstruted concepts in Kumiki. They are intended to be used as a reference source.
+
+- pattern should always use canonical arrangement in example_shavings.py when possible. 
+- each joint should have at least one pattern
+- if a joint has multiple patterns, they should all be in a subfolder named after the joint
+
+Kumiki also ships with a few example Frames that demonstrate how to put everything together. In general, follow agent_usage_instructions.md for authoring patterns and example frames.
+
+### How patterns and frames get discovered
+
+The librarian (`kumiki/librarian.py`) scans source files to find patterns and frame examples without importing them. In short: a module-level `patterns = [...]` list is how patterns are found, and a module-level `example` (or `build_frame`) — ideally, but not strictly required to be, annotated `-> Frame` — is how frame examples are found. See the module docstring in `kumiki/librarian.py` for the exact detection rules and how the pattern-index cache works.

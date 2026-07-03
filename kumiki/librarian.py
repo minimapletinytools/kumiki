@@ -1,35 +1,98 @@
 """
 Librarian: discovery and loading of kumiki frame examples and pattern books.
 
-This module owns the full librarian stack:
+This module owns the full librarian stack: AST-driven discovery, scanning,
+pattern index files, and layered search roots. The JS bridge never reads any
+of this directly — it always goes through the librarian CLI
+(:mod:`kumiki.librarian_cli`).
 
-* **AST-driven discovery** — a pure-AST static analyzer identifies module-level
-  entries that produce a ``Frame`` or pattern list, without importing the
-  file. Recognition is type-based, not name-based, and resolves identifiers
-  through the file's ``import`` statements (aliased imports like ``from
-  kumiki import Frame as F`` are handled correctly).
+Frame and pattern-list detection rules (see ``analyze_source``)
+------------------------------------------------------------------
 
-* **Scanning** — files are only imported when their runtime objects are
-  needed. Patternbook files are imported during scan so we can enumerate
-  their pattern and group names. Frame files are *not* imported during a
-  scan — the analyzer reports only the filename plus a chosen entry name
-  (the **last** module-level frame value or frame-returning function in
-  source order). Frame loading is the runner's job and happens on demand.
+Detection never imports the file — it's pure ``ast`` inspection. A module-level
+statement is recognized as a **frame** entry if either of these holds:
 
-* **Pattern index files** — a JSON cache (per file sha256) summarizing every
-  kumiki source file's frames and patternbooks under a root. Used both as a
-  build-time artifact shipped with the kumiki wheel
-  (``kumiki/_pattern_index.json``) and as a workspace-side cache
-  (``<workspace>/.kigumi/pattern_index.json``).
+* **Type-based** (the primary path): the statement's *type* resolves to
+  kumiki's canonical ``Frame`` (through aliases like ``from kumiki import
+  Frame as F``, dotted forms like ``kumiki.timber.Frame``, or string
+  annotations):
 
-* **Layered search roots** — workspace, the installed ``kumiki`` package
-  directory, and any explicitly declared kumiki-aware dependencies, in that
-  order. Dependencies are gated by both an explicit declaration in
-  ``.kigumi/config.json`` and an ``importlib.metadata`` ``Requires-Dist``
-  relationship with ``kumiki``.
+  - ``name: Frame = ...`` — annotation is ``Frame``
+  - ``name = Frame(...)`` / ``name = Frame.from_joints(...)`` — RHS call
+    constructs a ``Frame`` (checked even when the annotation, if any, isn't
+    ``Frame``)
+  - ``def foo(...) -> Frame:`` — return annotation is ``Frame``
 
-The JS bridge never reads any of this directly — it always goes through the
-librarian CLI (:mod:`kumiki.librarian_cli`).
+* **Name-based fallback** (unconditional, ignores types entirely): a target
+  or function literally named ``example`` or ``build_frame`` is *always*
+  treated as a frame entry, whether or not it's annotated ``-> Frame``. This
+  is why ``docs/agent_usage_instructions.md`` can say "just call it
+  ``example``" as the simple convention, while the type-based rule is what
+  actually backs it.
+
+A module-level statement is recognized as a **pattern list** entry only by
+name: ``patterns = [...]`` or ``patterns: ... = [...]``, list literal or
+call, no content type-checking at this stage (that happens after import, in
+``_resolve_pattern_list``).
+
+When a file has multiple frame entries, ``ModuleStaticInfo.chosen_frame`` is
+the **last** one in source order — that's what downstream consumers render.
+
+Two-phase scan (see ``_scan_single_file``)
+-------------------------------------------
+
+1. Static AST analysis always runs first and is cheap (no import).
+2. A file is only actually imported (``exec_module``) if its static info has
+   a ``patterns = [...]`` candidate (``needs_import = bool(static_info.pattern_lists)``).
+   **Frame-only files are never imported during a scan** — only their static
+   info (names/kinds/line numbers) is captured. Building the real ``Frame``
+   object (calling ``example()``/``build_frame()``) is deferred entirely to
+   the runner, on demand, when a specific file is opened/rendered.
+
+Pattern index files: the caching path
+--------------------------------------
+
+``build_pattern_index`` / ``refresh_pattern_index`` / ``read_pattern_index`` /
+``write_pattern_index`` maintain a JSON cache (keyed by per-file sha256) of
+the same scan results above, so unchanged files don't need to be re-scanned
+or re-imported:
+
+* ``build_pattern_index(root, prior_index=...)`` — for each file, reuses the
+  prior entry verbatim if its sha256 still matches; only changed/new files
+  get a real scan. Returns both a per-file ``entries`` dict (each entry has
+  its own ``frames``/``chosen_frame_name``/``patternbook``) and a flattened,
+  path-sorted ``frame_examples`` summary list, mirroring what
+  ``build_scan_index`` returns for a live scan.
+* ``refresh_pattern_index(root, index_path)`` — reads the index already on
+  disk at *index_path* as ``prior_index``, rebuilds against *root*, writes
+  the result back to *index_path*. This is **how to keep an index file up to
+  date**: call it (or ``python -m kumiki.librarian_cli refresh-index <root>
+  <index_path>``) whenever the source tree may have changed, instead of
+  hand-editing or blowing away the cache.
+* ``load_or_build_pattern_index_for_root`` (used by ``scan_all_roots``) is
+  the actual "check for an index file first" behavior: for the ``kumiki`` /
+  dependency search roots it trusts a bundled ``_pattern_index.json`` as-is
+  with **no** sha-diffing at all (installed packages are assumed immutable —
+  that file is what ``tools/build_pattern_index.py`` generates at release
+  time and ships in the wheel). Workspace roots always get a fresh
+  ``build_pattern_index`` call instead.
+
+Caveat: as of this writing the live kigumi extension bridge
+(``kigumi/frame-scanner.js``) only ever calls the CLI's ``scan-workspace``
+action (→ ``scan_workspace_index`` → ``scan_library_folder``), which does a
+full live AST (+ import-if-needed) scan every time and does **not** consult
+any pattern index file. The index/cache machinery above is real and tested,
+but currently only exercised for the bundled ``kumiki``/dependency roots via
+``scan_all_roots`` — not (yet) for the workspace's own live-edited files.
+
+Layered search roots
+---------------------
+
+``discover_search_roots`` returns, in order: the workspace, the installed
+``kumiki`` package directory, and any explicitly declared kumiki-aware
+dependencies. A dependency is only included if it's both declared in
+``.kigumi/config.json`` (``kumiki_dependencies``) *and* its installed
+metadata's ``Requires-Dist`` actually lists ``kumiki``.
 """
 
 from __future__ import annotations
@@ -1139,6 +1202,18 @@ def _entry_from_static(static_frames: Iterable[StaticEntry]) -> List[Dict[str, A
     ]
 
 
+def _patternbook_payload(pattern_list: Optional[List[Pattern]]) -> Optional[Dict[str, Any]]:
+    if pattern_list is None:
+        return None
+    return {
+        "patterns": [
+            {"path": p.path, "tags": list(p.tags), "pattern_type": p.pattern_type}
+            for p in pattern_list
+        ],
+        "pattern_names": [p.name for p in pattern_list],
+    }
+
+
 def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
     static = rec.static_info
     frames = list(static.frames) if static else []
@@ -1154,7 +1229,7 @@ def _entry_from_record(rec: LibrarianModuleRecord) -> Dict[str, Any]:
         "multiple_frames": bool(static and static.multiple_frames),
         "warnings": list(rec.warnings or []),
         "load_error": rec.load_error,
-        "patternbook": None,
+        "patternbook": _patternbook_payload(rec.pattern_list),
     }
 
     return entry
@@ -1172,6 +1247,13 @@ def build_pattern_index(
     matches are reused verbatim — which avoids re-importing unchanged modules.
 
     Frame files are never imported here; only pattern-list files are imported.
+
+    The returned dict has two views over the same per-file ``entries``:
+    each entry carries its own ``frames``/``chosen_frame_name``/``patternbook``
+    fields, and the top-level ``frame_examples`` list is a flattened,
+    sorted-by-path summary of every entry that has at least one frame —
+    mirroring the ``frame_examples`` list :func:`build_scan_index` returns,
+    so both index shapes expose frame examples the same way.
     """
     root = Path(root_folder).resolve()
     if not root.exists() or not root.is_dir():
@@ -1206,11 +1288,26 @@ def build_pattern_index(
         record = _scan_single_file(root, file_path)
         entries[relative_path] = _entry_from_record(record)
 
+    frame_examples = [
+        {
+            "relative_path": entry["relative_path"],
+            "module_name": entry["module_name"],
+            "chosen_frame_name": entry.get("chosen_frame_name"),
+            "chosen_frame_kind": entry.get("chosen_frame_kind"),
+            "all_frame_names": [f["name"] for f in entry.get("frames", [])],
+            "multiple_frames": entry.get("multiple_frames", False),
+        }
+        for entry in entries.values()
+        if entry.get("frames")
+    ]
+    frame_examples.sort(key=lambda item: item["relative_path"])
+
     return {
         "schema_version": PATTERN_INDEX_SCHEMA_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "root_folder": str(root),
         "entries": entries,
+        "frame_examples": frame_examples,
     }
 
 
