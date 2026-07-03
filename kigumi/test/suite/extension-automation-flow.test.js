@@ -159,6 +159,14 @@ describe('Kigumi automation flow', () => {
     const thetaDelta = Math.abs(Number(cameraAfter.payload.orbit.theta) - Number(cameraBefore.payload.orbit.theta));
     assert.ok(thetaDelta > 0.001, 'Expected camera theta to change after automation set');
 
+    // captureScreenshot awaits a webview requestAnimationFrame round trip, which
+    // browsers/VS Code suspend while the panel isn't visible/focused. The panel
+    // reveal()s itself before capturing, but if the OS focus is yanked away from
+    // this extension-host window while the suite is running (e.g. alt-tabbing to
+    // another app), rAF can still stall and this step will hang/time out. If this
+    // test is flaky only when run interactively, try leaving the test window
+    // focused/foregrounded for the duration of the run before treating it as a
+    // product bug.
     const artifactDir = path.resolve(__dirname, '..', '..', '.artifacts', 'automation');
     const screenshotResult = await vscode.commands.executeCommand('kigumi.captureScreenshot', {
       filePath: fixturePath,

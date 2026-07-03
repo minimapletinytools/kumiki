@@ -831,6 +831,18 @@ class FrameViewSession {
             throw new Error(`Viewer panel is not available for ${this.filePath}`);
         }
 
+        // The webview's capture handler waits on requestAnimationFrame, which browsers
+        // (and VS Code's webview host) suspend while the panel isn't visible — e.g. after
+        // some other editor/document took focus. Reveal it first so rAF actually fires;
+        // otherwise this hangs until the caller's own timeout (if any) gives up.
+        // Note: reveal() only fixes in-app focus (another editor/tab stealing focus
+        // within the same VS Code window). If the whole VS Code/extension-host window
+        // loses OS-level focus (e.g. the developer alt-tabs to another app while an
+        // automation test is running), rAF can still be suspended and this can hang
+        // regardless — keep the window foregrounded while running automation tests
+        // interactively.
+        this.panel.reveal(this.panel.viewColumn, false);
+
         const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 8000;
         const result = await requestViewerScreenshot(this.panel, { timeoutMs });
 

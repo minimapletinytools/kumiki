@@ -67,3 +67,5 @@ cd kigumi && npm run test:ext:complex
 Keep iteration fast:
 - Baseline tests are mandatory for all Kigumi edits.
 - Complex tests should be feature-targeted during active development and run fully before merge for high-impact changes.
+
+`npm run test:ext*` launches real VS Code extension-host windows on screen. Automation flows that wait on webview `requestAnimationFrame` (e.g. `kigumi.captureScreenshot`) can stall or time out if the OS moves focus away from those windows mid-run (e.g. alt-tabbing to another app) — rAF is suspended while a webview panel isn't visible/focused. If these tests hang or fail flakily, avoid switching windows/apps while they run before assuming it's a product bug.
