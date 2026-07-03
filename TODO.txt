@@ -11,6 +11,8 @@ face aligned butt notching helpers: in face aligned case, we can once again spli
 
 non-face aligned ubtt notching helpers: in this case, as a reasonable fallback, we can use the face aligned butt notching helpers and enhance the width of the notch by the sin/cos of the angle of the timber and both long faces that the timber enters in.
 
+dealing with inset shoulder: if inset shoulder is non trivial (always non trivial in non face/plane aligned cases, otheriwse non trivial if inset_shoulder > 0). if trivial, use regular notching algoritm, if non trivial, use special inset shoulder notching algorithm and extend to imperfect bounds of both timbers
+
 
 
 
@@ -22,6 +24,17 @@ DONE- double saw horse workbench
   -BONUS add well into tray and Us in feet with decorative cuts when you have those
 
 DONE-do multi-cross-lap joint with video
+  def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first_timber : TimberFace, cut_distance_ratios : List[Number] = [])
+
+    # assert at least 2 timbers
+    # assert all timbers have a long face axis that is parallel to starting_face_on_first_timber of timbers[0] (call it starting face)
+    # assert cut_distance_ratios are all in (0,1) and monotically increasing
+    # find the opposite face on timbers[timbers.length()-1] (call it finish face)
+    # set global cut positions in order using cut_distance_ratios based on the distance between starting face and finish face)
+    # if there are not enough cut_distance_ratios, the remaining cut ratios are such taht they are uniform between the last computed cut face (or starting face if none) and the finish face
+    # call cut_cross_lap_joint in order between timber[n] and timber[n+1]
+    # combine all cuts and return 
+
 
 - do fill_with_boards helper function
 
@@ -42,25 +55,28 @@ def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1:
 
 -finish cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon
 
-
-
-def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first_timber : TimberFace, cut_distance_ratios : List[Number] = [])
-
-  # assert at least 2 timbers
-  # assert all timbers have a long face axis that is parallel to starting_face_on_first_timber of timbers[0] (call it starting face)
-  # assert cut_distance_ratios are all in (0,1) and monotically increasing
-  # find the opposite face on timbers[timbers.length()-1] (call it finish face)
-  # set global cut positions in order using cut_distance_ratios based on the distance between starting face and finish face)
-  # if there are not enough cut_distance_ratios, the remaining cut ratios are such taht they are uniform between the last computed cut face (or starting face if none) and the finish face
-  # call cut_cross_lap_joint in order between timber[n] and timber[n+1]
-  # combine all cuts and return 
-
 - do the shed from the timber framing book
   - add a helper function for cerating imperfect rectangular timber from reference edge
   - need to finish generic notching and partial notching
 
 
-- tusked morties and tenon oint
+- tusked morties and tenon joint
+class TuskParameters()
+  tusk_entry_face_on_tenon_timber : TimberLongFace,
+  tusk_width : Numeric,
+  tusk_height: Numeric,
+  tusk_tip_extra_length: Numeric,
+  tusk_base_extra_length: Numeric,
+def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement : ButtJointTimberArrangement, tenon_size : V2, tenon_position : V2 = 0, tenon_stickout_amount : Optional[Numeric] = None, tusk_params : Optional[TuskParameters] = None, shoulder_inset : Numeric = 0)
+  # assert plane alignment
+  # if tusk_params is None, set tusk_entry_face_on_tenon_timber to be face in direction of cross product of arrangement, set tusk width (thickness) to 1/3 the width of the tenon size from the entry face direction, set its smol height to 1.5 the width of the tenon, set its angle to 10degrees, set the tip/base extra width to 0.7x the height of the tenon (the size of the adjacent face of the entry face on the tenon)
+  # tenon_stickout_amount measured from centerline of tenon, if None, set to 2.5x the tusk height + cos (joint angle) * tenon height (height being in the axis parallel to the arrangement plane)
+  # assert that tusk_entry_face_on_tenon_timber is perpendicular to the adjacent long face of the entry face of the receiving timber, if not error "angled side entry tusks not supported"
+  # check that the tenon exit long face on the receiving timber is a perfect face, if not output a warning and say a relief cut is added
+  # use build a butt joint helpers to establish the shoulder and notch on the netry face
+  # on the exit face, use special relief algorith to cut relief surface for tusk entry, this is just the usual notching algorithm except we set width to be the tusk length*2 (tenon height + extra lengths)
+  # create the tusk shape (wedge shape)
+  
 
 :: 5/30 kumiki intro script
 
@@ -113,6 +129,9 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 :: TODO
+
+-change wedge half dovetail joint to use angle rather than big/small size
+-rename notching.py to relief.py
 -test frame scanning fixes
 -test the install cadquery stuff 
 
