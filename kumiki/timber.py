@@ -983,16 +983,14 @@ class PerfectTimberWithin(ABC):
                 equality_test(width_halves[1], w_half) and
                 equality_test(height_halves[0], h_half) and
                 equality_test(height_halves[1], h_half))
+    
+    
 
 
 # TODO HomeDepotTimber or like BoxTimber or NominalTimber, sticktimber and dressedtimber are also cute names?
 @dataclass(frozen=True)
 class Timber(PerfectTimberWithin):
-    """Perfect rectangular timber (the current default timber type)
-    
-    This is a perfect rectangular prism where the nominal bounding box
-    exactly matches the actual geometry. This is the most common timber type
-    used in timber framing.
+    """Rectangular timber which may or may not be perfect.
     
     Inherits all attributes and methods from PerfectTimberWithin:
         - length: Length of the timber
@@ -1001,6 +999,23 @@ class Timber(PerfectTimberWithin):
         - name: Optional name
     """
     nominal_half_sizes: Optional[Tuple[V2, V2]] = None  # Optional asymmetric half-sizes from centerline
+
+    @staticmethod
+    def from_perfect_timber_within(perfect_timber: PerfectTimberWithin, nominal_half_sizes: Optional[Tuple[V2, V2]] = None) -> 'Timber':
+        """
+        Create a Timber instance from a PerfectTimberWithin instance.
+        
+        Args:
+            perfect_timber: An instance of PerfectTimberWithin
+            nominal_half_sizes: Optional asymmetric half-sizes from centerline
+        """
+        return Timber(
+            length=perfect_timber.length,
+            size=perfect_timber.size,
+            transform=perfect_timber.transform,
+            ticket=perfect_timber.ticket,
+            nominal_half_sizes=nominal_half_sizes
+        )
     
     def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
         """
@@ -1125,31 +1140,10 @@ class Board(PerfectTimberWithin):
 
 
 # TODO finish
-@dataclass(frozen=True)
-class FauxTimber(PerfectTimberWithin):
-    """proxy class allowing us to pretend rotated boards are timbers which allows us to use timber joints on boards"""
-
-    board: Board = field(kw_only=True)
+#@dataclass(frozen=True)
+#class FauxTimber(PerfectTimberWithin):
+#    """proxy class allowing us to pretend rotate timbers to cut joints in in different orientations."""
     
-    # init from a Board
-    @classmethod
-    def from_board(cls, board: Board, map_top_to : TimberFace = TimberFace.TOP, map_right_to: TimberFace = TimberFace.RIGHT) -> 'FauxTimber':
-        #TODO create a PerfectTimberWithin from the reoriented board
-        raise NotImplementedError("TODO")
-
-    def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
-        #TODO return the nominal half-sizes of the faux timber which should be the same as the original board
-        return self.board.get_nominal_half_sizes()
-
-    def reorient_csg(self, csg: CutCSG) -> CutCSG:
-        #TODO reorient the csg from the faux timber's orientation to the board's orientation
-        raise NotImplementedError("TODO")
-
-    def reconstruct_joint(self, joint: 'Joint') -> 'Joint':
-        #TODO reconstruct a joint by reorienting all the cut CSGs and replacing the FauxTimber with the original Board
-        raise NotImplementedError("TODO")
-        
-
 
 # TODO consider renaming to Log LOL
 @dataclass(frozen=True)
@@ -1160,6 +1154,27 @@ class RoundTimber(PerfectTimberWithin):
     is a square that contains the circle, but the actual geometry is a cylinder.
     """
     diameter: Numeric = field(kw_only=True)  # Diameter of the circular cross-section
+
+
+    @staticmethod
+    def from_perfect_timber_within(perfect_timber: PerfectTimberWithin, diameter: Optional[Numeric] = None) -> 'RoundTimber':
+        """
+        Create a Timber instance from a PerfectTimberWithin instance.
+        
+        Args:
+            perfect_timber: An instance of PerfectTimberWithin
+            diameter: Optional diameter for the round timber, if None, then the diagonal of the perfect_timber.size is used to compute the diameter.
+        """
+        if diameter is None:
+            diameter = sqrt(perfect_timber.size[0]**2 + perfect_timber.size[1]**2)
+        return RoundTimber(
+            length=perfect_timber.length,
+            size=perfect_timber.size,
+            transform=perfect_timber.transform,
+            ticket=perfect_timber.ticket,
+            diameter=diameter
+        )
+
     
     def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
         """

@@ -161,7 +161,10 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 -create test runner for examples so the exmaples are also tests :O
 -test frame scanning fixes
 -test the install cadquery stuff 
--do the timebr erplace helper method for round timbers etc
+-imperfect timber ctors
+  DONE-do the timebr erplace helper method for round timbers etc
+  -test them
+
 
 -do reorg on patterns and eaxmples again
   -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
