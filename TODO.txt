@@ -1,5 +1,5 @@
 
-:: 7/2/2026 arrangement
+:: 7/2/2026 assemblies
 
 each timber in each joint has an assembly constrain, these trace prism in R6 (directions and angles) that it can move. More specifically, it contains half or unbounded direction and angle in which it can move. there is currently an AssemblyFreedom that is wrong, the assembly freedom is per timber per joint, so the joint ticket should contain a map from its timbers to its freedoms. we don't expect to support rotational freedoms yet so feel free to NotImplemented for anything requiring rotational freedom specifi logic. IN the future, we may want a more complex shape in R6 rather than just half/full intervals, e.g. requires twisting and moving at the same time to move, or move firs,t then twist, then move etc, so please make some basic allowances for this, but for now we'll keep assemblies simple as just half or full intervals from 0
 
@@ -19,6 +19,13 @@ Assemblies on joints are added viat he ticket class, they have the assembly free
 In the kigumi viewer, now we want to allow previewing assemblies. Add a "assembly preview timeline" at the bottom, put marks in the timeline for each order, sliding the bar then dissamebles each other one at a time,
 set dissamebly_multiplier to be 1.5 and make it configurable via the options in kigumi
 add an option to show the assembly timeline and have it on by default
+
+
+assemblies next step
+
+- set assmebly DOFs on all joints
+- need a way to specify assembly order when cutting joints or after cutting joins
+- some joints have multi step removal DOFs. make some notes on how t odo this... but I guessy ou can actually do it later
 
 
 :: 7/2/2026 NOTCHING PLAN V2
@@ -154,6 +161,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 -create test runner for examples so the exmaples are also tests :O
 -test frame scanning fixes
 -test the install cadquery stuff 
+-do the timebr erplace helper method for round timbers etc
 
 -do reorg on patterns and eaxmples again
   -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
