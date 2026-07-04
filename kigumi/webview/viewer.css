@@ -458,6 +458,78 @@ canvas { display: block; width: 100%; height: 100%; }
     color: var(--hv-hint); font: 11px 'Segoe UI', sans-serif;
     pointer-events: none; user-select: none; white-space: nowrap;
 }
+#assembly-timeline {
+    position: absolute;
+    bottom: 26px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: min(520px, 70%);
+    padding: 8px 14px 18px;
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-left: 3px solid var(--hv-accent);
+    border-radius: 6px;
+    color: var(--hv-text);
+    font: 11px 'Segoe UI', sans-serif;
+    backdrop-filter: blur(4px);
+    z-index: 3;
+}
+.assembly-timeline-title {
+    color: var(--hv-title);
+    font-size: 11px;
+    text-transform: lowercase;
+    user-select: none;
+}
+.assembly-timeline-track {
+    position: relative;
+    flex: 1;
+    min-width: 0;
+}
+.assembly-timeline-track input[type="range"] {
+    width: 100%;
+    display: block;
+    accent-color: var(--hv-accent);
+}
+.assembly-timeline-marks {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 100%;
+    height: 12px;
+    pointer-events: none;
+    user-select: none;
+}
+.assembly-timeline-mark {
+    position: absolute;
+    transform: translateX(-50%);
+    color: var(--hv-dim);
+    font-size: 10px;
+    line-height: 12px;
+}
+.assembly-timeline-mark-failure {
+    pointer-events: auto;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--hv-error);
+    font-size: 11px;
+    line-height: 12px;
+    font-weight: 600;
+}
+.assembly-timeline-mark-failure:hover {
+    color: var(--hv-error-hover);
+}
+.assembly-timeline-warnings {
+    color: var(--hv-error);
+    font-size: 11px;
+    cursor: help;
+    user-select: none;
+    white-space: nowrap;
+}
 #panels {
     width: 100%;
     max-width: none;

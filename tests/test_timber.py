@@ -1612,3 +1612,121 @@ class TestGetNominalHalfSizes:
         assert not csg.contains_point(create_v3(scalar(1), scalar(-3), scalar(50)))
 
 
+
+
+class TestJointAssembly:
+    """Tests for Joint.with_assembly and solve_frame_assembly."""
+
+    def build_joint(self, ticket_a="post", ticket_b="beam", offset_x=0):
+        timber_a = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(offset_x), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket=ticket_a,
+        )
+        timber_b = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(offset_x + 10), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket=ticket_b,
+        )
+        peg = Peg(
+            transform=Transform(position=create_v3(scalar(offset_x + 5), 0, scalar(50)), orientation=Orientation.identity()),
+            size=scalar(1),
+            shape=PegShape.ROUND,
+            forward_length=scalar(10),
+            stickout_length=scalar(2),
+            ticket=AccessoryTicket(path=f"{ticket_a}_peg"),
+        )
+        joint = Joint(
+            cuttings={"a": Cutting(timber=timber_a), "b": Cutting(timber=timber_b)},
+            ticket=JointTicket(path=f"{ticket_a}_{ticket_b}", joint_type="test_joint"),
+            jointAccessories={"peg": peg},
+        )
+        return timber_a, timber_b, joint
+
+    def test_with_assembly_sets_order_and_freedoms(self, float_mode):
+        timber_a, timber_b, joint = self.build_joint()
+        freedom = AssemblyFreedom.translation(create_v3(0, 0, 1), freed_after=scalar(4))
+        peg_freedom = AssemblyFreedom.translation(create_v3(1, 0, 0), freed_after=scalar(2))
+
+        annotated = joint.with_assembly(1, {"a": freedom}, accessory_freedoms={"peg": peg_freedom})
+
+        assert annotated.assembly_order == 1
+        assert annotated.cuttings["a"].assembly_freedom is freedom
+        assert annotated.cuttings["b"].assembly_freedom is None
+        assert annotated.jointAccessories["peg"].assembly_freedom is peg_freedom
+        # Timber references are preserved so Frame.from_joints identity grouping works.
+        assert annotated.cuttings["a"].timber is timber_a
+        assert annotated.cuttings["b"].timber is timber_b
+        # The original joint is untouched (immutability).
+        assert joint.assembly_order is None
+        assert joint.cuttings["a"].assembly_freedom is None
+
+    def test_with_assembly_rejects_unknown_keys(self, float_mode):
+        _, _, joint = self.build_joint()
+        freedom = AssemblyFreedom.translation(create_v3(0, 0, 1), freed_after=scalar(4))
+
+        with pytest.raises(ValueError, match="unknown cutting key"):
+            joint.with_assembly(1, {"nope": freedom})
+        with pytest.raises(ValueError, match="unknown accessory key"):
+            joint.with_assembly(1, {"a": freedom}, accessory_freedoms={"nope": freedom})
+
+    def test_solve_frame_assembly_end_to_end(self, float_mode):
+        timber_a1, _, joint_one = self.build_joint(ticket_a="post_one", ticket_b="beam_one")
+        _, _, joint_two = self.build_joint(ticket_a="post_two", ticket_b="beam_two", offset_x=50)
+        joint_one = joint_one.with_assembly(
+            1, {"a": AssemblyFreedom.translation(create_v3(0, 0, 1), freed_after=scalar(4))}
+        )
+        joint_two = joint_two.with_assembly(
+            2, {"a": AssemblyFreedom.translation(create_v3(1, 0, 0), freed_after=scalar(6))}
+        )
+        frame = Frame.from_joints([joint_one, joint_two], name="assembly test")
+
+        solution = solve_frame_assembly(frame)
+
+        assert solution is not None
+        assert solution.failure is None
+        assert [step.order for step in solution.steps] == [1, 2]
+        step_one = solution.steps[0]
+        assert len(step_one.movements) == 1
+        movement = step_one.movements[0]
+        assert movement.member_key == joint_one.cuttings["a"].timber.ticket.kumiki_id
+        assert movement.dragged is False
+        assert float(giraffe_evalf(movement.distance)) == pytest.approx(4.0)
+
+    def test_solve_frame_assembly_returns_none_without_orders(self, float_mode):
+        _, _, joint = self.build_joint()
+        frame = Frame.from_joints([joint], name="no assembly")
+
+        assert solve_frame_assembly(frame) is None
+
+    def test_solve_frame_assembly_combines_duplicate_timber_freedoms(self, float_mode):
+        # A compound-style joint where the same timber appears under two
+        # cutting keys, each contributing a different escape DOF.
+        timber_a, timber_b, joint = self.build_joint()
+        freedom_up = AssemblyFreedom.translation(create_v3(0, 0, 1), freed_after=scalar(4))
+        freedom_x = AssemblyFreedom.translation(create_v3(1, 0, 0), freed_after=scalar(2))
+        compound = Joint(
+            cuttings={
+                "a": replace(joint.cuttings["a"], assembly_freedom=freedom_up),
+                "a_2": Cutting(timber=timber_a, assembly_freedom=freedom_x),
+                "b": joint.cuttings["b"],
+            },
+            ticket=joint.ticket,
+            jointAccessories={},
+            assembly_order=1,
+        )
+        frame = Frame.from_joints([compound], name="compound assembly")
+
+        solution = solve_frame_assembly(frame)
+
+        assert solution is not None
+        assert solution.failure is None
+        assert len(solution.steps) == 1
+        movement = solution.steps[0].movements[0]
+        assert movement.member_key == timber_a.ticket.kumiki_id

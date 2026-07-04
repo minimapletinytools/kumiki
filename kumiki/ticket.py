@@ -11,8 +11,6 @@ from dataclasses import dataclass, field
 from itertools import count
 from typing import Optional
 
-from kumiki.rule import Direction3D
-
 
 _KUMIKI_ID_COUNTER = count(1)
 
@@ -60,36 +58,9 @@ class AccessoryTicket(Ticket):
 class BoardTicket(TimberTicket):
     """Ticket metadata for board-like members."""
 
-# TODO this is wrong
-# use R6 DOF for each direction and orientation axis
-# each timber in each joint has its on freedom
-# in addition, there should be a "freed after" amount which is to say, the joint is "diassambled" after certain condition are met in each dof, this will simply be an amount in each DOF after which the joint is free
-@dataclass(frozen=True)
-class AssemblyFreedom:
-    """Assembly DOF in global space (up to two allowed insertion directions)."""
-
-    direction_freedom_1: Optional[Direction3D] = None
-    direction_freedom_2: Optional[Direction3D] = None
-
-    @staticmethod
-    def _invert_direction(direction: Optional[Direction3D]) -> Optional[Direction3D]:
-        if direction is None:
-            return None
-        return -direction
-
-    def invert(self) -> "AssemblyFreedom":
-        """Return a new AssemblyFreedom with each allowed direction inverted."""
-        return AssemblyFreedom(
-            direction_freedom_1=self._invert_direction(self.direction_freedom_1),
-            direction_freedom_2=self._invert_direction(self.direction_freedom_2),
-        )
-
-
 @dataclass(frozen=True)
 class JointTicket(Ticket):
-    """Concept ticket metadata for joints and assembly sequencing."""
+    """Concept ticket metadata for joints."""
 
     joint_type: Optional[str] = None
-    assembly_order: Optional[int] = None
-    assembly_freedom: Optional[AssemblyFreedom] = None
     tags: tuple[str, ...] = ()

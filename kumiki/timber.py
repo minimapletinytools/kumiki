@@ -8,9 +8,16 @@ from .rule import *
 from .footprint import *
 from .cutcsg import *
 from .ticket import Ticket, TimberTicket, AccessoryTicket, JointTicket
+from .assembly import (
+    AssemblyFreedom,
+    AssemblyJoint,
+    AssemblyMember,
+    AssemblySolution,
+    solve_assembly,
+)
 from enum import Enum
-from typing import List, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
-from dataclasses import dataclass, field
+from typing import List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
+from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 import warnings
 
@@ -1378,6 +1385,10 @@ class Cutting:
     # node so that the viewer can navigate the CSG tree by label.
     label: Optional[str] = None
 
+    # Assembly freedom of this timber within this joint (global space).
+    # None means unspecified: the assembly solver treats the connection as rigid.
+    assembly_freedom: Optional[AssemblyFreedom] = None
+
     def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
         """Return the top end cut HalfSpace derived from distance metadata."""
         if self.maybe_top_end_cut_distance_from_bottom is not None:
@@ -1884,6 +1895,10 @@ class JointAccessory(ABC):
     """Base class for joint accessories like wedges, drawbores, etc."""
 
     ticket: AccessoryTicket = field(default_factory=AccessoryTicket, kw_only=True)
+
+    # Assembly freedom of this accessory within its joint (global space).
+    # None means unspecified: the assembly solver treats the connection as rigid.
+    assembly_freedom: Optional[AssemblyFreedom] = field(default=None, kw_only=True)
     
     @abstractmethod
     def render_csg_local(self) -> CutCSG:
@@ -2129,6 +2144,53 @@ class Joint:
     cuttings: Dict[str, Cutting]
     ticket: JointTicket
     jointAccessories: Dict[str, JointAccessory] = field(default_factory=dict)
+    # Disassembly order of this joint: smaller order = extracted EARLIER during
+    # disassembly (order 1 is the first thing out). None = not part of the
+    # assembly sequence. See kumiki/assembly.py.
+    assembly_order: Optional[int] = None
+
+    def with_assembly(
+        self,
+        order: int,
+        freedoms: Mapping[str, AssemblyFreedom],
+        accessory_freedoms: Optional[Mapping[str, AssemblyFreedom]] = None,
+    ) -> "Joint":
+        """Return a copy of this joint annotated with assembly information.
+
+        Keys of ``freedoms`` are cutting keys (e.g. "butt_timber") and keys of
+        ``accessory_freedoms`` are accessory keys; members not named keep an
+        unspecified (rigid) freedom. Annotate joints BEFORE building the Frame:
+        this rebuilds the named Cutting/accessory objects (via dataclasses
+        replace, preserving timber references), so a Frame built earlier would
+        still hold the un-annotated objects.
+        """
+        accessory_freedoms = accessory_freedoms or {}
+        unknown_cutting_keys = [key for key in freedoms if key not in self.cuttings]
+        if unknown_cutting_keys:
+            raise ValueError(
+                f"with_assembly: unknown cutting key(s) {unknown_cutting_keys}; "
+                f"this joint has cuttings {sorted(self.cuttings)}"
+            )
+        unknown_accessory_keys = [key for key in accessory_freedoms if key not in self.jointAccessories]
+        if unknown_accessory_keys:
+            raise ValueError(
+                f"with_assembly: unknown accessory key(s) {unknown_accessory_keys}; "
+                f"this joint has accessories {sorted(self.jointAccessories)}"
+            )
+        new_cuttings = {
+            key: (replace(cutting, assembly_freedom=freedoms[key]) if key in freedoms else cutting)
+            for key, cutting in self.cuttings.items()
+        }
+        new_accessories = {
+            key: (replace(accessory, assembly_freedom=accessory_freedoms[key]) if key in accessory_freedoms else accessory)
+            for key, accessory in self.jointAccessories.items()
+        }
+        return Joint(
+            cuttings=new_cuttings,
+            ticket=self.ticket,
+            jointAccessories=new_accessories,
+            assembly_order=order,
+        )
 
 def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
     """
@@ -2481,3 +2543,64 @@ def add_milestone(name: str):
     _json.dump({"type": "milestone", "name": name}, stdout)
     stdout.write("\n")
     stdout.flush()
+
+
+def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
+    """Solve the disassembly sequence for a frame's source joints.
+
+    Adapts the frame into the abstract assembly graph of kumiki/assembly.py —
+    one AssemblyMember per distinct timber/accessory (keyed by ticket
+    kumiki_id, positioned at the timber centroid) and one AssemblyJoint per
+    source joint — then delegates to solve_assembly.
+
+    Returns None when no source joint carries an assembly_order.
+    """
+    source_joints = list(frame.source_joints or [])
+    if not any(joint.assembly_order is not None for joint in source_joints):
+        return None
+
+    members: Dict[int, AssemblyMember] = {}
+
+    def register_timber(timber: PerfectTimberWithin) -> int:
+        key = timber.ticket.kumiki_id
+        if key not in members:
+            centroid = (
+                timber.get_bottom_position_global()
+                + timber.get_length_direction_global() * timber.length / 2
+            )
+            members[key] = AssemblyMember(key=key, name=timber.ticket.path, position=centroid)
+        return key
+
+    def register_accessory(accessory: JointAccessory) -> int:
+        key = accessory.ticket.kumiki_id
+        if key not in members:
+            transform = getattr(accessory, "transform", None)
+            position = transform.position if transform is not None else create_v3(0, 0, 0)
+            members[key] = AssemblyMember(key=key, name=accessory.ticket.path, position=position)
+        return key
+
+    def add_freedom(freedoms: Dict[int, Optional[AssemblyFreedom]], key: int,
+                    freedom: Optional[AssemblyFreedom]) -> None:
+        existing = freedoms.get(key)
+        if existing is not None and freedom is not None:
+            # The same member can appear under several cutting keys of one
+            # (compound) joint; its escape DOFs are the union of all of them.
+            freedoms[key] = AssemblyFreedom.combine(existing, freedom)
+        elif key not in freedoms or freedom is not None:
+            freedoms[key] = freedom
+
+    assembly_joints: List[AssemblyJoint] = []
+    for joint in source_joints:
+        freedoms: Dict[int, Optional[AssemblyFreedom]] = {}
+        for cutting in joint.cuttings.values():
+            add_freedom(freedoms, register_timber(cutting.timber), cutting.assembly_freedom)
+        for accessory in joint.jointAccessories.values():
+            add_freedom(freedoms, register_accessory(accessory), accessory.assembly_freedom)
+        joint_name = joint.ticket.get_name()
+        if joint_name == "[no-name]":
+            joint_name = joint.ticket.joint_type or "joint"
+        assembly_joints.append(
+            AssemblyJoint(name=joint_name, order=joint.assembly_order, freedoms=freedoms)
+        )
+
+    return solve_assembly(list(members.values()), assembly_joints)
