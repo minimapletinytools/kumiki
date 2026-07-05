@@ -5,6 +5,7 @@ const { PythonRunnerSession } = require('./runner-session');
 const { FileWatcher } = require('./file-watcher');
 const { RefreshProfiler } = require('./refresh-profiler');
 const { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestViewerScreenshot } = require('./viewer');
+const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 
 const VIEWER_LOG_LEVEL_ORDER = {
     debug: 10,
@@ -716,7 +717,9 @@ class FrameViewSession {
             this.profiler.markTiming(timing, 'runner.get_layers_tree.start');
             let layersData = null;
             try {
-                layersData = await this.runnerSession.slotRequest('get_layers_tree', this.slotName);
+                layersData = applyFeatureFlagsToLayersPayload(
+                    await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
+                );
             } catch (err) {
                 this.log(`[layers] get_layers_tree failed: ${err.message || err}`);
             }
@@ -1022,7 +1025,9 @@ class FrameViewSession {
         if (!this.runnerSession) {
             return;
         }
-        const result = await this.runnerSession.slotRequest('get_layers_tree', this.slotName);
+        const result = applyFeatureFlagsToLayersPayload(
+            await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
+        );
         if (this.panel && !this.isDisposed) {
             this.panel.webview.postMessage({ type: 'layersTree', payload: result });
         }

@@ -1612,3 +1612,169 @@ class TestGetNominalHalfSizes:
         assert not csg.contains_point(create_v3(scalar(1), scalar(-3), scalar(50)))
 
 
+
+
+class TestJointAssembly:
+    """Tests for Joint.with_order and solve_frame_assembly."""
+
+    def build_joint(self, ticket_a="post", ticket_b="beam", offset_x=0,
+                    freedoms=False, suborders=False):
+        timber_a = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(offset_x), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket=ticket_a,
+        )
+        timber_b = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(offset_x + 10), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket=ticket_b,
+        )
+        peg = Peg(
+            transform=Transform(position=create_v3(scalar(offset_x + 5), 0, scalar(50)), orientation=Orientation.identity()),
+            size=scalar(1),
+            shape=PegShape.ROUND,
+            forward_length=scalar(10),
+            stickout_length=scalar(2),
+            ticket=AccessoryTicket(path=f"{ticket_a}_peg"),
+            assembly_freedom=AssemblyFreedom.translation(create_v3(0, 1, 0), freed_after=scalar(2)) if freedoms else None,
+            assembly_ordering=Ordering(0, 0),
+        )
+        cutting_suborder = 1 if suborders else 0
+        joint = Joint(
+            cuttings={
+                "a": Cutting(
+                    timber=timber_a,
+                    assembly_freedom=AssemblyFreedom.translation(create_v3(0, 0, 1), freed_after=scalar(4)) if freedoms else None,
+                    assembly_ordering=Ordering(0, cutting_suborder),
+                ),
+                "b": Cutting(
+                    timber=timber_b,
+                    assembly_freedom=AssemblyFreedom.translation(create_v3(0, 0, -1), freed_after=scalar(4)) if freedoms else None,
+                    assembly_ordering=Ordering(0, cutting_suborder),
+                ),
+            },
+            ticket=JointTicket(path=f"{ticket_a}_{ticket_b}", joint_type="test_joint"),
+            jointAccessories={"peg": peg},
+        )
+        return timber_a, timber_b, joint
+
+    def test_with_order_uniform_preserves_suborders(self, float_mode):
+        _, _, joint = self.build_joint(suborders=True)
+
+        ordered = joint.with_order(2)
+
+        assert ordered.cuttings["a"].assembly_ordering == Ordering(2, 1)
+        assert ordered.cuttings["b"].assembly_ordering == Ordering(2, 1)
+        assert ordered.jointAccessories["peg"].assembly_ordering == Ordering(2, 0)
+        # The original joint is untouched (immutability), timber refs preserved.
+        assert joint.cuttings["a"].assembly_ordering == Ordering(0, 1)
+        assert ordered.cuttings["a"].timber is joint.cuttings["a"].timber
+
+    def test_with_order_mapping_by_key_and_object(self, float_mode):
+        timber_a, timber_b, joint = self.build_joint()
+        peg = joint.jointAccessories["peg"]
+
+        # Object references are unhashable (sympy content), so the per-member
+        # form also accepts (reference, order) pairs.
+        ordered = joint.with_order([("a", 1), (timber_b, 2), (peg, 3)])
+
+        assert ordered.cuttings["a"].assembly_ordering == Ordering(1, 0)
+        assert ordered.cuttings["b"].assembly_ordering == Ordering(2, 0)
+        assert ordered.jointAccessories["peg"].assembly_ordering == Ordering(3, 0)
+
+    def test_with_order_mapping_partial_keeps_unnamed(self, float_mode):
+        _, _, joint = self.build_joint()
+
+        ordered = joint.with_order({"a": 5})
+
+        assert ordered.cuttings["a"].assembly_ordering == Ordering(5, 0)
+        assert ordered.cuttings["b"].assembly_ordering == Ordering(0, 0)
+        assert ordered.jointAccessories["peg"].assembly_ordering == Ordering(0, 0)
+
+    def test_with_order_rejects_unknown_references(self, float_mode):
+        _, _, joint = self.build_joint()
+        _, foreign_timber, _ = self.build_joint(ticket_a="x", ticket_b="y", offset_x=50)
+
+        with pytest.raises(ValueError, match="unknown member key"):
+            joint.with_order({"nope": 1})
+        with pytest.raises(ValueError, match="not a timber or accessory"):
+            joint.with_order([(foreign_timber, 1)])
+
+    def test_with_order_mapping_rejects_suborder_precedence_violations(self, float_mode):
+        # The peg (suborder 0) must come out before the cuttings (suborder 1);
+        # explicit orders may not invert or collapse that.
+        _, _, joint = self.build_joint(suborders=True)
+
+        with pytest.raises(ValueError, match="must be extracted before"):
+            joint.with_order({"peg": 3, "a": 1, "b": 1})
+        with pytest.raises(ValueError, match="must be extracted before"):
+            joint.with_order({"peg": 1, "a": 1, "b": 1})
+
+        # A compliant refinement is fine.
+        ordered = joint.with_order({"peg": 1, "a": 2, "b": 2})
+        assert ordered.jointAccessories["peg"].assembly_ordering == Ordering(1, 0)
+        assert ordered.cuttings["a"].assembly_ordering == Ordering(2, 0)
+
+    def test_solve_frame_assembly_end_to_end(self, float_mode):
+        _, _, joint_one = self.build_joint(ticket_a="post_one", ticket_b="beam_one", freedoms=True, suborders=True)
+        _, _, joint_two = self.build_joint(ticket_a="post_two", ticket_b="beam_two", offset_x=50, freedoms=True, suborders=True)
+        joint_one = joint_one.with_order(1)
+        joint_two = joint_two.with_order(2)
+        frame = Frame.from_joints([joint_one, joint_two], name="assembly test")
+
+        solution = solve_frame_assembly(frame)
+
+        assert solution is not None
+        assert solution.failure is None
+        # Pegs pop at (n, 0), one timber separates the joint at (n, 1).
+        assert [step.ordering for step in solution.steps] == [
+            Ordering(1, 0), Ordering(1, 1), Ordering(2, 0), Ordering(2, 1),
+        ]
+        peg_step = solution.steps[0]
+        assert len(peg_step.movements) == 1
+        assert peg_step.movements[0].member_key == joint_one.jointAccessories["peg"].ticket.kumiki_id
+        # Both sides are freed by the cut, but the joint only needs one member
+        # to depart; the other is skipped as already separated.
+        assert len(solution.steps[1].movements) == 1
+        assert solution.steps[1].movements[0].member_key in {
+            joint_one.cuttings["a"].timber.ticket.kumiki_id,
+            joint_one.cuttings["b"].timber.ticket.kumiki_id,
+        }
+
+    def test_solve_frame_assembly_returns_none_without_freedoms(self, float_mode):
+        _, _, joint = self.build_joint()
+        frame = Frame.from_joints([joint], name="no assembly")
+
+        assert solve_frame_assembly(frame) is None
+
+    def test_solve_frame_assembly_combines_duplicate_timber_entries(self, float_mode):
+        # A compound-style joint where the same timber appears under two
+        # cutting keys: freedoms union, earliest ordering wins.
+        timber_a, timber_b, joint = self.build_joint()
+        freedom_up = AssemblyFreedom.translation(create_v3(0, 0, 1), freed_after=scalar(4))
+        freedom_x = AssemblyFreedom.translation(create_v3(1, 0, 0), freed_after=scalar(2))
+        compound = Joint(
+            cuttings={
+                "a": Cutting(timber=timber_a, assembly_freedom=freedom_up, assembly_ordering=Ordering(2, 0)),
+                "a_2": Cutting(timber=timber_a, assembly_freedom=freedom_x, assembly_ordering=Ordering(1, 0)),
+                "b": Cutting(timber=timber_b),
+            },
+            ticket=joint.ticket,
+            jointAccessories={},
+        )
+        frame = Frame.from_joints([compound], name="compound assembly")
+
+        solution = solve_frame_assembly(frame)
+
+        assert solution is not None
+        assert solution.failure is None
+        assert len(solution.steps) == 1
+        step = solution.steps[0]
+        assert step.ordering == Ordering(1, 0)
+        assert step.movements[0].member_key == timber_a.ticket.kumiki_id

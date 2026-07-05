@@ -343,6 +343,14 @@ if (!SelectionStore) {
 if (!CameraController) {
     throw new Error('CameraController is not loaded. Ensure camera-controller.js is included before viewer-app.js.');
 }
+const AssemblyTimeline = window.AssemblyTimeline;
+if (!AssemblyTimeline) {
+    throw new Error('AssemblyTimeline is not loaded. Ensure assembly-timeline.js is included before viewer-app.js.');
+}
+// Package-time feature flags (see webview/feature-flags.js). Missing is
+// tolerated (defaults every flag off) so this file never hard-fails if the
+// flags script isn't wired into some future embedding.
+const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 
 class ViewerSettingsPanel {
     constructor(app) {
@@ -382,6 +390,21 @@ class ViewerSettingsPanel {
                     <input id="footprint-toggle" type="checkbox" ?checked=${this.app.footprintsEnabled}>
                     footprint
                 </label>
+                ${FEATURE_FLAGS.assemblyPreview ? html`
+                <label>
+                    <input id="assembly-timeline-toggle" type="checkbox" ?checked=${this.app.showAssemblyTimeline}>
+                    assembly timeline
+                </label>
+                <label>
+                    disassembly spacing (×${this.app.disassemblyMultiplier})
+                    <input
+                        id="disassembly-multiplier-slider"
+                        type="range"
+                        min="1"
+                        max="4"
+                        step="0.1"
+                        .value=${String(this.app.disassemblyMultiplier)}>
+                </label>` : ''}
                 <label>
                     <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
                     debug info
@@ -551,6 +574,20 @@ class ViewerSettingsPanel {
             });
         }
 
+        const assemblyTimelineToggle = renderRoot.querySelector('#assembly-timeline-toggle');
+        if (assemblyTimelineToggle) {
+            assemblyTimelineToggle.addEventListener('change', (event) => {
+                this.app.setShowAssemblyTimeline(event.target.checked);
+            });
+        }
+
+        const disassemblyMultiplierSlider = renderRoot.querySelector('#disassembly-multiplier-slider');
+        if (disassemblyMultiplierSlider) {
+            disassemblyMultiplierSlider.addEventListener('input', (event) => {
+                this.app.setDisassemblyMultiplier(Number(event.target.value));
+            });
+        }
+
         if (exportCombinedToggle) {
             exportCombinedToggle.addEventListener('change', (event) => {
                 this.app.setExportCombinedEnabled(event.target.checked);
@@ -624,6 +661,14 @@ class ViewerSettingsPanel {
         }
         if (unselectedTransparencySlider) {
             unselectedTransparencySlider.value = String(100 - this.app.unselectedTransparencyPercent);
+        }
+        const assemblyTimelineToggle = renderRoot.querySelector('#assembly-timeline-toggle');
+        if (assemblyTimelineToggle) {
+            assemblyTimelineToggle.checked = this.app.showAssemblyTimeline;
+        }
+        const disassemblyMultiplierSlider = renderRoot.querySelector('#disassembly-multiplier-slider');
+        if (disassemblyMultiplierSlider) {
+            disassemblyMultiplierSlider.value = String(this.app.disassemblyMultiplier);
         }
         if (leftClickRotateToggle) {
             leftClickRotateToggle.checked = this.app.leftClickDragRotatesCamera;
@@ -869,6 +914,11 @@ class KigumiViewerApp extends LitElement {
         this.footprintObjects = [];
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
+        this.showAssemblyTimeline = true;
+        this.disassemblyMultiplier = 1.5;
+        this.assemblyData = null;
+        this.assemblyScrubValue = 0;
+        this._assemblyOffsetsByKey = new Map();
         this.logFilterText = '';
         this.memberListRoughLengthAllowanceMm = 30;
         this.memberListOptions = {
@@ -1005,6 +1055,7 @@ class KigumiViewerApp extends LitElement {
                 </div>
                 <div id="debug"></div>
                 <div id="hint">${navigationHint}</div>
+                ${this.renderAssemblyTimeline()}
             </div>
             <div id="top-controls">
                 ${this.settingsPanel.render()}
@@ -1572,6 +1623,8 @@ class KigumiViewerApp extends LitElement {
                 shadowsEnabled: Boolean(this.shadowsEnabled),
                 reflectionsEnabled: Boolean(this.reflectionsEnabled),
                 footprintsEnabled: Boolean(this.footprintsEnabled),
+                showAssemblyTimeline: Boolean(this.showAssemblyTimeline),
+                disassemblyMultiplier: Number(this.disassemblyMultiplier),
                 debugEnabled: Boolean(this.debugEnabled),
                 leftClickDragRotatesCamera: Boolean(this.leftClickDragRotatesCamera),
                 unselectedTransparencyPercent: Number(this.unselectedTransparencyPercent),
@@ -1623,6 +1676,12 @@ class KigumiViewerApp extends LitElement {
         }
         if (typeof ui.footprintsEnabled === 'boolean') {
             this.setFootprintsEnabled(ui.footprintsEnabled);
+        }
+        if (FEATURE_FLAGS.assemblyPreview && typeof ui.showAssemblyTimeline === 'boolean') {
+            this.setShowAssemblyTimeline(ui.showAssemblyTimeline);
+        }
+        if (FEATURE_FLAGS.assemblyPreview && Number.isFinite(ui.disassemblyMultiplier)) {
+            this.setDisassemblyMultiplier(Number(ui.disassemblyMultiplier));
         }
         if (typeof ui.debugEnabled === 'boolean') {
             this.debugEnabled = ui.debugEnabled;
@@ -1932,6 +1991,9 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (message.type === 'layersTree') {
+            this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
+                ? AssemblyTimeline.normalizeAssemblyPayload(message.payload ? message.payload.assembly : null)
+                : null);
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
             }
@@ -3123,10 +3185,142 @@ class KigumiViewerApp extends LitElement {
             if (!bundle.reflection) {
                 continue;
             }
-            bundle.reflection.position.set(0, 0, reflectionOffsetZ);
+            // The reflection is mirrored (scale.z = -1), so an assembly offset
+            // of +dz on the solid mesh moves the reflection by -dz.
+            const offset = this._assemblyOffsetsByKey.get(memberKey) || [0, 0, 0];
+            bundle.reflection.position.set(offset[0], offset[1], reflectionOffsetZ - offset[2]);
             bundle.reflection.scale.set(1, 1, -1);
             bundle.reflection.visible = this.reflectionsEnabled && !this.isMemberHidden(memberKey);
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Assembly preview timeline
+    // ------------------------------------------------------------------
+
+    setAssemblyData(assemblyData) {
+        this.assemblyData = assemblyData;
+        if (!assemblyData) {
+            this.assemblyScrubValue = 0;
+        } else {
+            // Preserve the scrub position across geometry refreshes; just keep
+            // it within the (possibly changed) step range.
+            const max = AssemblyTimeline.getScrubMax(assemblyData.steps, assemblyData.failure);
+            this.assemblyScrubValue = Math.min(Math.max(this.assemblyScrubValue, 0), max);
+        }
+        this.applyAssemblyOffsets();
+        this.requestUpdate();
+    }
+
+    setAssemblyScrubValue(nextValue) {
+        const max = this.assemblyData
+            ? AssemblyTimeline.getScrubMax(this.assemblyData.steps, this.assemblyData.failure)
+            : 0;
+        const normalized = Number.isFinite(nextValue) ? Math.min(Math.max(nextValue, 0), max) : 0;
+        if (this.assemblyScrubValue === normalized) {
+            return;
+        }
+        this.assemblyScrubValue = normalized;
+        this.applyAssemblyOffsets();
+        this.requestUpdate();
+    }
+
+    setDisassemblyMultiplier(nextMultiplier) {
+        const normalized = Number.isFinite(nextMultiplier)
+            ? Math.max(1, Math.min(4, Math.round(nextMultiplier * 10) / 10))
+            : 1.5;
+        if (this.disassemblyMultiplier === normalized) {
+            return;
+        }
+        this.disassemblyMultiplier = normalized;
+        this.applyAssemblyOffsets();
+        this.requestUpdate();
+    }
+
+    setShowAssemblyTimeline(enabled) {
+        const normalized = Boolean(enabled);
+        if (this.showAssemblyTimeline === normalized) {
+            return;
+        }
+        this.showAssemblyTimeline = normalized;
+        this.applyAssemblyOffsets();
+        this.requestUpdate();
+    }
+
+    // Recompute per-member displacement from the current scrub position and
+    // apply it to every mesh bundle. The continuous rAF loop repaints.
+    applyAssemblyOffsets() {
+        const active = this.assemblyData && this.showAssemblyTimeline;
+        this._assemblyOffsetsByKey = active
+            ? AssemblyTimeline.computeAssemblyOffsets(
+                this.assemblyData.steps, this.assemblyScrubValue, this.disassemblyMultiplier)
+            : new Map();
+        for (const [memberKey, bundle] of this.meshObjectsByKey.entries()) {
+            const offset = this._assemblyOffsetsByKey.get(memberKey) || [0, 0, 0];
+            if (bundle.mesh) {
+                bundle.mesh.position.set(offset[0], offset[1], offset[2]);
+            }
+            if (bundle.edges) {
+                bundle.edges.position.set(offset[0], offset[1], offset[2]);
+            }
+        }
+        this.updateReflectionTransforms();
+    }
+
+    logAssemblyFailure() {
+        const failure = this.assemblyData && this.assemblyData.failure;
+        if (!failure) {
+            return;
+        }
+        const lines = [`[assembly] ${failure.message}`, ...failure.diagnostics];
+        console.warn(lines.join('\n'));
+        if (vscode) {
+            vscode.postMessage({ type: 'debugProbe', message: lines.join(' | ') });
+        }
+    }
+
+    renderAssemblyTimeline() {
+        if (!FEATURE_FLAGS.assemblyPreview || !this.showAssemblyTimeline || !this.assemblyData) {
+            return '';
+        }
+        const { steps, warnings, failure } = this.assemblyData;
+        const scrubMax = AssemblyTimeline.getScrubMax(steps, failure);
+        const marks = AssemblyTimeline.getTimelineMarks(steps, failure);
+        return html`
+            <div id="assembly-timeline"
+                aria-label="Assembly preview timeline"
+                @pointerdown=${(event) => event.stopPropagation()}
+                @mousedown=${(event) => event.stopPropagation()}>
+                <span class="assembly-timeline-title">assembly</span>
+                <div class="assembly-timeline-track">
+                    <input
+                        id="assembly-scrub-slider"
+                        type="range"
+                        min="0"
+                        max=${String(scrubMax)}
+                        step="0.01"
+                        .value=${String(this.assemblyScrubValue)}
+                        ?disabled=${scrubMax === 0}
+                        @input=${(event) => this.setAssemblyScrubValue(Number(event.target.value))}>
+                    <div class="assembly-timeline-marks">
+                        ${marks.map((mark) => mark.kind === 'failure'
+                            ? html`<button
+                                class="assembly-timeline-mark assembly-timeline-mark-failure"
+                                style=${`left: ${scrubMax > 0 ? (mark.value / scrubMax) * 100 : 0}%`}
+                                type="button"
+                                title=${failure ? failure.message : ''}
+                                @click=${() => this.logAssemblyFailure()}>${mark.label}</button>`
+                            : html`<span
+                                class="assembly-timeline-mark"
+                                style=${`left: ${scrubMax > 0 ? (mark.value / scrubMax) * 100 : 0}%`}
+                                >${mark.label}</span>`)}
+                    </div>
+                </div>
+                ${warnings.length > 0
+                    ? html`<span class="assembly-timeline-warnings" title=${warnings.join('\n')}>⚠ ${warnings.length}</span>`
+                    : ''}
+            </div>
+        `;
     }
 
     setCenterGizmoEnabled(enabled) {
@@ -3977,6 +4171,9 @@ class KigumiViewerApp extends LitElement {
         this.rebuildTimberTable(meshes);
         this.updateReflectionTransforms();
         this.applySelectionOpacity();
+        // Rebuilt meshes come in at the origin; re-seat them at the current
+        // scrub position so the assembly preview survives geometry refreshes.
+        this.applyAssemblyOffsets();
         this._lastMeshBuildMs = meshBuildMs;
         return true;
     }

@@ -142,6 +142,9 @@ def cut_free_house_joint(
             timber=housed_timber.timber if isinstance(housed_timber, CutTimber) else housed_timber,
         )
 
+    # Assembly: no freedoms are set — the housing is derived from arbitrary
+    # CSG bodies, so there is no reliable single escape direction to author
+    # here. The connections are treated as rigid.
     return Joint(
         cuttings=cuttings,
         ticket=JointTicket(joint_type="free_house"),

@@ -8,6 +8,7 @@ const SUITE_FILES = {
   complex: [
     'extension-viewer-flow.test.js',
     'extension-automation-flow.test.js',
+    'extension-assembly-drive.test.js',
     'extension-complex-validation.test.js',
     'extension-initialization-workflow.test.js',
   ],

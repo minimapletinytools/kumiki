@@ -6,6 +6,7 @@ Contains plain butt, tongue-and-fork butt, mortise-and-tenon, and housed dovetai
 from __future__ import annotations  # Enable deferred annotation evaluation
 
 import warnings
+from dataclasses import replace
 from functools import wraps
 
 from kumiki.timber import *
@@ -183,10 +184,20 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
         negative_csg=end_cut,
     )
 
+    # Assembly: a plain butt has no mechanical engagement (it is free after 0
+    # travel), so use the receiving timber's thickness along the butt axis as
+    # a nominal freed_after to make the preview separation visible.
+    nominal_travel = receiving_timber.get_size_in_direction_3d(butt_direction)
     joint = Joint(
         cuttings={
-            "receiving_timber": Cutting(timber=receiving_timber),
-            "butt_timber": cut,
+            "receiving_timber": Cutting(
+                timber=receiving_timber,
+                assembly_freedom=AssemblyFreedom.translation(butt_direction, freed_after=nominal_travel),
+            ),
+            "butt_timber": replace(
+                cut,
+                assembly_freedom=AssemblyFreedom.translation(-butt_direction, freed_after=nominal_travel),
+            ),
         },
         ticket=JointTicket(joint_type="plain_butt"),
         jointAccessories={},
@@ -452,16 +463,22 @@ def cut_tongue_and_fork_butt_joint(
     # -------------------------------------------------------------------------
     # Assemble cuts and joint
     # -------------------------------------------------------------------------
+    # Assembly: the tongue withdraws back out of the fork slot along its own
+    # axis; it passes fully through the fork, so it is free after traveling
+    # the fork's thickness in that direction.
+    tongue_engagement = fork_timber.get_size_in_direction_3d(tongue_end_direction)
     tongue_cut = Cutting(
         timber=tongue_timber,
         maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=tongue_negative_parts),
+        assembly_freedom=AssemblyFreedom.translation(-tongue_end_direction, freed_after=tongue_engagement),
     )
 
     fork_cut = Cutting(
         timber=fork_timber,
         negative_csg=fork_negative_csg,
+        assembly_freedom=AssemblyFreedom.translation(tongue_end_direction, freed_after=tongue_engagement),
     )
 
     return Joint(
@@ -901,6 +918,9 @@ def cut_mortise_and_tenon_joint(
             peg_holes_in_mortise_local.append(adopt_csg(None, mortise_timber.transform, peg_hole_mortise_global))
 
             # Create Peg accessory in global space (positioned at mortise entry)
+            # Assembly: the peg backs out along its drill axis; it locks the
+            # joint, so it pops (suborder 0) before the tenon slides (suborder 1).
+            peg_drill_direction_global = peg_result.orientation_global.matrix * create_v3(scalar(0), scalar(0), scalar(1))
             peg_accessory = Peg(
                 transform=Transform(
                     position=peg_result.mortise_entry_position_global,
@@ -910,6 +930,11 @@ def cut_mortise_and_tenon_joint(
                 shape=peg_parameters.shape,
                 forward_length=peg_result.peg_depth,
                 stickout_length=peg_result.stickout_length,
+                assembly_freedom=AssemblyFreedom.translation(
+                    -peg_drill_direction_global,
+                    freed_after=peg_result.peg_depth + peg_result.stickout_length,
+                ),
+                assembly_ordering=Ordering(0, 0),
             )
             joint_accessories[f"peg_{peg_idx}"] = peg_accessory
 
@@ -930,8 +955,21 @@ def cut_mortise_and_tenon_joint(
                 label="mortise_and_tenon",
             )
 
-    tenon_cut_timber = tenon_cut
-    mortise_cut_timber = mortise_cut
+    # Assembly: the tenon backs out of the mortise along the tenon axis; the
+    # mortise timber's view of the same separation is the inverse direction.
+    # When pegs lock the joint they pop first (suborder 0), so the timbers
+    # slide at suborder 1.
+    timber_suborder = 1 if joint_accessories else 0
+    tenon_cut_timber = replace(
+        tenon_cut,
+        assembly_freedom=AssemblyFreedom.translation(-tenon_length_direction_global, freed_after=tenon_length),
+        assembly_ordering=Ordering(0, timber_suborder),
+    )
+    mortise_cut_timber = replace(
+        mortise_cut,
+        assembly_freedom=AssemblyFreedom.translation(tenon_length_direction_global, freed_after=tenon_length),
+        assembly_ordering=Ordering(0, timber_suborder),
+    )
 
     return Joint(
         cuttings={
@@ -1289,18 +1327,26 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
     tip_position_local = tenon_timber.transform.global_to_local(tenon_tip_position_global)
     tip_z_local = tip_position_local[2]
 
+    # Assembly: the tenon backs out of the mortise along the butt axis; the
+    # wedge (if any) locks it and pops first, so the timbers slide at
+    # suborder 1 when a wedge is present.
+    timber_suborder = 1 if geo.wedge_accessory_csg is not None else 0
     tenon_cut = Cutting(
         timber=tenon_timber,
         maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
         negative_csg=tenon_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
+        assembly_freedom=AssemblyFreedom.translation(-shoulder_result.butt_direction, freed_after=tenon_depth),
+        assembly_ordering=Ordering(0, timber_suborder),
     )
 
     mortise_cut = Cutting(
         timber=mortise_timber,
         negative_csg=mortise_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
+        assembly_freedom=AssemblyFreedom.translation(shoulder_result.butt_direction, freed_after=tenon_depth),
+        assembly_ordering=Ordering(0, timber_suborder),
     )
 
     joint_accessories = {}
@@ -1527,11 +1573,16 @@ def cut_dropin_dovetail_butt_joint(
         dovetail_end_local_z = shoulder_distance_from_end - dovetail_length
         dovetail_timber_end_cut = HalfSpace(normal=create_v3(0, 0, -1), offset=-dovetail_end_local_z)
 
+    # Assembly: the dovetail taper blocks axial pull, so the ONLY escape is
+    # lifting back out of the socket along the profile-face normal — a strictly
+    # unidirectional single DOF, freed after the drop-in depth.
+    dovetail_lift_direction_global = dovetail_timber.get_face_direction_global(dovetail_timber_face.to.face())
     dovetail_timber_cut_obj = Cutting(
         timber=dovetail_timber,
         maybe_top_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.BOTTOM else None,
-        negative_csg=Difference(dovetail_housing_prism, [dovetail_profile_csg])
+        negative_csg=Difference(dovetail_housing_prism, [dovetail_profile_csg]),
+        assembly_freedom=AssemblyFreedom.translation(dovetail_lift_direction_global, freed_after=dovetail_depth),
     )
 
     # Combine shoulder notch and dovetail socket if shoulder inset is specified
@@ -1542,7 +1593,8 @@ def cut_dropin_dovetail_butt_joint(
 
     receiving_timber_cut_obj = Cutting(
         timber=receiving_timber,
-        negative_csg=receiving_timber_negative_csg
+        negative_csg=receiving_timber_negative_csg,
+        assembly_freedom=AssemblyFreedom.translation(-dovetail_lift_direction_global, freed_after=dovetail_depth),
     )
 
     return Joint(

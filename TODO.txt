@@ -1,26 +1,4 @@
 
-:: 7/2/2026 arrangement
-
-each timber in each joint has an assembly constrain, these trace prism in R6 (directions and angles) that it can move. More specifically, it contains half or unbounded direction and angle in which it can move. there is currently an AssemblyFreedom that is wrong, the assembly freedom is per timber per joint, so the joint ticket should contain a map from its timbers to its freedoms. we don't expect to support rotational freedoms yet so feel free to NotImplemented for anything requiring rotational freedom specifi logic. IN the future, we may want a more complex shape in R6 rather than just half/full intervals, e.g. requires twisting and moving at the same time to move, or move firs,t then twist, then move etc, so please make some basic allowances for this, but for now we'll keep assemblies simple as just half or full intervals from 0
-
-Assemblies on joints are added viat he ticket class, they have the assembly freedom and an order, then this needs to get thrown into an assembly solver. the assembly solver does the following
-
-- iterate through orders from small to big
-  - collect all joints for each given order
-  - for each timber in that joint, we attempt to "move" the timber in one of the DOFs in its Assembly Freedom
-    - order DOF derictions based on other timbers in the same order, choose directions away from the other timbers in its order and then away from timbers in higher orders, and prioritize DOFs that tend to be planar with the timbers in that order
-    - for each DOF direction in that timber, attempt to move it in that direction, by the freed after boundary * dissamebly_multiplier
-      - for each joint that that timber is also a part of (excluding the one we are currently in)
-        - for ecah other timebr in that joint, if that timber shares the same DOF, then omit it, otherwise attempt to move the timbers in that joint in that direction 
-          -"attempt to move" is a recursive algorithm, repeat this algorithm until all timebrs have been moved
-            -if any timbers that got moved are of > assembly order, output a warning
-            -if a loop is detected, continue up to 6 loops, after which fail saying unsolveable and try to output some info explaining why the constraint can't be solved
-
-In the kigumi viewer, now we want to allow previewing assemblies. Add a "assembly preview timeline" at the bottom, put marks in the timeline for each order, sliding the bar then dissamebles each other one at a time,
-set dissamebly_multiplier to be 1.5 and make it configurable via the options in kigumi
-add an option to show the assembly timeline and have it on by default
-
-
 :: 7/2/2026 NOTCHING PLAN V2
 
 per face end notching helpers: basically, end notching can be done on a per face basis, there are many relief modes. the angle one, and then one where it's completely flat for a bit followed by a rounded relief to the nominal size, etc
@@ -31,7 +9,28 @@ non-face aligned ubtt notching helpers: in this case, as a reasonable fallback, 
 
 dealing with inset shoulder: if inset shoulder is non trivial (always non trivial in non face/plane aligned cases, otheriwse non trivial if inset_shoulder > 0). if trivial, use regular notching algoritm, if non trivial, use special inset shoulder notching algorithm and extend to imperfect bounds of both timbers
 
+old notching todo:
 
+
+-NOTCHING 
+  -do scribe notching on all joints (followup content yee)
+  -make butt jonit with shoulder inset notching more generic
+    -notch_length, measured in the length direction of the receiving timber
+    -notch_width, always 100% the full dimension of the receiving timber
+    -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
+    -notch_style, straight walls only for now
+    -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
+  -figure out inset notching.... config
+    -0 degree notch up to insertion face
+    -afterwards do the regular notching with varibale relief angle
+    -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
+      -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
+        -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
+  -notching configs
+    -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
+    -do generic butt joint notching config (no inset) + implement on joints + test
+    -do generic end joint notching config (no inset) + implement on joints + test
+    -do generic splice joint noching config??
 
 
 :: 6/28 CONTENT PLAN
@@ -130,12 +129,21 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 :: TODO
 
-DONE-fix automation integration tests 
-  supports session refresh/log/camera/screenshot automation commands: traced this to kigumi.captureScreenshot being called with timeoutMs: 0. In both frame-view-session.js and viewer.js, the timeout guard is if (timeoutMs > 0) { setTimeout(...) } — so 0 doesn't mean "fast fail," it means no safety timeout at all, and the call waits forever for a captureScreenshotResult message from the webview. Session logs show everything up through the explicit refresh succeeding, then dead silence for the rest of the 90s budget — so it's genuinely hanging on that webview round-trip, not just slow. I did not determine why the webview never posts back (could be a real product bug, or a screenshot/canvas limitation specific to this sandboxed environment) — that would need webview devtools/console access to pin down further. Want me to dig into that one too?
+-assembly next steps
+  -disable for now cuz its broken
+  -enable assembly for patterns so they can be previewed
+  -fix assembly direction for some accesories 
+  -solving algorithm I think needs some fixes
+    -need to refine rules on when to move other timbers together with asembly
+    -I think you can improve singel order groups, it can attempt to break it into groups by itself.
 
-
+-create test runner for examples so the exmaples are also tests :O
 -test frame scanning fixes
 -test the install cadquery stuff 
+-imperfect timber ctors
+  DONE-do the timebr erplace helper method for round timbers etc
+  -test them
+
 
 -do reorg on patterns and eaxmples again
   -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
@@ -165,26 +173,8 @@ DONE-fix automation integration tests
 -would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
 - no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
 - probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
+-should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
 
--NOTCHING 
-  -do scribe notching on all joints (followup content yee)
-  -make butt jonit with shoulder inset notching more generic
-    -notch_length, measured in the length direction of the receiving timber
-    -notch_width, always 100% the full dimension of the receiving timber
-    -notch_rotation, maybe support this someday or stub it, or maybe you did it already, just be specific about which direction, make sure it's not more than 45 deg 
-    -notch_style, straight walls only for now
-    -determine notch depth -> resize notch prisms so there aren't any gaps in the notching but still not using infinite prisms
-  -figure out inset notching.... config
-    -0 degree notch up to insertion face
-    -afterwards do the regular notching with varibale relief angle
-    -but need to decide where to start relief angle in the case of insertion not orthogonal to a face?? uh oh
-      -in this case, it's a non FAT/PAT arrangement and the notching parameters needs an additional arg to indicate distance from centerline to start notching from
-        -this is fine but the distance from centerline to start notching from is semi specific to the joint so you need to create a special notching config class just for this, which is fine, yo udon't want to use the generic notching class for this type of joint anyways.
-  -notching configs
-    -you may need to fix jints to cut off actual parts rather thna exact, just ask gpt
-    -do generic butt joint notching config (no inset) + implement on joints + test
-    -do generic end joint notching config (no inset) + implement on joints + test
-    -do generic splice joint noching config??
 
 
 -consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
@@ -216,7 +206,9 @@ DONE-fix automation integration tests
 
 
 
-
+-update shed example to include panels
+-add screw joint
+-add stl support for joint accessories so you can use framing hardware
 
 
 -JOINTS
@@ -268,35 +260,11 @@ DONE-fix automation integration tests
   
 
 
-
-
-
 -consider making a brace function that both creates a timber and joins it!
 -add CutCSG::get_surface_curvature(point: V3) -> Optional[Tuple[V3, Numeric, V3, Numeric]] (returns derivative and basis for the derivative) so you can properly do the point on boundary check.. welly ou may as well just have a get_surface_info that returns stuff like its curvature, whether it's an edge or face, and the curvature info.
--create a helper for sizing mortise and timber tenons (so that the "height" of the tenon is always in the mortise timber axis)
-  -just copy code from basic_mortise_and_tenon and update tha functino to use the helper
-  -you might want to make a sizing helpre class for this to simplify the args?.... idk...
-  -prompt address @TODO.txt (202-204)  in the helper, first assert that the 2 timbers are are_timbers_plane_aligned. next assert that the 2 timbers are not parallel. then proceed with the logic @basic_joints.py (97-113). put this helper function in mortise_and_tenon_joint.py
 
 
     
-
-
-
-
-TESTIFY
-  -setup one test template so it can be used as an agent template for everything else
-  -add test timber construction thingies on top of the example ones
-    -btw you should update your current example so that everything is in the XY plane I think yo uhave soem in the Z plane
-  -do better testing on join_face_aligned_on_face_aligned_timbers to make sure it's right....
-  -create test runner for examples so the exmaples are also tests :O
-  -add test for finger miter joint thingy
-
--M2.75
-  -add panel/board support 
-  -update shed example to include panels
-  -add screw joint
-  -add stl support for joint accessories so you can use framing hardware
 
 
 -M3 (reward: HNT gordon plane :D)
@@ -306,61 +274,52 @@ TESTIFY
   -add more features to mortise and tenon joint
     -extract out peg creation stuff, it will be useful in other places
       -basically, just figure out the start point and direction of the peg... it will return to you a tuple of prisms to substract from the mortise and tenon timber, and a peg accessory
-    -support non face aligned cases
-      -clean up the mortise shoulder calculation shit wtf or maybe yo uneed it for non face aligned cases?
     -end wedged mortise and tenon
     -fox wedge mortise and tenon
     -Hōzo-zashi Komisen-dome (ほぞ差し込み栓止め)
       -same as draw bore but with komisen peg,
-    -tusked mortise and tenon
     -support tenon_rotation
-    -support mortise_shoulder
-    IGNORE-add additinoal mortise timbers to mortise tenon joint.. so you can do the thing like the stacked joint on the back post of oscarshed
-      -actually better to do this as a house joint and 2 separate mortise and tenon joints. the second mortise and tenon joint will be awkard but it works so why not
     -end_mortise_and_tenon (opitonally extends the mortising timber and offsets the tenon)
       -otherwise calls into mortise_and_tenon above
       -also needs to convert the mortise into an "end cut"
-  -basic joints, or maybe move these to "lap joints" file?
-    -half_lap (use same code as cross lap joint?)
-    -bridle joint (special case of mortise and tenon? nah)
-  -sidewedged dovetail mortise and tenon joint (this method is its own method)
   -a few more fancy ones from here https://architizer.com/blog/inspiration/industry/japanese-art-of-wood-joinery/
+  
 
-M3.5
+M4
   -drawing support
-
--M4
   -IFC rendering?
   -more joints
     -splice joints
       -TODO 
     -coner joints
       -mortise and tenon end joint (calls mortise and tenon but positions the tenon in away from the end)
-      -half lap
-    -cross joints
-      -double notch
-    -fancy joints
-      -the one where 2 beams butt up against 1 post and have the thing that passes through them
   -chamfer render support?
-  -define assembly directions for each joint (does this go in meta data?)
-  -assembly solver thing :D (lol no) 
 
 
-
-
-
-
-:: FUTURE shit
-
--should I make a "block" class that parents "Timber" and then make a "board" class?
--should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
-- add nominal_size sup port for square and line rule desgins
-- make really awesome examples that showcase each parameter of each function
 
 
 
 :: TODONE 
 
+
+DONE-add panel/board support 
+DONE-fix automation integration tests 
+  supports session refresh/log/camera/screenshot automation commands: traced this to kigumi.captureScreenshot being called with timeoutMs: 0. In both frame-view-session.js and viewer.js, the timeout guard is if (timeoutMs > 0) { setTimeout(...) } — so 0 doesn't mean "fast fail," it means no safety timeout at all, and the call waits forever for a captureScreenshotResult message from the webview. Session logs show everything up through the explicit refresh succeeding, then dead silence for the rest of the 90s budget — so it's genuinely hanging on that webview round-trip, not just slow. I did not determine why the webview never posts back (could be a real product bug, or a screenshot/canvas limitation specific to this sandboxed environment) — that would need webview devtools/console access to pin down further. Want me to dig into that one too?
+DONE/IGNORE-create a helper for sizing mortise and timber tenons (so that the "height" of the tenon is always in the mortise timber axis)
+  -just copy code from basic_mortise_and_tenon and update tha functino to use the helper
+  -you might want to make a sizing helpre class for this to simplify the args?.... idk...
+  -prompt address @TODO.txt (202-204)  in the helper, first assert that the 2 timbers are are_timbers_plane_aligned. next assert that the 2 timbers are not parallel. then proceed with the logic @basic_joints.py (97-113). put this helper function in mortise_and_tenon_joint.py
+DONE-support non face aligned cases
+      -clean up the mortise shoulder calculation shit wtf or maybe yo uneed it for non face aligned cases?
+  DONE-support mortise_shoulder
+  IGNORE-add additinoal mortise timbers to mortise tenon joint.. so you can do the thing like the stacked joint on the back post of oscarshed
+    -actually better to do this as a house joint and 2 separate mortise and tenon joints. the second mortise and tenon joint will be awkard but it works so why not
+DONE-basic joints, or maybe move these to "lap joints" file?
+  -half_lap (use same code as cross lap joint?)
+  -bridle joint (special case of mortise and tenon? nah)
+DONE-sidewedged dovetail mortise and tenon joint (this method is its own method)
+IGNORE-should I make a "block" class that parents "Timber" and then make a "board" class?
+DONE-add nominal_size sup port for square and line rule desgins
 
 DONE- double saw horse workbench
   - do 2x10 "tray"
@@ -1304,6 +1263,36 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: END TODONE
+ 
+
+:: 7/2/2026 assemblies
+
+each timber in each joint has an assembly constrain, these trace prism in R6 (directions and angles) that it can move. More specifically, it contains half or unbounded direction and angle in which it can move. there is currently an AssemblyFreedom that is wrong, the assembly freedom is per timber per joint, so the joint ticket should contain a map from its timbers to its freedoms. we don't expect to support rotational freedoms yet so feel free to NotImplemented for anything requiring rotational freedom specifi logic. IN the future, we may want a more complex shape in R6 rather than just half/full intervals, e.g. requires twisting and moving at the same time to move, or move firs,t then twist, then move etc, so please make some basic allowances for this, but for now we'll keep assemblies simple as just half or full intervals from 0
+
+Assemblies on joints are added viat he ticket class, they have the assembly freedom and an order, then this needs to get thrown into an assembly solver. the assembly solver does the following
+
+- iterate through orders from small to big
+  - collect all joints for each given order
+  - for each timber in that joint, we attempt to "move" the timber in one of the DOFs in its Assembly Freedom
+    - order DOF derictions based on other timbers in the same order, choose directions away from the other timbers in its order and then away from timbers in higher orders, and prioritize DOFs that tend to be planar with the timbers in that order
+    - for each DOF direction in that timber, attempt to move it in that direction, by the freed after boundary * dissamebly_multiplier
+      - for each joint that that timber is also a part of (excluding the one we are currently in)
+        - for ecah other timebr in that joint, if that timber shares the same DOF, then omit it, otherwise attempt to move the timbers in that joint in that direction 
+          -"attempt to move" is a recursive algorithm, repeat this algorithm until all timebrs have been moved
+            -if any timbers that got moved are of > assembly order, output a warning
+            -if a loop is detected, continue up to 6 loops, after which fail saying unsolveable and try to output some info explaining why the constraint can't be solved
+
+In the kigumi viewer, now we want to allow previewing assemblies. Add a "assembly preview timeline" at the bottom, put marks in the timeline for each order, sliding the bar then dissamebles each other one at a time,
+set dissamebly_multiplier to be 1.5 and make it configurable via the options in kigumi
+add an option to show the assembly timeline and have it on by default
+
+
+assemblies next step
+
+- set assmebly DOFs on all joints
+- need a way to specify assembly order when cutting joints or after cutting joins
+- some joints have multi step removal DOFs. make some notes on how t odo this... but I guessy ou can actually do it later
+
 
 :: 5/30 kumiki setup video script
 hello in this video I will show you how to get started with the kumiki timber frame design language and the kigumi viewer. 

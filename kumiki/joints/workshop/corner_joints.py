@@ -271,11 +271,17 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
         timberB.get_length_direction_global(),
     )
 
+    # Assembly: a miter has no mechanical engagement — each timber pulls back
+    # along its own axis. Use the partner's thickness along that axis as a
+    # nominal freed_after so the preview separation is visible.
     cutA = Cutting(
         timber=timberA,
         maybe_top_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_A,
+        assembly_freedom=AssemblyFreedom.translation(
+            -directionA, freed_after=timberB.get_size_in_direction_3d(directionA)
+        ),
     )
 
     cutB = Cutting(
@@ -283,6 +289,9 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
         maybe_top_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_B,
+        assembly_freedom=AssemblyFreedom.translation(
+            -directionB, freed_after=timberA.get_size_in_direction_3d(directionB)
+        ),
     )
 
     # Create CutTimbers with cuts passed at construction
@@ -552,6 +561,12 @@ def cut_tongue_and_fork_corner_joint(
         maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=tongue_negative_parts),
+        # Assembly: the tongue withdraws out of the fork slot along its axis;
+        # it engages the fork's full thickness in that direction.
+        assembly_freedom=AssemblyFreedom.translation(
+            -tongue_end_direction,
+            freed_after=fork_timber.get_size_in_direction_3d(tongue_end_direction),
+        ),
     )
 
     fork_cut = Cutting(
@@ -559,6 +574,10 @@ def cut_tongue_and_fork_corner_joint(
         maybe_top_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=fork_negative_parts),
+        assembly_freedom=AssemblyFreedom.translation(
+            tongue_end_direction,
+            freed_after=fork_timber.get_size_in_direction_3d(tongue_end_direction),
+        ),
     )
 
     return Joint(
@@ -664,6 +683,9 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
         ),
         negative_csg=cross_lap_cutA.negative_csg,
         label=cross_lap_cutA.label,
+        # Assembly: the corner lap separates exactly like the cross lap it is
+        # built from — carry the lap's escape freedom through the rebuild.
+        assembly_freedom=cross_lap_cutA.assembly_freedom,
     )
     cutB = Cutting(
         timber=timberB,
@@ -679,6 +701,7 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
         ),
         negative_csg=cross_lap_cutB.negative_csg,
         label=cross_lap_cutB.label,
+        assembly_freedom=cross_lap_cutB.assembly_freedom,
     )
 
     return Joint(
@@ -1159,13 +1182,18 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
         # The wedge has the same transform as the key prism (in global space)
         # base_width and tip_width are the same (key_width) since it's a rectangular shape
         # height is key_thickness, length is 2 * key_depth (from -key_depth to +key_depth)
+        # Assembly: the key backs out along the diagonal (the way it was
+        # driven); it locks the joint, so it pops at suborder 0 before the
+        # halves slide apart.
         key_wedge = Wedge(
             transform=key_transform_global,
             base_width=key_width,
             tip_width=key_width,  # Same as base_width for rectangular shape
             height=key_thickness,
             length=key_depth,
-            stickout_length=key_depth*scalar(1,4)
+            stickout_length=key_depth*scalar(1,4),
+            assembly_freedom=AssemblyFreedom.translation(diagonal_direction, freed_after=key_depth * scalar(2)),
+            assembly_ordering=Ordering(0, 0),
         )
         key_wedges.append(key_wedge)
 
@@ -1297,19 +1325,29 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
         else -rough_end_cut_B.offset
     )
 
-    # Create Cutting objects
+    # Assembly: with the keys removed, each half pulls back along its own
+    # axis, sliding its lap fingers out of the other member. The keys lock
+    # exactly this motion, so the timbers slide at suborder 1.
     cutA = Cutting(
         timber=timberA,
         maybe_top_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberEnd.BOTTOM else None,
-        negative_csg=negative_csg_A
+        negative_csg=negative_csg_A,
+        assembly_freedom=AssemblyFreedom.translation(
+            -directionA, freed_after=timberB.get_size_in_direction_3d(directionA)
+        ),
+        assembly_ordering=Ordering(0, 1),
     )
 
     cutB = Cutting(
         timber=timberB,
         maybe_top_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberEnd.BOTTOM else None,
-        negative_csg=negative_csg_B
+        negative_csg=negative_csg_B,
+        assembly_freedom=AssemblyFreedom.translation(
+            -directionB, freed_after=timberA.get_size_in_direction_3d(directionB)
+        ),
+        assembly_ordering=Ordering(0, 1),
     )
 
     # Create CutTimber objects

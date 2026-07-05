@@ -3,6 +3,8 @@ Kumiki - Cross joint construction functions
 Contains cross-lap and house joint implementations.
 """
 
+from dataclasses import replace
+
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
@@ -367,6 +369,20 @@ def cut_plain_cross_lap_joint(
         )
         cuttings[scribed_key] = updated_scribed_cutting
         cuttings[cut_key] = updated_cut_cutting
+
+    # Assembly: the lap separates perpendicular to the cutting plane; timberA
+    # lifts away opposite the plane normal (which points from faceA toward
+    # faceB), timberB along it. Either member is free after traveling the full
+    # face-to-face overlap.
+    lap_overlap = Abs(safe_dot_product(cutting_plane_normal_normalized, faceA_position - faceB_position))
+    cuttings["timberA"] = replace(
+        cuttings["timberA"],
+        assembly_freedom=AssemblyFreedom.translation(-cutting_plane_normal_normalized, freed_after=lap_overlap),
+    )
+    cuttings["timberB"] = replace(
+        cuttings["timberB"],
+        assembly_freedom=AssemblyFreedom.translation(cutting_plane_normal_normalized, freed_after=lap_overlap),
+    )
 
     # Create and return the Joint
     joint = Joint(

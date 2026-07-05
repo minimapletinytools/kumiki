@@ -580,9 +580,19 @@ def dovetail_tenon_geometry(
             start_distance=-half_lateral,
             end_distance=half_lateral,
         )
+        # Assembly: the wedge backs out opposite its drive direction. It locks
+        # the joint, so it pops at suborder 0 before the tenon slides.
+        wedge_drive_direction = (
+            -into_mortise_dir
+            if wedge_accessory_parameters.wedge_from_receiving_timber_side
+            else into_mortise_dir
+        )
+        wedge_length = wedge_base_extra + tenon_depth + wedge_tip_extra
         wedge_accessory_csg = CSGAccessory(
             transform=extrusion_transform,
             positive_csg=wedge_positive_csg,
+            assembly_freedom=AssemblyFreedom.translation(-wedge_drive_direction, freed_after=wedge_length),
+            assembly_ordering=Ordering(0, 0),
         )
 
         # The mortise cavity must also include the wedge's slot (above Y=0), so the wedge can

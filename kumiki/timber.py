@@ -8,9 +8,18 @@ from .rule import *
 from .footprint import *
 from .cutcsg import *
 from .ticket import Ticket, TimberTicket, AccessoryTicket, JointTicket
+from .assembly import (
+    AssemblyFreedom,
+    AssemblyJoint,
+    AssemblyMember,
+    AssemblySolution,
+    JointMemberSpec,
+    Ordering,
+    solve_assembly,
+)
 from enum import Enum
-from typing import List, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
-from dataclasses import dataclass, field
+from typing import Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
+from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 import warnings
 
@@ -976,16 +985,14 @@ class PerfectTimberWithin(ABC):
                 equality_test(width_halves[1], w_half) and
                 equality_test(height_halves[0], h_half) and
                 equality_test(height_halves[1], h_half))
+    
+    
 
 
 # TODO HomeDepotTimber or like BoxTimber or NominalTimber, sticktimber and dressedtimber are also cute names?
 @dataclass(frozen=True)
 class Timber(PerfectTimberWithin):
-    """Perfect rectangular timber (the current default timber type)
-    
-    This is a perfect rectangular prism where the nominal bounding box
-    exactly matches the actual geometry. This is the most common timber type
-    used in timber framing.
+    """Rectangular timber which may or may not be perfect.
     
     Inherits all attributes and methods from PerfectTimberWithin:
         - length: Length of the timber
@@ -994,6 +1001,23 @@ class Timber(PerfectTimberWithin):
         - name: Optional name
     """
     nominal_half_sizes: Optional[Tuple[V2, V2]] = None  # Optional asymmetric half-sizes from centerline
+
+    @staticmethod
+    def from_perfect_timber_within(perfect_timber: PerfectTimberWithin, nominal_half_sizes: Optional[Tuple[V2, V2]] = None) -> 'Timber':
+        """
+        Create a Timber instance from a PerfectTimberWithin instance.
+        
+        Args:
+            perfect_timber: An instance of PerfectTimberWithin
+            nominal_half_sizes: Optional asymmetric half-sizes from centerline
+        """
+        return Timber(
+            length=perfect_timber.length,
+            size=perfect_timber.size,
+            transform=perfect_timber.transform,
+            ticket=perfect_timber.ticket,
+            nominal_half_sizes=nominal_half_sizes
+        )
     
     def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
         """
@@ -1118,31 +1142,10 @@ class Board(PerfectTimberWithin):
 
 
 # TODO finish
-@dataclass(frozen=True)
-class FauxTimber(PerfectTimberWithin):
-    """proxy class allowing us to pretend rotated boards are timbers which allows us to use timber joints on boards"""
-
-    board: Board = field(kw_only=True)
+#@dataclass(frozen=True)
+#class FauxTimber(PerfectTimberWithin):
+#    """proxy class allowing us to pretend rotate timbers to cut joints in in different orientations."""
     
-    # init from a Board
-    @classmethod
-    def from_board(cls, board: Board, map_top_to : TimberFace = TimberFace.TOP, map_right_to: TimberFace = TimberFace.RIGHT) -> 'FauxTimber':
-        #TODO create a PerfectTimberWithin from the reoriented board
-        raise NotImplementedError("TODO")
-
-    def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
-        #TODO return the nominal half-sizes of the faux timber which should be the same as the original board
-        return self.board.get_nominal_half_sizes()
-
-    def reorient_csg(self, csg: CutCSG) -> CutCSG:
-        #TODO reorient the csg from the faux timber's orientation to the board's orientation
-        raise NotImplementedError("TODO")
-
-    def reconstruct_joint(self, joint: 'Joint') -> 'Joint':
-        #TODO reconstruct a joint by reorienting all the cut CSGs and replacing the FauxTimber with the original Board
-        raise NotImplementedError("TODO")
-        
-
 
 # TODO consider renaming to Log LOL
 @dataclass(frozen=True)
@@ -1153,6 +1156,27 @@ class RoundTimber(PerfectTimberWithin):
     is a square that contains the circle, but the actual geometry is a cylinder.
     """
     diameter: Numeric = field(kw_only=True)  # Diameter of the circular cross-section
+
+
+    @staticmethod
+    def from_perfect_timber_within(perfect_timber: PerfectTimberWithin, diameter: Optional[Numeric] = None) -> 'RoundTimber':
+        """
+        Create a Timber instance from a PerfectTimberWithin instance.
+        
+        Args:
+            perfect_timber: An instance of PerfectTimberWithin
+            diameter: Optional diameter for the round timber, if None, then the diagonal of the perfect_timber.size is used to compute the diameter.
+        """
+        if diameter is None:
+            diameter = sqrt(perfect_timber.size[0]**2 + perfect_timber.size[1]**2)
+        return RoundTimber(
+            length=perfect_timber.length,
+            size=perfect_timber.size,
+            transform=perfect_timber.transform,
+            ticket=perfect_timber.ticket,
+            diameter=diameter
+        )
+
     
     def get_nominal_half_sizes(self) -> Tuple[V2, V2]:
         """
@@ -1377,6 +1401,15 @@ class Cutting:
     # When set, get_negative_csg_local() wraps the result in a labeled SolidUnion grouping
     # node so that the viewer can navigate the CSG tree by label.
     label: Optional[str] = None
+
+    # Assembly freedom of this timber within this joint (global space).
+    # None means unspecified: the assembly solver treats the connection as rigid.
+    assembly_freedom: Optional[AssemblyFreedom] = None
+
+    # Extraction position of this timber within the assembly plan. The
+    # suborder is authored by the cut function (sequencing required within the
+    # joint); the order is assigned afterwards via Joint.with_order.
+    assembly_ordering: Ordering = Ordering()
 
     def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
         """Return the top end cut HalfSpace derived from distance metadata."""
@@ -1884,6 +1917,15 @@ class JointAccessory(ABC):
     """Base class for joint accessories like wedges, drawbores, etc."""
 
     ticket: AccessoryTicket = field(default_factory=AccessoryTicket, kw_only=True)
+
+    # Assembly freedom of this accessory within its joint (global space).
+    # None means unspecified: the assembly solver treats the connection as rigid.
+    assembly_freedom: Optional[AssemblyFreedom] = field(default=None, kw_only=True)
+
+    # Extraction position within the assembly plan; the cut function sets the
+    # suborder (e.g. pegs pop before the joint slides apart), Joint.with_order
+    # sets the order.
+    assembly_ordering: Ordering = field(default=Ordering(), kw_only=True)
     
     @abstractmethod
     def render_csg_local(self) -> CutCSG:
@@ -2129,6 +2171,109 @@ class Joint:
     cuttings: Dict[str, Cutting]
     ticket: JointTicket
     jointAccessories: Dict[str, JointAccessory] = field(default_factory=dict)
+
+    def with_order(
+        self,
+        order: Union[
+            int,
+            Mapping[str, int],
+            Iterable[Tuple[Union[str, "PerfectTimberWithin", "JointAccessory"], int]],
+        ],
+    ) -> "Joint":
+        """Return a copy of this joint with assembly order(s) assigned.
+
+        Assembly freedoms and suborders are authored by the cut functions;
+        the order is the frame-level plan and is assigned here, after cutting
+        (smaller order = extracted earlier during disassembly).
+
+        with_order(n): sets order=n on every cutting and accessory, keeping
+        their suborders, so intra-joint sequencing (peg pops before the tenon
+        slides) is preserved within step n.
+
+        with_order({key: n, ...}) or with_order([(member, n), ...]): sets
+        Ordering(n, 0) on each named member — referenced by cutting/accessory
+        string key, or by the timber / accessory object itself (a timber
+        reference applies to every cutting holding it; use the pair-list form
+        for object references, which are unhashable). Unnamed members keep
+        their current ordering. Raises ValueError for unknown references, or
+        when the new orderings break the strict precedence the cut function
+        expressed via suborders (any member pair previously strictly ordered
+        must remain strictly ordered).
+
+        Assign orders BEFORE building the Frame: this rebuilds the member
+        objects (dataclasses.replace, preserving timber references), so a
+        Frame built earlier would still hold the previous orderings.
+        """
+        if isinstance(order, int):
+            new_cuttings = {
+                key: replace(cutting, assembly_ordering=Ordering(order, cutting.assembly_ordering.suborder))
+                for key, cutting in self.cuttings.items()
+            }
+            new_accessories = {
+                key: replace(accessory, assembly_ordering=Ordering(order, accessory.assembly_ordering.suborder))
+                for key, accessory in self.jointAccessories.items()
+            }
+            return Joint(cuttings=new_cuttings, ticket=self.ticket, jointAccessories=new_accessories)
+
+        # Per-member form. Members are addressed as ("cutting"|"accessory", key).
+        def resolve(reference) -> List[Tuple[str, str]]:
+            if isinstance(reference, str):
+                if reference in self.cuttings:
+                    return [("cutting", reference)]
+                if reference in self.jointAccessories:
+                    return [("accessory", reference)]
+                raise ValueError(
+                    f"with_order: unknown member key '{reference}'; this joint has cuttings "
+                    f"{sorted(self.cuttings)} and accessories {sorted(self.jointAccessories)}"
+                )
+            timber_matches = [("cutting", key) for key, cutting in self.cuttings.items() if cutting.timber is reference]
+            if timber_matches:
+                return timber_matches
+            accessory_matches = [("accessory", key) for key, accessory in self.jointAccessories.items() if accessory is reference]
+            if accessory_matches:
+                return accessory_matches
+            reference_name = getattr(getattr(reference, "ticket", None), "path", repr(type(reference)))
+            raise ValueError(f"with_order: '{reference_name}' is not a timber or accessory of this joint")
+
+        old_orderings: Dict[Tuple[str, str], Ordering] = {
+            ("cutting", key): cutting.assembly_ordering for key, cutting in self.cuttings.items()
+        }
+        old_orderings.update(
+            (("accessory", key), accessory.assembly_ordering) for key, accessory in self.jointAccessories.items()
+        )
+
+        order_pairs: List[Tuple[Union[str, "PerfectTimberWithin", "JointAccessory"], int]]
+        if isinstance(order, Mapping):
+            order_pairs = [(str(key), int(value)) for key, value in cast(Mapping[str, int], order).items()]
+        else:
+            order_pairs = [(reference, int(member_order)) for reference, member_order in order]
+        new_orderings = dict(old_orderings)
+        for reference, member_order in order_pairs:
+            for member_id in resolve(reference):
+                new_orderings[member_id] = Ordering(member_order, 0)
+
+        # The cut function's suborders express required sequencing; explicit
+        # per-member orders must not invert or collapse it.
+        member_ids = list(old_orderings)
+        for first in member_ids:
+            for second in member_ids:
+                if old_orderings[first] < old_orderings[second] and not new_orderings[first] < new_orderings[second]:
+                    raise ValueError(
+                        f"with_order: '{first[1]}' must be extracted before '{second[1]}' "
+                        f"(orderings {old_orderings[first].label()} < {old_orderings[second].label()}), "
+                        f"but the new orders place them at {new_orderings[first].label()} "
+                        f"vs {new_orderings[second].label()}"
+                    )
+
+        new_cuttings = {
+            key: replace(cutting, assembly_ordering=new_orderings[("cutting", key)])
+            for key, cutting in self.cuttings.items()
+        }
+        new_accessories = {
+            key: replace(accessory, assembly_ordering=new_orderings[("accessory", key)])
+            for key, accessory in self.jointAccessories.items()
+        }
+        return Joint(cuttings=new_cuttings, ticket=self.ticket, jointAccessories=new_accessories)
 
 def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
     """
@@ -2481,3 +2626,76 @@ def add_milestone(name: str):
     _json.dump({"type": "milestone", "name": name}, stdout)
     stdout.write("\n")
     stdout.flush()
+
+
+def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
+    """Solve the disassembly sequence for a frame's source joints.
+
+    Adapts the frame into the abstract assembly graph of kumiki/assembly.py —
+    one AssemblyMember per distinct timber/accessory (keyed by ticket
+    kumiki_id, positioned at the timber centroid) and one AssemblyJoint per
+    source joint — then delegates to solve_assembly.
+
+    Returns None when no member of any source joint has an assembly freedom.
+    """
+    source_joints = list(frame.source_joints or [])
+    has_any_freedom = any(
+        cutting.assembly_freedom is not None
+        for joint in source_joints
+        for cutting in joint.cuttings.values()
+    ) or any(
+        accessory.assembly_freedom is not None
+        for joint in source_joints
+        for accessory in joint.jointAccessories.values()
+    )
+    if not has_any_freedom:
+        return None
+
+    members: Dict[int, AssemblyMember] = {}
+
+    def register_timber(timber: PerfectTimberWithin) -> int:
+        key = timber.ticket.kumiki_id
+        if key not in members:
+            centroid = (
+                timber.get_bottom_position_global()
+                + timber.get_length_direction_global() * timber.length / 2
+            )
+            members[key] = AssemblyMember(key=key, name=timber.ticket.path, position=centroid)
+        return key
+
+    def register_accessory(accessory: JointAccessory) -> int:
+        key = accessory.ticket.kumiki_id
+        if key not in members:
+            transform = getattr(accessory, "transform", None)
+            position = transform.position if transform is not None else create_v3(0, 0, 0)
+            members[key] = AssemblyMember(key=key, name=accessory.ticket.path, position=position)
+        return key
+
+    def add_spec(specs: Dict[int, JointMemberSpec], key: int,
+                 freedom: Optional[AssemblyFreedom], ordering: Ordering) -> None:
+        existing = specs.get(key)
+        if existing is None:
+            specs[key] = JointMemberSpec(freedom=freedom, ordering=ordering)
+            return
+        # The same member can appear under several cutting keys of one
+        # (compound) joint; its escape DOFs are the union of all of them and
+        # the earliest ordering wins.
+        if existing.freedom is not None and freedom is not None:
+            combined = AssemblyFreedom.combine(existing.freedom, freedom)
+        else:
+            combined = existing.freedom if freedom is None else freedom
+        specs[key] = JointMemberSpec(freedom=combined, ordering=min(existing.ordering, ordering))
+
+    assembly_joints: List[AssemblyJoint] = []
+    for joint in source_joints:
+        specs: Dict[int, JointMemberSpec] = {}
+        for cutting in joint.cuttings.values():
+            add_spec(specs, register_timber(cutting.timber), cutting.assembly_freedom, cutting.assembly_ordering)
+        for accessory in joint.jointAccessories.values():
+            add_spec(specs, register_accessory(accessory), accessory.assembly_freedom, accessory.assembly_ordering)
+        joint_name = joint.ticket.get_name()
+        if joint_name == "[no-name]":
+            joint_name = joint.ticket.joint_type or "joint"
+        assembly_joints.append(AssemblyJoint(name=joint_name, members=specs))
+
+    return solve_assembly(list(members.values()), assembly_joints)

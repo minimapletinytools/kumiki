@@ -901,6 +901,98 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
         "timbers": timbers_payload,
         "accessories": accessories_payload,
         "joints": joints_payload,
+        "assembly": _build_assembly_payload(frame, timber_entries, accessory_entries),
+    }
+
+
+def _assembly_float(value: Any) -> float:
+    """Strict numeric conversion for assembly payloads (no string fallback)."""
+    try:
+        return float(value)
+    except TypeError:
+        return float(value.evalf())
+
+
+def _build_assembly_payload(
+    frame: Any,
+    timber_entries: List[Dict[str, Any]],
+    accessory_entries: List[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    """Solve the frame's assembly sequence for the viewer's preview timeline.
+
+    Returns None when no member of any joint declares an assembly freedom
+    (the viewer hides the timeline). Payload shape:
+
+        {"steps": [{"order": int, "suborder": int,
+                    "movements": [{"kumikiId": int, "memberKey": str,
+                                   "direction": [x, y, z],  # unit
+                                   "distance": float,       # base freed_after amount
+                                   "dragged": bool}]}],
+         "warnings": [str],
+         "failure": {"order": int | None, "suborder": int,
+                     "message": str, "diagnostics": [str]} | None}
+
+    ``distance`` is unscaled; the viewer multiplies by its configurable
+    disassembly multiplier. On failure the solved steps are still included so
+    the timeline stays scrubbable up to the failure point.
+    """
+    try:
+        from kumiki.timber import solve_frame_assembly
+    except ImportError:
+        return None
+
+    member_key_by_kumiki_id: Dict[int, str] = {}
+    for entry in timber_entries:
+        member_key_by_kumiki_id[entry["kumikiId"]] = entry["memberKey"]
+    for entry in accessory_entries:
+        member_key_by_kumiki_id[entry["kumikiId"]] = entry["memberKey"]
+
+    try:
+        solution = solve_frame_assembly(frame)
+    except Exception as exc:  # noqa: BLE001 — assembly must never break the layers tree
+        log_stderr(f"[assembly] solve failed: {exc}")
+        return {
+            "steps": [],
+            "warnings": [],
+            "failure": {"order": None, "suborder": 0, "message": str(exc), "diagnostics": []},
+        }
+    if solution is None:
+        return None
+
+    steps_payload: List[Dict[str, Any]] = []
+    for step in solution.steps:
+        movements_payload: List[Dict[str, Any]] = []
+        for movement in step.movements:
+            member_key = member_key_by_kumiki_id.get(movement.member_key)
+            if member_key is None:
+                # Member not rendered (e.g. filtered out of the frame); skip defensively.
+                continue
+            movements_payload.append({
+                "kumikiId": int(movement.member_key),
+                "memberKey": member_key,
+                "direction": [_assembly_float(movement.direction[i, 0]) for i in range(3)],
+                "distance": _assembly_float(movement.distance),
+                "dragged": bool(movement.dragged),
+            })
+        steps_payload.append({
+            "order": int(step.ordering.order),
+            "suborder": int(step.ordering.suborder),
+            "movements": movements_payload,
+        })
+
+    failure_payload = None
+    if solution.failure is not None:
+        failure_payload = {
+            "order": int(solution.failure.ordering.order),
+            "suborder": int(solution.failure.ordering.suborder),
+            "message": solution.failure.message,
+            "diagnostics": list(solution.failure.diagnostics),
+        }
+
+    return {
+        "steps": steps_payload,
+        "warnings": list(solution.warnings),
+        "failure": failure_payload,
     }
 
 
