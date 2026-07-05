@@ -2153,6 +2153,20 @@ def _raise_specific_pattern(
     )
 
 
+def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
+    """Return payload[key] if it is a non-empty string, else raise ValueError(message)."""
+    value = payload.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(message)
+    return value
+
+
+def _opt_dict(payload: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
+    """Return payload[key] if it is a dict, else None."""
+    value = payload.get(key)
+    return value if isinstance(value, dict) else None
+
+
 def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerState, Dict[str, Any], bool]:
     request_id = request.get("id")
     command = request.get("command")
@@ -2168,7 +2182,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         slot_name = _resolve_slot_name(state, payload)
         old_slot = state.slots.get(slot_name)
         next_path = payload.get("filePath", str(state.get_slot(slot_name).file_path))
-        render_parameters = payload.get("renderParameters") if isinstance(payload.get("renderParameters"), dict) else None
+        render_parameters = _opt_dict(payload, "renderParameters")
         old_cache = old_slot.mesh_cache if old_slot else {}
         t0 = time.monotonic()
 
@@ -2215,10 +2229,8 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "get_csg_tree":
         ss = _resolve_slot(state, payload)
-        member_key = payload.get("memberKey")
+        member_key = _require_str(payload, "memberKey", "get_csg_tree requires payload.memberKey")
         cut_index = payload.get("cutIndex")
-        if not isinstance(member_key, str) or not member_key:
-            raise ValueError("get_csg_tree requires payload.memberKey")
         if not isinstance(cut_index, int):
             raise ValueError("get_csg_tree requires integer payload.cutIndex")
         cached = ss.mesh_cache.get(member_key)
@@ -2244,9 +2256,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "get_member":
         ss = _resolve_slot(state, payload)
-        member_name = payload.get("name")
-        if not isinstance(member_name, str) or not member_name:
-            raise ValueError("get_member requires payload.name")
+        member_name = _require_str(payload, "name", "get_member requires payload.name")
         return state, make_success_response(request_id, command, get_member_result(ss.frame, member_name)), False
 
     if command == "find_csg_at_point":
@@ -2262,13 +2272,9 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
     # --- Slot management ---
 
     if command == "load_slot":
-        slot_name = payload.get("slot")
-        file_path = payload.get("filePath")
-        render_parameters = payload.get("renderParameters") if isinstance(payload.get("renderParameters"), dict) else None
-        if not isinstance(slot_name, str) or not slot_name:
-            raise ValueError("load_slot requires payload.slot")
-        if not isinstance(file_path, str) or not file_path:
-            raise ValueError("load_slot requires payload.filePath")
+        slot_name = _require_str(payload, "slot", "load_slot requires payload.slot")
+        file_path = _require_str(payload, "filePath", "load_slot requires payload.filePath")
+        render_parameters = _opt_dict(payload, "renderParameters")
         t0 = time.monotonic()
         new_slot = load_slot_state(file_path, render_parameters=render_parameters)
         reload_s = time.monotonic() - t0
@@ -2288,9 +2294,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         return state, make_success_response(request_id, command, result), False
 
     if command == "unload_slot":
-        slot_name = payload.get("slot")
-        if not isinstance(slot_name, str) or not slot_name:
-            raise ValueError("unload_slot requires payload.slot")
+        slot_name = _require_str(payload, "slot", "unload_slot requires payload.slot")
         if slot_name == state.active_slot:
             raise ValueError(f"Cannot unload the active slot '{slot_name}'")
         removed = slot_name in state.slots
@@ -2320,16 +2324,10 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         return state, make_success_response(request_id, command, result), False
 
     if command == "raise_specific_pattern":
-        slot_name = payload.get("slot")
-        source_file = payload.get("sourceFile")
-        pattern_name = payload.get("patternName")
-        render_parameters = payload.get("renderParameters") if isinstance(payload.get("renderParameters"), dict) else None
-        if not isinstance(slot_name, str) or not slot_name:
-            raise ValueError("raise_specific_pattern requires payload.slot")
-        if not isinstance(source_file, str) or not source_file:
-            raise ValueError("raise_specific_pattern requires payload.sourceFile")
-        if not isinstance(pattern_name, str) or not pattern_name:
-            raise ValueError("raise_specific_pattern requires payload.patternName")
+        slot_name = _require_str(payload, "slot", "raise_specific_pattern requires payload.slot")
+        source_file = _require_str(payload, "sourceFile", "raise_specific_pattern requires payload.sourceFile")
+        pattern_name = _require_str(payload, "patternName", "raise_specific_pattern requires payload.patternName")
+        render_parameters = _opt_dict(payload, "renderParameters")
         new_slot, result = _raise_specific_pattern(
             source_file,
             pattern_name,
@@ -2361,50 +2359,30 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             except ValueError as exc:
                 raise ValueError("export_frame outputDir must be inside project kigumi_exports/") from exc
 
-        if export_format == "stl":
-            from kumiki.blueprint import export_frame_stl
+        from kumiki.blueprint import (
+            export_frame_stl,
+            export_frame_3mf,
+            export_frame_obj,
+            export_frame_step,
+        )
 
-            written = export_frame_stl(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.stl"
-            extension_glob = "*.stl"
-        elif export_format == "3mf":
-            from kumiki.blueprint import export_frame_3mf
-
-            written = export_frame_3mf(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.3mf"
-            extension_glob = "*.3mf"
-        elif export_format == "obj":
-            from kumiki.blueprint import export_frame_obj
-
-            written = export_frame_obj(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.obj"
-            extension_glob = "*.obj"
-        else:
-            from kumiki.blueprint import export_frame_step
-
-            written = export_frame_step(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.step"
-            extension_glob = "*.step"
+        # export_format is validated above, and the file extension equals the
+        # format name for every supported format — so combined_name/glob are
+        # derived from it directly (no per-format string can drift).
+        exporters = {
+            "stl": export_frame_stl,
+            "3mf": export_frame_3mf,
+            "obj": export_frame_obj,
+            "step": export_frame_step,
+        }
+        written = exporters[export_format](
+            ss.frame,
+            output_dir,
+            combined=include_combined,
+            include_accessories=include_accessories,
+        )
+        combined_name = f"_combined.{export_format}"
+        extension_glob = f"*.{export_format}"
 
         if not include_individuals:
             for candidate in output_dir.glob(extension_glob):

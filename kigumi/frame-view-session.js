@@ -77,6 +77,20 @@ class FrameViewSession {
         this._lastProfiling = null;
     }
 
+    // Project root for this session: the runner's resolved root if available,
+    // else the directory of the frame file. (getViewerSettingsPath adds a
+    // workspace-folder fallback in the middle and does not use this.)
+    get projectRoot() {
+        return (this.runnerSession && this.runnerSession.projectRoot) || path.dirname(this.filePath);
+    }
+
+    // Post a message to the webview if the panel is still live.
+    _postToWebview(message) {
+        if (this.panel && !this.isDisposed) {
+            this.panel.webview.postMessage(message);
+        }
+    }
+
     getViewerSettingsPath() {
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.filePath));
         const projectRoot = this.runnerSession && this.runnerSession.projectRoot
@@ -113,17 +127,11 @@ class FrameViewSession {
     }
 
     getRefreshStatsPath() {
-        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
-            ? this.runnerSession.projectRoot
-            : path.dirname(this.filePath);
-        return path.join(projectRoot, '.kigumi', 'refresh-stats.json');
+        return path.join(this.projectRoot, '.kigumi', 'refresh-stats.json');
     }
 
     getLogsDirectoryPath() {
-        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
-            ? this.runnerSession.projectRoot
-            : path.dirname(this.filePath);
-        return path.join(projectRoot, '.kigumi', 'logs');
+        return path.join(this.projectRoot, '.kigumi', 'logs');
     }
 
     getSessionLogPath() {
@@ -871,9 +879,7 @@ class FrameViewSession {
             ctrlClick: !!message.ctrlClick,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
-        if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage({ type: 'csgSelectionResult', ...result });
-        }
+        this._postToWebview({ type: 'csgSelectionResult', ...result });
     }
 
     async _handleRequestCSGTree(message) {
@@ -885,9 +891,7 @@ class FrameViewSession {
             cutIndex: Number.isFinite(message.cutIndex) ? Number(message.cutIndex) : 0,
         };
         const result = await this.runnerSession.slotRequest('get_csg_tree', this.slotName, payload);
-        if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage({ type: 'csgTree', payload: result });
-        }
+        this._postToWebview({ type: 'csgTree', payload: result });
     }
 
     async _handleRequestCSGByPath(message) {
@@ -901,9 +905,7 @@ class FrameViewSession {
         };
         try {
             const result = await this.runnerSession.slotRequest('find_csg_by_path', this.slotName, payload);
-            if (this.panel && !this.isDisposed) {
-                this.panel.webview.postMessage({ type: 'csgSelectionResult', ...result });
-            }
+            this._postToWebview({ type: 'csgSelectionResult', ...result });
         } catch (err) {
             this.log(`[layers] find_csg_by_path failed: ${err.message || err}`);
         }
@@ -916,15 +918,11 @@ class FrameViewSession {
         const result = applyFeatureFlagsToLayersPayload(
             await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
         );
-        if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage({ type: 'layersTree', payload: result });
-        }
+        this._postToWebview({ type: 'layersTree', payload: result });
     }
 
     getExportDirectory() {
-        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
-            ? this.runnerSession.projectRoot
-            : path.dirname(this.filePath);
+        const projectRoot = this.projectRoot;
         const baseName = path.basename(this.filePath, path.extname(this.filePath));
         const safeBaseName = (baseName || 'frame')
             .replace(/[^a-zA-Z0-9._-]+/g, '_')
