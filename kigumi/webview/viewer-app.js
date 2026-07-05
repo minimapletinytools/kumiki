@@ -119,7 +119,6 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 const SELECTION_VISUAL_STATES = Object.freeze({
     NOTHING_SELECTED: 'nothing_selected',
     TIMBER_SELECTED_NO_SUB: 'timber_selected_no_sub',
-    TIMBER_SELECTED_WITH_SUB: 'timber_selected_with_sub',
     TAGGED_CSG_SELECTED_NO_SUB: 'tagged_csg_selected_no_sub',
     TAGGED_CSG_SELECTED_WITH_SUB: 'tagged_csg_selected_with_sub',
     FEATURE_SELECTED: 'feature_selected',
@@ -382,6 +381,106 @@ function boundsFromAccumulator(acc) {
     return { minX, minY, minZ, maxX, maxY, maxZ };
 }
 
+// Export formats in menu order, and the KigumiViewerApp property backing each.
+const EXPORT_FORMATS = ['stl', '3mf', 'obj', 'step'];
+const EXPORT_FORMAT_PROP = {
+    stl: 'exportFormatStlEnabled',
+    '3mf': 'exportFormat3mfEnabled',
+    obj: 'exportFormatObjEnabled',
+    step: 'exportFormatStepEnabled',
+};
+
+// Classify the current selection into one of SELECTION_VISUAL_STATES from a
+// plain snapshot (list of selected timber keys + the csg subselection), so the
+// decision is pure and independently testable.
+function computeSelectionVisualContext(selectedTimbers, csgSelection) {
+    const selectedTimberSet = new Set(selectedTimbers);
+    if (selectedTimberSet.size === 0) {
+        return {
+            state: SELECTION_VISUAL_STATES.NOTHING_SELECTED,
+            selectedTimberSet,
+            hasSubselection: false,
+            subselectionTimberKey: null,
+        };
+    }
+
+    const csg = csgSelection;
+    const path = csg && Array.isArray(csg.path) ? csg.path : [];
+    const featureLabel = csg && csg.featureLabel ? csg.featureLabel : null;
+    const csgTimberKey = csg && csg.timberKey ? csg.timberKey : null;
+    const hasSubselection = !!csg && (path.length > 0 || !!featureLabel);
+    if (!hasSubselection) {
+        return {
+            state: SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB,
+            selectedTimberSet,
+            hasSubselection: false,
+            subselectionTimberKey: null,
+        };
+    }
+
+    const subselectionTimberKey = csgTimberKey
+        || (selectedTimbers.length === 1 ? selectedTimbers[0] : null);
+
+    let state;
+    if (featureLabel) {
+        state = SELECTION_VISUAL_STATES.FEATURE_SELECTED;
+    } else if (path.length >= 2) {
+        state = SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB;
+    } else {
+        // hasSubselection with no featureLabel guarantees path.length > 0, so
+        // the only remaining case here is path.length === 1.
+        state = SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB;
+    }
+
+    return { state, selectedTimberSet, hasSubselection: true, subselectionTimberKey };
+}
+
+// Opacity/highlight policy per selection state. dimmedOpacity depends on the
+// user's base unselected opacity, so each entry is a small factory.
+const SELECTION_VISUAL_POLICIES = {
+    [SELECTION_VISUAL_STATES.NOTHING_SELECTED]: () => ({
+        selectedTimberOpacity: 1.0,
+        dimmedOpacity: 1.0,
+        csgHighlightOpacity: 0.7,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.85,
+    }),
+    [SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB]: (base) => ({
+        selectedTimberOpacity: 1.0,
+        dimmedOpacity: base,
+        csgHighlightOpacity: 0.7,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.85,
+    }),
+    [SELECTION_VISUAL_STATES.FEATURE_SELECTED]: (base) => ({
+        selectedTimberOpacity: 0.62,
+        dimmedOpacity: Math.min(base, 0.18),
+        csgHighlightOpacity: 0.9,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.9,
+    }),
+    [SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB]: (base) => ({
+        selectedTimberOpacity: 0.66,
+        dimmedOpacity: Math.min(base, 0.2),
+        csgHighlightOpacity: 0.8,
+        parentHighlightOpacity: 0.3,
+        featureHighlightOpacity: 0.85,
+    }),
+    [SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB]: (base) => ({
+        selectedTimberOpacity: 0.72,
+        dimmedOpacity: Math.min(base, 0.25),
+        csgHighlightOpacity: 0.72,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.85,
+    }),
+};
+
+function selectionVisualPolicy(state, baseUnselectedOpacity) {
+    const factory = SELECTION_VISUAL_POLICIES[state]
+        || SELECTION_VISUAL_POLICIES[SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB];
+    return factory(baseUnselectedOpacity);
+}
+
 class ViewerSettingsPanel {
     constructor(app) {
         this.app = app;
@@ -541,195 +640,118 @@ class ViewerSettingsPanel {
         `;
     }
 
+    // Declarative description of every settings control: which element id it
+    // binds to, which DOM event drives it, how to apply a change to the app
+    // (`apply`), and — where the control reflects app state — how to sync the
+    // element from the app (`sync`). bindEvents and syncControls both iterate
+    // this instead of enumerating the same ~16 ids twice.
+    get controlDescriptors() {
+        const app = this.app;
+        return [
+            { id: 'center-gizmo-toggle', on: 'change', apply: (el) => app.setCenterGizmoEnabled(el.checked) },
+            { id: 'edges-toggle', on: 'change', apply: (el) => app.setEdgesEnabled(el.checked) },
+            { id: 'shadows-toggle', on: 'change', apply: (el) => app.setShadowsEnabled(el.checked) },
+            { id: 'reflections-toggle', on: 'change', apply: (el) => app.setReflectionsEnabled(el.checked) },
+            { id: 'footprint-toggle', on: 'change', apply: (el) => app.setFootprintsEnabled(el.checked) },
+            {
+                id: 'debug-toggle', on: 'change',
+                apply: (el, renderRoot) => {
+                    app.debugEnabled = el.checked;
+                    const debugEl = renderRoot.querySelector('#debug');
+                    if (debugEl) {
+                        debugEl.style.display = app.debugEnabled ? 'block' : 'none';
+                    }
+                },
+            },
+            {
+                id: 'left-click-rotate-toggle', on: 'change',
+                apply: (el) => app.setLeftClickDragRotatesCameraEnabled(el.checked),
+                sync: (el) => { el.checked = app.leftClickDragRotatesCamera; },
+            },
+            {
+                id: 'assembly-timeline-toggle', on: 'change',
+                apply: (el) => app.setShowAssemblyTimeline(el.checked),
+                sync: (el) => { el.checked = app.showAssemblyTimeline; },
+            },
+            {
+                id: 'export-combined-toggle', on: 'change',
+                apply: (el) => app.setExportCombinedEnabled(el.checked),
+                sync: (el) => { el.checked = app.exportCombinedEnabled; },
+            },
+            {
+                id: 'export-individual-toggle', on: 'change',
+                apply: (el) => app.setExportIndividualsEnabled(el.checked),
+                sync: (el) => { el.checked = app.exportIndividualsEnabled; },
+            },
+            {
+                id: 'export-accessories-toggle', on: 'change',
+                apply: (el) => app.setExportAccessoriesEnabled(el.checked),
+                sync: (el) => { el.checked = app.exportAccessoriesEnabled; },
+            },
+            ...EXPORT_FORMATS.map((format) => ({
+                id: `export-format-${format}-toggle`, on: 'change',
+                apply: (el) => app.setExportFormatEnabled(format, el.checked),
+                sync: (el) => { el.checked = app[EXPORT_FORMAT_PROP[format]]; },
+            })),
+            {
+                id: 'edge-visibility-slider', on: 'input',
+                apply: (el) => {
+                    const raw = Number(el.value);
+                    const percent = Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw / 5) * 5)) : 100;
+                    app.setEdgeLineVisibilityPercent(percent);
+                },
+                sync: (el) => { el.value = String(app.edgeLineVisibilityPercent); },
+            },
+            {
+                id: 'unselected-transparency-slider', on: 'input',
+                apply: (el) => {
+                    const raw = Number(el.value);
+                    const visibility = Number.isFinite(raw) ? Math.max(5, Math.min(100, Math.round(raw / 5) * 5)) : 60;
+                    app.setUnselectedTransparencyPercent(100 - visibility);
+                },
+                sync: (el) => { el.value = String(100 - app.unselectedTransparencyPercent); },
+            },
+            {
+                id: 'disassembly-multiplier-slider', on: 'input',
+                apply: (el) => app.setDisassemblyMultiplier(Number(el.value)),
+                sync: (el) => { el.value = String(app.disassemblyMultiplier); },
+            },
+            {
+                id: 'theme-select', on: 'change',
+                apply: (el) => app.setTheme(el.value),
+                sync: (el) => { el.value = app.activeTheme; },
+            },
+            {
+                id: 'geometry-mode-select', on: 'change',
+                apply: (el) => app.setGeometryMode(el.value),
+                sync: (el) => {
+                    if (app.viewerOptions) {
+                        el.value = app.viewerOptions.geometryMode || 'actual';
+                    }
+                },
+            },
+        ];
+    }
+
     bindEvents(renderRoot) {
-        const centerGizmoToggle = renderRoot.querySelector('#center-gizmo-toggle');
-        const edgesToggle = renderRoot.querySelector('#edges-toggle');
-        const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
-        const shadowsToggle = renderRoot.querySelector('#shadows-toggle');
-        const reflectionsToggle = renderRoot.querySelector('#reflections-toggle');
-        const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
-        const debugToggle = renderRoot.querySelector('#debug-toggle');
-        const leftClickRotateToggle = renderRoot.querySelector('#left-click-rotate-toggle');
-        const exportCombinedToggle = renderRoot.querySelector('#export-combined-toggle');
-        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
-        const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
-        const exportFormatStlToggle = renderRoot.querySelector('#export-format-stl-toggle');
-        const exportFormat3mfToggle = renderRoot.querySelector('#export-format-3mf-toggle');
-        const exportFormatObjToggle = renderRoot.querySelector('#export-format-obj-toggle');
-        const exportFormatStepToggle = renderRoot.querySelector('#export-format-step-toggle');
-        const themeSelect = renderRoot.querySelector('#theme-select');
-
-        centerGizmoToggle.addEventListener('change', (event) => {
-            this.app.setCenterGizmoEnabled(event.target.checked);
-        });
-
-        edgesToggle.addEventListener('change', (event) => {
-            this.app.setEdgesEnabled(event.target.checked);
-        });
-
-        edgeVisibilitySlider.addEventListener('input', (event) => {
-            const rawPercent = Number(event.target.value);
-            const normalizedPercent = Number.isFinite(rawPercent)
-                ? Math.max(0, Math.min(100, Math.round(rawPercent / 5) * 5))
-                : 100;
-            this.app.setEdgeLineVisibilityPercent(normalizedPercent);
-        });
-
-        debugToggle.addEventListener('change', (event) => {
-            this.app.debugEnabled = event.target.checked;
-            const debugEl = renderRoot.querySelector('#debug');
-            if (debugEl) {
-                debugEl.style.display = this.app.debugEnabled ? 'block' : 'none';
+        for (const control of this.controlDescriptors) {
+            const el = renderRoot.querySelector(`#${control.id}`);
+            if (!el) {
+                continue;
             }
-        });
-
-        if (leftClickRotateToggle) {
-            leftClickRotateToggle.addEventListener('change', (event) => {
-                this.app.setLeftClickDragRotatesCameraEnabled(event.target.checked);
-            });
-        }
-
-        shadowsToggle.addEventListener('change', (event) => {
-            this.app.setShadowsEnabled(event.target.checked);
-        });
-
-        reflectionsToggle.addEventListener('change', (event) => {
-            this.app.setReflectionsEnabled(event.target.checked);
-        });
-
-        const footprintToggle = renderRoot.querySelector('#footprint-toggle');
-        if (footprintToggle) {
-            footprintToggle.addEventListener('change', (event) => {
-                this.app.setFootprintsEnabled(event.target.checked);
-            });
-        }
-
-        const assemblyTimelineToggle = renderRoot.querySelector('#assembly-timeline-toggle');
-        if (assemblyTimelineToggle) {
-            assemblyTimelineToggle.addEventListener('change', (event) => {
-                this.app.setShowAssemblyTimeline(event.target.checked);
-            });
-        }
-
-        const disassemblyMultiplierSlider = renderRoot.querySelector('#disassembly-multiplier-slider');
-        if (disassemblyMultiplierSlider) {
-            disassemblyMultiplierSlider.addEventListener('input', (event) => {
-                this.app.setDisassemblyMultiplier(Number(event.target.value));
-            });
-        }
-
-        if (exportCombinedToggle) {
-            exportCombinedToggle.addEventListener('change', (event) => {
-                this.app.setExportCombinedEnabled(event.target.checked);
-            });
-        }
-        if (exportIndividualToggle) {
-            exportIndividualToggle.addEventListener('change', (event) => {
-                this.app.setExportIndividualsEnabled(event.target.checked);
-            });
-        }
-        if (exportAccessoriesToggle) {
-            exportAccessoriesToggle.addEventListener('change', (event) => {
-                this.app.setExportAccessoriesEnabled(event.target.checked);
-            });
-        }
-        if (exportFormatStlToggle) {
-            exportFormatStlToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('stl', event.target.checked);
-            });
-        }
-        if (exportFormat3mfToggle) {
-            exportFormat3mfToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('3mf', event.target.checked);
-            });
-        }
-        if (exportFormatObjToggle) {
-            exportFormatObjToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('obj', event.target.checked);
-            });
-        }
-        if (exportFormatStepToggle) {
-            exportFormatStepToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('step', event.target.checked);
-            });
-        }
-
-        unselectedTransparencySlider.addEventListener('input', (event) => {
-            const rawVisibility = Number(event.target.value);
-            const normalizedVisibility = Number.isFinite(rawVisibility)
-                ? Math.max(5, Math.min(100, Math.round(rawVisibility / 5) * 5))
-                : 60;
-            this.app.setUnselectedTransparencyPercent(100 - normalizedVisibility);
-        });
-
-        themeSelect.addEventListener('change', (event) => {
-            this.app.setTheme(event.target.value);
-        });
-
-        const geometryModeSelect = renderRoot.querySelector('#geometry-mode-select');
-        if (geometryModeSelect) {
-            geometryModeSelect.addEventListener('change', (event) => {
-                this.app.setGeometryMode(event.target.value);
-            });
+            el.addEventListener(control.on, () => control.apply(el, renderRoot));
         }
     }
 
     syncControls(renderRoot) {
-        const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
-        const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
-        const exportCombinedToggle = renderRoot.querySelector('#export-combined-toggle');
-        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
-        const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
-        const exportFormatStlToggle = renderRoot.querySelector('#export-format-stl-toggle');
-        const exportFormat3mfToggle = renderRoot.querySelector('#export-format-3mf-toggle');
-        const exportFormatObjToggle = renderRoot.querySelector('#export-format-obj-toggle');
-        const exportFormatStepToggle = renderRoot.querySelector('#export-format-step-toggle');
-        const themeSelect = renderRoot.querySelector('#theme-select');
-        const leftClickRotateToggle = renderRoot.querySelector('#left-click-rotate-toggle');
-        if (edgeVisibilitySlider) {
-            edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
-        }
-        if (unselectedTransparencySlider) {
-            unselectedTransparencySlider.value = String(100 - this.app.unselectedTransparencyPercent);
-        }
-        const assemblyTimelineToggle = renderRoot.querySelector('#assembly-timeline-toggle');
-        if (assemblyTimelineToggle) {
-            assemblyTimelineToggle.checked = this.app.showAssemblyTimeline;
-        }
-        const disassemblyMultiplierSlider = renderRoot.querySelector('#disassembly-multiplier-slider');
-        if (disassemblyMultiplierSlider) {
-            disassemblyMultiplierSlider.value = String(this.app.disassemblyMultiplier);
-        }
-        if (leftClickRotateToggle) {
-            leftClickRotateToggle.checked = this.app.leftClickDragRotatesCamera;
-        }
-        if (exportCombinedToggle) {
-            exportCombinedToggle.checked = this.app.exportCombinedEnabled;
-        }
-        if (exportIndividualToggle) {
-            exportIndividualToggle.checked = this.app.exportIndividualsEnabled;
-        }
-        if (exportAccessoriesToggle) {
-            exportAccessoriesToggle.checked = this.app.exportAccessoriesEnabled;
-        }
-        if (exportFormatStlToggle) {
-            exportFormatStlToggle.checked = this.app.exportFormatStlEnabled;
-        }
-        if (exportFormat3mfToggle) {
-            exportFormat3mfToggle.checked = this.app.exportFormat3mfEnabled;
-        }
-        if (exportFormatObjToggle) {
-            exportFormatObjToggle.checked = this.app.exportFormatObjEnabled;
-        }
-        if (exportFormatStepToggle) {
-            exportFormatStepToggle.checked = this.app.exportFormatStepEnabled;
-        }
-        if (themeSelect) {
-            themeSelect.value = this.app.activeTheme;
-        }
-        const geometryModeSelect = renderRoot.querySelector('#geometry-mode-select');
-        if (geometryModeSelect && this.app.viewerOptions) {
-            geometryModeSelect.value = this.app.viewerOptions.geometryMode || 'actual';
+        for (const control of this.controlDescriptors) {
+            if (!control.sync) {
+                continue;
+            }
+            const el = renderRoot.querySelector(`#${control.id}`);
+            if (el) {
+                control.sync(el);
+            }
         }
     }
 }
@@ -1560,83 +1582,37 @@ class KigumiViewerApp extends LitElement {
         this.applySelectionOpacity();
     }
 
-    setExportFormatEnabled(format, enabled) {
+    // Set a boolean export-related flag, re-rendering only when it changes.
+    _setExportFlag(prop, enabled) {
         const normalized = Boolean(enabled);
-        if (format === 'stl') {
-            if (this.exportFormatStlEnabled === normalized) {
-                return;
-            }
-            this.exportFormatStlEnabled = normalized;
-            this.requestUpdate();
+        if (this[prop] === normalized) {
             return;
         }
-        if (format === '3mf') {
-            if (this.exportFormat3mfEnabled === normalized) {
-                return;
-            }
-            this.exportFormat3mfEnabled = normalized;
-            this.requestUpdate();
-            return;
-        }
-        if (format === 'obj') {
-            if (this.exportFormatObjEnabled === normalized) {
-                return;
-            }
-            this.exportFormatObjEnabled = normalized;
-            this.requestUpdate();
-            return;
-        }
-        if (format === 'step') {
-            if (this.exportFormatStepEnabled === normalized) {
-                return;
-            }
-            this.exportFormatStepEnabled = normalized;
-            this.requestUpdate();
+        this[prop] = normalized;
+        this.requestUpdate();
+    }
+
+    setExportFormatEnabled(format, enabled) {
+        const prop = EXPORT_FORMAT_PROP[format];
+        if (prop) {
+            this._setExportFlag(prop, enabled);
         }
     }
 
     setExportCombinedEnabled(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.exportCombinedEnabled === normalized) {
-            return;
-        }
-        this.exportCombinedEnabled = normalized;
-        this.requestUpdate();
+        this._setExportFlag('exportCombinedEnabled', enabled);
     }
 
     setExportIndividualsEnabled(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.exportIndividualsEnabled === normalized) {
-            return;
-        }
-        this.exportIndividualsEnabled = normalized;
-        this.requestUpdate();
+        this._setExportFlag('exportIndividualsEnabled', enabled);
     }
 
     setExportAccessoriesEnabled(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.exportAccessoriesEnabled === normalized) {
-            return;
-        }
-        this.exportAccessoriesEnabled = normalized;
-        this.requestUpdate();
+        this._setExportFlag('exportAccessoriesEnabled', enabled);
     }
 
     getSelectedExportFormats() {
-        const formats = [];
-        if (this.exportFormatStlEnabled) {
-            formats.push('stl');
-        }
-        if (this.exportFormat3mfEnabled) {
-            formats.push('3mf');
-        }
-        if (this.exportFormatObjEnabled) {
-            formats.push('obj');
-        }
-        if (this.exportFormatStepEnabled) {
-            formats.push('step');
-        }
-        return formats;
+        return EXPORT_FORMATS.filter((format) => this[EXPORT_FORMAT_PROP[format]]);
     }
 
     collectViewerSettingsPayload() {
@@ -2118,80 +2094,61 @@ class KigumiViewerApp extends LitElement {
         };
     }
 
-    handleCollectPendingRenderParametersRequest(message) {
+    // Reply to a `${type}Request` message with a `${type}Result` carrying the
+    // value returned by `produce()` (or ok:false with its error). Only for
+    // handlers whose result is shaped `{ ok, payload }`; the capture handlers
+    // use a different result shape and post directly.
+    respondToRequest(message, resultType, produce, fallbackError = 'Request failed') {
         const requestId = message && message.requestId;
         if (!vscode || !requestId) {
             return;
         }
-
         try {
-            vscode.postMessage({
-                type: 'collectPendingRenderParametersResult',
-                requestId,
-                ok: true,
-                payload: {
-                    renderParameters: { ...this.pendingRenderParameters },
-                },
-            });
+            const payload = produce();
+            vscode.postMessage({ type: resultType, requestId, ok: true, payload });
         } catch (error) {
             vscode.postMessage({
-                type: 'collectPendingRenderParametersResult',
+                type: resultType,
                 requestId,
                 ok: false,
-                error: error && error.message ? error.message : 'Failed to read pending render parameters',
+                error: error && error.message ? error.message : fallbackError,
             });
         }
+    }
+
+    handleCollectPendingRenderParametersRequest(message) {
+        this.respondToRequest(
+            message,
+            'collectPendingRenderParametersResult',
+            () => ({ renderParameters: { ...this.pendingRenderParameters } }),
+            'Failed to read pending render parameters',
+        );
     }
 
     handleGetCameraStateRequest(message) {
-        const requestId = message && message.requestId;
-        if (!vscode || !requestId) {
-            return;
-        }
-        try {
-            vscode.postMessage({
-                type: 'getCameraStateResult',
-                requestId,
-                ok: true,
-                payload: this.buildCameraStatePayload(),
-            });
-        } catch (error) {
-            vscode.postMessage({
-                type: 'getCameraStateResult',
-                requestId,
-                ok: false,
-                error: error && error.message ? error.message : 'Failed to read camera state',
-            });
-        }
+        this.respondToRequest(
+            message,
+            'getCameraStateResult',
+            () => this.buildCameraStatePayload(),
+            'Failed to read camera state',
+        );
     }
 
     handleSetCameraStateRequest(message) {
-        const requestId = message && message.requestId;
-        if (!vscode || !requestId) {
-            return;
-        }
-        try {
-            const cameraState = message && message.cameraState && typeof message.cameraState === 'object'
-                ? message.cameraState
-                : {};
-            this.cameraController.applyStatePayload(cameraState);
-            this.requestUpdate();
-            this.updateCamera();
-
-            vscode.postMessage({
-                type: 'setCameraStateResult',
-                requestId,
-                ok: true,
-                payload: this.buildCameraStatePayload(),
-            });
-        } catch (error) {
-            vscode.postMessage({
-                type: 'setCameraStateResult',
-                requestId,
-                ok: false,
-                error: error && error.message ? error.message : 'Failed to set camera state',
-            });
-        }
+        this.respondToRequest(
+            message,
+            'setCameraStateResult',
+            () => {
+                const cameraState = message && message.cameraState && typeof message.cameraState === 'object'
+                    ? message.cameraState
+                    : {};
+                this.cameraController.applyStatePayload(cameraState);
+                this.requestUpdate();
+                this.updateCamera();
+                return this.buildCameraStatePayload();
+            },
+            'Failed to set camera state',
+        );
     }
 
     onWindowScroll() {
@@ -2473,129 +2430,14 @@ class KigumiViewerApp extends LitElement {
     }
 
     _getSelectionVisualContext() {
-        const selectedTimbers = this.selectionManager.getSelectedTimbers();
-        const selectedTimberSet = new Set(selectedTimbers);
-        const hasTimberSelection = selectedTimberSet.size > 0;
-        if (!hasTimberSelection) {
-            return {
-                state: SELECTION_VISUAL_STATES.NOTHING_SELECTED,
-                selectedTimberSet,
-                hasSubselection: false,
-                subselectionTimberKey: null,
-            };
-        }
-
-        const csg = this.selectionManager.csgSelection;
-        const path = csg && Array.isArray(csg.path) ? csg.path : [];
-        const featureLabel = csg && csg.featureLabel ? csg.featureLabel : null;
-        const csgTimberKey = csg && csg.timberKey ? csg.timberKey : null;
-        const hasSubselection = !!csg && (path.length > 0 || !!featureLabel);
-        const subselectionTimberKey = hasSubselection
-            ? (csgTimberKey || (selectedTimbers.length === 1 ? selectedTimbers[0] : null))
-            : null;
-
-        if (!hasSubselection) {
-            return {
-                state: SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB,
-                selectedTimberSet,
-                hasSubselection: false,
-                subselectionTimberKey: null,
-            };
-        }
-
-        if (featureLabel) {
-            return {
-                state: SELECTION_VISUAL_STATES.FEATURE_SELECTED,
-                selectedTimberSet,
-                hasSubselection: true,
-                subselectionTimberKey,
-            };
-        }
-
-        if (path.length >= 2) {
-            return {
-                state: SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB,
-                selectedTimberSet,
-                hasSubselection: true,
-                subselectionTimberKey,
-            };
-        }
-
-        if (path.length === 1) {
-            return {
-                state: SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB,
-                selectedTimberSet,
-                hasSubselection: true,
-                subselectionTimberKey,
-            };
-        }
-
-        return {
-            state: SELECTION_VISUAL_STATES.TIMBER_SELECTED_WITH_SUB,
-            selectedTimberSet,
-            hasSubselection: true,
-            subselectionTimberKey,
-        };
+        return computeSelectionVisualContext(
+            this.selectionManager.getSelectedTimbers(),
+            this.selectionManager.csgSelection,
+        );
     }
 
     _getSelectionVisualPolicy(state, baseUnselectedOpacity) {
-        if (state === SELECTION_VISUAL_STATES.NOTHING_SELECTED) {
-            return {
-                selectedTimberOpacity: 1.0,
-                dimmedOpacity: 1.0,
-                csgHighlightOpacity: 0.7,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
-            return {
-                selectedTimberOpacity: 1.0,
-                dimmedOpacity: baseUnselectedOpacity,
-                csgHighlightOpacity: 0.7,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.FEATURE_SELECTED) {
-            return {
-                selectedTimberOpacity: 0.62,
-                dimmedOpacity: Math.min(baseUnselectedOpacity, 0.18),
-                csgHighlightOpacity: 0.9,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.9,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB) {
-            return {
-                selectedTimberOpacity: 0.66,
-                dimmedOpacity: Math.min(baseUnselectedOpacity, 0.2),
-                csgHighlightOpacity: 0.8,
-                parentHighlightOpacity: 0.3,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB) {
-            return {
-                selectedTimberOpacity: 0.72,
-                dimmedOpacity: Math.min(baseUnselectedOpacity, 0.25),
-                csgHighlightOpacity: 0.72,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        return {
-            selectedTimberOpacity: 0.72,
-            dimmedOpacity: Math.min(baseUnselectedOpacity, 0.25),
-            csgHighlightOpacity: 0.72,
-            parentHighlightOpacity: 0.35,
-            featureHighlightOpacity: 0.85,
-        };
+        return selectionVisualPolicy(state, baseUnselectedOpacity);
     }
 
     applySelectionOpacity() {
