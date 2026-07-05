@@ -7,20 +7,16 @@ const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const { resolveProjectEnvironment } = require('./project-root');
+const {
+    runCommand: spawnProcess,
+    getVenvPythonCandidates,
+    getVenvPython,
+    getKigumiVersion,
+    kumikiCompatiblePipSpec,
+    getMissingDependencies,
+} = require('./python-env');
 
 const ENV_SETUP_CACHE = new Map();
-
-function getKigumiVersion(extensionPath) {
-    const pkg = JSON.parse(fs.readFileSync(path.join(extensionPath, 'package.json'), 'utf8'));
-    return pkg.version;
-}
-
-// Returns a pip version specifier that constrains kumiki to the same major.minor as kigumi.
-// e.g. kigumi 0.3.2 → "kumiki~=0.3.0"  (pip ~= means >=0.3.0, <0.4.0)
-function kumikiCompatiblePipSpec(kigumiVersion) {
-    const [major, minor] = kigumiVersion.split('.').map(Number);
-    return `kumiki~=${major}.${minor}.0`;
-}
 
 class PythonRunnerSession {
     constructor(filePath, context, channel) {
@@ -64,21 +60,6 @@ class PythonRunnerSession {
 
     isAlive() {
         return this.process && !this.process.killed && this.process.exitCode === null;
-    }
-
-    getPythonCandidates(root) {
-        if (process.platform === 'win32') {
-            return [
-                path.join(root, '.venv', 'Scripts', 'python.exe'),
-                path.join(root, 'venv', 'Scripts', 'python.exe'),
-            ];
-        }
-        return [
-            path.join(root, '.venv', 'bin', 'python3'),
-            path.join(root, '.venv', 'bin', 'python'),
-            path.join(root, 'venv', 'bin', 'python3'),
-            path.join(root, 'venv', 'bin', 'python'),
-        ];
     }
 
     getConfiguredPythonFromProjectYaml() {
@@ -128,7 +109,7 @@ class PythonRunnerSession {
         }
 
         for (const root of searchRoots) {
-            for (const candidate of this.getPythonCandidates(root)) {
+            for (const candidate of getVenvPythonCandidates(root)) {
                 if (fs.existsSync(candidate)) {
                     return candidate;
                 }
@@ -139,34 +120,9 @@ class PythonRunnerSession {
     }
 
     runCommand(command, args, options = {}) {
-        return new Promise((resolve, reject) => {
-            const child = spawn(command, args, {
-                cwd: options.cwd || this.projectRoot,
-                env: options.env || process.env,
-                stdio: ['ignore', 'pipe', 'pipe'],
-            });
-
-            let stdout = '';
-            let stderr = '';
-
-            child.stdout.on('data', (chunk) => {
-                stdout += chunk.toString();
-            });
-            child.stderr.on('data', (chunk) => {
-                stderr += chunk.toString();
-            });
-
-            child.on('error', (error) => {
-                reject(error);
-            });
-
-            child.on('close', (code) => {
-                if (code === 0) {
-                    resolve({ stdout, stderr });
-                    return;
-                }
-                reject(new Error(`Command failed (${command} ${args.join(' ')}), exit=${code}, stderr=${stderr.trim()}`));
-            });
+        return spawnProcess(command, args, {
+            cwd: options.cwd || this.projectRoot,
+            env: options.env,
         });
     }
 
@@ -225,17 +181,8 @@ class PythonRunnerSession {
     }
 
     async getMissingViewerDependencies(pythonCmd) {
-        const snippet = [
-            'import importlib.util',
-            'required = ["kumiki", "sympy", "numpy", "trimesh", "manifold3d"]',
-            'missing = [name for name in required if importlib.util.find_spec(name) is None]',
-            'print("\\n".join(missing))',
-        ].join('; ');
-        const { stdout } = await this.runCommand(pythonCmd, ['-c', snippet]);
-        return stdout
-            .split('\n')
-            .map((line) => line.trim())
-            .filter((line) => line.length > 0);
+        // Default required list includes "kumiki" (see python-env.js).
+        return getMissingDependencies(pythonCmd, { cwd: this.projectRoot });
     }
 
     async isCadqueryOcpInstalled() {
@@ -330,7 +277,7 @@ class PythonRunnerSession {
 
     async ensurePythonEnvironmentInternal() {
         const venvDir = path.join(this.projectRoot, '.venv');
-        const expectedVenvPython = this.getPythonCandidates(this.projectRoot)[0];
+        const expectedVenvPython = getVenvPython(this.projectRoot);
         let createdVenv = false;
 
         fs.mkdirSync(path.join(this.projectRoot, '.kigumi'), { recursive: true });
