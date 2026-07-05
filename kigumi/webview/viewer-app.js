@@ -352,6 +352,36 @@ if (!AssemblyTimeline) {
 // flags script isn't wired into some future embedding.
 const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 
+// Axis-aligned bounds accumulation over flat [x,y,z,...] position arrays.
+function createBoundsAccumulator() {
+    return {
+        minX: Infinity, minY: Infinity, minZ: Infinity,
+        maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity,
+        hasAny: false,
+    };
+}
+
+function accumulateBounds(acc, positions) {
+    for (let index = 0; index < positions.length; index += 3) {
+        acc.hasAny = true;
+        const vx = positions[index];
+        const vy = positions[index + 1];
+        const vz = positions[index + 2];
+        if (vx < acc.minX) acc.minX = vx;
+        if (vx > acc.maxX) acc.maxX = vx;
+        if (vy < acc.minY) acc.minY = vy;
+        if (vy > acc.maxY) acc.maxY = vy;
+        if (vz < acc.minZ) acc.minZ = vz;
+        if (vz > acc.maxZ) acc.maxZ = vz;
+    }
+    return acc;
+}
+
+function boundsFromAccumulator(acc) {
+    const { minX, minY, minZ, maxX, maxY, maxZ } = acc;
+    return { minX, minY, minZ, maxX, maxY, maxZ };
+}
+
 class ViewerSettingsPanel {
     constructor(app) {
         this.app = app;
@@ -2683,39 +2713,20 @@ class KigumiViewerApp extends LitElement {
             return this.getSceneBounds();
         }
 
-        let minX = Infinity;
-        let minY = Infinity;
-        let minZ = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        let maxZ = -Infinity;
-        let hasAny = false;
-
+        const acc = createBoundsAccumulator();
         for (const key of selected) {
             const bundle = this.meshObjectsByKey.get(key);
             if (!bundle || !bundle.mesh || !bundle.mesh.geometry) {
                 continue;
             }
-            const positions = bundle.mesh.geometry.getAttribute('position').array;
-            for (let index = 0; index < positions.length; index += 3) {
-                hasAny = true;
-                const vx = positions[index];
-                const vy = positions[index + 1];
-                const vz = positions[index + 2];
-                if (vx < minX) minX = vx;
-                if (vx > maxX) maxX = vx;
-                if (vy < minY) minY = vy;
-                if (vy > maxY) maxY = vy;
-                if (vz < minZ) minZ = vz;
-                if (vz > maxZ) maxZ = vz;
-            }
+            accumulateBounds(acc, bundle.mesh.geometry.getAttribute('position').array);
         }
 
-        if (!hasAny) {
+        if (!acc.hasAny) {
             return this.getSceneBounds();
         }
 
-        return { minX, minY, minZ, maxX, maxY, maxZ };
+        return boundsFromAccumulator(acc);
     }
 
     setTheme(id) {
@@ -3336,12 +3347,13 @@ class KigumiViewerApp extends LitElement {
         return this.memberRenderProfileByType.timber;
     }
 
-    createMaterialSetForMemberType(memberType) {
-        const profileId = this.resolveRenderProfileIdForMemberType(memberType);
-        const profile = this.resolveRenderProfile(profileId);
+    // Single source of truth for the solid/edge/reflection material parameters
+    // derived from a render profile. Used both to construct new materials
+    // (createMaterialSetForMemberType) and to mutate existing ones
+    // (applyRenderProfileToBundle), so the two paths never drift.
+    renderProfileMaterialSpecs(profile) {
         return {
-            profileId,
-            solid: new THREE.MeshStandardMaterial({
+            solid: {
                 color: profile.solidColor,
                 metalness: profile.metalness,
                 roughness: profile.roughness,
@@ -3350,15 +3362,15 @@ class KigumiViewerApp extends LitElement {
                 polygonOffsetFactor: 2,
                 polygonOffsetUnits: 2,
                 side: THREE.FrontSide,
-            }),
-            edge: new THREE.LineBasicMaterial({
+            },
+            edge: {
                 color: profile.edgeColor,
                 transparent: true,
                 opacity: profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100),
                 depthTest: false,
                 depthWrite: false,
-            }),
-            reflection: new THREE.MeshStandardMaterial({
+            },
+            reflection: {
                 color: profile.reflectionColor,
                 metalness: profile.reflectionMetalness,
                 roughness: profile.reflectionRoughness,
@@ -3367,7 +3379,30 @@ class KigumiViewerApp extends LitElement {
                 flatShading: true,
                 depthWrite: false,
                 side: THREE.DoubleSide,
-            }),
+            },
+        };
+    }
+
+    // Apply a material spec (as built by renderProfileMaterialSpecs) to an
+    // existing THREE material in place. `color` is a hex number applied via
+    // setHex; every other key is assigned directly.
+    applyMaterialSpec(material, spec) {
+        const { color, ...rest } = spec;
+        if (color !== undefined) {
+            material.color.setHex(color);
+        }
+        Object.assign(material, rest);
+        material.needsUpdate = true;
+    }
+
+    createMaterialSetForMemberType(memberType) {
+        const profileId = this.resolveRenderProfileIdForMemberType(memberType);
+        const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
+        return {
+            profileId,
+            solid: new THREE.MeshStandardMaterial(specs.solid),
+            edge: new THREE.LineBasicMaterial(specs.edge),
+            reflection: new THREE.MeshStandardMaterial(specs.reflection),
         };
     }
 
@@ -3375,35 +3410,11 @@ class KigumiViewerApp extends LitElement {
         if (!bundle || !bundle.mesh || !bundle.mesh.material || !bundle.edges || !bundle.edges.material || !bundle.reflection || !bundle.reflection.material) {
             return;
         }
-        const profile = this.resolveRenderProfile(profileId);
+        const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
         bundle.profileId = profileId;
-
-        bundle.mesh.material.color.setHex(profile.solidColor);
-        bundle.mesh.material.metalness = profile.metalness;
-        bundle.mesh.material.roughness = profile.roughness;
-        bundle.mesh.material.flatShading = true;
-        bundle.mesh.material.polygonOffset = true;
-        bundle.mesh.material.polygonOffsetFactor = 2;
-        bundle.mesh.material.polygonOffsetUnits = 2;
-        bundle.mesh.material.side = THREE.FrontSide;
-        bundle.mesh.material.needsUpdate = true;
-
-        bundle.edges.material.color.setHex(profile.edgeColor);
-        bundle.edges.material.opacity = profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100);
-        bundle.edges.material.transparent = true;
-        bundle.edges.material.depthTest = false;
-        bundle.edges.material.depthWrite = false;
-        bundle.edges.material.needsUpdate = true;
-
-        bundle.reflection.material.color.setHex(profile.reflectionColor);
-        bundle.reflection.material.metalness = profile.reflectionMetalness;
-        bundle.reflection.material.roughness = profile.reflectionRoughness;
-        bundle.reflection.material.opacity = profile.reflectionOpacity;
-        bundle.reflection.material.transparent = true;
-        bundle.reflection.material.flatShading = true;
-        bundle.reflection.material.depthWrite = false;
-        bundle.reflection.material.side = THREE.DoubleSide;
-        bundle.reflection.material.needsUpdate = true;
+        this.applyMaterialSpec(bundle.mesh.material, specs.solid);
+        this.applyMaterialSpec(bundle.edges.material, specs.edge);
+        this.applyMaterialSpec(bundle.reflection.material, specs.reflection);
     }
 
     applyRenderProfilesToScene() {
@@ -4149,35 +4160,16 @@ class KigumiViewerApp extends LitElement {
     }
 
     getSceneBounds() {
-        let minX = Infinity;
-        let minY = Infinity;
-        let minZ = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        let maxZ = -Infinity;
-        let hasAny = false;
-
+        const acc = createBoundsAccumulator();
         this.meshObjectsByKey.forEach((bundle) => {
-            const positions = bundle.mesh.geometry.getAttribute('position').array;
-            for (let index = 0; index < positions.length; index += 3) {
-                hasAny = true;
-                const vx = positions[index];
-                const vy = positions[index + 1];
-                const vz = positions[index + 2];
-                if (vx < minX) minX = vx;
-                if (vx > maxX) maxX = vx;
-                if (vy < minY) minY = vy;
-                if (vy > maxY) maxY = vy;
-                if (vz < minZ) minZ = vz;
-                if (vz > maxZ) maxZ = vz;
-            }
+            accumulateBounds(acc, bundle.mesh.geometry.getAttribute('position').array);
         });
 
-        if (!hasAny) {
+        if (!acc.hasAny) {
             return { minX: -1, minY: -1, minZ: -1, maxX: 1, maxY: 1, maxZ: 1 };
         }
 
-        return { minX, minY, minZ, maxX, maxY, maxZ };
+        return boundsFromAccumulator(acc);
     }
 
     async applyPayload(payload, refreshToken) {

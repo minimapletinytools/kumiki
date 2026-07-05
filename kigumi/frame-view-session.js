@@ -5,6 +5,7 @@ const { PythonRunnerSession } = require('./runner-session');
 const { FileWatcher } = require('./file-watcher');
 const { RefreshProfiler } = require('./refresh-profiler');
 const { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestViewerScreenshot } = require('./viewer');
+const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 
 const VIEWER_LOG_LEVEL_ORDER = {
@@ -487,63 +488,14 @@ class FrameViewSession {
 
         const timeoutMs = Number.isFinite(options.timeoutMs) ? Number(options.timeoutMs) : 6000;
         const requestId = `${requestPrefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-        const requestType = `${type}Request`;
-        const resultType = `${type}Result`;
 
-        return new Promise((resolve, reject) => {
-            let settled = false;
-            let timeoutHandle = null;
-
-            const cleanup = () => {
-                if (timeoutHandle) {
-                    clearTimeout(timeoutHandle);
-                    timeoutHandle = null;
-                }
-                listener.dispose();
-            };
-
-            const listener = this.panel.webview.onDidReceiveMessage((message) => {
-                if (!message || message.type !== resultType || message.requestId !== requestId) {
-                    return;
-                }
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                cleanup();
-                if (message.ok) {
-                    resolve(message.payload || {});
-                    return;
-                }
-                reject(new Error(message.error || `${type} failed`));
-            });
-
-            timeoutHandle = setTimeout(() => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                cleanup();
-                reject(new Error(`Timed out waiting for ${type} (${timeoutMs}ms)`));
-            }, timeoutMs);
-
-            this.panel.webview.postMessage({
-                type: requestType,
-                requestId,
-                ...payload,
-            }).then((posted) => {
-                if (!posted && !settled) {
-                    settled = true;
-                    cleanup();
-                    reject(new Error(`Failed to post ${requestType} to webview`));
-                }
-            }, (error) => {
-                if (!settled) {
-                    settled = true;
-                    cleanup();
-                    reject(error);
-                }
-            });
+        return requestWebviewRoundTrip(this.panel.webview, {
+            requestType: `${type}Request`,
+            resultType: `${type}Result`,
+            requestId,
+            payload,
+            timeoutMs,
+            label: type,
         });
     }
 
@@ -859,60 +811,15 @@ class FrameViewSession {
         const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 3000;
         const requestId = `panel-snapshot-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
-        return new Promise((resolve, reject) => {
-            let settled = false;
-            let timeoutHandle = null;
-
-            const cleanup = () => {
-                if (timeoutHandle) {
-                    clearTimeout(timeoutHandle);
-                    timeoutHandle = null;
-                }
-                listener.dispose();
-            };
-
-            const listener = this.panel.webview.onDidReceiveMessage((message) => {
-                if (!message || message.type !== 'capturePanelSnapshotResult' || message.requestId !== requestId) {
-                    return;
-                }
-                if (settled) {
-                    return;
-                }
-
-                settled = true;
-                cleanup();
-                if (message.ok) {
-                    resolve(message.snapshot || {});
-                    return;
-                }
-                reject(new Error(message.error || 'Panel snapshot failed'));
-            });
-
-            timeoutHandle = setTimeout(() => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                cleanup();
-                reject(new Error(`Timed out waiting for panel snapshot (${timeoutMs}ms)`));
-            }, timeoutMs);
-
-            this.panel.webview.postMessage({
-                type: 'capturePanelSnapshotRequest',
-                requestId,
-            }).then((posted) => {
-                if (!posted && !settled) {
-                    settled = true;
-                    cleanup();
-                    reject(new Error('Failed to post panel snapshot request to webview'));
-                }
-            }, (error) => {
-                if (!settled) {
-                    settled = true;
-                    cleanup();
-                    reject(error);
-                }
-            });
+        return requestWebviewRoundTrip(this.panel.webview, {
+            requestType: 'capturePanelSnapshotRequest',
+            resultType: 'capturePanelSnapshotResult',
+            requestId,
+            timeoutMs,
+            extractResult: (message) => message.snapshot || {},
+            label: 'panel snapshot',
+            failMessage: 'Panel snapshot failed',
+            postFailMessage: 'Failed to post panel snapshot request to webview',
         });
     }
 

@@ -5,6 +5,7 @@
 const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
+const { requestWebviewRoundTrip } = require('./webview-request');
 
 const initializedPanels = new WeakSet();
 const webviewDir = path.join(__dirname, 'webview');
@@ -185,62 +186,19 @@ function requestViewerScreenshot(panel, options = {}) {
     const requestId = `capture-${Date.now()}-${screenshotRequestCounter}`;
     screenshotRequestCounter += 1;
 
-    return new Promise((resolve, reject) => {
-        let settled = false;
-        let timeoutHandle = null;
-
-        const cleanup = () => {
-            if (timeoutHandle) {
-                clearTimeout(timeoutHandle);
-                timeoutHandle = null;
-            }
-            listener.dispose();
-        };
-
-        const listener = panel.webview.onDidReceiveMessage((message) => {
-            if (!message || message.type !== 'captureScreenshotResult' || message.requestId !== requestId) {
-                return;
-            }
-            if (settled) {
-                return;
-            }
-            settled = true;
-            cleanup();
-            if (message.ok) {
-                resolve({
-                    dataUrl: message.dataUrl,
-                    width: message.width,
-                    height: message.height,
-                });
-                return;
-            }
-            reject(new Error(message.error || 'Screenshot capture failed'));
-        });
-
-        if (timeoutMs > 0) {
-            timeoutHandle = setTimeout(() => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                cleanup();
-                reject(new Error(`Timed out waiting for screenshot (${timeoutMs}ms)`));
-            }, timeoutMs);
-        }
-
-        panel.webview.postMessage({ type: 'captureScreenshotRequest', requestId }).then((posted) => {
-            if (!posted && !settled) {
-                settled = true;
-                cleanup();
-                reject(new Error('Failed to send screenshot request to webview'));
-            }
-        }, (error) => {
-            if (!settled) {
-                settled = true;
-                cleanup();
-                reject(error);
-            }
-        });
+    return requestWebviewRoundTrip(panel.webview, {
+        requestType: 'captureScreenshotRequest',
+        resultType: 'captureScreenshotResult',
+        requestId,
+        timeoutMs,
+        extractResult: (message) => ({
+            dataUrl: message.dataUrl,
+            width: message.width,
+            height: message.height,
+        }),
+        label: 'screenshot',
+        failMessage: 'Screenshot capture failed',
+        postFailMessage: 'Failed to send screenshot request to webview',
     });
 }
 

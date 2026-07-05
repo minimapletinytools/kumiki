@@ -657,28 +657,7 @@ function activate(context) {
             });
 
             // Create a FrameViewSession that shares the main runner
-            const patternSession = new FrameViewSession(
-                picked._sourceFile,
-                context,
-                outputChannel,
-                (_filePath, disposedSlotName) => {
-                    if (patternSessions.get(disposedSlotName) === patternSession) {
-                        patternSessions.delete(disposedSlotName);
-                    }
-                },
-                {
-                    slotName,
-                    sessionType: 'pattern',
-                    sharedRunner: runner,
-                    patternName: picked._patternName,
-                    openInSplitView,
-                    autoRefreshOnFileChange,
-                }
-            );
-            patternSessions.set(slotName, patternSession);
-            await patternSession.initialize();
-            patternSession.reveal();
-            await patternSession.refresh('pattern open');
+            await createPatternSession(runner, slotName, picked._sourceFile, picked._patternName, context, 'pattern open');
         } catch (error) {
             outputChannel.show(true);
             if (!error || !error.kigumiErrorNotified) {
@@ -1025,6 +1004,35 @@ async function _getOrCreateBackgroundRunner(sourceFile, context) {
  * By default, if a pattern panel is already active/visible it is reused (replaced).
  * Pass { forceNewWindow: true } to always open a fresh panel.
  */
+// Create a pattern FrameViewSession that shares the main runner, register it
+// in patternSessions, and bring it up. Shared by browsePatterns,
+// _openPatternFromWebview, and _openBookFromWebview.
+async function createPatternSession(runner, slotName, sourceFile, patternName, context, refreshReason) {
+    const patternSession = new FrameViewSession(
+        sourceFile,
+        context,
+        outputChannel,
+        (_filePath, disposedSlotName) => {
+            if (patternSessions.get(disposedSlotName) === patternSession) {
+                patternSessions.delete(disposedSlotName);
+            }
+        },
+        {
+            slotName,
+            sessionType: 'pattern',
+            sharedRunner: runner,
+            patternName,
+            openInSplitView,
+            autoRefreshOnFileChange,
+        }
+    );
+    patternSessions.set(slotName, patternSession);
+    await patternSession.initialize();
+    patternSession.reveal();
+    await patternSession.refresh(refreshReason);
+    return patternSession;
+}
+
 async function _openPatternFromWebview(runner, patternName, sourceFile, context, { forceNewWindow = false } = {}) {
     if (!runner || !runner.isAlive()) {
         vscode.window.showErrorMessage('Kigumi runner is not running.');
@@ -1060,28 +1068,7 @@ async function _openPatternFromWebview(runner, patternName, sourceFile, context,
         }
     }
 
-    const patternSession = new FrameViewSession(
-        sourceFile,
-        context,
-        outputChannel,
-        (_filePath, disposedSlotName) => {
-            if (patternSessions.get(disposedSlotName) === patternSession) {
-                patternSessions.delete(disposedSlotName);
-            }
-        },
-        {
-            slotName,
-            sessionType: 'pattern',
-            sharedRunner: runner,
-            patternName,
-            openInSplitView,
-            autoRefreshOnFileChange,
-        }
-    );
-    patternSessions.set(slotName, patternSession);
-    await patternSession.initialize();
-    patternSession.reveal();
-    await patternSession.refresh('pattern open from webview');
+    await createPatternSession(runner, slotName, sourceFile, patternName, context, 'pattern open from webview');
 }
 
 /**
@@ -1103,28 +1090,7 @@ async function _openBookFromWebview(runner, sourceFile, context) {
         filePath: sourceFile,
     });
 
-    const patternSession = new FrameViewSession(
-        sourceFile,
-        context,
-        outputChannel,
-        (_filePath, disposedSlotName) => {
-            if (patternSessions.get(disposedSlotName) === patternSession) {
-                patternSessions.delete(disposedSlotName);
-            }
-        },
-        {
-            slotName,
-            sessionType: 'pattern',
-            sharedRunner: runner,
-            patternName: bookName,
-            openInSplitView,
-            autoRefreshOnFileChange,
-        }
-    );
-    patternSessions.set(slotName, patternSession);
-    await patternSession.initialize();
-    patternSession.reveal();
-    await patternSession.refresh('book open from webview');
+    await createPatternSession(runner, slotName, sourceFile, bookName, context, 'book open from webview');
 }
 
 /**

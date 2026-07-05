@@ -343,6 +343,48 @@ def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
     }
 
 
+def _base_member_payload(
+    *,
+    name: str,
+    member_type: str,
+    member_key: str,
+    kumiki_id: int,
+    tags: Any,
+    vertices: Any,
+    indices: Any,
+    prism_length: Any,
+    prism_width: Any,
+    prism_height: Any,
+    perfect_width: Any,
+    perfect_height: Any,
+    nominal_width: Any,
+    nominal_height: Any,
+) -> Dict[str, Any]:
+    """Common member-mesh payload shared by every geometry serializer.
+
+    Callers add type-specific extras (csg counts, timber class, fallback
+    markers, perfect-within meshes) to the returned dict.
+    """
+    return {
+        "name": name,
+        "memberName": name,
+        "memberType": member_type,
+        "memberKey": member_key,
+        "timberKey": member_key,
+        "kumikiId": kumiki_id,
+        "tags": tags,
+        "vertices": vertices,
+        "indices": indices,
+        "prism_length": round(float(prism_length), 6),
+        "prism_width": round(float(prism_width), 6),
+        "prism_height": round(float(prism_height), 6),
+        "perfect_width": round(float(perfect_width), 6),
+        "perfect_height": round(float(perfect_height), 6),
+        "nominal_width": round(float(nominal_width), 6),
+        "nominal_height": round(float(nominal_height), 6),
+    }
+
+
 def _cut_timber_to_triangle_mesh_payload(
     cut_timber: Any,
     local_csg: Any,
@@ -369,30 +411,30 @@ def _cut_timber_to_triangle_mesh_payload(
     non_rectangular_classes = ('RoundTimber', 'MeshTimber', 'RegularPolygonTimber')
     has_non_rectangular_actual = timber_class in non_rectangular_classes
 
-    payload: Dict[str, Any] = {
-        "name": get_timber_display_name(timber),
-        "memberName": get_timber_display_name(timber),
-        "memberType": "timber",
-        "memberKey": timber_key,
-        "timberKey": timber_key,
-        "kumikiId": timber_kumiki_id,
-        "tags": timber_tags,
-        # Top-level vertices/indices remain the actual-geometry mesh for
-        # backwards compatibility with viewers that pre-date the dual mesh.
-        "vertices": vertices,
-        "indices": indices,
-        "prism_length": round(float(getattr(timber, "length", dims[2])), 6),
-        "prism_width": round(float(getattr(timber, "size", [dims[0], dims[1]])[0]), 6),
-        "prism_height": round(float(getattr(timber, "size", [dims[0], dims[1]])[1]), 6),
-        "perfect_width": round(float(perfect_size[0]), 6),
-        "perfect_height": round(float(perfect_size[1]), 6),
-        "nominal_width": round(float(nominal_size[0]), 6),
-        "nominal_height": round(float(nominal_size[1]), 6),
+    # Top-level vertices/indices remain the actual-geometry mesh for
+    # backwards compatibility with viewers that pre-date the dual mesh.
+    payload: Dict[str, Any] = _base_member_payload(
+        name=get_timber_display_name(timber),
+        member_type="timber",
+        member_key=timber_key,
+        kumiki_id=timber_kumiki_id,
+        tags=timber_tags,
+        vertices=vertices,
+        indices=indices,
+        prism_length=getattr(timber, "length", dims[2]),
+        prism_width=getattr(timber, "size", [dims[0], dims[1]])[0],
+        prism_height=getattr(timber, "size", [dims[0], dims[1]])[1],
+        perfect_width=perfect_size[0],
+        perfect_height=perfect_size[1],
+        nominal_width=nominal_size[0],
+        nominal_height=nominal_size[1],
+    )
+    payload.update({
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
         "timberClass": timber_class,
         "isPerfectTimber": is_perfect,
-    }
+    })
 
     # For non-rectangular-actual timbers, also triangulate the perfect-AABB CSG
     # so the viewer can swap meshes locally without round-tripping to Python.
@@ -441,24 +483,22 @@ def _accessory_to_triangle_mesh_payload(
 
     accessory_kumiki_id = int(accessory.ticket.kumiki_id) if getattr(accessory, "ticket", None) is not None else 0
     accessory_tags = _normalize_ticket_tags(getattr(accessory, "ticket", None))
-    return {
-        "name": accessory_name,
-        "memberName": accessory_name,
-        "memberType": "accessory",
-        "memberKey": accessory_key,
-        "timberKey": accessory_key,
-        "kumikiId": accessory_kumiki_id,
-        "tags": accessory_tags,
-        "vertices": vertices,
-        "indices": indices,
-        "prism_length": round(float(dims[2]), 6),
-        "prism_width": round(float(dims[0]), 6),
-        "prism_height": round(float(dims[1]), 6),
-        "perfect_width": round(float(dims[0]), 6),
-        "perfect_height": round(float(dims[1]), 6),
-        "nominal_width": round(float(dims[0]), 6),
-        "nominal_height": round(float(dims[1]), 6),
-    }
+    return _base_member_payload(
+        name=accessory_name,
+        member_type="accessory",
+        member_key=accessory_key,
+        kumiki_id=accessory_kumiki_id,
+        tags=accessory_tags,
+        vertices=vertices,
+        indices=indices,
+        prism_length=dims[2],
+        prism_width=dims[0],
+        prism_height=dims[1],
+        perfect_width=dims[0],
+        perfect_height=dims[1],
+        nominal_width=dims[0],
+        nominal_height=dims[1],
+    )
 
 
 def _cut_timber_to_bbox_mesh_payload(
@@ -483,30 +523,31 @@ def _cut_timber_to_bbox_mesh_payload(
     timber_kumiki_id = int(timber.ticket.kumiki_id)
     timber_class = type(timber).__name__
     is_perfect = bool(timber.is_perfect_timber())
-    return {
-        "name": get_timber_display_name(timber),
-        "memberName": get_timber_display_name(timber),
-        "memberType": "timber",
-        "memberKey": timber_key,
-        "timberKey": timber_key,
-        "kumikiId": timber_kumiki_id,
-        "tags": timber_tags,
-        "vertices": mesh["vertices"],
-        "indices": mesh["indices"],
-        "prism_length": round(float(getattr(timber, "length", 0.0)), 6),
-        "prism_width": round(float(getattr(timber, "size", [0.0, 0.0])[0]), 6),
-        "prism_height": round(float(getattr(timber, "size", [0.0, 0.0])[1]), 6),
-        "perfect_width": round(float(perfect_size[0]), 6),
-        "perfect_height": round(float(perfect_size[1]), 6),
-        "nominal_width": round(float(nominal_size[0]), 6),
-        "nominal_height": round(float(nominal_size[1]), 6),
+    payload = _base_member_payload(
+        name=get_timber_display_name(timber),
+        member_type="timber",
+        member_key=timber_key,
+        kumiki_id=timber_kumiki_id,
+        tags=timber_tags,
+        vertices=mesh["vertices"],
+        indices=mesh["indices"],
+        prism_length=getattr(timber, "length", 0.0),
+        prism_width=getattr(timber, "size", [0.0, 0.0])[0],
+        prism_height=getattr(timber, "size", [0.0, 0.0])[1],
+        perfect_width=perfect_size[0],
+        perfect_height=perfect_size[1],
+        nominal_width=nominal_size[0],
+        nominal_height=nominal_size[1],
+    )
+    payload.update({
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
         "meshSource": "bounding-prism-fallback",
         "timberClass": timber_class,
         "isPerfectTimber": is_perfect,
         "hasActualGeometryDifferentFromPerfect": False,
-    }
+    })
+    return payload
 
 
 def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
