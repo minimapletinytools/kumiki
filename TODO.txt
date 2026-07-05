@@ -76,6 +76,7 @@ def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement : Bu
   # on the exit face, use special relief algorith to cut relief surface for tusk entry, this is just the usual notching algorithm except we set width to be the tusk length*2 (tenon height + extra lengths)
   # create the tusk shape (wedge shape)
   
+-make the awful thuma bed video
 
 :: 5/30 kumiki intro script
 
@@ -129,20 +130,20 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 :: TODO
 
--assembly next steps
-  -disable for now cuz its broken
-  -enable assembly for patterns so they can be previewed
-  -fix assembly direction for some accesories 
-  -solving algorithm I think needs some fixes
-    -need to refine rules on when to move other timbers together with asembly
-    -I think you can improve singel order groups, it can attempt to break it into groups by itself.
-
+-have claude do a refactor pass on kumiki...
 -create test runner for examples so the exmaples are also tests :O
+-additional agentic test loop featuers
+  -offline (not in kigumi) render and screenshot
+  -output AABB only as json and pass back to agent
+
 -test frame scanning fixes
 -test the install cadquery stuff 
--imperfect timber ctors
-  DONE-do the timebr erplace helper method for round timbers etc
-  -test them
+-test regular imperfect rectangular timber stuff
+-test imperfect timber ctors
+-try and run a full loop agent test on this to see if it all works
+
+
+-update shed example to include panels
 
 
 -do reorg on patterns and eaxmples again
@@ -151,20 +152,12 @@ kumiki currently has limited support for "boards" for more general purpose woodw
   -"Example Frames" -> "Examples"
 
 -do example cleanup
--make website
-  -get domain D:
--try and run a full loop agent test on this to see if it all works
+-choose domnai for website
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
--marketing
-  -make basic example case
-  -make program castle joint video
-    -make the awful thuma bed video
-  -make simple website
-  -make some content drip
--do ticket refactor so that each timber type can have its own ticket?
-  -or do we do the derived ticket thing instead?
--test regular imperfect rectangular timber stuff
+
+
+
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
@@ -174,9 +167,6 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 - no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
 - probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
 -should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
-
-
-
 -consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
 -you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
 -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
@@ -206,7 +196,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 
--update shed example to include panels
+
 -add screw joint
 -add stl support for joint accessories so you can use framing hardware
 
@@ -301,6 +291,22 @@ M4
 
 :: TODONE 
 
+DONE-marketing
+  DONE-make basic example case
+  IGNORE-make program castle joint video    
+  DONE-make simple website
+  DONE-make some content drip
+DONE/IGNORE-do ticket refactor so that each timber type can have its own ticket?
+  -or do we do the derived ticket thing instead?
+DONE-do the timebr erplace helper method for round timbers etc
+-assembly next steps
+  DONE-disable for now cuz its broken
+  -delete some of the useless files that got created, maybe assembly demo 
+  -enable assembly for patterns so they can be previewed
+  -fix assembly direction for some accesories 
+  -solving algorithm I think needs some fixes
+    -need to refine rules on when to move other timbers together with asembly
+    -I think you can improve singel order groups, it can attempt to break it into groups by itself.
 
 DONE-add panel/board support 
 DONE-fix automation integration tests 
