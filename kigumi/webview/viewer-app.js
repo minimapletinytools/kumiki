@@ -347,6 +347,10 @@ const AssemblyTimeline = window.AssemblyTimeline;
 if (!AssemblyTimeline) {
     throw new Error('AssemblyTimeline is not loaded. Ensure assembly-timeline.js is included before viewer-app.js.');
 }
+// Package-time feature flags (see webview/feature-flags.js). Missing is
+// tolerated (defaults every flag off) so this file never hard-fails if the
+// flags script isn't wired into some future embedding.
+const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 
 class ViewerSettingsPanel {
     constructor(app) {
@@ -386,6 +390,7 @@ class ViewerSettingsPanel {
                     <input id="footprint-toggle" type="checkbox" ?checked=${this.app.footprintsEnabled}>
                     footprint
                 </label>
+                ${FEATURE_FLAGS.assemblyPreview ? html`
                 <label>
                     <input id="assembly-timeline-toggle" type="checkbox" ?checked=${this.app.showAssemblyTimeline}>
                     assembly timeline
@@ -399,7 +404,7 @@ class ViewerSettingsPanel {
                         max="4"
                         step="0.1"
                         .value=${String(this.app.disassemblyMultiplier)}>
-                </label>
+                </label>` : ''}
                 <label>
                     <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
                     debug info
@@ -1672,10 +1677,10 @@ class KigumiViewerApp extends LitElement {
         if (typeof ui.footprintsEnabled === 'boolean') {
             this.setFootprintsEnabled(ui.footprintsEnabled);
         }
-        if (typeof ui.showAssemblyTimeline === 'boolean') {
+        if (FEATURE_FLAGS.assemblyPreview && typeof ui.showAssemblyTimeline === 'boolean') {
             this.setShowAssemblyTimeline(ui.showAssemblyTimeline);
         }
-        if (Number.isFinite(ui.disassemblyMultiplier)) {
+        if (FEATURE_FLAGS.assemblyPreview && Number.isFinite(ui.disassemblyMultiplier)) {
             this.setDisassemblyMultiplier(Number(ui.disassemblyMultiplier));
         }
         if (typeof ui.debugEnabled === 'boolean') {
@@ -1986,9 +1991,9 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (message.type === 'layersTree') {
-            this.setAssemblyData(AssemblyTimeline.normalizeAssemblyPayload(
-                message.payload ? message.payload.assembly : null,
-            ));
+            this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
+                ? AssemblyTimeline.normalizeAssemblyPayload(message.payload ? message.payload.assembly : null)
+                : null);
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
             }
@@ -3275,7 +3280,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     renderAssemblyTimeline() {
-        if (!this.showAssemblyTimeline || !this.assemblyData) {
+        if (!FEATURE_FLAGS.assemblyPreview || !this.showAssemblyTimeline || !this.assemblyData) {
             return '';
         }
         const { steps, warnings, failure } = this.assemblyData;
