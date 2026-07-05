@@ -13,10 +13,12 @@ from .assembly import (
     AssemblyJoint,
     AssemblyMember,
     AssemblySolution,
+    JointMemberSpec,
+    Ordering,
     solve_assembly,
 )
 from enum import Enum
-from typing import List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
+from typing import Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 import warnings
@@ -1404,6 +1406,11 @@ class Cutting:
     # None means unspecified: the assembly solver treats the connection as rigid.
     assembly_freedom: Optional[AssemblyFreedom] = None
 
+    # Extraction position of this timber within the assembly plan. The
+    # suborder is authored by the cut function (sequencing required within the
+    # joint); the order is assigned afterwards via Joint.with_order.
+    assembly_ordering: Ordering = Ordering()
+
     def get_maybe_top_end_cut(self) -> Optional[HalfSpace]:
         """Return the top end cut HalfSpace derived from distance metadata."""
         if self.maybe_top_end_cut_distance_from_bottom is not None:
@@ -1914,6 +1921,11 @@ class JointAccessory(ABC):
     # Assembly freedom of this accessory within its joint (global space).
     # None means unspecified: the assembly solver treats the connection as rigid.
     assembly_freedom: Optional[AssemblyFreedom] = field(default=None, kw_only=True)
+
+    # Extraction position within the assembly plan; the cut function sets the
+    # suborder (e.g. pegs pop before the joint slides apart), Joint.with_order
+    # sets the order.
+    assembly_ordering: Ordering = field(default=Ordering(), kw_only=True)
     
     @abstractmethod
     def render_csg_local(self) -> CutCSG:
@@ -2159,53 +2171,109 @@ class Joint:
     cuttings: Dict[str, Cutting]
     ticket: JointTicket
     jointAccessories: Dict[str, JointAccessory] = field(default_factory=dict)
-    # Disassembly order of this joint: smaller order = extracted EARLIER during
-    # disassembly (order 1 is the first thing out). None = not part of the
-    # assembly sequence. See kumiki/assembly.py.
-    assembly_order: Optional[int] = None
 
-    def with_assembly(
+    def with_order(
         self,
-        order: int,
-        freedoms: Mapping[str, AssemblyFreedom],
-        accessory_freedoms: Optional[Mapping[str, AssemblyFreedom]] = None,
+        order: Union[
+            int,
+            Mapping[str, int],
+            Iterable[Tuple[Union[str, "PerfectTimberWithin", "JointAccessory"], int]],
+        ],
     ) -> "Joint":
-        """Return a copy of this joint annotated with assembly information.
+        """Return a copy of this joint with assembly order(s) assigned.
 
-        Keys of ``freedoms`` are cutting keys (e.g. "butt_timber") and keys of
-        ``accessory_freedoms`` are accessory keys; members not named keep an
-        unspecified (rigid) freedom. Annotate joints BEFORE building the Frame:
-        this rebuilds the named Cutting/accessory objects (via dataclasses
-        replace, preserving timber references), so a Frame built earlier would
-        still hold the un-annotated objects.
+        Assembly freedoms and suborders are authored by the cut functions;
+        the order is the frame-level plan and is assigned here, after cutting
+        (smaller order = extracted earlier during disassembly).
+
+        with_order(n): sets order=n on every cutting and accessory, keeping
+        their suborders, so intra-joint sequencing (peg pops before the tenon
+        slides) is preserved within step n.
+
+        with_order({key: n, ...}) or with_order([(member, n), ...]): sets
+        Ordering(n, 0) on each named member — referenced by cutting/accessory
+        string key, or by the timber / accessory object itself (a timber
+        reference applies to every cutting holding it; use the pair-list form
+        for object references, which are unhashable). Unnamed members keep
+        their current ordering. Raises ValueError for unknown references, or
+        when the new orderings break the strict precedence the cut function
+        expressed via suborders (any member pair previously strictly ordered
+        must remain strictly ordered).
+
+        Assign orders BEFORE building the Frame: this rebuilds the member
+        objects (dataclasses.replace, preserving timber references), so a
+        Frame built earlier would still hold the previous orderings.
         """
-        accessory_freedoms = accessory_freedoms or {}
-        unknown_cutting_keys = [key for key in freedoms if key not in self.cuttings]
-        if unknown_cutting_keys:
-            raise ValueError(
-                f"with_assembly: unknown cutting key(s) {unknown_cutting_keys}; "
-                f"this joint has cuttings {sorted(self.cuttings)}"
-            )
-        unknown_accessory_keys = [key for key in accessory_freedoms if key not in self.jointAccessories]
-        if unknown_accessory_keys:
-            raise ValueError(
-                f"with_assembly: unknown accessory key(s) {unknown_accessory_keys}; "
-                f"this joint has accessories {sorted(self.jointAccessories)}"
-            )
+        if isinstance(order, int):
+            new_cuttings = {
+                key: replace(cutting, assembly_ordering=Ordering(order, cutting.assembly_ordering.suborder))
+                for key, cutting in self.cuttings.items()
+            }
+            new_accessories = {
+                key: replace(accessory, assembly_ordering=Ordering(order, accessory.assembly_ordering.suborder))
+                for key, accessory in self.jointAccessories.items()
+            }
+            return Joint(cuttings=new_cuttings, ticket=self.ticket, jointAccessories=new_accessories)
+
+        # Per-member form. Members are addressed as ("cutting"|"accessory", key).
+        def resolve(reference) -> List[Tuple[str, str]]:
+            if isinstance(reference, str):
+                if reference in self.cuttings:
+                    return [("cutting", reference)]
+                if reference in self.jointAccessories:
+                    return [("accessory", reference)]
+                raise ValueError(
+                    f"with_order: unknown member key '{reference}'; this joint has cuttings "
+                    f"{sorted(self.cuttings)} and accessories {sorted(self.jointAccessories)}"
+                )
+            timber_matches = [("cutting", key) for key, cutting in self.cuttings.items() if cutting.timber is reference]
+            if timber_matches:
+                return timber_matches
+            accessory_matches = [("accessory", key) for key, accessory in self.jointAccessories.items() if accessory is reference]
+            if accessory_matches:
+                return accessory_matches
+            reference_name = getattr(getattr(reference, "ticket", None), "path", repr(type(reference)))
+            raise ValueError(f"with_order: '{reference_name}' is not a timber or accessory of this joint")
+
+        old_orderings: Dict[Tuple[str, str], Ordering] = {
+            ("cutting", key): cutting.assembly_ordering for key, cutting in self.cuttings.items()
+        }
+        old_orderings.update(
+            (("accessory", key), accessory.assembly_ordering) for key, accessory in self.jointAccessories.items()
+        )
+
+        order_pairs: List[Tuple[Union[str, "PerfectTimberWithin", "JointAccessory"], int]]
+        if isinstance(order, Mapping):
+            order_pairs = [(str(key), int(value)) for key, value in cast(Mapping[str, int], order).items()]
+        else:
+            order_pairs = [(reference, int(member_order)) for reference, member_order in order]
+        new_orderings = dict(old_orderings)
+        for reference, member_order in order_pairs:
+            for member_id in resolve(reference):
+                new_orderings[member_id] = Ordering(member_order, 0)
+
+        # The cut function's suborders express required sequencing; explicit
+        # per-member orders must not invert or collapse it.
+        member_ids = list(old_orderings)
+        for first in member_ids:
+            for second in member_ids:
+                if old_orderings[first] < old_orderings[second] and not new_orderings[first] < new_orderings[second]:
+                    raise ValueError(
+                        f"with_order: '{first[1]}' must be extracted before '{second[1]}' "
+                        f"(orderings {old_orderings[first].label()} < {old_orderings[second].label()}), "
+                        f"but the new orders place them at {new_orderings[first].label()} "
+                        f"vs {new_orderings[second].label()}"
+                    )
+
         new_cuttings = {
-            key: (replace(cutting, assembly_freedom=freedoms[key]) if key in freedoms else cutting)
+            key: replace(cutting, assembly_ordering=new_orderings[("cutting", key)])
             for key, cutting in self.cuttings.items()
         }
         new_accessories = {
-            key: (replace(accessory, assembly_freedom=accessory_freedoms[key]) if key in accessory_freedoms else accessory)
+            key: replace(accessory, assembly_ordering=new_orderings[("accessory", key)])
             for key, accessory in self.jointAccessories.items()
         }
-        return Joint(
-            cuttings=new_cuttings,
-            ticket=self.ticket,
-            jointAccessories=new_accessories,
-            assembly_order=order,
-        )
+        return Joint(cuttings=new_cuttings, ticket=self.ticket, jointAccessories=new_accessories)
 
 def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
     """
@@ -2568,10 +2636,19 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
     kumiki_id, positioned at the timber centroid) and one AssemblyJoint per
     source joint — then delegates to solve_assembly.
 
-    Returns None when no source joint carries an assembly_order.
+    Returns None when no member of any source joint has an assembly freedom.
     """
     source_joints = list(frame.source_joints or [])
-    if not any(joint.assembly_order is not None for joint in source_joints):
+    has_any_freedom = any(
+        cutting.assembly_freedom is not None
+        for joint in source_joints
+        for cutting in joint.cuttings.values()
+    ) or any(
+        accessory.assembly_freedom is not None
+        for joint in source_joints
+        for accessory in joint.jointAccessories.values()
+    )
+    if not has_any_freedom:
         return None
 
     members: Dict[int, AssemblyMember] = {}
@@ -2594,28 +2671,31 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
             members[key] = AssemblyMember(key=key, name=accessory.ticket.path, position=position)
         return key
 
-    def add_freedom(freedoms: Dict[int, Optional[AssemblyFreedom]], key: int,
-                    freedom: Optional[AssemblyFreedom]) -> None:
-        existing = freedoms.get(key)
-        if existing is not None and freedom is not None:
-            # The same member can appear under several cutting keys of one
-            # (compound) joint; its escape DOFs are the union of all of them.
-            freedoms[key] = AssemblyFreedom.combine(existing, freedom)
-        elif key not in freedoms or freedom is not None:
-            freedoms[key] = freedom
+    def add_spec(specs: Dict[int, JointMemberSpec], key: int,
+                 freedom: Optional[AssemblyFreedom], ordering: Ordering) -> None:
+        existing = specs.get(key)
+        if existing is None:
+            specs[key] = JointMemberSpec(freedom=freedom, ordering=ordering)
+            return
+        # The same member can appear under several cutting keys of one
+        # (compound) joint; its escape DOFs are the union of all of them and
+        # the earliest ordering wins.
+        if existing.freedom is not None and freedom is not None:
+            combined = AssemblyFreedom.combine(existing.freedom, freedom)
+        else:
+            combined = existing.freedom if freedom is None else freedom
+        specs[key] = JointMemberSpec(freedom=combined, ordering=min(existing.ordering, ordering))
 
     assembly_joints: List[AssemblyJoint] = []
     for joint in source_joints:
-        freedoms: Dict[int, Optional[AssemblyFreedom]] = {}
+        specs: Dict[int, JointMemberSpec] = {}
         for cutting in joint.cuttings.values():
-            add_freedom(freedoms, register_timber(cutting.timber), cutting.assembly_freedom)
+            add_spec(specs, register_timber(cutting.timber), cutting.assembly_freedom, cutting.assembly_ordering)
         for accessory in joint.jointAccessories.values():
-            add_freedom(freedoms, register_accessory(accessory), accessory.assembly_freedom)
+            add_spec(specs, register_accessory(accessory), accessory.assembly_freedom, accessory.assembly_ordering)
         joint_name = joint.ticket.get_name()
         if joint_name == "[no-name]":
             joint_name = joint.ticket.joint_type or "joint"
-        assembly_joints.append(
-            AssemblyJoint(name=joint_name, order=joint.assembly_order, freedoms=freedoms)
-        )
+        assembly_joints.append(AssemblyJoint(name=joint_name, members=specs))
 
     return solve_assembly(list(members.values()), assembly_joints)

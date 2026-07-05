@@ -3,6 +3,8 @@ Kumiki - Multi-butt joint construction functions
 Contains functions for creating joints where two butt timbers meet a single receiving timber.
 """
 
+from dataclasses import replace
+
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
@@ -417,6 +419,8 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
                     adopt_csg(None, spline_transform, peg_hole_in_spline_global)
                 )
 
+                # Assembly: the peg backs out of its entry face; it locks the
+                # joint, so it pops (suborder 0) before the members slide.
                 joint_accessories[f"{accessory_prefix}_{peg_idx}"] = Peg(
                     transform=Transform(
                         position=peg_face_pos_global,
@@ -426,6 +430,10 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
                     shape=peg_parameters.shape,
                     forward_length=actual_depth,
                     stickout_length=stickout,
+                    assembly_freedom=AssemblyFreedom.translation(
+                        peg_face_normal_global, freed_after=actual_depth + stickout
+                    ),
+                    assembly_ordering=Ordering(0, 0),
                 )
 
         _append_pegs_for_butt(
@@ -470,9 +478,29 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
             subtract=peg_holes_in_spline_local,
         )
 
+    # Assembly: each butt timber pulls back along its own axis, sliding off
+    # the spline (free after clearing the spline's reach into it); the spline
+    # backs out of its slot. When pegs lock the joint they pop first
+    # (suborder 0), so the sliding members go at suborder 1.
+    member_suborder = 1 if peg_parameters is not None else 0
+    butt_1_escape_direction = -butt_timber_1.get_face_direction_global(arrangement.butt_timber_1_end)
+    butt_2_escape_direction = -butt_timber_2.get_face_direction_global(arrangement.butt_timber_2_end)
+    butt_1_cut = replace(
+        butt_1_cut,
+        assembly_freedom=AssemblyFreedom.translation(butt_1_escape_direction, freed_after=spline_length / scalar(2)),
+        assembly_ordering=Ordering(0, member_suborder),
+    )
+    butt_2_cut = replace(
+        butt_2_cut,
+        assembly_freedom=AssemblyFreedom.translation(butt_2_escape_direction, freed_after=spline_length / scalar(2)),
+        assembly_ordering=Ordering(0, member_suborder),
+    )
+
     spline = CSGAccessory(
         transform=spline_transform,
         positive_csg=spline_positive_csg,
+        assembly_freedom=AssemblyFreedom.translation(-slot_direction_global, freed_after=effective_slot_depth),
+        assembly_ordering=Ordering(0, member_suborder),
     )
     joint_accessories["spline"] = spline
 

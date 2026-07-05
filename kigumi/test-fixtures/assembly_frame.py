@@ -7,7 +7,7 @@ sys.path.insert(0, str(project_root))
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.ticket import JointTicket
-from kumiki.timber import AssemblyFreedom, Cutting, Frame, Joint
+from kumiki.timber import AssemblyFreedom, Cutting, Frame, Joint, Ordering
 
 
 def build_frame():
@@ -30,9 +30,15 @@ def build_frame():
     )
 
     joint = Joint(
-        cuttings={"a": Cutting(timber=timber_a), "b": Cutting(timber=timber_b)},
+        cuttings={
+            "a": Cutting(timber=timber_a),
+            "b": Cutting(
+                timber=timber_b,
+                assembly_freedom=AssemblyFreedom.translation(create_v3(0, 0, 1), mm(200)),
+            ),
+        },
         ticket=JointTicket(path="ab_joint", joint_type="test_joint"),
-    ).with_assembly(1, {"b": AssemblyFreedom.translation(create_v3(0, 0, 1), mm(200))})
+    ).with_order(1)
 
     return Frame.from_joints(
         joints=[joint],

@@ -10,6 +10,8 @@ from kumiki.assembly import (
     AssemblyFreedom,
     AssemblyJoint,
     AssemblyMember,
+    JointMemberSpec,
+    Ordering,
     RotationDof,
     solve_assembly,
 )
@@ -23,6 +25,10 @@ Z = create_v3(0, 0, 1)
 
 def member(key, name, x=0, y=0, z=0):
     return AssemblyMember(key=key, name=name, position=create_v3(x, y, z))
+
+
+def spec(freedom=None, order=0, suborder=0):
+    return JointMemberSpec(freedom=freedom, ordering=Ordering(order, suborder))
 
 
 def direction_floats(movement):
@@ -41,6 +47,20 @@ def assert_direction(movement, expected, tolerance=1e-6):
     actual = direction_floats(movement)
     for actual_component, expected_component in zip(actual, expected):
         assert actual_component == pytest.approx(expected_component, abs=tolerance)
+
+
+class TestOrdering:
+    def test_lexicographic_comparison(self):
+        assert Ordering(0, 0) < Ordering(0, 1)
+        assert Ordering(0, 5) < Ordering(1, 0)
+        assert Ordering(1, 0) < Ordering(1, 1)
+        assert Ordering(2, 3) == Ordering(2, 3)
+        assert not Ordering(1, 1) < Ordering(1, 1)
+
+    def test_label(self):
+        assert Ordering(2, 0).label() == "2"
+        assert Ordering(2, 1).label() == "2.1"
+        assert Ordering().label() == "0"
 
 
 class TestAssemblyFreedom:
@@ -70,15 +90,15 @@ class TestAssemblyFreedom:
 
 
 class TestSolveAssemblyBasics:
-    def test_no_orders_returns_none(self):
+    def test_no_freedoms_returns_none(self):
         members = [member(1, "a"), member(2, "b")]
-        joints = [AssemblyJoint(name="j", order=None, freedoms={1: None, 2: None})]
+        joints = [AssemblyJoint(name="j", members={1: spec(), 2: spec()})]
 
         assert solve_assembly(members, joints) is None
 
     def test_unknown_member_key_raises(self):
         members = [member(1, "a")]
-        joints = [AssemblyJoint(name="j", order=1, freedoms={1: None, 99: None})]
+        joints = [AssemblyJoint(name="j", members={1: spec(), 99: spec()})]
 
         with pytest.raises(ValueError, match="unknown assembly member key 99"):
             solve_assembly(members, joints)
@@ -87,7 +107,7 @@ class TestSolveAssemblyBasics:
         rotation = RotationDof(axis_position=create_v3(0, 0, 0), axis_direction=Z, freed_after_angle=1)
         freedom = AssemblyFreedom(rotations=(rotation,))
         members = [member(1, "a"), member(2, "b")]
-        joints = [AssemblyJoint(name="j", order=1, freedoms={1: freedom, 2: None})]
+        joints = [AssemblyJoint(name="j", members={1: spec(freedom), 2: spec()})]
 
         with pytest.raises(NotImplementedError, match="rotational"):
             solve_assembly(members, joints)
@@ -97,31 +117,60 @@ class TestSolveAssemblyBasics:
         joints = [
             AssemblyJoint(
                 name="tenon",
-                order=1,
-                freedoms={1: None, 2: AssemblyFreedom.translation(Z, freed_after=3)},
+                members={1: spec(), 2: spec(AssemblyFreedom.translation(Z, freed_after=3), order=1)},
             )
         ]
 
         solution = solve_assembly(members, joints)
         assert solution is not None
+
         assert solution.failure is None
         assert len(solution.steps) == 1
         step = solution.steps[0]
-        assert step.order == 1
+        assert step.ordering == Ordering(1, 0)
         moved = movements_by_key(step)
         assert set(moved) == {2}
         assert_direction(moved[2], (0, 0, 1))
         assert float(giraffe_evalf(moved[2].distance)) == pytest.approx(3.0)
         assert moved[2].dragged is False
 
-    def test_order_with_no_freedoms_warns(self):
-        members = [member(1, "a"), member(2, "b")]
-        joints = [AssemblyJoint(name="mystery", order=1, freedoms={1: None, 2: None})]
+    def test_default_ordering_is_single_exploded_step(self):
+        members = [member(1, "post"), member(2, "beam", z=10)]
+        joints = [
+            AssemblyJoint(
+                name="tenon",
+                members={1: spec(), 2: spec(AssemblyFreedom.translation(Z, freed_after=3))},
+            )
+        ]
 
         solution = solve_assembly(members, joints)
         assert solution is not None
-        assert solution.steps == ()
-        assert any("mystery" in warning and "no assembly freedoms" in warning for warning in solution.warnings)
+
+        assert [step.ordering for step in solution.steps] == [Ordering(0, 0)]
+
+    def test_second_side_skipped_once_joint_separates(self):
+        # Cut functions set inverse freedoms on both sides of an interface,
+        # but a joint only needs ONE member to depart: after the first side
+        # extracts, the other is skipped as already separated.
+        members = [member(1, "left", x=-5), member(2, "right", x=5)]
+        joints = [
+            AssemblyJoint(
+                name="splice",
+                members={
+                    1: spec(AssemblyFreedom.translation(-X, freed_after=2)),
+                    2: spec(AssemblyFreedom.translation(X, freed_after=2)),
+                },
+            )
+        ]
+
+        solution = solve_assembly(members, joints)
+        assert solution is not None
+
+        moved = movements_by_key(solution.steps[0])
+        assert len(moved) == 1
+        mover_key, movement = next(iter(moved.items()))
+        assert movement.dragged is False
+        assert_direction(movement, (-1, 0, 0) if mover_key == 1 else (1, 0, 0))
 
 
 class TestDofRanking:
@@ -132,8 +181,10 @@ class TestDofRanking:
         joints = [
             AssemblyJoint(
                 name="lap",
-                order=1,
-                freedoms={1: AssemblyFreedom.bidirectional_translation(X, freed_after=2), 2: None},
+                members={
+                    1: spec(AssemblyFreedom.bidirectional_translation(X, freed_after=2), order=1),
+                    2: spec(),
+                },
             )
         ]
 
@@ -146,7 +197,7 @@ class TestDofRanking:
 
 class TestDragPropagation:
     def test_drag_through_rigid_joints(self):
-        # beam is extracted; brace hangs off it through an unannotated (rigid)
+        # beam is extracted; brace hangs off it through a freedom-less (rigid)
         # joint, and shelf hangs off the brace: both get dragged with the beam.
         members = [
             member(1, "beam"),
@@ -157,11 +208,10 @@ class TestDragPropagation:
         joints = [
             AssemblyJoint(
                 name="tenon",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=2), 2: None},
+                members={1: spec(AssemblyFreedom.translation(Z, freed_after=2), order=1), 2: spec()},
             ),
-            AssemblyJoint(name="brace_joint", order=None, freedoms={1: None, 3: None}),
-            AssemblyJoint(name="shelf_joint", order=None, freedoms={3: None, 4: None}),
+            AssemblyJoint(name="brace_joint", members={1: spec(), 3: spec()}),
+            AssemblyJoint(name="shelf_joint", members={3: spec(), 4: spec()}),
         ]
 
         solution = solve_assembly(members, joints)
@@ -183,13 +233,11 @@ class TestDragPropagation:
         joints = [
             AssemblyJoint(
                 name="tenon",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=2), 2: None},
+                members={1: spec(AssemblyFreedom.translation(Z, freed_after=2), order=1), 2: spec()},
             ),
             AssemblyJoint(
                 name="slide",
-                order=None,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=1), 3: None},
+                members={1: spec(AssemblyFreedom.translation(Z, freed_after=1), order=1), 3: spec()},
             ),
         ]
 
@@ -201,26 +249,28 @@ class TestDragPropagation:
 
     def test_shared_dof_on_other_side_omits_drag(self):
         # The side joint's freedom for the OTHER member allows the opposite
-        # relative motion, which also means the connection separates freely.
+        # relative motion, which also means the connection separates freely:
+        # the rail is not dragged at step 1, and by its own step 2 the beam's
+        # departure has already separated the slide joint, so the rail never
+        # needs to move at all.
         members = [member(1, "beam"), member(2, "post", x=10), member(3, "rail", x=3)]
         joints = [
             AssemblyJoint(
                 name="tenon",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=2), 2: None},
+                members={1: spec(AssemblyFreedom.translation(Z, freed_after=2), order=1), 2: spec()},
             ),
             AssemblyJoint(
                 name="slide",
-                order=None,
-                freedoms={1: None, 3: AssemblyFreedom.translation(-Z, freed_after=1)},
+                members={1: spec(), 3: spec(AssemblyFreedom.translation(-Z, freed_after=1), order=2)},
             ),
         ]
 
         solution = solve_assembly(members, joints)
         assert solution is not None
 
-        moved = movements_by_key(solution.steps[0])
-        assert set(moved) == {1}
+        assert [step.ordering for step in solution.steps] == [Ordering(1, 0)]
+        step_one = movements_by_key(solution.steps[0])
+        assert set(step_one) == {1}
 
     def test_accessory_rides_along_dragged_subassembly_but_not_freed_joint(self):
         # peg_a sits in the extracting joint, which frees the beam: it stays.
@@ -235,11 +285,14 @@ class TestDragPropagation:
         joints = [
             AssemblyJoint(
                 name="tenon",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=2), 2: None, 4: None},
+                members={
+                    1: spec(AssemblyFreedom.translation(Z, freed_after=2), order=1),
+                    2: spec(),
+                    4: spec(),
+                },
             ),
-            AssemblyJoint(name="brace_joint", order=None, freedoms={1: None, 3: None}),
-            AssemblyJoint(name="peg_joint", order=None, freedoms={3: None, 5: None}),
+            AssemblyJoint(name="brace_joint", members={1: spec(), 3: spec()}),
+            AssemblyJoint(name="peg_joint", members={3: spec(), 5: spec()}),
         ]
 
         solution = solve_assembly(members, joints)
@@ -262,16 +315,14 @@ class TestDragPropagation:
         joints = [
             AssemblyJoint(
                 name="left_pocket",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(X, freed_after=2), 2: None},
+                members={1: spec(AssemblyFreedom.translation(X, freed_after=2), order=1), 2: spec()},
             ),
             AssemblyJoint(
                 name="right_pocket",
-                order=1,
-                freedoms={3: AssemblyFreedom.translation(-X, freed_after=2), 4: None},
+                members={3: spec(AssemblyFreedom.translation(-X, freed_after=2), order=1), 4: spec()},
             ),
-            AssemblyJoint(name="left_link", order=None, freedoms={1: None, 5: None}),
-            AssemblyJoint(name="right_link", order=None, freedoms={3: None, 5: None}),
+            AssemblyJoint(name="left_link", members={1: spec(), 5: spec()}),
+            AssemblyJoint(name="right_link", members={3: spec(), 5: spec()}),
         ]
 
         solution = solve_assembly(members, joints)
@@ -283,6 +334,53 @@ class TestDragPropagation:
             assert 5 not in movements_by_key(step)
 
 
+class TestSuborders:
+    def build_pegged_joint_graph(self, order=1):
+        # A pegged tenon: the peg (suborder 0) must pop before the tenon
+        # timber slides (suborder 1).
+        members = [member(1, "post"), member(2, "beam", z=10), member(3, "peg", y=3)]
+        joints = [
+            AssemblyJoint(
+                name="pegged_tenon",
+                members={
+                    1: spec(),
+                    2: spec(AssemblyFreedom.translation(Z, freed_after=3), order=order, suborder=1),
+                    3: spec(AssemblyFreedom.translation(Y, freed_after=1), order=order, suborder=0),
+                },
+            )
+        ]
+        return members, joints
+
+    def test_peg_pops_before_timber_slides(self):
+        members, joints = self.build_pegged_joint_graph()
+
+        solution = solve_assembly(members, joints)
+        assert solution is not None
+
+        assert [step.ordering for step in solution.steps] == [Ordering(1, 0), Ordering(1, 1)]
+        assert set(movements_by_key(solution.steps[0])) == {3}
+        assert set(movements_by_key(solution.steps[1])) == {2}
+
+    def test_suborder_steps_sort_within_and_across_orders(self):
+        members_a, joints_a = self.build_pegged_joint_graph(order=2)
+        members_b = [member(10, "cap", z=20), member(11, "cap_seat", z=25)]
+        joints_b = [
+            AssemblyJoint(
+                name="cap_joint",
+                members={10: spec(AssemblyFreedom.translation(Z, freed_after=1), order=1), 11: spec()},
+            )
+        ]
+
+        solution = solve_assembly(members_a + members_b, joints_a + joints_b)
+        assert solution is not None
+
+        assert [step.ordering for step in solution.steps] == [
+            Ordering(1, 0),
+            Ordering(2, 0),
+            Ordering(2, 1),
+        ]
+
+
 class TestOrdersAndWarnings:
     def build_two_order_graph(self):
         # Order 1 extracts the key, which rigidly drags the wedge; the wedge's
@@ -291,26 +389,24 @@ class TestOrdersAndWarnings:
         joints = [
             AssemblyJoint(
                 name="key_joint",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=2), 2: None},
+                members={1: spec(AssemblyFreedom.translation(Z, freed_after=2), order=1), 2: spec()},
             ),
-            AssemblyJoint(name="key_wedge_link", order=None, freedoms={1: None, 3: None}),
+            AssemblyJoint(name="key_wedge_link", members={1: spec(), 3: spec()}),
             AssemblyJoint(
                 name="wedge_joint",
-                order=2,
-                freedoms={3: AssemblyFreedom.translation(X, freed_after=1), 4: None},
+                members={3: spec(AssemblyFreedom.translation(X, freed_after=1), order=2), 4: spec()},
             ),
         ]
         return members, joints
 
-    def test_dragging_higher_order_member_warns(self):
+    def test_dragging_later_ordered_member_warns(self):
         members, joints = self.build_two_order_graph()
 
         solution = solve_assembly(members, joints)
         assert solution is not None
 
         assert any(
-            "wedge" in warning and "order 1" in warning and "own assembly order is 2" in warning
+            "wedge" in warning and "step 1" in warning and "own ordering is 2" in warning
             for warning in solution.warnings
         )
 
@@ -322,7 +418,7 @@ class TestOrdersAndWarnings:
         solution = solve_assembly(members, joints)
         assert solution is not None
 
-        assert [step.order for step in solution.steps] == [1, 2]
+        assert [step.ordering for step in solution.steps] == [Ordering(1, 0), Ordering(2, 0)]
         step_one = movements_by_key(solution.steps[0])
         step_two = movements_by_key(solution.steps[1])
         assert step_one[3].dragged is True
@@ -330,9 +426,9 @@ class TestOrdersAndWarnings:
         assert step_two[3].dragged is False
         assert_direction(step_two[3], (1, 0, 0))
 
-    def test_removed_members_and_released_joints_do_not_propagate(self):
+    def test_removed_members_do_not_propagate(self):
         # After order 1 extracts the key, the key is out of the frame: order 2
-        # extracting the wedge must not drag it through their shared joints.
+        # extracting the wedge must not drag it through their shared joint.
         members, joints = self.build_two_order_graph()
 
         solution = solve_assembly(members, joints)
@@ -341,21 +437,18 @@ class TestOrdersAndWarnings:
         step_two = movements_by_key(solution.steps[1])
         assert set(step_two) == {3}
 
-    def test_extraction_through_lower_order_joint_is_released(self):
-        # The bar sits in an order-1 joint (already disassembled) and an
-        # order-2 joint. Extracting it at order 2 must not drag the order-1
-        # joint's partner: that joint no longer constrains anything.
+    def test_extraction_through_earlier_step_joint_does_not_drag_removed(self):
+        # The bar sits in a step-1 joint (whose partner already left) and a
+        # step-2 joint. Extracting it at step 2 must not drag the departed cap.
         members = [member(1, "cap"), member(2, "bar", x=5), member(3, "base", x=10)]
         joints = [
             AssemblyJoint(
                 name="cap_joint",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=1), 2: None},
+                members={1: spec(AssemblyFreedom.translation(Z, freed_after=1), order=1), 2: spec()},
             ),
             AssemblyJoint(
                 name="bar_joint",
-                order=2,
-                freedoms={2: AssemblyFreedom.translation(X, freed_after=2), 3: None},
+                members={2: spec(AssemblyFreedom.translation(X, freed_after=2), order=2), 3: spec()},
             ),
         ]
 
@@ -377,12 +470,12 @@ class TestOrdersAndWarnings:
 
 class TestUnsolvable:
     def test_loop_cap_yields_partial_steps_and_failure(self):
-        # Order 1 solves fine. At order 2, ten spokes are each extracted from
+        # Step 1 solves fine. At step 2, ten spokes are each extracted from
         # their own seat in a different direction while all being RIGIDLY
         # linked to a shared hub: every extraction re-drags the hub (and,
         # through it, every other spoke) in a new direction, so the movement
-        # records keep changing past the loop cap. Order 2 fails but order 1's
-        # step is preserved.
+        # records keep changing past the loop cap. Step 2 fails but step 1's
+        # result is preserved.
         spoke_directions = [
             create_v3(1, 0, 0),
             create_v3(-1, 0, 0),
@@ -399,8 +492,7 @@ class TestUnsolvable:
         joints = [
             AssemblyJoint(
                 name="lid_joint",
-                order=1,
-                freedoms={1: AssemblyFreedom.translation(Z, freed_after=1), 2: None},
+                members={1: spec(AssemblyFreedom.translation(Z, freed_after=1), order=1), 2: spec()},
             ),
         ]
         for index, direction in enumerate(spoke_directions):
@@ -411,23 +503,25 @@ class TestUnsolvable:
             joints.append(
                 AssemblyJoint(
                     name=f"seat_joint_{index:02d}",
-                    order=2,
-                    freedoms={spoke_key: AssemblyFreedom.translation(direction, freed_after=1), seat_key: None},
+                    members={
+                        spoke_key: spec(AssemblyFreedom.translation(direction, freed_after=1), order=2),
+                        seat_key: spec(),
+                    },
                 )
             )
             joints.append(
                 AssemblyJoint(
                     name=f"hub_link_{index:02d}",
-                    order=None,
-                    freedoms={spoke_key: None, 100: None},
+                    members={spoke_key: spec(), 100: spec()},
                 )
             )
 
         solution = solve_assembly(members, joints)
+
         assert solution is not None
-        assert [step.order for step in solution.steps] == [1]
+        assert [step.ordering for step in solution.steps] == [Ordering(1, 0)]
         assert solution.failure is not None
-        assert solution.failure.order == 2
+        assert solution.failure.ordering == Ordering(2, 0)
         assert "no workable DOF" in solution.failure.message
         assert len(solution.failure.diagnostics) > 0
         assert any("drag chain" in diagnostic for diagnostic in solution.failure.diagnostics)

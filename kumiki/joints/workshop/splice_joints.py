@@ -131,19 +131,27 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     distance_B_from_bottom = safe_dot_product(splice_point - timberB.get_bottom_position_global(), timberB.get_length_direction_global())
     distance_B_from_end = timberB.length - distance_B_from_bottom if timberB_end == TimberEnd.TOP else distance_B_from_bottom
 
+    # Assembly: a plain butt splice has no engagement — each half pulls back
+    # along its own axis. Use the larger cross-section dimension as a nominal
+    # freed_after so the preview separation is visible.
+    endA_direction = timberA.get_face_direction_global(timberA_end)
+    endB_direction = timberB.get_face_direction_global(timberB_end)
+
     # Create the Cuts
     cutA = Cutting(
         timber=timberA,
         maybe_top_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
-        negative_csg=None
+        negative_csg=None,
+        assembly_freedom=AssemblyFreedom.translation(-endA_direction, freed_after=max_dimension),
     )
 
     cutB = Cutting(
         timber=timberB,
         maybe_top_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
-        negative_csg=None
+        negative_csg=None,
+        assembly_freedom=AssemblyFreedom.translation(-endB_direction, freed_after=max_dimension),
     )
 
     # Create CutTimbers with cuts passed at construction
@@ -239,18 +247,26 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
         else -bottom_end_cut.offset
     )
 
+    # Assembly: the laps separate perpendicular to the lap plane — the top-lap
+    # timber lifts along the lap face normal, the bottom-lap timber the other
+    # way. Either member is free after traveling the full thickness.
+    lap_face_normal_global = top_lap_timber.get_face_direction_global(top_lap_timber_face.to.face())
+    lap_thickness = top_lap_timber.get_size_in_face_normal_axis(top_lap_timber_face)
+
     cut_top = Cutting(
         timber=top_lap_timber,
         maybe_top_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberEnd.BOTTOM else None,
-        negative_csg=top_lap_prism
+        negative_csg=top_lap_prism,
+        assembly_freedom=AssemblyFreedom.translation(lap_face_normal_global, freed_after=lap_thickness),
     )
 
     cut_bottom = Cutting(
         timber=bottom_lap_timber,
         maybe_top_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberEnd.BOTTOM else None,
-        negative_csg=bottom_lap_prism
+        negative_csg=bottom_lap_prism,
+        assembly_freedom=AssemblyFreedom.translation(-lap_face_normal_global, freed_after=lap_thickness),
     )
 
     # Create CutTimbers
@@ -568,6 +584,10 @@ def cut_lapped_gooseneck_joint(
         negative_csg=gooseneck_timber_combined_csg
     )
 
+    # Assembly: no freedoms are set — a gooseneck extracts by lifting the head
+    # out of the socket and THEN sliding along the run (a sequenced motion),
+    # which cannot be expressed as a single half-interval translation yet. The
+    # connection is treated as rigid until richer R6 freedom shapes exist.
     return Joint(
         cuttings={
             receiving_timber.ticket.path: receiving_timber_cut_obj,

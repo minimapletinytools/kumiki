@@ -22,16 +22,25 @@ describe('normalizeAssemblyPayload', () => {
 
   test('valid payload passes through', () => {
     const payload = normalizeAssemblyPayload({
-      steps: [{ order: 1, movements: [movement('beam#0', [0, 0, 1], 4)] }],
+      steps: [{ order: 1, suborder: 1, movements: [movement('beam#0', [0, 0, 1], 4)] }],
       warnings: ['careful'],
       failure: null,
     });
 
     expect(payload.steps).toHaveLength(1);
     expect(payload.steps[0].order).toBe(1);
+    expect(payload.steps[0].suborder).toBe(1);
     expect(payload.steps[0].movements[0].memberKey).toBe('beam#0');
     expect(payload.warnings).toEqual(['careful']);
     expect(payload.failure).toBeNull();
+  });
+
+  test('missing suborder defaults to 0', () => {
+    const payload = normalizeAssemblyPayload({
+      steps: [{ order: 2, movements: [movement('beam#0', [0, 0, 1], 4)] }],
+    });
+
+    expect(payload.steps[0].suborder).toBe(0);
   });
 
   test('invalid movements are dropped', () => {
@@ -55,11 +64,11 @@ describe('normalizeAssemblyPayload', () => {
     const payload = normalizeAssemblyPayload({
       steps: [],
       warnings: [],
-      failure: { order: 2, message: 'stuck', diagnostics: ['a --> b'] },
+      failure: { order: 2, suborder: 1, message: 'stuck', diagnostics: ['a --> b'] },
     });
 
     expect(payload.steps).toEqual([]);
-    expect(payload.failure).toEqual({ order: 2, message: 'stuck', diagnostics: ['a --> b'] });
+    expect(payload.failure).toEqual({ order: 2, suborder: 1, message: 'stuck', diagnostics: ['a --> b'] });
   });
 });
 
@@ -109,26 +118,28 @@ describe('computeAssemblyOffsets', () => {
 
 describe('timeline marks', () => {
   const steps = [
-    { order: 1, movements: [] },
-    { order: 3, movements: [] },
+    { order: 1, suborder: 0, movements: [] },
+    { order: 1, suborder: 1, movements: [] },
+    { order: 3, suborder: 0, movements: [] },
   ];
 
-  test('marks include assembled start and one mark per order', () => {
+  test('marks include assembled start and one mark per step with suborder labels', () => {
     const marks = getTimelineMarks(steps, null);
 
     expect(marks).toEqual([
       { value: 0, label: 'assembled', kind: 'start' },
       { value: 1, label: '1', kind: 'order' },
-      { value: 2, label: '3', kind: 'order' },
+      { value: 2, label: '1.1', kind: 'order' },
+      { value: 3, label: '3', kind: 'order' },
     ]);
-    expect(getScrubMax(steps, null)).toBe(2);
+    expect(getScrubMax(steps, null)).toBe(3);
   });
 
   test('failure adds an ✕ mark past the last solved step', () => {
-    const failure = { order: 4, message: 'stuck', diagnostics: [] };
+    const failure = { order: 4, suborder: 0, message: 'stuck', diagnostics: [] };
     const marks = getTimelineMarks(steps, failure);
 
-    expect(marks[marks.length - 1]).toEqual({ value: 3, label: '✕', kind: 'failure' });
-    expect(getScrubMax(steps, failure)).toBe(3);
+    expect(marks[marks.length - 1]).toEqual({ value: 4, label: '✕', kind: 'failure' });
+    expect(getScrubMax(steps, failure)).toBe(4);
   });
 });

@@ -1,19 +1,21 @@
-"""Assembly preview demo: an H-frame annotated with a disassembly sequence.
+"""Assembly preview demo: an H-frame with a disassembly sequence.
 
-Demonstrates the assembly solver + kigumi assembly preview timeline:
+Joint cut functions author their own assembly freedoms (escape directions and
+travel) and suborders (pegs pop before their joint slides), so the assembly
+plan is just an order per joint via `with_order`:
 
-- Order 1: the right side slides +X off both cross-timber tenons. The brace is
-  rigidly butt-jointed to it, so it gets dragged along — and because the
-  brace's own extraction is order 3, this also demos the "dragged a
-  higher-order member" warning badge.
-- Order 2: the front cross slides +X out of the left side's mortise while its
-  draw-bore peg (annotated as an accessory freedom) backs out in -Y.
-- Order 3: the (already dragged) brace lifts off in +Z.
+- Order 1: pegs pop (1.0), then the right side slides +X off both cross-timber
+  tenons (1.1). The brace is rigidly butt-jointed to it, so it gets dragged
+  along — and because the brace's own extraction is order 3, this also demos
+  the "dragged a later-ordered member" warning badge.
+- Order 2: the front-left peg pops (2.0), then the front cross slides out of
+  the left side's mortise (2.1).
+- Order 3: the (already dragged) brace pulls off the right side.
+- Order 4: the last peg pops (4.0), then the back cross and left side separate
+  (4.1).
 
-The back cross / left side joint is left unannotated, so scrubbing the
-timeline never separates those two members. Scrub the timeline at the bottom
-of the kigumi viewer to step through the sequence; the disassembly spacing
-multiplier lives in the viewer options.
+Scrub the timeline at the bottom of the kigumi viewer to step through the
+sequence; the disassembly spacing multiplier lives in the viewer options.
 """
 
 from kumiki import *
@@ -77,7 +79,7 @@ def build_frame() -> Frame:
     )
 
     # A short brace butted rigidly onto the outside of the right side; it rides
-    # along when the right side is extracted, then lifts off at order 3.
+    # along when the right side is extracted, then pulls off at order 3.
     brace = create_axis_aligned_timber(
         bottom_position=create_v3(side_spacing / 2, scalar(0), scalar(0)),
         length=brace_length,
@@ -109,33 +111,20 @@ def build_frame() -> Frame:
             peg_parameters=peg_params,
         )
 
-    out_x = create_v3(1, 0, 0)
-    up_z = create_v3(0, 0, 1)
-    peg_out = create_v3(0, -1, 0)
-
-    # Mortise-and-tenon cuttings are keyed by timber ticket path.
-    back_right = mortise_into_side(back_cross, TimberEnd.TOP, right_side).with_assembly(
-        1, {"Right Side": AssemblyFreedom.translation(out_x, mortise_depth)},
-    )
-    front_right = mortise_into_side(front_cross, TimberEnd.TOP, right_side).with_assembly(
-        1, {"Right Side": AssemblyFreedom.translation(out_x, mortise_depth)},
-    )
-    back_left = mortise_into_side(back_cross, TimberEnd.BOTTOM, left_side)  # unannotated: stays assembled
-    front_left = mortise_into_side(front_cross, TimberEnd.BOTTOM, left_side).with_assembly(
-        2,
-        {"Front Cross": AssemblyFreedom.translation(out_x, mortise_depth)},
-        accessory_freedoms={"peg_0": AssemblyFreedom.translation(peg_out, mm(150))},
-    )
-    brace_joint = cut_plain_butt_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=right_side,
-            butt_timber=brace,
-            butt_timber_end=TimberEnd.BOTTOM,
-            front_face_on_butt_timber=TimberLongFace.FRONT,
-        ),
-    ).with_assembly(3, {"butt_timber": AssemblyFreedom.translation(up_z, mm(120))})
-
-    joints = [back_right, front_right, back_left, front_left, brace_joint]
+    joints = [
+        mortise_into_side(back_cross, TimberEnd.TOP, right_side).with_order(1),
+        mortise_into_side(front_cross, TimberEnd.TOP, right_side).with_order(1),
+        mortise_into_side(front_cross, TimberEnd.BOTTOM, left_side).with_order(2),
+        cut_plain_butt_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=right_side,
+                butt_timber=brace,
+                butt_timber_end=TimberEnd.BOTTOM,
+                front_face_on_butt_timber=TimberLongFace.FRONT,
+            ),
+        ).with_order(3),
+        mortise_into_side(back_cross, TimberEnd.BOTTOM, left_side).with_order(4),
+    ]
     return Frame.from_joints(joints, name="Assembly Preview Demo")
 
 

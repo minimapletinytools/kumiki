@@ -2,12 +2,15 @@
     // Framework-agnostic domain logic for the assembly preview timeline.
     //
     // Payload shape (produced by runner.py serialize_layers -> "assembly"):
-    //   { steps: [{ order, movements: [{ kumikiId, memberKey,
-    //                                    direction: [x, y, z],  // unit
-    //                                    distance,              // base freed_after amount
-    //                                    dragged }] }],
+    //   { steps: [{ order, suborder, movements: [{ kumikiId, memberKey,
+    //                                              direction: [x, y, z],  // unit
+    //                                              distance,  // base freed_after amount
+    //                                              dragged }] }],
     //     warnings: [string],
-    //     failure: { order, message, diagnostics: [string] } | null }
+    //     failure: { order, suborder, message, diagnostics: [string] } | null }
+    //
+    // A step is one (order, suborder) extraction: the suborder sequences
+    // motion WITHIN a joint (a peg pops before the tenon slides).
     //
     // Scrub semantics: a scrub value of k means "the first k steps are fully
     // applied"; the fractional part linearly interpolates the next step.
@@ -48,6 +51,7 @@
         }
         return {
             order: isFiniteNumber(raw.order) ? raw.order : null,
+            suborder: isFiniteNumber(raw.suborder) ? raw.suborder : 0,
             message: raw.message,
             diagnostics: Array.isArray(raw.diagnostics)
                 ? raw.diagnostics.filter((entry) => typeof entry === 'string')
@@ -71,7 +75,11 @@
                 const movements = Array.isArray(rawStep.movements)
                     ? rawStep.movements.map(normalizeMovement).filter((movement) => movement !== null)
                     : [];
-                steps.push({ order: rawStep.order, movements });
+                steps.push({
+                    order: rawStep.order,
+                    suborder: isFiniteNumber(rawStep.suborder) ? rawStep.suborder : 0,
+                    movements,
+                });
             }
         }
         const warnings = Array.isArray(raw.warnings)
@@ -110,6 +118,12 @@
         return offsets;
     }
 
+    // Human-readable label for one step: "2" or "2.1" when a suborder is present.
+    function getStepLabel(step) {
+        const suborder = isFiniteNumber(step.suborder) ? step.suborder : 0;
+        return suborder === 0 ? String(step.order) : `${step.order}.${suborder}`;
+    }
+
     // Marks for the timeline track. Scrub value k = "first k steps applied",
     // so step i gets its mark at value i + 1; value 0 is the assembled state.
     // When a failure is present an extra '✕' mark sits past the last solved step.
@@ -117,7 +131,7 @@
         const marks = [{ value: 0, label: 'assembled', kind: 'start' }];
         const stepList = Array.isArray(steps) ? steps : [];
         for (let index = 0; index < stepList.length; index += 1) {
-            marks.push({ value: index + 1, label: String(stepList[index].order), kind: 'order' });
+            marks.push({ value: index + 1, label: getStepLabel(stepList[index]), kind: 'order' });
         }
         if (failure) {
             marks.push({ value: stepList.length + 1, label: '✕', kind: 'failure' });
@@ -135,6 +149,7 @@
     const AssemblyTimeline = {
         normalizeAssemblyPayload,
         computeAssemblyOffsets,
+        getStepLabel,
         getTimelineMarks,
         getScrubMax,
     };

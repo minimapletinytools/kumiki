@@ -4,11 +4,12 @@ Contains functions for creating joints between boards.
 """
 
 import warnings
+from dataclasses import replace
 from typing import Dict, List, Tuple
 
 from sympy import Matrix
 
-from kumiki.timber import Board, TimberLike, Cutting, Joint, JointTicket
+from kumiki.timber import AssemblyFreedom, Board, TimberLike, Cutting, Joint, JointTicket
 from kumiki.rule import (
     Numeric,
     scalar,
@@ -252,6 +253,27 @@ def cut_tongue_and_groove_joint(
         label="tongue_and_groove",
     )
 
+    # Assembly: the boards part along the mating axis (tongue pulls out of the
+    # groove after tongue_depth of travel) and can also slide freely along the
+    # board length (free after the full board length).
+    groove_local_x_global = groove_board.get_width_direction_global()
+    tongue_escape_direction = groove_local_x_global * (-side_sign)
+    length_direction_global = tongue_board.get_length_direction_global()
+    tongue_cutting = replace(
+        tongue_cutting,
+        assembly_freedom=AssemblyFreedom.combine(
+            AssemblyFreedom.translation(tongue_escape_direction, freed_after=tongue_depth),
+            AssemblyFreedom.bidirectional_translation(length_direction_global, freed_after=tongue_board.length),
+        ),
+    )
+    groove_cutting = replace(
+        groove_cutting,
+        assembly_freedom=AssemblyFreedom.combine(
+            AssemblyFreedom.translation(-tongue_escape_direction, freed_after=tongue_depth),
+            AssemblyFreedom.bidirectional_translation(length_direction_global, freed_after=groove_board.length),
+        ),
+    )
+
     return Joint(
         cuttings={
             tongue_board.ticket.path: tongue_cutting,
@@ -391,6 +413,10 @@ def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_
             label="board_in_grooved_frame",
         )
 
+    # Assembly: no freedoms are set — a panel captured in a 4-sided grooved
+    # frame is fully constrained once assembled (the frame must be built
+    # around it); there is no single-translation escape to express. The
+    # connections are treated as rigid.
     return Joint(
         cuttings=cuttings,
         ticket=JointTicket(joint_type="board_in_grooved_frame"),

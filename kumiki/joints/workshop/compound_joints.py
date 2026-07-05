@@ -3,6 +3,8 @@ Kumiki - Compound joint construction functions
 Contains functions for creating complex joints that combine multiple joint types.
 """
 
+from dataclasses import replace
+
 from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
@@ -164,6 +166,21 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
               jointAccessories={},
           ))
 
+  # Assembly: a woven multi-lap stack is mutually interlocked (an inner board
+  # has no single-translation escape while its neighbors are in place), so the
+  # connections are treated as rigid: strip the escape freedoms the underlying
+  # pairwise cross-lap cuts declared.
+  joints = [
+      Joint(
+          cuttings={
+              key: replace(cutting, assembly_freedom=None)
+              for key, cutting in sub_joint.cuttings.items()
+          },
+          ticket=sub_joint.ticket,
+          jointAccessories=sub_joint.jointAccessories,
+      )
+      for sub_joint in joints
+  ]
   return make_compound_joint(joints, ticket=JointTicket(joint_type="multi_cross_lap"))
 
 

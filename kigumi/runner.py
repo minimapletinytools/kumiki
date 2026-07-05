@@ -920,16 +920,17 @@ def _build_assembly_payload(
 ) -> Optional[Dict[str, Any]]:
     """Solve the frame's assembly sequence for the viewer's preview timeline.
 
-    Returns None when the frame has no assembly-annotated joints (the viewer
-    hides the timeline). Payload shape:
+    Returns None when no member of any joint declares an assembly freedom
+    (the viewer hides the timeline). Payload shape:
 
-        {"steps": [{"order": int,
+        {"steps": [{"order": int, "suborder": int,
                     "movements": [{"kumikiId": int, "memberKey": str,
                                    "direction": [x, y, z],  # unit
                                    "distance": float,       # base freed_after amount
                                    "dragged": bool}]}],
          "warnings": [str],
-         "failure": {"order": int | None, "message": str, "diagnostics": [str]} | None}
+         "failure": {"order": int | None, "suborder": int,
+                     "message": str, "diagnostics": [str]} | None}
 
     ``distance`` is unscaled; the viewer multiplies by its configurable
     disassembly multiplier. On failure the solved steps are still included so
@@ -953,7 +954,7 @@ def _build_assembly_payload(
         return {
             "steps": [],
             "warnings": [],
-            "failure": {"order": None, "message": str(exc), "diagnostics": []},
+            "failure": {"order": None, "suborder": 0, "message": str(exc), "diagnostics": []},
         }
     if solution is None:
         return None
@@ -973,12 +974,17 @@ def _build_assembly_payload(
                 "distance": _assembly_float(movement.distance),
                 "dragged": bool(movement.dragged),
             })
-        steps_payload.append({"order": int(step.order), "movements": movements_payload})
+        steps_payload.append({
+            "order": int(step.ordering.order),
+            "suborder": int(step.ordering.suborder),
+            "movements": movements_payload,
+        })
 
     failure_payload = None
     if solution.failure is not None:
         failure_payload = {
-            "order": int(solution.failure.order),
+            "order": int(solution.failure.ordering.order),
+            "suborder": int(solution.failure.ordering.suborder),
             "message": solution.failure.message,
             "diagnostics": list(solution.failure.diagnostics),
         }

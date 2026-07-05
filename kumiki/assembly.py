@@ -3,9 +3,14 @@
 Each member (timber or accessory) in each joint may declare an AssemblyFreedom:
 the set of degrees of freedom in which it can move to escape that joint, each
 with a "freed after" amount — the travel after which the joint no longer
-constrains the member. Joints carry an assembly order; smaller order means the
-joint is extracted EARLIER during disassembly (order 1 is the first thing out,
-i.e. the last thing installed during assembly).
+constrains the member. Each member additionally carries an Ordering
+(order, suborder), compared lexicographically; smaller = extracted EARLIER
+during disassembly (i.e. installed later during assembly). The suborder
+expresses sequencing REQUIRED within a joint (a peg must come out before the
+tenon slides) and is authored by the joint cut functions; the order is the
+frame-level plan, assigned afterwards via Joint.with_order. Everything
+defaults to Ordering(0, 0), so an un-ordered frame disassembles as one big
+exploded-view step (with locking accessories popping first).
 
 The solver is deliberately timber-agnostic: it operates on an abstract graph of
 AssemblyMember / AssemblyJoint records so it can be tested without constructing
@@ -118,6 +123,28 @@ class AssemblyFreedom:
 
 
 # ============================================================================
+# Ordering
+# ============================================================================
+
+
+@dataclass(frozen=True, order=True)
+class Ordering:
+    """Extraction position: compared lexicographically; smaller = out earlier.
+
+    ``suborder`` expresses sequencing required WITHIN a joint (peg before
+    slide) and is authored by the joint cut functions; ``order`` is the
+    frame-level plan set via Joint.with_order.
+    """
+
+    order: int = 0
+    suborder: int = 0
+
+    def label(self) -> str:
+        """Human-readable form: "2" or "2.1" when a suborder is present."""
+        return str(self.order) if self.suborder == 0 else f"{self.order}.{self.suborder}"
+
+
+# ============================================================================
 # Solver input graph (timber-agnostic)
 # ============================================================================
 
@@ -137,17 +164,27 @@ class AssemblyMember:
 
 
 @dataclass(frozen=True)
+class JointMemberSpec:
+    """One member's participation in one joint.
+
+    A None freedom means "unspecified" and the connection is treated as rigid
+    (the member is dragged along whenever the joint moves).
+    """
+
+    freedom: Optional[AssemblyFreedom] = None
+    ordering: Ordering = Ordering()
+
+
+@dataclass(frozen=True)
 class AssemblyJoint:
     """One joint in the assembly graph.
 
-    ``freedoms`` must contain an entry for EVERY member participating in the
-    joint; a None freedom means "unspecified" and the connection is treated as
-    rigid (the member is dragged along whenever the joint moves).
+    ``members`` must contain an entry for EVERY member participating in the
+    joint.
     """
 
     name: str
-    order: Optional[int]
-    freedoms: Mapping[int, Optional[AssemblyFreedom]]
+    members: Mapping[int, JointMemberSpec]
 
 
 # ============================================================================
@@ -173,7 +210,7 @@ class MemberMovement:
 
 @dataclass(frozen=True)
 class AssemblyStep:
-    order: int
+    ordering: Ordering
     movements: Tuple[MemberMovement, ...]
 
 
@@ -181,7 +218,7 @@ class AssemblyStep:
 class AssemblyFailure:
     """Why (and where) solving stopped. Earlier steps remain valid/scrubbable."""
 
-    order: int
+    ordering: Ordering
     message: str
     diagnostics: Tuple[str, ...]
 
@@ -306,21 +343,25 @@ class _LoopDetected(Exception):
         self.chain = chain
 
 
+def _spec_has_translations(spec: JointMemberSpec) -> bool:
+    return spec.freedom is not None and bool(spec.freedom.translations)
+
+
 def solve_assembly(
     members: Sequence[AssemblyMember],
     joints: Sequence[AssemblyJoint],
 ) -> Optional[AssemblySolution]:
     """Solve the disassembly sequence for an abstract assembly graph.
 
-    Iterates assembly orders from small to large. At each order, every member
-    holding a freedom in an order-o joint is extracted along one of its DOFs
-    (ranked by _rank_dofs); moving a member recursively drags every member it
-    is rigidly connected to (see _propagate).
+    Iterates the distinct member Orderings from small to large. At each step,
+    every member holding a freedom at that ordering in some joint is extracted
+    along one of its DOFs (ranked by _rank_dofs); moving a member recursively
+    drags every member it is rigidly connected to (see _propagate).
 
-    Returns None when no joint carries an order. When some order cannot be
-    solved, solving stops there and the partial steps plus an AssemblyFailure
-    are returned (it never raises for unsolvability), so callers can still
-    preview the orders that did solve.
+    Returns None when no member has any freedom (nothing can move). When some
+    step cannot be solved, solving stops there and the partial steps plus an
+    AssemblyFailure are returned (it never raises for unsolvability), so
+    callers can still preview the steps that did solve.
 
     Raises NotImplementedError for rotational freedoms and ValueError for
     joints referencing unknown member keys.
@@ -329,91 +370,125 @@ def solve_assembly(
 
     joints_by_member: Dict[int, List[AssemblyJoint]] = {}
     for joint in joints:
-        for key, freedom in joint.freedoms.items():
+        for key, spec in joint.members.items():
             if key not in member_by_key:
                 raise ValueError(
                     f"Joint '{joint.name}' references unknown assembly member key {key}"
                 )
-            if freedom is not None and freedom.rotations:
+            if spec.freedom is not None and spec.freedom.rotations:
                 raise NotImplementedError(
                     f"Joint '{joint.name}': rotational assembly freedoms are not supported yet"
                 )
             joints_by_member.setdefault(key, []).append(joint)
 
-    orders = sorted({joint.order for joint in joints if joint.order is not None})
-    if not orders:
+    step_orderings = sorted({
+        spec.ordering
+        for joint in joints
+        for spec in joint.members.values()
+        if _spec_has_translations(spec)
+    })
+    if not step_orderings:
         return None
 
-    # A member's own extraction order: the smallest order at which some joint
-    # gives it a usable freedom. Used for the dragged-too-early warning.
-    own_order: Dict[int, int] = {}
+    # A member's own extraction step: the smallest ordering at which some
+    # joint gives it a usable freedom. Used for the dragged-too-early warning.
+    own_ordering: Dict[int, Ordering] = {}
     for joint in joints:
-        if joint.order is None:
-            continue
-        for key, freedom in joint.freedoms.items():
-            if freedom is not None and freedom.translations:
-                own_order[key] = min(own_order.get(key, joint.order), joint.order)
+        for key, spec in joint.members.items():
+            if _spec_has_translations(spec):
+                existing = own_ordering.get(key)
+                if existing is None or spec.ordering < existing:
+                    own_ordering[key] = spec.ordering
 
     positions: Dict[int, _Float3] = {member.key: _float3(member.position) for member in members}
 
     removed: set = set()
     warnings: List[str] = []
     steps: List[AssemblyStep] = []
+    # Cumulative committed displacement per member, used to decide whether a
+    # joint has ALREADY separated (relative motion along an escape DOF beyond
+    # its freed_after) so the joint's other member need not also extract.
+    total_displacement: Dict[int, _Float3] = {}
 
-    for order in orders:
-        order_joints = [joint for joint in joints if joint.order == order]
-        outcome = _solve_order(
-            order=order,
-            order_joints=order_joints,
-            all_joints=joints,
+    for step_ordering in step_orderings:
+        step_joints = [
+            joint for joint in joints
+            if any(
+                spec.ordering == step_ordering and _spec_has_translations(spec)
+                for spec in joint.members.values()
+            )
+        ]
+        outcome = _solve_step(
+            step_ordering=step_ordering,
+            step_joints=step_joints,
             joints_by_member=joints_by_member,
             member_by_key=member_by_key,
             positions=positions,
-            own_order=own_order,
+            own_ordering=own_ordering,
             removed=removed,
+            total_displacement=total_displacement,
             warnings=warnings,
         )
         if isinstance(outcome, AssemblyFailure):
             return AssemblySolution(steps=tuple(steps), warnings=tuple(warnings), failure=outcome)
-        movements, primary_movers = outcome
+        movements, primary_movers, step_records = outcome
         removed |= primary_movers
+        for key, contributions in step_records.items():
+            net = total_displacement.get(key, (0.0, 0.0, 0.0))
+            for direction, distance in contributions:
+                net = _add3(net, _scale3(direction, distance))
+            total_displacement[key] = net
         if movements:
-            steps.append(AssemblyStep(order=order, movements=tuple(movements)))
+            steps.append(AssemblyStep(ordering=step_ordering, movements=tuple(movements)))
 
     return AssemblySolution(steps=tuple(steps), warnings=tuple(warnings), failure=None)
 
 
-def _solve_order(
-    order: int,
-    order_joints: List[AssemblyJoint],
-    all_joints: Sequence[AssemblyJoint],
+def _solve_step(
+    step_ordering: Ordering,
+    step_joints: List[AssemblyJoint],
     joints_by_member: Dict[int, List[AssemblyJoint]],
     member_by_key: Dict[int, AssemblyMember],
     positions: Dict[int, _Float3],
-    own_order: Dict[int, int],
+    own_ordering: Dict[int, Ordering],
     removed: set,
+    total_displacement: Dict[int, _Float3],
     warnings: List[str],
 ):
-    """Extract every annotated member of one order.
+    """Extract the members scheduled at one (order, suborder) step.
 
-    Returns (movements, primary_movers) on success, or an AssemblyFailure.
-    Mutates ``warnings``; ``removed`` is only read (the caller commits it).
+    Cut functions author escape freedoms on BOTH sides of each interface, so
+    every member of a scheduled joint is a candidate — but a joint only needs
+    ONE member to depart. Candidates are processed cheapest-drag-first, and a
+    candidate is skipped when all joints scheduling it have already separated
+    (see _is_joint_separated), so the second side of an interface stays put.
+
+    Returns (movements, primary_movers, step_records) on success, or an
+    AssemblyFailure. Mutates ``warnings``; ``removed`` and
+    ``total_displacement`` are only read (the caller commits them).
     """
-    # Which members get extracted at this order, and along which candidate DOFs.
+    # Which members get extracted at this step, and along which candidate DOFs.
     candidates: Dict[int, List[TranslationDof]] = {}
-    for joint in order_joints:
-        joint_candidates = {
-            key: freedom
-            for key, freedom in joint.freedoms.items()
-            if key not in removed and freedom is not None and freedom.translations
-        }
-        if not joint_candidates:
-            warnings.append(
-                f"Joint '{joint.name}' has assembly order {order} but no assembly freedoms; nothing to move"
-            )
-            continue
-        for key, freedom in joint_candidates.items():
-            candidates.setdefault(key, []).extend(freedom.translations)
+    for joint in step_joints:
+        for key, spec in joint.members.items():
+            if key in removed or spec.ordering != step_ordering:
+                continue
+            if spec.freedom is None or not spec.freedom.translations:
+                continue
+            candidates.setdefault(key, []).extend(spec.freedom.translations)
+
+    ranked_dofs_by_key = {
+        key: _rank_dofs(
+            key=key,
+            dofs=candidates[key],
+            step_ordering=step_ordering,
+            step_joints=step_joints,
+            positions=positions,
+            own_ordering=own_ordering,
+            removed=removed,
+        )
+        for key in candidates
+    }
 
     # Step-local movement records: member key -> list of (unit direction, distance)
     # contributions. Committed trial by trial.
@@ -421,17 +496,52 @@ def _solve_order(
     loop_counts: Dict[int, int] = {}
     primary_movers: set = set()
 
-    sorted_candidate_keys = sorted(candidates, key=lambda key: (member_by_key[key].name, key))
+    def estimated_drag_cost(key: int) -> float:
+        """How many members the candidate's best DOF would move (on a clean
+        slate). Cheapest-first processing lets the least-entangled member of
+        an interface depart, so its partner can be skipped as separated."""
+        for dof in ranked_dofs_by_key[key]:
+            direction = _unit3(_float3(dof.direction))
+            distance = float(giraffe_evalf(dof.freed_after))
+            if direction is None or distance < _ZERO_EPSILON:
+                continue
+            probe_records: Dict[int, List[Tuple[_Float3, float]]] = {}
+            try:
+                _propagate(
+                    start_key=key,
+                    direction=direction,
+                    distance=distance,
+                    step_ordering=step_ordering,
+                    joints_by_member=joints_by_member,
+                    member_by_key=member_by_key,
+                    own_ordering=own_ordering,
+                    removed=removed,
+                    records=probe_records,
+                    loop_counts={},
+                )
+            except _LoopDetected:
+                return float("inf")
+            return float(len(probe_records))
+        return float("inf")
+
+    sorted_candidate_keys = sorted(
+        candidates,
+        key=lambda key: (estimated_drag_cost(key), member_by_key[key].name, key),
+    )
     for key in sorted_candidate_keys:
-        ranked_dofs = _rank_dofs(
-            key=key,
-            dofs=candidates[key],
-            order=order,
-            order_joints=order_joints,
-            all_joints=all_joints,
-            positions=positions,
-            removed=removed,
-        )
+        scheduling_joints = [
+            joint for joint in step_joints
+            if key in joint.members
+            and joint.members[key].ordering == step_ordering
+            and _spec_has_translations(joint.members[key])
+        ]
+        if scheduling_joints and all(
+            _is_joint_separated(key, joint, removed, step_records, total_displacement)
+            for joint in scheduling_joints
+        ):
+            continue  # every joint scheduling this member has already come apart
+
+        ranked_dofs = ranked_dofs_by_key[key]
         failure_diagnostics: List[str] = []
         succeeded = False
         for dof in ranked_dofs:
@@ -448,10 +558,10 @@ def _solve_order(
                     start_key=key,
                     direction=direction,
                     distance=distance,
-                    order=order,
+                    step_ordering=step_ordering,
                     joints_by_member=joints_by_member,
                     member_by_key=member_by_key,
-                    own_order=own_order,
+                    own_ordering=own_ordering,
                     removed=removed,
                     records=trial_records,
                     loop_counts=trial_loops,
@@ -470,61 +580,124 @@ def _solve_order(
         if not succeeded:
             member_name = member_by_key[key].name
             return AssemblyFailure(
-                order=order,
+                ordering=step_ordering,
                 message=(
-                    f"Cannot disassemble order {order}: member '{member_name}' has no workable DOF; "
-                    f"every direction keeps re-dragging other members past the loop limit "
-                    f"({_MAX_LOOP_ITERATIONS})"
+                    f"Cannot disassemble step {step_ordering.label()}: member '{member_name}' has no "
+                    f"workable DOF; every direction keeps re-dragging other members past the loop "
+                    f"limit ({_MAX_LOOP_ITERATIONS})"
                 ),
                 diagnostics=tuple(failure_diagnostics),
             )
 
     movements = _merge_movements(
-        order=order,
+        step_ordering=step_ordering,
         step_records=step_records,
         primary_movers=primary_movers,
         member_by_key=member_by_key,
         warnings=warnings,
     )
-    return movements, primary_movers
+    return movements, primary_movers, step_records
+
+
+def _member_displacement(
+    key: int,
+    step_records: Dict[int, List[Tuple[_Float3, float]]],
+    total_displacement: Dict[int, _Float3],
+) -> _Float3:
+    """Cumulative displacement of a member: committed steps + current step."""
+    net = total_displacement.get(key, (0.0, 0.0, 0.0))
+    for direction, distance in step_records.get(key, []):
+        net = _add3(net, _scale3(direction, distance))
+    return net
+
+
+def _dof_travel_reached(freedom: Optional[AssemblyFreedom], unit_direction: _Float3, magnitude: float) -> bool:
+    """Whether traveling ``magnitude`` along ``unit_direction`` satisfies one of
+    the freedom's DOFs (parallel direction, at least freed_after of travel)."""
+    if freedom is None:
+        return False
+    for dof in freedom.translations:
+        dof_unit = _unit3(_float3(dof.direction))
+        if dof_unit is None or not _are_parallel(dof_unit, unit_direction):
+            continue
+        if magnitude >= float(giraffe_evalf(dof.freed_after)) - _ZERO_EPSILON:
+            return True
+    return False
+
+
+def _is_joint_separated(
+    member_key: int,
+    joint: AssemblyJoint,
+    removed: set,
+    step_records: Dict[int, List[Tuple[_Float3, float]]],
+    total_displacement: Dict[int, _Float3],
+) -> bool:
+    """Whether ``member_key`` no longer needs to extract from ``joint``: every
+    other member has already moved RELATIVE to it along an escape DOF by at
+    least that DOF's freed_after.
+
+    Relative motion is what matters: a member dragged along with its partner
+    (zero relative displacement) is still attached even though the partner was
+    "removed", while a peg that popped out earlier no longer blocks the skip.
+    """
+    my_displacement = _member_displacement(member_key, step_records, total_displacement)
+    for other_key, other_spec in joint.members.items():
+        if other_key == member_key:
+            continue
+        delta = _sub3(_member_displacement(other_key, step_records, total_displacement), my_displacement)
+        magnitude = _norm3(delta)
+        if magnitude < _ZERO_EPSILON:
+            return False
+        unit_delta = _scale3(delta, 1.0 / magnitude)
+        if _dof_travel_reached(other_spec.freedom, unit_delta, magnitude):
+            continue  # the other member escaped this joint relative to us
+        my_spec = joint.members.get(member_key)
+        my_freedom = my_spec.freedom if my_spec is not None else None
+        if _dof_travel_reached(my_freedom, _neg3(unit_delta), magnitude):
+            continue  # we already escaped relative to the other member
+        return False
+    return True
 
 
 def _rank_dofs(
     key: int,
     dofs: List[TranslationDof],
-    order: int,
-    order_joints: List[AssemblyJoint],
-    all_joints: Sequence[AssemblyJoint],
+    step_ordering: Ordering,
+    step_joints: List[AssemblyJoint],
     positions: Dict[int, _Float3],
+    own_ordering: Dict[int, Ordering],
     removed: set,
 ) -> List[TranslationDof]:
     """Rank candidate escape DOFs, best first.
 
-    Preference (see score weights): directions every same-order joint of this
-    member already frees (no dragging of same-order partners), then away from
-    the other members of this order, then away from higher-order members, then
-    roughly planar with this order's members.
+    Preference (see score weights): directions every same-step joint of this
+    member already frees (no dragging of same-step partners), then away from
+    the other members of this step, then away from later-extracted members,
+    then roughly planar with this step's members.
     """
-    order_member_keys = {
+    step_member_keys = {
         member_key
-        for joint in order_joints
-        for member_key in joint.freedoms
+        for joint in step_joints
+        for member_key in joint.members
         if member_key not in removed
     }
-    peers = [member_key for member_key in order_member_keys if member_key != key]
+    peers = [member_key for member_key in step_member_keys if member_key != key]
 
-    higher_keys = {
+    later_keys = {
         member_key
-        for joint in all_joints
-        if joint.order is not None and joint.order > order
-        for member_key in joint.freedoms
-        if member_key not in removed and member_key != key
+        for member_key, member_ordering in own_ordering.items()
+        if member_ordering > step_ordering and member_key not in removed and member_key != key
     }
 
-    plane_normal = _dominant_plane_normal([positions[member_key] for member_key in sorted(order_member_keys)])
+    plane_normal = _dominant_plane_normal([positions[member_key] for member_key in sorted(step_member_keys)])
 
     my_position = positions[key]
-    my_order_joints = [joint for joint in order_joints if key in joint.freedoms]
+    my_step_joints = [
+        joint for joint in step_joints
+        if key in joint.members
+        and joint.members[key].ordering == step_ordering
+        and _spec_has_translations(joint.members[key])
+    ]
 
     def away_score(direction: _Float3, other_keys) -> float:
         score = 0.0
@@ -542,13 +715,13 @@ def _rank_dofs(
         if direction is None:
             return float("-inf")
         shared = 1.0 if all(
-            _freedom_allows(joint.freedoms.get(key), direction) is not None
-            for joint in my_order_joints
+            _freedom_allows(joint.members[key].freedom, direction) is not None
+            for joint in my_step_joints
         ) else 0.0
         away_same = away_score(direction, peers)
-        away_higher = away_score(direction, higher_keys)
+        away_later = away_score(direction, later_keys)
         planarity = (1.0 - abs(_dot3(direction, plane_normal))) if plane_normal is not None else 0.0
-        return 8.0 * shared + 4.0 * away_same + 2.0 * away_higher + 1.0 * planarity
+        return 8.0 * shared + 4.0 * away_same + 2.0 * away_later + 1.0 * planarity
 
     return sorted(dofs, key=score, reverse=True)
 
@@ -557,10 +730,10 @@ def _propagate(
     start_key: int,
     direction: _Float3,
     distance: float,
-    order: int,
+    step_ordering: Ordering,
     joints_by_member: Dict[int, List[AssemblyJoint]],
     member_by_key: Dict[int, AssemblyMember],
-    own_order: Dict[int, int],
+    own_ordering: Dict[int, Ordering],
     removed: set,
     records: Dict[int, List[Tuple[_Float3, float]]],
     loop_counts: Dict[int, int],
@@ -610,22 +783,23 @@ def _propagate(
             record.append((direction, distance))
 
         if key != start_key:
-            member_own_order = own_order.get(key)
-            if member_own_order is not None and member_own_order > order:
+            member_own_ordering = own_ordering.get(key)
+            if member_own_ordering is not None and member_own_ordering > step_ordering:
                 trial_warnings.append(
-                    f"Disassembling order {order} dragged member '{member_by_key[key].name}' "
-                    f"whose own assembly order is {member_own_order}"
+                    f"Disassembling step {step_ordering.label()} dragged member "
+                    f"'{member_by_key[key].name}' whose own ordering is {member_own_ordering.label()}"
                 )
 
+        # Members extracted at earlier steps are in `removed`, which also
+        # releases their joints' grip (no joint-level release check needed).
         for joint in joints_by_member.get(key, []):
-            if joint.order is not None and joint.order < order:
-                continue  # this joint was already disassembled at an earlier order
-            if _freedom_allows(joint.freedoms.get(key), direction) is not None:
+            my_spec = joint.members.get(key)
+            if my_spec is not None and _freedom_allows(my_spec.freedom, direction) is not None:
                 continue  # the joint lets this member slide in `direction`; nothing to drag
-            for other_key in joint.freedoms:
+            for other_key, other_spec in joint.members.items():
                 if other_key == key or other_key in removed:
                     continue
-                if _freedom_allows(joint.freedoms.get(other_key), _neg3(direction)) is not None:
+                if _freedom_allows(other_spec.freedom, _neg3(direction)) is not None:
                     continue  # relative motion allowed from the other member's side
                 queue.append((other_key, chain + ((key, joint.name, other_key),)))
 
@@ -633,7 +807,7 @@ def _propagate(
 
 
 def _merge_movements(
-    order: int,
+    step_ordering: Ordering,
     step_records: Dict[int, List[Tuple[_Float3, float]]],
     primary_movers: set,
     member_by_key: Dict[int, AssemblyMember],
@@ -648,8 +822,8 @@ def _merge_movements(
         magnitude = _norm3(net)
         if magnitude < _ZERO_EPSILON:
             warnings.append(
-                f"Drag directions for member '{member_by_key[key].name}' cancelled out at order {order}; "
-                f"it does not move"
+                f"Drag directions for member '{member_by_key[key].name}' cancelled out at "
+                f"step {step_ordering.label()}; it does not move"
             )
             continue
         unit = _scale3(net, 1.0 / magnitude)
