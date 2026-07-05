@@ -14,10 +14,6 @@ const VIEWER_LOG_LEVEL_ORDER = {
     error: 40,
 };
 
-// Minimum level to allow per log source. Lower levels are suppressed.
-const VIEWER_LOG_SOURCE_MIN_LEVEL = {
-};
-
 function normalizeViewerLogLevel(level) {
     if (typeof level !== 'string') {
         return 'info';
@@ -27,13 +23,6 @@ function normalizeViewerLogLevel(level) {
         return 'info';
     }
     return normalized;
-}
-
-function shouldSuppressViewerLog(source, level) {
-    const effectiveSource = typeof source === 'string' && source ? source : 'webview';
-    const incomingLevel = normalizeViewerLogLevel(level);
-    const minLevel = normalizeViewerLogLevel(VIEWER_LOG_SOURCE_MIN_LEVEL[effectiveSource] || 'debug');
-    return VIEWER_LOG_LEVEL_ORDER[incomingLevel] < VIEWER_LOG_LEVEL_ORDER[minLevel];
 }
 
 function sanitizeLogPathSegment(value, fallback) {
@@ -286,11 +275,7 @@ class FrameViewSession {
                 });
                 return;
             }
-            if (message.type === 'openOutputChannel') {
-                this.channel.show(true);
-                return;
-            }
-            if (message.type === 'openKigumiOutput') {
+            if (message.type === 'openOutputChannel' || message.type === 'openKigumiOutput') {
                 this.channel.show(true);
                 return;
             }
@@ -358,9 +343,6 @@ class FrameViewSession {
             const eventName = typeof message.event === 'string' ? message.event : 'unknown';
             const source = typeof message.source === 'string' ? message.source : 'webview';
             const level = normalizeViewerLogLevel(message.level);
-            if (shouldSuppressViewerLog(source, level)) {
-                return;
-            }
             const version = typeof message.version === 'string' ? message.version : 'unknown';
             const details = message.details && typeof message.details === 'object'
                 ? JSON.stringify(message.details)
@@ -790,7 +772,6 @@ class FrameViewSession {
             this._lastFrameData = frameData;
             this._lastGeometryData = geometryData;
             this._lastProfiling = profiling;
-            this._lastLayersData = layersData;
             if (layersData && this.panel && !this.isDisposed) {
                 this.panel.webview.postMessage({
                     type: 'layersTree',

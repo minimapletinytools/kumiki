@@ -95,13 +95,6 @@ TARGET_MODULE_NAME = "_kigumi_viewer_target"
 
 
 @dataclass
-class ProfilingStats:
-    """Timing data collected during runner operations (seconds)."""
-    reload_s: Optional[float] = None
-    geometry_s: Optional[float] = None
-
-
-@dataclass
 class SlotState:
     """State for a single named viewer slot (e.g. 'main' or a pattern)."""
     file_path: Path
@@ -330,7 +323,7 @@ def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
 def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
     """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
     from kumiki.cutcsg import adopt_csg
-    from kumiki.rule import Transform, scalar
+    from kumiki.rule import Transform
     from kumiki.triangles import triangulate_cutcsg
 
     global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
@@ -999,7 +992,7 @@ def _build_assembly_payload(
 def _walk_tagged_csg(csg: Any, current_path: List[str], collected: List[Dict[str, Any]]) -> None:
     """Walk a CSG tree, collecting tagged nodes with their path and feature labels."""
     from kumiki.cutcsg import (
-        SolidUnion, Difference, HalfSpace, RectangularPrism, Cylinder,
+        SolidUnion, Difference, HalfSpace, RectangularPrism,
     )
 
     tag = getattr(csg, "tag", None)
@@ -1046,13 +1039,6 @@ def serialize_cut_csg_tree(cut_timber: Any, cut_index: int) -> Dict[str, Any]:
         "cutIndex": cut_index,
         "taggedCSGs": collected,
     }
-
-
-def build_placeholder_geometry(frame: Any) -> Dict[str, Any]:
-    # kept for reference – use build_real_geometry instead
-    slot = SlotState(file_path=Path("."), module=None, frame=frame)
-    dummy_state = RunnerState(slots={"main": slot}, active_slot="main")
-    return build_real_geometry(dummy_state)
 
 
 def _module_file_path(module: Any) -> Optional[Path]:
@@ -1772,55 +1758,6 @@ def _extract_highlight_mesh(
     return out_verts, out_idx, matched, total_tris
 
 
-def _debug_prism_distances(prism: Any, pt: List[float], eps: float, indent: int = 4) -> None:
-    """Log detailed distances from point to each face of a RectangularPrism."""
-    rot, pos = _build_inv_transform_float(prism.transform)
-    lp = _inv_transform_point(rot, pos, pt)
-    hw = float(prism.size[0]) / 2.0
-    hh = float(prism.size[1]) / 2.0
-    z0 = float(prism.start_distance) if prism.start_distance is not None else None
-    z1 = float(prism.end_distance) if prism.end_distance is not None else None
-    pad = " " * indent
-    log_stderr(f"[csg-nav] {pad}prism local_pt={[round(v,6) for v in lp]}, hw={hw:.4f}, hh={hh:.4f}, z0={z0}, z1={z1}")
-    log_stderr(f"[csg-nav] {pad}  dist to -X: {abs(lp[0]+hw):.6f}, +X: {abs(lp[0]-hw):.6f}")
-    log_stderr(f"[csg-nav] {pad}  dist to -Y: {abs(lp[1]+hh):.6f}, +Y: {abs(lp[1]-hh):.6f}")
-    if z0 is not None:
-        log_stderr(f"[csg-nav] {pad}  dist to z0: {abs(lp[2]-z0):.6f}")
-    else:
-        log_stderr(f"[csg-nav] {pad}  z0=None (infinite)")
-    if z1 is not None:
-        log_stderr(f"[csg-nav] {pad}  dist to z1: {abs(lp[2]-z1):.6f}")
-    else:
-        log_stderr(f"[csg-nav] {pad}  z1=None (infinite)")
-
-
-def _debug_difference_distances(diff: Any, pt: List[float], eps: float, indent: int = 4) -> None:
-    """Log detailed distances for a Difference CSG."""
-    from kumiki.cutcsg import HalfSpace as _HS, RectangularPrism as _RP
-    pad = " " * indent
-    base = diff.base
-    if isinstance(base, _HS):
-        n = [float(base.normal[k]) for k in range(3)]
-        dot_val = _dot3(n, pt)
-        offset = float(base.offset)
-        dist = abs(dot_val - offset)
-        inside = dot_val >= offset
-        log_stderr(f"[csg-nav] {pad}Diff.base HalfSpace: dot={dot_val:.6f}, offset={offset:.6f}, dist={dist:.6f}, inside={inside} (eps={eps})")
-    elif isinstance(base, _RP):
-        log_stderr(f"[csg-nav] {pad}Diff.base RectangularPrism:")
-        _debug_prism_distances(base, pt, eps, indent + 2)
-    for i, sub in enumerate(diff.subtract):
-        if isinstance(sub, _HS):
-            n = [float(sub.normal[k]) for k in range(3)]
-            dot_val = _dot3(n, pt)
-            offset = float(sub.offset)
-            dist = abs(dot_val - offset)
-            log_stderr(f"[csg-nav] {pad}Diff.sub[{i}] HalfSpace: dot={dot_val:.6f}, offset={offset:.6f}, dist={dist:.6f}")
-        elif isinstance(sub, _RP):
-            log_stderr(f"[csg-nav] {pad}Diff.sub[{i}] RectangularPrism:")
-            _debug_prism_distances(sub, pt, eps, indent + 2)
-
-
 def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
     """Process a find_csg_at_point request and return the result dict."""
     ss = slot_state if slot_state is not None else state._active
@@ -1851,81 +1788,21 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
 
     t0 = time.monotonic()
 
-    # --- Debug: describe the CSG tree ---
-    def _csg_debug_label(c: Any) -> str:
-        tag = getattr(c, "tag", None)
-        ctype = type(c).__name__
-        label = f"{ctype}"
-        if tag:
-            label += f'(tag="{tag}")'
-        return label
-
-    def _csg_tree_debug(c: Any, depth: int = 0) -> List[str]:
-        from kumiki.cutcsg import SolidUnion, Difference
-        indent = "  " * depth
-        lines = [f"{indent}{_csg_debug_label(c)}"]
-        if isinstance(c, Difference):
-            lines.append(f"{indent}  base: {_csg_debug_label(c.base)}")
-            for i, s in enumerate(c.subtract):
-                lines.append(f"{indent}  subtract[{i}]:")
-                lines.extend(_csg_tree_debug(s, depth + 2))
-        elif isinstance(c, SolidUnion):
-            for i, ch in enumerate(c.children):
-                lines.append(f"{indent}  child[{i}]:")
-                lines.extend(_csg_tree_debug(ch, depth + 2))
-        return lines
-
-    log_stderr(f"[csg-nav] === find_csg_at_point ===")
-    log_stderr(f"[csg-nav] memberKey={member_key}, ctrlClick={ctrl_click}")
-    log_stderr(f"[csg-nav] global point={[round(float(p), 4) for p in point]}")
-    log_stderr(f"[csg-nav] local point={[round(v, 4) for v in pt_local]}")
-    log_stderr(f"[csg-nav] currentPath={current_path}")
-    log_stderr(f"[csg-nav] CSG tree:")
-    for line in _csg_tree_debug(local_csg):
-        log_stderr(f"[csg-nav]   {line}")
-
     if ctrl_click:
         new_path, target_csg, feature_label = _navigate_csg_to_leaf(local_csg, pt_local, eps)
     else:
         if current_path:
             node = _resolve_csg_at_path(local_csg, current_path, pt_local, eps)
             on_boundary = _is_point_on_csg_boundary_float(node, pt_local, eps)
-            log_stderr(f"[csg-nav] resolved node at path: {_csg_debug_label(node)}, point on boundary={on_boundary}")
             if not on_boundary:
                 node = local_csg
                 current_path = []
-                log_stderr(f"[csg-nav] popped back to root")
         else:
             node = local_csg
-        log_stderr(f"[csg-nav] navigating from: {_csg_debug_label(node)}")
-
-        # Debug: test each subtract child boundary for Difference nodes
-        from kumiki.cutcsg import Difference as _Diff, SolidUnion as _SU, HalfSpace as _HS, RectangularPrism as _RP
-        if isinstance(node, _Diff):
-            for i, sub in enumerate(node.subtract):
-                on_b = _is_point_on_csg_boundary_float(sub, pt_local, eps)
-                log_stderr(f"[csg-nav]   subtract[{i}] {_csg_debug_label(sub)} boundary={on_b}")
-                if isinstance(sub, _SU):
-                    for j, ch in enumerate(sub.children):
-                        on_ch = _is_point_on_csg_boundary_float(ch, pt_local, eps)
-                        log_stderr(f"[csg-nav]     child[{j}] {_csg_debug_label(ch)} boundary={on_ch}")
-                        # Deep debug: show distances for primitives inside this child
-                        if isinstance(ch, _Diff):
-                            _debug_difference_distances(ch, pt_local, eps, indent=6)
-                        elif isinstance(ch, _HS):
-                            n = [float(ch.normal[k]) for k in range(3)]
-                            dist = abs(_dot3(n, pt_local) - float(ch.offset))
-                            log_stderr(f"[csg-nav]       HalfSpace dist={dist:.6f} (eps={eps}), n={[round(v,4) for v in n]}, offset={float(ch.offset):.4f}")
-            on_base = _is_point_on_csg_boundary_float(node.base, pt_local, eps)
-            log_stderr(f"[csg-nav]   base {_csg_debug_label(node.base)} boundary={on_base}")
-            if isinstance(node.base, _RP):
-                _debug_prism_distances(node.base, pt_local, eps, indent=4)
 
         new_path, target_csg, feature_label = _navigate_csg_one_level(
             node, pt_local, current_path, eps,
         )
-
-    log_stderr(f"[csg-nav] result: path={new_path}, featureLabel={feature_label}, target={_csg_debug_label(target_csg)}")
 
     parent_csg = None
     if new_path:
@@ -1944,7 +1821,6 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         selected_ref=parent_csg if feature_label is not None else target_csg,
         feature_label=feature_label,
     )
-    log_stderr(f"[csg-nav] highlight mesh: {matched}/{total} triangles matched")
 
     # When a feature (face) is selected, also extract the parent tagged CSG mesh
     # so the viewer can render the parent dimmer and the feature brighter.
@@ -2465,7 +2341,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 include_accessories=include_accessories,
             )
             combined_name = "_combined.3mf"
-            extension_glob = "*.stl"
+            extension_glob = "*.3mf"
         elif export_format == "obj":
             from kumiki.blueprint import export_frame_obj
 

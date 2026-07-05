@@ -887,8 +887,6 @@ class KigumiViewerApp extends LitElement {
             'cx', 'cy', 'cz',
             'orbitDist',
             'cameraOffsetDir', 'cameraUpVector',
-            'cameraAnimation',
-            'dragOrbitUpAxis', 'dragOrbitRightAxis',
         ];
         for (const field of FORWARDED_CAMERA_FIELDS) {
             Object.defineProperty(this, field, {
@@ -971,7 +969,6 @@ class KigumiViewerApp extends LitElement {
         this.edgeLineVisibilityPercent = 100;
         this.unselectedTransparencyPercent = 70;
         this.activeTheme = 'forest';
-        this.activeBackground = this.activeTheme;
 
         this.animationHandle = null;
         this.viewState = createInitialViewState();
@@ -1857,68 +1854,6 @@ class KigumiViewerApp extends LitElement {
         });
     }
 
-    updateStructureScreenBounds() {
-        if (!this.camera || !this.lastBounds) {
-            this.structureScreenBounds = null;
-            return;
-        }
-        const viewport = this.renderRoot.querySelector('#viewport');
-        if (!viewport) {
-            this.structureScreenBounds = null;
-            return;
-        }
-        const width = viewport.clientWidth;
-        const height = viewport.clientHeight;
-        if (width <= 0 || height <= 0) {
-            this.structureScreenBounds = null;
-            return;
-        }
-
-        const bounds = this.lastBounds;
-        const corners = [
-            [bounds.minX, bounds.minY, bounds.minZ],
-            [bounds.minX, bounds.minY, bounds.maxZ],
-            [bounds.minX, bounds.maxY, bounds.minZ],
-            [bounds.minX, bounds.maxY, bounds.maxZ],
-            [bounds.maxX, bounds.minY, bounds.minZ],
-            [bounds.maxX, bounds.minY, bounds.maxZ],
-            [bounds.maxX, bounds.maxY, bounds.minZ],
-            [bounds.maxX, bounds.maxY, bounds.maxZ],
-        ];
-
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-        let hasPoint = false;
-
-        for (const corner of corners) {
-            const projected = new THREE.Vector3(corner[0], corner[1], corner[2]).project(this.camera);
-            if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) {
-                continue;
-            }
-            const sx = ((projected.x + 1) * 0.5) * width;
-            const sy = ((1 - projected.y) * 0.5) * height;
-            minX = Math.min(minX, sx);
-            maxX = Math.max(maxX, sx);
-            minY = Math.min(minY, sy);
-            maxY = Math.max(maxY, sy);
-            hasPoint = true;
-        }
-
-        if (!hasPoint) {
-            this.structureScreenBounds = null;
-            return;
-        }
-
-        this.structureScreenBounds = {
-            minX: Math.max(0, minX),
-            maxX: Math.min(width, maxX),
-            minY: Math.max(0, minY),
-            maxY: Math.min(height, maxY),
-        };
-    }
-
     onWindowMessage(event) {
         const message = event.data || {};
         if (message.type === 'viewerState') {
@@ -2315,7 +2250,6 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setSize(width, height, false);
         this.resizeGizmoRenderer();
         this.drawLightDial();
-        this.updateStructureScreenBounds();
     }
 
     handleCanvasClick(event) {
@@ -2359,11 +2293,6 @@ class KigumiViewerApp extends LitElement {
         let hit = intersects[0];
         let memberKey = this.meshKeyMap.get(hit.object);
 
-        const allHitKeys = intersects.map((h) => this.meshKeyMap.get(h.object)).filter(Boolean);
-        console.log('[csg-nav] click: allHits=' + JSON.stringify(allHitKeys) +
-            ', selectedTimbers=' + JSON.stringify(this.selectionManager.getSelectedTimbers()) +
-            ', csgSelection=' + JSON.stringify(this.selectionManager.csgSelection));
-
         this.selectionManager.clearLayerSelection();
 
         if (!memberKey) {
@@ -2371,7 +2300,6 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (event.shiftKey) {
-            console.log('[csg-nav] action: shift-toggle');
             this.selectionManager.clearCSGSelection();
             this.removeCSGHighlight();
             this.selectionManager.toggleTimber(memberKey);
@@ -2380,7 +2308,6 @@ class KigumiViewerApp extends LitElement {
             const point = [hit.point.x, hit.point.y, hit.point.z];
             const csg = this.selectionManager.csgSelection;
             const currentPath = (csg && csg.timberKey === memberKey) ? csg.path : [];
-            console.log('[csg-nav] action: navigate CSG, memberKey=' + memberKey + ', point=' + JSON.stringify(point) + ', currentPath=' + JSON.stringify(currentPath));
             if (typeof vscode !== 'undefined') {
                 vscode.postMessage({
                     type: 'findCSGAtPoint',
@@ -2391,7 +2318,6 @@ class KigumiViewerApp extends LitElement {
                 });
             }
         } else {
-            console.log('[csg-nav] action: select new timber ' + memberKey);
             this.selectionManager.clearCSGSelection();
             this.removeCSGHighlight();
             this.selectionManager.selectTimber(memberKey, false);
@@ -2408,15 +2334,6 @@ class KigumiViewerApp extends LitElement {
         const hlMesh = message.highlightMesh;
         const parentHlMesh = message.parentHighlightMesh || null;
         const stats = message.stats;
-
-        console.log('[csg-nav] csgSelectionResult:', JSON.stringify({
-            path,
-            featureLabel,
-            hlVerts: hlMesh ? hlMesh.vertices.length : 0,
-            hlIdx: hlMesh ? hlMesh.indices.length : 0,
-            parentHlVerts: parentHlMesh ? parentHlMesh.vertices.length : 0,
-            stats,
-        }));
 
         // Find which timber this applies to
         const csg = this.selectionManager.csgSelection;
@@ -2482,12 +2399,7 @@ class KigumiViewerApp extends LitElement {
         return div.innerHTML;
     }
 
-    _escapeAttr(str) {
-        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
     _buildHighlightMesh(vertices, indices, color, opacity, storeKey) {
-        console.log('[csg-nav] _buildHighlightMesh:', storeKey, 'verts=' + vertices.length, 'idx=' + indices.length, 'color=0x' + color.toString(16), 'opacity=' + opacity);
         const geometry = new THREE.BufferGeometry();
         const posArray = new Float32Array(vertices);
         geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
@@ -2747,31 +2659,6 @@ class KigumiViewerApp extends LitElement {
         return this.cameraController.clampPhi(value);
     }
 
-    normalizeAngle(value) {
-        let out = value;
-        while (out <= -Math.PI) {
-            out += Math.PI * 2;
-        }
-        while (out > Math.PI) {
-            out -= Math.PI * 2;
-        }
-        return out;
-    }
-
-    shortestAngleDelta(from, to) {
-        return this.normalizeAngle(to - from);
-    }
-
-    directionToAngles(direction) {
-        const length = Math.sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z) || 1;
-        const nx = direction.x / length;
-        const ny = direction.y / length;
-        const nz = direction.z / length;
-        const theta = Math.atan2(ny, nx);
-        const phi = this.clampPhi(Math.acos(Math.max(-1, Math.min(1, nz))));
-        return { theta, phi };
-    }
-
     animateCameraTo(targetOffsetDir, targetOrbitDist, durationMs = 260, targetUpVector = null, targetCenter = null) {
         this.cameraController.animateTo({
             offsetDir: targetOffsetDir,
@@ -2837,7 +2724,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this.activeTheme = id;
-        this.activeBackground = id;
         this.memberRenderProfileByType = {
             timber: theme.timberProfileId,
             accessory: theme.accessoryProfileId,
@@ -2853,10 +2739,6 @@ class KigumiViewerApp extends LitElement {
         this.style.background = this._buildCssBg(theme);
         this.applyRenderProfilesToScene();
         this.requestUpdate();
-    }
-
-    setBackground(id) {
-        this.setTheme(id);
     }
 
     setGeometryMode(mode) {
@@ -3531,21 +3413,6 @@ class KigumiViewerApp extends LitElement {
             this.applyRenderProfileToBundle(bundle, profileId);
         }
         this.applySelectionOpacity();
-    }
-
-    setMemberRenderProfile(memberType, profileId) {
-        if (!this.renderProfiles[profileId]) {
-            return;
-        }
-        if (memberType !== 'timber' && memberType !== 'accessory') {
-            return;
-        }
-        this.memberRenderProfileByType = {
-            ...this.memberRenderProfileByType,
-            [memberType]: profileId,
-        };
-        this.applyRenderProfilesToScene();
-        this.requestUpdate();
     }
 
     createGizmoFaceMaterial(label, backgroundColor) {
@@ -4388,7 +4255,6 @@ class KigumiViewerApp extends LitElement {
         this.updateCamera();
         this.updateLightFromAngles();
         this.drawLightDial();
-        this.updateStructureScreenBounds();
         if (this.isRefreshStale(refreshToken)) {
             return;
         }
@@ -4401,7 +4267,6 @@ class KigumiViewerApp extends LitElement {
         }
         this.cameraController.applyToCamera(this.camera);
         this.updateOrbitCenterGizmo();
-        this.updateStructureScreenBounds();
     }
 }
 
