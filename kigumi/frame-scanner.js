@@ -9,23 +9,11 @@
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
+const { getVenvPythonCandidates } = require('./python-env');
 
 function getPythonCandidates(workspaceRoot) {
-    if (process.platform === 'win32') {
-        return [
-            path.join(workspaceRoot, '.venv', 'Scripts', 'python.exe'),
-            path.join(workspaceRoot, 'venv', 'Scripts', 'python.exe'),
-            'python',
-        ];
-    }
-    return [
-        path.join(workspaceRoot, '.venv', 'bin', 'python3'),
-        path.join(workspaceRoot, '.venv', 'bin', 'python'),
-        path.join(workspaceRoot, 'venv', 'bin', 'python3'),
-        path.join(workspaceRoot, 'venv', 'bin', 'python'),
-        'python3',
-        'python',
-    ];
+    const fallbacks = process.platform === 'win32' ? ['python'] : ['python3', 'python'];
+    return [...getVenvPythonCandidates(workspaceRoot), ...fallbacks];
 }
 
 function runLibrarianCli(pythonCommand, workspaceRoot, timeoutMs) {

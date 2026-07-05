@@ -5,6 +5,7 @@ const { PythonRunnerSession } = require('./runner-session');
 const { FileWatcher } = require('./file-watcher');
 const { RefreshProfiler } = require('./refresh-profiler');
 const { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestViewerScreenshot } = require('./viewer');
+const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
 
 const VIEWER_LOG_LEVEL_ORDER = {
@@ -12,10 +13,6 @@ const VIEWER_LOG_LEVEL_ORDER = {
     info: 20,
     warn: 30,
     error: 40,
-};
-
-// Minimum level to allow per log source. Lower levels are suppressed.
-const VIEWER_LOG_SOURCE_MIN_LEVEL = {
 };
 
 function normalizeViewerLogLevel(level) {
@@ -27,13 +24,6 @@ function normalizeViewerLogLevel(level) {
         return 'info';
     }
     return normalized;
-}
-
-function shouldSuppressViewerLog(source, level) {
-    const effectiveSource = typeof source === 'string' && source ? source : 'webview';
-    const incomingLevel = normalizeViewerLogLevel(level);
-    const minLevel = normalizeViewerLogLevel(VIEWER_LOG_SOURCE_MIN_LEVEL[effectiveSource] || 'debug');
-    return VIEWER_LOG_LEVEL_ORDER[incomingLevel] < VIEWER_LOG_LEVEL_ORDER[minLevel];
 }
 
 function sanitizeLogPathSegment(value, fallback) {
@@ -87,6 +77,20 @@ class FrameViewSession {
         this._lastProfiling = null;
     }
 
+    // Project root for this session: the runner's resolved root if available,
+    // else the directory of the frame file. (getViewerSettingsPath adds a
+    // workspace-folder fallback in the middle and does not use this.)
+    get projectRoot() {
+        return (this.runnerSession && this.runnerSession.projectRoot) || path.dirname(this.filePath);
+    }
+
+    // Post a message to the webview if the panel is still live.
+    _postToWebview(message) {
+        if (this.panel && !this.isDisposed) {
+            this.panel.webview.postMessage(message);
+        }
+    }
+
     getViewerSettingsPath() {
         const workspaceFolder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(this.filePath));
         const projectRoot = this.runnerSession && this.runnerSession.projectRoot
@@ -123,17 +127,11 @@ class FrameViewSession {
     }
 
     getRefreshStatsPath() {
-        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
-            ? this.runnerSession.projectRoot
-            : path.dirname(this.filePath);
-        return path.join(projectRoot, '.kigumi', 'refresh-stats.json');
+        return path.join(this.projectRoot, '.kigumi', 'refresh-stats.json');
     }
 
     getLogsDirectoryPath() {
-        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
-            ? this.runnerSession.projectRoot
-            : path.dirname(this.filePath);
-        return path.join(projectRoot, '.kigumi', 'logs');
+        return path.join(this.projectRoot, '.kigumi', 'logs');
     }
 
     getSessionLogPath() {
@@ -286,11 +284,7 @@ class FrameViewSession {
                 });
                 return;
             }
-            if (message.type === 'openOutputChannel') {
-                this.channel.show(true);
-                return;
-            }
-            if (message.type === 'openKigumiOutput') {
+            if (message.type === 'openOutputChannel' || message.type === 'openKigumiOutput') {
                 this.channel.show(true);
                 return;
             }
@@ -358,9 +352,6 @@ class FrameViewSession {
             const eventName = typeof message.event === 'string' ? message.event : 'unknown';
             const source = typeof message.source === 'string' ? message.source : 'webview';
             const level = normalizeViewerLogLevel(message.level);
-            if (shouldSuppressViewerLog(source, level)) {
-                return;
-            }
             const version = typeof message.version === 'string' ? message.version : 'unknown';
             const details = message.details && typeof message.details === 'object'
                 ? JSON.stringify(message.details)
@@ -505,63 +496,14 @@ class FrameViewSession {
 
         const timeoutMs = Number.isFinite(options.timeoutMs) ? Number(options.timeoutMs) : 6000;
         const requestId = `${requestPrefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-        const requestType = `${type}Request`;
-        const resultType = `${type}Result`;
 
-        return new Promise((resolve, reject) => {
-            let settled = false;
-            let timeoutHandle = null;
-
-            const cleanup = () => {
-                if (timeoutHandle) {
-                    clearTimeout(timeoutHandle);
-                    timeoutHandle = null;
-                }
-                listener.dispose();
-            };
-
-            const listener = this.panel.webview.onDidReceiveMessage((message) => {
-                if (!message || message.type !== resultType || message.requestId !== requestId) {
-                    return;
-                }
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                cleanup();
-                if (message.ok) {
-                    resolve(message.payload || {});
-                    return;
-                }
-                reject(new Error(message.error || `${type} failed`));
-            });
-
-            timeoutHandle = setTimeout(() => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                cleanup();
-                reject(new Error(`Timed out waiting for ${type} (${timeoutMs}ms)`));
-            }, timeoutMs);
-
-            this.panel.webview.postMessage({
-                type: requestType,
-                requestId,
-                ...payload,
-            }).then((posted) => {
-                if (!posted && !settled) {
-                    settled = true;
-                    cleanup();
-                    reject(new Error(`Failed to post ${requestType} to webview`));
-                }
-            }, (error) => {
-                if (!settled) {
-                    settled = true;
-                    cleanup();
-                    reject(error);
-                }
-            });
+        return requestWebviewRoundTrip(this.panel.webview, {
+            requestType: `${type}Request`,
+            resultType: `${type}Result`,
+            requestId,
+            payload,
+            timeoutMs,
+            label: type,
         });
     }
 
@@ -790,7 +732,6 @@ class FrameViewSession {
             this._lastFrameData = frameData;
             this._lastGeometryData = geometryData;
             this._lastProfiling = profiling;
-            this._lastLayersData = layersData;
             if (layersData && this.panel && !this.isDisposed) {
                 this.panel.webview.postMessage({
                     type: 'layersTree',
@@ -878,60 +819,15 @@ class FrameViewSession {
         const timeoutMs = typeof options.timeoutMs === 'number' ? options.timeoutMs : 3000;
         const requestId = `panel-snapshot-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
 
-        return new Promise((resolve, reject) => {
-            let settled = false;
-            let timeoutHandle = null;
-
-            const cleanup = () => {
-                if (timeoutHandle) {
-                    clearTimeout(timeoutHandle);
-                    timeoutHandle = null;
-                }
-                listener.dispose();
-            };
-
-            const listener = this.panel.webview.onDidReceiveMessage((message) => {
-                if (!message || message.type !== 'capturePanelSnapshotResult' || message.requestId !== requestId) {
-                    return;
-                }
-                if (settled) {
-                    return;
-                }
-
-                settled = true;
-                cleanup();
-                if (message.ok) {
-                    resolve(message.snapshot || {});
-                    return;
-                }
-                reject(new Error(message.error || 'Panel snapshot failed'));
-            });
-
-            timeoutHandle = setTimeout(() => {
-                if (settled) {
-                    return;
-                }
-                settled = true;
-                cleanup();
-                reject(new Error(`Timed out waiting for panel snapshot (${timeoutMs}ms)`));
-            }, timeoutMs);
-
-            this.panel.webview.postMessage({
-                type: 'capturePanelSnapshotRequest',
-                requestId,
-            }).then((posted) => {
-                if (!posted && !settled) {
-                    settled = true;
-                    cleanup();
-                    reject(new Error('Failed to post panel snapshot request to webview'));
-                }
-            }, (error) => {
-                if (!settled) {
-                    settled = true;
-                    cleanup();
-                    reject(error);
-                }
-            });
+        return requestWebviewRoundTrip(this.panel.webview, {
+            requestType: 'capturePanelSnapshotRequest',
+            resultType: 'capturePanelSnapshotResult',
+            requestId,
+            timeoutMs,
+            extractResult: (message) => message.snapshot || {},
+            label: 'panel snapshot',
+            failMessage: 'Panel snapshot failed',
+            postFailMessage: 'Failed to post panel snapshot request to webview',
         });
     }
 
@@ -983,9 +879,7 @@ class FrameViewSession {
             ctrlClick: !!message.ctrlClick,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
-        if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage({ type: 'csgSelectionResult', ...result });
-        }
+        this._postToWebview({ type: 'csgSelectionResult', ...result });
     }
 
     async _handleRequestCSGTree(message) {
@@ -997,9 +891,7 @@ class FrameViewSession {
             cutIndex: Number.isFinite(message.cutIndex) ? Number(message.cutIndex) : 0,
         };
         const result = await this.runnerSession.slotRequest('get_csg_tree', this.slotName, payload);
-        if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage({ type: 'csgTree', payload: result });
-        }
+        this._postToWebview({ type: 'csgTree', payload: result });
     }
 
     async _handleRequestCSGByPath(message) {
@@ -1013,9 +905,7 @@ class FrameViewSession {
         };
         try {
             const result = await this.runnerSession.slotRequest('find_csg_by_path', this.slotName, payload);
-            if (this.panel && !this.isDisposed) {
-                this.panel.webview.postMessage({ type: 'csgSelectionResult', ...result });
-            }
+            this._postToWebview({ type: 'csgSelectionResult', ...result });
         } catch (err) {
             this.log(`[layers] find_csg_by_path failed: ${err.message || err}`);
         }
@@ -1028,15 +918,11 @@ class FrameViewSession {
         const result = applyFeatureFlagsToLayersPayload(
             await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
         );
-        if (this.panel && !this.isDisposed) {
-            this.panel.webview.postMessage({ type: 'layersTree', payload: result });
-        }
+        this._postToWebview({ type: 'layersTree', payload: result });
     }
 
     getExportDirectory() {
-        const projectRoot = this.runnerSession && this.runnerSession.projectRoot
-            ? this.runnerSession.projectRoot
-            : path.dirname(this.filePath);
+        const projectRoot = this.projectRoot;
         const baseName = path.basename(this.filePath, path.extname(this.filePath));
         const safeBaseName = (baseName || 'frame')
             .replace(/[^a-zA-Z0-9._-]+/g, '_')

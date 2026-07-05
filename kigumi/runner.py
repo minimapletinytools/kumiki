@@ -95,13 +95,6 @@ TARGET_MODULE_NAME = "_kigumi_viewer_target"
 
 
 @dataclass
-class ProfilingStats:
-    """Timing data collected during runner operations (seconds)."""
-    reload_s: Optional[float] = None
-    geometry_s: Optional[float] = None
-
-
-@dataclass
 class SlotState:
     """State for a single named viewer slot (e.g. 'main' or a pattern)."""
     file_path: Path
@@ -330,7 +323,7 @@ def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
 def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
     """Triangulate a local CSG in the timber's frame, returning flat vertex/index lists."""
     from kumiki.cutcsg import adopt_csg
-    from kumiki.rule import Transform, scalar
+    from kumiki.rule import Transform
     from kumiki.triangles import triangulate_cutcsg
 
     global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
@@ -347,6 +340,48 @@ def _triangulate_local_csg(cut_timber: Any, local_csg: Any) -> Dict[str, Any]:
         "vertices": triangle_mesh.vertices.reshape(-1).tolist(),
         "indices": triangle_mesh.faces.reshape(-1).tolist(),
         "bounds": bounds,
+    }
+
+
+def _base_member_payload(
+    *,
+    name: str,
+    member_type: str,
+    member_key: str,
+    kumiki_id: int,
+    tags: Any,
+    vertices: Any,
+    indices: Any,
+    prism_length: Any,
+    prism_width: Any,
+    prism_height: Any,
+    perfect_width: Any,
+    perfect_height: Any,
+    nominal_width: Any,
+    nominal_height: Any,
+) -> Dict[str, Any]:
+    """Common member-mesh payload shared by every geometry serializer.
+
+    Callers add type-specific extras (csg counts, timber class, fallback
+    markers, perfect-within meshes) to the returned dict.
+    """
+    return {
+        "name": name,
+        "memberName": name,
+        "memberType": member_type,
+        "memberKey": member_key,
+        "timberKey": member_key,
+        "kumikiId": kumiki_id,
+        "tags": tags,
+        "vertices": vertices,
+        "indices": indices,
+        "prism_length": round(float(prism_length), 6),
+        "prism_width": round(float(prism_width), 6),
+        "prism_height": round(float(prism_height), 6),
+        "perfect_width": round(float(perfect_width), 6),
+        "perfect_height": round(float(perfect_height), 6),
+        "nominal_width": round(float(nominal_width), 6),
+        "nominal_height": round(float(nominal_height), 6),
     }
 
 
@@ -376,30 +411,30 @@ def _cut_timber_to_triangle_mesh_payload(
     non_rectangular_classes = ('RoundTimber', 'MeshTimber', 'RegularPolygonTimber')
     has_non_rectangular_actual = timber_class in non_rectangular_classes
 
-    payload: Dict[str, Any] = {
-        "name": get_timber_display_name(timber),
-        "memberName": get_timber_display_name(timber),
-        "memberType": "timber",
-        "memberKey": timber_key,
-        "timberKey": timber_key,
-        "kumikiId": timber_kumiki_id,
-        "tags": timber_tags,
-        # Top-level vertices/indices remain the actual-geometry mesh for
-        # backwards compatibility with viewers that pre-date the dual mesh.
-        "vertices": vertices,
-        "indices": indices,
-        "prism_length": round(float(getattr(timber, "length", dims[2])), 6),
-        "prism_width": round(float(getattr(timber, "size", [dims[0], dims[1]])[0]), 6),
-        "prism_height": round(float(getattr(timber, "size", [dims[0], dims[1]])[1]), 6),
-        "perfect_width": round(float(perfect_size[0]), 6),
-        "perfect_height": round(float(perfect_size[1]), 6),
-        "nominal_width": round(float(nominal_size[0]), 6),
-        "nominal_height": round(float(nominal_size[1]), 6),
+    # Top-level vertices/indices remain the actual-geometry mesh for
+    # backwards compatibility with viewers that pre-date the dual mesh.
+    payload: Dict[str, Any] = _base_member_payload(
+        name=get_timber_display_name(timber),
+        member_type="timber",
+        member_key=timber_key,
+        kumiki_id=timber_kumiki_id,
+        tags=timber_tags,
+        vertices=vertices,
+        indices=indices,
+        prism_length=getattr(timber, "length", dims[2]),
+        prism_width=getattr(timber, "size", [dims[0], dims[1]])[0],
+        prism_height=getattr(timber, "size", [dims[0], dims[1]])[1],
+        perfect_width=perfect_size[0],
+        perfect_height=perfect_size[1],
+        nominal_width=nominal_size[0],
+        nominal_height=nominal_size[1],
+    )
+    payload.update({
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
         "timberClass": timber_class,
         "isPerfectTimber": is_perfect,
-    }
+    })
 
     # For non-rectangular-actual timbers, also triangulate the perfect-AABB CSG
     # so the viewer can swap meshes locally without round-tripping to Python.
@@ -448,24 +483,22 @@ def _accessory_to_triangle_mesh_payload(
 
     accessory_kumiki_id = int(accessory.ticket.kumiki_id) if getattr(accessory, "ticket", None) is not None else 0
     accessory_tags = _normalize_ticket_tags(getattr(accessory, "ticket", None))
-    return {
-        "name": accessory_name,
-        "memberName": accessory_name,
-        "memberType": "accessory",
-        "memberKey": accessory_key,
-        "timberKey": accessory_key,
-        "kumikiId": accessory_kumiki_id,
-        "tags": accessory_tags,
-        "vertices": vertices,
-        "indices": indices,
-        "prism_length": round(float(dims[2]), 6),
-        "prism_width": round(float(dims[0]), 6),
-        "prism_height": round(float(dims[1]), 6),
-        "perfect_width": round(float(dims[0]), 6),
-        "perfect_height": round(float(dims[1]), 6),
-        "nominal_width": round(float(dims[0]), 6),
-        "nominal_height": round(float(dims[1]), 6),
-    }
+    return _base_member_payload(
+        name=accessory_name,
+        member_type="accessory",
+        member_key=accessory_key,
+        kumiki_id=accessory_kumiki_id,
+        tags=accessory_tags,
+        vertices=vertices,
+        indices=indices,
+        prism_length=dims[2],
+        prism_width=dims[0],
+        prism_height=dims[1],
+        perfect_width=dims[0],
+        perfect_height=dims[1],
+        nominal_width=dims[0],
+        nominal_height=dims[1],
+    )
 
 
 def _cut_timber_to_bbox_mesh_payload(
@@ -490,30 +523,31 @@ def _cut_timber_to_bbox_mesh_payload(
     timber_kumiki_id = int(timber.ticket.kumiki_id)
     timber_class = type(timber).__name__
     is_perfect = bool(timber.is_perfect_timber())
-    return {
-        "name": get_timber_display_name(timber),
-        "memberName": get_timber_display_name(timber),
-        "memberType": "timber",
-        "memberKey": timber_key,
-        "timberKey": timber_key,
-        "kumikiId": timber_kumiki_id,
-        "tags": timber_tags,
-        "vertices": mesh["vertices"],
-        "indices": mesh["indices"],
-        "prism_length": round(float(getattr(timber, "length", 0.0)), 6),
-        "prism_width": round(float(getattr(timber, "size", [0.0, 0.0])[0]), 6),
-        "prism_height": round(float(getattr(timber, "size", [0.0, 0.0])[1]), 6),
-        "perfect_width": round(float(perfect_size[0]), 6),
-        "perfect_height": round(float(perfect_size[1]), 6),
-        "nominal_width": round(float(nominal_size[0]), 6),
-        "nominal_height": round(float(nominal_size[1]), 6),
+    payload = _base_member_payload(
+        name=get_timber_display_name(timber),
+        member_type="timber",
+        member_key=timber_key,
+        kumiki_id=timber_kumiki_id,
+        tags=timber_tags,
+        vertices=mesh["vertices"],
+        indices=mesh["indices"],
+        prism_length=getattr(timber, "length", 0.0),
+        prism_width=getattr(timber, "size", [0.0, 0.0])[0],
+        prism_height=getattr(timber, "size", [0.0, 0.0])[1],
+        perfect_width=perfect_size[0],
+        perfect_height=perfect_size[1],
+        nominal_width=nominal_size[0],
+        nominal_height=nominal_size[1],
+    )
+    payload.update({
         "csg_nodes": csg_nodes,
         "csg_features": csg_features,
         "meshSource": "bounding-prism-fallback",
         "timberClass": timber_class,
         "isPerfectTimber": is_perfect,
         "hasActualGeometryDifferentFromPerfect": False,
-    }
+    })
+    return payload
 
 
 def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
@@ -999,7 +1033,7 @@ def _build_assembly_payload(
 def _walk_tagged_csg(csg: Any, current_path: List[str], collected: List[Dict[str, Any]]) -> None:
     """Walk a CSG tree, collecting tagged nodes with their path and feature labels."""
     from kumiki.cutcsg import (
-        SolidUnion, Difference, HalfSpace, RectangularPrism, Cylinder,
+        SolidUnion, Difference, HalfSpace, RectangularPrism,
     )
 
     tag = getattr(csg, "tag", None)
@@ -1046,13 +1080,6 @@ def serialize_cut_csg_tree(cut_timber: Any, cut_index: int) -> Dict[str, Any]:
         "cutIndex": cut_index,
         "taggedCSGs": collected,
     }
-
-
-def build_placeholder_geometry(frame: Any) -> Dict[str, Any]:
-    # kept for reference – use build_real_geometry instead
-    slot = SlotState(file_path=Path("."), module=None, frame=frame)
-    dummy_state = RunnerState(slots={"main": slot}, active_slot="main")
-    return build_real_geometry(dummy_state)
 
 
 def _module_file_path(module: Any) -> Optional[Path]:
@@ -1772,55 +1799,6 @@ def _extract_highlight_mesh(
     return out_verts, out_idx, matched, total_tris
 
 
-def _debug_prism_distances(prism: Any, pt: List[float], eps: float, indent: int = 4) -> None:
-    """Log detailed distances from point to each face of a RectangularPrism."""
-    rot, pos = _build_inv_transform_float(prism.transform)
-    lp = _inv_transform_point(rot, pos, pt)
-    hw = float(prism.size[0]) / 2.0
-    hh = float(prism.size[1]) / 2.0
-    z0 = float(prism.start_distance) if prism.start_distance is not None else None
-    z1 = float(prism.end_distance) if prism.end_distance is not None else None
-    pad = " " * indent
-    log_stderr(f"[csg-nav] {pad}prism local_pt={[round(v,6) for v in lp]}, hw={hw:.4f}, hh={hh:.4f}, z0={z0}, z1={z1}")
-    log_stderr(f"[csg-nav] {pad}  dist to -X: {abs(lp[0]+hw):.6f}, +X: {abs(lp[0]-hw):.6f}")
-    log_stderr(f"[csg-nav] {pad}  dist to -Y: {abs(lp[1]+hh):.6f}, +Y: {abs(lp[1]-hh):.6f}")
-    if z0 is not None:
-        log_stderr(f"[csg-nav] {pad}  dist to z0: {abs(lp[2]-z0):.6f}")
-    else:
-        log_stderr(f"[csg-nav] {pad}  z0=None (infinite)")
-    if z1 is not None:
-        log_stderr(f"[csg-nav] {pad}  dist to z1: {abs(lp[2]-z1):.6f}")
-    else:
-        log_stderr(f"[csg-nav] {pad}  z1=None (infinite)")
-
-
-def _debug_difference_distances(diff: Any, pt: List[float], eps: float, indent: int = 4) -> None:
-    """Log detailed distances for a Difference CSG."""
-    from kumiki.cutcsg import HalfSpace as _HS, RectangularPrism as _RP
-    pad = " " * indent
-    base = diff.base
-    if isinstance(base, _HS):
-        n = [float(base.normal[k]) for k in range(3)]
-        dot_val = _dot3(n, pt)
-        offset = float(base.offset)
-        dist = abs(dot_val - offset)
-        inside = dot_val >= offset
-        log_stderr(f"[csg-nav] {pad}Diff.base HalfSpace: dot={dot_val:.6f}, offset={offset:.6f}, dist={dist:.6f}, inside={inside} (eps={eps})")
-    elif isinstance(base, _RP):
-        log_stderr(f"[csg-nav] {pad}Diff.base RectangularPrism:")
-        _debug_prism_distances(base, pt, eps, indent + 2)
-    for i, sub in enumerate(diff.subtract):
-        if isinstance(sub, _HS):
-            n = [float(sub.normal[k]) for k in range(3)]
-            dot_val = _dot3(n, pt)
-            offset = float(sub.offset)
-            dist = abs(dot_val - offset)
-            log_stderr(f"[csg-nav] {pad}Diff.sub[{i}] HalfSpace: dot={dot_val:.6f}, offset={offset:.6f}, dist={dist:.6f}")
-        elif isinstance(sub, _RP):
-            log_stderr(f"[csg-nav] {pad}Diff.sub[{i}] RectangularPrism:")
-            _debug_prism_distances(sub, pt, eps, indent + 2)
-
-
 def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
     """Process a find_csg_at_point request and return the result dict."""
     ss = slot_state if slot_state is not None else state._active
@@ -1851,81 +1829,21 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
 
     t0 = time.monotonic()
 
-    # --- Debug: describe the CSG tree ---
-    def _csg_debug_label(c: Any) -> str:
-        tag = getattr(c, "tag", None)
-        ctype = type(c).__name__
-        label = f"{ctype}"
-        if tag:
-            label += f'(tag="{tag}")'
-        return label
-
-    def _csg_tree_debug(c: Any, depth: int = 0) -> List[str]:
-        from kumiki.cutcsg import SolidUnion, Difference
-        indent = "  " * depth
-        lines = [f"{indent}{_csg_debug_label(c)}"]
-        if isinstance(c, Difference):
-            lines.append(f"{indent}  base: {_csg_debug_label(c.base)}")
-            for i, s in enumerate(c.subtract):
-                lines.append(f"{indent}  subtract[{i}]:")
-                lines.extend(_csg_tree_debug(s, depth + 2))
-        elif isinstance(c, SolidUnion):
-            for i, ch in enumerate(c.children):
-                lines.append(f"{indent}  child[{i}]:")
-                lines.extend(_csg_tree_debug(ch, depth + 2))
-        return lines
-
-    log_stderr(f"[csg-nav] === find_csg_at_point ===")
-    log_stderr(f"[csg-nav] memberKey={member_key}, ctrlClick={ctrl_click}")
-    log_stderr(f"[csg-nav] global point={[round(float(p), 4) for p in point]}")
-    log_stderr(f"[csg-nav] local point={[round(v, 4) for v in pt_local]}")
-    log_stderr(f"[csg-nav] currentPath={current_path}")
-    log_stderr(f"[csg-nav] CSG tree:")
-    for line in _csg_tree_debug(local_csg):
-        log_stderr(f"[csg-nav]   {line}")
-
     if ctrl_click:
         new_path, target_csg, feature_label = _navigate_csg_to_leaf(local_csg, pt_local, eps)
     else:
         if current_path:
             node = _resolve_csg_at_path(local_csg, current_path, pt_local, eps)
             on_boundary = _is_point_on_csg_boundary_float(node, pt_local, eps)
-            log_stderr(f"[csg-nav] resolved node at path: {_csg_debug_label(node)}, point on boundary={on_boundary}")
             if not on_boundary:
                 node = local_csg
                 current_path = []
-                log_stderr(f"[csg-nav] popped back to root")
         else:
             node = local_csg
-        log_stderr(f"[csg-nav] navigating from: {_csg_debug_label(node)}")
-
-        # Debug: test each subtract child boundary for Difference nodes
-        from kumiki.cutcsg import Difference as _Diff, SolidUnion as _SU, HalfSpace as _HS, RectangularPrism as _RP
-        if isinstance(node, _Diff):
-            for i, sub in enumerate(node.subtract):
-                on_b = _is_point_on_csg_boundary_float(sub, pt_local, eps)
-                log_stderr(f"[csg-nav]   subtract[{i}] {_csg_debug_label(sub)} boundary={on_b}")
-                if isinstance(sub, _SU):
-                    for j, ch in enumerate(sub.children):
-                        on_ch = _is_point_on_csg_boundary_float(ch, pt_local, eps)
-                        log_stderr(f"[csg-nav]     child[{j}] {_csg_debug_label(ch)} boundary={on_ch}")
-                        # Deep debug: show distances for primitives inside this child
-                        if isinstance(ch, _Diff):
-                            _debug_difference_distances(ch, pt_local, eps, indent=6)
-                        elif isinstance(ch, _HS):
-                            n = [float(ch.normal[k]) for k in range(3)]
-                            dist = abs(_dot3(n, pt_local) - float(ch.offset))
-                            log_stderr(f"[csg-nav]       HalfSpace dist={dist:.6f} (eps={eps}), n={[round(v,4) for v in n]}, offset={float(ch.offset):.4f}")
-            on_base = _is_point_on_csg_boundary_float(node.base, pt_local, eps)
-            log_stderr(f"[csg-nav]   base {_csg_debug_label(node.base)} boundary={on_base}")
-            if isinstance(node.base, _RP):
-                _debug_prism_distances(node.base, pt_local, eps, indent=4)
 
         new_path, target_csg, feature_label = _navigate_csg_one_level(
             node, pt_local, current_path, eps,
         )
-
-    log_stderr(f"[csg-nav] result: path={new_path}, featureLabel={feature_label}, target={_csg_debug_label(target_csg)}")
 
     parent_csg = None
     if new_path:
@@ -1944,7 +1862,6 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         selected_ref=parent_csg if feature_label is not None else target_csg,
         feature_label=feature_label,
     )
-    log_stderr(f"[csg-nav] highlight mesh: {matched}/{total} triangles matched")
 
     # When a feature (face) is selected, also extract the parent tagged CSG mesh
     # so the viewer can render the parent dimmer and the feature brighter.
@@ -2236,6 +2153,20 @@ def _raise_specific_pattern(
     )
 
 
+def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
+    """Return payload[key] if it is a non-empty string, else raise ValueError(message)."""
+    value = payload.get(key)
+    if not isinstance(value, str) or not value:
+        raise ValueError(message)
+    return value
+
+
+def _opt_dict(payload: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
+    """Return payload[key] if it is a dict, else None."""
+    value = payload.get(key)
+    return value if isinstance(value, dict) else None
+
+
 def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerState, Dict[str, Any], bool]:
     request_id = request.get("id")
     command = request.get("command")
@@ -2251,7 +2182,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         slot_name = _resolve_slot_name(state, payload)
         old_slot = state.slots.get(slot_name)
         next_path = payload.get("filePath", str(state.get_slot(slot_name).file_path))
-        render_parameters = payload.get("renderParameters") if isinstance(payload.get("renderParameters"), dict) else None
+        render_parameters = _opt_dict(payload, "renderParameters")
         old_cache = old_slot.mesh_cache if old_slot else {}
         t0 = time.monotonic()
 
@@ -2298,10 +2229,8 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "get_csg_tree":
         ss = _resolve_slot(state, payload)
-        member_key = payload.get("memberKey")
+        member_key = _require_str(payload, "memberKey", "get_csg_tree requires payload.memberKey")
         cut_index = payload.get("cutIndex")
-        if not isinstance(member_key, str) or not member_key:
-            raise ValueError("get_csg_tree requires payload.memberKey")
         if not isinstance(cut_index, int):
             raise ValueError("get_csg_tree requires integer payload.cutIndex")
         cached = ss.mesh_cache.get(member_key)
@@ -2327,9 +2256,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "get_member":
         ss = _resolve_slot(state, payload)
-        member_name = payload.get("name")
-        if not isinstance(member_name, str) or not member_name:
-            raise ValueError("get_member requires payload.name")
+        member_name = _require_str(payload, "name", "get_member requires payload.name")
         return state, make_success_response(request_id, command, get_member_result(ss.frame, member_name)), False
 
     if command == "find_csg_at_point":
@@ -2345,13 +2272,9 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
     # --- Slot management ---
 
     if command == "load_slot":
-        slot_name = payload.get("slot")
-        file_path = payload.get("filePath")
-        render_parameters = payload.get("renderParameters") if isinstance(payload.get("renderParameters"), dict) else None
-        if not isinstance(slot_name, str) or not slot_name:
-            raise ValueError("load_slot requires payload.slot")
-        if not isinstance(file_path, str) or not file_path:
-            raise ValueError("load_slot requires payload.filePath")
+        slot_name = _require_str(payload, "slot", "load_slot requires payload.slot")
+        file_path = _require_str(payload, "filePath", "load_slot requires payload.filePath")
+        render_parameters = _opt_dict(payload, "renderParameters")
         t0 = time.monotonic()
         new_slot = load_slot_state(file_path, render_parameters=render_parameters)
         reload_s = time.monotonic() - t0
@@ -2371,9 +2294,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         return state, make_success_response(request_id, command, result), False
 
     if command == "unload_slot":
-        slot_name = payload.get("slot")
-        if not isinstance(slot_name, str) or not slot_name:
-            raise ValueError("unload_slot requires payload.slot")
+        slot_name = _require_str(payload, "slot", "unload_slot requires payload.slot")
         if slot_name == state.active_slot:
             raise ValueError(f"Cannot unload the active slot '{slot_name}'")
         removed = slot_name in state.slots
@@ -2403,16 +2324,10 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         return state, make_success_response(request_id, command, result), False
 
     if command == "raise_specific_pattern":
-        slot_name = payload.get("slot")
-        source_file = payload.get("sourceFile")
-        pattern_name = payload.get("patternName")
-        render_parameters = payload.get("renderParameters") if isinstance(payload.get("renderParameters"), dict) else None
-        if not isinstance(slot_name, str) or not slot_name:
-            raise ValueError("raise_specific_pattern requires payload.slot")
-        if not isinstance(source_file, str) or not source_file:
-            raise ValueError("raise_specific_pattern requires payload.sourceFile")
-        if not isinstance(pattern_name, str) or not pattern_name:
-            raise ValueError("raise_specific_pattern requires payload.patternName")
+        slot_name = _require_str(payload, "slot", "raise_specific_pattern requires payload.slot")
+        source_file = _require_str(payload, "sourceFile", "raise_specific_pattern requires payload.sourceFile")
+        pattern_name = _require_str(payload, "patternName", "raise_specific_pattern requires payload.patternName")
+        render_parameters = _opt_dict(payload, "renderParameters")
         new_slot, result = _raise_specific_pattern(
             source_file,
             pattern_name,
@@ -2444,50 +2359,30 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             except ValueError as exc:
                 raise ValueError("export_frame outputDir must be inside project kigumi_exports/") from exc
 
-        if export_format == "stl":
-            from kumiki.blueprint import export_frame_stl
+        from kumiki.blueprint import (
+            export_frame_stl,
+            export_frame_3mf,
+            export_frame_obj,
+            export_frame_step,
+        )
 
-            written = export_frame_stl(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.stl"
-            extension_glob = "*.stl"
-        elif export_format == "3mf":
-            from kumiki.blueprint import export_frame_3mf
-
-            written = export_frame_3mf(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.3mf"
-            extension_glob = "*.stl"
-        elif export_format == "obj":
-            from kumiki.blueprint import export_frame_obj
-
-            written = export_frame_obj(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.obj"
-            extension_glob = "*.obj"
-        else:
-            from kumiki.blueprint import export_frame_step
-
-            written = export_frame_step(
-                ss.frame,
-                output_dir,
-                combined=include_combined,
-                include_accessories=include_accessories,
-            )
-            combined_name = "_combined.step"
-            extension_glob = "*.step"
+        # export_format is validated above, and the file extension equals the
+        # format name for every supported format — so combined_name/glob are
+        # derived from it directly (no per-format string can drift).
+        exporters = {
+            "stl": export_frame_stl,
+            "3mf": export_frame_3mf,
+            "obj": export_frame_obj,
+            "step": export_frame_step,
+        }
+        written = exporters[export_format](
+            ss.frame,
+            output_dir,
+            combined=include_combined,
+            include_accessories=include_accessories,
+        )
+        combined_name = f"_combined.{export_format}"
+        extension_glob = f"*.{export_format}"
 
         if not include_individuals:
             for candidate in output_dir.glob(extension_glob):

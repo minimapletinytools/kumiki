@@ -119,7 +119,6 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 const SELECTION_VISUAL_STATES = Object.freeze({
     NOTHING_SELECTED: 'nothing_selected',
     TIMBER_SELECTED_NO_SUB: 'timber_selected_no_sub',
-    TIMBER_SELECTED_WITH_SUB: 'timber_selected_with_sub',
     TAGGED_CSG_SELECTED_NO_SUB: 'tagged_csg_selected_no_sub',
     TAGGED_CSG_SELECTED_WITH_SUB: 'tagged_csg_selected_with_sub',
     FEATURE_SELECTED: 'feature_selected',
@@ -352,6 +351,136 @@ if (!AssemblyTimeline) {
 // flags script isn't wired into some future embedding.
 const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 
+// Axis-aligned bounds accumulation over flat [x,y,z,...] position arrays.
+function createBoundsAccumulator() {
+    return {
+        minX: Infinity, minY: Infinity, minZ: Infinity,
+        maxX: -Infinity, maxY: -Infinity, maxZ: -Infinity,
+        hasAny: false,
+    };
+}
+
+function accumulateBounds(acc, positions) {
+    for (let index = 0; index < positions.length; index += 3) {
+        acc.hasAny = true;
+        const vx = positions[index];
+        const vy = positions[index + 1];
+        const vz = positions[index + 2];
+        if (vx < acc.minX) acc.minX = vx;
+        if (vx > acc.maxX) acc.maxX = vx;
+        if (vy < acc.minY) acc.minY = vy;
+        if (vy > acc.maxY) acc.maxY = vy;
+        if (vz < acc.minZ) acc.minZ = vz;
+        if (vz > acc.maxZ) acc.maxZ = vz;
+    }
+    return acc;
+}
+
+function boundsFromAccumulator(acc) {
+    const { minX, minY, minZ, maxX, maxY, maxZ } = acc;
+    return { minX, minY, minZ, maxX, maxY, maxZ };
+}
+
+// Export formats in menu order, and the KigumiViewerApp property backing each.
+const EXPORT_FORMATS = ['stl', '3mf', 'obj', 'step'];
+const EXPORT_FORMAT_PROP = {
+    stl: 'exportFormatStlEnabled',
+    '3mf': 'exportFormat3mfEnabled',
+    obj: 'exportFormatObjEnabled',
+    step: 'exportFormatStepEnabled',
+};
+
+// Classify the current selection into one of SELECTION_VISUAL_STATES from a
+// plain snapshot (list of selected timber keys + the csg subselection), so the
+// decision is pure and independently testable.
+function computeSelectionVisualContext(selectedTimbers, csgSelection) {
+    const selectedTimberSet = new Set(selectedTimbers);
+    if (selectedTimberSet.size === 0) {
+        return {
+            state: SELECTION_VISUAL_STATES.NOTHING_SELECTED,
+            selectedTimberSet,
+            hasSubselection: false,
+            subselectionTimberKey: null,
+        };
+    }
+
+    const csg = csgSelection;
+    const path = csg && Array.isArray(csg.path) ? csg.path : [];
+    const featureLabel = csg && csg.featureLabel ? csg.featureLabel : null;
+    const csgTimberKey = csg && csg.timberKey ? csg.timberKey : null;
+    const hasSubselection = !!csg && (path.length > 0 || !!featureLabel);
+    if (!hasSubselection) {
+        return {
+            state: SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB,
+            selectedTimberSet,
+            hasSubselection: false,
+            subselectionTimberKey: null,
+        };
+    }
+
+    const subselectionTimberKey = csgTimberKey
+        || (selectedTimbers.length === 1 ? selectedTimbers[0] : null);
+
+    let state;
+    if (featureLabel) {
+        state = SELECTION_VISUAL_STATES.FEATURE_SELECTED;
+    } else if (path.length >= 2) {
+        state = SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB;
+    } else {
+        // hasSubselection with no featureLabel guarantees path.length > 0, so
+        // the only remaining case here is path.length === 1.
+        state = SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB;
+    }
+
+    return { state, selectedTimberSet, hasSubselection: true, subselectionTimberKey };
+}
+
+// Opacity/highlight policy per selection state. dimmedOpacity depends on the
+// user's base unselected opacity, so each entry is a small factory.
+const SELECTION_VISUAL_POLICIES = {
+    [SELECTION_VISUAL_STATES.NOTHING_SELECTED]: () => ({
+        selectedTimberOpacity: 1.0,
+        dimmedOpacity: 1.0,
+        csgHighlightOpacity: 0.7,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.85,
+    }),
+    [SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB]: (base) => ({
+        selectedTimberOpacity: 1.0,
+        dimmedOpacity: base,
+        csgHighlightOpacity: 0.7,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.85,
+    }),
+    [SELECTION_VISUAL_STATES.FEATURE_SELECTED]: (base) => ({
+        selectedTimberOpacity: 0.62,
+        dimmedOpacity: Math.min(base, 0.18),
+        csgHighlightOpacity: 0.9,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.9,
+    }),
+    [SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB]: (base) => ({
+        selectedTimberOpacity: 0.66,
+        dimmedOpacity: Math.min(base, 0.2),
+        csgHighlightOpacity: 0.8,
+        parentHighlightOpacity: 0.3,
+        featureHighlightOpacity: 0.85,
+    }),
+    [SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB]: (base) => ({
+        selectedTimberOpacity: 0.72,
+        dimmedOpacity: Math.min(base, 0.25),
+        csgHighlightOpacity: 0.72,
+        parentHighlightOpacity: 0.35,
+        featureHighlightOpacity: 0.85,
+    }),
+};
+
+function selectionVisualPolicy(state, baseUnselectedOpacity) {
+    const factory = SELECTION_VISUAL_POLICIES[state]
+        || SELECTION_VISUAL_POLICIES[SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB];
+    return factory(baseUnselectedOpacity);
+}
+
 class ViewerSettingsPanel {
     constructor(app) {
         this.app = app;
@@ -511,195 +640,118 @@ class ViewerSettingsPanel {
         `;
     }
 
+    // Declarative description of every settings control: which element id it
+    // binds to, which DOM event drives it, how to apply a change to the app
+    // (`apply`), and — where the control reflects app state — how to sync the
+    // element from the app (`sync`). bindEvents and syncControls both iterate
+    // this instead of enumerating the same ~16 ids twice.
+    get controlDescriptors() {
+        const app = this.app;
+        return [
+            { id: 'center-gizmo-toggle', on: 'change', apply: (el) => app.setCenterGizmoEnabled(el.checked) },
+            { id: 'edges-toggle', on: 'change', apply: (el) => app.setEdgesEnabled(el.checked) },
+            { id: 'shadows-toggle', on: 'change', apply: (el) => app.setShadowsEnabled(el.checked) },
+            { id: 'reflections-toggle', on: 'change', apply: (el) => app.setReflectionsEnabled(el.checked) },
+            { id: 'footprint-toggle', on: 'change', apply: (el) => app.setFootprintsEnabled(el.checked) },
+            {
+                id: 'debug-toggle', on: 'change',
+                apply: (el, renderRoot) => {
+                    app.debugEnabled = el.checked;
+                    const debugEl = renderRoot.querySelector('#debug');
+                    if (debugEl) {
+                        debugEl.style.display = app.debugEnabled ? 'block' : 'none';
+                    }
+                },
+            },
+            {
+                id: 'left-click-rotate-toggle', on: 'change',
+                apply: (el) => app.setLeftClickDragRotatesCameraEnabled(el.checked),
+                sync: (el) => { el.checked = app.leftClickDragRotatesCamera; },
+            },
+            {
+                id: 'assembly-timeline-toggle', on: 'change',
+                apply: (el) => app.setShowAssemblyTimeline(el.checked),
+                sync: (el) => { el.checked = app.showAssemblyTimeline; },
+            },
+            {
+                id: 'export-combined-toggle', on: 'change',
+                apply: (el) => app.setExportCombinedEnabled(el.checked),
+                sync: (el) => { el.checked = app.exportCombinedEnabled; },
+            },
+            {
+                id: 'export-individual-toggle', on: 'change',
+                apply: (el) => app.setExportIndividualsEnabled(el.checked),
+                sync: (el) => { el.checked = app.exportIndividualsEnabled; },
+            },
+            {
+                id: 'export-accessories-toggle', on: 'change',
+                apply: (el) => app.setExportAccessoriesEnabled(el.checked),
+                sync: (el) => { el.checked = app.exportAccessoriesEnabled; },
+            },
+            ...EXPORT_FORMATS.map((format) => ({
+                id: `export-format-${format}-toggle`, on: 'change',
+                apply: (el) => app.setExportFormatEnabled(format, el.checked),
+                sync: (el) => { el.checked = app[EXPORT_FORMAT_PROP[format]]; },
+            })),
+            {
+                id: 'edge-visibility-slider', on: 'input',
+                apply: (el) => {
+                    const raw = Number(el.value);
+                    const percent = Number.isFinite(raw) ? Math.max(0, Math.min(100, Math.round(raw / 5) * 5)) : 100;
+                    app.setEdgeLineVisibilityPercent(percent);
+                },
+                sync: (el) => { el.value = String(app.edgeLineVisibilityPercent); },
+            },
+            {
+                id: 'unselected-transparency-slider', on: 'input',
+                apply: (el) => {
+                    const raw = Number(el.value);
+                    const visibility = Number.isFinite(raw) ? Math.max(5, Math.min(100, Math.round(raw / 5) * 5)) : 60;
+                    app.setUnselectedTransparencyPercent(100 - visibility);
+                },
+                sync: (el) => { el.value = String(100 - app.unselectedTransparencyPercent); },
+            },
+            {
+                id: 'disassembly-multiplier-slider', on: 'input',
+                apply: (el) => app.setDisassemblyMultiplier(Number(el.value)),
+                sync: (el) => { el.value = String(app.disassemblyMultiplier); },
+            },
+            {
+                id: 'theme-select', on: 'change',
+                apply: (el) => app.setTheme(el.value),
+                sync: (el) => { el.value = app.activeTheme; },
+            },
+            {
+                id: 'geometry-mode-select', on: 'change',
+                apply: (el) => app.setGeometryMode(el.value),
+                sync: (el) => {
+                    if (app.viewerOptions) {
+                        el.value = app.viewerOptions.geometryMode || 'actual';
+                    }
+                },
+            },
+        ];
+    }
+
     bindEvents(renderRoot) {
-        const centerGizmoToggle = renderRoot.querySelector('#center-gizmo-toggle');
-        const edgesToggle = renderRoot.querySelector('#edges-toggle');
-        const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
-        const shadowsToggle = renderRoot.querySelector('#shadows-toggle');
-        const reflectionsToggle = renderRoot.querySelector('#reflections-toggle');
-        const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
-        const debugToggle = renderRoot.querySelector('#debug-toggle');
-        const leftClickRotateToggle = renderRoot.querySelector('#left-click-rotate-toggle');
-        const exportCombinedToggle = renderRoot.querySelector('#export-combined-toggle');
-        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
-        const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
-        const exportFormatStlToggle = renderRoot.querySelector('#export-format-stl-toggle');
-        const exportFormat3mfToggle = renderRoot.querySelector('#export-format-3mf-toggle');
-        const exportFormatObjToggle = renderRoot.querySelector('#export-format-obj-toggle');
-        const exportFormatStepToggle = renderRoot.querySelector('#export-format-step-toggle');
-        const themeSelect = renderRoot.querySelector('#theme-select');
-
-        centerGizmoToggle.addEventListener('change', (event) => {
-            this.app.setCenterGizmoEnabled(event.target.checked);
-        });
-
-        edgesToggle.addEventListener('change', (event) => {
-            this.app.setEdgesEnabled(event.target.checked);
-        });
-
-        edgeVisibilitySlider.addEventListener('input', (event) => {
-            const rawPercent = Number(event.target.value);
-            const normalizedPercent = Number.isFinite(rawPercent)
-                ? Math.max(0, Math.min(100, Math.round(rawPercent / 5) * 5))
-                : 100;
-            this.app.setEdgeLineVisibilityPercent(normalizedPercent);
-        });
-
-        debugToggle.addEventListener('change', (event) => {
-            this.app.debugEnabled = event.target.checked;
-            const debugEl = renderRoot.querySelector('#debug');
-            if (debugEl) {
-                debugEl.style.display = this.app.debugEnabled ? 'block' : 'none';
+        for (const control of this.controlDescriptors) {
+            const el = renderRoot.querySelector(`#${control.id}`);
+            if (!el) {
+                continue;
             }
-        });
-
-        if (leftClickRotateToggle) {
-            leftClickRotateToggle.addEventListener('change', (event) => {
-                this.app.setLeftClickDragRotatesCameraEnabled(event.target.checked);
-            });
-        }
-
-        shadowsToggle.addEventListener('change', (event) => {
-            this.app.setShadowsEnabled(event.target.checked);
-        });
-
-        reflectionsToggle.addEventListener('change', (event) => {
-            this.app.setReflectionsEnabled(event.target.checked);
-        });
-
-        const footprintToggle = renderRoot.querySelector('#footprint-toggle');
-        if (footprintToggle) {
-            footprintToggle.addEventListener('change', (event) => {
-                this.app.setFootprintsEnabled(event.target.checked);
-            });
-        }
-
-        const assemblyTimelineToggle = renderRoot.querySelector('#assembly-timeline-toggle');
-        if (assemblyTimelineToggle) {
-            assemblyTimelineToggle.addEventListener('change', (event) => {
-                this.app.setShowAssemblyTimeline(event.target.checked);
-            });
-        }
-
-        const disassemblyMultiplierSlider = renderRoot.querySelector('#disassembly-multiplier-slider');
-        if (disassemblyMultiplierSlider) {
-            disassemblyMultiplierSlider.addEventListener('input', (event) => {
-                this.app.setDisassemblyMultiplier(Number(event.target.value));
-            });
-        }
-
-        if (exportCombinedToggle) {
-            exportCombinedToggle.addEventListener('change', (event) => {
-                this.app.setExportCombinedEnabled(event.target.checked);
-            });
-        }
-        if (exportIndividualToggle) {
-            exportIndividualToggle.addEventListener('change', (event) => {
-                this.app.setExportIndividualsEnabled(event.target.checked);
-            });
-        }
-        if (exportAccessoriesToggle) {
-            exportAccessoriesToggle.addEventListener('change', (event) => {
-                this.app.setExportAccessoriesEnabled(event.target.checked);
-            });
-        }
-        if (exportFormatStlToggle) {
-            exportFormatStlToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('stl', event.target.checked);
-            });
-        }
-        if (exportFormat3mfToggle) {
-            exportFormat3mfToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('3mf', event.target.checked);
-            });
-        }
-        if (exportFormatObjToggle) {
-            exportFormatObjToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('obj', event.target.checked);
-            });
-        }
-        if (exportFormatStepToggle) {
-            exportFormatStepToggle.addEventListener('change', (event) => {
-                this.app.setExportFormatEnabled('step', event.target.checked);
-            });
-        }
-
-        unselectedTransparencySlider.addEventListener('input', (event) => {
-            const rawVisibility = Number(event.target.value);
-            const normalizedVisibility = Number.isFinite(rawVisibility)
-                ? Math.max(5, Math.min(100, Math.round(rawVisibility / 5) * 5))
-                : 60;
-            this.app.setUnselectedTransparencyPercent(100 - normalizedVisibility);
-        });
-
-        themeSelect.addEventListener('change', (event) => {
-            this.app.setTheme(event.target.value);
-        });
-
-        const geometryModeSelect = renderRoot.querySelector('#geometry-mode-select');
-        if (geometryModeSelect) {
-            geometryModeSelect.addEventListener('change', (event) => {
-                this.app.setGeometryMode(event.target.value);
-            });
+            el.addEventListener(control.on, () => control.apply(el, renderRoot));
         }
     }
 
     syncControls(renderRoot) {
-        const edgeVisibilitySlider = renderRoot.querySelector('#edge-visibility-slider');
-        const unselectedTransparencySlider = renderRoot.querySelector('#unselected-transparency-slider');
-        const exportCombinedToggle = renderRoot.querySelector('#export-combined-toggle');
-        const exportIndividualToggle = renderRoot.querySelector('#export-individual-toggle');
-        const exportAccessoriesToggle = renderRoot.querySelector('#export-accessories-toggle');
-        const exportFormatStlToggle = renderRoot.querySelector('#export-format-stl-toggle');
-        const exportFormat3mfToggle = renderRoot.querySelector('#export-format-3mf-toggle');
-        const exportFormatObjToggle = renderRoot.querySelector('#export-format-obj-toggle');
-        const exportFormatStepToggle = renderRoot.querySelector('#export-format-step-toggle');
-        const themeSelect = renderRoot.querySelector('#theme-select');
-        const leftClickRotateToggle = renderRoot.querySelector('#left-click-rotate-toggle');
-        if (edgeVisibilitySlider) {
-            edgeVisibilitySlider.value = String(this.app.edgeLineVisibilityPercent);
-        }
-        if (unselectedTransparencySlider) {
-            unselectedTransparencySlider.value = String(100 - this.app.unselectedTransparencyPercent);
-        }
-        const assemblyTimelineToggle = renderRoot.querySelector('#assembly-timeline-toggle');
-        if (assemblyTimelineToggle) {
-            assemblyTimelineToggle.checked = this.app.showAssemblyTimeline;
-        }
-        const disassemblyMultiplierSlider = renderRoot.querySelector('#disassembly-multiplier-slider');
-        if (disassemblyMultiplierSlider) {
-            disassemblyMultiplierSlider.value = String(this.app.disassemblyMultiplier);
-        }
-        if (leftClickRotateToggle) {
-            leftClickRotateToggle.checked = this.app.leftClickDragRotatesCamera;
-        }
-        if (exportCombinedToggle) {
-            exportCombinedToggle.checked = this.app.exportCombinedEnabled;
-        }
-        if (exportIndividualToggle) {
-            exportIndividualToggle.checked = this.app.exportIndividualsEnabled;
-        }
-        if (exportAccessoriesToggle) {
-            exportAccessoriesToggle.checked = this.app.exportAccessoriesEnabled;
-        }
-        if (exportFormatStlToggle) {
-            exportFormatStlToggle.checked = this.app.exportFormatStlEnabled;
-        }
-        if (exportFormat3mfToggle) {
-            exportFormat3mfToggle.checked = this.app.exportFormat3mfEnabled;
-        }
-        if (exportFormatObjToggle) {
-            exportFormatObjToggle.checked = this.app.exportFormatObjEnabled;
-        }
-        if (exportFormatStepToggle) {
-            exportFormatStepToggle.checked = this.app.exportFormatStepEnabled;
-        }
-        if (themeSelect) {
-            themeSelect.value = this.app.activeTheme;
-        }
-        const geometryModeSelect = renderRoot.querySelector('#geometry-mode-select');
-        if (geometryModeSelect && this.app.viewerOptions) {
-            geometryModeSelect.value = this.app.viewerOptions.geometryMode || 'actual';
+        for (const control of this.controlDescriptors) {
+            if (!control.sync) {
+                continue;
+            }
+            const el = renderRoot.querySelector(`#${control.id}`);
+            if (el) {
+                control.sync(el);
+            }
         }
     }
 }
@@ -887,8 +939,6 @@ class KigumiViewerApp extends LitElement {
             'cx', 'cy', 'cz',
             'orbitDist',
             'cameraOffsetDir', 'cameraUpVector',
-            'cameraAnimation',
-            'dragOrbitUpAxis', 'dragOrbitRightAxis',
         ];
         for (const field of FORWARDED_CAMERA_FIELDS) {
             Object.defineProperty(this, field, {
@@ -971,7 +1021,6 @@ class KigumiViewerApp extends LitElement {
         this.edgeLineVisibilityPercent = 100;
         this.unselectedTransparencyPercent = 70;
         this.activeTheme = 'forest';
-        this.activeBackground = this.activeTheme;
 
         this.animationHandle = null;
         this.viewState = createInitialViewState();
@@ -1533,83 +1582,37 @@ class KigumiViewerApp extends LitElement {
         this.applySelectionOpacity();
     }
 
-    setExportFormatEnabled(format, enabled) {
+    // Set a boolean export-related flag, re-rendering only when it changes.
+    _setExportFlag(prop, enabled) {
         const normalized = Boolean(enabled);
-        if (format === 'stl') {
-            if (this.exportFormatStlEnabled === normalized) {
-                return;
-            }
-            this.exportFormatStlEnabled = normalized;
-            this.requestUpdate();
+        if (this[prop] === normalized) {
             return;
         }
-        if (format === '3mf') {
-            if (this.exportFormat3mfEnabled === normalized) {
-                return;
-            }
-            this.exportFormat3mfEnabled = normalized;
-            this.requestUpdate();
-            return;
-        }
-        if (format === 'obj') {
-            if (this.exportFormatObjEnabled === normalized) {
-                return;
-            }
-            this.exportFormatObjEnabled = normalized;
-            this.requestUpdate();
-            return;
-        }
-        if (format === 'step') {
-            if (this.exportFormatStepEnabled === normalized) {
-                return;
-            }
-            this.exportFormatStepEnabled = normalized;
-            this.requestUpdate();
+        this[prop] = normalized;
+        this.requestUpdate();
+    }
+
+    setExportFormatEnabled(format, enabled) {
+        const prop = EXPORT_FORMAT_PROP[format];
+        if (prop) {
+            this._setExportFlag(prop, enabled);
         }
     }
 
     setExportCombinedEnabled(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.exportCombinedEnabled === normalized) {
-            return;
-        }
-        this.exportCombinedEnabled = normalized;
-        this.requestUpdate();
+        this._setExportFlag('exportCombinedEnabled', enabled);
     }
 
     setExportIndividualsEnabled(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.exportIndividualsEnabled === normalized) {
-            return;
-        }
-        this.exportIndividualsEnabled = normalized;
-        this.requestUpdate();
+        this._setExportFlag('exportIndividualsEnabled', enabled);
     }
 
     setExportAccessoriesEnabled(enabled) {
-        const normalized = Boolean(enabled);
-        if (this.exportAccessoriesEnabled === normalized) {
-            return;
-        }
-        this.exportAccessoriesEnabled = normalized;
-        this.requestUpdate();
+        this._setExportFlag('exportAccessoriesEnabled', enabled);
     }
 
     getSelectedExportFormats() {
-        const formats = [];
-        if (this.exportFormatStlEnabled) {
-            formats.push('stl');
-        }
-        if (this.exportFormat3mfEnabled) {
-            formats.push('3mf');
-        }
-        if (this.exportFormatObjEnabled) {
-            formats.push('obj');
-        }
-        if (this.exportFormatStepEnabled) {
-            formats.push('step');
-        }
-        return formats;
+        return EXPORT_FORMATS.filter((format) => this[EXPORT_FORMAT_PROP[format]]);
     }
 
     collectViewerSettingsPayload() {
@@ -1857,68 +1860,6 @@ class KigumiViewerApp extends LitElement {
         });
     }
 
-    updateStructureScreenBounds() {
-        if (!this.camera || !this.lastBounds) {
-            this.structureScreenBounds = null;
-            return;
-        }
-        const viewport = this.renderRoot.querySelector('#viewport');
-        if (!viewport) {
-            this.structureScreenBounds = null;
-            return;
-        }
-        const width = viewport.clientWidth;
-        const height = viewport.clientHeight;
-        if (width <= 0 || height <= 0) {
-            this.structureScreenBounds = null;
-            return;
-        }
-
-        const bounds = this.lastBounds;
-        const corners = [
-            [bounds.minX, bounds.minY, bounds.minZ],
-            [bounds.minX, bounds.minY, bounds.maxZ],
-            [bounds.minX, bounds.maxY, bounds.minZ],
-            [bounds.minX, bounds.maxY, bounds.maxZ],
-            [bounds.maxX, bounds.minY, bounds.minZ],
-            [bounds.maxX, bounds.minY, bounds.maxZ],
-            [bounds.maxX, bounds.maxY, bounds.minZ],
-            [bounds.maxX, bounds.maxY, bounds.maxZ],
-        ];
-
-        let minX = Infinity;
-        let maxX = -Infinity;
-        let minY = Infinity;
-        let maxY = -Infinity;
-        let hasPoint = false;
-
-        for (const corner of corners) {
-            const projected = new THREE.Vector3(corner[0], corner[1], corner[2]).project(this.camera);
-            if (!Number.isFinite(projected.x) || !Number.isFinite(projected.y)) {
-                continue;
-            }
-            const sx = ((projected.x + 1) * 0.5) * width;
-            const sy = ((1 - projected.y) * 0.5) * height;
-            minX = Math.min(minX, sx);
-            maxX = Math.max(maxX, sx);
-            minY = Math.min(minY, sy);
-            maxY = Math.max(maxY, sy);
-            hasPoint = true;
-        }
-
-        if (!hasPoint) {
-            this.structureScreenBounds = null;
-            return;
-        }
-
-        this.structureScreenBounds = {
-            minX: Math.max(0, minX),
-            maxX: Math.min(width, maxX),
-            minY: Math.max(0, minY),
-            maxY: Math.min(height, maxY),
-        };
-    }
-
     onWindowMessage(event) {
         const message = event.data || {};
         if (message.type === 'viewerState') {
@@ -2153,80 +2094,61 @@ class KigumiViewerApp extends LitElement {
         };
     }
 
-    handleCollectPendingRenderParametersRequest(message) {
+    // Reply to a `${type}Request` message with a `${type}Result` carrying the
+    // value returned by `produce()` (or ok:false with its error). Only for
+    // handlers whose result is shaped `{ ok, payload }`; the capture handlers
+    // use a different result shape and post directly.
+    respondToRequest(message, resultType, produce, fallbackError = 'Request failed') {
         const requestId = message && message.requestId;
         if (!vscode || !requestId) {
             return;
         }
-
         try {
-            vscode.postMessage({
-                type: 'collectPendingRenderParametersResult',
-                requestId,
-                ok: true,
-                payload: {
-                    renderParameters: { ...this.pendingRenderParameters },
-                },
-            });
+            const payload = produce();
+            vscode.postMessage({ type: resultType, requestId, ok: true, payload });
         } catch (error) {
             vscode.postMessage({
-                type: 'collectPendingRenderParametersResult',
+                type: resultType,
                 requestId,
                 ok: false,
-                error: error && error.message ? error.message : 'Failed to read pending render parameters',
+                error: error && error.message ? error.message : fallbackError,
             });
         }
+    }
+
+    handleCollectPendingRenderParametersRequest(message) {
+        this.respondToRequest(
+            message,
+            'collectPendingRenderParametersResult',
+            () => ({ renderParameters: { ...this.pendingRenderParameters } }),
+            'Failed to read pending render parameters',
+        );
     }
 
     handleGetCameraStateRequest(message) {
-        const requestId = message && message.requestId;
-        if (!vscode || !requestId) {
-            return;
-        }
-        try {
-            vscode.postMessage({
-                type: 'getCameraStateResult',
-                requestId,
-                ok: true,
-                payload: this.buildCameraStatePayload(),
-            });
-        } catch (error) {
-            vscode.postMessage({
-                type: 'getCameraStateResult',
-                requestId,
-                ok: false,
-                error: error && error.message ? error.message : 'Failed to read camera state',
-            });
-        }
+        this.respondToRequest(
+            message,
+            'getCameraStateResult',
+            () => this.buildCameraStatePayload(),
+            'Failed to read camera state',
+        );
     }
 
     handleSetCameraStateRequest(message) {
-        const requestId = message && message.requestId;
-        if (!vscode || !requestId) {
-            return;
-        }
-        try {
-            const cameraState = message && message.cameraState && typeof message.cameraState === 'object'
-                ? message.cameraState
-                : {};
-            this.cameraController.applyStatePayload(cameraState);
-            this.requestUpdate();
-            this.updateCamera();
-
-            vscode.postMessage({
-                type: 'setCameraStateResult',
-                requestId,
-                ok: true,
-                payload: this.buildCameraStatePayload(),
-            });
-        } catch (error) {
-            vscode.postMessage({
-                type: 'setCameraStateResult',
-                requestId,
-                ok: false,
-                error: error && error.message ? error.message : 'Failed to set camera state',
-            });
-        }
+        this.respondToRequest(
+            message,
+            'setCameraStateResult',
+            () => {
+                const cameraState = message && message.cameraState && typeof message.cameraState === 'object'
+                    ? message.cameraState
+                    : {};
+                this.cameraController.applyStatePayload(cameraState);
+                this.requestUpdate();
+                this.updateCamera();
+                return this.buildCameraStatePayload();
+            },
+            'Failed to set camera state',
+        );
     }
 
     onWindowScroll() {
@@ -2315,7 +2237,6 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setSize(width, height, false);
         this.resizeGizmoRenderer();
         this.drawLightDial();
-        this.updateStructureScreenBounds();
     }
 
     handleCanvasClick(event) {
@@ -2359,11 +2280,6 @@ class KigumiViewerApp extends LitElement {
         let hit = intersects[0];
         let memberKey = this.meshKeyMap.get(hit.object);
 
-        const allHitKeys = intersects.map((h) => this.meshKeyMap.get(h.object)).filter(Boolean);
-        console.log('[csg-nav] click: allHits=' + JSON.stringify(allHitKeys) +
-            ', selectedTimbers=' + JSON.stringify(this.selectionManager.getSelectedTimbers()) +
-            ', csgSelection=' + JSON.stringify(this.selectionManager.csgSelection));
-
         this.selectionManager.clearLayerSelection();
 
         if (!memberKey) {
@@ -2371,7 +2287,6 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (event.shiftKey) {
-            console.log('[csg-nav] action: shift-toggle');
             this.selectionManager.clearCSGSelection();
             this.removeCSGHighlight();
             this.selectionManager.toggleTimber(memberKey);
@@ -2380,7 +2295,6 @@ class KigumiViewerApp extends LitElement {
             const point = [hit.point.x, hit.point.y, hit.point.z];
             const csg = this.selectionManager.csgSelection;
             const currentPath = (csg && csg.timberKey === memberKey) ? csg.path : [];
-            console.log('[csg-nav] action: navigate CSG, memberKey=' + memberKey + ', point=' + JSON.stringify(point) + ', currentPath=' + JSON.stringify(currentPath));
             if (typeof vscode !== 'undefined') {
                 vscode.postMessage({
                     type: 'findCSGAtPoint',
@@ -2391,7 +2305,6 @@ class KigumiViewerApp extends LitElement {
                 });
             }
         } else {
-            console.log('[csg-nav] action: select new timber ' + memberKey);
             this.selectionManager.clearCSGSelection();
             this.removeCSGHighlight();
             this.selectionManager.selectTimber(memberKey, false);
@@ -2408,15 +2321,6 @@ class KigumiViewerApp extends LitElement {
         const hlMesh = message.highlightMesh;
         const parentHlMesh = message.parentHighlightMesh || null;
         const stats = message.stats;
-
-        console.log('[csg-nav] csgSelectionResult:', JSON.stringify({
-            path,
-            featureLabel,
-            hlVerts: hlMesh ? hlMesh.vertices.length : 0,
-            hlIdx: hlMesh ? hlMesh.indices.length : 0,
-            parentHlVerts: parentHlMesh ? parentHlMesh.vertices.length : 0,
-            stats,
-        }));
 
         // Find which timber this applies to
         const csg = this.selectionManager.csgSelection;
@@ -2482,12 +2386,7 @@ class KigumiViewerApp extends LitElement {
         return div.innerHTML;
     }
 
-    _escapeAttr(str) {
-        return str.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-
     _buildHighlightMesh(vertices, indices, color, opacity, storeKey) {
-        console.log('[csg-nav] _buildHighlightMesh:', storeKey, 'verts=' + vertices.length, 'idx=' + indices.length, 'color=0x' + color.toString(16), 'opacity=' + opacity);
         const geometry = new THREE.BufferGeometry();
         const posArray = new Float32Array(vertices);
         geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
@@ -2531,129 +2430,14 @@ class KigumiViewerApp extends LitElement {
     }
 
     _getSelectionVisualContext() {
-        const selectedTimbers = this.selectionManager.getSelectedTimbers();
-        const selectedTimberSet = new Set(selectedTimbers);
-        const hasTimberSelection = selectedTimberSet.size > 0;
-        if (!hasTimberSelection) {
-            return {
-                state: SELECTION_VISUAL_STATES.NOTHING_SELECTED,
-                selectedTimberSet,
-                hasSubselection: false,
-                subselectionTimberKey: null,
-            };
-        }
-
-        const csg = this.selectionManager.csgSelection;
-        const path = csg && Array.isArray(csg.path) ? csg.path : [];
-        const featureLabel = csg && csg.featureLabel ? csg.featureLabel : null;
-        const csgTimberKey = csg && csg.timberKey ? csg.timberKey : null;
-        const hasSubselection = !!csg && (path.length > 0 || !!featureLabel);
-        const subselectionTimberKey = hasSubselection
-            ? (csgTimberKey || (selectedTimbers.length === 1 ? selectedTimbers[0] : null))
-            : null;
-
-        if (!hasSubselection) {
-            return {
-                state: SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB,
-                selectedTimberSet,
-                hasSubselection: false,
-                subselectionTimberKey: null,
-            };
-        }
-
-        if (featureLabel) {
-            return {
-                state: SELECTION_VISUAL_STATES.FEATURE_SELECTED,
-                selectedTimberSet,
-                hasSubselection: true,
-                subselectionTimberKey,
-            };
-        }
-
-        if (path.length >= 2) {
-            return {
-                state: SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB,
-                selectedTimberSet,
-                hasSubselection: true,
-                subselectionTimberKey,
-            };
-        }
-
-        if (path.length === 1) {
-            return {
-                state: SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB,
-                selectedTimberSet,
-                hasSubselection: true,
-                subselectionTimberKey,
-            };
-        }
-
-        return {
-            state: SELECTION_VISUAL_STATES.TIMBER_SELECTED_WITH_SUB,
-            selectedTimberSet,
-            hasSubselection: true,
-            subselectionTimberKey,
-        };
+        return computeSelectionVisualContext(
+            this.selectionManager.getSelectedTimbers(),
+            this.selectionManager.csgSelection,
+        );
     }
 
     _getSelectionVisualPolicy(state, baseUnselectedOpacity) {
-        if (state === SELECTION_VISUAL_STATES.NOTHING_SELECTED) {
-            return {
-                selectedTimberOpacity: 1.0,
-                dimmedOpacity: 1.0,
-                csgHighlightOpacity: 0.7,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
-            return {
-                selectedTimberOpacity: 1.0,
-                dimmedOpacity: baseUnselectedOpacity,
-                csgHighlightOpacity: 0.7,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.FEATURE_SELECTED) {
-            return {
-                selectedTimberOpacity: 0.62,
-                dimmedOpacity: Math.min(baseUnselectedOpacity, 0.18),
-                csgHighlightOpacity: 0.9,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.9,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_WITH_SUB) {
-            return {
-                selectedTimberOpacity: 0.66,
-                dimmedOpacity: Math.min(baseUnselectedOpacity, 0.2),
-                csgHighlightOpacity: 0.8,
-                parentHighlightOpacity: 0.3,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        if (state === SELECTION_VISUAL_STATES.TAGGED_CSG_SELECTED_NO_SUB) {
-            return {
-                selectedTimberOpacity: 0.72,
-                dimmedOpacity: Math.min(baseUnselectedOpacity, 0.25),
-                csgHighlightOpacity: 0.72,
-                parentHighlightOpacity: 0.35,
-                featureHighlightOpacity: 0.85,
-            };
-        }
-
-        return {
-            selectedTimberOpacity: 0.72,
-            dimmedOpacity: Math.min(baseUnselectedOpacity, 0.25),
-            csgHighlightOpacity: 0.72,
-            parentHighlightOpacity: 0.35,
-            featureHighlightOpacity: 0.85,
-        };
+        return selectionVisualPolicy(state, baseUnselectedOpacity);
     }
 
     applySelectionOpacity() {
@@ -2747,31 +2531,6 @@ class KigumiViewerApp extends LitElement {
         return this.cameraController.clampPhi(value);
     }
 
-    normalizeAngle(value) {
-        let out = value;
-        while (out <= -Math.PI) {
-            out += Math.PI * 2;
-        }
-        while (out > Math.PI) {
-            out -= Math.PI * 2;
-        }
-        return out;
-    }
-
-    shortestAngleDelta(from, to) {
-        return this.normalizeAngle(to - from);
-    }
-
-    directionToAngles(direction) {
-        const length = Math.sqrt(direction.x * direction.x + direction.y * direction.y + direction.z * direction.z) || 1;
-        const nx = direction.x / length;
-        const ny = direction.y / length;
-        const nz = direction.z / length;
-        const theta = Math.atan2(ny, nx);
-        const phi = this.clampPhi(Math.acos(Math.max(-1, Math.min(1, nz))));
-        return { theta, phi };
-    }
-
     animateCameraTo(targetOffsetDir, targetOrbitDist, durationMs = 260, targetUpVector = null, targetCenter = null) {
         this.cameraController.animateTo({
             offsetDir: targetOffsetDir,
@@ -2796,39 +2555,20 @@ class KigumiViewerApp extends LitElement {
             return this.getSceneBounds();
         }
 
-        let minX = Infinity;
-        let minY = Infinity;
-        let minZ = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        let maxZ = -Infinity;
-        let hasAny = false;
-
+        const acc = createBoundsAccumulator();
         for (const key of selected) {
             const bundle = this.meshObjectsByKey.get(key);
             if (!bundle || !bundle.mesh || !bundle.mesh.geometry) {
                 continue;
             }
-            const positions = bundle.mesh.geometry.getAttribute('position').array;
-            for (let index = 0; index < positions.length; index += 3) {
-                hasAny = true;
-                const vx = positions[index];
-                const vy = positions[index + 1];
-                const vz = positions[index + 2];
-                if (vx < minX) minX = vx;
-                if (vx > maxX) maxX = vx;
-                if (vy < minY) minY = vy;
-                if (vy > maxY) maxY = vy;
-                if (vz < minZ) minZ = vz;
-                if (vz > maxZ) maxZ = vz;
-            }
+            accumulateBounds(acc, bundle.mesh.geometry.getAttribute('position').array);
         }
 
-        if (!hasAny) {
+        if (!acc.hasAny) {
             return this.getSceneBounds();
         }
 
-        return { minX, minY, minZ, maxX, maxY, maxZ };
+        return boundsFromAccumulator(acc);
     }
 
     setTheme(id) {
@@ -2837,7 +2577,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this.activeTheme = id;
-        this.activeBackground = id;
         this.memberRenderProfileByType = {
             timber: theme.timberProfileId,
             accessory: theme.accessoryProfileId,
@@ -2853,10 +2592,6 @@ class KigumiViewerApp extends LitElement {
         this.style.background = this._buildCssBg(theme);
         this.applyRenderProfilesToScene();
         this.requestUpdate();
-    }
-
-    setBackground(id) {
-        this.setTheme(id);
     }
 
     setGeometryMode(mode) {
@@ -3454,12 +3189,13 @@ class KigumiViewerApp extends LitElement {
         return this.memberRenderProfileByType.timber;
     }
 
-    createMaterialSetForMemberType(memberType) {
-        const profileId = this.resolveRenderProfileIdForMemberType(memberType);
-        const profile = this.resolveRenderProfile(profileId);
+    // Single source of truth for the solid/edge/reflection material parameters
+    // derived from a render profile. Used both to construct new materials
+    // (createMaterialSetForMemberType) and to mutate existing ones
+    // (applyRenderProfileToBundle), so the two paths never drift.
+    renderProfileMaterialSpecs(profile) {
         return {
-            profileId,
-            solid: new THREE.MeshStandardMaterial({
+            solid: {
                 color: profile.solidColor,
                 metalness: profile.metalness,
                 roughness: profile.roughness,
@@ -3468,15 +3204,15 @@ class KigumiViewerApp extends LitElement {
                 polygonOffsetFactor: 2,
                 polygonOffsetUnits: 2,
                 side: THREE.FrontSide,
-            }),
-            edge: new THREE.LineBasicMaterial({
+            },
+            edge: {
                 color: profile.edgeColor,
                 transparent: true,
                 opacity: profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100),
                 depthTest: false,
                 depthWrite: false,
-            }),
-            reflection: new THREE.MeshStandardMaterial({
+            },
+            reflection: {
                 color: profile.reflectionColor,
                 metalness: profile.reflectionMetalness,
                 roughness: profile.reflectionRoughness,
@@ -3485,7 +3221,30 @@ class KigumiViewerApp extends LitElement {
                 flatShading: true,
                 depthWrite: false,
                 side: THREE.DoubleSide,
-            }),
+            },
+        };
+    }
+
+    // Apply a material spec (as built by renderProfileMaterialSpecs) to an
+    // existing THREE material in place. `color` is a hex number applied via
+    // setHex; every other key is assigned directly.
+    applyMaterialSpec(material, spec) {
+        const { color, ...rest } = spec;
+        if (color !== undefined) {
+            material.color.setHex(color);
+        }
+        Object.assign(material, rest);
+        material.needsUpdate = true;
+    }
+
+    createMaterialSetForMemberType(memberType) {
+        const profileId = this.resolveRenderProfileIdForMemberType(memberType);
+        const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
+        return {
+            profileId,
+            solid: new THREE.MeshStandardMaterial(specs.solid),
+            edge: new THREE.LineBasicMaterial(specs.edge),
+            reflection: new THREE.MeshStandardMaterial(specs.reflection),
         };
     }
 
@@ -3493,35 +3252,11 @@ class KigumiViewerApp extends LitElement {
         if (!bundle || !bundle.mesh || !bundle.mesh.material || !bundle.edges || !bundle.edges.material || !bundle.reflection || !bundle.reflection.material) {
             return;
         }
-        const profile = this.resolveRenderProfile(profileId);
+        const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
         bundle.profileId = profileId;
-
-        bundle.mesh.material.color.setHex(profile.solidColor);
-        bundle.mesh.material.metalness = profile.metalness;
-        bundle.mesh.material.roughness = profile.roughness;
-        bundle.mesh.material.flatShading = true;
-        bundle.mesh.material.polygonOffset = true;
-        bundle.mesh.material.polygonOffsetFactor = 2;
-        bundle.mesh.material.polygonOffsetUnits = 2;
-        bundle.mesh.material.side = THREE.FrontSide;
-        bundle.mesh.material.needsUpdate = true;
-
-        bundle.edges.material.color.setHex(profile.edgeColor);
-        bundle.edges.material.opacity = profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100);
-        bundle.edges.material.transparent = true;
-        bundle.edges.material.depthTest = false;
-        bundle.edges.material.depthWrite = false;
-        bundle.edges.material.needsUpdate = true;
-
-        bundle.reflection.material.color.setHex(profile.reflectionColor);
-        bundle.reflection.material.metalness = profile.reflectionMetalness;
-        bundle.reflection.material.roughness = profile.reflectionRoughness;
-        bundle.reflection.material.opacity = profile.reflectionOpacity;
-        bundle.reflection.material.transparent = true;
-        bundle.reflection.material.flatShading = true;
-        bundle.reflection.material.depthWrite = false;
-        bundle.reflection.material.side = THREE.DoubleSide;
-        bundle.reflection.material.needsUpdate = true;
+        this.applyMaterialSpec(bundle.mesh.material, specs.solid);
+        this.applyMaterialSpec(bundle.edges.material, specs.edge);
+        this.applyMaterialSpec(bundle.reflection.material, specs.reflection);
     }
 
     applyRenderProfilesToScene() {
@@ -3531,21 +3266,6 @@ class KigumiViewerApp extends LitElement {
             this.applyRenderProfileToBundle(bundle, profileId);
         }
         this.applySelectionOpacity();
-    }
-
-    setMemberRenderProfile(memberType, profileId) {
-        if (!this.renderProfiles[profileId]) {
-            return;
-        }
-        if (memberType !== 'timber' && memberType !== 'accessory') {
-            return;
-        }
-        this.memberRenderProfileByType = {
-            ...this.memberRenderProfileByType,
-            [memberType]: profileId,
-        };
-        this.applyRenderProfilesToScene();
-        this.requestUpdate();
     }
 
     createGizmoFaceMaterial(label, backgroundColor) {
@@ -4282,35 +4002,16 @@ class KigumiViewerApp extends LitElement {
     }
 
     getSceneBounds() {
-        let minX = Infinity;
-        let minY = Infinity;
-        let minZ = Infinity;
-        let maxX = -Infinity;
-        let maxY = -Infinity;
-        let maxZ = -Infinity;
-        let hasAny = false;
-
+        const acc = createBoundsAccumulator();
         this.meshObjectsByKey.forEach((bundle) => {
-            const positions = bundle.mesh.geometry.getAttribute('position').array;
-            for (let index = 0; index < positions.length; index += 3) {
-                hasAny = true;
-                const vx = positions[index];
-                const vy = positions[index + 1];
-                const vz = positions[index + 2];
-                if (vx < minX) minX = vx;
-                if (vx > maxX) maxX = vx;
-                if (vy < minY) minY = vy;
-                if (vy > maxY) maxY = vy;
-                if (vz < minZ) minZ = vz;
-                if (vz > maxZ) maxZ = vz;
-            }
+            accumulateBounds(acc, bundle.mesh.geometry.getAttribute('position').array);
         });
 
-        if (!hasAny) {
+        if (!acc.hasAny) {
             return { minX: -1, minY: -1, minZ: -1, maxX: 1, maxY: 1, maxZ: 1 };
         }
 
-        return { minX, minY, minZ, maxX, maxY, maxZ };
+        return boundsFromAccumulator(acc);
     }
 
     async applyPayload(payload, refreshToken) {
@@ -4388,7 +4089,6 @@ class KigumiViewerApp extends LitElement {
         this.updateCamera();
         this.updateLightFromAngles();
         this.drawLightDial();
-        this.updateStructureScreenBounds();
         if (this.isRefreshStale(refreshToken)) {
             return;
         }
@@ -4401,7 +4101,6 @@ class KigumiViewerApp extends LitElement {
         }
         this.cameraController.applyToCamera(this.camera);
         this.updateOrbitCenterGizmo();
-        this.updateStructureScreenBounds();
     }
 }
 

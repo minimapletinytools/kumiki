@@ -1,19 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const vscode = require('vscode');
-
-/**
- * Detects if a Python file is a patternbook by checking for:
- * - `patternbook = ...` at module level
- * - `create_*_patternbook(...)` function definition
- * @param {string} fileContent
- * @returns {boolean}
- */
-function isPatternbookFile(fileContent) {
-    if (/^\s*patternbook\s*=/m.test(fileContent)) return true;
-    if (/^\s*def\s+create_\w+_patternbook\s*\(/m.test(fileContent)) return true;
-    return false;
-}
 
 /**
  * Extracts patternbook name from a file path or content.
@@ -23,28 +9,6 @@ function isPatternbookFile(fileContent) {
  */
 function getPatternbookName(sourceFile) {
     return path.basename(sourceFile, '.py');
-}
-
-/**
- * Opens a file in the workspace or shows it as read-only if it's from dependencies.
- * @param {vscode.Uri} fileUri - The file URI to open
- * @param {boolean} readOnly - Whether to open as read-only
- */
-async function openFileInEditor(fileUri, readOnly = false) {
-    try {
-        const doc = await vscode.workspace.openTextDocument(fileUri);
-        const editor = await vscode.window.showTextDocument(doc);
-        
-        if (readOnly) {
-            // VS Code doesn't have a direct API to make a document read-only,
-            // but we can show a message and disable editing via command
-            await vscode.commands.executeCommand('workbench.action.files.setActiveEditorReadonlyInSession');
-        }
-        
-        return editor;
-    } catch (error) {
-        throw new Error(`Failed to open file: ${error.message}`);
-    }
 }
 
 /**
@@ -134,10 +98,6 @@ function groupPatternsByPatternbook(patterns) {
 }
 
 module.exports = {
-    isPatternbookFile,
-    getPatternbookName,
-    openFileInEditor,
-    copyPatternToWorkspace,
     duplicatePatternToWorkspace,
     viewShippedPatternSource,
     groupPatternsByPatternbook,

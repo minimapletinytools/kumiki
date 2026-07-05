@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const { spawn } = require('child_process');
 const https = require('https');
 const {
     ensureKigumiYaml,
@@ -8,19 +7,16 @@ const {
     KUMIKI_YAML_RELATIVE_PATH,
     LEGACY_KIGUMI_YAML_NAME,
 } = require('./project-root');
+const {
+    runCommand: spawnProcess,
+    getVenvPython,
+    getKigumiVersion,
+    kumikiCompatiblePipSpec,
+    getMissingDependencies,
+} = require('./python-env');
 
 const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
 const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
-
-function getKigumiVersion() {
-    return JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'), 'utf8')).version;
-}
-
-// pip ~= spec: kigumi 0.3.2 → "kumiki~=0.3.0" (>=0.3.0, <0.4.0)
-function kumikiCompatiblePipSpec() {
-    const [major, minor] = getKigumiVersion().split('.').map(Number);
-    return `kumiki~=${major}.${minor}.0`;
-}
 
 function stripLeadingYamlFrontmatter(content) {
     if (!content.startsWith('---')) {
@@ -205,13 +201,6 @@ function ensureGitignore(workspaceRoot) {
     };
 }
 
-function getVenvPython(workspaceRoot) {
-    if (process.platform === 'win32') {
-        return path.join(workspaceRoot, '.venv', 'Scripts', 'python.exe');
-    }
-    return path.join(workspaceRoot, '.venv', 'bin', 'python3');
-}
-
 function getBootstrapPythonLaunchers() {
     if (process.platform === 'win32') {
         return [
@@ -231,35 +220,7 @@ function getBootstrapPythonLaunchers() {
 }
 
 function runCommand(command, args, cwd) {
-    return new Promise((resolve, reject) => {
-        const child = spawn(command, args, {
-            cwd,
-            stdio: ['ignore', 'pipe', 'pipe'],
-        });
-
-        let stdout = '';
-        let stderr = '';
-
-        child.stdout.on('data', (chunk) => {
-            stdout += chunk.toString();
-        });
-
-        child.stderr.on('data', (chunk) => {
-            stderr += chunk.toString();
-        });
-
-        child.on('error', (error) => {
-            reject(error);
-        });
-
-        child.on('close', (code) => {
-            if (code === 0) {
-                resolve({ stdout, stderr });
-                return;
-            }
-            reject(new Error(`${command} ${args.join(' ')} failed with exit code ${code}: ${stderr.trim()}`));
-        });
-    });
+    return spawnProcess(command, args, { cwd });
 }
 
 async function canRunCommand(command, args, cwd) {
@@ -505,18 +466,12 @@ async function createVenv(workspaceRoot) {
 }
 
 async function getMissingViewerDependencies(workspaceRoot, pythonPath) {
-    const snippet = [
-        'import importlib.util',
-        'required = ["sympy", "numpy", "trimesh", "manifold3d"]',
-        'missing = [name for name in required if importlib.util.find_spec(name) is None]',
-        'print("\\n".join(missing))',
-    ].join('; ');
-
-    const { stdout } = await runCommand(pythonPath, ['-c', snippet], workspaceRoot);
-    return stdout
-        .split('\n')
-        .map((line) => line.trim())
-        .filter((line) => line.length > 0);
+    // The initializer omits "kumiki" from the required list (it is installed
+    // separately in installOrUpdateKumiki); see python-env.js.
+    return getMissingDependencies(pythonPath, {
+        cwd: workspaceRoot,
+        required: ['sympy', 'numpy', 'trimesh', 'manifold3d'],
+    });
 }
 
 async function ensurePipAvailable(workspaceRoot, pythonPath) {
