@@ -68,6 +68,21 @@ function _isDuplicableLibraryElement(element) {
     return _isLibraryPatternLeafElement(element) || _isLibraryPatternbookGroupElement(element);
 }
 
+// Register a command and add its disposable to the extension subscriptions.
+function register(context, id, handler) {
+    context.subscriptions.push(vscode.commands.registerCommand(id, handler));
+}
+
+// Run `fn(session)` for the session identified by automation `options`, or
+// return the shared not-found result (merged with `notFoundExtra`).
+function withSession(options, fn, notFoundExtra = {}) {
+    const session = findSessionFromOptions(options);
+    if (!session) {
+        return { ok: false, reason: 'session-not-found', ...notFoundExtra };
+    }
+    return fn(session);
+}
+
 /**
  * Main activation function for the Kigumi extension.
  * @param {vscode.ExtensionContext} context
@@ -175,7 +190,7 @@ function activate(context) {
     }));
     context.subscriptions.push(sidebarProvider, explorerTreeView);
 
-    const disposable = vscode.commands.registerCommand('kigumi.render', async function () {
+    register(context, 'kigumi.render', async function () {
         try {
             await renderActiveEditor(context);
         } catch (error) {
@@ -186,9 +201,7 @@ function activate(context) {
         }
     });
 
-    context.subscriptions.push(disposable);
-
-    const openCurrentFileInViewer = vscode.commands.registerCommand('kigumi.openCurrentFileInViewer', async () => {
+    register(context, 'kigumi.openCurrentFileInViewer', async () => {
         try {
             await renderActiveEditor(context, {
                 usePanelParameters: true,
@@ -199,48 +212,40 @@ function activate(context) {
             vscode.window.showErrorMessage(`Open current file failed: ${error.message || error}`);
         }
     });
-    context.subscriptions.push(openCurrentFileInViewer);
 
-    const openExplorer = vscode.commands.registerCommand('kigumi.explorer', async () => {
+    register(context, 'kigumi.explorer', async () => {
         await vscode.commands.executeCommand('workbench.view.extension.kigumi');
     });
-    context.subscriptions.push(openExplorer);
 
-    const initializeProjectInWorkspace = vscode.commands.registerCommand('kigumi.initializeProjectInWorkspace', async () => {
+    register(context, 'kigumi.initializeProjectInWorkspace', async () => {
         await runProjectHeaderAction();
     });
-    context.subscriptions.push(initializeProjectInWorkspace);
 
-    const projectHeaderAction = vscode.commands.registerCommand('kigumi.projectHeaderAction', async () => {
+    register(context, 'kigumi.projectHeaderAction', async () => {
         await runProjectHeaderAction();
     });
-    context.subscriptions.push(projectHeaderAction);
 
-    const updateKumiki = vscode.commands.registerCommand('kigumi.updateKumiki', async () => {
+    register(context, 'kigumi.updateKumiki', async () => {
         await runProjectHeaderUpdateAction();
     });
-    context.subscriptions.push(updateKumiki);
 
-    const openWebsite = vscode.commands.registerCommand('kigumi.openWebsite', async () => {
+    register(context, 'kigumi.openWebsite', async () => {
         await vscode.env.openExternal(vscode.Uri.parse('https://github.com/minimapletinytools/kumiki'));
     });
-    context.subscriptions.push(openWebsite);
 
-    const refreshSidebar = vscode.commands.registerCommand('kigumi.refreshSidebar', async () => {
+    register(context, 'kigumi.refreshSidebar', async () => {
         if (sidebarProvider) {
             await sidebarProvider.refresh(true);
         }
     });
-    context.subscriptions.push(refreshSidebar);
 
-    const refreshPatterns = vscode.commands.registerCommand('kigumi.refreshPatterns', async () => {
+    register(context, 'kigumi.refreshPatterns', async () => {
         if (sidebarProvider) {
             await sidebarProvider.refreshPatterns(true);
         }
     });
-    context.subscriptions.push(refreshPatterns);
 
-    const toggleAutoRefresh = vscode.commands.registerCommand('kigumi.toggleAutoRefreshOnFileChange', async () => {
+    register(context, 'kigumi.toggleAutoRefreshOnFileChange', async () => {
         const current = vscode.workspace.getConfiguration('kigumi').get('viewer.autoRefreshOnFileChange', false);
         const nextValue = !current;
         await vscode.workspace.getConfiguration('kigumi').update(
@@ -251,9 +256,8 @@ function activate(context) {
         vscode.window.showInformationMessage(`Kigumi auto refresh on file change ${nextValue ? 'enabled' : 'disabled'}.`);
         return { enabled: nextValue };
     });
-    context.subscriptions.push(toggleAutoRefresh);
 
-    const automationListSessions = vscode.commands.registerCommand('kigumi.automationListSessions', async () => {
+    register(context, 'kigumi.automationListSessions', async () => {
         const sessions = [];
         for (const session of frameSessions.values()) {
             sessions.push(session.getTestSnapshot());
@@ -266,9 +270,8 @@ function activate(context) {
             sessions,
         };
     });
-    context.subscriptions.push(automationListSessions);
 
-    const automationOpenFileInViewer = vscode.commands.registerCommand('kigumi.automationOpenFileInViewer', async (options = {}) => {
+    register(context, 'kigumi.automationOpenFileInViewer', async (options = {}) => {
         const targetFilePath = typeof options === 'string'
             ? options
             : (options && typeof options.filePath === 'string' ? options.filePath : null);
@@ -287,14 +290,8 @@ function activate(context) {
         await openFileInViewer(resolvedFilePath, context);
         return { ok: true, filePath: resolvedFilePath };
     });
-    context.subscriptions.push(automationOpenFileInViewer);
 
-    const automationRefreshSession = vscode.commands.registerCommand('kigumi.automationRefreshSession', async (options = {}) => {
-        const session = findSessionFromOptions(options);
-        if (!session) {
-            return { ok: false, reason: 'session-not-found' };
-        }
-
+    register(context, 'kigumi.automationRefreshSession', async (options = {}) => withSession(options, async (session) => {
         if (options && options.dirtyOnce) {
             const result = await session.refreshOnceIfDirty({
                 saveIfDirty: options.saveIfDirty !== false,
@@ -310,14 +307,9 @@ function activate(context) {
             refreshSequence: session.refreshSequence,
             lastRefreshReason: session.lastRefreshReason,
         };
-    });
-    context.subscriptions.push(automationRefreshSession);
+    }));
 
-    const automationReadSessionLogs = vscode.commands.registerCommand('kigumi.automationReadSessionLogs', async (options = {}) => {
-        const session = findSessionFromOptions(options);
-        if (!session) {
-            return { ok: false, reason: 'session-not-found', entries: [] };
-        }
+    register(context, 'kigumi.automationReadSessionLogs', async (options = {}) => withSession(options, async (session) => {
         const snapshot = session.getLogSnapshot({
             minLevel: options.minLevel,
             contains: options.contains,
@@ -329,32 +321,21 @@ function activate(context) {
             slotName: session.slotName,
             ...snapshot,
         };
-    });
-    context.subscriptions.push(automationReadSessionLogs);
+    }, { entries: [] }));
 
-    const automationGetCameraState = vscode.commands.registerCommand('kigumi.automationGetCameraState', async (options = {}) => {
-        const session = findSessionFromOptions(options);
-        if (!session) {
-            return { ok: false, reason: 'session-not-found' };
-        }
+    register(context, 'kigumi.automationGetCameraState', async (options = {}) => withSession(options, async (session) => {
         const payload = await session.getCameraState();
         return { ok: true, payload };
-    });
-    context.subscriptions.push(automationGetCameraState);
+    }));
 
-    const automationSetCameraState = vscode.commands.registerCommand('kigumi.automationSetCameraState', async (options = {}) => {
-        const session = findSessionFromOptions(options);
-        if (!session) {
-            return { ok: false, reason: 'session-not-found' };
-        }
+    register(context, 'kigumi.automationSetCameraState', async (options = {}) => withSession(options, async (session) => {
         const payload = await session.setCameraState(options.cameraState || {}, {
             timeoutMs: typeof options.timeoutMs === 'number' ? options.timeoutMs : undefined,
         });
         return { ok: true, payload };
-    });
-    context.subscriptions.push(automationSetCameraState);
+    }));
 
-    const captureScreenshot = vscode.commands.registerCommand('kigumi.captureScreenshot', async (options = {}) => {
+    register(context, 'kigumi.captureScreenshot', async (options = {}) => {
         const session = await ensureViewerSessionForScreenshot(options, context);
 
         if (options.preRefresh === true) {
@@ -404,16 +385,14 @@ function activate(context) {
             screenshot: screenshotMeta,
         };
     });
-    context.subscriptions.push(captureScreenshot);
 
     // Split-view toggle now handled via Settings panel only (kigumi.viewer.openInSplitView setting)
 
-    const openFrameFromSidebar = vscode.commands.registerCommand('kigumi.openFrameFromSidebar', async (filePath) => {
+    register(context, 'kigumi.openFrameFromSidebar', async (filePath) => {
         await openFileInViewer(filePath, context);
     });
-    context.subscriptions.push(openFrameFromSidebar);
 
-    const openPatternFromSidebar = vscode.commands.registerCommand('kigumi.openPatternFromSidebar', async (patternRecord) => {
+    register(context, 'kigumi.openPatternFromSidebar', async (patternRecord) => {
         const sourceFile = patternRecord && patternRecord.sourceFile;
         const patternName = patternRecord && patternRecord.patternName;
         if (!sourceFile) {
@@ -437,9 +416,8 @@ function activate(context) {
 
         await _openBookFromWebview(runner, sourceFile, context);
     });
-    context.subscriptions.push(openPatternFromSidebar);
 
-    const openPatternInNewWindow = vscode.commands.registerCommand('kigumi.openPatternInNewWindow', async (element) => {
+    register(context, 'kigumi.openPatternInNewWindow', async (element) => {
         // Context menu passes the SidebarNode tree item; data lives in element.data
         const data = element && (element.data || element);
         const sourceFile = data && data.sourceFile;
@@ -465,23 +443,20 @@ function activate(context) {
 
         await _openBookFromWebview(runner, sourceFile, context);
     });
-    context.subscriptions.push(openPatternInNewWindow);
 
-    const openExampleFromSidebar = vscode.commands.registerCommand('kigumi.openExampleFromSidebar', async (sourceFile) => {
+    register(context, 'kigumi.openExampleFromSidebar', async (sourceFile) => {
         await openFileInViewer(sourceFile, context);
     });
-    context.subscriptions.push(openExampleFromSidebar);
 
     // --- Toggle Group by Patternbook ---
-    const toggleGroupByPatternbook = vscode.commands.registerCommand('kigumi.toggleGroupByPatternbook', async () => {
+    register(context, 'kigumi.toggleGroupByPatternbook', async () => {
         if (sidebarProvider) {
             sidebarProvider.toggleGroupByPatternbook();
         }
     });
-    context.subscriptions.push(toggleGroupByPatternbook);
 
     // --- Open Patternbook Group ---
-    const openPatternbookGroup = vscode.commands.registerCommand('kigumi.openPatternbookGroup', async (groupData) => {
+    register(context, 'kigumi.openPatternbookGroup', async (groupData) => {
         if (!groupData || !groupData.patterns || groupData.patterns.length === 0) {
             vscode.window.showErrorMessage('Patternbook has no patterns.');
             return;
@@ -503,10 +478,9 @@ function activate(context) {
             vscode.window.showErrorMessage(`Failed to open patternbook: ${error.message}`);
         }
     });
-    context.subscriptions.push(openPatternbookGroup);
 
     // --- View Pattern Source ---
-    const viewPatternSource = vscode.commands.registerCommand('kigumi.viewPatternSource', async (elementArg) => {
+    register(context, 'kigumi.viewPatternSource', async (elementArg) => {
         const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
         const sourcePath = _extractSourcePathFromSidebarElement(selectedElement);
 
@@ -545,10 +519,9 @@ function activate(context) {
             vscode.window.showErrorMessage(`Failed to view pattern source: ${error.message}`);
         }
     });
-    context.subscriptions.push(viewPatternSource);
 
     // --- Duplicate Pattern to Workspace ---
-    const duplicatePatternToWorkspace = vscode.commands.registerCommand('kigumi.duplicatePatternToWorkspace', async (elementArg) => {
+    register(context, 'kigumi.duplicatePatternToWorkspace', async (elementArg) => {
         const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
         if (!_isDuplicableLibraryElement(selectedElement)) {
             vscode.window.showErrorMessage('Duplicate to workspace is only available for library patterns and patternbooks.');
@@ -586,10 +559,9 @@ function activate(context) {
             vscode.window.showErrorMessage(`Failed to duplicate pattern: ${error.message}`);
         }
     });
-    context.subscriptions.push(duplicatePatternToWorkspace);
 
     // --- Browse Patterns command ---
-    const browsePatterns = vscode.commands.registerCommand('kigumi.browsePatterns', async function () {
+    register(context, 'kigumi.browsePatterns', async function () {
         try {
             // We need a running main session to query patterns via its runner process.
             // If none exists, try to create one from the active editor.
@@ -666,10 +638,9 @@ function activate(context) {
         }
     });
 
-    context.subscriptions.push(browsePatterns);
 
     // --- Unload Pattern command ---
-    const unloadPattern = vscode.commands.registerCommand('kigumi.unloadPattern', async function () {
+    register(context, 'kigumi.unloadPattern', async function () {
         if (patternSessions.size === 0) {
             vscode.window.showInformationMessage('No pattern viewers are open.');
             return;
@@ -694,7 +665,6 @@ function activate(context) {
         }
     });
 
-    context.subscriptions.push(unloadPattern);
 
     if (ENABLE_TEST_COMMANDS) {
         const sidebarSnapshotDisposable = vscode.commands.registerCommand(
