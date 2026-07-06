@@ -130,7 +130,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 :: TODO
 
--have claude do a refactor pass on kumiki...
+DONE-have claude do a refactor pass on kumiki...
 -create test runner for examples so the exmaples are also tests :O
 -additional agentic test loop featuers
   -offline (not in kigumi) render and screenshot
