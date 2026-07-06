@@ -658,23 +658,17 @@ def giraffe_normalize_vector(vec: Matrix, collapse_mode: CollapseMode = Collapse
     Normalize a vector.  Uses giraffe_norm for the magnitude, then divides
     element-wise.  Result elements are optionally collapsed to Float.
     """
-    from fractions import Fraction
-
     norm = giraffe_norm(vec, collapse_mode)
 
     if safe_zero_test(norm):
         return vec
 
-    # For Float / numeric norms, divide and convert back to Rational for stability
+    # For Float / numeric norms, divide directly (result elements are Float)
     if isinstance(norm, Float):
         norm_val = float(norm)
         if abs(norm_val) < 1e-15:
             return vec
-        normalized = []
-        for component in vec:
-            comp_val = float(giraffe_evalf(component)) / norm_val
-            frac = Fraction(comp_val).limit_denominator(10**9)
-            normalized.append(scalar(frac.numerator, frac.denominator))
+        normalized = [giraffe_evalf(component) / norm for component in vec]
         return Matrix(normalized)
 
     # For exact symbolic norms (sqrt, Rational, Integer) — divide exactly
@@ -1179,69 +1173,68 @@ class Orientation:
         return cls(R)
         
     
-    # TODO change veeryhting below to static methods....
     # Static constants for cardinal directions
-    @classmethod
-    def identity(cls) -> 'Orientation':
+    @staticmethod
+    def identity() -> 'Orientation':
         """Identity orientation - facing east (+X)"""
-        return cls()
+        return Orientation()
 
-    @classmethod
-    def from_z_and_y(cls, z_direction: Direction3D, y_direction: Direction3D) -> 'Orientation':
+    @staticmethod
+    def from_z_and_y(z_direction: Direction3D, y_direction: Direction3D) -> 'Orientation':
         """
         Create an Orientation from z and y direction vectors.
         Computes x = y × z to complete the right-handed coordinate system.
         """
         x_direction = cross_product(y_direction, z_direction)
-        return cls(Matrix([
+        return Orientation(Matrix([
             [x_direction[0], y_direction[0], z_direction[0]],
             [x_direction[1], y_direction[1], z_direction[1]],
             [x_direction[2], y_direction[2], z_direction[2]]
         ]))
-    
-    @classmethod
-    def from_z_and_x(cls, z_direction: Direction3D, x_direction: Direction3D) -> 'Orientation':
+
+    @staticmethod
+    def from_z_and_x(z_direction: Direction3D, x_direction: Direction3D) -> 'Orientation':
         """
         Create an Orientation from z and x direction vectors.
         Computes y = z × x to complete the right-handed coordinate system.
         """
         y_direction = cross_product(z_direction, x_direction)
-        return cls(Matrix([
+        return Orientation(Matrix([
             [x_direction[0], y_direction[0], z_direction[0]],
             [x_direction[1], y_direction[1], z_direction[1]],
             [x_direction[2], y_direction[2], z_direction[2]]
         ]))
-    
-    @classmethod
-    def from_x_and_y(cls, x_direction: Direction3D, y_direction: Direction3D) -> 'Orientation':
+
+    @staticmethod
+    def from_x_and_y(x_direction: Direction3D, y_direction: Direction3D) -> 'Orientation':
         """
         Create an Orientation from x and y direction vectors.
         Computes z = x × y to complete the right-handed coordinate system.
         """
         z_direction = cross_product(x_direction, y_direction)
-        return cls(Matrix([
+        return Orientation(Matrix([
             [x_direction[0], y_direction[0], z_direction[0]],
             [x_direction[1], y_direction[1], z_direction[1]],
             [x_direction[2], y_direction[2], z_direction[2]]
         ]))
-    
-    @classmethod
-    def from_axis_angle(cls, axis: Direction3D, radians: Numeric) -> 'Orientation':
+
+    @staticmethod
+    def from_axis_angle(axis: Direction3D, radians: Numeric) -> 'Orientation':
         """
         Create an Orientation representing a rotation around an axis by an angle.
         Uses Rodrigues' rotation formula.
-        
+
         Args:
             axis: Direction vector to rotate around (will be normalized)
             radians: Angle to rotate in radians
-            
+
         Returns:
             Orientation object representing the rotation
         """
         # Normalize the axis
         axis_normalized = safe_normalize_vector(axis)
         kx, ky, kz = axis_normalized[0], axis_normalized[1], axis_normalized[2]
-        
+
         # Rodrigues' rotation formula: R = I + sin(θ)K + (1 - cos(θ))K²
         # where K is the skew-symmetric cross-product matrix of k
         K = Matrix([
@@ -1252,22 +1245,22 @@ class Orientation:
         K_squared = K * K
         I = Matrix.eye(3)
         rotation_matrix = I + sin(radians) * K + (scalar(1) - cos(radians)) * K_squared
-        
-        return cls(rotation_matrix)
-            
-    @classmethod
-    def from_euleryZYX(cls, yaw: Union[float, int, sp.Basic], pitch: Union[float, int, sp.Basic], roll: Union[float, int, sp.Basic]) -> 'Orientation':
+
+        return Orientation(rotation_matrix)
+
+    @staticmethod
+    def from_euleryZYX(yaw: Union[float, int, sp.Basic], pitch: Union[float, int, sp.Basic], roll: Union[float, int, sp.Basic]) -> 'Orientation':
         """
         Create an Orientation from Euler angles using ZYX rotation sequence.
-        
+
         Args:
             yaw: Rotation around Z-axis (radians)
-            pitch: Rotation around Y-axis (radians) 
+            pitch: Rotation around Y-axis (radians)
             roll: Rotation around X-axis (radians)
-            
+
         Returns:
             Orientation object with combined rotation matrix
-            
+
         The rotation sequence is:
         1. Yaw (Z-axis rotation)
         2. Pitch (Y-axis rotation)
@@ -1279,24 +1272,24 @@ class Orientation:
             [sin(yaw), cos(yaw), 0],
             [0, 0, 1]
         ])
-        
+
         Ry = Matrix([
             [cos(pitch), 0, sin(pitch)],
             [0, 1, 0],
             [-sin(pitch), 0, cos(pitch)]
         ])
-        
+
         Rx = Matrix([
             [1, 0, 0],
             [0, cos(roll), -sin(roll)],
             [0, sin(roll), cos(roll)]
         ])
-        
+
         # Combined rotation: R = Rz * Ry * Rx
         combined_matrix = Rz * Ry * Rx
-        return cls(combined_matrix)
+        return Orientation(combined_matrix)
 
-    
+
     # ========================================================================
     # TIMBER ORIENTATION METHODS
     # ========================================================================
@@ -1304,12 +1297,12 @@ class Orientation:
     # TODO prefix all these method with orient_timber_
     #
     # These methods provide orientations specifically for orienting timbers.
-    # 
+    #
     # CANONICAL CONVENTIONS:
     # - facing_* methods: HORIZONTAL timbers with LENGTH along the horizontal plane
     #   and FACING (top) pointing up (+Z). The name indicates which direction the
     #   LENGTH axis points. Example: facing_east has Length pointing +X (east).
-    # 
+    #
     # - pointing_* methods: Timbers with LENGTH pointing in the named direction.
     #   Example: pointing_up has Length pointing +Z (up), pointing_down has Length
     #   pointing -Z (down).
@@ -1319,27 +1312,27 @@ class Orientation:
     # - Timber WIDTH runs along local +Y axis (column 1 of rotation matrix)
     # - Timber HEIGHT/FACING runs along local +Z axis (column 2 of rotation matrix)
     # ========================================================================
-    
-    @classmethod
-    def facing_west(cls) -> 'Orientation':
+
+    @staticmethod
+    def facing_west() -> 'Orientation':
         """
         Horizontal timber with top face up.
         This is the IDENTITY orientation.
-        
+
         - Length: +X (local) = -X (west) in global
         - Width: +Y (local) = -Y (south) in global
         - Facing: +Z (up)
         """
-        return cls()  # Identity matrix
-    
-    @classmethod
-    def facing_east(cls) -> 'Orientation':
+        return Orientation()  # Identity matrix
+
+    @staticmethod
+    def facing_east() -> 'Orientation':
         """
         Horizontal timber with top face up.
         180° rotation around Z axis from facing_west.
-        
+
         - Length: +X (local) = +X (east) in global
-        - Width: +Y (local) = +Y (north) in global  
+        - Width: +Y (local) = +Y (north) in global
         - Facing: +Z (up)
         """
         matrix = Matrix([
@@ -1347,14 +1340,14 @@ class Orientation:
             [0, -1, 0],
             [0, 0, 1]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def facing_north(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def facing_north() -> 'Orientation':
         """
         Horizontal timber with top face up.
         90° counterclockwise rotation around Z axis from facing_west.
-        
+
         - Length: +X (local) = +Y (north) in global
         - Width: +Y (local) = -X (west) in global
         - Facing: +Z (up)
@@ -1364,14 +1357,14 @@ class Orientation:
             [1, 0, 0],
             [0, 0, 1]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def facing_south(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def facing_south() -> 'Orientation':
         """
         Horizontal timber with top face up.
         90° clockwise rotation around Z axis from facing_west.
-        
+
         - Length: +X (local) = -Y (south) in global
         - Width: +Y (local) = +X (east) in global
         - Facing: +Z (up)
@@ -1381,14 +1374,14 @@ class Orientation:
             [-1, 0, 0],
             [0, 0, 1]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def pointing_up(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def pointing_up() -> 'Orientation':
         """
         Vertical timber with LENGTH pointing upward (+Z).
         This is the same as pointing_forward.
-        
+
         - Length (local +X) → +Z (up) in global
         - Width (local +Y) → +Y (north) in global
         - Facing (local +Z) → -X (west) in global
@@ -1398,13 +1391,13 @@ class Orientation:
             [0, 1, 0],
             [1, 0, 0]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def pointing_down(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def pointing_down() -> 'Orientation':
         """
         Vertical timber with LENGTH pointing downward (-Z).
-        
+
         - Length (local +X) → -Z (down) in global
         - Width (local +Y) → +Y (north) in global
         - Facing (local +Z) → +X (east) in global
@@ -1414,14 +1407,14 @@ class Orientation:
             [0, 1, 0],
             [-1, 0, 0]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def pointing_forward(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def pointing_forward() -> 'Orientation':
         """
         Vertical timber with LENGTH pointing upward (+Z).
         Identical to pointing_up.
-        
+
         - Length (local +X) → +Z (up) in global
         - Width (local +Y) → +Y (north) in global
         - Facing (local +Z) → -X (west) in global
@@ -1431,13 +1424,13 @@ class Orientation:
             [0, 1, 0],
             [1, 0, 0]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def pointing_backward(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def pointing_backward() -> 'Orientation':
         """
         Vertical timber with LENGTH pointing upward (+Z), rotated 180° from pointing_forward.
-        
+
         - Length (local +X) → +Z (up) in global
         - Width (local +Y) → -Y (south) in global
         - Facing (local +Z) → +X (east) in global
@@ -1447,13 +1440,13 @@ class Orientation:
             [0, -1, 0],
             [1, 0, 0]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def pointing_left(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def pointing_left() -> 'Orientation':
         """
         Vertical timber with LENGTH pointing upward (+Z), rotated 90° CCW from pointing_forward.
-        
+
         - Length (local +X) → +Z (up) in global
         - Width (local +Y) → -X (west) in global
         - Facing (local +Z) → -Y (south) in global
@@ -1463,13 +1456,13 @@ class Orientation:
             [0, 0, -1],
             [1, 0, 0]
         ])
-        return cls(matrix)
-    
-    @classmethod
-    def pointing_right(cls) -> 'Orientation':
+        return Orientation(matrix)
+
+    @staticmethod
+    def pointing_right() -> 'Orientation':
         """
         Vertical timber with LENGTH pointing upward (+Z), rotated 90° CW from pointing_forward.
-        
+
         - Length (local +X) → +Z (up) in global
         - Width (local +Y) → +X (east) in global
         - Facing (local +Z) → +Y (north) in global
@@ -1479,4 +1472,4 @@ class Orientation:
             [0, 0, 1],
             [1, 0, 0]
         ])
-        return cls(matrix)
+        return Orientation(matrix)

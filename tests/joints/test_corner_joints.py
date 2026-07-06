@@ -422,11 +422,11 @@ class TestCornerLapJoint:
 
         timberA_end_direction = -timberA.get_length_direction_global()
         timberB_entry_face = timberB.get_closest_oriented_face_from_global_direction(-timberA_end_direction)
-        timberB_far_face_center = get_point_on_face_global(timberB_entry_face.get_opposite_face(), timberB)
+        timberB_far_face_center = get_center_point_on_face_global(timberB_entry_face.get_opposite_face(), timberB)
 
         timberB_end_direction = -timberB.get_length_direction_global()
         timberA_entry_face = timberA.get_closest_oriented_face_from_global_direction(-timberB_end_direction)
-        timberA_far_face_center = get_point_on_face_global(timberA_entry_face.get_opposite_face(), timberA)
+        timberA_far_face_center = get_center_point_on_face_global(timberA_entry_face.get_opposite_face(), timberA)
 
         expected_A_distance = safe_dot_product(
             timberB_far_face_center - timberA.get_bottom_position_global(),

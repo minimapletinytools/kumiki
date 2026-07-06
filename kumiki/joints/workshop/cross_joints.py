@@ -100,9 +100,6 @@ def cut_plain_cross_lap_joint(
     Raises:
         AssertionError: If the timbers don't intersect, are parallel, or cut_ratio is out of range.
     """
-    from kumiki.cutcsg import Difference, RectangularPrism, HalfSpace
-    from kumiki.rule import safe_dot_product, safe_transform_vector, safe_norm
-
     timberA = arrangement.timber1
     timberB = arrangement.timber2
     timberA_cut_face = arrangement.front_face_on_timber1
@@ -160,7 +157,7 @@ def cut_plain_cross_lap_joint(
     # Choose the face on that axis on timberA that's closest to timberB
     # Then pick the opposite face on timberB
     if timberA_cut_face is None:
-        from kumiki.rule import cross_product, safe_normalize_vector as normalize_vector, safe_norm
+        from kumiki.rule import safe_normalize_vector as normalize_vector
 
         # Get length directions of both timbers
         d1 = timberA.get_length_direction_global()

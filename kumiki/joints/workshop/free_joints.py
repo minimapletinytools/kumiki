@@ -24,8 +24,6 @@ def cut_free_house_joint(
         housing_timber: Timber that will be cut to house the housed timbers
         housed_timbers: Timbers that will be housed
     """
-    from kumiki.cutcsg import adopt_csg, Difference, SolidUnion
-
     assert len(housed_timbers) > 0, "housed_timbers must contain at least one timber"
 
     def _compute_housed_body_in_housing_local(housed_timber: Union[TimberLike, CutTimber]) -> CutCSG:

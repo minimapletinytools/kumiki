@@ -24,7 +24,7 @@ from kumiki.measuring import (
     locate_plane_from_edge_in_direction,
     mark_distance_from_end_along_centerline,
     mark_plane_from_edge_in_direction,
-    get_point_on_face_global,
+    get_center_point_on_face_global,
     Space,
 )
 from kumiki.timber_shavings import are_timbers_plane_aligned
@@ -127,7 +127,6 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
     Raises:
         AssertionError: If the timbers are parallel.
     """
-    from kumiki.rule import safe_dot_product, safe_compare, Comparison, safe_transform_vector
 
     receiving_timber = arrangement.receiving_timber
     butt_timber = arrangement.butt_timber
@@ -255,7 +254,6 @@ def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJoi
 
     face_center = _get_face_center_position(receiving_timber, receiving_face)
 
-    from kumiki.rule import safe_dot_product
     distance_from_bottom = safe_dot_product(face_center - butt_timber.get_bottom_position_global(), butt_timber.get_length_direction_global())
     distance_from_end = butt_timber.length - distance_from_bottom if butt_end == TimberEnd.TOP else distance_from_bottom
 
@@ -303,8 +301,6 @@ def cut_tongue_and_fork_butt_joint(
         AssertionError: If timbers are not plane aligned, are parallel, or
             tongue parameters are out of bounds.
     """
-    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, CutCSG, adopt_csg
-    from kumiki.rule import safe_dot_product, safe_compare, Comparison
 
     error = arrangement.check_plane_aligned()
     assert error is None, error
@@ -412,7 +408,7 @@ def cut_tongue_and_fork_butt_joint(
     fork_entry_long_face_for_end_cut = fork_timber.get_closest_oriented_long_face_from_global_direction(-tongue_end_direction)
     fork_far_face = fork_entry_long_face_for_end_cut.to.face().get_opposite_face()
     fork_far_face_normal_global = fork_timber.get_face_direction_global(fork_far_face)
-    fork_far_face_point_global = get_point_on_face_global(fork_far_face, fork_timber)
+    fork_far_face_point_global = get_center_point_on_face_global(fork_far_face, fork_timber)
 
     fork_slot_depth = safe_dot_product(
         fork_far_face_point_global - shoulder_point_global,
@@ -440,7 +436,6 @@ def cut_tongue_and_fork_butt_joint(
         if safe_dot_product(fork_far_face_normal_global, tongue_end_direction) > 0
         else -fork_far_face_normal_global
     )
-    from kumiki.rule import safe_transform_vector
     tongue_end_cut_local_normal = safe_transform_vector(
         tongue_timber.orientation.matrix.T, tongue_end_hs_normal_global
     )
@@ -725,7 +720,7 @@ def cut_mortise_and_tenon_joint(
         # mortise_depth measured from the face inward.
         mortise_depth_crop_global = HalfSpace(
             normal=-mortise_face_direction,
-            offset=mortise_depth - safe_dot_product(mortise_face_direction, get_point_on_face_global(mortise_face, mortise_timber)),
+            offset=mortise_depth - safe_dot_product(mortise_face_direction, get_center_point_on_face_global(mortise_face, mortise_timber)),
         )
 
         tenon_prism_cropping_csgs = [mortise_hole_end_crop_global, mortise_depth_crop_global]
