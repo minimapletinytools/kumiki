@@ -35,7 +35,7 @@ def example() -> Frame:
         create_v2(base_width, base_depth),       # Corner 2: back-right
         create_v2(scalar(0), base_depth),      # Corner 3: back-left
     ]
-    footprint = Footprint(footprint_corners)
+    footprint = Footprint(tuple(footprint_corners))
 
     post_front_left = create_vertical_timber_on_footprint_corner(
         footprint, corner_index=0, length=post_height,

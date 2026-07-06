@@ -2,6 +2,8 @@
 Tests for Kumiki timber framing system
 """
 
+from typing import Any, Dict
+
 import pytest
 from sympy import Matrix, sqrt, simplify, Abs
 from kumiki.rule import Orientation
@@ -572,7 +574,7 @@ class TestJoinTimbers:
         """Test perpendicular joining of face-aligned timbers."""
         timber1, timber2 = self.make_parallel_timbers()
 
-        joining_timber2 = join_face_aligned_on_face_aligned_timbers(
+        joining_timber2 = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
             timber1, timber2,
             location_on_timber1=scalar("1.5"),
             stickout=Stickout(0, 0),  # No stickout
@@ -590,7 +592,7 @@ class TestJoinTimbers:
         """Test perpendicular joining of face-aligned timbers."""
         timber1, timber2 = self.make_parallel_timbers()
         
-        joining_timber2 = join_face_aligned_on_face_aligned_timbers(
+        joining_timber2 = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
             timber1, timber2,
             location_on_timber1=scalar("1.5"),
             stickout=Stickout(scalar("1.2"), scalar("1.2")),  # Symmetric stickout
@@ -626,7 +628,7 @@ class TestJoinTimbers:
         
         # Now try to join them - should raise AssertionError
         with pytest.raises(AssertionError, match="must be face-aligned"):
-            join_face_aligned_on_face_aligned_timbers(
+            join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
                 timber1, timber2,
                 location_on_timber1=scalar("1.5"),
                 stickout=Stickout(scalar(0), scalar(0)),
@@ -644,7 +646,7 @@ class TestJoinTimbers:
         post2 = create_standard_vertical_timber(height=3, size=(inches(1), inches(2)), position=(feet(5), 0, 0))
         
         # Join perpendicular with size=None (auto-determine)
-        beam = join_face_aligned_on_face_aligned_timbers(
+        beam = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
             timber1=post1,
             timber2=post2,
             location_on_timber1=scalar(3, 2),  # 1.5m up the post (exact rational)
@@ -868,7 +870,7 @@ class TestJoinTimbers:
             # Join base timber to beam
             # Let the function determine the orientation automatically by projecting
             # timber1's length direction onto the perpendicular plane
-            joining_timber = join_face_aligned_on_face_aligned_timbers(
+            joining_timber = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
                 timber1=base_timber,
                 timber2=beam,
                 location_on_timber1=location_on_base,
@@ -944,7 +946,7 @@ class TestJoinTimbers:
             timber1 = base_timbers[timber1_idx]
             timber2 = base_timbers[timber2_idx]
             
-            cross_timber = join_face_aligned_on_face_aligned_timbers(
+            cross_timber = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
                 timber1=timber1,
                 timber2=timber2,
                 location_on_timber1=loc1,
@@ -1018,7 +1020,7 @@ class TestJoinTimbers:
         
         beams = {}
         for feature in face_features:
-            beam = join_face_aligned_on_face_aligned_timbers(
+            beam = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
                 timber1=post_left,
                 timber2=post_right,
                 location_on_timber1=inches(48),  # Mid-height
@@ -1419,7 +1421,7 @@ class TestHelperFunctions:
     
     def test_stickout_reference_inside_face_aligned(self):
         """Test INSIDE stickout reference with face-aligned timbers."""
-        from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace
+        from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace  # ty: ignore[deprecated]
         
         # Create two parallel horizontal posts 2.0 meters apart
         post1 = timber_from_directions(
@@ -1439,7 +1441,7 @@ class TestHelperFunctions:
         )
         
         # Join with INSIDE reference
-        beam = join_face_aligned_on_face_aligned_timbers(
+        beam = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
             post1, post2,
             location_on_timber1=scalar("1.5"),
             stickout=Stickout(scalar("0.1"), scalar("0.1"), StickoutReference.INSIDE, StickoutReference.INSIDE),
@@ -1455,7 +1457,7 @@ class TestHelperFunctions:
     
     def test_stickout_reference_outside_face_aligned(self):
         """Test OUTSIDE stickout reference with face-aligned timbers."""
-        from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace
+        from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace  # ty: ignore[deprecated]
         
         # Create two parallel horizontal posts 2.0 meters apart
         post1 = timber_from_directions(
@@ -1475,7 +1477,7 @@ class TestHelperFunctions:
         )
         
         # Join with OUTSIDE reference
-        beam = join_face_aligned_on_face_aligned_timbers(
+        beam = join_face_aligned_on_face_aligned_timbers(  # ty: ignore[deprecated]
             post1, post2,
             location_on_timber1=scalar("1.5"),
             stickout=Stickout(scalar("0.2"), scalar("0.2"), StickoutReference.OUTSIDE, StickoutReference.OUTSIDE),
@@ -2110,7 +2112,7 @@ class TestAttachPlaneAlignedTimber:
     def test_reduces_to_face_aligned_at_ninety_degrees(self, symbolic_mode):
         # at pi/2 the plane-aligned attach must match the face-aligned attach exactly
         post = self._make_post()
-        common = dict(
+        common: Dict[str, Any] = dict(
             original_timber=post,
             size=create_v2(scalar(2), scalar(3)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
@@ -2125,7 +2127,7 @@ class TestAttachPlaneAlignedTimber:
         face = attach_face_aligned_timber(**common)
         bp, bf = plane.get_bottom_position_global(), face.get_bottom_position_global()
         self._assert_v3(bp, bf[0], bf[1], bf[2])
-        assert simplify(plane.length - face.length) == 0
+        assert simplify(plane.length - face.length) == 0  # ty: ignore[no-matching-overload]
         ld, lf = plane.get_length_direction_global(), face.get_length_direction_global()
         self._assert_v3(ld, lf[0], lf[1], lf[2])
         wd, wf = plane.get_width_direction_global(), face.get_width_direction_global()
@@ -2151,7 +2153,7 @@ class TestAttachPlaneAlignedTimber:
     def test_end_flips_the_angle(self, symbolic_mode):
         # the end that points toward the original flips the length direction (angle -> pi - angle)
         post = self._make_post()
-        kw = dict(
+        kw: Dict[str, Any] = dict(
             original_timber=post,
             size=create_v2(scalar(2), scalar(2)),
             original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
