@@ -952,9 +952,9 @@ class PerfectTimberWithin(ABC):
             face: The TimberFace to check
         """
         width_halves, height_halves = self.get_nominal_half_sizes()
-        w_half = self.size[0] / Integer(2)
-        h_half = self.size[1] / Integer(2)
-        
+        w_half = self.size[0] / scalar(2)
+        h_half = self.size[1] / scalar(2)
+
         if face == TimberFace.TOP or face == TimberFace.BOTTOM:
             return True  # Length is always perfect
         elif face == TimberFace.RIGHT:
