@@ -118,7 +118,7 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
           cut_ratio=cut_ratio,
       ))
 
-  from kumiki.cutcsg import adopt_csg, Difference, HalfSpace as _HalfSpace
+  from kumiki.cutcsg import HalfSpace as _HalfSpace
 
   # --- Fill-in cuts for non-adjacent board pairs ---
   # Boards that share no direct cross-lap joint can still collide outside their

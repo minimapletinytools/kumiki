@@ -10,8 +10,8 @@ from sympy import Matrix
 
 
 class TestGetPointOnFace:
-    """Tests for get_point_on_face_global helper function"""
-    
+    """Tests for get_center_point_on_face_global helper function"""
+
     def test_get_point_on_right_face(self, symbolic_mode):
         """Test getting a point on the RIGHT face of a vertical timber"""
         timber = timber_from_directions(
@@ -21,14 +21,14 @@ class TestGetPointOnFace:
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
         )
-        
-        point = get_point_on_face_global(TimberFace.RIGHT, timber)
-        
+
+        point = get_center_point_on_face_global(TimberFace.RIGHT, timber)
+
         # RIGHT face center: x=5 (half the width), y=0, z=50 (mid-length)
         assert point[0] == scalar(5)
         assert point[1] == scalar(0)
         assert point[2] == scalar(50)
-    
+
     def test_get_point_on_top_face(self, symbolic_mode):
         """Test getting a point on the TOP face of a vertical timber"""
         timber = timber_from_directions(
@@ -38,9 +38,9 @@ class TestGetPointOnFace:
             length_direction=create_v3(0, 0, 1),
             width_direction=create_v3(1, 0, 0)
         )
-        
-        point = get_point_on_face_global(TimberFace.TOP, timber)
-        
+
+        point = get_center_point_on_face_global(TimberFace.TOP, timber)
+
         # TOP face center: x=0, y=0, z=100 (actual top of 100-long timber)
         assert point[0] == scalar(0)
         assert point[1] == scalar(0)

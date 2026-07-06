@@ -119,7 +119,6 @@ class Plane:
         Returns:
             Plane with normal in global coordinates and point at transform position
         """
-        from kumiki.rule import safe_transform_vector
         return Plane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
 
 @dataclass(frozen=True)
@@ -146,7 +145,6 @@ class UnsignedPlane(Plane):
         Returns:
             UnsignedPlane with normal in global coordinates and point at transform position
         """
-        from kumiki.rule import safe_transform_vector
         return UnsignedPlane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
 
 # TODO rename to LineOnPlane
@@ -222,7 +220,7 @@ class DistanceFromPointIntoFace(Marking):
         if self.point is not None:
             starting_point = self.point
         else:
-            starting_point = get_point_on_face_global(self.face, self.timber)
+            starting_point = get_center_point_on_face_global(self.face, self.timber)
 
         # Get the face normal (pointing OUT of the timber)
         face_normal = self.timber.get_face_direction_global(self.face)
@@ -364,6 +362,7 @@ class PlaneFromEdgeInDirection(Marking):
     def locate(self) -> Plane:
         return locate_plane_from_edge_in_direction(self.timber, self.edge, self.direction, self.distance)
 
+@dataclass(frozen=True)
 class MarkingSpace(Marking):
     """
     Represents a space to mark in.
@@ -391,20 +390,6 @@ def get_center_point_on_face_global(face: SomeTimberFace, timber: PerfectTimberW
     """
     timber_center = timber.get_bottom_position_global() + timber.get_length_direction_global() * timber.length / 2
     return timber_center + timber.get_face_direction_global(face) * timber.get_size_in_face_normal_axis(face) / 2
-
-
-# DELETE ME
-def get_point_on_face_global(face: SomeTimberFace, timber: PerfectTimberWithin) -> V3:
-    """
-    Get a point on the timber face surface (at the bottom-end of the timber).
-    Useful for defining infinite planes through the face where the exact
-    position along the face doesn't matter.
-
-    For the actual center of the face, use get_center_point_on_face_global.
-    """
-    return get_center_point_on_face_global(face, timber)
-
-
 
 
 def get_point_on_feature(feature: Union[UnsignedPlane, Plane, Line, Point, HalfPlane], timber: PerfectTimberWithin) -> V3:
@@ -454,7 +439,7 @@ def locate_face(timber: PerfectTimberWithin, face: SomeTimberFace) -> Plane:
     face_normal = timber.get_face_direction_global(face)
     
     # Get a point on the face surface (at the center)
-    face_point = get_point_on_face_global(face, timber)
+    face_point = get_center_point_on_face_global(face, timber)
     
     return Plane(face_normal, face_point)
 
@@ -560,7 +545,7 @@ def locate_into_face(distance: Numeric, face: SomeTimberFace, timber: PerfectTim
     """
 
     # First pick any point on the face
-    point_on_face = get_point_on_face_global(face, timber)
+    point_on_face = get_center_point_on_face_global(face, timber)
 
     # Measure INTO the face
     point_on_plane = point_on_face - timber.get_face_direction_global(face) * distance
@@ -612,7 +597,7 @@ def mark_distance_from_face_in_normal_direction(feature: Union[UnsignedPlane, Pl
 
     # Project the feature point onto the face to get the signed distance
     # Get a reference point on the face surface
-    face_point_global = get_point_on_face_global(face, timber)
+    face_point_global = get_center_point_on_face_global(face, timber)
     
     # Get the face normal (pointing OUT of the timber)
     face_direction_global = timber.get_face_direction_global(face)
@@ -620,7 +605,6 @@ def mark_distance_from_face_in_normal_direction(feature: Union[UnsignedPlane, Pl
     # Calculate signed distance: how far from the face is the point?
     # Positive if point is in the direction opposite to face_direction (inside timber)
     # Negative if point is in the direction of face_direction (outside timber)
-    from kumiki.rule import safe_dot_product
     distance = safe_dot_product(face_direction_global, (face_point_global - feature_point))
     
     return DistanceFromFace(distance=distance, timber=timber, face=face)

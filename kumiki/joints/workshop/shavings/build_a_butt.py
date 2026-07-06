@@ -30,7 +30,6 @@ from kumiki.measuring import (
 )
 from kumiki.construction import *
 from kumiki.rule import *
-from kumiki.rule import safe_dot_product, safe_transform_vector
 from kumiki.cutcsg import CutCSG
 
 
@@ -230,8 +229,6 @@ def build_dovetail_shoulder_geometery(
     The resulting CutCSG object is in global space. It includes part of the butt timber itself, not just the dovetail shape.
     The resulting CutCSG object includes part of the butt timber itself, not just the dovetail shape. This is useful for cutting notches into the receiving timber for non perfect receiving timbers.
     """
-    from kumiki.cutcsg import ConvexPolygonExtrusion
-
     if safe_compare(dovetail_depth, scalar(0), Comparison.LE):
         raise ValueError(f"dovetail_depth must be positive, got {dovetail_depth}")
 
@@ -404,8 +401,6 @@ def dovetail_tenon_geometry(
                     "wedge_from_receiving_timber_side cannot be True when mortise is shallower than receiving timber width in the receiving axis!"
                 )
 
-
-    from kumiki.cutcsg import ConvexPolygonExtrusion, HalfSpace, Difference
 
     tenon_timber = arrangement.butt_timber
 

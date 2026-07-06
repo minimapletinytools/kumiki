@@ -95,14 +95,7 @@ class RectangularPrismFeature(CSGFeature):
     def test_point(self, point: V3) -> bool:
         if not self.owner.is_point_on_boundary(point):
             return False
-        local_point = point - self.owner.transform.position
-        m = self.owner.transform.orientation.matrix
-        width_dir = Matrix([m[0, 0], m[1, 0], m[2, 0]])
-        height_dir = Matrix([m[0, 1], m[1, 1], m[2, 1]])
-        length_dir = Matrix([m[0, 2], m[1, 2], m[2, 2]])
-        x = safe_dot_product(local_point, width_dir)
-        y = safe_dot_product(local_point, height_dir)
-        z = safe_dot_product(local_point, length_dir)
+        x, y, z = self.owner._local_coords(point)
         hw = self.owner.size[0] / 2
         hh = self.owner.size[1] / 2
         if self.face == PrismFace.RIGHT:
@@ -264,7 +257,7 @@ class HalfSpace(CutCSG):
         """
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
-        return dot_product >= self.offset
+        return safe_compare(dot_product, self.offset, Comparison.GE)
     
     def is_point_on_boundary(self, point: V3) -> bool:
         """
@@ -278,7 +271,6 @@ class HalfSpace(CutCSG):
         Returns:
             True if the point is on the boundary plane, False otherwise
         """
-        from kumiki.rule import zero_test
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
         # Use zero_test to handle Float vs Integer comparison with tolerance
@@ -423,200 +415,140 @@ class RectangularPrism(CutCSG):
         
         return True
     
-    def contains_point(self, point: V3) -> bool:
-        """
-        Check if a point is contained within the prism.
-        
-        Args:
-            point: Point to test (3x1 Matrix)
-            
-        Returns:
-            True if the point is inside or on the boundary of the prism, False otherwise
-        """
-        # Transform point to local coordinates
-        # Local origin is at self.transform.position
+    def _local_axes(self) -> Tuple[Direction3D, Direction3D, Direction3D]:
+        """Return (width_dir, height_dir, length_dir) unit vectors in global coordinates."""
+        m = self.transform.orientation.matrix
+        width_dir = Matrix([m[0, 0], m[1, 0], m[2, 0]])
+        height_dir = Matrix([m[0, 1], m[1, 1], m[2, 1]])
+        length_dir = Matrix([m[0, 2], m[1, 2], m[2, 2]])
+        return width_dir, height_dir, length_dir
+
+    def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
+        """Project a global point onto this prism's local (width, height, length) axes."""
         local_point = point - self.transform.position
-        
-        # Extract axes from orientation matrix
-        width_dir = Matrix([
-            self.transform.orientation.matrix[0, 0],
-            self.transform.orientation.matrix[1, 0],
-            self.transform.orientation.matrix[2, 0]
-        ])
-        height_dir = Matrix([
-            self.transform.orientation.matrix[0, 1],
-            self.transform.orientation.matrix[1, 1],
-            self.transform.orientation.matrix[2, 1]
-        ])
-        length_dir = Matrix([
-            self.transform.orientation.matrix[0, 2],
-            self.transform.orientation.matrix[1, 2],
-            self.transform.orientation.matrix[2, 2]
-        ])
-        
-        # Project onto local axes
+        width_dir, height_dir, length_dir = self._local_axes()
         x_coord = safe_dot_product(local_point, width_dir)
         y_coord = safe_dot_product(local_point, height_dir)
         z_coord = safe_dot_product(local_point, length_dir)
-        
+        return x_coord, y_coord, z_coord
+
+    def contains_point(self, point: V3) -> bool:
+        """
+        Check if a point is contained within the prism.
+
+        Args:
+            point: Point to test (3x1 Matrix)
+
+        Returns:
+            True if the point is inside or on the boundary of the prism, False otherwise
+        """
+        x_coord, y_coord, z_coord = self._local_coords(point)
+
         # Check bounds in each dimension
         half_width = self.size[0] / 2
         half_height = self.size[1] / 2
-        
+
         # Check width and height bounds
-        if abs(x_coord) > half_width or abs(y_coord) > half_height:
+        if safe_compare(Abs(x_coord), half_width, Comparison.GT) or safe_compare(Abs(y_coord), half_height, Comparison.GT):
             return False
-        
+
         # Check length bounds
-        if self.start_distance is not None and z_coord < self.start_distance:
+        if self.start_distance is not None and safe_compare(z_coord, self.start_distance, Comparison.LT):
             return False
-        if self.end_distance is not None and z_coord > self.end_distance:
+        if self.end_distance is not None and safe_compare(z_coord, self.end_distance, Comparison.GT):
             return False
-        
+
         return True
 
     def is_point_on_boundary(self, point: V3) -> bool:
         """
         Check if a point is on the boundary of the prism.
-        
+
         Args:
             point: Point to test (3x1 Matrix)
-            
+
         Returns:
             True if the point is on the boundary of the prism, False otherwise
         """
         # First check if point is contained
         if not self.contains_point(point):
             return False
-        
-        # Transform point to local coordinates
-        local_point = point - self.transform.position
-        
-        # Extract axes from orientation matrix
-        width_dir = Matrix([
-            self.transform.orientation.matrix[0, 0],
-            self.transform.orientation.matrix[1, 0],
-            self.transform.orientation.matrix[2, 0]
-        ])
-        height_dir = Matrix([
-            self.transform.orientation.matrix[0, 1],
-            self.transform.orientation.matrix[1, 1],
-            self.transform.orientation.matrix[2, 1]
-        ])
-        length_dir = Matrix([
-            self.transform.orientation.matrix[0, 2],
-            self.transform.orientation.matrix[1, 2],
-            self.transform.orientation.matrix[2, 2]
-        ])
-        
-        # Project onto local axes
-        x_coord = safe_dot_product(local_point, width_dir)
-        y_coord = safe_dot_product(local_point, height_dir)
-        z_coord = safe_dot_product(local_point, length_dir)
-        
+
+        x_coord, y_coord, z_coord = self._local_coords(point)
+
         # Check if on any face
         half_width = self.size[0] / 2
         half_height = self.size[1] / 2
-        
+
         # On width faces
-        if abs(x_coord) == half_width:
+        if equality_test(Abs(x_coord), half_width):
             return True
-        
+
         # On height faces
-        if abs(y_coord) == half_height:
+        if equality_test(Abs(y_coord), half_height):
             return True
-        
+
         # On length faces (if finite)
-        if self.start_distance is not None and z_coord == self.start_distance:
+        if self.start_distance is not None and equality_test(z_coord, self.start_distance):
             return True
-        if self.end_distance is not None and z_coord == self.end_distance:
+        if self.end_distance is not None and equality_test(z_coord, self.end_distance):
             return True
-        
+
         return False
-    
+
     def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
-        
+
         Returns the normalized outward normal for the face that contains this point.
         If the point is on multiple faces (edge or corner), returns one of the normals.
-        
+
         Args:
             point: A point on the boundary
-            
+
         Returns:
             The outward normal vector at the point, or None if cannot be determined
         """
-        # Transform point to local coordinates
-        local_point = point - self.transform.position
-        
-        # Extract axes from orientation matrix
-        width_dir = Matrix([
-            self.transform.orientation.matrix[0, 0],
-            self.transform.orientation.matrix[1, 0],
-            self.transform.orientation.matrix[2, 0]
-        ])
-        height_dir = Matrix([
-            self.transform.orientation.matrix[0, 1],
-            self.transform.orientation.matrix[1, 1],
-            self.transform.orientation.matrix[2, 1]
-        ])
-        length_dir = Matrix([
-            self.transform.orientation.matrix[0, 2],
-            self.transform.orientation.matrix[1, 2],
-            self.transform.orientation.matrix[2, 2]
-        ])
-        
-        # Project onto local axes
-        x_coord = safe_dot_product(local_point, width_dir)
-        y_coord = safe_dot_product(local_point, height_dir)
-        z_coord = safe_dot_product(local_point, length_dir)
-        
+        x_coord, y_coord, z_coord = self._local_coords(point)
+        width_dir, height_dir, length_dir = self._local_axes()
+
         half_width = self.size[0] / 2
         half_height = self.size[1] / 2
-        
+
         # Check which face(s) the point is on
         # For edges/corners, we'll return one of the normals
         # Prioritize: length faces (top/bottom), then width faces, then height faces
         # This prioritization makes sense for typical CSG operations where end faces are often involved
 
         # TODO you should check if point is on edges and return averages instead
-        
+
         # On length faces (top/bottom) - check these first
-        if self.start_distance is not None and z_coord == self.start_distance:
+        if self.start_distance is not None and equality_test(z_coord, self.start_distance):
             return -length_dir  # Bottom face, normal points in -length direction (outward)
-        if self.end_distance is not None and z_coord == self.end_distance:
+        if self.end_distance is not None and equality_test(z_coord, self.end_distance):
             return length_dir  # Top face, normal points in +length direction (outward)
-        
+
         # On width faces (right/left)
-        if abs(x_coord) == half_width:
-            if x_coord > 0:
+        if equality_test(Abs(x_coord), half_width):
+            if safe_compare(x_coord, 0, Comparison.GT):
                 return width_dir  # Right face, normal points in +width direction
             else:
                 return -width_dir  # Left face, normal points in -width direction
-        
+
         # On height faces (front/back)
-        if abs(y_coord) == half_height:
-            if y_coord > 0:
+        if equality_test(Abs(y_coord), half_height):
+            if safe_compare(y_coord, 0, Comparison.GT):
                 return height_dir  # Front face, normal points in +height direction
             else:
                 return -height_dir  # Back face, normal points in -height direction
-        
+
         # Should not reach here if point is actually on boundary
         return None
 
     def get_all_features(self, point: V3) -> List[CSGFeature]:
         if self.named_features is None or not self.is_point_on_boundary(point):
             return []
-        # Transform to local coords
-        local_point = point - self.transform.position
-        m = self.transform.orientation.matrix
-        width_dir = Matrix([m[0, 0], m[1, 0], m[2, 0]])
-        height_dir = Matrix([m[0, 1], m[1, 1], m[2, 1]])
-        length_dir = Matrix([m[0, 2], m[1, 2], m[2, 2]])
-        x = safe_dot_product(local_point, width_dir)
-        y = safe_dot_product(local_point, height_dir)
-        z = safe_dot_product(local_point, length_dir)
+        x, y, z = self._local_coords(point)
         hw = self.size[0] / 2
         hh = self.size[1] / 2
         face_checks = {
@@ -756,20 +688,20 @@ class Cylinder(CutCSG):
         
         # Project onto axis to get axial coordinate
         axial_coord = safe_dot_product(local_point, axis)
-        
+
         # Check axial bounds
-        if self.start_distance is not None and axial_coord < self.start_distance:
+        if self.start_distance is not None and safe_compare(axial_coord, self.start_distance, Comparison.LT):
             return False
-        if self.end_distance is not None and axial_coord > self.end_distance:
+        if self.end_distance is not None and safe_compare(axial_coord, self.end_distance, Comparison.GT):
             return False
-        
+
         # Calculate radial distance from axis
         axial_projection = axis * axial_coord
         radial_vector = local_point - axial_projection
         radial_distance = safe_norm(radial_vector)
-        
+
         # Check if within radius
-        return radial_distance <= self.radius
+        return safe_compare(radial_distance, self.radius, Comparison.LE)
 
     def is_point_on_boundary(self, point: V3) -> bool:
         """
@@ -802,17 +734,17 @@ class Cylinder(CutCSG):
         axial_projection = axis * axial_coord
         radial_vector = local_point - axial_projection
         radial_distance = safe_norm(radial_vector)
-        
+
         # On cylindrical surface
-        if radial_distance == self.radius:
+        if equality_test(radial_distance, self.radius):
             return True
-        
+
         # On end caps (if finite and at the end)
-        if self.start_distance is not None and axial_coord == self.start_distance:
+        if self.start_distance is not None and equality_test(axial_coord, self.start_distance):
             return True
-        if self.end_distance is not None and axial_coord == self.end_distance:
+        if self.end_distance is not None and equality_test(axial_coord, self.end_distance):
             return True
-        
+
         return False
     
     def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
@@ -840,25 +772,25 @@ class Cylinder(CutCSG):
         axial_projection = axis * axial_coord
         radial_vector = local_point - axial_projection
         radial_distance = safe_norm(radial_vector)
-        
+
         # Check if on cylindrical surface first (most common case)
-        if radial_distance == self.radius:
+        if equality_test(radial_distance, self.radius):
             # Normal is the radial direction (normalized)
-            if radial_distance == scalar(0):
+            if safe_zero_test(radial_distance):
                 # Point is on the axis, which shouldn't happen for the cylindrical surface
                 # This might be an edge case on the cap center
                 pass
             else:
                 return radial_vector / radial_distance
-        
+
         # Check if on end caps
-        if self.start_distance is not None and axial_coord == self.start_distance:
+        if self.start_distance is not None and equality_test(axial_coord, self.start_distance):
             # Bottom cap, normal points in -axis direction (outward)
             return -axis
-        if self.end_distance is not None and axial_coord == self.end_distance:
+        if self.end_distance is not None and equality_test(axial_coord, self.end_distance):
             # Top cap, normal points in +axis direction (outward)
             return axis
-        
+
         # Should not reach here if point is on boundary
         return None
 
@@ -968,9 +900,9 @@ class SolidUnion(CutCSG):
                 if normal is not None:
                     normals.append(normal)
         
-        if len(normals) == scalar(0):
+        if len(normals) == 0:
             return None
-        elif len(normals) == scalar(1):
+        elif len(normals) == 1:
             return normals[0]
         else:
             # Average the normals
@@ -979,7 +911,7 @@ class SolidUnion(CutCSG):
                 avg_normal = avg_normal + n
             # Normalize
             norm = safe_norm(avg_normal)
-            if norm == scalar(0):
+            if safe_zero_test(norm):
                 return None
             return avg_normal / norm
 
@@ -1058,7 +990,7 @@ class Intersection(CutCSG):
                 return left_normal
             avg_normal = left_normal + right_normal
             norm = safe_norm(avg_normal)
-            if norm == scalar(0):
+            if safe_zero_test(norm):
                 return left_normal
             return avg_normal / norm
 
@@ -1242,9 +1174,9 @@ class Difference(CutCSG):
                     # Negate because we want the normal pointing into the remaining material
                     normals.append(-normal)
         
-        if len(normals) == scalar(0):
+        if len(normals) == 0:
             return None
-        elif len(normals) == scalar(1):
+        elif len(normals) == 1:
             return normals[0]
         else:
             # Average the normals
@@ -1253,7 +1185,7 @@ class Difference(CutCSG):
                 avg_normal = avg_normal + n
             # Normalize
             norm = safe_norm(avg_normal)
-            if norm == scalar(0):
+            if safe_zero_test(norm):
                 return None
             return avg_normal / norm
 
@@ -1369,27 +1301,27 @@ class ConvexPolygonExtrusion(CutCSG):
         
         # Check distance configuration
         if self.start_distance is not None and self.end_distance is not None:
-            if self.end_distance <= self.start_distance:
+            if safe_compare(self.end_distance, self.start_distance, Comparison.LE):
                 return False
-        
+
         # Check convexity: all cross products of consecutive edges should have the same sign
         # For a convex polygon, as we traverse the vertices, we should always turn the same way
         n = len(self.points)
-        
+
         # Compute 2D cross product for each triplet of consecutive points
         def cross_product(i):
             p0, p1, p2 = self.points[i], self.points[(i + 1) % n], self.points[(i + 2) % n]
             edge1, edge2 = p1 - p0, p2 - p1
             return edge1[0] * edge2[1] - edge1[1] * edge2[0]
-        
+
         # Generate all cross products and filter out zeros (collinear points)
         cross_products = [cross_product(i) for i in range(n)]
-        non_zero_crosses = [cp for cp in cross_products if cp != scalar(0)]
-        
+        non_zero_crosses = [cp for cp in cross_products if not safe_zero_test(cp)]
+
         # Reject if all collinear, otherwise check all turns go the same direction
-        return (len(non_zero_crosses) > scalar(0) and 
-                (all(cp > scalar(0) for cp in non_zero_crosses) or 
-                 all(cp < scalar(0) for cp in non_zero_crosses)))
+        return (len(non_zero_crosses) > 0 and
+                (all(safe_compare(cp, 0, Comparison.GT) for cp in non_zero_crosses) or
+                 all(safe_compare(cp, 0, Comparison.LT) for cp in non_zero_crosses)))
 
     def contains_point(self, point: V3) -> bool:
         """
@@ -1414,7 +1346,6 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check Z bounds (use safe_compare for tolerance with Float vs Integer)
-        from kumiki.rule import safe_compare, Comparison
         if self.start_distance is not None and safe_compare(z_coord - self.start_distance, 0, Comparison.LT):
             return False
         if self.end_distance is not None and safe_compare(z_coord - self.end_distance, 0, Comparison.GT):
@@ -1441,7 +1372,6 @@ class ConvexPolygonExtrusion(CutCSG):
             cross = edge[0] * to_point[1] - edge[1] * to_point[0]
             
             # Use safe_compare with tolerance to handle Float vs Integer comparisons
-            from kumiki.rule import safe_compare, Comparison
             if safe_compare(cross, 0, Comparison.LT):
                 return False
         
@@ -1473,7 +1403,6 @@ class ConvexPolygonExtrusion(CutCSG):
         y_coord = local_coords[1]
         z_coord = local_coords[2]
         
-        from kumiki.rule import zero_test
         # Check if on top or bottom face (if finite)
         if self.start_distance is not None and zero_test(z_coord - self.start_distance):
             return True
@@ -1506,7 +1435,6 @@ class ConvexPolygonExtrusion(CutCSG):
             t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
             
             # Check if projection is on the segment [0, 1]
-            from kumiki.rule import safe_compare, Comparison
             t_in_range = safe_compare(t, 0, Comparison.GE) and safe_compare(t - scalar(1), 0, Comparison.LE)
             
             if t_in_range:
@@ -1538,64 +1466,64 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check if on top face
-        if self.end_distance is not None and z_coord == self.end_distance:
+        if self.end_distance is not None and equality_test(z_coord, self.end_distance):
             # Top face, normal points in +Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
-        
+
         # Check if on bottom face
-        if self.start_distance is not None and z_coord == self.start_distance:
+        if self.start_distance is not None and equality_test(z_coord, self.start_distance):
             # Bottom face, normal points in -Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
-        
+
         # Otherwise, point is on a side face (edge of polygon extruded)
         # Find which edge it's on and compute the normal
         point_2d = Matrix([x_coord, y_coord])
-        
+
         for i in range(len(self.points)):
             p1 = self.points[i]
             p2 = self.points[(i + 1) % len(self.points)]
-            
+
             # Check if point is on the line segment from p1 to p2
             edge = p2 - p1
             to_point = point_2d - p1
-            
+
             edge_length_sq = edge[0]**2 + edge[1]**2
-            if edge_length_sq == scalar(0):
+            if safe_zero_test(edge_length_sq):
                 continue
-            
+
             t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
-            
-            if scalar(0) <= t <= scalar(1):
+
+            if safe_compare(t, 0, Comparison.GE) and safe_compare(t, 1, Comparison.LE):
                 closest_point = p1 + edge * t
                 distance_sq = (point_2d[0] - closest_point[0])**2 + (point_2d[1] - closest_point[1])**2
-                if distance_sq == scalar(0):
+                if safe_zero_test(distance_sq):
                     # Point is on this edge
                     # Normal is perpendicular to edge (in 2D), pointing outward
                     # Left perpendicular of (dx, dy) is (-dy, dx)
                     edge_normal_2d = Matrix([-edge[1], edge[0]])
                     edge_normal_2d = edge_normal_2d / sqrt(edge_normal_2d[0]**2 + edge_normal_2d[1]**2)
-                    
+
                     # Check if this normal points outward (away from polygon center)
                     # Calculate polygon center
                     center_x = sum(p[0] for p in self.points) / len(self.points)
                     center_y = sum(p[1] for p in self.points) / len(self.points)
                     center = Matrix([center_x, center_y])
-                    
+
                     # Vector from center to point on edge
                     to_edge = closest_point - center
-                    
+
                     # If dot product is negative, flip the normal
-                    if (edge_normal_2d[0] * to_edge[0] + edge_normal_2d[1] * to_edge[1]) < scalar(0):
+                    if safe_compare(edge_normal_2d[0] * to_edge[0] + edge_normal_2d[1] * to_edge[1], 0, Comparison.LT):
                         edge_normal_2d = -edge_normal_2d
-                    
+
                     # Convert to 3D local normal (no Z component for side faces)
                     local_normal = Matrix([edge_normal_2d[0], edge_normal_2d[1], 0])
-                    
+
                     # Transform to global coordinates
                     return safe_transform_vector(self.transform.orientation.matrix, local_normal)
-        
+
         return None
 
     def get_aabb(self) -> BoundingBox:
@@ -1808,7 +1736,7 @@ def adopt_csg(
             )
 
         normal_length_sq = numeric_dot_product(hp.normal, hp.normal)
-        if normal_length_sq == scalar(0):
+        if safe_zero_test(normal_length_sq):
             return replace(hp, normal=new_normal, offset=hp.offset)
 
         point_on_plane_in_orig = hp.normal * (hp.offset / normal_length_sq)

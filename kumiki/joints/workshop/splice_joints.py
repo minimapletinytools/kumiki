@@ -98,7 +98,6 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         to_splice = splice_point - timberA.get_bottom_position_global()
 
         # Project onto the centerline
-        from kumiki.rule import safe_dot_product
         distance_along_centerline = safe_dot_product(to_splice, length_dir_norm)
         projected_point = timberA.get_bottom_position_global() + length_dir_norm * distance_along_centerline
 
@@ -111,7 +110,6 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     # Check if timber cross sections overlap (approximate check using bounding boxes)
     # Project both timber cross-sections onto a plane perpendicular to the length direction
     # For simplicity, we'll warn if the centerlines are far apart
-    from kumiki.rule import safe_dot_product
     centerline_distance = vector_magnitude(
         (splice_point - timberA.get_bottom_position_global()) -
         length_dir_norm * safe_dot_product(splice_point - timberA.get_bottom_position_global(), length_dir_norm) -

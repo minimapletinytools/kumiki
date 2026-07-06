@@ -222,7 +222,6 @@ def check_timber_overlap_for_splice_joint_is_sensible(
     # Check 1: The joint ends must be pointing in opposite directions (anti-parallel)
     # For a proper splice joint, the specified ends should point towards each other
     # (dot product of end directions should be close to -1)
-    from kumiki.rule import safe_compare, Comparison
     end_dot_product = numeric_dot_product(timberA_end_direction, timberB_end_direction)
     
     if safe_compare(end_dot_product, 0, Comparison.GT):
@@ -723,9 +722,8 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
     from sympy import Matrix
-    from kumiki.rule import Orientation, Transform, create_v3, cross_product, safe_normalize_vector as normalize_vector
-    from kumiki.cutcsg import ConvexPolygonExtrusion
-    
+    from kumiki.rule import safe_normalize_vector as normalize_vector
+
     # Check if we have a single profile or multiple profiles
     # If the first element is a list, we have multiple profiles
     is_multiple_profiles = isinstance(profile, list) and len(profile) > 0 and isinstance(profile[0], list)

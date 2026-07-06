@@ -180,7 +180,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     def _make_shoulder_end_cut(timber: TimberLike, timber_end: TimberEnd) -> HalfSpace:
         butt_end_direction_global = timber.get_face_direction_global(timber_end)
         receiving_face = receiving_timber.get_closest_oriented_face_from_global_direction(-butt_end_direction_global)
-        receiving_face_center_global = get_point_on_face_global(receiving_face, receiving_timber)
+        receiving_face_center_global = get_center_point_on_face_global(receiving_face, receiving_timber)
 
         distance_from_bottom = safe_dot_product(
             receiving_face_center_global - timber.get_bottom_position_global(),

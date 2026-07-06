@@ -8,7 +8,7 @@ from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
 from .shavings.relief import CrossJointScribeReliefConfig, chop_scribe_relief_and_apply, warn_if_arrangement_timbers_imperfect
-from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, get_point_on_face_global, Space
+from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, get_center_point_on_face_global, Space
 from .shavings.build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
 
 
@@ -364,8 +364,6 @@ def cut_tongue_and_fork_corner_joint(
         AssertionError: If timbers are not plane aligned, are parallel, or tongue parameters
             are out of bounds.
     """
-    from kumiki.cutcsg import RectangularPrism, HalfSpace, Difference, CutCSG, adopt_csg
-    from kumiki.rule import safe_dot_product, safe_compare, Comparison
 
     error = arrangement.check_plane_aligned()
     assert error is None, error
@@ -473,7 +471,7 @@ def cut_tongue_and_fork_corner_joint(
     fork_entry_long_face_for_end_cut = fork_timber.get_closest_oriented_long_face_from_global_direction(-tongue_end_direction)
     fork_far_face = fork_entry_long_face_for_end_cut.to.face().get_opposite_face()
     fork_far_face_normal_global = fork_timber.get_face_direction_global(fork_far_face)
-    fork_far_face_point_global = get_point_on_face_global(fork_far_face, fork_timber)
+    fork_far_face_point_global = get_center_point_on_face_global(fork_far_face, fork_timber)
 
     # Slot depth = distance from shoulder to fork far face along tongue direction
     fork_slot_depth = safe_dot_product(
@@ -511,7 +509,6 @@ def cut_tongue_and_fork_corner_joint(
         else -fork_far_face_normal_global
     )
     # Convert to tongue timber local coordinates
-    from kumiki.rule import safe_transform_vector
     tongue_end_cut_local_normal = safe_transform_vector(
         tongue_timber.orientation.matrix.T, tongue_end_hs_normal_global
     )
@@ -525,7 +522,7 @@ def cut_tongue_and_fork_corner_joint(
     tongue_entry_long_face = tongue_timber.get_closest_oriented_long_face_from_global_direction(-fork_end_direction)
     tongue_far_face = tongue_entry_long_face.to.face().get_opposite_face()
     tongue_far_face_normal_global = tongue_timber.get_face_direction_global(tongue_far_face)
-    tongue_far_face_point_global = get_point_on_face_global(tongue_far_face, tongue_timber)
+    tongue_far_face_point_global = get_center_point_on_face_global(tongue_far_face, tongue_timber)
 
     fork_end_hs_normal_global = (
         tongue_far_face_normal_global
@@ -643,18 +640,17 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
         cut_ratio=cut_ratio,
     )
 
-    from kumiki.rule import safe_dot_product
 
     timberA_end_direction = timberA.get_face_direction_global(timberA_end)
     timberB_end_direction = timberB.get_face_direction_global(timberB_end)
 
     timberB_entry_face = timberB.get_closest_oriented_face_from_global_direction(-timberA_end_direction)
     timberB_far_face = timberB_entry_face.get_opposite_face()
-    timberB_far_face_point_global = get_point_on_face_global(timberB_far_face, timberB)
+    timberB_far_face_point_global = get_center_point_on_face_global(timberB_far_face, timberB)
 
     timberA_entry_face = timberA.get_closest_oriented_face_from_global_direction(-timberB_end_direction)
     timberA_far_face = timberA_entry_face.get_opposite_face()
-    timberA_far_face_point_global = get_point_on_face_global(timberA_far_face, timberA)
+    timberA_far_face_point_global = get_center_point_on_face_global(timberA_far_face, timberA)
 
     timberA_end_cut_distance_from_bottom = safe_dot_product(
         timberB_far_face_point_global - timberA.get_bottom_position_global(),
@@ -1071,7 +1067,6 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
 
         # Apply crop using the opposing timber's inner face
         from kumiki.measuring import locate_into_face
-        from kumiki.rule import safe_transform_vector
 
         # Measure into opposing timber's inner face to create a cutting plane (in global space)
         crop_distance = miter_face_width - distance_between_lap_and_outside

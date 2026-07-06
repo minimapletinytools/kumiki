@@ -21,6 +21,7 @@ from enum import Enum
 from typing import Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
+from typing_extensions import deprecated
 import warnings
 
 # Aliases for backwards compatibility
@@ -690,7 +691,6 @@ class PerfectTimberWithin(ABC):
 
     def _get_closest_oriented_face_from_faces(self, faces: List[TimberFace], target_direction: Direction3D) -> TimberFace:
         """Return the face in `faces` whose outward normal best aligns with `target_direction` (max dot product)."""
-        from kumiki.rule import numeric_dot_product
         best_face = faces[0]
         best_alignment = numeric_dot_product(target_direction, self.get_face_direction_global(faces[0]))
         for face in faces[1:]:
@@ -1056,7 +1056,6 @@ class Timber(PerfectTimberWithin):
         Returns:
             RectangularPrism representing the actual geometry in local coordinates
         """
-        from .cutcsg import RectangularPrism
         nominal_size, offset = self._nominal_csg_size_and_offset()
         return RectangularPrism(
             size=nominal_size,
@@ -1080,7 +1079,6 @@ class Timber(PerfectTimberWithin):
         Returns:
             CutCSG representing the extended geometry in local coordinates
         """
-        from .cutcsg import RectangularPrism
         nominal_size, offset = self._nominal_csg_size_and_offset()
         return RectangularPrism(
             size=nominal_size,
@@ -1199,7 +1197,6 @@ class RoundTimber(PerfectTimberWithin):
         Returns:
             Cylinder representing the actual geometry in local coordinates
         """
-        from .cutcsg import Cylinder
         return Cylinder(
             radius=self.diameter / scalar(2),
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Local Z-axis
@@ -1221,7 +1218,6 @@ class RoundTimber(PerfectTimberWithin):
         Returns:
             Cylinder representing the extended geometry in local coordinates
         """
-        from .cutcsg import Cylinder
         return Cylinder(
             radius=self.diameter / scalar(2),
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Local Z-axis
@@ -1331,7 +1327,6 @@ class RegularPolygonTimber(PerfectTimberWithin):
         Returns:
             ConvexPolygonExtrusion representing the actual geometry in local coordinates
         """
-        from .cutcsg import ConvexPolygonExtrusion
         return ConvexPolygonExtrusion(
             points=self._compute_polygon_vertices(),
             transform=Transform.identity(),
@@ -1352,7 +1347,6 @@ class RegularPolygonTimber(PerfectTimberWithin):
         Returns:
             ConvexPolygonExtrusion representing the extended geometry in local coordinates
         """
-        from .cutcsg import ConvexPolygonExtrusion
         return ConvexPolygonExtrusion(
             points=self._compute_polygon_vertices(),
             transform=Transform.identity(),
@@ -1464,10 +1458,8 @@ class Cutting:
         elif len(csg_components) == 1:
             result = csg_components[0]
             if self.label is not None:
-                from .cutcsg import SolidUnion
                 result = SolidUnion([result], label=self.label)
         else:
-            from .cutcsg import SolidUnion
             result = SolidUnion(csg_components, label=self.label)
 
         return result
@@ -1534,7 +1526,6 @@ def _create_extended_rectangular_prism(
     Returns:
         RectangularPrism in local coordinates
     """
-    from .cutcsg import RectangularPrism
     return RectangularPrism(
         size=size,
         transform=Transform.identity(),
@@ -1605,7 +1596,6 @@ def did_end_cuts_extend_timber(timber: PerfectTimberWithin, cuts: List['Cutting'
     Returns:
         True if any end cut extends beyond the timber's original length
     """
-    from kumiki.rule import safe_compare, Comparison
     
     for cut in cuts:
         top_end_cut = cut.get_maybe_top_end_cut()
@@ -1689,7 +1679,6 @@ class CutTimber:
         negative_csgs = [cut.get_negative_csg_local() for cut in self.cuts]
         
         # Return the difference: timber - all cuts
-        from .cutcsg import Difference
         return Difference(starting_csg, negative_csgs)
 
     def get_bounding_box_prism(self) -> RectangularPrism:
@@ -1705,7 +1694,6 @@ class CutTimber:
         Returns:
             RectangularPrism: The bounding box for the cut timber in global coordinates
         """
-        from .cutcsg import RectangularPrism, HalfSpace
         
         # Start with the timber's original bounds (in local coordinates)
         min_z = scalar(0)
@@ -1774,8 +1762,7 @@ class CutTimber:
             end_distance=max_z
         )
     
-    # TODO test me
-    # TODO DELETE ME
+    @deprecated("use get_bounding_box_prism instead")
     def DEPRECATED_approximate_bounding_prism(self) -> RectangularPrism:
         """
         TODO someday we want a fully analytical solution for this, but for now this is sufficient for our needs.
@@ -1789,7 +1776,6 @@ class CutTimber:
         Returns:
             RectangularPrism: The bounding box for the cut timber in global coordinates
         """
-        from .cutcsg import RectangularPrism, HalfSpace, Difference
         
         # Start with the timber's original bounds (in local coordinates)
         min_z = scalar(0)
@@ -1806,7 +1792,6 @@ class CutTimber:
             # Check if it's a simple HalfSpace or a Difference with HalfSpaces
             if isinstance(csg, HalfSpace):
                 half_space = csg
-                from kumiki.rule import safe_compare, Comparison, safe_dot_product
                 dot_product = safe_dot_product(half_space.normal, length_direction_local)
                 
                 if equality_test(Abs(dot_product), 1):
@@ -2499,7 +2484,6 @@ class Frame:
                         local_corners.append(local_corner)
             
             # Transform each corner to global coordinates
-            from kumiki.rule import safe_transform_vector
             for local_corner in local_corners:
                 global_corner = prism.transform.position + safe_transform_vector(prism.transform.orientation.matrix, local_corner)
                 
@@ -2605,9 +2589,17 @@ class Frame:
 
 
 
+class KumikiArrangementError(ValueError):
+    """Raised when a timber arrangement or joint parameter fails a validation check.
+
+    Unlike AssertionError, this survives `python -O` and is safe for callers to
+    catch specifically when handling invalid joint/arrangement configurations.
+    """
+
+
 def require_check(err: Optional[str]):
     if err is not None:
-        raise AssertionError(err)
+        raise KumikiArrangementError(err)
 
 
 def add_milestone(name: str):
