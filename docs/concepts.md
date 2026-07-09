@@ -204,7 +204,7 @@ Another important detail. If a timber has an end cut on one of its ends, the "le
 
 ## Accesories
 
-Joints also contain a dictionary of `JointAccessory` which are additional *things* needed to complete the joint, such as pegs, nails, or other hardware.
+Joints also contain a dictionary of `Accessory` which are additional *things* needed to complete the joint, such as pegs, nails, or other hardware.
 
 ## Relief cuts
 

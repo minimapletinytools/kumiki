@@ -10,7 +10,7 @@ import inspect
 from typing import Any, Dict, List, Tuple, Optional, Callable, Union, Literal, Sequence
 from dataclasses import dataclass, field, replace
 from .rule import V3, create_v3, Transform, scalar
-from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, JointAccessory
+from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, Accessory
 from .cutcsg import CutCSG, translate_csg
 
 
@@ -70,7 +70,7 @@ def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
             translated_timbers.append(CutTimber(timber=translated_timber, cuts=[translated_cut]))
             translated_cuttings[name] = translated_cut
 
-        translated_accessories: List[JointAccessory] = []
+        translated_accessories: List[Accessory] = []
         if joint.jointAccessories:
             for accessory in joint.jointAccessories.values():
                 if isinstance(accessory, Peg):
@@ -141,7 +141,7 @@ def make_pattern_from_frame(frame_func: Callable[..., Frame]) -> PatternLambda:
             )
             translated_timbers.append(CutTimber(timber=translated_timber, cuts=cut_timber.cuts))
 
-        translated_accessories: List[JointAccessory] = []
+        translated_accessories: List[Accessory] = []
         if frame.accessories:
             for accessory in frame.accessories:
                 if isinstance(accessory, Peg):
@@ -488,7 +488,7 @@ class PatternBook:
         name: str,
     ) -> Frame:
         all_cut_timbers: List[CutTimber] = []
-        all_accessories: List[JointAccessory] = []
+        all_accessories: List[Accessory] = []
         all_source_joints: List = []
 
         for result in results:

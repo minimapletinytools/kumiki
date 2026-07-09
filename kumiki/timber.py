@@ -1896,7 +1896,7 @@ class CutTimber:
 
 # TODO rename to just Accessory
 @dataclass(frozen=True)
-class JointAccessory(ABC):
+class Accessory(ABC):
     """Base class for joint accessories like wedges, drawbores, etc."""
 
     ticket: AccessoryTicket = field(default_factory=AccessoryTicket, kw_only=True)
@@ -1935,7 +1935,7 @@ class PegShape(Enum):
 
 
 @dataclass(frozen=True)
-class Peg(JointAccessory):
+class Peg(Accessory):
     """
     Represents a peg used in timber joinery (e.g., draw bore pegs, komisen).
     
@@ -2005,7 +2005,7 @@ class WedgeShape:
 
 
 @dataclass(frozen=True)
-class Wedge(JointAccessory):
+class Wedge(Accessory):
     r"""
     Represents a wedge used in timber joinery (e.g., wedged tenons).
     
@@ -2105,7 +2105,7 @@ class Wedge(JointAccessory):
 
 
 @dataclass(frozen=True)
-class CSGAccessory(JointAccessory):
+class CSGAccessory(Accessory):
     """Generic accessory represented as local-space positive CSG plus a global transform."""
 
     transform: Transform
@@ -2117,7 +2117,7 @@ class CSGAccessory(JointAccessory):
 
 # TODO you should build this out, maybe do any LocatedTimberFeature
 @dataclass(frozen=True)
-class Sticker(JointAccessory):
+class Sticker(Accessory):
     """
     Just a marking used for debugging (ball at center + shaft in local +Z).
     """
@@ -2152,14 +2152,14 @@ class Sticker(JointAccessory):
 class Joint:
     cuttings: Dict[str, Cutting]
     ticket: JointTicket
-    jointAccessories: Dict[str, JointAccessory] = field(default_factory=dict)
+    jointAccessories: Dict[str, Accessory] = field(default_factory=dict)
 
     def with_order(
         self,
         order: Union[
             int,
             Mapping[str, int],
-            Iterable[Tuple[Union[str, "PerfectTimberWithin", "JointAccessory"], int]],
+            Iterable[Tuple[Union[str, "PerfectTimberWithin", "Accessory"], int]],
         ],
     ) -> "Joint":
         """Return a copy of this joint with assembly order(s) assigned.
@@ -2224,7 +2224,7 @@ class Joint:
             (("accessory", key), accessory.assembly_ordering) for key, accessory in self.jointAccessories.items()
         )
 
-        order_pairs: List[Tuple[Union[str, "PerfectTimberWithin", "JointAccessory"], int]]
+        order_pairs: List[Tuple[Union[str, "PerfectTimberWithin", "Accessory"], int]]
         if isinstance(order, Mapping):
             order_pairs = [(str(key), int(value)) for key, value in cast(Mapping[str, int], order).items()]
         else:
@@ -2279,7 +2279,7 @@ def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
         target[f"{key}_{suffix}"] = value
 
     merged_cuttings: Dict[str, Cutting] = {}
-    merged_accessories: Dict[str, JointAccessory] = {}
+    merged_accessories: Dict[str, Accessory] = {}
     for joint in joints:
         for key, cutting in joint.cuttings.items():
             _add_with_unique_key(merged_cuttings, key, cutting)
@@ -2299,11 +2299,11 @@ class Frame:
     
     Attributes:
         cut_timbers: List of CutTimber objects representing all timbers in the frame
-        accessories: List of JointAccessory objects (already in global space)
+        accessories: List of Accessory objects (already in global space)
         name: Optional name for this frame (e.g., "Oscar's Shed", "Main Frame")
     """
     cut_timbers: List[CutTimber]
-    accessories: List[JointAccessory] = field(default_factory=list)
+    accessories: List[Accessory] = field(default_factory=list)
     name: Optional[str] = None
     source_joints: Optional[List] = field(default=None, compare=False, hash=False, repr=False)
     footprints: List[Footprint] = field(default_factory=list)
@@ -2415,7 +2415,7 @@ class Frame:
             merged_cut_timbers.append(CutTimber(timber, cuts=[]))
         
         # Collect all accessories from all joints
-        all_accessories: List[JointAccessory] = []
+        all_accessories: List[Accessory] = []
         for joint in joints:
             all_accessories.extend(joint.jointAccessories.values())
         
@@ -2538,7 +2538,7 @@ class Frame:
         # Note: orientation.matrix is checked as part of the matrix
         self._check_matrix_no_python_floats(timber.transform.orientation.matrix, f"Timber '{timber.ticket.path}' transform.orientation")
     
-    def _check_accessory_no_python_floats(self, accessory: JointAccessory):
+    def _check_accessory_no_python_floats(self, accessory: Accessory):
         """Check an accessory for float values."""
         if isinstance(accessory, Peg):
             self._check_vector_no_python_floats(accessory.transform.position, f"Peg transform.position")
@@ -2652,7 +2652,7 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
             members[key] = AssemblyMember(key=key, name=timber.ticket.path, position=centroid)
         return key
 
-    def register_accessory(accessory: JointAccessory) -> int:
+    def register_accessory(accessory: Accessory) -> int:
         key = accessory.ticket.kumiki_id
         if key not in members:
             transform = getattr(accessory, "transform", None)

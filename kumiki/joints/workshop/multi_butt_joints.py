@@ -276,7 +276,7 @@ def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArr
     )
 
     peg_holes_in_spline_local: List[CutCSG] = []
-    joint_accessories: Dict[str, JointAccessory] = {}
+    joint_accessories: Dict[str, Accessory] = {}
 
     # peg logic slightly different so we don't use compute_peg_positions
     if peg_parameters is not None:

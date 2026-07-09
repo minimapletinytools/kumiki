@@ -51,11 +51,11 @@ Solver (`solve_assembly(members, joints)`) rework:
 
 ## 2. kumiki/timber.py — fields, `with_order`, adapter
 
-- `Cutting.assembly_ordering: Ordering = Ordering()` and `JointAccessory.assembly_ordering: Ordering = field(default=Ordering(), kw_only=True)` (next to the existing `assembly_freedom` fields at :1390 / :1901).
+- `Cutting.assembly_ordering: Ordering = Ordering()` and `Accessory.assembly_ordering: Ordering = field(default=Ordering(), kw_only=True)` (next to the existing `assembly_freedom` fields at :1390 / :1901).
 - **Delete** `Joint.assembly_order` and `Joint.with_assembly` (:2146-2196). Add:
 
 ```python
-def with_order(self, order: Union[int, Mapping[Union[str, PerfectTimberWithin, JointAccessory], int]]) -> "Joint":
+def with_order(self, order: Union[int, Mapping[Union[str, PerfectTimberWithin, Accessory], int]]) -> "Joint":
 ```
   - int: rebuild every cutting/accessory via `replace(member, assembly_ordering=Ordering(order, member.assembly_ordering.suborder))`.
   - Mapping: resolve each key (str → cuttings/jointAccessories key; object → identity scan over `cutting.timber` / accessory values; ValueError naming unknown references). Named → `Ordering(n, 0)`; unnamed unchanged. Then assert precedence preservation across ALL member pairs (old strict `<` must remain strict `<` in the result) — ValueError explaining which pair breaks (e.g. "peg_0 must be extracted before 'Right Side' (suborder 0 < 1) but new orders place it at 3 vs 1").

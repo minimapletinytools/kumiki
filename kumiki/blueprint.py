@@ -26,7 +26,7 @@ from .cutcsg import (
     adopt_csg,
 )
 from .rule import Transform
-from .timber import CutTimber, Frame, JointAccessory
+from .timber import CutTimber, Frame, Accessory
 
 import numpy as np
 import trimesh
@@ -140,8 +140,8 @@ def _cut_timber_to_trimesh(cut_timber: CutTimber) -> "trimesh.Trimesh":
     return triangulate_cutcsg(global_csg).mesh
 
 
-def _joint_accessory_to_trimesh(accessory: JointAccessory) -> "trimesh.Trimesh":
-    """Return a trimesh in global coordinates for a single JointAccessory."""
+def _joint_accessory_to_trimesh(accessory: Accessory) -> "trimesh.Trimesh":
+    """Return a trimesh in global coordinates for a single Accessory."""
     from .triangles import triangulate_cutcsg
 
     local_csg = accessory.get_csg_local()
