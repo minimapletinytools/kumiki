@@ -61,8 +61,6 @@ def scalar(numerator, denominator=1):
 # Global Numeric Mode
 # ============================================================================
 
-# TODO DELETE this does not do anything meaningufl, just determines whether we "warn on complex expressions in symbolic mode" or something less heavy-handed.
-# so rename this varibale
 NUMERIC_MODE = "float"
 
 
@@ -175,7 +173,7 @@ def _should_collapse(expr, collapse_mode: CollapseMode) -> bool:
     - ALWAYS → True
     - NEVER  → False
     - SMART  → True when the expression exceeds the complexity threshold
-               (is_complex_expr).  In symbolic mode, also emits a warning.
+               (is_complex_expr).
     """
     if collapse_mode == CollapseMode.ALWAYS:
         return True
@@ -183,15 +181,7 @@ def _should_collapse(expr, collapse_mode: CollapseMode) -> bool:
         return False
     # SMART mode — collapse only when expression is complex
     max_nodes = SMART_NODE_GUARD_MAX_NODES if SMART_NODE_GUARD_ENABLED else COMPLEX_NUM_NODES_THRESHOLD
-    if is_complex_expr(expr, max_nodes):
-        if not is_float_numeric_mode():
-            #warnings.warn(
-            #    f"Expression exceeded complexity threshold and will be collapsed to Float: {repr(expr)[:120]}",
-            #    stacklevel=3,
-            #)
-            pass
-        return True
-    return False
+    return is_complex_expr(expr, max_nodes)
 
 
 def _collapse_scalar(value, collapse_mode: CollapseMode):
