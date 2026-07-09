@@ -7,7 +7,7 @@ from sympy import Matrix
 from kumiki.rule import inches, Transform, scalar
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
-    PegShape, timber_from_directions,
+    PegShape, create_timber,
     create_v3, V2, CutTimber, Frame
 )
 from kumiki.ticket import Ticket

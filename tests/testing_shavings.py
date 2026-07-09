@@ -54,7 +54,7 @@ def create_standard_vertical_timber(
     if position is None:
         position = (scalar(0), scalar(0), scalar(0))
     
-    return timber_from_directions(
+    return create_timber(
         length=scalar(height),
         size=Matrix([scalar(size[0]), scalar(size[1])]),
         bottom_position=Matrix([scalar(position[0]), scalar(position[1]), scalar(position[2])]),
@@ -102,7 +102,7 @@ def create_standard_horizontal_timber(
     
     length_dir, width_dir = direction_map[direction]
     
-    return timber_from_directions(
+    return create_timber(
         length=scalar(length),
         size=Matrix([scalar(size[0]), scalar(size[1])]),
         bottom_position=Matrix([scalar(position[0]), scalar(position[1]), scalar(position[2])]),

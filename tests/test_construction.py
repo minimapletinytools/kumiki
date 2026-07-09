@@ -29,7 +29,7 @@ class TestTimberCreation:
         length_dir = create_v3(scalar(0), scalar(0), scalar(1))
         width_dir = create_v3(scalar(1), scalar(0), scalar(0))
         
-        timber = create_timber(position, scalar("2.5"), size, length_dir, width_dir)
+        timber = create_timber(scalar("2.5"), size, position, length_dir, width_dir)
         
         assert timber.length == scalar("2.5")
         assert timber.get_bottom_position_global()[0] == scalar(1)
@@ -615,7 +615,7 @@ class TestJoinTimbers:
         timber1 = create_standard_vertical_timber(height=3, size=(0.15, 0.15), position=(0, 0, 0))
         
         # Timber2: 3D rotation not aligned with timber1's coordinate grid
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.15"), scalar("0.15")),
             bottom_position=create_v3(scalar(2), scalar(2), scalar(0)),
@@ -688,7 +688,7 @@ class TestJoinTimbers:
         # Use exact integer/rational inputs for exact SymPy results
         timber1 = create_standard_vertical_timber(height=1, size=(0.1, 0.1), position=(-0.5, 0, 0))
         
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=1,  # Integer
             size=create_v2(scalar(1, 10), scalar(1, 10)),  # Exact rationals
             bottom_position=create_v3(scalar(1, 2), 0, 0),   # Exact rationals
@@ -811,7 +811,7 @@ class TestJoinTimbers:
         
         # Create base timbers - all horizontal and face-aligned
         for i, pos in enumerate(positions):
-            timber = timber_from_directions(
+            timber = create_timber(
                 length=2,  # 2m long
                 size=timber_size,
                 bottom_position=pos,
@@ -823,7 +823,7 @@ class TestJoinTimbers:
         
         # Create a beam at a higher level
         beam_z = scalar(3, 2)  # 1.5m height
-        beam = timber_from_directions(
+        beam = create_timber(
             length=4,  # 4m long beam
             size=create_v2(scalar(15, 100), scalar(15, 100)),  # 15cm x 15cm
             bottom_position=create_v3(-2, 0, beam_z),
@@ -991,7 +991,7 @@ class TestJoinTimbers:
         beam_size = create_v2(inches(4), inches(4))
         
         # Left post at origin
-        post_left = timber_from_directions(
+        post_left = create_timber(
             length=post_height,
             size=post_size,
             bottom_position=create_v3(0, 0, 0),
@@ -1001,7 +1001,7 @@ class TestJoinTimbers:
         )
         
         # Right post 8" away in X direction
-        post_right = timber_from_directions(
+        post_right = create_timber(
             length=post_height,
             size=post_size,
             bottom_position=create_v3(inches(8), 0, 0),
@@ -1113,7 +1113,7 @@ class TestHelperFunctions:
     def test_timber_get_closest_oriented_face_axis_aligned(self):
         """Test Timber.get_closest_oriented_face_from_global_direction() with axis-aligned timber."""
         # Create an axis-aligned timber (standard orientation)
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),  # width=0.2, height=0.3
             bottom_position=create_v3(0, 0, 0),
@@ -1161,7 +1161,7 @@ class TestHelperFunctions:
         """Test Timber.get_closest_oriented_face_from_global_direction() with rotated timber."""
         # Create a timber rotated 90 degrees around Z axis
         # length_direction stays Z-up, but width_direction becomes Y-forward
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -1201,8 +1201,8 @@ class TestHelperFunctions:
         """Test Timber.get_closest_oriented_face_from_global_direction() with horizontal timber."""
         # Create a horizontal timber lying along X axis
         # Note: create_standard_horizontal_timber uses width_direction=[0,1,0] by default,
-        # so we need to use timber_from_directions here for width_direction=[0,0,1]
-        timber = timber_from_directions(
+        # so we need to use create_timber here for width_direction=[0,0,1]
+        timber = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -1241,7 +1241,7 @@ class TestHelperFunctions:
     def test_timber_get_closest_oriented_face_diagonal(self):
         """Test Timber.get_closest_oriented_face_from_global_direction() with diagonal target direction."""
         # Create an axis-aligned timber
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -1264,7 +1264,7 @@ class TestHelperFunctions:
     def test_timber_get_face_direction(self):
         """Test Timber.get_face_direction_global() method."""
         # Create an axis-aligned timber
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -1296,7 +1296,7 @@ class TestHelperFunctions:
     def test_timber_get_face_direction_for_ends(self):
         """Test using Timber.get_face_direction_global() for timber ends."""
         # Create a timber
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -1315,7 +1315,7 @@ class TestHelperFunctions:
     def test_timber_get_face_direction_with_timber_reference_end(self):
         """Test that Timber.get_face_direction_global() accepts TimberEnd."""
         # Create a timber
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -1338,7 +1338,7 @@ class TestHelperFunctions:
     def test_timber_get_size_in_face_normal_axis_with_timber_reference_end(self):
         """Test that Timber.get_size_in_face_normal_axis() accepts TimberEnd."""
         # Create a timber
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -1424,7 +1424,7 @@ class TestHelperFunctions:
         from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace  # ty: ignore[deprecated]
         
         # Create two parallel horizontal posts 2.0 meters apart
-        post1 = timber_from_directions(
+        post1 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.2"), scalar("0.2")),
             bottom_position=create_v3(0, 0, 0),
@@ -1432,7 +1432,7 @@ class TestHelperFunctions:
             width_direction=create_v3(0, 0, 1)     # Up
         )
         
-        post2 = timber_from_directions(
+        post2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.2"), scalar("0.2")),
             bottom_position=create_v3(0, 2, 0),  # 2m north
@@ -1460,7 +1460,7 @@ class TestHelperFunctions:
         from kumiki import StickoutReference, join_face_aligned_on_face_aligned_timbers, TimberFace  # ty: ignore[deprecated]
         
         # Create two parallel horizontal posts 2.0 meters apart
-        post1 = timber_from_directions(
+        post1 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.2"), scalar("0.2")),
             bottom_position=create_v3(0, 0, 0),
@@ -1468,7 +1468,7 @@ class TestHelperFunctions:
             width_direction=create_v3(0, 0, 1)     # Up
         )
         
-        post2 = timber_from_directions(
+        post2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.2"), scalar("0.2")),
             bottom_position=create_v3(0, 2, 0),  # 2m north
@@ -1536,7 +1536,7 @@ class TestTimberFootprintOrientation:
         ]
         
         for description, bottom_pos, length_dir, width_dir, length, expected_inside, expected_outside in test_cases:
-            timber = timber_from_directions(
+            timber = create_timber(
                 length=length,
                 size=create_v2(scalar("0.2"), scalar("0.3")),
                 bottom_position=bottom_pos,
@@ -1563,7 +1563,7 @@ class TestTimberFootprintOrientation:
         footprint = Footprint(tuple(corners))
         
         # Diagonal timber from (1,1) going toward (9,9), but oriented so width points inward
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar("11.31"),  # ~8*sqrt(2)
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
@@ -1618,7 +1618,7 @@ class TestSplitTimber:
     def test_split_timber_horizontal(self, symbolic_mode):
         """Test splitting a horizontal timber"""
         # Create a horizontal timber along X axis
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(20),
             size=create_v2(scalar(6), scalar(4)),
             bottom_position=create_v3(scalar(5), scalar(10), scalar(2)),
@@ -1642,7 +1642,7 @@ class TestSplitTimber:
         # Create a diagonal timber at 45 degrees
         length_dir = normalize_vector(create_v3(scalar(1), scalar(1), scalar(0)))
         
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -1671,7 +1671,7 @@ class TestSplitTimber:
     def test_split_timber_with_rational(self, symbolic_mode):
         """Test splitting with exact rational arithmetic"""
         # Create a timber with rational values
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10, 1),
             size=create_v2(scalar(4, 1), scalar(4, 1)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -1690,7 +1690,7 @@ class TestSplitTimber:
     
     def test_split_timber_invalid_distance(self):
         """Test that invalid split distances raise assertions"""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -1729,7 +1729,7 @@ class TestSplitTimber:
     def test_split_timber_preserves_orientation(self):
         """Test that both resulting timbers preserve the original orientation"""
         # Create a timber with non-standard orientation
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(15),
             size=create_v2(scalar(6), scalar(8)),
             bottom_position=create_v3(scalar(1), scalar(2), scalar(3)),
@@ -1757,8 +1757,8 @@ class TestSplitTimber:
 
 def test_join_plane_aligned_on_place_aligned_timbers():
     # Let's use create_timber
-    t1 = create_timber(create_v3(0, 0, 0), scalar(100), create_v2(10, 10), length_direction=create_v3(0, 1, 0), width_direction=create_v3(0, 0, 1))
-    t2 = create_timber(create_v3(50, -50, 0), scalar(100), create_v2(10, 10), length_direction=create_v3(1, 0, 0), width_direction=create_v3(0, 0, 1))
+    t1 = create_timber(scalar(100), create_v2(10, 10), create_v3(0, 0, 0), length_direction=create_v3(0, 1, 0), width_direction=create_v3(0, 0, 1))
+    t2 = create_timber(scalar(100), create_v2(10, 10), create_v3(50, -50, 0), length_direction=create_v3(1, 0, 0), width_direction=create_v3(0, 0, 1))
     
     stickout = Stickout(stickout1=scalar(0), stickout2=scalar(0))
     size = create_v2(10, 10)
@@ -1777,7 +1777,7 @@ class TestAttachFaceAlignedTimber:
     def _make_post(self):
         # Vertical 2x2 post from the origin, length 10, length +Z, width +X.
         # => RIGHT face normal +X, FRONT face normal +Y, length +Z.
-        return timber_from_directions(
+        return create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
@@ -1946,7 +1946,7 @@ class TestAttachFaceAlignedTimber:
 
     def _make_far_post(self):
         # A second vertical 2x2 post with its centerline at x=10: faces at x=9 and x=11.
-        return timber_from_directions(
+        return create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(10, 0, 0),
@@ -2025,7 +2025,7 @@ class TestAttachFaceAlignedTimber:
         # a target post rotated 45 degrees about its own axis: INSIDE/OUTSIDE reference the
         # near/far corner edges of its projected silhouette rather than its (diagonal) faces
         post = self._make_post()
-        rotated_post = timber_from_directions(
+        rotated_post = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(10, 0, 0),
@@ -2053,7 +2053,7 @@ class TestAttachFaceAlignedTimber:
         # projects to a single *point* on the attachment plane, which is dropped perpendicularly
         # onto the attached timber's length axis
         post = self._make_post()
-        cross_beam = timber_from_directions(
+        cross_beam = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(7, -5, 3),  # centerline: x=7, z=3, running along +Y
@@ -2095,7 +2095,7 @@ class TestAttachPlaneAlignedTimber:
     """Tests for attach_plane_aligned_timber (the angled generalization)."""
 
     def _make_post(self):
-        return timber_from_directions(
+        return create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
@@ -2173,7 +2173,7 @@ class TestAttachPlaneAlignedTimber:
         # the far-end centerline point must land exactly on that centerline (projected onto the
         # attachment plane)
         post = self._make_post()
-        far_post = timber_from_directions(
+        far_post = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(10, 0, 0),
@@ -2200,7 +2200,7 @@ class TestAttachPlaneAlignedTimber:
         # moves as the length grows): the far-end centerline point must still land exactly on
         # the target centerline height
         post = self._make_post()
-        beam_above = timber_from_directions(
+        beam_above = create_timber(
             length=scalar(40),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 15),
@@ -2226,7 +2226,7 @@ class TestAttachTimber:
     """Test for attach_timber (arbitrary direction, no face/plane alignment)."""
 
     def test_direction_position_and_lateral_offset(self, symbolic_mode):
-        post = timber_from_directions(
+        post = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),

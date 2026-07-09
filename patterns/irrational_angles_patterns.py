@@ -7,7 +7,7 @@ representations are converted to floating point values in CAD systems.
 """
 
 from sympy import pi, Matrix, cos, sin
-from kumiki.timber import Frame, TimberFace, TimberEnd, create_v3, timber_from_directions
+from kumiki.timber import Frame, TimberFace, TimberEnd, create_v3, create_timber
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.butt_joints import cut_mortise_and_tenon_joint
 from kumiki.patternbook import Pattern
@@ -22,7 +22,7 @@ def create_all_irrational_examples() -> Frame:
     at irrational angles and SymPy values are converted to floats.
     """
     # Vertical post (mortise timber)
-    post = timber_from_directions(
+    post = create_timber(
         length=scalar(96),
         size=Matrix([scalar(6), scalar(6)]),
         bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -38,7 +38,7 @@ def create_all_irrational_examples() -> Frame:
     length_dir = create_v3(cos(angle_37), sin(angle_37), scalar(0))
     width_dir = create_v3(scalar(0), scalar(0), scalar(1))
     
-    beam = timber_from_directions(
+    beam = create_timber(
         length=scalar(60),
         size=Matrix([scalar(4), scalar(6)]),
         bottom_position=create_v3(scalar(0), scalar(0), scalar(48)),

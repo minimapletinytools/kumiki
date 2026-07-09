@@ -78,7 +78,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
         position = create_v3(scalar(0), scalar(0), scalar(0))
 
     receiving_bottom = position + create_v3(-TIMBER_LENGTH / scalar(2), scalar(0), scalar(0))
-    receiving_timber = _maybe_round_timber(timber_from_directions(
+    receiving_timber = _maybe_round_timber(create_timber(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=receiving_bottom,
@@ -88,7 +88,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
     ), use_round_timbers)
 
     butt_length_direction = create_v3(sin(angle), cos(angle), scalar(0))
-    butt_timber = _maybe_round_timber(timber_from_directions(
+    butt_timber = _maybe_round_timber(create_timber(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=position,
@@ -153,7 +153,7 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
     sqrt5 = sqrt(5)
 
     # Receiving timber: vertical post along Z
-    receiving = _maybe_round_timber(timber_from_directions(
+    receiving = _maybe_round_timber(create_timber(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=position,
@@ -172,7 +172,7 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
     right_face_mid = position + Matrix([TIMBER_WIDTH / 2, scalar(0), TIMBER_LENGTH / 2])
     butt_bottom = right_face_mid - TIMBER_LENGTH * dirB
 
-    butt = _maybe_round_timber(timber_from_directions(
+    butt = _maybe_round_timber(create_timber(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=butt_bottom,
@@ -197,7 +197,7 @@ from sympy import Matrix
 from kumiki.rule import inches, Transform, degrees
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
-    PegShape, timber_from_directions,
+    PegShape, create_timber,
     create_v3, V2, CutTimber, Frame
 )
 

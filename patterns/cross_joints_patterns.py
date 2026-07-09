@@ -70,7 +70,7 @@ def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutT
 
     # Housing timber (beam) extends in +X direction
     # This is the timber that gets the groove cut into it
-    housing_timber = _maybe_round_timber(timber_from_directions(
+    housing_timber = _maybe_round_timber(create_timber(
         ticket="HouseJoint_Housing",
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
@@ -82,7 +82,7 @@ def make_house_joint_example(position: V3, use_round_timbers=False) -> list[CutT
     # Housed timber (shelf) extends in +Y direction, crossing through the housing timber
     # This timber fits into the groove and remains uncut
     # Offset vertically so they intersect properly
-    housed_timber = _maybe_round_timber(timber_from_directions(
+    housed_timber = _maybe_round_timber(create_timber(
         ticket="HouseJoint_Housed",
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
@@ -118,7 +118,7 @@ def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[
 
     # TimberA extends in +X direction, bottom at Z=0 (relative to position)
     # Height direction is +Z, so top face is at Z=TIMBER_HEIGHT
-    timberA = _maybe_round_timber(timber_from_directions(
+    timberA = _maybe_round_timber(create_timber(
         ticket="CrossLap_TimberA",
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
@@ -130,7 +130,7 @@ def make_cross_lap_joint_example(position: V3, use_round_timbers=False) -> list[
     # TimberB extends in +Y direction, bottom at Z=half_height (relative to position)
     # This creates an overlap from Z=half_height to Z=TIMBER_HEIGHT
     # Height direction is +Z, so top face is at Z=half_height+TIMBER_HEIGHT
-    timberB = _maybe_round_timber(timber_from_directions(
+    timberB = _maybe_round_timber(create_timber(
         ticket="CrossLap_TimberB",
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,

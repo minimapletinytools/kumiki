@@ -94,7 +94,7 @@ class TestSpliceJoint:
     def test_splice_joint_opposite_orientation(self):
         """Test splice joint with two aligned timbers with opposite orientations."""
         # TimberA points in +X direction
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=scalar(60),
             size=Matrix([scalar(6), scalar(6)]),
             bottom_position=Matrix([scalar(0), scalar(0), scalar(0)]),
@@ -104,7 +104,7 @@ class TestSpliceJoint:
         
         # TimberB points in -X direction (opposite orientation)
         # Bottom is at x=100, top at x=40
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=scalar(60),
             size=Matrix([scalar(6), scalar(6)]),
             bottom_position=Matrix([scalar(100), scalar(0), scalar(0)]),
@@ -133,7 +133,7 @@ class TestSpliceJoint:
     def test_splice_joint_non_aligned_timbers_raises_error(self):
         """Test that non-aligned (non-parallel) timbers raise a ValueError."""
         # Create two perpendicular timbers
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=scalar(50),
             size=Matrix([scalar(4), scalar(4)]),
             bottom_position=Matrix([scalar(0), scalar(0), scalar(0)]),
@@ -141,7 +141,7 @@ class TestSpliceJoint:
             width_direction=Matrix([scalar(0), scalar(1), scalar(0)])
         )
         
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=scalar(50),
             size=Matrix([scalar(4), scalar(4)]),
             bottom_position=Matrix([scalar(50), scalar(0), scalar(0)]),
@@ -177,7 +177,7 @@ class TestSpliceLapJoint:
         timber_size = create_v2(4, 4)
         
         # TimberA extends from x=0 to x=20
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -187,7 +187,7 @@ class TestSpliceLapJoint:
         )
         
         # TimberB extends from x=20 to x=40
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(20, 0, 0),

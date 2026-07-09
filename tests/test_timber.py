@@ -220,7 +220,7 @@ class TestTimber:
         length_dir = create_v3(scalar(0), scalar(0), scalar(1))  # Use exact integers
         width_dir = create_v3(1, 0, 0)   # Use exact integers
         
-        timber = timber_from_directions(length, size, position, length_dir, width_dir)
+        timber = create_timber(length, size, position, length_dir, width_dir)
         
         assert timber.length == 3
         assert timber.size.shape == (2, 1)
@@ -258,7 +258,7 @@ class TestTimber:
         input_length_dir = create_v3(scalar(0), scalar(0), scalar(1))  # Up - exact integers
         input_width_dir = create_v3(1, 0, 0)    # East - exact integers
         
-        timber = timber_from_directions(
+        timber = create_timber(
             length=2,  # Use exact integer
             size=create_v2(scalar(1, 10), scalar(1, 10)),  # 0.1 as exact rational
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),  # Use exact integers
@@ -291,7 +291,7 @@ class TestTimber:
         input_length_dir = create_v3(scalar(0), scalar(1), scalar(0))  # North - exact integers
         input_width_dir = create_v3(scalar(0), scalar(0), scalar(1))    # Up - exact integers
         
-        timber = timber_from_directions(
+        timber = create_timber(
             length=3,  # Use exact integer
             size=create_v2(scalar(1, 10), scalar(1, 10)),  # 0.1 as exact rational
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),  # Use exact integers
@@ -320,7 +320,7 @@ class TestTimber:
     
     def test_orientation_directions_are_orthonormal(self):
         """Test that the computed direction vectors form an orthonormal basis."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(1),
             size=create_v2(scalar("0.1"), scalar("0.1")),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -348,7 +348,7 @@ class TestTimber:
         input_length_dir = create_v3(scalar(0), scalar(0), scalar(5))  # Up, but length 5
         input_width_dir = create_v3(scalar(3), scalar(0), scalar(0))    # East, but length 3
         
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(1),
             size=create_v2(scalar("0.1"), scalar("0.1")),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -371,7 +371,7 @@ class TestTimber:
     
     def test_get_position_on_centerline_from_bottom_global(self, symbolic_mode):
         """Test the get_centerline_position_from_bottom method."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(5),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(scalar(1), scalar(2), scalar(3)),
@@ -405,7 +405,7 @@ class TestTimber:
     
     def test_get_position_on_centerline_from_bottom_global(self, symbolic_mode):
         """Test get_centerline_position_from_bottom method."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(scalar(1), scalar(2), scalar(3)),
@@ -433,7 +433,7 @@ class TestTimber:
     
     def test_get_position_on_centerline_from_top_global(self, symbolic_mode):
         """Test get_centerline_position_from_top method."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(scalar(1), scalar(2), scalar(3)),
@@ -463,7 +463,7 @@ class TestTimber:
         """Test get_size_in_face_normal_axis method returns correct dimensions for each face."""
         # Create a timber with distinct dimensions:
         # length = 10, width (size[0]) = 0.2, height (size[1]) = 0.3
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -663,7 +663,7 @@ class TestGetCornerPositionGlobal:
 
     def test_bot_right_front_vertical_timber(self, symbolic_mode):
         """BOT_RIGHT_FRONT corner of a 10x20x100 vertical timber at origin = (5, 10, 0)."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(100),
             size=create_v2(10, 20),
             bottom_position=create_v3(0, 0, 0),
@@ -689,7 +689,7 @@ class TestCutTimber:
         length_direction = Matrix([scalar(0), scalar(0), scalar(1)])
         width_direction = Matrix([scalar(1), scalar(0), scalar(0)])
         
-        timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction, ticket='test_timber')
+        timber = create_timber(length, size, bottom_position, length_direction, width_direction, ticket='test_timber')
         cut_timber = CutTimber(timber)
         
         # Get the CSG
@@ -722,7 +722,7 @@ class TestCutTimber:
         length_direction = Matrix([scalar(0), scalar(0), scalar(1)])
         width_direction = Matrix([scalar(1), scalar(0), scalar(0)])
         
-        timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
+        timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         cut_timber = CutTimber(timber)
         
         csg = cut_timber._extended_timber_without_cuts_csg_local()
@@ -743,7 +743,7 @@ class TestCutTimber:
         length_direction = Matrix([scalar(1), scalar(0), scalar(0)])  # Along X
         width_direction = Matrix([scalar(0), scalar(1), scalar(0)])
         
-        timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
+        timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         cut_timber = CutTimber(timber)
         
         csg = cut_timber._extended_timber_without_cuts_csg_local()
@@ -768,7 +768,7 @@ class TestCutTimber:
         length_direction = Matrix([scalar(0), scalar(0), scalar(1)])
         width_direction = Matrix([scalar(1), scalar(0), scalar(0)])
         
-        timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
+        timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         cut_timber = CutTimber(timber, cuts=[])
         
         # Get the CSG with cuts applied (should be same as without cuts since there are none)
@@ -789,7 +789,7 @@ class TestCutTimber:
         length_direction = Matrix([scalar(0), scalar(0), scalar(1)])
         width_direction = Matrix([scalar(1), scalar(0), scalar(0)])
         
-        timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
+        timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         
         # Add a cut (a simple half-plane cut at z=50 in local coordinates)
         from kumiki.cutcsg import HalfSpace
@@ -824,7 +824,7 @@ class TestCutTimber:
         length_direction = Matrix([scalar(0), scalar(0), scalar(1)])
         width_direction = Matrix([scalar(1), scalar(0), scalar(0)])
         
-        timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
+        timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         
         # Add two cuts
         from kumiki.cutcsg import HalfSpace
@@ -866,7 +866,7 @@ class TestCutTimber:
         length_direction = Matrix([scalar(0), scalar(0), scalar(1)])
         width_direction = Matrix([scalar(1), scalar(0), scalar(0)])
         
-        timber = timber_from_directions(length, size, bottom_position, length_direction, width_direction)
+        timber = create_timber(length, size, bottom_position, length_direction, width_direction)
         
         # Add an end cut at the top
         from kumiki.cutcsg import HalfSpace

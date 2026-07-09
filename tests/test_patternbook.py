@@ -4,7 +4,7 @@ Tests for the PatternBook module
 
 import pytest
 from kumiki.rule import V3, create_v3, create_v2, inches, Transform, Orientation, scalar
-from kumiki.timber import timber_from_directions, Frame, CutTimber, CSGAccessory
+from kumiki.timber import create_timber, Frame, CutTimber, CSGAccessory
 from kumiki.cutcsg import RectangularPrism
 from kumiki.patternbook import PatternMetadata, PatternBook, PatternLambda
 
@@ -57,7 +57,7 @@ def test_pattern_book_creation_with_frames():
     """Test creating a PatternBook with frame patterns."""
     # Create a simple pattern function
     def make_simple_frame(center):
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(24),
             size=create_v2(inches(2), inches(4)),
             bottom_position=center,
@@ -99,7 +99,7 @@ def test_pattern_book_creation_with_csg():
 def test_pattern_book_duplicate_names():
     """Test that duplicate pattern names raise ValueError."""
     def make_frame1(center):
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(24),
             size=create_v2(inches(2), inches(4)),
             bottom_position=center,
@@ -121,7 +121,7 @@ def test_pattern_book_duplicate_names():
 def test_raise_pattern():
     """Test raising a single pattern."""
     def make_frame(center: V3) -> Frame:
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(24),
             size=create_v2(inches(2), inches(4)),
             bottom_position=center,
@@ -159,7 +159,7 @@ def test_raise_pattern_group_frames():
     """Test raising a group of frame patterns."""
     def make_frame(name):
         def _make(center):
-            timber = timber_from_directions(
+            timber = create_timber(
                 length=inches(24),
                 size=create_v2(inches(2), inches(4)),
                 bottom_position=center,
@@ -252,7 +252,7 @@ def test_raise_patternbook_as_frame_combines_frame_and_csg_patterns():
     """Mixed frame/CSG patternbooks should combine into one viewable Frame."""
 
     def make_frame(center: V3) -> Frame:
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(24),
             size=create_v2(inches(2), inches(4)),
             bottom_position=center,
@@ -288,7 +288,7 @@ def test_raise_patternbook_as_frame_combines_frame_and_csg_patterns():
 def test_raise_pattern_group_mixed_types():
     """Test that mixing frame and CSG patterns in a group raises ValueError."""
     def make_frame(center):
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(24),
             size=create_v2(inches(2), inches(4)),
             bottom_position=center,

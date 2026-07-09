@@ -7,7 +7,7 @@ from sympy import cos, sin, pi
 from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector, safe_compare, Comparison, scalar
 from kumiki.timber import (
     TimberEnd,
-    timber_from_directions, create_v3
+    create_timber, create_v3
 )
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.shavings.build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
@@ -60,7 +60,7 @@ class TestMeasureMortiseShoulderPlane:
         """
         angle_rad = radians(scalar(2, 9) * pi)  # 40 degrees
 
-        mortise_timber = timber_from_directions(
+        mortise_timber = create_timber(
             length=inches(48), size=create_v2(inches(4), inches(5)),
             bottom_position=create_v3(-inches(24), scalar(0), scalar(0)),
             length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
@@ -68,7 +68,7 @@ class TestMeasureMortiseShoulderPlane:
             ticket="mortise"
         )
         tenon_length_dir = create_v3(cos(angle_rad), sin(angle_rad), scalar(0))
-        tenon_timber = timber_from_directions(
+        tenon_timber = create_timber(
             length=inches(48), size=create_v2(inches(4), inches(5)),
             bottom_position=create_v3(-inches(24) * cos(angle_rad), -inches(24) * sin(angle_rad), inches(3)),
             length_direction=tenon_length_dir,

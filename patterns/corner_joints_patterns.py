@@ -135,7 +135,7 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
     # (-4,2,0)/sqrt(20) = (-2,1,0)/sqrt(5) is perpendicular to dirB: 2*(-2)+4*1+3*0 = 0
     widthB = Matrix([scalar(-2), scalar(1), scalar(0)]) / sqrt5
 
-    timberA = _maybe_round_timber(timber_from_directions(
+    timberA = _maybe_round_timber(create_timber(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=position,
@@ -143,7 +143,7 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
         width_direction=widthA,
         ticket=TimberTicket("MiterWeird_TimberA"),
     ), use_round_timbers)
-    timberB = _maybe_round_timber(timber_from_directions(
+    timberB = _maybe_round_timber(create_timber(
         length=TIMBER_LENGTH,
         size=TIMBER_SIZE_2D,
         bottom_position=position,

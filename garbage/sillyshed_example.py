@@ -153,7 +153,7 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
         back_bottom = back_plate_point - normalize_vector(back_vec) * rafter_overhang
 
         rafters.append(
-            timber_from_directions(
+            create_timber(
                 length=safe_norm(front_vec) + rafter_overhang,
                 size=rafter_size,
                 bottom_position=front_bottom,
@@ -164,7 +164,7 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
         )
 
         rafters.append(
-            timber_from_directions(
+            create_timber(
                 length=safe_norm(back_vec) + rafter_overhang,
                 size=rafter_size,
                 bottom_position=back_bottom,

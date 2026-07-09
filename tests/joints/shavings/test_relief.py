@@ -22,7 +22,7 @@ from kumiki.timber import (
     TimberFace,
     TimberEnd,
     create_v3,
-    timber_from_directions,
+    create_timber,
 )
 from kumiki.timber_shavings import are_timbers_plane_aligned
 from tests.testing_shavings import (
@@ -80,7 +80,7 @@ class TestShoulderNotchingDecision:
         assert does_shoulder_plane_need_notching(aligned_arrangement, face_half_size - scalar(1))
         assert not does_shoulder_plane_need_notching(aligned_arrangement, face_half_size)
 
-        non_plane_mortise = timber_from_directions(
+        non_plane_mortise = create_timber(
             length=scalar(100),
             size=create_v2(scalar(6), scalar(6)),
             bottom_position=create_v3(-scalar(50), scalar(0), scalar(0)),
@@ -88,7 +88,7 @@ class TestShoulderNotchingDecision:
             width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             ticket="non_plane_mortise",
         )
-        non_plane_tenon = timber_from_directions(
+        non_plane_tenon = create_timber(
             length=scalar(100),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -166,7 +166,7 @@ class TestChopScribeRelief:
             ticket="timber_to_be_cut",
         )
         timber_to_be_scribed = replace(
-            timber_from_directions(
+            create_timber(
                 length=scalar(20),
                 size=create_v2(scalar(4), scalar(4)),
                 bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
