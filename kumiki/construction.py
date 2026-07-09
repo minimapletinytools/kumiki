@@ -138,24 +138,6 @@ class Stickout:
 # ============================================================================
 
 
-def create_timber(bottom_position: V3, length: Numeric, size: V2, 
-                  length_direction: Direction3D, width_direction: Direction3D, ticket: Optional[Union[TimberTicket, str]] = None) -> Timber:
-    """
-    Creates a timber at bottom_position with given dimensions and rotates it 
-    to the length_direction and width_direction
-
-    AGENT NOTE: AVOID this function if possible, prefer methods like join_timber, attach_timber, create_*_timber_on_footprint, or even create_axis_aligned_timber, which are more robust and easier to use.
-    
-    Args:
-        bottom_position: Position of the bottom point of the timber
-        length: Length of the timber
-        size: Cross-sectional size (width, height)
-        length_direction: Direction vector for the timber's length axis
-        width_direction: Direction vector for the timber's width axis
-        ticket: Optional ticket for this timber (can be Ticket object or string name, used for rendering/debugging)
-    """
-    return timber_from_directions(length, size, bottom_position, length_direction, width_direction, ticket=ticket)
-
 def create_axis_aligned_timber(bottom_position: V3, length: Numeric, size: V2,
                               length_direction: TimberFace, width_direction: Optional[TimberFace] = None, 
                               ticket: Optional[Union[TimberTicket, str]] = None) -> Timber:
@@ -195,7 +177,7 @@ def create_axis_aligned_timber(bottom_position: V3, length: Numeric, size: V2,
     
     width_vec = width_direction.get_direction()
     
-    return create_timber(bottom_position, length, size, length_vec, width_vec, ticket=ticket)
+    return create_timber(length=length, size=size, bottom_position=bottom_position, length_direction=length_vec, width_direction=width_vec, ticket=ticket)
 
 def create_vertical_timber_on_footprint_corner(footprint: Footprint, corner_index: int, 
                                                length: Numeric, location_type: FootprintLocation,
@@ -284,7 +266,7 @@ def create_vertical_timber_on_footprint_corner(footprint: Footprint, corner_inde
         # Center of bottom face lies on the boundary corner.
         bottom_position = create_v3(corner_x, corner_y, scalar(0))
     
-    return create_timber(bottom_position, length, size, length_direction, width_direction, ticket=ticket)
+    return create_timber(length=length, size=size, bottom_position=bottom_position, length_direction=length_direction, width_direction=width_direction, ticket=ticket)
 
 def create_vertical_timber_on_footprint_side(footprint: Footprint, side_index: int, 
                                             distance_along_side: Numeric,
@@ -383,7 +365,7 @@ def create_vertical_timber_on_footprint_side(footprint: Footprint, side_index: i
                                          point_y - inward_y * timber_depth / scalar(2), 
                                          scalar(0))
     
-    return create_timber(bottom_position, length, size, length_direction, width_direction, ticket=ticket)
+    return create_timber(length=length, size=size, bottom_position=bottom_position, length_direction=length_direction, width_direction=width_direction, ticket=ticket)
 
 def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: int,
                                         location_type: FootprintLocation, 
@@ -452,7 +434,7 @@ def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: in
         bottom_position = bottom_position - inward_normal * (timber_height / scalar(2))
     # For CENTER, no offset needed - centerline is already on the boundary side
     
-    return create_timber(bottom_position, length, size, length_direction, width_direction, ticket=ticket)
+    return create_timber(length=length, size=size, bottom_position=bottom_position, length_direction=length_direction, width_direction=width_direction, ticket=ticket)
 
 def stretch_timber(timber: Timber, end: TimberEnd, overlap_length: Numeric, 
                   extend_length: Numeric) -> Timber:
@@ -480,7 +462,7 @@ def stretch_timber(timber: Timber, end: TimberEnd, overlap_length: Numeric,
     # Create new timber with extended length
     new_length = timber.length + extend_length + overlap_length
     
-    return timber_from_directions(new_length, timber.size, new_bottom_position, 
+    return create_timber(new_length, timber.size, new_bottom_position, 
                                    timber.get_length_direction_global(), timber.get_width_direction_global())
 
 # TODO add some sorta splice stickout parameter
@@ -525,7 +507,7 @@ def split_timber(
     top_ticket = ticket2 if ticket2 is not None else f"{timber.ticket.path}/top"
     
     # Create first timber (bottom part)
-    bottom_timber = timber_from_directions(
+    bottom_timber = create_timber(
         length=distance_from_bottom,
         size=create_v2(timber.size[0], timber.size[1]),
         bottom_position=timber.get_bottom_position_global(),
@@ -539,7 +521,7 @@ def split_timber(
     top_of_first = timber.get_bottom_position_global() + distance_from_bottom * timber.get_length_direction_global()
     
     # Create second timber (top part)
-    top_timber = timber_from_directions(
+    top_timber = create_timber(
         length=timber.length - distance_from_bottom,
         size=create_v2(timber.size[0], timber.size[1]),
         bottom_position=top_of_first,
@@ -1130,7 +1112,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     if lateral_offset != scalar(0):
         bottom_pos += offset_dir * lateral_offset
     
-    return create_timber(bottom_pos, timber_length, size, length_direction, width_direction, ticket=ticket)
+    return create_timber(length=timber_length, size=size, bottom_position=bottom_pos, length_direction=length_direction, width_direction=width_direction, ticket=ticket)
 
 
 def join_plane_aligned_on_place_aligned_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,

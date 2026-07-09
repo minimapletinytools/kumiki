@@ -20,7 +20,7 @@ from kumiki.blueprint import (
     _OCP_AVAILABLE,
     _THREEMF_AVAILABLE,
 )
-from kumiki.timber import CutTimber, Frame, Peg, PegShape, Timber, timber_from_directions
+from kumiki.timber import CutTimber, Frame, Peg, PegShape, Timber, create_timber
 from kumiki.rule import Transform, create_v3, create_v2, scalar
 
 
@@ -30,7 +30,7 @@ from kumiki.rule import Transform, create_v3, create_v2, scalar
 
 def _simple_timber(name: str = "test_timber") -> Timber:
     """A small axis-aligned timber for export tests."""
-    return timber_from_directions(
+    return create_timber(
         bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
         length=scalar(2),
         size=create_v2(scalar(1), scalar(1)),
@@ -46,7 +46,7 @@ def _simple_cut_timber(name: str = "test_timber") -> CutTimber:
 
 def _simple_frame() -> Frame:
     t1 = _simple_timber("beam")
-    t2 = timber_from_directions(
+    t2 = create_timber(
         bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
         length=scalar(3),
         size=create_v2(scalar(1), scalar(1)),

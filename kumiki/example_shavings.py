@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from kumiki.timber import (
     Timber, TimberEnd, TimberLongFace,
-    timber_from_directions, normalize_vector,
+    create_timber, normalize_vector,
     RoundTimber, MeshTimber, RegularPolygonTimber,
 )
 from kumiki.rule import (
@@ -81,7 +81,7 @@ def _create_configurable_example_timber(
     ticket: str,
     timber_config: CanonicalExampleTimberConfig,
 ) -> CanonicalExampleTimber:
-    base_timber = timber_from_directions(
+    base_timber = create_timber(
         length=length,
         size=size,
         bottom_position=bottom_position,

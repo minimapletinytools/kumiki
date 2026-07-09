@@ -59,7 +59,7 @@ class TestHouseJoint:
         housing_timber = create_standard_vertical_timber(height=200, size=(10, 10), position=(0, 0, 0))
         
         # Create housed timber (horizontal beam intersecting the post)
-        housed_timber = timber_from_directions(
+        housed_timber = create_timber(
             length=scalar(80),
             size=Matrix([scalar(6), scalar(6)]),  # 6 x 6 beam
             bottom_position=Matrix([scalar(-20), scalar(0), scalar(100)]),

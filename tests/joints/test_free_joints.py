@@ -34,7 +34,7 @@ class TestFreeHouseJoint:
 
         # 1×1 horizontal +X housed timber; bottom at (-10, 0, 10), length 20
         # Crosses the housing at global Z=10, Y ∈ [-0.5, 0.5]
-        housed_timber = timber_from_directions(
+        housed_timber = create_timber(
             length=scalar(20),
             size=Matrix([scalar(1), scalar(1)]),
             bottom_position=create_v3(scalar(-10), scalar(0), scalar(10)),
@@ -80,7 +80,7 @@ class TestFreeHouseJoint:
 
         # 2×2 horizontal +X base timber; bottom at (-10, 0, 10), length 20
         # local x = global Y, local y = global Z, local z = global X
-        housed_timber_base = timber_from_directions(
+        housed_timber_base = create_timber(
             length=scalar(20),
             size=Matrix([scalar(2), scalar(2)]),
             bottom_position=create_v3(scalar(-10), scalar(0), scalar(10)),
@@ -132,7 +132,7 @@ class TestFreeHouseJoint:
             height=20, size=(3, 3), position=(0, 0, 0), ticket="housing"
         )
 
-        housed_timber_1 = timber_from_directions(
+        housed_timber_1 = create_timber(
             length=scalar(20),
             size=Matrix([scalar(1), scalar(1)]),
             bottom_position=create_v3(scalar(-10), scalar(0), scalar(8)),
@@ -140,7 +140,7 @@ class TestFreeHouseJoint:
             width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
             ticket="housed_1",
         )
-        housed_timber_2 = timber_from_directions(
+        housed_timber_2 = create_timber(
             length=scalar(20),
             size=Matrix([scalar(1), scalar(1)]),
             bottom_position=create_v3(scalar(-10), scalar(0), scalar(12)),

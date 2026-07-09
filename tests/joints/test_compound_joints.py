@@ -47,7 +47,7 @@ class TestMultiCrossLapJoint:
         """Two boards in an X shape (board_0 along +X, board_1 along +Y)."""
         W, L, T = scalar(6), scalar(20), scalar(4)
         wd = self._width_dir()
-        board_0 = timber_from_directions(
+        board_0 = create_timber(
             length=L,
             size=Matrix([W, T]),
             bottom_position=create_v3(scalar(-10), scalar(0), scalar(3)),
@@ -55,7 +55,7 @@ class TestMultiCrossLapJoint:
             width_direction=wd,
             ticket="board_0",
         )
-        board_1 = timber_from_directions(
+        board_1 = create_timber(
             length=L,
             size=Matrix([W, T]),
             bottom_position=create_v3(scalar(0), scalar(-10), scalar(3)),
@@ -73,7 +73,7 @@ class TestMultiCrossLapJoint:
         """
         W, L, T = scalar(6), scalar(20), scalar(4)
         wd = self._width_dir()
-        board_0 = timber_from_directions(
+        board_0 = create_timber(
             length=L,
             size=Matrix([W, T]),
             bottom_position=create_v3(scalar(-10), scalar(0), scalar(3)),
@@ -81,7 +81,7 @@ class TestMultiCrossLapJoint:
             width_direction=wd,
             ticket="board_0",
         )
-        board_1 = timber_from_directions(
+        board_1 = create_timber(
             length=L,
             size=Matrix([W, T]),
             bottom_position=create_v3(scalar(0), scalar(-10), scalar(3)),
@@ -89,7 +89,7 @@ class TestMultiCrossLapJoint:
             width_direction=wd,
             ticket="board_1",
         )
-        board_2 = timber_from_directions(
+        board_2 = create_timber(
             length=L,
             size=Matrix([W, T]),
             bottom_position=create_v3(scalar(-10), scalar(3), scalar(3)),

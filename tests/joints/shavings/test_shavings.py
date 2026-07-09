@@ -12,7 +12,7 @@ from kumiki.joints.workshop.shavings.shavings import (
     scribe_centerline_onto_centerline
 )
 from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face
-from kumiki.timber import timber_from_directions, TimberEnd, TimberFace, TimberLongFace
+from kumiki.timber import create_timber, TimberEnd, TimberFace, TimberLongFace
 from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel, scalar
 from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace
 from kumiki.measuring import mark_distance_from_end_along_centerline
@@ -28,7 +28,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timber_size = create_v2(inches(4), inches(4))
         
         # TimberA pointing east (left to right)
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -39,7 +39,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # TimberB pointing west (right to left), positioned to overlap
         # For timbers pointing opposite directions, join matching ends (TOP to TOP)
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(timber_length * 2, 0, 0),
@@ -61,7 +61,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timber_size = create_v2(inches(4), inches(4))
         
         # TimberA pointing east
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -72,7 +72,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # TimberB pointing west, TOP ends exactly touch
         # For opposite direction timbers, join matching ends so they face each other
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(2 * timber_length, 0, 0),  # Start further right
@@ -94,7 +94,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timber_size = create_v2(inches(4), inches(4))
         
         # Both timbers pointing east
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -103,7 +103,7 @@ class TestCheckTimberOverlapForSpliceJoint:
             ticket="timberA"
         )
         
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(timber_length, 0, 0),
@@ -128,7 +128,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timber_size = create_v2(inches(4), inches(4))
         
         # TimberA pointing east
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -138,7 +138,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         )
         
         # TimberB pointing up (perpendicular, not parallel)
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(timber_length, 0, 0),
@@ -161,7 +161,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         gap = inches(6)  # 6 inch gap
         
         # TimberA pointing east, TOP end at inches(36)
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -172,7 +172,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         
         # TimberB pointing west, TOP end at inches(36-6)=inches(30)
         # So there's a 6 inch gap between timberA's TOP and timberB's TOP
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(inches(30) - timber_length, 0, 0),  # Bottom at -6 inches
@@ -194,7 +194,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timber_size = create_v2(inches(6), inches(6))
         
         # TimberA pointing up (vertical post)
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -207,7 +207,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         # For opposite direction timbers, join matching ends (TOP to TOP)
         # TimberA TOP is at z=timber_length
         # Position TimberB so its TOP is at z=1.5*timber_length (overlapping)
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, timber_length * scalar(5, 2)),  # Start at 2.5*L
@@ -227,7 +227,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         """Test validation works with different sized timbers."""
         # 4x4 timber, 36 inches long
         timberA_length = inches(36)
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timberA_length,
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -241,7 +241,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         # TimberA TOP is at x=36"
         # Position TimberB so its TOP is at x=48" (overlapping)
         timberB_length = inches(48)
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timberB_length,
             size=create_v2(inches(6), inches(8)),
             bottom_position=create_v3(timberA_length + timberB_length, 0, 0),  # Start at 84"
@@ -264,7 +264,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timber_size = create_v2(inches(4), inches(4))
         
         # Both timbers pointing east (e.g., split from same timber)
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -273,7 +273,7 @@ class TestCheckTimberOverlapForSpliceJoint:
             ticket="timberA"
         )
         
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(timber_length, 0, 0),
@@ -295,7 +295,7 @@ class TestCheckTimberOverlapForSpliceJoint:
         timber_length = inches(36)
         timber_size = create_v2(inches(4), inches(4))
         
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -304,7 +304,7 @@ class TestCheckTimberOverlapForSpliceJoint:
             ticket="timberA"
         )
         
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=timber_length,
             size=timber_size,
             bottom_position=create_v3(timber_length * 2, 0, 0),
@@ -335,7 +335,7 @@ class TestChopTimberEndWithPrism:
     def test_chop_top_end(self):
         """Test chopping from the top end of a timber."""
         # Create a simple vertical timber: 4x4 inches, 10 feet tall
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(120),  # 10 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -362,7 +362,7 @@ class TestChopTimberEndWithPrism:
     def test_chop_bottom_end(self):
         """Test chopping from the bottom end of a timber."""
         # Create a simple vertical timber: 4x4 inches, 10 feet tall
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(120),  # 10 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -388,7 +388,7 @@ class TestChopTimberEndWithPrism:
     def test_chop_horizontal_timber(self):
         """Test chopping a horizontal timber to ensure it works in any orientation."""
         # Create a horizontal timber pointing east
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(48),  # 4 feet
             size=create_v2(inches(6), inches(6)),
             bottom_position=create_v3(0, 0, 0),
@@ -409,7 +409,7 @@ class TestChopTimberEndWithPrism:
     
     def test_chop_with_rational_distances(self):
         """Test that the function works with Rational arithmetic."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
@@ -434,7 +434,7 @@ class TestChopTimberEndWithHalfspace:
     def test_chop_top_end(self):
         """Test chopping from the top end of a timber with a half-plane."""
         # Create a simple vertical timber: 4x4 inches, 10 feet tall
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(120),  # 10 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -456,7 +456,7 @@ class TestChopTimberEndWithHalfspace:
     def test_chop_bottom_end(self):
         """Test chopping from the bottom end of a timber with a half-plane."""
         # Create a simple vertical timber: 4x4 inches, 10 feet tall
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(120),  # 10 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -477,7 +477,7 @@ class TestChopTimberEndWithHalfspace:
     
     def test_chop_with_rational_distances(self):
         """Test that the function works with Rational arithmetic."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
@@ -509,7 +509,7 @@ class TestChopLapOnTimberEnd:
         Tests boundary points and verifies CSG structure.
         """
         # Create a 4"x6" timber that is 4 ft long
-        timber = timber_from_directions(
+        timber = create_timber(
             length=inches(48),  # 4 ft
             size=create_v2(inches(4), inches(6)),  # 4" wide x 6" high
             bottom_position=create_v3(0, 0, 0),
@@ -608,7 +608,7 @@ class TestChopShoulderNotchOnTimberFace:
         timber_height = inches(4)
         timber_length = inches(48)  # 4 feet
         
-        timber = timber_from_directions(
+        timber = create_timber(
             length=timber_length,
             size=create_v2(timber_width, timber_height),
             bottom_position=create_v3(0, 0, 0),
@@ -680,7 +680,7 @@ class TestScribeFaceOnCenterline:
         Classic butt joint scenario: horizontal timber approaching a vertical face.
         """
         # Create timber_a pointing east (horizontal)
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(48),  # 4 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, inches(4)),  # 4 inches above ground
@@ -691,7 +691,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at (48", 0, 4"), centerline runs along x-axis
         
         # Create timber_b vertical with LEFT face that will intersect timber_a's centerline
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(96),  # 8 feet tall
             size=create_v2(inches(6), inches(6)),
             bottom_position=create_v3(inches(60), 0, 0),  # Bottom at x=60"
@@ -724,7 +724,7 @@ class TestScribeFaceOnCenterline:
         Test scribing between a vertical timber and a horizontal timber's vertical face.
         """
         # Create timber_a pointing up
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(96),  # 8 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -735,7 +735,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at (0, 0, 96"), centerline runs along z-axis
         
         # Create timber_b horizontal so its BACK face (pointing down) intersects timber_a's centerline
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(48),  # 4 feet
             size=create_v2(inches(6), inches(6)),
             bottom_position=create_v3(inches(-10), 0, inches(50)),  # BACK face at z=50"-3"=47"
@@ -766,7 +766,7 @@ class TestScribeFaceOnCenterline:
     def test_scribe_from_bottom_end(self, symbolic_mode):
         """Test scribing from the BOTTOM end of a timber."""
         # Create timber_a pointing up
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(96),  # 8 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, inches(12)),  # Bottom at z=12"
@@ -778,7 +778,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at (0, 0, 108")
         
         # Create timber_b horizontal with FRONT face (pointing up) intersecting timber_a's centerline
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(48),  # 4 feet
             size=create_v2(inches(6), inches(6)),
             bottom_position=create_v3(0, 0, 0),  # FRONT face at z=3"
@@ -809,7 +809,7 @@ class TestScribeFaceOnCenterline:
     def test_scribe_to_end_face_top(self, symbolic_mode):
         """Test scribing to an upward-pointing face."""
         # Create timber_a vertical
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(48),  # 4 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -820,7 +820,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at (0, 0, 48"), centerline runs along z-axis
         
         # Create timber_b horizontal with its FRONT face (pointing up) intersecting timber_a's centerline
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(60),  # 5 feet
             size=create_v2(inches(6), inches(6)),
             bottom_position=create_v3(inches(-10), 0, inches(27)),  # FRONT face at z=27"+3"=30"
@@ -851,7 +851,7 @@ class TestScribeFaceOnCenterline:
     def test_scribe_to_long_face(self, symbolic_mode):
         """Test scribing to a long face (FRONT/BACK/LEFT/RIGHT)."""
         # Create timber_a horizontal
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(36),  # 3 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -862,7 +862,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at x=36"
         
         # Create timber_b vertical
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(96),  # 8 feet
             size=create_v2(inches(6), inches(6)),
             bottom_position=create_v3(inches(50), 0, 0),
@@ -895,7 +895,7 @@ class TestScribeFaceOnCenterline:
     def test_with_rational_arithmetic(self, symbolic_mode):
         """Test that the function works correctly with exact Rational arithmetic."""
         # Create timber_a vertical with Rational dimensions
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(0, 0, 0),
@@ -906,7 +906,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at (0, 0, 10), centerline runs along z-axis
         
         # Create timber_b horizontal with its BACK face (pointing down) intersecting timber_a's centerline
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=scalar(20),
             size=create_v2(scalar(3), scalar(3)),
             bottom_position=create_v3(scalar(-5), 0, scalar(7) + scalar(3)/2),  # BACK face at z=7
@@ -937,7 +937,7 @@ class TestScribeFaceOnCenterline:
     def test_positive_distance_into_timber(self, symbolic_mode):
         """Test a case where the intersection is in the positive direction (into the timber)."""
         # Create timber_a pointing east
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(48),  # 4 feet
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -948,7 +948,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at (48", 0, 0), centerline runs along x-axis
         
         # Create timber_b vertical with LEFT face that intersects at x=36" (before timber_a's TOP end)
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(60),  # 5 feet
             size=create_v2(inches(6), inches(6)),
             bottom_position=create_v3(inches(36), 0, 0),  # LEFT face at x=36"-3"=33"
@@ -979,7 +979,7 @@ class TestScribeFaceOnCenterline:
     def test_different_timber_sizes(self, symbolic_mode):
         """Test scribing between timbers of different cross-sectional sizes."""
         # Create small timber_a
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(24),  # 2 feet
             size=create_v2(inches(2), inches(4)),  # 2x4
             bottom_position=create_v3(0, 0, 0),
@@ -990,7 +990,7 @@ class TestScribeFaceOnCenterline:
         # timber_a's TOP end is at z=24"
         
         # Create larger timber_b
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(48),  # 4 feet
             size=create_v2(inches(8), inches(8)),  # 8x8
             bottom_position=create_v3(0, 0, inches(36)),  # Start at z=36"
@@ -1025,7 +1025,7 @@ class TestFindProjectedIntersectionOnCenterlines:
     def test_orthogonal_timbers_t_joint(self, symbolic_mode):
         """Test with orthogonal timbers forming a T-joint."""
         # Vertical timber (receiving)
-        timber_vertical = timber_from_directions(
+        timber_vertical = create_timber(
             length=inches(36),
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1035,7 +1035,7 @@ class TestFindProjectedIntersectionOnCenterlines:
         )
         
         # Horizontal timber intersecting at middle of vertical
-        timber_horizontal = timber_from_directions(
+        timber_horizontal = create_timber(
             length=inches(24),
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, inches(12), inches(18)),  # 18" up on vertical
@@ -1063,7 +1063,7 @@ class TestFindProjectedIntersectionOnCenterlines:
     def test_parallel_timbers(self):
         """Test with parallel timbers - should return zero distances."""
         # Two parallel timbers
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=inches(36),
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1072,7 +1072,7 @@ class TestFindProjectedIntersectionOnCenterlines:
             ticket="timberA"
         )
         
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=inches(36),
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, inches(6), 0),  # 6" away parallel
@@ -1091,7 +1091,7 @@ class TestFindProjectedIntersectionOnCenterlines:
     def test_with_different_reference_ends(self, symbolic_mode):
         """Test measuring from different reference ends (TOP vs BOTTOM)."""
         # Vertical timber
-        timber_vertical = timber_from_directions(
+        timber_vertical = create_timber(
             length=inches(36),
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1101,7 +1101,7 @@ class TestFindProjectedIntersectionOnCenterlines:
         )
         
         # Horizontal timber at middle
-        timber_horizontal = timber_from_directions(
+        timber_horizontal = create_timber(
             length=inches(24),
             size=create_v2(inches(4), inches(4)),
             bottom_position=create_v3(0, inches(12), inches(18)),

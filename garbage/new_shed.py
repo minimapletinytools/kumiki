@@ -270,7 +270,7 @@ def create_honeycomb_shed():
     hub_post_size = create_v2(inches(6), inches(6))  # 6" x 6"
     hub_height = (post_front_height + post_back_height) / 2 + inches(12)  # Average height + 12"
     
-    hub_post = timber_from_directions(
+    hub_post = create_timber(
         length=hub_height,
         size=hub_post_size,
         bottom_position=center_point,

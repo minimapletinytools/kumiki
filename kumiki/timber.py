@@ -402,15 +402,16 @@ def compute_timber_orientation(length_direction: Direction3D, width_direction: D
     return Orientation(rotation_matrix)
 
 
-# TODO rename to create_timber (or maybe hew lolololol) + add defaults
-def timber_from_directions(length: Numeric, size: V2, bottom_position: V3,
+def create_timber(length: Numeric, size: V2, bottom_position: V3,
                           length_direction: Direction3D, width_direction: Direction3D,
                           ticket: Optional[Union[TimberTicket, str]] = None) -> 'Timber':
     """Factory function to create a Timber with computed orientation from direction vectors
-    
+
     This is the main way to construct Timber instances. It takes direction vectors
     and computes the proper orientation matrix automatically.
-    
+
+    AGENT NOTE: AVOID this function if possible, prefer methods like join_timber, attach_timber, create_*_timber_on_footprint, or even create_axis_aligned_timber, which are more robust and easier to use.
+
     Args:
         length: Length of the timber
         size: Cross-sectional size (width, height) as 2D vector, width is the X dimension (left to right), height is the Y dimension (front to back)
@@ -434,7 +435,7 @@ class PerfectTimberWithin(ABC):
     This is an abstract base class (ABC) to prevent direct instantiation.
     All timbers contain a perfect rectangular timber within their nominal bounding box.
     
-    Note: Use timber_from_directions() factory function to construct timber instances from
+    Note: Use create_timber() factory function to construct timber instances from
     length_direction and width_direction vectors. Subclasses are frozen to ensure immutability
     after construction.
     

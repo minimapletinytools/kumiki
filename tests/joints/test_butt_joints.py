@@ -261,7 +261,7 @@ from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_par
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace,
     V2, V3, Numeric, PegShape, WedgeShape, Peg, Cutting, CutTimber,
-    timber_from_directions, create_v3
+    create_timber, create_v3
 )
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.timber_shavings import are_timbers_plane_aligned

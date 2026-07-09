@@ -16,7 +16,7 @@ NOTE: Prism positioning follows the Timber convention:
 from sympy import Matrix, eye, sqrt
 from kumiki.cutcsg import *
 from kumiki.rule import Orientation, Transform, inches, feet, scalar
-from kumiki.timber import Timber, TimberEnd, TimberFace, TimberLongFace, timber_from_directions
+from kumiki.timber import Timber, TimberEnd, TimberFace, TimberLongFace, create_timber
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.joints.workshop.shavings import chop_lap_on_timber_end, chop_profile_on_timber_face
 from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face
@@ -233,7 +233,7 @@ def example_lap_cut_on_timber():
     timber_length = 4 * foot  # 4'
     
     # Create timber extending along X-axis
-    timber = timber_from_directions(
+    timber = create_timber(
         length=timber_length,
         size=Matrix([timber_width, timber_height]),
         bottom_position=Matrix([0, 0, 0]),
@@ -298,7 +298,7 @@ def example_gooseneck_profile_cut():
     timber_length = feet(4)    # 4'
     
     # Create timber extending along Z-axis (vertical)
-    timber = timber_from_directions(
+    timber = create_timber(
         length=timber_length,
         size=Matrix([timber_width, timber_height]),
         bottom_position=Matrix([0, 0, 0]),
@@ -372,7 +372,7 @@ def example_shoulder_notch_on_timber():
     timber_length = feet(4)    # 4'
     
     # Create vertical timber extending along Z-axis
-    timber = timber_from_directions(
+    timber = create_timber(
         length=timber_length,
         size=Matrix([timber_width, timber_height]),
         bottom_position=Matrix([0, 0, 0]),
@@ -429,7 +429,7 @@ def example_chop_shoulder_notch_on_timber_face_raw():
     timber_size = inches(4)
     timber_length = feet(4)
     
-    timber = timber_from_directions(
+    timber = create_timber(
         length=timber_length,
         size=Matrix([timber_size, timber_size]),
         bottom_position=Matrix([0, 0, 0]),
@@ -469,7 +469,7 @@ def example_angled_shoulder_notch_on_timber():
     timber_size = inches(4)
     timber_length = feet(4)
     
-    timber = timber_from_directions(
+    timber = create_timber(
         length=timber_length,
         size=Matrix([timber_size, timber_size]),
         bottom_position=Matrix([0, 0, 0]),
@@ -530,7 +530,7 @@ def example_angled_shoulder_notch_on_timber():
 
 def _create_dovetail_debug_arrangement() -> ButtJointTimberArrangement:
     """Create a simple orthogonal butt arrangement used by dovetail debug examples."""
-    receiving_timber = timber_from_directions(
+    receiving_timber = create_timber(
         length=feet(5),
         size=Matrix([inches(4), inches(6)]),
         bottom_position=Matrix([0, 0, 0]),
@@ -538,7 +538,7 @@ def _create_dovetail_debug_arrangement() -> ButtJointTimberArrangement:
         width_direction=Matrix([0, 1, 0]),
         ticket='debug_receiving_timber',
     )
-    butt_timber = timber_from_directions(
+    butt_timber = create_timber(
         length=feet(4),
         size=Matrix([inches(4), inches(4)]),
         bottom_position=Matrix([inches(18), 0, -feet(2)]),

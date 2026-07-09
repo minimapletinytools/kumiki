@@ -23,7 +23,7 @@ def make_join_face_aligned_on_face_aligned_timbers_example():
     beam_size = create_v2(inches(4), inches(4))
     
     # Create left post at origin
-    post_left = timber_from_directions(
+    post_left = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
@@ -33,7 +33,7 @@ def make_join_face_aligned_on_face_aligned_timbers_example():
     )
     
     # Create right post 4' away in X direction
-    post_right = timber_from_directions(
+    post_right = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(feet(4), 0, 0),
@@ -76,7 +76,7 @@ def make_attach_face_aligned_timber_example():
     post_height = inches(96)
     beam_size = create_v2(inches(4), inches(6))
 
-    post = timber_from_directions(
+    post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
@@ -131,7 +131,7 @@ def make_attach_face_aligned_timber_stickout_example(reference: StickoutReferenc
     attached_size = create_v2(inches(4), inches(4))
     span = feet(3)
 
-    post = timber_from_directions(
+    post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
@@ -140,7 +140,7 @@ def make_attach_face_aligned_timber_stickout_example(reference: StickoutReferenc
         ticket="Post",
     )
 
-    target_post = timber_from_directions(
+    target_post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(span, 0, 0),
@@ -181,7 +181,7 @@ def make_attach_face_aligned_timber_target_projection_example():
     attached_size = create_v2(inches(4), inches(4))
     span = feet(3)
 
-    post = timber_from_directions(
+    post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
@@ -190,7 +190,7 @@ def make_attach_face_aligned_timber_target_projection_example():
         ticket="Post",
     )
 
-    target_post = timber_from_directions(
+    target_post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(span, inches(8), 0),
@@ -234,7 +234,7 @@ def make_attach_face_aligned_timber_flush_example():
     post_height = feet(8)
     attached_size = create_v2(inches(5), inches(7))
 
-    post = timber_from_directions(
+    post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
@@ -277,7 +277,7 @@ def make_attach_plane_aligned_timber_brace_example():
     post_height = feet(8)
     brace_size = create_v2(inches(4), inches(4))
 
-    post = timber_from_directions(
+    post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),
@@ -317,7 +317,7 @@ def make_attach_timber_example():
     post_height = feet(8)
     attached_size = create_v2(inches(4), inches(4))
 
-    post = timber_from_directions(
+    post = create_timber(
         length=post_height,
         size=post_size,
         bottom_position=create_v3(0, 0, 0),

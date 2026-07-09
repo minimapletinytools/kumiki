@@ -211,14 +211,14 @@ class TestMiterJoint:
     # 🐪
     def test_miter_joint_on_parallel_timbers_produces_perpendicular_cuts(self):
         """cut_plain_miter_joint (base function) accepts parallel timbers and produces end cuts perpendicular to the timber axis."""
-        timberA = timber_from_directions(
+        timberA = create_timber(
             length=scalar(100),
             size=Matrix([scalar(6), scalar(6)]),
             bottom_position=Matrix([scalar(0), scalar(0), scalar(0)]),
             length_direction=Matrix([scalar(1), scalar(0), scalar(0)]),
             width_direction=Matrix([scalar(0), scalar(1), scalar(0)]),
         )
-        timberB = timber_from_directions(
+        timberB = create_timber(
             length=scalar(100),
             size=Matrix([scalar(6), scalar(6)]),
             bottom_position=Matrix([scalar(0), scalar(0), scalar(10)]),
@@ -379,7 +379,7 @@ class TestTongueAndForkJoint:
             )
 
         tongue_non_plane = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
-        fork_non_plane = timber_from_directions(
+        fork_non_plane = create_timber(
             length=scalar(100),
             size=create_v2(6, 6),
             bottom_position=create_v3(0, 0, 0),

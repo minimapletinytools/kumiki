@@ -23,7 +23,7 @@ class TestFindOpposingFaceOnAnotherTimber:
         timber_size = create_v2(inches(4), inches(6))
         
         # Timber A pointing east (along X-axis)
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(36),
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -41,7 +41,7 @@ class TestFindOpposingFaceOnAnotherTimber:
         # - BACK face points Down: (0, 0, -1)
         
         # Timber B pointing east, offset in Y direction (north)
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(36),
             size=timber_size,
             bottom_position=create_v3(0, inches(10), 0),  # 10 inches north
@@ -78,7 +78,7 @@ class TestFindOpposingFaceOnAnotherTimber:
         timber_size = create_v2(inches(4), inches(6))
         
         # Timber A pointing along X-axis (East)
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(36),
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -102,7 +102,7 @@ class TestFindOpposingFaceOnAnotherTimber:
         # width_direction perpendicular to length in XY plane: (-sin(30°), cos(30°), 0)
         width_dir_b = create_v3(-sin(angle), cos(angle), 0)
         
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(36),
             size=timber_size,
             bottom_position=create_v3(inches(20), 0, 0),
@@ -144,7 +144,7 @@ class TestFindOpposingFaceOnAnotherTimber:
         timber_size = create_v2(inches(4), inches(6))
         
         # Timber A pointing east
-        timber_a = timber_from_directions(
+        timber_a = create_timber(
             length=inches(36),
             size=timber_size,
             bottom_position=create_v3(0, 0, 0),
@@ -155,7 +155,7 @@ class TestFindOpposingFaceOnAnotherTimber:
         
         # Timber B pointing up (perpendicular to Timber A)
         # This timber has no faces parallel to Timber A's RIGHT face
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(36),
             size=timber_size,
             bottom_position=create_v3(inches(20), 0, 0),
@@ -177,7 +177,7 @@ class TestFindOpposingFaceOnAnotherTimber:
         from sympy import sqrt
         
         # Timber B with non-axis-aligned orientation
-        timber_b = timber_from_directions(
+        timber_b = create_timber(
             length=inches(36),
             size=timber_size,
             bottom_position=create_v3(inches(20), 0, 0),
@@ -431,7 +431,7 @@ class TestCreatePegGoingIntoFace:
     
     def setup_method(self):
         """Create a standard vertical timber for testing."""
-        self.timber = timber_from_directions(
+        self.timber = create_timber(
             length=scalar(100),
             size=create_v2(scalar(10), scalar(15)),
             bottom_position=create_v3(0, 0, 0),
@@ -539,7 +539,7 @@ class TestProjectGlobalPointOntoTimberFace:
     def test_project_onto_top_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the top face of an axis-aligned timber."""
         # Create a simple vertical timber
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -559,7 +559,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_onto_bottom_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the bottom face."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -579,7 +579,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_onto_right_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the right face."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -598,7 +598,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_onto_left_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the left face."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -616,7 +616,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_onto_front_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the front face."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -634,7 +634,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_onto_back_face_axis_aligned(self, symbolic_mode):
         """Test projecting a point onto the back face."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -652,7 +652,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_point_already_on_face(self, symbolic_mode):
         """Test that projecting a point already on the face returns the same point."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -671,7 +671,7 @@ class TestProjectGlobalPointOntoTimberFace:
     def test_project_onto_rotated_timber(self, symbolic_mode):
         """Test projecting onto a face of a rotated timber."""
         # Create a timber pointing east (along X-axis)
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -691,7 +691,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_with_offset_bottom_position(self, symbolic_mode):
         """Test projection on a timber with non-zero bottom position."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(5, 10, 20),  # Offset position
@@ -709,7 +709,7 @@ class TestProjectGlobalPointOntoTimberFace:
     
     def test_project_accepts_timber_reference_end(self, symbolic_mode):
         """Test that the method accepts TimberEnd as well as TimberFace."""
-        timber = timber_from_directions(
+        timber = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -732,7 +732,7 @@ class TestCreateWedgeInTimberEnd:
     
     def setup_method(self):
         """Create a standard vertical timber for testing."""
-        self.timber = timber_from_directions(
+        self.timber = create_timber(
             length=scalar(100),
             size=create_v2(scalar(10), scalar(15)),
             bottom_position=create_v3(0, 0, 0),
@@ -832,7 +832,7 @@ class TestTimberRelationshipHelpers:
         """Test are_timbers_parallel helper function."""
         from kumiki.timber_shavings import are_timbers_parallel
         # Create two timbers with parallel length directions
-        timber1 = timber_from_directions(
+        timber1 = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -840,7 +840,7 @@ class TestTimberRelationshipHelpers:
             width_direction=create_v3(1, 0, 0)      # X-right
         )
         
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(2, 0, 0),
@@ -852,7 +852,7 @@ class TestTimberRelationshipHelpers:
         assert are_timbers_parallel(timber1, timber2)
         
         # Create a timber with opposite direction (still parallel)
-        timber3 = timber_from_directions(
+        timber3 = create_timber(
             length=scalar("1.5"),
             size=create_v2(scalar("0.1"), scalar("0.2")),
             bottom_position=create_v3(-1, 0, 0),
@@ -864,7 +864,7 @@ class TestTimberRelationshipHelpers:
         assert are_timbers_parallel(timber1, timber3)
         
         # Create a timber with perpendicular direction
-        timber4 = timber_from_directions(
+        timber4 = create_timber(
             length=scalar("2.5"),
             size=create_v2(scalar("0.3"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
@@ -879,7 +879,7 @@ class TestTimberRelationshipHelpers:
         """Test are_timbers_orthogonal helper function."""
         from kumiki.timber_shavings import are_timbers_orthogonal
         # Create two timbers with perpendicular length directions
-        timber1 = timber_from_directions(
+        timber1 = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -887,7 +887,7 @@ class TestTimberRelationshipHelpers:
             width_direction=create_v3(1, 0, 0)      # X-right
         )
         
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(2, 0, 0),
@@ -899,7 +899,7 @@ class TestTimberRelationshipHelpers:
         assert are_timbers_orthogonal(timber1, timber2)
         
         # Create a timber with parallel direction
-        timber3 = timber_from_directions(
+        timber3 = create_timber(
             length=scalar("1.5"),
             size=create_v2(scalar("0.1"), scalar("0.2")),
             bottom_position=create_v3(-1, 0, 0),
@@ -911,7 +911,7 @@ class TestTimberRelationshipHelpers:
         assert not are_timbers_orthogonal(timber1, timber3)
         
         # Test with Y-direction
-        timber4 = timber_from_directions(
+        timber4 = create_timber(
             length=scalar("2.5"),
             size=create_v2(scalar("0.3"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
@@ -926,7 +926,7 @@ class TestTimberRelationshipHelpers:
         """Test are_timbers_face_aligned helper function."""
         from kumiki.timber_shavings import are_timbers_face_aligned
         # Create a reference timber with standard orientation
-        timber1 = timber_from_directions(
+        timber1 = create_timber(
             length=scalar(2),
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(0, 0, 0),
@@ -936,7 +936,7 @@ class TestTimberRelationshipHelpers:
         # timber1 directions: length=[0,0,1], face=[1,0,0], height=[0,1,0]
         
         # Test 1: Timber with same orientation - should be face-aligned
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(2, 0, 0),
@@ -947,7 +947,7 @@ class TestTimberRelationshipHelpers:
         
         # Test 2: Timber rotated 90° around Z - should be face-aligned  
         # (length stays Z, but face becomes Y, height becomes -X)
-        timber3 = timber_from_directions(
+        timber3 = create_timber(
             length=scalar("1.5"),
             size=create_v2(scalar("0.1"), scalar("0.2")),
             bottom_position=create_v3(-1, 0, 0),
@@ -958,7 +958,7 @@ class TestTimberRelationshipHelpers:
         
         # Test 3: Timber rotated 90° around X - should be face-aligned
         # (length becomes -Y, face stays X, height becomes Z) 
-        timber4 = timber_from_directions(
+        timber4 = create_timber(
             length=scalar("2.5"),
             size=create_v2(scalar("0.3"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
@@ -969,7 +969,7 @@ class TestTimberRelationshipHelpers:
         
         # Test 4: Timber with perpendicular orientation but face-aligned
         # (length becomes X, face becomes Z, height becomes Y)
-        timber5 = timber_from_directions(
+        timber5 = create_timber(
             length=scalar("1.8"),
             size=create_v2(scalar("0.2"), scalar("0.2")),
             bottom_position=create_v3(0, 2, 0),
@@ -988,7 +988,7 @@ class TestTimberRelationshipHelpers:
         sin45 = math.sin(math.pi/4)
         
         # This creates a timber whose directions don't align with any cardinal axes
-        timber6 = timber_from_directions(
+        timber6 = create_timber(
             length=scalar(1),
             size=create_v2(scalar("0.1"), scalar("0.1")),
             bottom_position=create_v3(0, 0, 2),
@@ -1001,7 +1001,7 @@ class TestTimberRelationshipHelpers:
         # (because height direction is still Z, parallel to timber1's length direction)
         cos45_xy = math.cos(math.pi/4)
         sin45_xy = math.sin(math.pi/4)
-        timber7 = timber_from_directions(
+        timber7 = create_timber(
             length=scalar(1),
             size=create_v2(scalar("0.1"), scalar("0.1")),
             bottom_position=create_v3(0, 0, 2),
@@ -1026,7 +1026,7 @@ class TestTimberRelationshipHelpers:
         from kumiki.timber_shavings import are_timbers_parallel
         
         # Create timbers with exact rational directions
-        timber1 = timber_from_directions(
+        timber1 = create_timber(
             length=2,
             size=create_v2(scalar(1, 5), scalar(3, 10)),
             bottom_position=create_v3(0, 0, 0),
@@ -1034,7 +1034,7 @@ class TestTimberRelationshipHelpers:
             width_direction=create_v3(1, 0, 0)
         )
         
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=3,
             size=create_v2(scalar(1, 10), scalar(1, 4)),
             bottom_position=create_v3(2, 0, 0),
@@ -1046,7 +1046,7 @@ class TestTimberRelationshipHelpers:
         assert are_timbers_parallel(timber1, timber2)
         
         # Test anti-parallel (should still be parallel)
-        timber3 = timber_from_directions(
+        timber3 = create_timber(
             length=scalar(3, 2),
             size=create_v2(scalar(1, 10), scalar(1, 5)),
             bottom_position=create_v3(-1, 0, 0),
@@ -1057,7 +1057,7 @@ class TestTimberRelationshipHelpers:
         assert are_timbers_parallel(timber1, timber3)
         
         # Test perpendicular (should not be parallel)
-        timber4 = timber_from_directions(
+        timber4 = create_timber(
             length=2,
             size=create_v2(scalar(3, 10), scalar(3, 10)),
             bottom_position=create_v3(1, 1, 0),
@@ -1077,7 +1077,7 @@ class TestTimberRelationshipHelpers:
         
         # Slightly off parallel (within tolerance)
         small_angle = 1e-11
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(scalar(2), scalar(0), scalar(0)),
@@ -1093,7 +1093,7 @@ class TestTimberRelationshipHelpers:
         from kumiki.timber_shavings import are_timbers_orthogonal
         
         # Create timbers with exact rational perpendicular directions
-        timber1 = timber_from_directions(
+        timber1 = create_timber(
             length=2,
             size=create_v2(scalar(1, 5), scalar(3, 10)),
             bottom_position=create_v3(0, 0, 0),
@@ -1101,7 +1101,7 @@ class TestTimberRelationshipHelpers:
             width_direction=create_v3(1, 0, 0)
         )
         
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=3,
             size=create_v2(scalar(15, 100), scalar(1, 4)),
             bottom_position=create_v3(2, 0, 0),
@@ -1113,7 +1113,7 @@ class TestTimberRelationshipHelpers:
         assert are_timbers_orthogonal(timber1, timber2)
         
         # Test non-orthogonal
-        timber3 = timber_from_directions(
+        timber3 = create_timber(
             length=scalar(3, 2),
             size=create_v2(scalar(1, 10), scalar(1, 5)),
             bottom_position=create_v3(-1, 0, 0),
@@ -1133,7 +1133,7 @@ class TestTimberRelationshipHelpers:
         
         # Nearly perpendicular (within numeric fallback test tolerance)
         small_offset = scalar(1e-20)
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=scalar(3),
             size=create_v2(scalar("0.15"), scalar("0.25")),
             bottom_position=create_v3(scalar(2), scalar(0), scalar(0)),
@@ -1148,7 +1148,7 @@ class TestTimberRelationshipHelpers:
         """Test are_timbers_face_aligned with exact equality (no tolerance)."""
         from kumiki.timber_shavings import are_timbers_face_aligned
         # Create two face-aligned timbers using exact rational values
-        timber1 = timber_from_directions(
+        timber1 = create_timber(
             length=2,  # Integer
             size=create_v2(scalar(1, 5), scalar(3, 10)),  # Exact rationals
             bottom_position=create_v3(0, 0, 0),  # Integers
@@ -1156,7 +1156,7 @@ class TestTimberRelationshipHelpers:
             width_direction=create_v3(1, 0, 0)      # East - integers
         )
         
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=3,  # Integer
             size=create_v2(scalar(3, 20), scalar(1, 4)),  # Exact rationals
             bottom_position=create_v3(2, 0, 0),  # Integers
@@ -1169,7 +1169,7 @@ class TestTimberRelationshipHelpers:
         
         # Create a non-face-aligned timber (3D rotation with no aligned axes)
         # Using a timber rotated in 3D such that none of its axes align with timber1's axes
-        timber3 = timber_from_directions(
+        timber3 = create_timber(
             length=2,  # Integer
             size=create_v2(scalar(1, 5), scalar(1, 5)),  # Exact rationals
             bottom_position=create_v3(3, 3, 0),  # Integers
@@ -1191,7 +1191,7 @@ class TestTimberRelationshipHelpers:
         from kumiki.timber_shavings import do_xy_cross_section_on_parallel_timbers_overlap
         
         # Test 1: Two aligned timbers that overlap
-        timber1 = timber_from_directions(
+        timber1 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1200,7 +1200,7 @@ class TestTimberRelationshipHelpers:
             ticket='timber1'
         )
         
-        timber2 = timber_from_directions(
+        timber2 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(5, 0, 0),
@@ -1213,7 +1213,7 @@ class TestTimberRelationshipHelpers:
             "Aligned timbers at same cross-section should overlap"
         
         # Test 2: Two aligned timbers that don't overlap (separated in Y)
-        timber3 = timber_from_directions(
+        timber3 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(5, 10, 0),
@@ -1226,7 +1226,7 @@ class TestTimberRelationshipHelpers:
             "Timbers separated in Y should not overlap"
         
         # Test 3: Two rotated timbers that overlap
-        timber4 = timber_from_directions(
+        timber4 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1235,7 +1235,7 @@ class TestTimberRelationshipHelpers:
             ticket='timber4'
         )
         
-        timber5 = timber_from_directions(
+        timber5 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1248,7 +1248,7 @@ class TestTimberRelationshipHelpers:
             "Rotated timbers at same position should overlap"
         
         # Test 4: Timbers that just touch at edge (should overlap)
-        timber6 = timber_from_directions(
+        timber6 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1259,7 +1259,7 @@ class TestTimberRelationshipHelpers:
         
         # timber6 spans Y: -2 to 2
         # timber7 at Y=4 spans Y: 2 to 6, so they just touch
-        timber7 = timber_from_directions(
+        timber7 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, scalar(4), 0),
@@ -1272,7 +1272,7 @@ class TestTimberRelationshipHelpers:
             "Timbers touching at edge should overlap"
         
         # Test 5: Timbers with small gap (should not overlap)
-        timber8 = timber_from_directions(
+        timber8 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, scalar(4) + scalar('0.01'), 0),
@@ -1285,7 +1285,7 @@ class TestTimberRelationshipHelpers:
             "Timbers with small gap should not overlap"
         
         # Test 6: Anti-parallel timbers (same direction but opposite ends)
-        timber9 = timber_from_directions(
+        timber9 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1294,7 +1294,7 @@ class TestTimberRelationshipHelpers:
             ticket='timber9'
         )
         
-        timber10 = timber_from_directions(
+        timber10 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(20, 0, 0),
@@ -1307,7 +1307,7 @@ class TestTimberRelationshipHelpers:
             "Anti-parallel timbers at same cross-section should overlap"
         
         # Test 7: Offset rotated timbers
-        timber11 = timber_from_directions(
+        timber11 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(6)),  # 4 wide, 6 high
             bottom_position=create_v3(0, 0, 0),
@@ -1317,7 +1317,7 @@ class TestTimberRelationshipHelpers:
         )
         
         # Rotated 90 degrees and offset
-        timber12 = timber_from_directions(
+        timber12 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(6), scalar(4)),  # 6 wide, 4 high
             bottom_position=create_v3(scalar(4), 0, 0),  # Offset in X
@@ -1333,7 +1333,7 @@ class TestTimberRelationshipHelpers:
             "Offset rotated timbers with partial overlap should overlap"
         
         # Test 8: Assertion error for non-parallel timbers
-        timber13 = timber_from_directions(
+        timber13 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),
@@ -1342,7 +1342,7 @@ class TestTimberRelationshipHelpers:
             ticket='timber13'
         )
         
-        timber14 = timber_from_directions(
+        timber14 = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(0, 0, 0),

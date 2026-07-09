@@ -54,7 +54,7 @@ def _create_side_rails(origin: V3, x_offset: Numeric, side_label: str) -> tuple[
     # Width points out of the side-frame plane (X), keeping members plane-aligned in YZ.
     width_direction = create_v3(1, 0, 0)
 
-    front_rail = timber_from_directions(
+    front_rail = create_timber(
         length=ladder_height,
         size=rail_size,
         bottom_position=front_bottom_global,
@@ -63,7 +63,7 @@ def _create_side_rails(origin: V3, x_offset: Numeric, side_label: str) -> tuple[
         ticket=f"Ladder {side_label} Front Stringer",
     )
 
-    back_rail = timber_from_directions(
+    back_rail = create_timber(
         length=ladder_height,
         size=rail_size,
         bottom_position=back_bottom_global,
@@ -95,7 +95,7 @@ def _create_half_rung_between_parallel_stringers(
         length_direction = create_v3(-1, 0, 0)
         side_text = "Right"
 
-    return timber_from_directions(
+    return create_timber(
         length=half_rung_length,
         size=step_size,
         bottom_position=rung_bottom,
