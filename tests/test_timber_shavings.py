@@ -315,7 +315,7 @@ class TestPeg:
         with pytest.raises(Exception):  # FrozenInstanceError
             peg.size = scalar(3)  # type: ignore
     
-    def test_peg_render_csg_local_square(self):
+    def test_peg_get_csg_local_square(self):
         """Test rendering square peg CSG in local space."""
         peg = Peg(
             transform=Transform.identity(),
@@ -325,7 +325,7 @@ class TestPeg:
             stickout_length=scalar(1)
         )
         
-        csg = peg.render_csg_local()
+        csg = peg.get_csg_local()
         
         # Should return a RectangularPrism
         from kumiki.cutcsg import RectangularPrism
@@ -337,7 +337,7 @@ class TestPeg:
         assert csg.start_distance == scalar(-1)  # stickout_length
         assert csg.end_distance == scalar(10)  # forward_length
     
-    def test_peg_render_csg_local_round(self):
+    def test_peg_get_csg_local_round(self):
         """Test rendering round peg CSG in local space."""
         peg = Peg(
             transform=Transform.identity(),
@@ -347,7 +347,7 @@ class TestPeg:
             stickout_length=scalar(2)
         )
         
-        csg = peg.render_csg_local()
+        csg = peg.get_csg_local()
         
         # Should return a Cylinder
         from kumiki.cutcsg import Cylinder
@@ -408,7 +408,7 @@ class TestWedge:
         with pytest.raises(Exception):  # FrozenInstanceError
             wedge.base_width = scalar(6)  # type: ignore
     
-    def test_wedge_render_csg_local(self):
+    def test_wedge_get_csg_local(self):
         """Test rendering wedge CSG in local space."""
         wedge = Wedge(
             transform=Transform.identity(),
@@ -418,7 +418,7 @@ class TestWedge:
             length=scalar(10)
         )
         
-        csg = wedge.render_csg_local()
+        csg = wedge.get_csg_local()
         
         # Should return a ConvexPolygonExtrusion 
         from kumiki.cutcsg import ConvexPolygonExtrusion

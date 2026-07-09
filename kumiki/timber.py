@@ -1268,7 +1268,6 @@ class MeshTimber(PerfectTimberWithin):
 
     # TODO: Add mesh_csg field and override get_actual_csg_local()
 
-# TODO rename to RegularPolygonTimber
 @dataclass(frozen=True)
 class RegularPolygonTimber(PerfectTimberWithin):
     """Timber with regular polygonal cross-section
@@ -1912,7 +1911,7 @@ class JointAccessory(ABC):
     assembly_ordering: Ordering = field(default=Ordering(), kw_only=True)
     
     @abstractmethod
-    def render_csg_local(self) -> CutCSG:
+    def get_csg_local(self) -> CutCSG:
         """
         Generate CSG representation of the accessory in local space.
         
@@ -1935,7 +1934,6 @@ class PegShape(Enum):
     ROUND = "round"
 
 
-# TODO add a get_local_csg function that returns the CSG of the peg at the origin 
 @dataclass(frozen=True)
 class Peg(JointAccessory):
     """
@@ -1967,7 +1965,7 @@ class Peg(JointAccessory):
     # how far the peg "sticks out" in the back direction
     stickout_length: Numeric
     
-    def render_csg_local(self) -> CutCSG:
+    def get_csg_local(self) -> CutCSG:
         """
         Generate CSG representation of the peg in local space.
         
@@ -2039,7 +2037,7 @@ class Wedge(JointAccessory):
         """Alias for base_width for convenience."""
         return self.base_width
     
-    def render_csg_local(self) -> CutCSG:
+    def get_csg_local(self) -> CutCSG:
         """
         Generate CSG representation of the wedge in local space.
         
@@ -2113,7 +2111,7 @@ class CSGAccessory(JointAccessory):
     transform: Transform
     positive_csg: CutCSG
 
-    def render_csg_local(self) -> CutCSG:
+    def get_csg_local(self) -> CutCSG:
         return self.positive_csg
 
 
@@ -2126,7 +2124,7 @@ class Sticker(JointAccessory):
     transform: Transform
     size: Numeric = inches(1)
 
-    def render_csg_local(self) -> CutCSG:
+    def get_csg_local(self) -> CutCSG:
         # Ball diameter = size, shaft diameter = size/2, shaft length = 2*size
         ball_radius = self.size / scalar(2)
         shaft_radius = self.size / scalar(4)

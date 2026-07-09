@@ -144,7 +144,7 @@ def _joint_accessory_to_trimesh(accessory: JointAccessory) -> "trimesh.Trimesh":
     """Return a trimesh in global coordinates for a single JointAccessory."""
     from .triangles import triangulate_cutcsg
 
-    local_csg = accessory.render_csg_local()
+    local_csg = accessory.get_csg_local()
     transform = getattr(accessory, "transform", None)
     if transform is None:
         raise ValueError(
@@ -765,7 +765,7 @@ def export_frame_step(
                 raise ValueError(
                     f"Accessory '{accessory.ticket.path}' does not define a global transform"
                 )
-            local_csg = accessory.render_csg_local()
+            local_csg = accessory.get_csg_local()
             global_csg = adopt_csg(transform, Transform.identity(), local_csg)
             shape = _csg_to_ocp(global_csg)
             shapes.append(shape)

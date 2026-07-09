@@ -644,7 +644,7 @@ def build_real_geometry(state: RunnerState, slot_state: Optional['SlotState'] = 
             accessory_key = f"{key_base}#{occurrence}"
             accessory_name = f"{accessory_type} {occurrence + 1}"
 
-            local_csg = accessory.render_csg_local()
+            local_csg = accessory.get_csg_local()
 
             remesh_t0 = time.monotonic()
             csg_depth = _compute_csg_depth(local_csg)

@@ -569,7 +569,7 @@ class TestPegStuff:
         
         peg = joint.jointAccessories["peg_0"]
         assert isinstance(peg, Peg), "Expected peg to be a Peg instance"
-        peg_csg = peg.render_csg_local()
+        peg_csg = peg.get_csg_local()
 
         # Sample points within the peg's CSG
         peg_center_points = [
