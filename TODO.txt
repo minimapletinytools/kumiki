@@ -135,33 +135,26 @@ IGNORE-aderss # TODO DELETE this does not do anything meaningufl, just determine
 DONE-address # TODO maybe better to add an empty flag to BoundingBox rather than returning a 0-size box which could be misinterpreted as a point
 DONE-create_timber rename
 DONE-address rename TODOs in timebr.py
+
+
 -create test runner for examples so the exmaples are also tests :O
 -additional agentic test loop featuers
   -offline (not in kigumi) render and screenshot
   -output AABB only as json and pass back to agent
-
 -test frame scanning fixes
 -test the install cadquery stuff 
 -test regular imperfect rectangular timber stuff
 -test imperfect timber ctors
 -try and run a full loop agent test on this to see if it all works
-
-
 -update shed example to include panels
-
-
 -do reorg on patterns and eaxmples again
   -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
   -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
   -"Example Frames" -> "Examples"
-
 -do example cleanup
 -choose domnai for website
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
-
-
-
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
