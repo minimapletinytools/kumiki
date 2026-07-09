@@ -16,6 +16,7 @@ from kumiki.cutcsg import (
     Difference,
     ConvexPolygonExtrusion,
     BoundingBox,
+    EmptyCSG,
     PrismFace,
     HalfSpaceFeature,
     RectangularPrismFeature,
@@ -2204,6 +2205,69 @@ class TestGetAABB:
         assert bbox.min_y == scalar(0)
         assert simplify(bbox.max_x - 5 * sqrt(scalar(2))) == scalar(0)
         assert simplify(bbox.max_y - 5 * sqrt(scalar(2))) == scalar(0)
+
+    # ------------------------------------------------------------------
+    # Empty CSG propagation
+    # ------------------------------------------------------------------
+
+    def test_bbox_empty_csg_is_flagged_empty(self, symbolic_mode):
+        """EmptyCSG's bbox is flagged empty, not a real zero-size box at the origin."""
+        bbox = EmptyCSG().get_aabb()
+        assert bbox.is_empty
+
+    def test_bbox_union_ignores_empty_children(self, symbolic_mode):
+        """A union of a real prism and EmptyCSG has the same bbox as the prism alone."""
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(4)]),
+            transform=Transform(
+                position=Matrix([scalar(10), scalar(10), scalar(10)]),
+                orientation=Orientation.identity(),
+            ),
+            start_distance=scalar(0),
+            end_distance=scalar(5),
+        )
+        union = SolidUnion(children=[prism, EmptyCSG()])
+        bbox = union.get_aabb()
+        assert not bbox.is_empty
+        assert bbox.min_x == scalar(8)
+        assert bbox.max_x == scalar(12)
+        assert bbox.min_y == scalar(8)
+        assert bbox.max_y == scalar(12)
+        assert bbox.min_z == scalar(10)
+        assert bbox.max_z == scalar(15)
+
+    def test_bbox_union_of_only_empty_children_is_empty(self, symbolic_mode):
+        """A union with no non-empty children (including no children at all) is empty."""
+        assert SolidUnion(children=[EmptyCSG(), EmptyCSG()]).get_aabb().is_empty
+        assert SolidUnion(children=[]).get_aabb().is_empty
+
+    def test_bbox_intersection_with_empty_is_empty(self, symbolic_mode):
+        """Intersecting anything with EmptyCSG has no points."""
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(4)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(5),
+        )
+        assert Intersection(left=prism, right=EmptyCSG()).get_aabb().is_empty
+
+    def test_bbox_difference_of_empty_base_is_empty(self, symbolic_mode):
+        """Subtracting from an empty base stays empty, regardless of what's subtracted."""
+        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0))
+        assert Difference(base=EmptyCSG(), subtract=[hs]).get_aabb().is_empty
+
+    def test_bbox_difference_fully_consumed_is_empty(self, symbolic_mode):
+        """Subtracting a halfspace that swallows the whole prism yields an empty bbox."""
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(4)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(5),
+        )
+        # Halfspace covering all of space (normal dotted with anything minus a very negative offset is always >= offset)
+        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(-1000))
+        bbox = Difference(base=prism, subtract=[hs]).get_aabb()
+        assert bbox.is_empty
 
 
 # ============================================================================

@@ -72,6 +72,9 @@ def cut_free_house_joint(
                 # if this is the case, that means that CSG feature does not actually affect the housed timber
                 # and can be removed from the tree
                 aabb = csg_in_housing_local.get_aabb()
+                # Empty (e.g. EmptyCSG) -> trivially doesn't affect anything, safe to prune
+                if aabb.is_empty:
+                    return True
                 # Unbounded (e.g. HalfSpace) -> conservatively keep
                 if any(v is None for v in (aabb.min_x, aabb.max_x, aabb.min_y, aabb.max_y)):
                     return False

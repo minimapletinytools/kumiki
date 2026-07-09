@@ -203,7 +203,6 @@ class TimberFace(Enum):
         else:  # BACK
             return TimberFace.FRONT
 
-# TODO why is this not just TimberEnd?
 class TimberEnd(Enum):
     TOP = 1
     BOTTOM = 2

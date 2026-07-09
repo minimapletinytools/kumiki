@@ -42,6 +42,11 @@ class BoundingBox:
     Axis-aligned bounding box (AABB) for a CSG object.
 
     Each bound is Optional[Numeric] where None means unbounded in that direction.
+
+    When is_empty is True, the CSG object contains no points at all (e.g. EmptyCSG,
+    or a union/intersection that reduces to nothing). The bound fields are meaningless
+    in this case (by convention all set to 0) and must not be treated as a real
+    zero-size box at the origin — check is_empty first.
     """
     min_x: Optional[Numeric]
     min_y: Optional[Numeric]
@@ -49,6 +54,7 @@ class BoundingBox:
     max_x: Optional[Numeric]
     max_y: Optional[Numeric]
     max_z: Optional[Numeric]
+    is_empty: bool = False
 
 class PrismFace(Enum):
     """Face of a RectangularPrism, indices match TimberFace."""
@@ -211,7 +217,6 @@ class EmptyCSG(CutCSG):
     def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
         return None
 
-    # TODO maybe better to add an empty flag to BoundingBox rather than returning a 0-size box which could be misinterpreted as a point
     def get_aabb(self) -> 'BoundingBox':
         return BoundingBox(
             min_x=0,
@@ -220,6 +225,7 @@ class EmptyCSG(CutCSG):
             max_x=0,
             max_y=0,
             max_z=0,
+            is_empty=True,
         )
 
 
@@ -923,10 +929,12 @@ class SolidUnion(CutCSG):
         return features
 
     def get_aabb(self) -> BoundingBox:
-        if not self.children:
-            return BoundingBox(None, None, None, None, None, None)
-
-        bboxes = [child.get_aabb() for child in self.children]
+        # Empty children contribute no points to the union, so they're excluded
+        # before combining bounds — otherwise their degenerate zero-box would
+        # incorrectly pull the union's bounds toward the origin.
+        bboxes = [b for b in (child.get_aabb() for child in self.children) if not b.is_empty]
+        if not bboxes:
+            return BoundingBox(None, None, None, None, None, None, is_empty=True)
 
         def union_min(vals):
             if any(v is None for v in vals):
@@ -1008,6 +1016,10 @@ class Intersection(CutCSG):
     def get_aabb(self) -> BoundingBox:
         left_bbox = self.left.get_aabb()
         right_bbox = self.right.get_aabb()
+
+        # If either side is empty, their intersection has no points either.
+        if left_bbox.is_empty or right_bbox.is_empty:
+            return BoundingBox(None, None, None, None, None, None, is_empty=True)
 
         def intersect_min(a: Optional[Numeric], b: Optional[Numeric]) -> Optional[Numeric]:
             if a is None:
@@ -1202,6 +1214,8 @@ class Difference(CutCSG):
 
     def get_aabb(self) -> BoundingBox:
         bbox = self.base.get_aabb()
+        if bbox.is_empty:
+            return bbox
         for sub in self.subtract:
             if isinstance(sub, HalfSpace):
                 bbox = _clip_bbox_by_halfspace_complement(bbox, sub)
@@ -1562,8 +1576,11 @@ def _clip_bbox_by_halfspace_complement(bbox: BoundingBox, hs: HalfSpace) -> Boun
     (i.e., the set of points where ``hs.contains_point()`` is False).
 
     If any bound of ``bbox`` is None the box is returned unchanged, because
-    we cannot enumerate the corners of an infinite box.
+    we cannot enumerate the corners of an infinite box. An already-empty bbox
+    is also returned unchanged (it has no corners to clip).
     """
+    if bbox.is_empty:
+        return bbox
     if any(v is None for v in [bbox.min_x, bbox.min_y, bbox.min_z,
                                 bbox.max_x, bbox.max_y, bbox.max_z]):
         return bbox
@@ -1615,9 +1632,8 @@ def _clip_bbox_by_halfspace_complement(bbox: BoundingBox, hs: HalfSpace) -> Boun
             valid_points.append(a + (b - a) * t)
 
     if not valid_points:
-        # The entire bbox is consumed by the halfspace — return a degenerate (point) bbox
-        return BoundingBox(bbox.min_x, bbox.min_y, bbox.min_z,
-                           bbox.min_x, bbox.min_y, bbox.min_z)
+        # The entire bbox is consumed by the halfspace — nothing remains
+        return BoundingBox(0, 0, 0, 0, 0, 0, is_empty=True)
 
     xs = [p[0] for p in valid_points]
     ys = [p[1] for p in valid_points]

@@ -132,7 +132,8 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 DONE-have claude do a refactor pass on kumiki...
 IGNORE-aderss # TODO DELETE this does not do anything meaningufl, just determines whether we
--address # TODO maybe better to add an empty flag to BoundingBox rather than returning a 0-size box which could be misinterpreted as a point
+DONE-address # TODO maybe better to add an empty flag to BoundingBox rather than returning a 0-size box which could be misinterpreted as a point
+-create_timber rename
 
 -address rename TODOs in timebr.py
 -create test runner for examples so the exmaples are also tests :O
