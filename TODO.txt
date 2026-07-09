@@ -1960,7 +1960,7 @@ So we need to design a way to
 class PerfectTimberWithin(ABC)
   current timber stuff
   get_nominal_bounding_box_csg_local 
-  get_perfect_timber_within_CSG_local
+  get_perfect_timber_within_csg_local
   get_actual_csg_local -> CSG (you can make mesh a CSG class that errors if in a union or on the RHS of a difference)
   is_perfect_timber: check nominal_bounding_box is same as true box, only works if is timber
 

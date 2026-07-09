@@ -772,13 +772,13 @@ def chop_scribe_relief(
     timber_to_be_scribed_perfect_csg_global = adopt_csg(
         timber_to_be_scribed.transform,
         None,
-        timber_to_be_scribed.get_perfect_timber_within_CSG_local(),
+        timber_to_be_scribed.get_perfect_timber_within_csg_local(),
     )
 
     timber_to_be_cut_perfect_csg_global = adopt_csg(
         timber_to_be_cut.transform,
         None,
-        timber_to_be_cut.get_perfect_timber_within_CSG_local(),
+        timber_to_be_cut.get_perfect_timber_within_csg_local(),
     )
 
     # seems to create triangulation artifacts when used on circular timbers with trimesh right now :(
