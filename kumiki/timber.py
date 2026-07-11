@@ -1679,9 +1679,10 @@ class CutTimber:
         # Return the difference: timber - all cuts
         return Difference(starting_csg, negative_csgs)
 
-    def get_bounding_box_prism(self) -> RectangularPrism:
+    
+    def get_perfect_timber_within_bounding_box_prism(self) -> RectangularPrism:
         """
-        Get the bounding box prism for this timber including all its cuts.
+        Get the bounding box prism for this timber cropped based on its end cuts if any, otherwise the original perfet timber within box is produced.
         The bounding box is aligned with the timber's orientation.
         
         Uses PerfectTimberWithin size to determine the cross-sectional size of the bounding box.
@@ -1760,7 +1761,11 @@ class CutTimber:
             end_distance=max_z
         )
     
-    @deprecated("use get_bounding_box_prism instead")
+    @deprecated("use get_perfect_timber_within_bounding_box_prism instead")
+    def get_bounding_box_prism(self) -> RectangularPrism:
+        return self.get_perfect_timber_within_bounding_box_prism()
+    
+    @deprecated("use get_perfect_timber_within_bounding_box_prism instead")
     def DEPRECATED_approximate_bounding_prism(self) -> RectangularPrism:
         """
         TODO someday we want a fully analytical solution for this, but for now this is sufficient for our needs.
@@ -2448,7 +2453,7 @@ class Frame:
             raise ValueError("Cannot compute bounding box for empty frame (no cut timbers)")
         
         # Get bounding prism for each cut timber
-        bounding_prisms = [ct.get_bounding_box_prism() for ct in self.cut_timbers]
+        bounding_prisms = [ct.get_perfect_timber_within_bounding_box_prism() for ct in self.cut_timbers]
         
         # For each prism, we need to find its 8 corners and track global min/max
         # Initialize with infinities

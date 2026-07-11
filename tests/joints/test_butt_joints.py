@@ -173,7 +173,7 @@ class TestButtJoint:
         # Use the analytical finite bounding prism for dimensional checks.
         # render_timber_with_cuts_csg_local() starts from an intentionally
         # extended (possibly infinite) base CSG when end-cuts are present.
-        bbox_prism = CutTimber(cut_butt_timber.timber, cuts=[cut_butt_timber]).get_bounding_box_prism()
+        bbox_prism = CutTimber(cut_butt_timber.timber, cuts=[cut_butt_timber]).get_perfect_timber_within_bounding_box_prism()
         bbox = bbox_prism.get_aabb()
         
         # Verify bbox is valid (not unbounded)

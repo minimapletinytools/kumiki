@@ -516,7 +516,7 @@ def _cut_timber_to_bbox_mesh_payload(
     timber_tags = _normalize_ticket_tags(getattr(timber, "ticket", None))
     perfect_size = timber.get_perfect_size()
     nominal_size = timber.get_nominal_size()
-    prism = cut_timber.get_bounding_box_prism()
+    prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
     mesh = prism_to_mesh(prism)
 
     csg_nodes, csg_features = _count_csg_nodes_and_features(cut_timber.render_timber_with_cuts_csg_local())

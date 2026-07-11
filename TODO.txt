@@ -135,6 +135,8 @@ IGNORE-aderss # TODO DELETE this does not do anything meaningufl, just determine
 DONE-address # TODO maybe better to add an empty flag to BoundingBox rather than returning a 0-size box which could be misinterpreted as a point
 DONE-create_timber rename
 DONE-address rename TODOs in timebr.py
+IGNORE-update release job to do everything in 1 run not 2
+  -no, because it's 2 separate tags
 
 
 -create test runner for examples so the exmaples are also tests :O
@@ -887,7 +889,7 @@ DONE-new shed and irrational angles are failing
 DONE-start viewer I guess?
   DONE-setup stdio
   DONE-load example
-  ODNE-do basic frame rendering (as boxes) get_bounding_box_prism
+  ODNE-do basic frame rendering (as boxes) get_perfect_timber_within_bounding_box_prism
   DONE-do camera centering and navigation using 3js package I guess
 DONE-add wireframe rendering
 DONE-3d view
