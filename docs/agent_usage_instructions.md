@@ -162,7 +162,7 @@ By default this renders the whole frame from a 3/4 isometric angle, auto-framed 
 - `render_mode=RenderMode.BOUNDING_BOX` for a fast approximate render instead of the fully-cut geometry
 - `geometry_style=GeometryStyle.NONE, show_edges=True` for a wireframe-only (hidden-line) render
 
-This requires the optional `pyglet` dependency: `pip install kumiki[render]`. Only the *first* render call in a process is reliable on macOS (see the module docstring for why) -- if you need several renders in one session, invoke this function from a fresh `python3` subprocess each time rather than calling it repeatedly in a long-lived process.
+By default this uses `render_backend=RenderBackend.MATPLOTLIB` (requires `pip install kumiki[render-matplotlib]`), which never opens a window and can be called as many times as you like in the same process. There's also `render_backend=RenderBackend.TRIMESH_PYGLET` (requires `pip install kumiki[render]`), which is correctly z-buffered but opens a real window and is only reliable for the *first* render call in a process on macOS (see the module docstring for why) -- if you use that backend and need several renders in one session, invoke this function from a fresh `python3` subprocess each time rather than calling it repeatedly in a long-lived process.
 
 After taking a screenshot, alwasy make sure to show it to the user in the agent chat window so the user can see your progress.
 

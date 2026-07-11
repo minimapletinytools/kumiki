@@ -32,9 +32,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Headless PNG rendering (kumiki.kigumi_at_home). Pinned to pyglet<2 because
-# trimesh's built-in scene viewer does not yet support the pyglet 2.x rewrite.
+# Headless PNG rendering (kumiki.kigumi_at_home), RenderBackend.TRIMESH_PYGLET.
+# Pinned to pyglet<2 because trimesh's built-in scene viewer does not yet
+# support the pyglet 2.x rewrite.
 render = ["pyglet>=1.5,<2", "scipy>=1.7.0"]
+# Headless PNG rendering, RenderBackend.MATPLOTLIB. Genuinely headless (no
+# window/GPU/display dependency anywhere) -- the recommended default.
+render-matplotlib = ["matplotlib>=3.5.0"]
 
 [project.urls]
 Homepage = "https://github.com/minimapletinytools/kumiki"

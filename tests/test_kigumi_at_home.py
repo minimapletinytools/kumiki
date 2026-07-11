@@ -1,5 +1,6 @@
 """Tests for kumiki.kigumi_at_home -- headless PNG rendering."""
 
+import math
 import subprocess
 import sys
 import tempfile
@@ -13,13 +14,17 @@ from kumiki.kigumi_at_home import (
     CameraAngle,
     GeometryStyle,
     ProjectionType,
+    RenderBackend,
     RenderMode,
     UnfocusedStyle,
+    _MATPLOTLIB_AVAILABLE,
     _PYGLET_AVAILABLE,
     _combined_bounds,
-    _feature_edges_path,
+    _direction_to_elev_azim,
+    _feature_edge_segments,
     _look_at_matrix,
     _resolve_focus_timbers,
+    render_frame_to_png,
 )
 from kumiki.timber import CutTimber, Frame, Peg, PegShape, Timber, create_timber
 from kumiki.rule import Transform, create_v3, create_v2, scalar
@@ -143,20 +148,42 @@ class TestLookAtMatrix:
         assert np.allclose(rot.T @ rot, np.eye(3), atol=1e-9)
 
 
+class TestDirectionToElevAzim:
+    def test_straight_down_is_elev_90(self):
+        elev, azim = _direction_to_elev_azim(np.array([0.0, 0.0, 1.0]))
+        assert elev == pytest.approx(90.0)
+
+    def test_non_unit_iso_direction_is_not_gimbal_locked(self):
+        """Regression test: _CAMERA_DIRECTIONS entries like the iso corners
+        are not unit vectors (e.g. (1, -1, 1) has magnitude sqrt(3)). Failing
+        to normalize before asin(z) clamps every iso direction's elev to
+        exactly 90 degrees, collapsing all iso angles into a top-down view."""
+        elev, azim = _direction_to_elev_azim(np.array([1.0, -1.0, 1.0]))
+        assert elev < 89.0
+        assert elev == pytest.approx(math.degrees(math.asin(1.0 / math.sqrt(3.0))))
+
+    def test_front_direction_azim(self):
+        # FRONT direction is (0, -1, 0): looking along +Y, elev 0, azim -90.
+        elev, azim = _direction_to_elev_azim(np.array([0.0, -1.0, 0.0]))
+        assert elev == pytest.approx(0.0)
+        assert azim == pytest.approx(-90.0)
+
+
 # ---------------------------------------------------------------------------
 # feature edges
 # ---------------------------------------------------------------------------
 
 
-class TestFeatureEdgesPath:
+class TestFeatureEdgeSegments:
     def test_box_has_edges(self):
         from kumiki.blueprint import _cut_timber_to_trimesh
 
         _, ct1, _ = _two_timber_frame()
         mesh = _cut_timber_to_trimesh(ct1)
-        path = _feature_edges_path(mesh)
-        assert path is not None
-        assert len(path.entities) > 0
+        segments = _feature_edge_segments(mesh)
+        assert segments is not None
+        assert segments.shape[1:] == (2, 3)
+        assert len(segments) > 0
 
     def test_diagonal_triangulation_seams_are_excluded(self):
         """A flat face triangulated into two triangles has one dihedral angle
@@ -170,15 +197,112 @@ class TestFeatureEdgesPath:
         import trimesh
 
         mesh = trimesh.Trimesh(vertices=vertices, faces=faces, process=False)
-        path = _feature_edges_path(mesh)
+        segments = _feature_edge_segments(mesh)
         # only the 4 boundary edges should show up, not the coplanar diagonal
-        assert path is not None
-        assert len(path.entities) == 4
+        assert segments is not None
+        assert len(segments) == 4
 
 
 # ---------------------------------------------------------------------------
-# end-to-end rendering (subprocess-isolated -- see module docstring: only the
-# first render-per-process is reliable on macOS with pyglet<2)
+# end-to-end rendering -- RenderBackend.MATPLOTLIB
+#
+# No subprocess isolation needed: unlike TRIMESH_PYGLET, this backend has no
+# per-process window-state bug, so these call render_frame_to_png directly
+# and can run repeatedly in the same test process.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _MATPLOTLIB_AVAILABLE, reason="matplotlib (kumiki[render-matplotlib]) not installed")
+class TestRenderFrameToPngMatplotlibEndToEnd:
+    def test_writes_a_png_file(self, tmp_path):
+        frame, ct1, ct2 = _two_timber_frame()
+        out_path = render_frame_to_png(frame, tmp_path / "out.png")
+        assert out_path.exists()
+        assert out_path.stat().st_size > 0
+        assert out_path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_creates_parent_directories(self, tmp_path):
+        frame, _, _ = _two_timber_frame()
+        out_path = render_frame_to_png(frame, tmp_path / "sub" / "dir" / "out.png")
+        assert out_path.exists()
+        assert out_path.stat().st_size > 0
+
+    def test_bounding_box_mode_renders(self, tmp_path):
+        frame, _, _ = _two_timber_frame()
+        out_path = render_frame_to_png(frame, tmp_path / "out.png", render_mode=RenderMode.BOUNDING_BOX)
+        assert out_path.stat().st_size > 0
+
+    def test_wireframe_mode_renders(self, tmp_path):
+        frame, _, _ = _two_timber_frame()
+        out_path = render_frame_to_png(
+            frame, tmp_path / "out.png", geometry_style=GeometryStyle.NONE, show_edges=True
+        )
+        assert out_path.stat().st_size > 0
+
+    def test_orthographic_projection_renders(self, tmp_path):
+        frame, _, _ = _two_timber_frame()
+        out_path = render_frame_to_png(
+            frame, tmp_path / "out.png", projection=ProjectionType.ORTHOGRAPHIC, camera_angle=CameraAngle.FRONT
+        )
+        assert out_path.stat().st_size > 0
+
+    def test_focus_with_ghosted_unfocused_renders(self, tmp_path):
+        frame, ct1, ct2 = _two_timber_frame()
+        out_path = render_frame_to_png(
+            frame, tmp_path / "out.png", focus_timbers=[ct2], unfocused_style=UnfocusedStyle.GHOSTED
+        )
+        assert out_path.stat().st_size > 0
+
+    def test_focus_by_kumiki_id_renders(self, tmp_path):
+        frame, ct1, ct2 = _two_timber_frame()
+        out_path = render_frame_to_png(
+            frame, tmp_path / "out.png", focus_timbers=[ct2.timber.ticket.kumiki_id]
+        )
+        assert out_path.stat().st_size > 0
+
+    def test_multiple_renders_in_same_process(self, tmp_path):
+        """The whole reason RenderBackend.MATPLOTLIB exists: unlike
+        TRIMESH_PYGLET it must not corrupt any per-process state."""
+        frame, _, _ = _two_timber_frame()
+        for i in range(3):
+            out_path = render_frame_to_png(frame, tmp_path / f"out_{i}.png")
+            assert out_path.stat().st_size > 0
+
+    def test_all_camera_angles_render(self, tmp_path):
+        frame, _, _ = _two_timber_frame()
+        for angle in CameraAngle:
+            out_path = render_frame_to_png(frame, tmp_path / f"{angle.value}.png", camera_angle=angle)
+            assert out_path.stat().st_size > 0
+
+    def test_accessory_near_focus_timber_is_included(self, tmp_path):
+        t1 = _simple_timber("beam")
+        ct1 = CutTimber(t1)
+        peg = Peg(
+            transform=Transform.identity(),
+            size=scalar(0.05),
+            shape=PegShape.ROUND,
+            forward_length=scalar(0.2),
+            stickout_length=scalar(0),
+        )
+        frame = Frame(cut_timbers=[ct1], accessories=[peg])
+        out_path = render_frame_to_png(
+            frame, tmp_path / "out.png", focus_timbers=[ct1], unfocused_style=UnfocusedStyle.HIDDEN
+        )
+        assert out_path.stat().st_size > 0
+
+
+class TestMatplotlibImportGuard:
+    @pytest.mark.skipif(_MATPLOTLIB_AVAILABLE, reason="matplotlib IS installed")
+    def test_raises_helpful_import_error(self, tmp_path):
+        frame, _, _ = _two_timber_frame()
+        with pytest.raises(ImportError, match=r"kumiki\[render-matplotlib\]"):
+            render_frame_to_png(frame, tmp_path / "out.png")
+
+
+# ---------------------------------------------------------------------------
+# end-to-end rendering -- RenderBackend.TRIMESH_PYGLET (subprocess-isolated --
+# see module docstring: only the first render-per-process is reliable on
+# macOS with pyglet<2)
 # ---------------------------------------------------------------------------
 
 
@@ -198,7 +322,7 @@ def _run_render_script(body: str) -> Path:
         from kumiki.timber import CutTimber, Frame, create_timber
         from kumiki.rule import create_v3, create_v2, scalar
         from kumiki.kigumi_at_home import (
-            render_frame_to_png, CameraAngle, ProjectionType,
+            render_frame_to_png, RenderBackend, CameraAngle, ProjectionType,
             GeometryStyle, UnfocusedStyle, RenderMode,
         )
 
@@ -231,16 +355,19 @@ def _run_render_script(body: str) -> Path:
 
 
 @pytest.mark.skipif(not _PYGLET_AVAILABLE, reason="pyglet (kumiki[render]) not installed")
-class TestRenderFrameToPngEndToEnd:
+class TestRenderFrameToPngTrimeshPygletEndToEnd:
     def test_writes_a_png_file(self):
-        out_path = _run_render_script("render_frame_to_png(frame, output_path)")
+        out_path = _run_render_script(
+            "render_frame_to_png(frame, output_path, render_backend=RenderBackend.TRIMESH_PYGLET)"
+        )
         assert out_path.exists()
         assert out_path.stat().st_size > 0
         assert out_path.read_bytes()[:8] == b"\x89PNG\r\n\x1a\n"
 
     def test_creates_parent_directories(self):
         out_path = _run_render_script(
-            "render_frame_to_png(frame, output_path.parent / 'sub' / 'dir' / 'out.png')"
+            "render_frame_to_png(frame, output_path.parent / 'sub' / 'dir' / 'out.png', "
+            "render_backend=RenderBackend.TRIMESH_PYGLET)"
         )
         nested = out_path.parent / "sub" / "dir" / "out.png"
         assert nested.exists()
@@ -248,26 +375,28 @@ class TestRenderFrameToPngEndToEnd:
 
     def test_bounding_box_mode_renders(self):
         out_path = _run_render_script(
-            "render_frame_to_png(frame, output_path, render_mode=RenderMode.BOUNDING_BOX)"
+            "render_frame_to_png(frame, output_path, render_backend=RenderBackend.TRIMESH_PYGLET, "
+            "render_mode=RenderMode.BOUNDING_BOX)"
         )
         assert out_path.stat().st_size > 0
 
     def test_wireframe_mode_renders(self):
         out_path = _run_render_script(
-            "render_frame_to_png(frame, output_path, geometry_style=GeometryStyle.NONE, show_edges=True)"
+            "render_frame_to_png(frame, output_path, render_backend=RenderBackend.TRIMESH_PYGLET, "
+            "geometry_style=GeometryStyle.NONE, show_edges=True)"
         )
         assert out_path.stat().st_size > 0
 
     def test_focus_with_ghosted_unfocused_renders(self):
         out_path = _run_render_script(
-            "render_frame_to_png(frame, output_path, focus_timbers=[ct2], "
-            "unfocused_style=UnfocusedStyle.GHOSTED)"
+            "render_frame_to_png(frame, output_path, render_backend=RenderBackend.TRIMESH_PYGLET, "
+            "focus_timbers=[ct2], unfocused_style=UnfocusedStyle.GHOSTED)"
         )
         assert out_path.stat().st_size > 0
 
     def test_focus_by_kumiki_id_renders(self):
         out_path = _run_render_script(
-            "render_frame_to_png(frame, output_path, "
+            "render_frame_to_png(frame, output_path, render_backend=RenderBackend.TRIMESH_PYGLET, "
             "focus_timbers=[ct2.timber.ticket.kumiki_id])"
         )
         assert out_path.stat().st_size > 0
@@ -278,10 +407,12 @@ class TestRenderFrameToPngEndToEnd:
             script = textwrap.dedent(
                 f"""
                 from kumiki.timber import Frame
-                from kumiki.kigumi_at_home import render_frame_to_png
+                from kumiki.kigumi_at_home import render_frame_to_png, RenderBackend
                 frame = Frame(cut_timbers=[])
                 try:
-                    render_frame_to_png(frame, {str(out_path)!r})
+                    render_frame_to_png(
+                        frame, {str(out_path)!r}, render_backend=RenderBackend.TRIMESH_PYGLET
+                    )
                 except ValueError as exc:
                     assert "No timbers" in str(exc)
                 else:
@@ -300,7 +431,7 @@ class TestRenderFrameToPngEndToEnd:
                 f"""
                 from kumiki.timber import CutTimber, Frame, create_timber
                 from kumiki.rule import create_v3, create_v2, scalar
-                from kumiki.kigumi_at_home import render_frame_to_png
+                from kumiki.kigumi_at_home import render_frame_to_png, RenderBackend
 
                 t1 = create_timber(
                     bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -312,7 +443,10 @@ class TestRenderFrameToPngEndToEnd:
                 other = CutTimber(t1)
                 frame = Frame(cut_timbers=[CutTimber(t1)])
                 try:
-                    render_frame_to_png(frame, {str(out_path)!r}, focus_timbers=[other])
+                    render_frame_to_png(
+                        frame, {str(out_path)!r}, render_backend=RenderBackend.TRIMESH_PYGLET,
+                        focus_timbers=[other],
+                    )
                 except ValueError as exc:
                     assert "not part of this frame" in str(exc)
                 else:
@@ -328,20 +462,21 @@ class TestRenderFrameToPngEndToEnd:
 class TestPygletImportGuard:
     @pytest.mark.skipif(_PYGLET_AVAILABLE, reason="pyglet IS installed")
     def test_raises_helpful_import_error(self):
-        from kumiki.kigumi_at_home import render_frame_to_png
-
         frame, _, _ = _two_timber_frame()
         with tempfile.TemporaryDirectory() as td:
-            with pytest.raises(ImportError, match="kumiki\\[render\\]"):
-                render_frame_to_png(frame, Path(td) / "out.png")
+            with pytest.raises(ImportError, match=r"kumiki\[render\]"):
+                render_frame_to_png(
+                    frame, Path(td) / "out.png", render_backend=RenderBackend.TRIMESH_PYGLET
+                )
 
 
 # ---------------------------------------------------------------------------
-# accessories
+# accessories (trimesh backend path -- matplotlib's accessory test lives in
+# TestRenderFrameToPngMatplotlibEndToEnd above)
 # ---------------------------------------------------------------------------
 
 
-class TestAccessoryFocusHeuristic:
+class TestAccessoryFocusHeuristicTrimeshPyglet:
     @pytest.mark.skipif(not _PYGLET_AVAILABLE, reason="pyglet (kumiki[render]) not installed")
     def test_accessory_near_focus_timber_is_included(self):
         with tempfile.TemporaryDirectory() as td:
@@ -350,7 +485,7 @@ class TestAccessoryFocusHeuristic:
                 f"""
                 from kumiki.timber import CutTimber, Frame, Peg, PegShape, create_timber
                 from kumiki.rule import Transform, create_v3, create_v2, scalar
-                from kumiki.kigumi_at_home import render_frame_to_png, UnfocusedStyle
+                from kumiki.kigumi_at_home import render_frame_to_png, RenderBackend, UnfocusedStyle
 
                 t1 = create_timber(
                     bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -367,7 +502,7 @@ class TestAccessoryFocusHeuristic:
                 )
                 frame = Frame(cut_timbers=[ct1], accessories=[peg])
                 render_frame_to_png(
-                    frame, {str(out_path)!r},
+                    frame, {str(out_path)!r}, render_backend=RenderBackend.TRIMESH_PYGLET,
                     focus_timbers=[ct1], unfocused_style=UnfocusedStyle.HIDDEN,
                 )
                 """
