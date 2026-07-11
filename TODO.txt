@@ -139,7 +139,7 @@ IGNORE-update release job to do everything in 1 run not 2
   -no, because it's 2 separate tags
 -additional agentic test loop featuers
   IGNORE-output AABB only as json and pass back to agent 
-  -offline (not in kigumi) render and screenshot
+  DONE-offline (not in kigumi) render and screenshot
   -update instructions on how to parse frame output from runner.py
 
 -improve kiguim rendering modes

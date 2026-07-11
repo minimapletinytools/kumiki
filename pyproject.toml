@@ -31,6 +31,11 @@ dependencies = [
     "typing_extensions>=4.0.0",
 ]
 
+[project.optional-dependencies]
+# Headless PNG rendering (kumiki.kigumi_at_home). Pinned to pyglet<2 because
+# trimesh's built-in scene viewer does not yet support the pyglet 2.x rewrite.
+render = ["pyglet>=1.5,<2", "scipy>=1.7.0"]
+
 [project.urls]
 Homepage = "https://github.com/minimapletinytools/kumiki"
 Repository = "https://github.com/minimapletinytools/kumiki"

@@ -147,9 +147,22 @@ When authoring a frame for the user, always test locally first just by running t
 
 The Kumiki project will output a Frame object. You can then introspect this Frame object to see its contents and validate it based on this. Please do not hesitate to write small validation scripts in python to do this.
 
-In addition, Kumiki ships with a headless rendering utility allowing you to take screenshots of the frame directly.
+In addition, Kumiki ships with a headless rendering utility (`kumiki.kigumi_at_home`) allowing you to take screenshots of the frame directly, without needing the Kigumi VS Code viewer or any VS Code commands at all:
 
-TODO 
+```python
+from kumiki.kigumi_at_home import render_frame_to_png
+
+render_frame_to_png(frame, "/tmp/my_frame.png")
+```
+
+By default this renders the whole frame from a 3/4 isometric angle, auto-framed to fit. Useful options:
+
+- `camera_angle=CameraAngle.TOP` (also FRONT/BACK/LEFT/RIGHT/BOTTOM/ISO_*) for a fixed view
+- `focus_timbers=[some_cut_timber, ...]` to zoom the camera onto specific timbers only (pass either `CutTimber` objects or their `.timber.ticket.kumiki_id`); use `unfocused_style=UnfocusedStyle.GHOSTED` to keep the rest faintly visible for context instead of hiding it
+- `render_mode=RenderMode.BOUNDING_BOX` for a fast approximate render instead of the fully-cut geometry
+- `geometry_style=GeometryStyle.NONE, show_edges=True` for a wireframe-only (hidden-line) render
+
+This requires the optional `pyglet` dependency: `pip install kumiki[render]`. Only the *first* render call in a process is reliable on macOS (see the module docstring for why) -- if you need several renders in one session, invoke this function from a fresh `python3` subprocess each time rather than calling it repeatedly in a long-lived process.
 
 After taking a screenshot, alwasy make sure to show it to the user in the agent chat window so the user can see your progress.
 
