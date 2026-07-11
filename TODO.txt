@@ -137,12 +137,18 @@ DONE-create_timber rename
 DONE-address rename TODOs in timebr.py
 IGNORE-update release job to do everything in 1 run not 2
   -no, because it's 2 separate tags
+-additional agentic test loop featuers
+  IGNORE-output AABB only as json and pass back to agent 
+  -offline (not in kigumi) render and screenshot
+  -update instructions on how to parse frame output from runner.py
 
+-improve kiguim rendering modes
+  -add edge modes: no edges, overlay, no overlay (dose this work it might have z fighting issues... maybe you can hack the Z depth test to have some buffer))
+  -add edge thickness parameter
+  -add transparent rendering (edge overaly and transparent rendering should be mutually exclusive?)
 
 -create test runner for examples so the exmaples are also tests :O
--additional agentic test loop featuers
-  -offline (not in kigumi) render and screenshot
-  -output AABB only as json and pass back to agent
+  
 -test frame scanning fixes
 -test the install cadquery stuff 
 -test regular imperfect rectangular timber stuff

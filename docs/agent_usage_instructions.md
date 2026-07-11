@@ -141,11 +141,19 @@ Supported arguments types added to the `example` function will be displayed in t
 
 # Validation Workflow
 
-When authoring a frame for the user, always test locally first just by running the python script directly to confirm there are no errors and the logging looks accurate.
+When authoring a frame for the user, always test locally first just by running the python script directly to confirm there are no errors and the logging looks accurate. There are several additional ways you can test and validate the output
 
-Afterwards, if the user is wanting a full agentic development loop, test the frame by actually opening it in Kigumi
+## Headlessly using Kumiki
 
-## VS Code Commands for Full Agentic Development Loop (only if you have access to VSCode commands, sorry Claude)
+The Kumiki project will output a Frame object. You can then introspect this Frame object to see its contents and validate it based on this. Please do not hesitate to write small validation scripts in python to do this.
+
+In addition, Kumiki ships with a headless rendering utility allowing you to take screenshots of the frame directly.
+
+TODO 
+
+After taking a screenshot, alwasy make sure to show it to the user in the agent chat window so the user can see your progress.
+
+## Using VS Code Commands for Full Agentic Development Loop (only if you have access to VSCode commands, which you most likely don't)
 
 Use this sequence after headless local validation passes.
 
