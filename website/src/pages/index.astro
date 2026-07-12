@@ -57,14 +57,73 @@ const gallery = [
   <section class="gallery">
     <h2>Gallery</h2>
     <div class="grid">
-      {gallery.map((photo) => (
+      {gallery.map((photo, i) => (
         <figure>
-          <img src={photo.src} alt={photo.alt} loading="lazy" />
+          <button class="thumb" type="button" data-index={i} aria-label={`Open larger view: ${photo.alt}`}>
+            <img src={photo.src} alt={photo.alt} loading="lazy" />
+          </button>
         </figure>
       ))}
     </div>
   </section>
+
+  <div class="lightbox" id="lightbox" hidden>
+    <button class="lightbox-close" type="button" aria-label="Close">&times;</button>
+    <button class="lightbox-nav lightbox-prev" type="button" aria-label="Previous image">&#8249;</button>
+    <img class="lightbox-image" id="lightbox-image" src="" alt="" />
+    <button class="lightbox-nav lightbox-next" type="button" aria-label="Next image">&#8250;</button>
+    <p class="lightbox-caption" id="lightbox-caption"></p>
+  </div>
 </Layout>
+
+<script>
+  const gallery = Array.from(document.querySelectorAll<HTMLButtonElement>('.thumb'));
+  const lightbox = document.getElementById('lightbox') as HTMLDivElement | null;
+  const lightboxImage = document.getElementById('lightbox-image') as HTMLImageElement | null;
+  const lightboxCaption = document.getElementById('lightbox-caption');
+  const closeBtn = lightbox?.querySelector<HTMLButtonElement>('.lightbox-close');
+  const prevBtn = lightbox?.querySelector<HTMLButtonElement>('.lightbox-prev');
+  const nextBtn = lightbox?.querySelector<HTMLButtonElement>('.lightbox-next');
+
+  let currentIndex = 0;
+
+  function show(index: number) {
+    if (!lightbox || !lightboxImage || gallery.length === 0) return;
+    currentIndex = (index + gallery.length) % gallery.length;
+    const img = gallery[currentIndex].querySelector('img');
+    if (!img) return;
+    lightboxImage.src = img.src;
+    lightboxImage.alt = img.alt;
+    if (lightboxCaption) lightboxCaption.textContent = img.alt;
+    lightbox.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function close() {
+    if (!lightbox) return;
+    lightbox.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  gallery.forEach((btn, i) => {
+    btn.addEventListener('click', () => show(i));
+  });
+
+  closeBtn?.addEventListener('click', close);
+  prevBtn?.addEventListener('click', () => show(currentIndex - 1));
+  nextBtn?.addEventListener('click', () => show(currentIndex + 1));
+
+  lightbox?.addEventListener('click', (e) => {
+    if (e.target === lightbox) close();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (!lightbox || lightbox.hidden) return;
+    if (e.key === 'Escape') close();
+    if (e.key === 'ArrowLeft') show(currentIndex - 1);
+    if (e.key === 'ArrowRight') show(currentIndex + 1);
+  });
+</script>
 
 <style>
   .hero {
@@ -138,8 +197,95 @@ const gallery = [
     display: block;
   }
 
+  .thumb {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    margin: 0;
+    border: none;
+    background: none;
+    cursor: zoom-in;
+  }
+
   @media (max-width: 760px) {
     .hero { grid-template-columns: 1fr; padding: 1.5rem 0 2rem; }
     .features { grid-template-columns: 1fr; }
+  }
+
+  .lightbox[hidden] {
+    display: none;
+  }
+
+  .lightbox {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: 1fr auto;
+    align-items: center;
+    justify-items: center;
+    gap: 0 1rem;
+    padding: 3rem 1.5rem;
+    background: rgba(20, 16, 10, 0.88);
+  }
+
+  .lightbox-image {
+    grid-column: 2;
+    grid-row: 1;
+    max-width: 100%;
+    max-height: calc(100vh - 8rem);
+    object-fit: contain;
+    border-radius: 0.5rem;
+    box-shadow: var(--shadow);
+  }
+
+  .lightbox-caption {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin: 0.75rem 0 0;
+    color: var(--surface);
+    font-size: 0.9rem;
+    text-align: center;
+  }
+
+  .lightbox-close {
+    position: absolute;
+    top: 1rem;
+    right: 1.2rem;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--surface);
+    font-size: 1.6rem;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .lightbox-close:hover { background: rgba(255, 255, 255, 0.18); }
+
+  .lightbox-nav {
+    grid-row: 1;
+    width: 3rem;
+    height: 3rem;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--surface);
+    font-size: 1.8rem;
+    line-height: 1;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .lightbox-nav:hover { background: rgba(255, 255, 255, 0.18); }
+  .lightbox-prev { grid-column: 1; }
+  .lightbox-next { grid-column: 3; }
+
+  @media (max-width: 640px) {
+    .lightbox { padding: 3.5rem 0.75rem 1.5rem; }
+    .lightbox-nav { width: 2.4rem; height: 2.4rem; font-size: 1.4rem; }
   }
 </style>
