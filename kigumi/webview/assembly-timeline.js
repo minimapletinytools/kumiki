@@ -2,7 +2,7 @@
     // Framework-agnostic domain logic for the assembly preview timeline.
     //
     // Payload shape (produced by runner.py serialize_layers -> "assembly"):
-    //   { steps: [{ order, suborder, movements: [{ kumikiId, memberKey,
+    //   { steps: [{ order, suborder, movements: [{ kumikiEphemeralId, memberKey,
     //                                              direction: [x, y, z],  // unit
     //                                              distance,  // base freed_after amount
     //                                              dragged }] }],
@@ -37,7 +37,7 @@
             return null;
         }
         return {
-            kumikiId: isFiniteNumber(raw.kumikiId) ? raw.kumikiId : null,
+            kumikiEphemeralId: isFiniteNumber(raw.kumikiEphemeralId) ? raw.kumikiEphemeralId : null,
             memberKey: raw.memberKey,
             direction: [direction[0], direction[1], direction[2]],
             distance: raw.distance,

@@ -8,7 +8,7 @@ const {
 } = AssemblyTimeline;
 
 function movement(memberKey, direction, distance, extra = {}) {
-  return { kumikiId: 1, memberKey, direction, distance, dragged: false, ...extra };
+  return { kumikiEphemeralId: 1, memberKey, direction, distance, dragged: false, ...extra };
 }
 
 describe('normalizeAssemblyPayload', () => {
