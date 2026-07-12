@@ -711,8 +711,9 @@ def cut_mortise_and_tenon_joint(
         )
 
     tenon_prism_cropping_csgs: Optional[List[CutCSG]] = None
-    do_cropping = bore_mortise_perpendicular_to_face and not zero_test(cos_angle)
-    if do_cropping:
+    # why did the agent do zero_test(scalar(1) - cos_angle * cos_angle)...
+    do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not zero_test(scalar(1) - cos_angle * cos_angle)
+    if do_lengthwise_cropping:
         # Compute mortise_face locally — cropping is only used for plane-aligned timbers
         mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
             -tenon_end_direction
@@ -764,7 +765,7 @@ def cut_mortise_and_tenon_joint(
 
     mortise_hole_prism_global = None
 
-    if do_cropping:
+    if do_lengthwise_cropping:
         if use_round_tenon:
             # Round mortise hole at an angle: use cylinder
             mortise_radius = tenon_size[0] / scalar(2)
