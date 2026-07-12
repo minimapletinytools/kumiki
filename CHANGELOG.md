@@ -8,6 +8,24 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-12
+
+### kumiki
+
+#### Added
+
+- Supported full compound (multi-axis) tenon and mortise cropping in `cut_mortise_and_tenon_joint` when `bore_mortise_perpendicular_to_face=True` is enabled, sizing the mortise hole correctly along both the receiving timber's length and width axes.
+
+#### Fixed
+
+- Fixed a bug where a perpendicular tenon entry on a raked joint with `bore_mortise_perpendicular_to_face=True` caused a division-by-zero that inflated the mortise hole size, cutting a channel along the entire length of the receiving timber.
+
+### kigumi
+
+#### Added
+
+- Added edge thickness options and edge-mode selector (with independent selected transparency) to the Kigumi viewer.
+
 ## [0.4.1] - 2026-07-08
 
 ### kumiki
