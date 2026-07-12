@@ -8,6 +8,59 @@ from .rule import *
 from .timber import *
 
 
+# ============================================================================
+# Support-distance geometry
+# ============================================================================
+#
+# In computational geometry, "support" refers to the furthest extent of a shape
+# in a specified direction.
+#
+# Imagine an infinite plane perpendicular to `direction`. Start with the plane
+# beyond the timber, then slide it backward toward the timber until it first
+# touches the timber's bounding box. That plane is the timber's support plane
+# in that direction.
+#
+# Equivalently, for a shape containing points `p`, the support value is:
+#
+#     max(dot(direction, p))
+#
+# The support distance from some position is the distance from that position
+# to this furthest plane, measured parallel to `direction`.
+#
+# For example, for a rectangular cross-section centered at the origin:
+#
+#     direction = (1, 0)   -> support plane is the right face
+#     direction = (-1, 0)  -> support plane is the left face
+#     direction = (0, 1)   -> support plane is the front/top face
+#     direction = (1, 1)   -> support plane touches the upper-right corner
+#
+# The direction does not have to point directly toward a face. For diagonal
+# directions, the support plane may touch an edge or corner instead.
+#
+# "Nominal" and "perfect" describe two different bounding boxes:
+#
+# - Nominal support uses the timber's nominal half-sizes. These may be
+#   asymmetric around the centerline if the modeled perfect timber lies within
+#   a nominal timber envelope.
+#
+# - Perfect support uses the perfect dimensions of the perfect timber. Its
+#   cross-section is assumed to be centered on the local X/Y centerline, so its
+#   positive and negative half-sizes are equal.
+#
+# The "...from_centerline" functions operate only in the timber's XY
+# cross-section. They measure from local (0, 0) and ignore the timber's length.
+#
+# The 3D functions operate over the complete timber box:
+#
+#     X = width
+#     Y = height
+#     Z = distance from the bottom end
+#
+# They therefore account for both the timber's cross-section and its end
+# planes at Z=0 and Z=timber.length.
+# ============================================================================
+
+
 def _support_value_local(
     direction_local: V3,
     x_pos: Numeric,
@@ -56,7 +109,7 @@ def _support_distance_local(
 
 
 def get_nominal_support_distance_from_centerline(timber: PerfectTimberWithin, direction: V2) -> Numeric:
-    """Support distance from cross-section centerline to nominal support plane."""
+    """distance from cross-section centerline to support plane of the actual timber dimensions in direction"""
     width_halves, height_halves = timber.get_nominal_half_sizes()
     return _support_distance_local(
         position_local=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -71,7 +124,7 @@ def get_nominal_support_distance_from_centerline(timber: PerfectTimberWithin, di
 
 
 def get_perfect_support_distance_from_centerline(timber: PerfectTimberWithin, direction: V2) -> Numeric:
-    """Support distance from cross-section centerline to perfect support plane."""
+    """distance from cross-section centerline to support plane of the perfect timber dimensions in direction"""
     w_half = timber.size[0] / scalar(2)
     h_half = timber.size[1] / scalar(2)
     return _support_distance_local(
@@ -87,7 +140,7 @@ def get_perfect_support_distance_from_centerline(timber: PerfectTimberWithin, di
 
 
 def get_nominal_support_distance(timber: PerfectTimberWithin, position_from_bottom: V3, direction: V3) -> Numeric:
-    """Support distance from a 3D local position to nominal support plane."""
+    """distance from a 3D local position to support plane of the actual timber dimensions in direction"""
     width_halves, height_halves = timber.get_nominal_half_sizes()
     return _support_distance_local(
         position_local=position_from_bottom,
@@ -102,7 +155,7 @@ def get_nominal_support_distance(timber: PerfectTimberWithin, position_from_bott
 
 
 def get_perfect_support_distance(timber: PerfectTimberWithin, position_from_bottom: V3, direction: V3) -> Numeric:
-    """Support distance from a 3D local position to perfect support plane."""
+    """distance from a 3D local position to support plane of the perfect timber dimensions in direction"""
     w_half = timber.size[0] / scalar(2)
     h_half = timber.size[1] / scalar(2)
     return _support_distance_local(
