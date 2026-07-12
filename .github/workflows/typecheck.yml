@@ -41,7 +41,7 @@ jobs:
         if [ ! -f kumiki/_pattern_index.json ]; then
           echo '{"schema_version":1,"entries":{}}' > kumiki/_pattern_index.json
         fi
-        uv sync --dev
+        uv sync --dev --extra render --extra render-matplotlib
         
     - name: Run type checker
       run: |

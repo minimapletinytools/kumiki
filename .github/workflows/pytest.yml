@@ -39,7 +39,12 @@ jobs:
         if [ ! -f kumiki/_pattern_index.json ]; then
           echo '{"schema_version":1,"entries":{}}' > kumiki/_pattern_index.json
         fi
-        uv sync --group dev
+        # Only render-matplotlib: it's genuinely headless. render (pyglet)
+        # needs a real X server (Xvfb) on Linux to actually open a window,
+        # which this runner doesn't have -- installing it here would
+        # un-skip the RenderBackend.TRIMESH_PYGLET tests and they'd fail
+        # trying to render with no display. Those stay skipped on CI.
+        uv sync --group dev --extra render-matplotlib
 
     - name: Generate pattern index
       run: uv run --group dev python tools/build_pattern_index.py
