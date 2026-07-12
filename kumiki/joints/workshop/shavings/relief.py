@@ -274,6 +274,7 @@ def _projected_perfect_cross_section_span_along_global_direction(
     """Projected full cross-section span of a timber along a global direction."""
     direction_local = safe_transform_vector(timber.orientation.matrix.T, direction_global)
     direction_local_2d = create_v2(direction_local[0], direction_local[1])
+    # TODO this is wrong, this projects the direction onto the XY plane of the timber and returns the support distance in that plane. Instead, you need to multiply the support distance by the cos of the angle between the timber's length axis and the direction. 
     return scalar(2) * get_perfect_support_distance_from_centerline(timber, direction_local_2d)
 
 
@@ -354,6 +355,9 @@ def chop_shoulder_notch_aligned_with_timber(
     projected = raw_approach - notch_length_dir_global * safe_dot_product(
         raw_approach, notch_length_dir_global
     )
+
+    # the approach direction projected onto the plane perpendicular to the notch timber's length axis
+    # TODO rename this to perpendicular_approach_direction_global or something like that
     approach_direction_global = normalize_vector(projected)
 
     shoulder_plane = locate_plane_from_edge_in_direction(
@@ -371,11 +375,17 @@ def chop_shoulder_notch_aligned_with_timber(
     ) / denom
     intersection_global = butting_centerline.point + butting_centerline.direction * t
 
+    # TODO you can do better than this, just use the cos(length axis rotation angle) instead but the angle is computed relative to the length axis of the receiving timber...
+    # worst case scenario, use the maximum diagonal dimension to determine the notch span and width, so that the notch is guaranteed to cover the entire cross-section regardless of rotation. 
     max_size = Max(
         notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT),
         notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT),
     )
+    # notch span is ORTHOGONAL to the LENGTH axis of the receiving timber
     notch_span = max_size * sqrt(scalar(2))
+    # this is misleading, the notch prism STARTS at the shoulder plane and extends OUTWARD, so the notch depth is actually the distance from the shoulder plane to the far end of the notch prism. 
+    # I think we base it on the max cross section size here because we might be notching at an angle on the receiving timber?? (but then the cross sectional size should be that of the receiving timber, not the butting timber, so maybe this is probably wrong, also this should account for the imperfect dimensions of the receiving timber)
+    # TODO fix this to be more simple
     notch_depth = max_size * sqrt(scalar(2)) / scalar(2)
 
     cross_section_span_on_notch_length = _projected_perfect_cross_section_span_along_global_direction(
@@ -383,14 +393,16 @@ def chop_shoulder_notch_aligned_with_timber(
         notch_length_dir_global,
     )
 
+    # TODO Delete this stuff, this is not needed
     approach_dot_depth = safe_dot_product(raw_approach, approach_direction_global)
     approach_dot_length = safe_dot_product(raw_approach, notch_length_dir_global)
-
     if not zero_test(approach_dot_depth):
         shift_along_length = notch_depth * Abs(approach_dot_length / approach_dot_depth)
     else:
         shift_along_length = scalar(0)
 
+    # notch_width is in the LENGTH axis of the receiving timber
+    # TODO it should not be based on notch_depth omg, you can delete shift_along_length, that part is covered by the left/right wall relief prisms
     notch_width = cross_section_span_on_notch_length + shift_along_length
 
     approach_direction_local = safe_transform_vector(
@@ -402,6 +414,7 @@ def chop_shoulder_notch_aligned_with_timber(
     prism_orientation = Orientation.from_z_and_x(approach_direction_local, notch_length_dir_local)
     prism_position_local = notch_timber.transform.global_to_local(intersection_global)
 
+    # this prism is the "main" part of the notch
     notch_prism = RectangularPrism(
         size=create_v2(notch_width, notch_span),
         transform=Transform(position=prism_position_local, orientation=prism_orientation),
@@ -409,6 +422,7 @@ def chop_shoulder_notch_aligned_with_timber(
         end_distance=notch_depth,
     )
 
+    # TODO notch_wall_relief_cut_angle_radians to max(notch_wall_relief_cut_angle_radians, 90 - butt_acute_approach_angle_radians) so that the relief cut is always at least as steep as the approach angle of the butting timber, otherwise the relief cut will not be deep enough to clear the butting timber.
     if notch_wall_relief_cut_angle_radians == 0:
         return notch_prism
 
@@ -424,6 +438,7 @@ def chop_shoulder_notch_aligned_with_timber(
 
     extended_end_distance = notch_depth / cos(angle_rad)
 
+    # these 2 prisms are the "relief" parts of the notch
     left_wall_prism = RectangularPrism(
         size=notch_prism.size,
         transform=notch_prism.transform.rotate_around_axis(axis_1, angle_rad),
