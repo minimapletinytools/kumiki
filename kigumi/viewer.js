@@ -148,6 +148,9 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const stylesCssUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer.css'))).toString();
     const threeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'three.min.js'))).toString();
     const reflectorJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'Reflector.js'))).toString();
+    const lineSegmentsGeometryJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'LineSegmentsGeometry.js'))).toString();
+    const lineMaterialJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'LineMaterial.js'))).toString();
+    const lineSegments2JsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'LineSegments2.js'))).toString();
     const litJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'lit.min.js'))).toString();
     const nonce = getNonce();
 
@@ -174,6 +177,9 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__STYLES_CSS_URI__', stylesCssUri)
         .replace('__THREE_JS_URI__', threeJsUri)
         .replace('__REFLECTOR_JS_URI__', reflectorJsUri)
+        .replace('__LINE_SEGMENTS_GEOMETRY_JS_URI__', lineSegmentsGeometryJsUri)
+        .replace('__LINE_MATERIAL_JS_URI__', lineMaterialJsUri)
+        .replace('__LINE_SEGMENTS2_JS_URI__', lineSegments2JsUri)
         .replace('__LIT_JS_URI__', litJsUri);
 }
 

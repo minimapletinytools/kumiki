@@ -24,6 +24,24 @@ const TARGETS = [
         minBytes: 4_000,
     },
     {
+        file: 'LineSegmentsGeometry.js',
+        url: 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegmentsGeometry.js',
+        note: 'three r128 fat-line geometry (attaches to global THREE), for edge thickness',
+        minBytes: 1_000,
+    },
+    {
+        file: 'LineMaterial.js',
+        url: 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineMaterial.js',
+        note: 'three r128 fat-line material (attaches to global THREE), for edge thickness',
+        minBytes: 1_000,
+    },
+    {
+        file: 'LineSegments2.js',
+        url: 'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/lines/LineSegments2.js',
+        note: 'three r128 fat-line mesh (attaches to global THREE), for edge thickness',
+        minBytes: 1_000,
+    },
+    {
         file: 'lit.min.js',
         url: 'https://esm.sh/lit@3.2.0/es2022/lit.bundle.mjs',
         note: 'lit 3.2.0 self-contained ESM bundle',

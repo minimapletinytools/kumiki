@@ -521,6 +521,16 @@ class ViewerSettingsPanel {
                         .value=${String(this.app.edgeLineVisibilityPercent)}>
                 </label>
                 <label>
+                    edge thickness (${this.app.edgeLineThicknessPx}px)
+                    <input
+                        id="edge-thickness-slider"
+                        type="range"
+                        min="0.5"
+                        max="6"
+                        step="0.5"
+                        .value=${String(this.app.edgeLineThicknessPx)}>
+                </label>
+                <label>
                     <input id="shadows-toggle" type="checkbox" ?checked=${this.app.shadowsEnabled}>
                     shadows
                 </label>
@@ -728,6 +738,11 @@ class ViewerSettingsPanel {
                     app.setEdgeLineVisibilityPercent(percent);
                 },
                 sync: (el) => { el.value = String(app.edgeLineVisibilityPercent); },
+            },
+            {
+                id: 'edge-thickness-slider', on: 'input',
+                apply: (el) => app.setEdgeLineThicknessPx(Number(el.value)),
+                sync: (el) => { el.value = String(app.edgeLineThicknessPx); },
             },
             {
                 id: 'unselected-transparency-slider', on: 'input',
@@ -994,6 +1009,7 @@ class KigumiViewerApp extends LitElement {
 
         this.showCenterGizmo = true;
         this.edgeMode = 'overlay';
+        this.edgeLineThicknessPx = 1.5;
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
         this.footprintsEnabled = true;
@@ -1671,6 +1687,7 @@ class KigumiViewerApp extends LitElement {
                 showCenterGizmo: Boolean(this.showCenterGizmo),
                 edgeMode: String(this.edgeMode || 'overlay'),
                 edgeLineVisibilityPercent: Number(this.edgeLineVisibilityPercent),
+                edgeLineThicknessPx: Number(this.edgeLineThicknessPx),
                 shadowsEnabled: Boolean(this.shadowsEnabled),
                 reflectionsEnabled: Boolean(this.reflectionsEnabled),
                 footprintsEnabled: Boolean(this.footprintsEnabled),
@@ -1723,6 +1740,9 @@ class KigumiViewerApp extends LitElement {
         }
         if (Number.isFinite(ui.edgeLineVisibilityPercent)) {
             this.setEdgeLineVisibilityPercent(Number(ui.edgeLineVisibilityPercent));
+        }
+        if (Number.isFinite(ui.edgeLineThicknessPx)) {
+            this.setEdgeLineThicknessPx(Number(ui.edgeLineThicknessPx));
         }
         if (typeof ui.shadowsEnabled === 'boolean') {
             this.setShadowsEnabled(ui.shadowsEnabled);
@@ -2293,6 +2313,15 @@ class KigumiViewerApp extends LitElement {
         this.renderer.setSize(width, height, false);
         this.resizeGizmoRenderer();
         this.drawLightDial();
+        // Fat-line (LineMaterial) edges compute their pixel thickness from
+        // this resolution uniform -- keep it in sync or edges get thinner or
+        // thicker than their configured linewidth as the viewport resizes.
+        const resolution = this._getRendererResolution();
+        for (const bundle of this.meshObjectsByKey.values()) {
+            if (bundle.edges && bundle.edges.material) {
+                bundle.edges.material.resolution = resolution;
+            }
+        }
     }
 
     handleCanvasClick(event) {
@@ -3146,6 +3175,22 @@ class KigumiViewerApp extends LitElement {
         this.applySelectionOpacity();
     }
 
+    setEdgeLineThicknessPx(nextThickness) {
+        const normalized = Number.isFinite(nextThickness)
+            ? Math.max(0.5, Math.min(6, nextThickness))
+            : 1.5;
+        if (this.edgeLineThicknessPx === normalized) {
+            return;
+        }
+        this.edgeLineThicknessPx = normalized;
+        for (const bundle of this.meshObjectsByKey.values()) {
+            if (bundle.edges && bundle.edges.material) {
+                bundle.edges.material.linewidth = normalized;
+            }
+        }
+        this.requestUpdate();
+    }
+
     setShadowsEnabled(enabled) {
         this.shadowsEnabled = enabled;
         if (this.renderer) {
@@ -3295,6 +3340,13 @@ class KigumiViewerApp extends LitElement {
                 // materials when the mode changes.
                 depthTest: this.edgeMode === 'noOverlay',
                 depthWrite: this.edgeMode === 'noOverlay',
+                // Fat lines (THREE.LineMaterial): linewidth is in screen
+                // pixels (this three.js version has no worldUnits option),
+                // and resolution must track the actual canvas size or the
+                // computed pixel width is wrong -- onWindowResize() keeps
+                // this in sync on existing materials.
+                linewidth: this.edgeLineThicknessPx,
+                resolution: this._getRendererResolution(),
             },
             reflection: {
                 color: profile.reflectionColor,
@@ -3321,13 +3373,20 @@ class KigumiViewerApp extends LitElement {
         material.needsUpdate = true;
     }
 
+    // THREE.LineMaterial's resolution uniform needs the actual canvas size in
+    // pixels; falls back to a 1x1 placeholder before the renderer exists
+    // (onWindowResize() and setEdgeLineThicknessPx() keep it correct afterwards).
+    _getRendererResolution() {
+        return this.renderer ? this.renderer.getSize(new THREE.Vector2()) : new THREE.Vector2(1, 1);
+    }
+
     createMaterialSetForMemberType(memberType) {
         const profileId = this.resolveRenderProfileIdForMemberType(memberType);
         const specs = this.renderProfileMaterialSpecs(this.resolveRenderProfile(profileId));
         return {
             profileId,
             solid: new THREE.MeshStandardMaterial(specs.solid),
-            edge: new THREE.LineBasicMaterial(specs.edge),
+            edge: new THREE.LineMaterial(specs.edge),
             reflection: new THREE.MeshStandardMaterial(specs.reflection),
         };
     }
@@ -3925,8 +3984,19 @@ class KigumiViewerApp extends LitElement {
             const materialSet = this.createMaterialSetForMemberType(memberType);
 
             const solidMesh = new THREE.Mesh(geometry, materialSet.solid);
-            const edgeGeometry = new THREE.EdgesGeometry(geometry, 25);
-            const edgeMesh = new THREE.LineSegments(edgeGeometry, materialSet.edge);
+            // EdgesGeometry gives a flat, non-indexed position array (every
+            // consecutive pair of vertices is one segment) -- exactly what
+            // LineSegmentsGeometry.setPositions() expects, so it's used here
+            // purely as a way to compute the sharp/boundary edge positions,
+            // then thrown away in favor of the fat-line (LineSegments2)
+            // geometry that actually gets rendered (supports real linewidth,
+            // unlike plain THREE.LineSegments/LineBasicMaterial).
+            const edgesSource = new THREE.EdgesGeometry(geometry, 25);
+            const edgeGeometry = new THREE.LineSegmentsGeometry();
+            edgeGeometry.setPositions(edgesSource.attributes.position.array);
+            edgesSource.dispose();
+            const edgeMesh = new THREE.LineSegments2(edgeGeometry, materialSet.edge);
+            edgeMesh.computeLineDistances();
             const reflectionMesh = new THREE.Mesh(geometry, materialSet.reflection);
             solidMesh.renderOrder = 1;
             edgeMesh.renderOrder = 10;
