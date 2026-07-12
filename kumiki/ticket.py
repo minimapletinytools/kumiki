@@ -9,14 +9,18 @@ will be rendered as actual folders in the layer view.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from itertools import count
-from typing import Optional
+from typing import NewType, Optional
+
+from typing_extensions import deprecated
+
+KumikiId = NewType("KumikiId", int)
+"""Runtime-only identifier type for the Kumiki viewer. See Ticket.kumiki_id."""
+
+_kumiki_id_COUNTER = count(1)
 
 
-_KUMIKI_ID_COUNTER = count(1)
-
-
-def _next_kumiki_id() -> int:
-    return next(_KUMIKI_ID_COUNTER)
+def _next_kumiki_id() -> KumikiId:
+    return KumikiId(next(_kumiki_id_COUNTER))
 
 
 @dataclass(frozen=True)
@@ -33,12 +37,13 @@ class Ticket(ABC):
     path: str = "[no-name]"
     # Runtime-only identifier for the Kumiki viewer. It has no meaning outside
     # the viewer runtime and should not be used as persistent data.
-    kumiki_id: int = field(default_factory=_next_kumiki_id, init=False, compare=False, repr=False)
+    kumiki_id: KumikiId = field(
+        default_factory=_next_kumiki_id, init=False, compare=False, repr=False
+    )
 
     def get_name(self) -> str:
         """Return the display name: the last segment of the path."""
         return self.path.rsplit("/", 1)[-1]
-
 
 @dataclass(frozen=True)
 class TimberTicket(Ticket):

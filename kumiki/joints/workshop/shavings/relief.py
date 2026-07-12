@@ -756,10 +756,17 @@ def chop_relief_for_butt_joint_arrangement(
 
 def chop_scribe_relief(
     timber_to_be_scribed: TimberLike,
+    timber_to_be_scribed_cutting: Cutting,
     timber_to_be_cut: TimberLike,
 ) -> tuple[CutCSG, CutCSG]:
     """
     scribes timber_to_be_scribed onto timber_to_be_cut such that the entirety of timber_to_be_scribed is cut out of timber_to_be_cut excluding the perfect timber within portion of timber_to_be_cut
+
+    timber_to_be_scribed_cutting is the cutting already computed for timber_to_be_scribed
+    elsewhere in the current joint (e.g. the tenon's shoulder cut, plus any end cut) --
+    material already removed there is excluded from what gets scribed onto timber_to_be_cut,
+    otherwise the relief would be based on timber_to_be_scribed's full, uncut extent (its
+    entire length) rather than just the part of it that actually survives near the joint.
 
     returns a pair of CSG geometries, the first to be removed from timber_to_be_scribed and the second to be removed from timber_to_be_cut, both expressed in their respective local frames
     """
@@ -773,6 +780,12 @@ def chop_scribe_relief(
         timber_to_be_scribed.transform,
         None,
         timber_to_be_scribed.get_perfect_timber_within_csg_local(),
+    )
+
+    timber_to_be_scribed_own_cuts_global = adopt_csg(
+        timber_to_be_scribed.transform,
+        None,
+        timber_to_be_scribed_cutting.get_negative_csg_local(),
     )
 
     timber_to_be_cut_perfect_csg_global = adopt_csg(
@@ -790,9 +803,20 @@ def chop_scribe_relief(
         right=timber_to_be_cut_perfect_csg_global,
     )
 
+    # What actually remains of timber_to_be_scribed's imperfect (beyond-perfect-within)
+    # material near the joint, after its own cuts (shoulder, end cut, etc.) are accounted
+    # for -- this, not the raw/uncut imperfect fringe, is what needs a matching hollow in
+    # timber_to_be_cut.
+    timber_to_be_scribed_imperfect_after_own_cuts_global = Difference(
+        base=Difference(
+            timber_to_be_scribed_actual_csg_global,
+            subtract=[timber_to_be_scribed_perfect_csg_global],
+        ),
+        subtract=[timber_to_be_scribed_own_cuts_global],
+    )
 
     cut_relief_global = Difference(
-        base=timber_to_be_scribed_actual_csg_global,
+        base=timber_to_be_scribed_imperfect_after_own_cuts_global,
         subtract=[timber_to_be_cut_perfect_csg_global],
     )
 
@@ -825,6 +849,7 @@ def chop_scribe_relief_and_apply(
 
     scribed_relief_csg_local, cut_relief_csg_local = chop_scribe_relief(
         timber_to_be_scribed=timber_to_be_scribed,
+        timber_to_be_scribed_cutting=timber_to_be_scribed_cutting,
         timber_to_be_cut=timber_to_be_cut,
     )
 

@@ -137,20 +137,21 @@ DONE-create_timber rename
 DONE-address rename TODOs in timebr.py
 IGNORE-update release job to do everything in 1 run not 2
   -no, because it's 2 separate tags
--additional agentic test loop featuers
+DONE-additional agentic test loop featuers
   IGNORE-output AABB only as json and pass back to agent 
   DONE-offline (not in kigumi) render and screenshot
-  -update instructions on how to parse frame output from runner.py
+  DONE-update instructions on how to parse frame output from runner.py
+DONE-give kumiki_id in ticket and type def name ro seomteihng so its not just int. maybe rename to kumiki_id or something
+
 
 -improve kiguim rendering modes
   -add edge modes: no edges, overlay, no overlay (dose this work it might have z fighting issues... maybe you can hack the Z depth test to have some buffer))
-  -add edge thickness parameter
-  -add transparent rendering (edge overaly and transparent rendering should be mutually exclusive?)
+  -add edge thickness parameter to options
+  -add transparent rendering mode so faces  are rendered transparent. this only appiles ot faces, not the edge lines.
 
--give kumiki_id in ticket and type def name ro seomteihng so its not just int. maybe rename to kumiki_ephemeral_id or something
-
+-choose domnai for website
 -create test runner for examples so the exmaples are also tests :O
-  
+-enable potato (scribe) notching on the remaining joints?  
 -test frame scanning fixes
 -test the install cadquery stuff 
 -test regular imperfect rectangular timber stuff
@@ -162,7 +163,7 @@ IGNORE-update release job to do everything in 1 run not 2
   -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
   -"Example Frames" -> "Examples"
 -do example cleanup
--choose domnai for website
+
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
 -add an optional scale ruler to the view and havei t default off

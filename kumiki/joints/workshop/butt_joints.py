@@ -13,7 +13,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching
+from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, chop_scribe_relief_and_apply
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -556,9 +556,10 @@ def cut_mortise_and_tenon_joint(
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
 
-    # TODO rename this parameter, and also assert that mortise_depth is None if this is true
-    crop_tenon_to_mortise_orientation_on_angled_joints: bool = False,
+    bore_mortise_perpendicular_to_face: bool = False,
     use_round_tenon: bool = False,
+
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
     Creates a mortise and tenon joint with full control over all parameters.
@@ -572,8 +573,9 @@ def cut_mortise_and_tenon_joint(
         tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
         tenon_length: Length of the tenon extending from the mortise entry face. For angled
             joints, set this slightly longer than expected to ensure full penetration.
-        mortise_depth: Depth of the mortise (None = through mortise). Measurement differs
-            depending on crop_tenon_to_mortise_orientation_on_angled_joints.
+        mortise_depth: Depth of the mortise (None = through mortise, only valid when
+            bore_mortise_perpendicular_to_face is False).
+            Measures along the tenon axis if bore_mortise_perpendicular_to_face is False; along the mortise face axis if True.
         mortise_shoulder_distance_from_centerline: Signed distance from the mortise
             centerline to the shoulder plane, measured within the mortise cross-section
             in the direction toward the tenon centerline. 0 = shoulder at the mortise
@@ -585,13 +587,21 @@ def cut_mortise_and_tenon_joint(
             distance_from_shoulder is measured along the tenon axis, while
             distance_from_centerline is measured along the mortise axis — this makes
             positioning pegs on angled braces easier.
-        crop_tenon_to_mortise_orientation_on_angled_joints: If True, the tenon is cropped
-            so its depth along the mortise face axis equals mortise_depth and its tip is
-            trimmed to the mortise hole boundary. If False, mortise depth is measured along
-            the tenon axis from the shoulder.
+        bore_mortise_perpendicular_to_face: If True, the mortise is bored straight into the
+            receiving face (perpendicular to it) rather than along the tenon's own axis, and
+            the tenon is cropped to fit — its depth along the mortise face axis equals
+            mortise_depth (which must be provided) and its tip is trimmed to the mortise hole
+            boundary. If False (default), the mortise hole and mortise_depth both follow the
+            tenon's own axis from the shoulder, so the mortise face aligns with the tenon.
         use_round_tenon: If True, creates a round (cylindrical) tenon and mortise instead of
             rectangular. When True, tenon_size[0] and tenon_size[1] must be equal (no ovals),
             and peg_parameters must be None. Default is False.
+        relief: Scribe-relief configuration for imperfect timbers (see `chop_scribe_relief_and_apply`
+            in relief.py), scribing one timber's imperfect (beyond-perfect-within) material onto
+            the other and cutting it away. Defaults to scribing the tenon (butt) timber onto the
+            mortise (receiving) timber. Pass None to skip scribe relief entirely. This is separate
+            from — and applied on top of — the shoulder notch/relief that
+            mortise_shoulder_distance_from_centerline may require.
 
     Returns:
         Joint object containing the two CutTimbers and any accessories, all in global space.
@@ -614,6 +624,12 @@ def cut_mortise_and_tenon_joint(
         )
         require_check(
             None if peg_parameters is None else "Round tenon does not support pegs (peg_parameters must be None)"
+        )
+
+    if bore_mortise_perpendicular_to_face:
+        require_check(
+            None if mortise_depth is not None
+            else "mortise_depth must be provided (not None) when bore_mortise_perpendicular_to_face is True"
         )
 
     # TODO default mortise depth if mortise_depth is None
@@ -695,7 +711,7 @@ def cut_mortise_and_tenon_joint(
         )
 
     tenon_prism_cropping_csgs: Optional[List[CutCSG]] = None
-    do_cropping = crop_tenon_to_mortise_orientation_on_angled_joints and not zero_test(cos_angle)
+    do_cropping = bore_mortise_perpendicular_to_face and not zero_test(cos_angle)
     if do_cropping:
         # Compute mortise_face locally — cropping is only used for plane-aligned timbers
         mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
@@ -813,6 +829,7 @@ def cut_mortise_and_tenon_joint(
 
     from sympy import pi as _pi
 
+    # TODO renameto shoulder_notch_relief_geom since we do generic relief cutting later too
     relief_geom = chop_relief_for_butt_joint_arrangement(
         arrangement,
         mortise_shoulder_distance_from_centerline,
@@ -950,6 +967,30 @@ def cut_mortise_and_tenon_joint(
                 label="mortise_and_tenon",
             )
 
+    if relief is not None:
+        if relief.timber_to_be_scribed == ArrangementNames.butt_timber:
+            scribed_timber, cut_timber_for_relief = tenon_timber, mortise_timber
+            scribed_cutting, cut_cutting = tenon_cut, mortise_cut
+        elif relief.timber_to_be_scribed == ArrangementNames.receiving_timber:
+            scribed_timber, cut_timber_for_relief = mortise_timber, tenon_timber
+            scribed_cutting, cut_cutting = mortise_cut, tenon_cut
+        else:
+            raise AssertionError(
+                f"Unsupported mortise-and-tenon relief target: {relief.timber_to_be_scribed}"
+            )
+
+        updated_cut_cutting, updated_scribed_cutting = chop_scribe_relief_and_apply(
+            timber_to_be_scribed=scribed_timber,
+            timber_to_be_scribed_cutting=scribed_cutting,
+            timber_to_be_cut=cut_timber_for_relief,
+            timber_to_be_cut_cutting=cut_cutting,
+        )
+        print("meow meow meow")
+        if relief.timber_to_be_scribed == ArrangementNames.butt_timber:
+            tenon_cut, mortise_cut = updated_scribed_cutting, updated_cut_cutting
+        else:
+            mortise_cut, tenon_cut = updated_scribed_cutting, updated_cut_cutting
+
     # Assembly: the tenon backs out of the mortise along the tenon axis; the
     # mortise timber's view of the same separation is the inverse direction.
     # When pegs lock the joint they pop first (suborder 0), so the timbers
@@ -985,8 +1026,9 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     mortise_shoulder_inset: Numeric = scalar(0),
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
-    crop_tenon_to_mortise_orientation_on_angled_joints = False,
+    bore_mortise_perpendicular_to_face: bool = False,
     use_round_tenon: bool = False,
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
     Creates a mortise and tenon joint for plane-aligned timbers.
@@ -1005,15 +1047,19 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
         tenon_length: Length of the tenon extending from the mortise entry face. For angled
             joints, set this slightly longer than expected.
-        mortise_depth: Depth of the mortise (None = through mortise).
+        mortise_depth: Depth of the mortise (None = through mortise, only valid when
+            bore_mortise_perpendicular_to_face is False).
         tenon_position: Offset of the tenon center from the timber centerline in the tenon's
             local cross-section. (0, 0) = centered on the centerline.
         mortise_shoulder_inset: Distance from the mortise entry face to the shoulder plane,
             measured perpendicular to the face inward. 0 = shoulder flush with the entry face.
         wedge_parameters: Wedge configuration (not currently used).
         peg_parameters: Peg configuration for draw-bore tightening (optional).
-        crop_tenon_to_mortise_orientation_on_angled_joints: If True, the tenon tip is cropped
-            to the mortise hole boundary. If False, mortise depth is measured along the tenon axis.
+        bore_mortise_perpendicular_to_face: If True, the mortise is bored straight into the
+            receiving face and the tenon tip is cropped to the mortise hole boundary; mortise_depth
+            must be provided. If False, mortise depth is measured along the tenon axis.
+        relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
+            tenon (butt) timber onto the mortise (receiving) timber. Pass None to skip.
 
     Returns:
         Joint object containing the two CutTimbers and any accessories.
@@ -1049,8 +1095,9 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         tenon_position=tenon_position,
         wedge_parameters=wedge_parameters,
         peg_parameters=peg_parameters,
-        crop_tenon_to_mortise_orientation_on_angled_joints=crop_tenon_to_mortise_orientation_on_angled_joints,
+        bore_mortise_perpendicular_to_face=bore_mortise_perpendicular_to_face,
         use_round_tenon=use_round_tenon,
+        relief=relief,
     )
 
 
@@ -1065,6 +1112,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
     use_round_tenon: bool = False,
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
     Creates a mortise and tenon joint for face-aligned orthogonal timbers.
@@ -1075,7 +1123,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     joints in the same plane, use `cut_mortise_and_tenon_joint_on_plane_aligned_timbers`.
 
     This is a stricter variant of `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` that enforces
-    perpendicularity and does not support crop_tenon_to_mortise_orientation_on_angled_joints.
+    perpendicularity and does not support bore_mortise_perpendicular_to_face.
 
     Args:
         arrangement: Butt joint timber arrangement (butt_timber = tenon, receiving_timber = mortise).
@@ -1089,6 +1137,8 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             measured perpendicular to the face inward. 0 = shoulder flush with the entry face.
         wedge_parameters: Wedge configuration (not currently used).
         peg_parameters: Peg configuration for draw-bore tightening (optional).
+        relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
+            tenon (butt) timber onto the mortise (receiving) timber. Pass None to skip.
 
     Returns:
         Joint object containing the two CutTimbers and any accessories.
@@ -1109,6 +1159,7 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         wedge_parameters=wedge_parameters,
         peg_parameters=peg_parameters,
         use_round_tenon=use_round_tenon,
+        relief=relief,
     )
 
 def cut_round_mortise_and_tenon_joint(

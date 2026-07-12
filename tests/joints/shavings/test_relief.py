@@ -23,6 +23,7 @@ from kumiki.timber import (
     TimberEnd,
     create_v3,
     create_timber,
+    Cutting,
 )
 from kumiki.timber_shavings import are_timbers_plane_aligned
 from tests.testing_shavings import (
@@ -182,6 +183,7 @@ class TestChopScribeRelief:
 
         scribed_overlap_csg_local, scribe_relief_csg_local = chop_scribe_relief(
             timber_to_be_scribed=timber_to_be_scribed,
+            timber_to_be_scribed_cutting=Cutting(timber=timber_to_be_scribed),
             timber_to_be_cut=timber_to_be_cut,
         )
 

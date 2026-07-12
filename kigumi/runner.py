@@ -371,7 +371,7 @@ def _base_member_payload(
         "memberType": member_type,
         "memberKey": member_key,
         "timberKey": member_key,
-        "kumikiId": kumiki_id,
+        "kumikiEphemeralId": kumiki_id,
         "tags": tags,
         "vertices": vertices,
         "indices": indices,
@@ -733,8 +733,8 @@ def _assign_member_keys(frame: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str
     """Compute the same memberKey scheme used by build_real_geometry.
 
     Returns (timber_entries, accessory_entries) with stable ordering.
-    Each timber entry: {memberKey, kumikiId, timber, cutTimber, displayName}.
-    Each accessory entry: {memberKey, kumikiId, accessory, displayName, type}.
+    Each timber entry: {memberKey, kumikiEphemeralId, timber, cutTimber, displayName}.
+    Each accessory entry: {memberKey, kumikiEphemeralId, accessory, displayName, type}.
     """
     timber_entries: List[Dict[str, Any]] = []
     accessory_entries: List[Dict[str, Any]] = []
@@ -748,7 +748,7 @@ def _assign_member_keys(frame: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str
         member_key = f"{display}#{occurrence}"
         timber_entries.append({
             "memberKey": member_key,
-            "kumikiId": int(timber.ticket.kumiki_id),
+            "kumikiEphemeralId": int(timber.ticket.kumiki_id),
             "timber": timber,
             "cutTimber": cut_timber,
             "displayName": display,
@@ -767,7 +767,7 @@ def _assign_member_keys(frame: Any) -> Tuple[List[Dict[str, Any]], List[Dict[str
         display = ticket_name if ticket_name and ticket_name != "[no-name]" else f"{accessory_type} {occurrence + 1}"
         accessory_entries.append({
             "memberKey": member_key,
-            "kumikiId": kumiki_id,
+            "kumikiEphemeralId": kumiki_id,
             "accessory": accessory,
             "displayName": display,
             "type": accessory_type,
@@ -834,16 +834,16 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
     timber_to_kumiki_and_cut: Dict[int, tuple[int, Any]] = {}
     for entry in timber_entries:
         timber_id = id(entry["timber"])
-        timber_to_kumiki_and_cut[timber_id] = (entry["kumikiId"], entry["cutTimber"])
+        timber_to_kumiki_and_cut[timber_id] = (entry["kumikiEphemeralId"], entry["cutTimber"])
 
     timber_tags_by_kumiki_id: Dict[int, List[str]] = {}
     for entry in timber_entries:
         timber_ticket = getattr(entry.get("timber"), "ticket", None)
-        timber_tags_by_kumiki_id[entry["kumikiId"]] = _normalize_ticket_tags(timber_ticket)
+        timber_tags_by_kumiki_id[entry["kumikiEphemeralId"]] = _normalize_ticket_tags(timber_ticket)
 
     # Extract joint records from source_joints
     source_joints = list(getattr(frame, "source_joints", ()) or ())
-    accessory_kumiki_to_joint: Dict[int, int] = {}
+    accessory_kumiki_ephemeral_to_joint: Dict[int, int] = {}
 
     joints_payload: List[Dict[str, Any]] = []
     for joint in source_joints:
@@ -886,10 +886,10 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             
             if cut_indices:
                 members_list.append({
-                    "timberKumikiId": timber_kumiki_id,
+                    "timberKumikiEphemeralId": timber_kumiki_id,
                     "cutIndices": cut_indices,
                 })
-        
+
         # Extract accessories
         accessory_kumiki_ids: List[int] = []
         joint_accessories = getattr(joint, "jointAccessories", {})
@@ -898,36 +898,36 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             if accessory_ticket is not None:
                 accessory_kumiki_id = int(getattr(accessory_ticket, "kumiki_id", 0))
                 accessory_kumiki_ids.append(accessory_kumiki_id)
-                accessory_kumiki_to_joint[accessory_kumiki_id] = joint_kumiki_id
-        
+                accessory_kumiki_ephemeral_to_joint[accessory_kumiki_id] = joint_kumiki_id
+
         joints_payload.append({
-            "kumikiId": joint_kumiki_id,
+            "kumikiEphemeralId": joint_kumiki_id,
             "name": joint_name,
             "jointType": joint_type,
             "tags": joint_tags,
             "members": members_list,
-            "accessoryKumikiIds": accessory_kumiki_ids,
+            "accessoryKumikiEphemeralIds": accessory_kumiki_ids,
         })
 
     timbers_payload: List[Dict[str, Any]] = []
     for entry in timber_entries:
         cuts_meta = _serialize_cutting_summary(entry["cutTimber"])
         timbers_payload.append({
-            "kumikiId": entry["kumikiId"],
+            "kumikiEphemeralId": entry["kumikiEphemeralId"],
             "memberKey": entry["memberKey"],
             "name": entry["displayName"],
-            "tags": list(timber_tags_by_kumiki_id.get(entry["kumikiId"], [])),
+            "tags": list(timber_tags_by_kumiki_id.get(entry["kumikiEphemeralId"], [])),
             "cuts": cuts_meta,
         })
 
     accessories_payload: List[Dict[str, Any]] = []
     for entry in accessory_entries:
         accessories_payload.append({
-            "kumikiId": entry["kumikiId"],
+            "kumikiEphemeralId": entry["kumikiEphemeralId"],
             "memberKey": entry["memberKey"],
             "name": entry["displayName"],
             "type": entry["type"],
-            "jointKumikiId": accessory_kumiki_to_joint.get(entry["kumikiId"]),
+            "jointKumikiEphemeralId": accessory_kumiki_ephemeral_to_joint.get(entry["kumikiEphemeralId"]),
         })
 
     return {
@@ -958,7 +958,7 @@ def _build_assembly_payload(
     (the viewer hides the timeline). Payload shape:
 
         {"steps": [{"order": int, "suborder": int,
-                    "movements": [{"kumikiId": int, "memberKey": str,
+                    "movements": [{"kumikiEphemeralId": int, "memberKey": str,
                                    "direction": [x, y, z],  # unit
                                    "distance": float,       # base freed_after amount
                                    "dragged": bool}]}],
@@ -977,9 +977,9 @@ def _build_assembly_payload(
 
     member_key_by_kumiki_id: Dict[int, str] = {}
     for entry in timber_entries:
-        member_key_by_kumiki_id[entry["kumikiId"]] = entry["memberKey"]
+        member_key_by_kumiki_id[entry["kumikiEphemeralId"]] = entry["memberKey"]
     for entry in accessory_entries:
-        member_key_by_kumiki_id[entry["kumikiId"]] = entry["memberKey"]
+        member_key_by_kumiki_id[entry["kumikiEphemeralId"]] = entry["memberKey"]
 
     try:
         solution = solve_frame_assembly(frame)
@@ -1002,7 +1002,7 @@ def _build_assembly_payload(
                 # Member not rendered (e.g. filtered out of the frame); skip defensively.
                 continue
             movements_payload.append({
-                "kumikiId": int(movement.member_key),
+                "kumikiEphemeralId": int(movement.member_key),
                 "memberKey": member_key,
                 "direction": [_assembly_float(movement.direction[i, 0]) for i in range(3)],
                 "distance": _assembly_float(movement.distance),

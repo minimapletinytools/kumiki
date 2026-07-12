@@ -580,17 +580,17 @@
             const accessories = Array.isArray(payload.accessories) ? payload.accessories : [];
             const joints = Array.isArray(payload.joints) ? payload.joints : [];
 
-            const timberKeyByKumikiId = new Map();
+            const timberKeyByKumikiEphemeralId = new Map();
             for (const t of timbers) {
-                if (typeof t.kumikiId === 'number' && typeof t.memberKey === 'string') {
-                    timberKeyByKumikiId.set(t.kumikiId, t.memberKey);
+                if (typeof t.kumikiEphemeralId === 'number' && typeof t.memberKey === 'string') {
+                    timberKeyByKumikiEphemeralId.set(t.kumikiEphemeralId, t.memberKey);
                 }
             }
 
-            const accessoryKeyByKumikiId = new Map();
+            const accessoryKeyByKumikiEphemeralId = new Map();
             for (const a of accessories) {
-                if (typeof a.kumikiId === 'number' && typeof a.memberKey === 'string') {
-                    accessoryKeyByKumikiId.set(a.kumikiId, a.memberKey);
+                if (typeof a.kumikiEphemeralId === 'number' && typeof a.memberKey === 'string') {
+                    accessoryKeyByKumikiEphemeralId.set(a.kumikiEphemeralId, a.memberKey);
                 }
             }
 
@@ -601,14 +601,14 @@
             })).filter((t) => typeof t.key === 'string' && t.key.length > 0);
 
             const hierarchyJoints = joints.map((j) => ({
-                id: String(j.kumikiId != null ? j.kumikiId : j.name || 'joint'),
+                id: String(j.kumikiEphemeralId != null ? j.kumikiEphemeralId : j.name || 'joint'),
                 name: j.name || 'joint',
                 tags: Array.isArray(j.tags) ? j.tags : [],
                 timberKeys: (Array.isArray(j.members) ? j.members : [])
-                    .map((m) => timberKeyByKumikiId.get(m.timberKumikiId))
+                    .map((m) => timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId))
                     .filter((key) => typeof key === 'string'),
-                accessoryKeys: (Array.isArray(j.accessoryKumikiIds) ? j.accessoryKumikiIds : [])
-                    .map((kid) => accessoryKeyByKumikiId.get(kid))
+                accessoryKeys: (Array.isArray(j.accessoryKumikiEphemeralIds) ? j.accessoryKumikiEphemeralIds : [])
+                    .map((kid) => accessoryKeyByKumikiEphemeralId.get(kid))
                     .filter((key) => typeof key === 'string'),
             }));
 

@@ -1,3 +1,5 @@
+import pytest
+
 from kumiki.ticket import JointTicket, TimberTicket
 
 
