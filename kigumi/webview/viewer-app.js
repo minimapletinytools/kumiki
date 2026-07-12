@@ -10,6 +10,15 @@ const ViewerPhase = Object.freeze({
 
 const VALID_GEOMETRY_MODES = new Set(['actual', 'perfectTimberWithin']);
 
+// 'none': edge lines hidden entirely.
+// 'overlay': edge lines drawn on top of solid faces (default) -- always
+//   rendered on top regardless of what's in front (depthTest off), matching
+//   the original edge-overlay behavior.
+// 'wireframeOnly': solid faces hidden, only edge lines shown -- depth-tested
+//   against other geometry, so wireframes are properly occluded by anything
+//   in front of them (unlike 'overlay', which never occludes).
+const VALID_EDGE_MODES = new Set(['none', 'overlay', 'wireframeOnly']);
+
 function normalizeV3RenderParameterValue(value) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
         return {
@@ -494,8 +503,12 @@ class ViewerSettingsPanel {
                     center gizmo
                 </label>
                 <label>
-                    <input id="edges-toggle" type="checkbox" ?checked=${this.app.edgesEnabled}>
                     edges
+                    <select id="edge-mode-select" .value=${this.app.edgeMode || 'overlay'}>
+                        <option value="none">no edges</option>
+                        <option value="overlay">overlay</option>
+                        <option value="wireframeOnly">no overlay</option>
+                    </select>
                 </label>
                 <label>
                     edge line visibility (${this.app.edgeLineVisibilityPercent}%)
@@ -558,6 +571,16 @@ class ViewerSettingsPanel {
                         max="100"
                         step="5"
                         .value=${String(100 - this.app.unselectedTransparencyPercent)}>
+                </label>
+                <label>
+                    selected visibility (${100 - this.app.selectedTransparencyPercent}%)
+                    <input
+                        id="selected-transparency-slider"
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        .value=${String(100 - this.app.selectedTransparencyPercent)}>
                 </label>
                 <label>
                     theme
@@ -649,7 +672,11 @@ class ViewerSettingsPanel {
         const app = this.app;
         return [
             { id: 'center-gizmo-toggle', on: 'change', apply: (el) => app.setCenterGizmoEnabled(el.checked) },
-            { id: 'edges-toggle', on: 'change', apply: (el) => app.setEdgesEnabled(el.checked) },
+            {
+                id: 'edge-mode-select', on: 'change',
+                apply: (el) => app.setEdgeMode(el.value),
+                sync: (el) => { el.value = app.edgeMode || 'overlay'; },
+            },
             { id: 'shadows-toggle', on: 'change', apply: (el) => app.setShadowsEnabled(el.checked) },
             { id: 'reflections-toggle', on: 'change', apply: (el) => app.setReflectionsEnabled(el.checked) },
             { id: 'footprint-toggle', on: 'change', apply: (el) => app.setFootprintsEnabled(el.checked) },
@@ -710,6 +737,15 @@ class ViewerSettingsPanel {
                     app.setUnselectedTransparencyPercent(100 - visibility);
                 },
                 sync: (el) => { el.value = String(100 - app.unselectedTransparencyPercent); },
+            },
+            {
+                id: 'selected-transparency-slider', on: 'input',
+                apply: (el) => {
+                    const raw = Number(el.value);
+                    const visibility = Number.isFinite(raw) ? Math.max(5, Math.min(100, Math.round(raw / 5) * 5)) : 100;
+                    app.setSelectedTransparencyPercent(100 - visibility);
+                },
+                sync: (el) => { el.value = String(100 - app.selectedTransparencyPercent); },
             },
             {
                 id: 'disassembly-multiplier-slider', on: 'input',
@@ -957,7 +993,7 @@ class KigumiViewerApp extends LitElement {
         this.mouseActionMoved = false;
 
         this.showCenterGizmo = true;
-        this.edgesEnabled = true;
+        this.edgeMode = 'overlay';
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
         this.footprintsEnabled = true;
@@ -1020,6 +1056,7 @@ class KigumiViewerApp extends LitElement {
         };
         this.edgeLineVisibilityPercent = 100;
         this.unselectedTransparencyPercent = 70;
+        this.selectedTransparencyPercent = 0;
         this.activeTheme = 'forest';
 
         this.animationHandle = null;
@@ -1479,7 +1516,6 @@ class KigumiViewerApp extends LitElement {
         this.syncLightAnglesFromSun();
         this.drawLightDial();
         this.setCenterGizmoEnabled(this.showCenterGizmo);
-        this.setEdgesEnabled(this.edgesEnabled);
         this.setShadowsEnabled(this.shadowsEnabled);
         this.setReflectionsEnabled(this.reflectionsEnabled);
         this.setFootprintsEnabled(this.footprintsEnabled);
@@ -1570,6 +1606,18 @@ class KigumiViewerApp extends LitElement {
         this.applySelectionOpacity();
     }
 
+    setSelectedTransparencyPercent(nextPercent) {
+        const normalizedPercent = Number.isFinite(nextPercent)
+            ? Math.max(0, Math.min(95, Math.round(nextPercent / 5) * 5))
+            : 0;
+        if (this.selectedTransparencyPercent === normalizedPercent) {
+            return;
+        }
+        this.selectedTransparencyPercent = normalizedPercent;
+        this.requestUpdate();
+        this.applySelectionOpacity();
+    }
+
     setEdgeLineVisibilityPercent(nextPercent) {
         const normalizedPercent = Number.isFinite(nextPercent)
             ? Math.max(0, Math.min(100, Math.round(nextPercent / 5) * 5))
@@ -1621,7 +1669,7 @@ class KigumiViewerApp extends LitElement {
             viewerOptions: { ...this.viewerOptions },
             ui: {
                 showCenterGizmo: Boolean(this.showCenterGizmo),
-                edgesEnabled: Boolean(this.edgesEnabled),
+                edgeMode: String(this.edgeMode || 'overlay'),
                 edgeLineVisibilityPercent: Number(this.edgeLineVisibilityPercent),
                 shadowsEnabled: Boolean(this.shadowsEnabled),
                 reflectionsEnabled: Boolean(this.reflectionsEnabled),
@@ -1631,6 +1679,7 @@ class KigumiViewerApp extends LitElement {
                 debugEnabled: Boolean(this.debugEnabled),
                 leftClickDragRotatesCamera: Boolean(this.leftClickDragRotatesCamera),
                 unselectedTransparencyPercent: Number(this.unselectedTransparencyPercent),
+                selectedTransparencyPercent: Number(this.selectedTransparencyPercent),
                 activeTheme: String(this.activeTheme || 'forest'),
                 exportFormatStlEnabled: Boolean(this.exportFormatStlEnabled),
                 exportFormat3mfEnabled: Boolean(this.exportFormat3mfEnabled),
@@ -1665,8 +1714,12 @@ class KigumiViewerApp extends LitElement {
         if (typeof ui.showCenterGizmo === 'boolean') {
             this.setCenterGizmoEnabled(ui.showCenterGizmo);
         }
-        if (typeof ui.edgesEnabled === 'boolean') {
-            this.setEdgesEnabled(ui.edgesEnabled);
+        if (typeof ui.edgeMode === 'string') {
+            this.setEdgeMode(ui.edgeMode);
+        } else if (typeof ui.edgesEnabled === 'boolean') {
+            // Back-compat for settings saved before edgeMode replaced the
+            // edgesEnabled boolean.
+            this.setEdgeMode(ui.edgesEnabled ? 'overlay' : 'none');
         }
         if (Number.isFinite(ui.edgeLineVisibilityPercent)) {
             this.setEdgeLineVisibilityPercent(Number(ui.edgeLineVisibilityPercent));
@@ -1700,6 +1753,9 @@ class KigumiViewerApp extends LitElement {
         }
         if (Number.isFinite(ui.unselectedTransparencyPercent)) {
             this.setUnselectedTransparencyPercent(Number(ui.unselectedTransparencyPercent));
+        }
+        if (Number.isFinite(ui.selectedTransparencyPercent)) {
+            this.setSelectedTransparencyPercent(Number(ui.selectedTransparencyPercent));
         }
         if (typeof ui.activeTheme === 'string') {
             this.setTheme(ui.activeTheme);
@@ -2442,6 +2498,7 @@ class KigumiViewerApp extends LitElement {
 
     applySelectionOpacity() {
         const baseUnselectedOpacity = 1 - (this.unselectedTransparencyPercent / 100);
+        const baseSelectedOpacity = 1 - (this.selectedTransparencyPercent / 100);
         const visualContext = this._getSelectionVisualContext();
         const policy = this._getSelectionVisualPolicy(visualContext.state, baseUnselectedOpacity);
 
@@ -2450,28 +2507,30 @@ class KigumiViewerApp extends LitElement {
             let opacity = 1.0;
 
             if (visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
-                opacity = visualContext.selectedTimberSet.has(name) ? 1.0 : policy.dimmedOpacity;
+                opacity = visualContext.selectedTimberSet.has(name) ? baseSelectedOpacity : policy.dimmedOpacity;
             } else if (visualContext.hasSubselection) {
                 const isSubselectionTarget = visualContext.subselectionTimberKey === name;
                 opacity = isSubselectionTarget ? policy.selectedTimberOpacity : policy.dimmedOpacity;
             }
 
             const isTransparent = opacity < 1.0;
-            bundle.mesh.visible = !isHidden;
+            bundle.mesh.visible = !isHidden && this.edgeMode !== 'wireframeOnly';
             bundle.mesh.material.transparent = isTransparent;
             bundle.mesh.material.opacity = opacity;
             // Transparent unselected timbers should not cast shadows
             bundle.mesh.castShadow = !isHidden && !isTransparent;
-            // Apply matching transparency to edges
+            // Edge opacity is independent of face opacity: a member with
+            // transparent faces (selected or unselected) keeps fully-opaque
+            // (relative to edgeLineVisibilityPercent) edge lines.
             if (bundle.edges && bundle.edges.material) {
                 const profile = this.resolveRenderProfile(bundle.profileId);
                 const baseEdgeOpacity = profile
                     ? profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100)
                     : (this.edgeLineVisibilityPercent / 100);
-                bundle.edges.material.opacity = baseEdgeOpacity * opacity;
-                bundle.edges.visible = !isHidden && this.edgesEnabled;
+                bundle.edges.material.opacity = baseEdgeOpacity;
+                bundle.edges.visible = !isHidden && this.edgeMode !== 'none';
             }
-            // Apply matching transparency to reflections
+            // Reflections fade together with face opacity.
             if (bundle.reflection && bundle.reflection.material) {
                 const profile = this.resolveRenderProfile(bundle.profileId);
                 const baseReflectionOpacity = profile ? profile.reflectionOpacity : 0.14;
@@ -3063,13 +3122,25 @@ class KigumiViewerApp extends LitElement {
         this.updateOrbitCenterGizmo();
     }
 
-    setEdgesEnabled(enabled) {
-        this.edgesEnabled = enabled;
-        for (const [memberKey, bundle] of this.meshObjectsByKey.entries()) {
-            if (bundle.edges) {
-                bundle.edges.visible = enabled && !this.isMemberHidden(memberKey);
+    setEdgeMode(mode) {
+        const next = VALID_EDGE_MODES.has(mode) ? mode : 'overlay';
+        if (this.edgeMode === next) {
+            return;
+        }
+        this.edgeMode = next;
+        // depthTest/depthWrite differ by mode ('overlay' always draws on top;
+        // 'wireframeOnly' is properly depth-tested/occluded) -- update existing
+        // materials in place rather than rebuilding meshes.
+        const depthTested = next === 'wireframeOnly';
+        for (const bundle of this.meshObjectsByKey.values()) {
+            if (bundle.edges && bundle.edges.material) {
+                bundle.edges.material.depthTest = depthTested;
+                bundle.edges.material.depthWrite = depthTested;
+                bundle.edges.material.needsUpdate = true;
             }
         }
+        this.requestUpdate();
+        this.applySelectionOpacity();
     }
 
     setShadowsEnabled(enabled) {
@@ -3209,8 +3280,13 @@ class KigumiViewerApp extends LitElement {
                 color: profile.edgeColor,
                 transparent: true,
                 opacity: profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100),
-                depthTest: false,
-                depthWrite: false,
+                // 'overlay' (default): always drawn on top, matching the
+                // original edge-overlay behavior. 'wireframeOnly': depth
+                // tested so wireframes are properly occluded by geometry in
+                // front of them. setEdgeMode() also updates this in place on
+                // existing materials when the mode changes.
+                depthTest: this.edgeMode === 'wireframeOnly',
+                depthWrite: this.edgeMode === 'wireframeOnly',
             },
             reflection: {
                 color: profile.reflectionColor,
@@ -3849,7 +3925,7 @@ class KigumiViewerApp extends LitElement {
             reflectionMesh.renderOrder = 0;
             solidMesh.castShadow = true;
             solidMesh.receiveShadow = true;
-            edgeMesh.visible = this.edgesEnabled;
+            edgeMesh.visible = this.edgeMode !== 'none';
             reflectionMesh.castShadow = false;
             reflectionMesh.receiveShadow = false;
             reflectionMesh.visible = this.reflectionsEnabled;
