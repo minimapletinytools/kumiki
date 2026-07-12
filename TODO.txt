@@ -147,6 +147,8 @@ IGNORE-update release job to do everything in 1 run not 2
   -add edge thickness parameter
   -add transparent rendering (edge overaly and transparent rendering should be mutually exclusive?)
 
+-give kumiki_id in ticket and type def name ro seomteihng so its not just int. maybe rename to kumiki_ephemeral_id or something
+
 -create test runner for examples so the exmaples are also tests :O
   
 -test frame scanning fixes
