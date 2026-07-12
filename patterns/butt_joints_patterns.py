@@ -439,7 +439,7 @@ def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=Fal
         mortise_depth=inches(3),
         mortise_shoulder_distance_from_centerline=inches(2),
         peg_parameters=peg_params,
-        crop_tenon_to_mortise_orientation_on_angled_joints=True,
+        bore_mortise_perpendicular_to_face=True,
     )
 
 
@@ -524,7 +524,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
         mortise_depth=mortise_depth,
         peg_parameters=peg_params,
         mortise_shoulder_inset=inches(1, 2),
-        crop_tenon_to_mortise_orientation_on_angled_joints=True,
+        bore_mortise_perpendicular_to_face=True,
     )
 
     # Create mortise and tenon joint between brace (tenon) and timber2 (mortise)
@@ -542,7 +542,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
         mortise_depth=mortise_depth,
         peg_parameters=peg_params,
         mortise_shoulder_inset=inches(1, 2),
-        crop_tenon_to_mortise_orientation_on_angled_joints=True,
+        bore_mortise_perpendicular_to_face=True,
     )
     
     # Combine miter + both mortise-and-tenon joints into a single Frame
