@@ -357,13 +357,12 @@ def chop_shoulder_notch_aligned_with_timber(
     )
 
     # the approach direction projected onto the plane perpendicular to the notch timber's length axis
-    # TODO rename this to perpendicular_approach_direction_global or something like that
-    approach_direction_global = normalize_vector(projected)
+    perpendicular_approach_direction_global = normalize_vector(projected)
 
     shoulder_plane = locate_plane_from_edge_in_direction(
         notch_timber,
         TimberCenterline.CENTERLINE,
-        approach_direction_global,
+        perpendicular_approach_direction_global,
         distance_from_centerline,
     )
     butting_centerline = locate_centerline(butting_timber)
@@ -394,7 +393,7 @@ def chop_shoulder_notch_aligned_with_timber(
     )
 
     # TODO Delete this stuff, this is not needed
-    approach_dot_depth = safe_dot_product(raw_approach, approach_direction_global)
+    approach_dot_depth = safe_dot_product(raw_approach, perpendicular_approach_direction_global)
     approach_dot_length = safe_dot_product(raw_approach, notch_length_dir_global)
     if not zero_test(approach_dot_depth):
         shift_along_length = notch_depth * Abs(approach_dot_length / approach_dot_depth)
@@ -407,7 +406,7 @@ def chop_shoulder_notch_aligned_with_timber(
 
     approach_direction_local = safe_transform_vector(
         notch_timber.orientation.matrix.T,
-        approach_direction_global,
+        perpendicular_approach_direction_global,
     )
     notch_length_dir_local = create_v3(scalar(0), scalar(0), scalar(1))
 
