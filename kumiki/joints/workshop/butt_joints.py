@@ -821,6 +821,7 @@ def cut_mortise_and_tenon_joint(
 
     from sympy import pi as _pi
 
+    # TODO renameto shoulder_notch_relief_geom since we do generic relief cutting later too
     relief_geom = chop_relief_for_butt_joint_arrangement(
         arrangement,
         mortise_shoulder_distance_from_centerline,

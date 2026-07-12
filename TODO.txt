@@ -148,7 +148,7 @@ DONE-give kumiki_id in ticket and type def name ro seomteihng so its not just in
   -add edge thickness parameter to options
   -add transparent rendering mode so faces  are rendered transparent. this only appiles ot faces, not the edge lines.
 
-
+-choose domnai for website
 
 -create test runner for examples so the exmaples are also tests :O
   
@@ -163,7 +163,7 @@ DONE-give kumiki_id in ticket and type def name ro seomteihng so its not just in
   -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
   -"Example Frames" -> "Examples"
 -do example cleanup
--choose domnai for website
+
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
 -add an optional scale ruler to the view and havei t default off
