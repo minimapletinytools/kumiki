@@ -32,6 +32,28 @@ Run the full complex suite before merging broader Kigumi changes:
 cd kigumi && npm run test:ext:complex
 ```
 
+## Debugging
+
+Write simple kumiki frames to test the changes you are making. You can run the examples you author directly with python and use various methods to inspect the results. Kumiki code always contains "patterns" which are simplified examples of specific features or concepts so oftentimes you can just run the pattern as your test case. Pritn debugging is always an option as well, don't hesistate to do that!
+
+You can use `kumiki.kigumi_at_home` to take screenshots of the frame as well:
+
+```python
+from kumiki.kigumi_at_home import render_frame_to_png
+
+render_frame_to_png(frame, "/tmp/my_frame.png")
+```
+
+By default this renders the whole frame from a 3/4 isometric angle, auto-framed to fit. Useful options:
+
+- `camera_angle=CameraAngle.TOP` (also FRONT/BACK/LEFT/RIGHT/BOTTOM/ISO_*) for a fixed view
+- `focus_timbers=[some_cut_timber, ...]` to zoom the camera onto specific timbers only (pass either `CutTimber` objects or their `.timber.ticket.kumiki_id`); use `unfocused_style=UnfocusedStyle.GHOSTED` to keep the rest faintly visible for context instead of hiding it
+- `render_mode=RenderMode.BOUNDING_BOX` for a fast approximate render instead of the fully-cut geometry
+- `geometry_style=GeometryStyle.NONE, show_edges=True` for a wireframe-only (hidden-line) render
+
+After taking a screenshot, always make sure to show it to the user in the agent chat window so they know what you are doing
+
+
 ## Key Files
 
 ### kumiki/timber.py
