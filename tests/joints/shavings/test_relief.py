@@ -6,6 +6,7 @@ from dataclasses import replace
 
 from kumiki.cutcsg import Difference, Intersection
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
+from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.shavings.relief import (
     BraceJointScribeReliefConfig,
     CrossCapJointScribeReliefConfig,
@@ -15,9 +16,18 @@ from kumiki.joints.workshop.shavings.relief import (
     TripleButtJointScribeReliefConfig,
     chop_relief_for_butt_joint_arrangement,
     chop_scribe_relief,
+    chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
 )
-from kumiki.rule import create_v2, safe_normalize_vector as normalize_vector, scalar
+from kumiki.rule import (
+    Orientation,
+    Transform,
+    create_v2,
+    degrees,
+    inches,
+    safe_normalize_vector as normalize_vector,
+    scalar,
+)
 from kumiki.timber import (
     TimberFace,
     TimberEnd,
@@ -156,6 +166,116 @@ class TestChopReliefForButtJointArrangement:
             chop_relief_for_butt_joint_arrangement(arrangement, face_half_size)
             is None
         )
+
+
+class TestChopShoulderNotchAlignedWithTimber:
+    """
+    Geometry tests for chop_shoulder_notch_aligned_with_timber on the
+    canonical butt arrangement (4"x5" timbers crossing at the origin,
+    receiving along +X, butt along +Y, widths along +Z), with the butt
+    timber optionally raked 45 degrees about its own local axes. The
+    shoulder sits 2" from the receiving centerline (a 1/2" inset on the
+    entry face).
+
+    Expected notch widths were independently verified by brute-force
+    slicing of the oblique butt prism's corner edge-lines with the
+    shoulder plane.
+    """
+
+    DISTANCE_FROM_CENTERLINE = inches(2)
+
+    @staticmethod
+    def _rotate_about_midpoint(timber, angle, local_axis):
+        pivot_local = create_v3(scalar(0), scalar(0), timber.length / scalar(2))
+        pivot_global = timber.transform.position + timber.transform.orientation.matrix * pivot_local
+        new_orientation = timber.transform.orientation * Orientation.from_angle_axis(angle, local_axis)
+        new_bottom = pivot_global - new_orientation.matrix * pivot_local
+        return replace(timber, transform=Transform(position=new_bottom, orientation=new_orientation))
+
+    def _make_notch(self, rotate_width_axis: bool, rotate_height_axis: bool):
+        arrangement = create_canonical_example_butt_joint_timbers(
+            create_v3(scalar(0), scalar(0), scalar(0))
+        )
+        butt_timber = arrangement.butt_timber
+        if rotate_width_axis:
+            butt_timber = self._rotate_about_midpoint(
+                butt_timber, degrees(45), create_v3(scalar(1), scalar(0), scalar(0))
+            )
+        if rotate_height_axis:
+            butt_timber = self._rotate_about_midpoint(
+                butt_timber, degrees(45), create_v3(scalar(0), scalar(1), scalar(0))
+            )
+        return chop_shoulder_notch_aligned_with_timber(
+            notch_timber=arrangement.receiving_timber,
+            butting_timber=butt_timber,
+            butting_timber_end=arrangement.butt_timber_end,
+            distance_from_centerline=self.DISTANCE_FROM_CENTERLINE,
+        )
+
+    @staticmethod
+    def _base_prism(notch):
+        from kumiki.cutcsg import SolidUnion
+
+        return notch.children[0] if isinstance(notch, SolidUnion) else notch
+
+    def test_perpendicular_notch_dimensions(self):
+        """
+        Perpendicular approach: width hugs the butt's 5" dimension exactly
+        (the 5" height axis lies along the receiving's length), the span and
+        depth clear the receiving's worst-case corner radius r = sqrt(2^2 +
+        2.5^2), and no wall relief prisms appear (zero rake).
+        """
+        from kumiki.cutcsg import RectangularPrism
+
+        notch = self._make_notch(False, False)
+        assert isinstance(notch, RectangularPrism)
+
+        corner_radius = float(inches(1)) * (2**2 + 2.5**2) ** 0.5
+        assert float(notch.size[0]) == pytest.approx(float(inches(5)), rel=1e-9)
+        assert float(notch.size[1]) == pytest.approx(2 * corner_radius, rel=1e-9)
+        assert float(notch.end_distance) == pytest.approx(
+            2 * corner_radius - float(self.DISTANCE_FROM_CENTERLINE), rel=1e-9
+        )
+
+    def test_width_axis_rake_stretches_width_and_adds_walls(self):
+        """
+        45-degree in-plane rake: the shoulder-plane slice of the butt prism
+        stretches the 5" dimension by sec(45) = sqrt(2), and wall relief
+        prisms appear automatically (floored at the rake angle) even though
+        no wall angle was requested.
+        """
+        from kumiki.cutcsg import SolidUnion
+
+        notch = self._make_notch(True, False)
+        assert isinstance(notch, SolidUnion)
+        assert len(notch.children) == 3
+        assert float(self._base_prism(notch).size[0]) == pytest.approx(
+            float(inches(5)) * 2**0.5, rel=1e-9
+        )
+
+    def test_height_axis_rake_reorients_shoulder_without_stretch(self):
+        """
+        45-degree out-of-plane tip: the shoulder plane reorients to face the
+        butt square-on, so the slice is NOT stretched (width stays 5") and no
+        wall relief is needed (the butt is perpendicular to ITS shoulder plane).
+        """
+        from kumiki.cutcsg import RectangularPrism
+
+        notch = self._make_notch(False, True)
+        assert isinstance(notch, RectangularPrism)
+        assert float(notch.size[0]) == pytest.approx(float(inches(5)), rel=1e-9)
+
+    def test_compound_rake_width_matches_brute_force(self):
+        """
+        Compound 45+45 rake: the slice direction shifts inside the butt's
+        cross-section AND stretches; expected width 0.187470m (7.3807") was
+        computed by brute-force corner-edge slicing.
+        """
+        from kumiki.cutcsg import SolidUnion
+
+        notch = self._make_notch(True, True)
+        assert isinstance(notch, SolidUnion)
+        assert float(self._base_prism(notch).size[0]) == pytest.approx(0.187470, rel=1e-4)
 
 
 class TestChopScribeRelief:

@@ -829,6 +829,7 @@ def cut_mortise_and_tenon_joint(
 
     from sympy import pi as _pi
 
+    # TODO check for face/plane aligned cases, if the shoulder is flush with the mortise entry face, and skip relief cutting in those cases (no notch needed)
     # TODO renameto shoulder_notch_relief_geom since we do generic relief cutting later too
     relief_geom = chop_relief_for_butt_joint_arrangement(
         arrangement,

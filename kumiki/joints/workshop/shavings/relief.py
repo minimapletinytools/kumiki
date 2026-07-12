@@ -267,15 +267,50 @@ class BraceJointScribeReliefConfig:
         )
 
 
-def _projected_perfect_cross_section_span_along_global_direction(
+def _perfect_cross_section_slice_span_along_plane_direction(
     timber: TimberLike,
-    direction_global: V3,
+    slice_plane_normal_global: Direction3D,
+    measure_direction_global: Direction3D,
 ) -> Numeric:
-    """Projected full cross-section span of a timber along a global direction."""
-    direction_local = safe_transform_vector(timber.orientation.matrix.T, direction_global)
-    direction_local_2d = create_v2(direction_local[0], direction_local[1])
-    # TODO this is wrong, this projects the direction onto the XY plane of the timber and returns the support distance in that plane. Instead, you need to multiply the support distance by the cos of the angle between the timber's length axis and the direction. 
-    return scalar(2) * get_perfect_support_distance_from_centerline(timber, direction_local_2d)
+    """
+    Full span, along ``measure_direction_global``, of the timber's perfect
+    cross-section sliced by a plane with normal ``slice_plane_normal_global``.
+    ``measure_direction_global`` must lie in the slice plane.
+
+    The timber is an oblique prism: cross-section extruded along its length
+    axis b. Slicing it with a plane stretches the footprint. A cross-section
+    point p lands on the plane at p + t*b (t solved per point from the plane
+    equation), so its coordinate along an in-plane direction d is dot(p, e)
+    with
+
+        e = d - n * (dot(b, d) / dot(b, n))        (n = plane normal)
+
+    e is perpendicular to b by construction (dot(e, b) == 0), i.e. e lies in
+    the cross-section plane, so the slice span along d is exactly the
+    cross-section's support span along e -- where both the direction AND the
+    magnitude of e matter (|e| grows as 1/cos of the timber's rake away from
+    the plane normal, and e's direction within the cross-section shifts for
+    compound rakes). Simply projecting d into the cross-section plane (what
+    this function used to do) measures the cross-section's shadow instead and
+    undershoots by that same secant factor.
+    """
+    b = timber.get_length_direction_global()
+    n = slice_plane_normal_global
+    d = measure_direction_global
+    assert zero_test(safe_dot_product(d, n)), "measure_direction_global must lie in the slice plane"
+    b_dot_n = safe_dot_product(b, n)
+    assert not zero_test(b_dot_n), "Timber length axis is parallel to the slice plane"
+
+    e_global = d - n * (safe_dot_product(b, d) / b_dot_n)
+    e_local = safe_transform_vector(timber.orientation.matrix.T, e_global)
+    # e is perpendicular to the length axis (local Z), so e_local[2] == 0 and
+    # the 2D cross-section support captures all of it.
+    e_local_2d = create_v2(e_local[0], e_local[1])
+    e_length = safe_norm(e_local_2d)
+    # get_perfect_support_distance_from_centerline normalizes its direction
+    # argument, so the stretch magnitude |e| is applied here. The perfect
+    # cross-section is symmetric about the centerline, hence span = 2*support.
+    return scalar(2) * e_length * get_perfect_support_distance_from_centerline(timber, e_local_2d)
 
 
 def does_shoulder_plane_need_notching(
@@ -339,9 +374,18 @@ def chop_shoulder_notch_aligned_with_timber(
 
     The notch bottom (shoulder plane) is distance_from_centerline away from the
     notch_timber's centerline. The notch opens outward from the centerline.
-    The notch width is along the notch_timber's length axis. Both the width and
-    span dimensions are oversized (max(size) * sqrt(2)) to guarantee full
-    coverage regardless of the cross-section rotation.
+    The notch width is along the notch_timber's length axis and hugs the
+    butting timber's shoulder-plane slice exactly (its perfect cross-section;
+    imperfect material beyond that is scribe relief's job, not the housing's).
+    The span and depth clear the notch timber's entire nominal cross-section
+    via a worst-case corner-radius bound -- overshoot is free in both of those
+    directions (the span channel exits the timber's sides, the depth exits its
+    outer face) so neither needs to be exact.
+
+    notch_wall_relief_cut_angle_radians is a MINIMUM: the walls are always
+    relieved by at least the butting timber's rake away from the shoulder-plane
+    normal, since anything less would leave housing walls colliding with the
+    raking butting timber above the shoulder plane.
     """
     from sympy import Max, cos, sqrt
 
@@ -374,35 +418,49 @@ def chop_shoulder_notch_aligned_with_timber(
     ) / denom
     intersection_global = butting_centerline.point + butting_centerline.direction * t
 
-    # TODO you can do better than this, just use the cos(length axis rotation angle) instead but the angle is computed relative to the length axis of the receiving timber...
-    # worst case scenario, use the maximum diagonal dimension to determine the notch span and width, so that the notch is guaranteed to cover the entire cross-section regardless of rotation. 
-    max_size = Max(
-        notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT),
-        notch_timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT),
-    )
-    # notch span is ORTHOGONAL to the LENGTH axis of the receiving timber
-    notch_span = max_size * sqrt(scalar(2))
-    # this is misleading, the notch prism STARTS at the shoulder plane and extends OUTWARD, so the notch depth is actually the distance from the shoulder plane to the far end of the notch prism. 
-    # I think we base it on the max cross section size here because we might be notching at an angle on the receiving timber?? (but then the cross sectional size should be that of the receiving timber, not the butting timber, so maybe this is probably wrong, also this should account for the imperfect dimensions of the receiving timber)
-    # TODO fix this to be more simple
-    notch_depth = max_size * sqrt(scalar(2)) / scalar(2)
+    # ------------------------------------------------------------------
+    # Notch prism dimensions. The three prism axes (all mutually
+    # perpendicular): depth extrudes along the approach direction outward
+    # from the shoulder plane, width runs along the notch timber's length
+    # axis, span runs across the notch timber's cross-section.
+    # ------------------------------------------------------------------
 
-    cross_section_span_on_notch_length = _projected_perfect_cross_section_span_along_global_direction(
+    # Span and depth must clear the notch timber's entire nominal
+    # (imperfect-bounding) cross-section regardless of how that cross-section
+    # is rotated about the length axis, and overshoot in both directions is
+    # free (span exits the timber's sides, depth exits its outer face), so
+    # both are sized from the worst-case corner radius -- the farthest any
+    # nominal-corner can be from the centerline under any rotation -- rather
+    # than computed exactly for the specific directions.
+    notch_timber_width_halves, notch_timber_height_halves = notch_timber.get_nominal_half_sizes()
+    max_corner_radius = sqrt(
+        Max(notch_timber_width_halves[0], notch_timber_width_halves[1]) ** 2
+        + Max(notch_timber_height_halves[0], notch_timber_height_halves[1]) ** 2
+    )
+    # The prism is centered on intersection_global, which carries no offset
+    # along the span direction as long as the two centerlines intersect: the
+    # span direction is perpendicular to the plane spanned by both length
+    # axes, and the intersection only ever moves within that plane.
+    notch_span = scalar(2) * max_corner_radius
+    # Depth is measured outward from the shoulder plane (start_distance=0 on
+    # the prism below), so the material to clear is at most
+    # max_corner_radius - distance_from_centerline; the Max keeps the prism
+    # comfortably non-degenerate when the shoulder sits near the surface.
+    notch_depth = Max(scalar(2) * max_corner_radius - distance_from_centerline, max_corner_radius)
+
+    # Width must hug the butting timber exactly -- unlike span/depth,
+    # overshoot here is NOT free: it would widen the housing and cut away
+    # seat material. This is the true footprint of the butting timber's
+    # (perfect) cross-section sliced by the shoulder plane; the raking
+    # overhang ABOVE the shoulder plane is the wall relief prisms' job, and
+    # the rake always overhangs along +-width, never along the span, because
+    # the butting timber's length axis lies in the plane spanned by the
+    # approach direction and the notch timber's length axis by construction.
+    notch_width = _perfect_cross_section_slice_span_along_plane_direction(
         butting_timber,
+        shoulder_plane.normal,
         notch_length_dir_global,
     )
-
-    # TODO Delete this stuff, this is not needed
-    approach_dot_depth = safe_dot_product(raw_approach, perpendicular_approach_direction_global)
-    approach_dot_length = safe_dot_product(raw_approach, notch_length_dir_global)
-    if not zero_test(approach_dot_depth):
-        shift_along_length = notch_depth * Abs(approach_dot_length / approach_dot_depth)
-    else:
-        shift_along_length = scalar(0)
-
-    # notch_width is in the LENGTH axis of the receiving timber
-    # TODO it should not be based on notch_depth omg, you can delete shift_along_length, that part is covered by the left/right wall relief prisms
-    notch_width = cross_section_span_on_notch_length + shift_along_length
 
     approach_direction_local = safe_transform_vector(
         notch_timber.orientation.matrix.T,
@@ -421,11 +479,18 @@ def chop_shoulder_notch_aligned_with_timber(
         end_distance=notch_depth,
     )
 
-    # TODO notch_wall_relief_cut_angle_radians to max(notch_wall_relief_cut_angle_radians, 90 - butt_acute_approach_angle_radians) so that the relief cut is always at least as steep as the approach angle of the butting timber, otherwise the relief cut will not be deep enough to clear the butting timber.
-    if notch_wall_relief_cut_angle_radians == 0:
+    # The requested wall relief angle is a floor, not the final value: the
+    # walls must be relieved by at least the butting timber's rake away from
+    # the shoulder-plane normal, otherwise the housing walls would collide
+    # with the raking butting timber above the shoulder plane.
+    cos_butt_from_shoulder_normal = Abs(safe_dot_product(raw_approach, shoulder_plane.normal))
+    butt_rake_from_shoulder_normal_radians = acos(Min(cos_butt_from_shoulder_normal, scalar(1)))
+    wall_relief_angle_radians = Max(notch_wall_relief_cut_angle_radians, butt_rake_from_shoulder_normal_radians)
+
+    if zero_test(wall_relief_angle_radians):
         return notch_prism
 
-    angle_rad = notch_wall_relief_cut_angle_radians
+    angle_rad = wall_relief_angle_radians
     span_direction_local = cross_product(approach_direction_local, notch_length_dir_local)
     span_direction_local = normalize_vector(span_direction_local)
 
