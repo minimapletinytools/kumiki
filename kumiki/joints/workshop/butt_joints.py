@@ -572,8 +572,8 @@ def cut_mortise_and_tenon_joint(
         tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
         tenon_length: Length of the tenon extending from the mortise entry face. For angled
             joints, set this slightly longer than expected to ensure full penetration.
-        mortise_depth: Depth of the mortise (None = through mortise). Measurement differs
-            depending on crop_tenon_to_mortise_orientation_on_angled_joints.
+        mortise_depth: Depth of the mortise (None = through mortise). 
+            Measures along the tenon axis if crop_tenon_to_mortise_orientation_on_angled_joints is False; along the mortise face axis if True.
         mortise_shoulder_distance_from_centerline: Signed distance from the mortise
             centerline to the shoulder plane, measured within the mortise cross-section
             in the direction toward the tenon centerline. 0 = shoulder at the mortise
