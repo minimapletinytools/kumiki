@@ -1,5 +1,6 @@
 #!/bin/bash
 # Installation script for Kigumi extension
+set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -44,11 +45,8 @@ PYEOF
 
 echo "${NEXT_ANIMAL} Installing Kigumi extension..."
 
-echo "Preparing bundled agent instructions..."
-if command -v node >/dev/null 2>&1; then
-    node "$SCRIPT_DIR/scripts/prepare-bundled-instructions.js"
-else
-    echo "❌ Node.js is required to prepare bundled instructions."
+if [ ! -x "$SCRIPT_DIR/node_modules/.bin/vsce" ]; then
+    echo "❌ @vscode/vsce not found in node_modules. Run 'npm install' in $SCRIPT_DIR first."
     exit 1
 fi
 
@@ -77,58 +75,62 @@ LEGACY_CURSOR_EXT_DIR="$HOME/.cursor/extensions/kigumi-local"
 # Remove legacy non-standard folder names so extension discovery is unambiguous.
 rm -rf "$LEGACY_VSCODE_EXT_DIR" "$LEGACY_CURSOR_EXT_DIR"
 
-TARGETS=("$VSCODE_EXT_DIR" "$CURSOR_EXT_DIR")
-EDITORS=("VSCode" "Cursor")
-#TARGETS=("$VSCODE_EXT_DIR")
-#EDITORS=("VSCode")
-#TARGETS=("$CURSOR_EXT_DIR")
-#EDITORS=("Cursor")
+# Pin to a high version so this local build always wins over any marketplace
+# version, then package a real VSIX and let `--install-extension` register it
+# properly (extensions.json, .vsixmanifest, etc.) instead of hand-copying files
+# into the extensions folder, which VS Code's scanner may silently reject/mark
+# obsolete without any visible error.
+WORK_DIR="$(mktemp -d)"
+# Snapshot package.json *after* the emoji rotation above so cleanup restores the
+# real version while keeping the rotated emoji (a plain `git checkout` here would
+# also discard the emoji change, since both edits land in the same tracked file).
+cp "$SCRIPT_DIR/package.json" "$WORK_DIR/package.json.orig"
+cleanup() {
+    cp "$WORK_DIR/package.json.orig" "$SCRIPT_DIR/package.json"
+    rm -rf "$WORK_DIR"
+}
+trap cleanup EXIT
 
-
-for i in "${!TARGETS[@]}"; do
-    EXT_DIR="${TARGETS[$i]}"
-    EDITOR="${EDITORS[$i]}"
-
-    echo "Installing to $EDITOR: $EXT_DIR"
-    mkdir -p "$EXT_DIR"
-
-    rsync -a --delete --delete-excluded \
-        --exclude node_modules \
-        --exclude .vscode-test \
-        --exclude .vscode \
-        --exclude .artifacts \
-        --exclude __pycache__ \
-        --exclude __tests__ \
-        --exclude test \
-        --exclude test-fixtures \
-        --exclude install.sh \
-        --exclude install \
-        --exclude test-frame.py \
-        --exclude jest.config.js \
-        --exclude package-lock.json \
-        --exclude check-extension.md \
-        --exclude .vscodeignore \
-        --exclude CURSOR-INSTALL.md \
-        --exclude INSTALL.md \
-        --exclude .git \
-        "$SCRIPT_DIR/" "$EXT_DIR/"
-
-    if [ -d "$REPO_ROOT/docs" ]; then
-        mkdir -p "$EXT_DIR/.kigumi/docs"
-        rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/.kigumi/docs/"
-    fi
-
-    # Pin to a high version so this local install always wins over any marketplace version.
-    python3 -c "
+python3 -c "
 import json
-path = '$EXT_DIR/package.json'
+path = '$SCRIPT_DIR/package.json'
 with open(path) as f: p = json.load(f)
 p['version'] = '$PINNED_VERSION'
 with open(path, 'w') as f: json.dump(p, f, indent=2, ensure_ascii=False); f.write('\n')
 "
+
+VSIX_PATH="$WORK_DIR/kigumi-local.vsix"
+echo "Packaging extension..."
+(cd "$SCRIPT_DIR" && ./node_modules/.bin/vsce package -o "$VSIX_PATH")
+
+INSTALLED_ANY=false
+for EDITOR_CLI in code cursor; do
+    if ! command -v "$EDITOR_CLI" >/dev/null 2>&1; then
+        echo "⚠️  '$EDITOR_CLI' CLI not found on PATH, skipping (install it via the editor's command palette: 'Shell Command: Install ''$EDITOR_CLI'' command in PATH')"
+        continue
+    fi
+
+    echo "Installing to $EDITOR_CLI..."
+    "$EDITOR_CLI" --install-extension "$VSIX_PATH" --force
+    INSTALLED_ANY=true
+
+    if [ "$EDITOR_CLI" = "code" ]; then
+        EXT_DIR="$VSCODE_EXT_DIR"
+    else
+        EXT_DIR="$CURSOR_EXT_DIR"
+    fi
+    if [ -d "$REPO_ROOT/docs" ] && [ -d "$EXT_DIR" ]; then
+        mkdir -p "$EXT_DIR/.kigumi/docs"
+        rsync -a --delete "$REPO_ROOT/docs/" "$EXT_DIR/.kigumi/docs/"
+    fi
 done
 
-echo "✅ Kigumi installed successfully in VSCode and Cursor!"
+if [ "$INSTALLED_ANY" = false ]; then
+    echo "❌ Neither 'code' nor 'cursor' CLI is on PATH. Install one from the editor's command palette and re-run this script, or drag-install the VSIX manually: $VSIX_PATH"
+    exit 1
+fi
+
+echo "✅ Kigumi installed successfully!"
 echo ""
 echo "Next steps:"
 echo "1. Reload VSCode and Cursor: Cmd+Shift+P → 'Developer: Reload Window'"

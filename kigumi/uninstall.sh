@@ -1,23 +1,33 @@
 #!/bin/bash
 # Uninstall script for Kigumi local development extension
 
-VSCODE_EXT_DIR="$HOME/.vscode/extensions/kigumi-local"
-CURSOR_EXT_DIR="$HOME/.cursor/extensions/kigumi-local"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-TARGETS=("$VSCODE_EXT_DIR" "$CURSOR_EXT_DIR")
-EDITORS=("VSCode" "Cursor")
+EXT_IDENTIFIER=$(python3 - "$SCRIPT_DIR/package.json" <<'PYEOF'
+import json
+import sys
 
-for i in "${!TARGETS[@]}"; do
-    EXT_DIR="${TARGETS[$i]}"
-    EDITOR="${EDITORS[$i]}"
+with open(sys.argv[1]) as f:
+    pkg = json.load(f)
 
-    if [ -d "$EXT_DIR" ]; then
-        rm -rf "$EXT_DIR"
-        echo "✅ Removed $EDITOR local install: $EXT_DIR"
+print(f"{pkg['publisher']}.{pkg['name']}")
+PYEOF
+)
+
+for EDITOR_CLI in code cursor; do
+    if ! command -v "$EDITOR_CLI" >/dev/null 2>&1; then
+        echo "⚠️  '$EDITOR_CLI' CLI not found on PATH, skipping"
+        continue
+    fi
+    if "$EDITOR_CLI" --uninstall-extension "$EXT_IDENTIFIER" 2>&1; then
+        echo "✅ Removed from $EDITOR_CLI"
     else
-        echo "⚠️  $EDITOR local install not found: $EXT_DIR"
+        echo "⚠️  $EDITOR_CLI: not installed or uninstall failed"
     fi
 done
+
+# Clean up any leftover legacy folder names from older install.sh versions.
+rm -rf "$HOME/.vscode/extensions/kigumi-local" "$HOME/.cursor/extensions/kigumi-local"
 
 echo ""
 echo "Reload VSCode/Cursor (Cmd+Shift+P → 'Developer: Reload Window') to pick up the marketplace version."
