@@ -14,10 +14,10 @@ const VALID_GEOMETRY_MODES = new Set(['actual', 'perfectTimberWithin']);
 // 'overlay': edge lines drawn on top of solid faces (default) -- always
 //   rendered on top regardless of what's in front (depthTest off), matching
 //   the original edge-overlay behavior.
-// 'wireframeOnly': solid faces hidden, only edge lines shown -- depth-tested
-//   against other geometry, so wireframes are properly occluded by anything
-//   in front of them (unlike 'overlay', which never occludes).
-const VALID_EDGE_MODES = new Set(['none', 'overlay', 'wireframeOnly']);
+// 'noOverlay': edge lines depth-tested against other geometry (unlike
+//   'overlay', which never occludes) -- solid faces stay visible in both
+//   modes, only the edges' depth behavior differs.
+const VALID_EDGE_MODES = new Set(['none', 'overlay', 'noOverlay']);
 
 function normalizeV3RenderParameterValue(value) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
@@ -507,7 +507,7 @@ class ViewerSettingsPanel {
                     <select id="edge-mode-select" .value=${this.app.edgeMode || 'overlay'}>
                         <option value="none">no edges</option>
                         <option value="overlay">overlay</option>
-                        <option value="wireframeOnly">no overlay</option>
+                        <option value="noOverlay">no overlay</option>
                     </select>
                 </label>
                 <label>
@@ -2504,7 +2504,10 @@ class KigumiViewerApp extends LitElement {
 
         for (const [name, bundle] of this.meshObjectsByKey) {
             const isHidden = this.isMemberHidden(name);
-            let opacity = 1.0;
+            // Nothing selected behaves like "everything selected" for the
+            // selected-visibility slider -- it's the default appearance, so
+            // it should respect the slider too, not silently stay at 1.0.
+            let opacity = baseSelectedOpacity;
 
             if (visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
                 opacity = visualContext.selectedTimberSet.has(name) ? baseSelectedOpacity : policy.dimmedOpacity;
@@ -2514,7 +2517,7 @@ class KigumiViewerApp extends LitElement {
             }
 
             const isTransparent = opacity < 1.0;
-            bundle.mesh.visible = !isHidden && this.edgeMode !== 'wireframeOnly';
+            bundle.mesh.visible = !isHidden;
             bundle.mesh.material.transparent = isTransparent;
             bundle.mesh.material.opacity = opacity;
             // Transparent unselected timbers should not cast shadows
@@ -3129,9 +3132,9 @@ class KigumiViewerApp extends LitElement {
         }
         this.edgeMode = next;
         // depthTest/depthWrite differ by mode ('overlay' always draws on top;
-        // 'wireframeOnly' is properly depth-tested/occluded) -- update existing
+        // 'noOverlay' is properly depth-tested/occluded) -- update existing
         // materials in place rather than rebuilding meshes.
-        const depthTested = next === 'wireframeOnly';
+        const depthTested = next === 'noOverlay';
         for (const bundle of this.meshObjectsByKey.values()) {
             if (bundle.edges && bundle.edges.material) {
                 bundle.edges.material.depthTest = depthTested;
@@ -3272,6 +3275,11 @@ class KigumiViewerApp extends LitElement {
                 roughness: profile.roughness,
                 flatShading: true,
                 polygonOffset: true,
+                // Larger than the original overlay-only values (2/2) --
+                // 'noOverlay' mode depth-tests edges against these coincident
+                // faces, so they need more headroom to win cleanly instead of
+                // z-fighting. Doesn't affect 'overlay' mode since its edges
+                // have depthTest disabled and never compare against this.
                 polygonOffsetFactor: 2,
                 polygonOffsetUnits: 2,
                 side: THREE.FrontSide,
@@ -3281,12 +3289,12 @@ class KigumiViewerApp extends LitElement {
                 transparent: true,
                 opacity: profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100),
                 // 'overlay' (default): always drawn on top, matching the
-                // original edge-overlay behavior. 'wireframeOnly': depth
-                // tested so wireframes are properly occluded by geometry in
-                // front of them. setEdgeMode() also updates this in place on
-                // existing materials when the mode changes.
-                depthTest: this.edgeMode === 'wireframeOnly',
-                depthWrite: this.edgeMode === 'wireframeOnly',
+                // original edge-overlay behavior. 'noOverlay': depth tested
+                // so edges are properly occluded by geometry in front of
+                // them. setEdgeMode() also updates this in place on existing
+                // materials when the mode changes.
+                depthTest: this.edgeMode === 'noOverlay',
+                depthWrite: this.edgeMode === 'noOverlay',
             },
             reflection: {
                 color: profile.reflectionColor,
