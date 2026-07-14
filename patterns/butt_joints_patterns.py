@@ -682,6 +682,43 @@ def create_dovetail_butt_joint_example(position: Optional[V3] = None):
     return frame
 
 
+def create_housed_butt_joint_example(position: Optional[V3] = None):
+    """
+    Create a drop-in housed butt joint using canonical 4"x5"x4' timbers.
+
+    Configuration:
+        - Uses canonical butt joint timbers (receiving along X, housed/butt along Y)
+
+    Args:
+        position: Center position of the joint (V3). Defaults to origin.
+    """
+    from dataclasses import replace
+
+    arrangement = create_canonical_example_butt_joint_timbers(position=position)
+    housed_timber = replace(arrangement.butt_timber, ticket=TimberTicket("housed_timber"))
+    arrangement = replace(
+        arrangement,
+        butt_timber=housed_timber,
+        front_face_on_butt_timber=TimberLongFace.RIGHT,
+    )
+
+    joint = cut_dropin_housed_butt_joint(
+        arrangement=arrangement,
+        receiving_timber_shoulder_inset=inches(scalar(1, 2)),  # 0.5" shoulder inset
+        housing_length=inches(4),                               # 4" long housing tenon
+        housing_width=inches(3),                                # 3" wide housing pocket
+        housing_lateral_offset=scalar(0),                       # Centered
+        housing_depth=inches(scalar(5, 2))                      # 2.5" deep cut
+    )
+    
+    # Create a frame from the joint
+    frame = Frame.from_joints(
+        [joint],
+        name="Drop-in Housed Butt Joint Example (大入れ仕口 / Oire Shiguchi)"
+    )
+    
+    return frame
+
 
 def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
     origin = create_v3(scalar(0), scalar(0), scalar(0))
@@ -710,4 +747,5 @@ patterns = [
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/half_dovetail_mortise_and_tenon_no_wedge", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
+    Pattern(path="butt_joints/cut_dropin_housed_butt_joint", lambda_=make_pattern_from_frame(create_housed_butt_joint_example), pattern_type='frame'),
 ]
