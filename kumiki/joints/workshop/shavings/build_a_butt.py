@@ -671,12 +671,14 @@ class SimplePegParameters:
                                   MORTISE = align peg Y axis with the mortise length axis.
                          - ccw_rotation_angle: counter-clockwise rotation (in radians) around the drill
                            axis applied on top of the face-aligned basis. 0 = no rotation.
+        stickout_length: Length the peg protrudes beyond the mortise entry face. If None, the peg sticks out by half its depth.
     """
     shape: PegShape
     peg_positions: List[Tuple[Numeric, Numeric]]
     size: Numeric
     depth: Optional[Numeric] = None
     tenon_hole_offset: Numeric = scalar(0)
+    stickout_length: Optional[Numeric] = None
     peg_position_space: Tuple[PegPositionSpace, PegPositionSpace] = (
         PegPositionSpace.TENON,
         PegPositionSpace.TENON,
@@ -889,7 +891,10 @@ def compute_peg_positions(
             peg_depth = peg_parameters.depth
         else:
             peg_depth = t_exit - t_enter
-        stickout_length = peg_depth * scalar(1, 2)
+        if peg_parameters.stickout_length is not None:
+            stickout_length = peg_parameters.stickout_length
+        else:
+            stickout_length = peg_depth * scalar(1, 2)
 
         results.append(PegPositionResult(
             tenon_face_position_global=peg_pos_on_tenon_face_global,

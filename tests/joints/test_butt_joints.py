@@ -541,6 +541,36 @@ class TestPegStuff:
             "SolidUnion should contain base cut plus peg holes"
 
     # 🐪
+    def test_peg_custom_stickout_length(self, symbolic_mode, simple_T_configuration):
+        """Test that custom stickout_length parameter works."""
+        tenon_timber, mortise_timber = simple_T_configuration
+        
+        peg_params = SimplePegParameters(
+            shape=PegShape.ROUND,
+            peg_positions=[(scalar(2), scalar(0))],
+            depth=scalar(5),
+            size=scalar(1, 2),
+            stickout_length=scalar(0)
+        )
+        
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+            front_face_on_butt_timber=TimberLongFace.FRONT,
+        )
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(4),
+            peg_parameters=peg_params,
+        )
+        
+        peg = joint.jointAccessories["peg_0"]
+        assert peg.stickout_length == 0
+
+    # 🐪
     def test_peg_geometry(self, symbolic_mode, simple_T_configuration):
         """Test points on peg hole boundary using is_point_on_boundary()."""
         tenon_timber, mortise_timber = simple_T_configuration
@@ -1328,3 +1358,46 @@ class TestHousedDovetailButtJoint:
                 dovetail_small_width=scalar(3, 2),
                 dovetail_large_width=scalar(3),
             )
+
+
+class TestDropinHousedButtJoint:
+    """Tests for cut_dropin_housed_butt_joint function."""
+
+    def test_basic_dropin_housed_butt_joint(self):
+        butt = create_standard_horizontal_timber(
+            direction='y', length=100, size=(6, 6),
+            position=(0, 0, 0), ticket="butt_timber",
+        )
+        recv = create_standard_horizontal_timber(
+            direction='x', length=100, size=(6, 6),
+            position=(0, 0, 0), ticket="receiving_timber",
+        )
+        arrangement = ButtJointTimberArrangement(
+            butt_timber=butt,
+            receiving_timber=recv,
+            butt_timber_end=TimberEnd.BOTTOM,
+            front_face_on_butt_timber=TimberLongFace.FRONT,
+        )
+
+        joint = cut_dropin_housed_butt_joint(
+            arrangement=arrangement,
+            receiving_timber_shoulder_inset=scalar(1),
+            housing_length=scalar(3),
+            housing_width=scalar(4),
+            housing_depth=scalar(3),
+        )
+
+        assert len(joint.cuttings) == 2
+        assert "butt_timber" in joint.cuttings
+        assert "receiving_timber" in joint.cuttings
+
+        butt_cut = joint.cuttings["butt_timber"]
+        recv_cut = joint.cuttings["receiving_timber"]
+
+        assert butt_cut.negative_csg is not None
+        assert recv_cut.negative_csg is not None
+
+        # Verify cuts compile
+        assert _render_cutting(butt_cut) is not None
+        assert _render_cutting(recv_cut) is not None
+
