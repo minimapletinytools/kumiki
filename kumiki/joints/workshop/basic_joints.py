@@ -23,6 +23,7 @@ from .butt_joints import (
     cut_tongue_and_fork_butt_joint,
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_dropin_dovetail_butt_joint,
+    cut_dropin_housed_butt_joint,
 )
 from .splice_joints import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
@@ -547,6 +548,51 @@ def cut_basic_dropin_dovetail_butt_joint(
         dovetail_length=dovetail_length,
         dovetail_small_width=dovetail_small_width,
         dovetail_large_width=dovetail_large_width
+    )
+
+
+def cut_basic_dropin_housed_butt_joint(
+    housed_timber: TimberLike,
+    receiving_timber: TimberLike,
+    housed_timber_end: TimberEnd,
+    housed_timber_face: TimberLongFace,
+    receiving_timber_shoulder_inset: Numeric = scalar(0),
+) -> Joint:
+    """
+    Creates a drop-in housed butt joint (大入れ仕口 / Oire Shiguchi) with default proportions.
+
+    All housing dimensions (housing_length and housing_width) are auto-calculated from the
+    housed timber's size. For full control, use `cut_dropin_housed_butt_joint` directly.
+
+    Args:
+        housed_timber: The timber with the housed end.
+        receiving_timber: The timber that receives the housing pocket.
+        housed_timber_end: Which end of the housed timber is cut.
+        housed_timber_face: The face on the housed timber where the pocket profile is open (top face).
+        receiving_timber_shoulder_inset: Distance to inset the shoulder notch. Default 0.
+
+    Returns:
+        Joint object containing the two CutTimbers with housing cuts.
+    """
+    assert isinstance(housed_timber_end, TimberEnd), f"expected TimberEnd, got {type(housed_timber_end).__name__}"
+    assert isinstance(housed_timber_face, TimberLongFace), f"expected TimberLongFace, got {type(housed_timber_face).__name__}"
+    assert isinstance(housed_timber, Timber), f"expected Timber, got {type(housed_timber).__name__}"
+    assert isinstance(receiving_timber, Timber), f"expected Timber, got {type(receiving_timber).__name__}"
+
+    width = housed_timber.get_size_in_face_normal_axis(housed_timber_face.rotate_right())
+    housing_length = width / scalar(2)
+    housing_width = width
+
+    return cut_dropin_housed_butt_joint(
+        arrangement=ButtJointTimberArrangement(
+            receiving_timber=receiving_timber,
+            butt_timber=housed_timber,
+            butt_timber_end=housed_timber_end,
+            front_face_on_butt_timber=housed_timber_face,
+        ),
+        receiving_timber_shoulder_inset=receiving_timber_shoulder_inset,
+        housing_length=housing_length,
+        housing_width=housing_width,
     )
 
 

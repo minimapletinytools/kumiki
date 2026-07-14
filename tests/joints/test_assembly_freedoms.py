@@ -120,6 +120,22 @@ class TestButtFamilyFreedoms:
         assert len(dovetail_freedom.translations) == 1
         assert_opposite_escape_pair(joint, "butt_timber", "receiving_timber")
 
+    def test_dropin_housed_is_unidirectional(self, float_mode):
+        arrangement = create_canonical_example_butt_joint_timbers()
+        joint = cut_basic_dropin_housed_butt_joint(
+            housed_timber=arrangement.butt_timber,
+            receiving_timber=arrangement.receiving_timber,
+            housed_timber_end=arrangement.butt_timber_end,
+            housed_timber_face=TimberLongFace.RIGHT,
+            receiving_timber_shoulder_inset=scalar(0),
+        )
+
+        housed_freedom = joint.cuttings["butt_timber"].assembly_freedom
+        assert housed_freedom is not None
+        assert_authored_translation(housed_freedom, (0, 0, 1))
+        assert len(housed_freedom.translations) == 1
+        assert_opposite_escape_pair(joint, "butt_timber", "receiving_timber")
+
 
 class TestLapAndSpliceFreedoms:
     def test_plain_cross_lap(self, float_mode):

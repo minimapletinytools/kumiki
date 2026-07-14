@@ -1476,4 +1476,24 @@ class TestHousedButtJoint:
                 housing_depth=scalar(0),
             )
 
+    def test_basic_dropin_housed_butt_joint(self):
+        """Test the cut_basic_dropin_housed_butt_joint convenience wrapper."""
+        butt = create_standard_horizontal_timber(
+            direction='y', length=100, size=(6, 6),
+            position=(0, 0, 0), ticket="butt_timber",
+        )
+        recv = create_standard_horizontal_timber(
+            direction='x', length=100, size=(6, 6),
+            position=(0, 0, 0), ticket="receiving_timber",
+        )
+        joint = cut_basic_dropin_housed_butt_joint(
+            housed_timber=butt,
+            receiving_timber=recv,
+            housed_timber_end=TimberEnd.BOTTOM,
+            housed_timber_face=TimberLongFace.FRONT,
+        )
+        assert len(joint.cuttings) == 2
+        assert joint.ticket.joint_type == "housed_butt"
+
+
 
