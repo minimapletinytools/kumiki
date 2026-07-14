@@ -4,7 +4,7 @@ Uses canonical timber configurations from construction.py
 """
 
 from sympy import Matrix
-from kumiki.rule import inches, Transform, scalar
+from kumiki.rule import inches, Transform, scalar, create_v2
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, create_timber,
@@ -203,6 +203,45 @@ def example_basic_mortise_and_tenon_joint_with_peg(position=None):
     return joint
 
 
+def example_basic_mortise_and_tenon_joint_imperfect_timber(position=None):
+    """
+    Create a basic mortise and tenon joint using imperfect 4x4 timbers.
+
+    The timbers are nominally 4x4 (that nominal size drives the joint layout math)
+    but their actual stock is 5x5: the RIGHT and BACK faces stay flush with the
+    nominal 4x4 reference, while the LEFT and FRONT faces are oversized, extending
+    an extra 1" beyond the reference. Timber.from_perfect_timber_within is used to
+    attach this asymmetric actual geometry to the perfect timbers produced by the
+    canonical butt joint arrangement. The canonical arrangement's tenon enters the
+    mortise timber through its FRONT face, so the tenon enters through an imperfect
+    (oversized) face.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    nominal_size = create_v2(inches(4), inches(4))
+    arrangement = create_canonical_example_butt_joint_timbers(position, timber_size=nominal_size)
+
+    reference_half = inches(4) / scalar(2)
+    extended_half = reference_half + inches(1)
+    imperfect_half_sizes = (
+        create_v2(reference_half, extended_half),  # right (flush), left (extended +1")
+        create_v2(extended_half, reference_half),  # front (extended +1"), back (flush)
+    )
+
+    tenon_timber = Timber.from_perfect_timber_within(arrangement.butt_timber, nominal_half_sizes=imperfect_half_sizes)
+    mortise_timber = Timber.from_perfect_timber_within(arrangement.receiving_timber, nominal_half_sizes=imperfect_half_sizes)
+
+    joint = cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
+        tenon_timber=tenon_timber,
+        mortise_timber=mortise_timber,
+        tenon_end=arrangement.butt_timber_end,
+        use_peg=False
+    )
+
+    return joint
+
+
 def example_basic_lapped_gooseneck_joint(position=None):
     """
     Create a basic lapped gooseneck joint.
@@ -274,6 +313,7 @@ patterns = [
     Pattern(path="basic_joints/basic_splice_lap_joint", lambda_=make_pattern_from_joint(example_basic_splice_lap_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint), pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_mortise_and_tenon/with_peg", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint_with_peg), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_mortise_and_tenon/imperfect_timber", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint_imperfect_timber), pattern_type='frame'),
     Pattern(path="basic_joints/basic_lapped_gooseneck_joint", lambda_=make_pattern_from_joint(example_basic_lapped_gooseneck_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_dropin_dovetail_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_dovetail_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mitered_and_keyed_lap_joint", lambda_=make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint), pattern_type='frame'),
