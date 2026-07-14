@@ -617,6 +617,37 @@ def cut_mortise_and_tenon_joint(
     if tenon_position is None:
         tenon_position = Matrix([scalar(0), scalar(0)])
 
+    # Assert if the tenon dimensions after offsetting exceed the perfect timber within dimension of the tenon timber
+    from kumiki.rule import safe_compare, Comparison
+    
+    # Check local X direction (vertical)
+    tenon_min_x = tenon_position[0] - tenon_size[0] / scalar(2)
+    tenon_max_x = tenon_position[0] + tenon_size[0] / scalar(2)
+    timber_half_width_x = tenon_timber.size[0] / scalar(2)
+    
+    assert safe_compare(tenon_min_x, -timber_half_width_x, Comparison.GE), (
+        f"Tenon X boundary extends outside of the timber: "
+        f"minimum tenon X ({tenon_min_x}) is less than timber boundary ({-timber_half_width_x})"
+    )
+    assert safe_compare(tenon_max_x, timber_half_width_x, Comparison.LE), (
+        f"Tenon X boundary extends outside of the timber: "
+        f"maximum tenon X ({tenon_max_x}) exceeds timber boundary ({timber_half_width_x})"
+    )
+    
+    # Check local Y direction (horizontal)
+    tenon_min_y = tenon_position[1] - tenon_size[1] / scalar(2)
+    tenon_max_y = tenon_position[1] + tenon_size[1] / scalar(2)
+    timber_half_width_y = tenon_timber.size[1] / scalar(2)
+    
+    assert safe_compare(tenon_min_y, -timber_half_width_y, Comparison.GE), (
+        f"Tenon Y boundary extends outside of the timber: "
+        f"minimum tenon Y ({tenon_min_y}) is less than timber boundary ({-timber_half_width_y})"
+    )
+    assert safe_compare(tenon_max_y, timber_half_width_y, Comparison.LE), (
+        f"Tenon Y boundary extends outside of the timber: "
+        f"maximum tenon Y ({tenon_max_y}) exceeds timber boundary ({timber_half_width_y})"
+    )
+
     # Validation for round tenon mode
     if use_round_tenon:
         require_check(
