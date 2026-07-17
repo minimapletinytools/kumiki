@@ -22,15 +22,80 @@ def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1:
 -finish cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon
 
 - do the shed from the timber framing book
-  "learn to timber frame" was one of the first books I read when I was learning to timber frame. The second half of the book walks you through how to build "the tiny timber frame". I thought it might be fun to model this in Kumiki. I'll try and match most of the little details as well. In particular, to emphasize that all measuring is done using the "square rule", timbers intentionally rendered larger than their "perfect timber within" dimension from which all joints are marked from, creating little notch and relief cuts throughout the design.
+  "learn to timber frame" was one of the first books I read when I was learning to timber frame. The second half of the book walks you through how to build "the tiny timber frame". I thought it might be fun to model this in Kumiki. 
+  
+  
+  create 6 7x7 posts on teh inside of the footprint, one in each corner, and one in the middle of the west/east sides
+
+  join the posts to the mudsills with mortise and tenon joints, they sholud be 1.5" thick x 6.5 inches wide and 3 inches deep they should be positioned such that there is a 1.5 inch gap between the tenon and the outside edge of the mudsill. the top of the posts should be 9'4" above the top of the mudsills. give each post names like west-center-post etc
+
+  conect the 3 posts on the west side with a top plate, the plate sholud be 7x8 with teh 8 dimension in the Z axis, and it sholud stick out each end by 1 foot past the outside edge of the post. the top of the plate should be flush with the top of the post. do the same fro the east side
+
+  (notice I'm not asknig it to give explicit names anymore, my previous instructions should be sufficient to have the agent name all future timbers appropriately)
+
+  join the posts to teh top plates with mortise and tenon joints matching the ones we did between the posts and the mudsills except the tenons should be 4" deep. these ones sholud take round pegs
+
+  (and also notice I didn't spceify the peg sizing/position, a bit more dodgy this wone but it will ilkely use the same settings from the pegs on the mudsill joints)
+
+  connect each post pair from east to west by a tie beam. the tie beam should be 7x8 with the 8" dimension it he z axis, it should be positioned 18inches below the top of the posts
+
+  join the tie beams to the posts with a wedged half dovetail mortise and tenon joint. it is a through tenon flush with the outside of the psots and the wedge comes from the outside
+
+  (and again, not specifying the tenon thickness this time, the wedge and dovetail shape are configurable but I'll just let the agent pick sensible defaults here. Note in the book, the shoulder has a dovetail shelf and the joint is supported by a peg. These features currently don't exist in kumiki but will be added at some point in the future. perhaps I'll make a video for it)
+
+  connect the corner posts to the middle posts on the west side with 4x5 girts the 5" dimension is in the Z axis, and the girt should be flush with the outside face of the posts. the top of the girt is 3' 4.5" above the top of the mudsill. do for the east side as well
+
+  join the girts to the posts with a barefaced mortise and tenon joint meaning the tenon face is flush with the inside face of the girt. the tenon should be 1.5" thick and 4" wide and 4 inches deep into the post. All girts and rafters should be barefaced when they connect to substantially bigger posts.
+
+  connect the corner north west corner post to the north east corner post with a 4x5 girt, the top of this girt is 3' above the top of the mudsill. DO not do the same for the south side
+
+  (notice I didn't give more details about the girt placement like I did the first time around, it should be clear to the agent what I want from the context established by the previosu prompt)
+
+  join the girts
+
+  on the south side, create 2 4x5 door posts connecting the south mudsill with the south tie beam. the 4" dimension matches the 4" dimension of the girt on the other side. they should be positioned symmetrically such that the door gap is 3'6"
+
+  join the door posts to the tie beam and sill with barefaced mortise nad tenons, only the top side is pegged.
+
+  connect the door posts to the corner posts using girts similar to how we did on the north side.
+
+  join the girts to the posts. the tenons going into the door post should be centered rather than bare faced.
+
+  (I probably didn't need to tell it about the tenons going into the door posts, but better to be safe than risk wasting another prompt fixing it)
+
+  (I'm getting a little impatient here so lets try and do all the braces and joints all at once.)
+
+  connect each corner and mid post to the top plate and tie beam around the perimiter of the buliding with a 3x5 brace such that the distance from the inside corner to the outside corner of the brace is 30". the 5" dimension of the brace is in the wall plane. join the braces using barefaced morties and tenon joints. the mortise depth is 3.5" measured orthogonally from the mortise face. the joints should be pegged.
+
+  Add 9 5x5 rafters. The bottom face of the rafter should intersect the outside face of the plate 3.5" below the top of the plate. 2 rafters have otuside faces flush with the ends of the top plates, 2 rafters have outside faces flushi with teh outside faces of teh posts, and the remaining rafters are spaced evenly between the rafters on top ofeth posts. The roof pitch is 45 digrees and the rafters extend beyond the plate by 18"
+
+  join the rafters to each other with tongue and fork joint, and then house the rafters in the top plate with a housing joint
+
+  (in the book, the tongue and fork joints is pegged, and rafters are joined to the top plates with a step lap joint which don't exist yet. I may try to implement these joints later in the video. this will do for now. )
+
+  TODO add collar ties
+
+  The book goes into good length explaining the "square rule" measuring system, and to to emphasize this, timbers intentionally rendered larger than their "perfect timber within" dimension from which all joints are marked from, creating little notch and relief cuts throughout the design. This can be modeled in kumiki!
+
   I'll explain this better witha diagram
   this square represents the "perfect timber within", which is represted in kumiki code as PerfectTimberWithin class
   this larger square represents the acutal dimnison of the timebr whichi s >= the PTW on all sides, which is representd in kumiki code as the Timber class
   since w're doing the square rule, 2 sides of the actual square match up with the 2 sides of the perfect timber within square. This edge of the timber is referred to as the reference edge, because all measurements are taken from this edge.
   all joints must be cut to the perfect timber within when using the square rule, but since timbersa re oversized, extra wood needs to be removed for the jointt to fit tgoether preoperly. These are referred to as relief cuts in kumiki
-  
-  - add a helper function for cerating imperfect rectangular timber from reference edge
-  - need to finish generic notching and partial notching
+
+  Currently, all timbers are their "perfect timber within" size, but so lets ask the agent to make their actual sizes a little larger to see the relief cutting detail. 
+
+  make the mudsills actual sizes 1/2" larger than their perfect timber within size. We only want to do this on the faces opposite to the reference edge. the reference edge is the bottom outside corner in global space. Add a helper function that enlargens the timbers by 1/2" opposite to the some reference edge as we'll be doing this to all the timbers.
+
+  now repeat for each of the posts, the outside corner of the posts is the reference edge, for the middle post, chooset he outside north face for the west one and the outside south face for the east one.
+
+  for the girts, tie beams and top plates, the outside top face is the reference edeg.
+
+  for the braces, it is the outside hypotneuse face
+
+  (we'll leave the rafters at their perfect dimension)
+
+
 
 
 - tusked morties and tenon joint
