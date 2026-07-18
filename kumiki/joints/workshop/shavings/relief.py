@@ -882,20 +882,21 @@ def chop_scribe_relief(
         right=timber_to_be_cut_perfect_csg_global,
     )
 
-    # What actually remains of timber_to_be_scribed's imperfect (beyond-perfect-within)
-    # material near the joint, after its own cuts (shoulder, end cut, etc.) are accounted
-    # for -- this, not the raw/uncut imperfect fringe, is what needs a matching hollow in
-    # timber_to_be_cut.
-    timber_to_be_scribed_imperfect_after_own_cuts_global = Difference(
-        base=Difference(
-            timber_to_be_scribed_actual_csg_global,
-            subtract=[timber_to_be_scribed_perfect_csg_global],
-        ),
+    # What actually remains of timber_to_be_scribed's full extent (perfect core
+    # AND imperfect fringe alike) near the joint, after its own cuts (shoulder,
+    # end cut, etc.) are accounted for -- per this function's contract, the
+    # ENTIRETY of timber_to_be_scribed needs a matching hollow in
+    # timber_to_be_cut (excluding timber_to_be_cut's own perfect-within, which
+    # is handled by the subtraction below). Using only the imperfect fringe
+    # here would leave timber_to_be_cut's imperfect material un-cut wherever it
+    # overlaps timber_to_be_scribed's perfect-within region.
+    timber_to_be_scribed_actual_after_own_cuts_global = Difference(
+        base=timber_to_be_scribed_actual_csg_global,
         subtract=[timber_to_be_scribed_own_cuts_global],
     )
 
     cut_relief_global = Difference(
-        base=timber_to_be_scribed_imperfect_after_own_cuts_global,
+        base=timber_to_be_scribed_actual_after_own_cuts_global,
         subtract=[timber_to_be_cut_perfect_csg_global],
     )
 
