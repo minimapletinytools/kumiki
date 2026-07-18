@@ -267,6 +267,20 @@ class BraceJointScribeReliefConfig:
         )
 
 
+
+@dataclass(frozen=True)
+class DropinButtJointSweepScribeReliefConfig:
+    """
+    Configuration for drop in butt joint relief
+
+    The butting (drop in) timber is always scribed onto the receiving timber
+
+    Actually the butting timber and its entire swept volume in the drop-in path are scribed onto the receiving timber
+    """
+    pass
+
+
+
 def _perfect_cross_section_slice_span_along_plane_direction(
     timber: TimberLike,
     slice_plane_normal_global: Direction3D,
