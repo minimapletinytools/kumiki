@@ -530,8 +530,8 @@ def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     """
     assert isinstance(dovetail_timber_end, TimberEnd), f"expected TimberEnd, got {type(dovetail_timber_end).__name__}"
     assert isinstance(dovetail_timber_face, TimberLongFace), f"expected TimberLongFace, got {type(dovetail_timber_face).__name__}"
-    assert isinstance(dovetail_timber, Timber), f"expected Timber, got {type(dovetail_timber).__name__}"
-    assert isinstance(receiving_timber, Timber), f"expected Timber, got {type(receiving_timber).__name__}"
+    assert isinstance(dovetail_timber, TimberLike), f"expected TimberLike, got {type(dovetail_timber).__name__}"
+    assert isinstance(receiving_timber, TimberLike), f"expected TimberLike, got {type(receiving_timber).__name__}"
     width = dovetail_timber.get_size_in_face_normal_axis(dovetail_timber_face.rotate_right())
     dovetail_length = width/scalar(2)
     dovetail_small_width = width*scalar(1, 2)
@@ -576,8 +576,8 @@ def cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(
     """
     assert isinstance(housed_timber_end, TimberEnd), f"expected TimberEnd, got {type(housed_timber_end).__name__}"
     assert isinstance(housed_timber_face, TimberLongFace), f"expected TimberLongFace, got {type(housed_timber_face).__name__}"
-    assert isinstance(housed_timber, Timber), f"expected Timber, got {type(housed_timber).__name__}"
-    assert isinstance(receiving_timber, Timber), f"expected Timber, got {type(receiving_timber).__name__}"
+    assert isinstance(housed_timber, TimberLike), f"expected TimberLike, got {type(housed_timber).__name__}"
+    assert isinstance(receiving_timber, TimberLike), f"expected TimberLike, got {type(receiving_timber).__name__}"
 
     width = housed_timber.get_size_in_face_normal_axis(housed_timber_face.rotate_right())
     housing_length = width / scalar(2)
