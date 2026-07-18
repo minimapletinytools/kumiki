@@ -10,7 +10,7 @@ from kumiki.ticket import TimberTicket
 from kumiki.joints.workshop.shavings import SimplePegParameters
 from kumiki.joints.workshop.butt_joints import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
-    cut_dropin_housed_butt_joint
+    cut_dropin_housed_butt_joint_on_face_aligned_timbers
 )
 
 # ============================================================================
@@ -263,7 +263,7 @@ def build_shed_frame() -> Frame:
     for idx in [0, 1, 3, 4]:
         joist = joists[idx]
         # East end
-        joint_east = cut_dropin_housed_butt_joint(
+        joint_east = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=east_mudsill,
                 butt_timber=joist,
@@ -276,7 +276,7 @@ def build_shed_frame() -> Frame:
             housing_depth=inches(9, 2), # 4.5" depth
         )
         # West end
-        joint_west = cut_dropin_housed_butt_joint(
+        joint_west = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=west_mudsill,
                 butt_timber=joist,

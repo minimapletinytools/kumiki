@@ -7,7 +7,7 @@ cross" / asterisk pattern). Each board stands on edge (7.25" dimension
 vertical, 1.5" dimension horizontal) with its top face flush with the top of
 the post.
 
-The three boards are woven together with `cut_multi_cross_lap_joint`, starting
+The three boards are woven together with `cut_multi_cross_lap_joint_on_plane_aligned_timbers`, starting
 from each board's LEFT face (the global-bottom face shared by all three boards
 regardless of their plan rotation), split half-and-half at the midpoint.
 """
@@ -66,7 +66,7 @@ def example() -> Frame:
         )
         boards.append(board)
 
-    joint = cut_multi_cross_lap_joint(
+    joint = cut_multi_cross_lap_joint_on_plane_aligned_timbers(
         boards,
         starting_face_on_first_timber=TimberFace.LEFT,
         cut_distance_ratios=[scalar(1, 2)],

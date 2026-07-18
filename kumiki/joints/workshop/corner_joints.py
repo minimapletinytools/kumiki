@@ -333,7 +333,7 @@ def cut_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimber
     return cut_plain_miter_joint(arrangement)
 
 
-def cut_tongue_and_fork_corner_joint(
+def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
@@ -589,20 +589,20 @@ def cut_tongue_and_fork_corner_joint(
     )
 
 
-def cut_plain_tongue_and_fork_joint(
+def cut_plain_tongue_and_fork_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
 ) -> Joint:
-    """Compatibility alias for `cut_tongue_and_fork_corner_joint`."""
-    return cut_tongue_and_fork_corner_joint(
+    """Compatibility alias for `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers`."""
+    return cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,
         tongue_position=tongue_position,
     )
 
 
-def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ratio: Numeric = scalar(1, 2)) -> Joint:
+def cut_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, cut_ratio: Numeric = scalar(1, 2)) -> Joint:
     """
     Creates a corner-lap joint between two corner timbers with trimmed ends.
 
@@ -717,7 +717,7 @@ def cut_plain_corner_lap_joint(arrangement: CornerJointTimberArrangement, cut_ra
 # ============================================================================
 
 
-def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, lap_thickness: Optional[Numeric] = None, lap_start_distance_from_reference_miter_face: Optional[Numeric] = None, distance_between_lap_and_outside: Optional[Numeric] = None, num_laps: int = 2, key_width: Optional[Numeric] = None, key_thickness: Optional[Numeric] = None) -> Joint:
+def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement, lap_thickness: Optional[Numeric] = None, lap_start_distance_from_reference_miter_face: Optional[Numeric] = None, distance_between_lap_and_outside: Optional[Numeric] = None, num_laps: int = 2, key_width: Optional[Numeric] = None, key_thickness: Optional[Numeric] = None) -> Joint:
     """
     Creates a mitered and keyed lap joint (箱相欠き車知栓仕口 / Hako Aikaki Shachi Sen Shikuchi)
     between two timbers.
@@ -1372,5 +1372,5 @@ def cut_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement, l
 # Aliases for Japanese joint functions
 # ============================================================================
 
-cut_箱相欠き車知栓仕口 = cut_mitered_and_keyed_lap_joint
-cut_hako_aikaki_shachi_sen_shikuchi = cut_mitered_and_keyed_lap_joint
+cut_箱相欠き車知栓仕口 = cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers
+cut_hako_aikaki_shachi_sen_shikuchi = cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers

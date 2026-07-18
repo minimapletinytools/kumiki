@@ -14,27 +14,27 @@ from kumiki.rule import *
 from .corner_joints import (
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
-    cut_tongue_and_fork_corner_joint,
-    cut_mitered_and_keyed_lap_joint,
+    cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
+    cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers,
 )
 from .butt_joints import (
     cut_plain_butt_joint,
     cut_plain_butt_joint_on_face_aligned_timbers,
-    cut_tongue_and_fork_butt_joint,
+    cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers,
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
-    cut_dropin_dovetail_butt_joint,
-    cut_dropin_housed_butt_joint,
+    cut_dropin_dovetail_butt_joint_on_face_aligned_timbers,
+    cut_dropin_housed_butt_joint_on_face_aligned_timbers,
 )
 from .splice_joints import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_splice_lap_joint_on_aligned_timbers,
-    cut_lapped_gooseneck_joint,
+    cut_lapped_gooseneck_joint_on_aligned_timbers,
 )
 from .cross_joints import (
     cut_plain_cross_lap_joint,
     cut_plain_cross_lap_house_joint,
 )
-from .multi_butt_joints import cut_splined_opposing_double_butt_joint
+from .multi_butt_joints import cut_splined_opposing_double_butt_joint_on_face_aligned_timbers
 from kumiki.construction import (
     ButtJointTimberArrangement,
     SpliceJointTimberArrangement,
@@ -99,7 +99,7 @@ def cut_basic_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJoint
     return cut_plain_miter_joint_on_face_aligned_timbers(arrangement)
 
 
-def cut_basic_tongue_and_fork_corner_joint(
+def cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
@@ -107,7 +107,7 @@ def cut_basic_tongue_and_fork_corner_joint(
     """
     Creates a tongue-and-fork corner joint (corner bridle style).
 
-    Convenience wrapper around `cut_tongue_and_fork_corner_joint`. Timbers must be plane-aligned
+    Convenience wrapper around `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers`. Timbers must be plane-aligned
     and non-parallel.
 
     Args:
@@ -121,27 +121,27 @@ def cut_basic_tongue_and_fork_corner_joint(
     """
     error = arrangement.check_plane_aligned()
     assert error is None, error
-    return cut_tongue_and_fork_corner_joint(
+    return cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,
         tongue_position=tongue_position,
     )
 
 
-def cut_basic_tongue_and_fork_joint(
+def cut_basic_tongue_and_fork_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
 ) -> Joint:
-    """Compatibility alias for `cut_basic_tongue_and_fork_corner_joint`."""
-    return cut_basic_tongue_and_fork_corner_joint(
+    """Compatibility alias for `cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers`."""
+    return cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,
         tongue_position=tongue_position,
     )
 
 
-def cut_basic_tongue_and_fork_butt_joint(
+def cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
@@ -149,7 +149,7 @@ def cut_basic_tongue_and_fork_butt_joint(
     """
     Creates a tongue-and-fork butt joint.
 
-    Convenience wrapper around `cut_tongue_and_fork_butt_joint`. Timbers must be
+    Convenience wrapper around `cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers`. Timbers must be
     plane-aligned and non-parallel. The receiving (fork) timber is not end-cut.
 
     Args:
@@ -163,7 +163,7 @@ def cut_basic_tongue_and_fork_butt_joint(
     """
     error = arrangement.check_plane_aligned()
     assert error is None, error
-    return cut_tongue_and_fork_butt_joint(
+    return cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,
         tongue_position=tongue_position,
@@ -223,7 +223,7 @@ def cut_basic_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJoin
     return cut_plain_butt_splice_joint_on_aligned_timbers(arrangement)
 
 
-def cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) -> Joint:
+def cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint:
     """
     Creates a cross-lap joint between two intersecting timbers with equal material removal.
 
@@ -241,7 +241,7 @@ def cut_basic_plain_cross_lap_joint(arrangement: CrossJointTimberArrangement) ->
     return cut_plain_cross_lap_joint(arrangement)
 
 
-def cut_basic_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joint:
+def cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement: CrossJointTimberArrangement) -> Joint:
     """
     Creates a house (dado/housing) joint where the housing timber is relieved to receive the housed timber.
 
@@ -260,7 +260,7 @@ def cut_basic_plain_house_joint(arrangement: CrossJointTimberArrangement) -> Joi
     return cut_plain_cross_lap_house_joint(arrangement)
 
 
-def cut_basic_splined_opposing_double_butt_joint(
+def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     arrangement: DoubleButtJointTimberArrangement,
     slot_facing_end_on_receiving_timber: TimberEnd,
 ) -> Joint:
@@ -326,7 +326,7 @@ def cut_basic_splined_opposing_double_butt_joint(
         butt_length_direction_global
     ) * scalar(4)
 
-    return cut_splined_opposing_double_butt_joint(
+    return cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
         arrangement=arrangement_with_peg_face,
         slot_thickness=slot_thickness,
         slot_depth=slot_depth,
@@ -449,7 +449,7 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
 # Japanese Joint Wrappers
 # ============================================================================
 
-def cut_basic_lapped_gooseneck_joint(
+def cut_basic_lapped_gooseneck_joint_on_aligned_timbers(
     gooseneck_timber: TimberLike,
     receiving_timber: TimberLike,
     receiving_timber_end: TimberEnd,
@@ -460,7 +460,7 @@ def cut_basic_lapped_gooseneck_joint(
 
     Gooseneck dimensions scale with the timber width: length = 2×width, small_width = 1/4×width,
     large_width = 1/2×width, head_length = 1/2×width. For full control, use
-    `cut_lapped_gooseneck_joint` directly.
+    `cut_lapped_gooseneck_joint_on_aligned_timbers` directly.
 
     Args:
         gooseneck_timber: The timber with the gooseneck feature cut into it.
@@ -482,7 +482,7 @@ def cut_basic_lapped_gooseneck_joint(
     gooseneck_head_length = width*scalar(1, 2)
     gooseneck_timber_end = TimberEnd.BOTTOM if receiving_timber_end == TimberEnd.TOP else TimberEnd.TOP
 
-    return cut_lapped_gooseneck_joint(
+    return cut_lapped_gooseneck_joint_on_aligned_timbers(
         arrangement=SpliceJointTimberArrangement(
             timber1=gooseneck_timber,
             timber2=receiving_timber,
@@ -497,7 +497,7 @@ def cut_basic_lapped_gooseneck_joint(
     )
 
 
-def cut_basic_dropin_dovetail_butt_joint(
+def cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     dovetail_timber: TimberLike,
     receiving_timber: TimberLike,
     dovetail_timber_end: TimberEnd,
@@ -513,7 +513,7 @@ def cut_basic_dropin_dovetail_butt_joint(
     Dovetail dimensions scale with the timber width regardless of the values passed for
     dovetail_length, dovetail_small_width, and dovetail_large_width — those parameters are
     overridden internally (present for API compatibility). For full control, use
-    `cut_dropin_dovetail_butt_joint` directly.
+    `cut_dropin_dovetail_butt_joint_on_face_aligned_timbers` directly.
 
     Args:
         dovetail_timber: The timber with the dovetail tenon.
@@ -537,7 +537,7 @@ def cut_basic_dropin_dovetail_butt_joint(
     dovetail_small_width = width*scalar(1, 2)
     dovetail_large_width = width*scalar(2, 3)
 
-    return cut_dropin_dovetail_butt_joint(
+    return cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             butt_timber=dovetail_timber,
             receiving_timber=receiving_timber,
@@ -551,7 +551,7 @@ def cut_basic_dropin_dovetail_butt_joint(
     )
 
 
-def cut_basic_dropin_housed_butt_joint(
+def cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(
     housed_timber: TimberLike,
     receiving_timber: TimberLike,
     housed_timber_end: TimberEnd,
@@ -562,7 +562,7 @@ def cut_basic_dropin_housed_butt_joint(
     Creates a drop-in housed butt joint (大入れ仕口 / Oire Shiguchi) with default proportions.
 
     All housing dimensions (housing_length and housing_width) are auto-calculated from the
-    housed timber's size. For full control, use `cut_dropin_housed_butt_joint` directly.
+    housed timber's size. For full control, use `cut_dropin_housed_butt_joint_on_face_aligned_timbers` directly.
 
     Args:
         housed_timber: The timber with the housed end.
@@ -583,7 +583,7 @@ def cut_basic_dropin_housed_butt_joint(
     housing_length = width / scalar(2)
     housing_width = width
 
-    return cut_dropin_housed_butt_joint(
+    return cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=receiving_timber,
             butt_timber=housed_timber,
@@ -596,7 +596,7 @@ def cut_basic_dropin_housed_butt_joint(
     )
 
 
-def cut_basic_mitered_and_keyed_lap_joint(
+def cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement,
 ) -> Joint:
     """
@@ -604,7 +604,7 @@ def cut_basic_mitered_and_keyed_lap_joint(
 
     Combines a miter cut with interlocking finger laps on the inside of the corner for
     mechanical strength. All lap and key dimensions are auto-calculated. For full control,
-    use `cut_mitered_and_keyed_lap_joint` directly.
+    use `cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers` directly.
 
     Args:
         arrangement: Corner joint arrangement. Timbers must be plane-aligned and
@@ -618,6 +618,6 @@ def cut_basic_mitered_and_keyed_lap_joint(
     assert arrangement.front_face_on_timber1 is not None, (
         "arrangement.front_face_on_timber1 must be set to determine the reference miter face"
     )
-    return cut_mitered_and_keyed_lap_joint(
+    return cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=arrangement
     )

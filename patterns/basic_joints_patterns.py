@@ -14,18 +14,18 @@ from kumiki.ticket import Ticket
 from kumiki.joints.workshop.basic_joints import (
     cut_basic_plain_miter_joint,
     cut_basic_plain_miter_joint_on_face_aligned_timbers,
-    cut_basic_tongue_and_fork_corner_joint,
+    cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
     cut_basic_plain_butt_joint_on_face_aligned_timbers,
     cut_basic_plain_butt_splice_joint_on_aligned_timbers,
-    cut_basic_plain_cross_lap_joint,
-    cut_basic_plain_house_joint,
-    cut_basic_splined_opposing_double_butt_joint,
+    cut_basic_plain_cross_lap_joint_on_face_aligned_timbers,
+    cut_basic_plain_house_joint_on_face_aligned_timbers,
+    cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers,
     cut_basic_plain_splice_lap_joint_on_aligned_timbers,
     cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers,
-    cut_basic_lapped_gooseneck_joint,
-    cut_basic_dropin_dovetail_butt_joint,
-    cut_basic_dropin_housed_butt_joint,
-    cut_basic_mitered_and_keyed_lap_joint,
+    cut_basic_lapped_gooseneck_joint_on_aligned_timbers,
+    cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers,
+    cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers,
+    cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers,
 )
 from kumiki.example_shavings import (
     create_canonical_example_right_angle_corner_joint_timbers,
@@ -73,7 +73,7 @@ def example_basic_tongue_and_fork_joint(position=None):
         position = create_v3(0, 0, 0)
 
     arrangement = create_canonical_example_right_angle_corner_joint_timbers(position)
-    joint = cut_basic_tongue_and_fork_corner_joint(arrangement)
+    joint = cut_basic_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement)
 
     return joint
 
@@ -112,7 +112,7 @@ def example_basic_cross_lap_joint(position=None):
         position = create_v3(0, 0, 0)
     
     arrangement = create_canonical_example_cross_joint_timbers(position=position)
-    joint = cut_basic_plain_cross_lap_joint(arrangement)
+    joint = cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(arrangement)
     
     return joint
 
@@ -126,7 +126,7 @@ def example_basic_house_joint(position=None):
     
     # TODO offset
     arrangement = create_canonical_example_cross_joint_timbers(position=position, lateral_offset=inches(2))
-    joint = cut_basic_plain_house_joint(arrangement)
+    joint = cut_basic_plain_house_joint_on_face_aligned_timbers(arrangement)
     
     return joint
 
@@ -139,7 +139,7 @@ def example_basic_splined_opposing_double_butt_joint(position=None):
         position = create_v3(0, 0, 0)
 
     arrangement = create_canonical_example_opposing_double_butt_joint_timbers(position)
-    joint = cut_basic_splined_opposing_double_butt_joint(
+    joint = cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
         arrangement=arrangement,
         slot_facing_end_on_receiving_timber=TimberEnd.TOP,
     )
@@ -249,7 +249,7 @@ def example_basic_lapped_gooseneck_joint(position=None):
     Uses canonical splice joint timbers (parallel timbers meeting at position).
     """
     arrangement = create_canonical_example_splice_joint_timbers(position)
-    joint = cut_basic_lapped_gooseneck_joint(
+    joint = cut_basic_lapped_gooseneck_joint_on_aligned_timbers(
         gooseneck_timber=arrangement.timber2,
         receiving_timber=arrangement.timber1,
         receiving_timber_end=arrangement.timber1_end,
@@ -274,7 +274,7 @@ def example_basic_dropin_dovetail_butt_joint(position=None):
     dovetail_large_width = width * scalar(2, 3)
     receiving_timber_shoulder_inset = inches(1)  # 1 inch inset
 
-    joint = cut_basic_dropin_dovetail_butt_joint(
+    joint = cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         dovetail_timber=arrangement.butt_timber,
         receiving_timber=arrangement.receiving_timber,
         dovetail_timber_end=arrangement.butt_timber_end,
@@ -297,7 +297,7 @@ def example_basic_dropin_housed_butt_joint(position=None):
     housed_timber_face = TimberLongFace.RIGHT
     receiving_timber_shoulder_inset = inches(1)  # 1 inch inset
 
-    joint = cut_basic_dropin_housed_butt_joint(
+    joint = cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(
         housed_timber=arrangement.butt_timber,
         receiving_timber=arrangement.receiving_timber,
         housed_timber_end=arrangement.butt_timber_end,
@@ -315,7 +315,7 @@ def example_basic_mitered_and_keyed_lap_joint(position=None):
         position = create_v3(0, 0, 0)
     
     arrangement = create_canonical_example_right_angle_corner_joint_timbers(position)
-    joint = cut_basic_mitered_and_keyed_lap_joint(
+    joint = cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=arrangement
     )
     

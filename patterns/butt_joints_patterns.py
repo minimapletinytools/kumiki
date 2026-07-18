@@ -63,7 +63,7 @@ def make_tongue_and_fork_butt_joint_90_example(position: V3, use_round_timbers=F
         position=position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
-    joint = cut_tongue_and_fork_butt_joint(arrangement)
+    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
@@ -102,7 +102,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
         receiving_timber=receiving_timber,
         butt_timber_end=TimberEnd.BOTTOM,
     )
-    joint = cut_tongue_and_fork_butt_joint(arrangement)
+    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
@@ -566,7 +566,7 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timb
         position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
-    return cut_wedged_half_dovetail_mortise_and_tenon_joint(
+    return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
         dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([inches(2), inches(4)]),
@@ -596,7 +596,7 @@ def example_wedged_half_dovetail_mortise_and_tenon_no_wedge(position=None, use_r
         position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
-    return cut_wedged_half_dovetail_mortise_and_tenon_joint(
+    return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
         dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([inches(2), inches(2)]),
@@ -663,7 +663,7 @@ def create_dovetail_butt_joint_example(position: Optional[V3] = None):
         front_face_on_butt_timber=TimberLongFace.RIGHT,
     )
 
-    joint = cut_dropin_dovetail_butt_joint(
+    joint = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         arrangement=arrangement,
         receiving_timber_shoulder_inset=inches(scalar(1, 2)),  # 0.5" shoulder inset
         dovetail_length=inches(4),                                # 4" long dovetail tenon
@@ -702,7 +702,7 @@ def create_housed_butt_joint_example(position: Optional[V3] = None):
         front_face_on_butt_timber=TimberLongFace.RIGHT,
     )
 
-    joint = cut_dropin_housed_butt_joint(
+    joint = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         arrangement=arrangement,
         receiving_timber_shoulder_inset=inches(scalar(1, 2)),  # 0.5" shoulder inset
         housing_length=inches(4),                               # 4" long housing tenon
@@ -746,6 +746,6 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/half_dovetail_mortise_and_tenon_no_wedge", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge), pattern_type='frame'),
-    Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
-    Pattern(path="butt_joints/cut_dropin_housed_butt_joint", lambda_=make_pattern_from_frame(create_housed_butt_joint_example), pattern_type='frame'),
+    Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
+    Pattern(path="butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_housed_butt_joint_example), pattern_type='frame'),
 ]

@@ -36,7 +36,7 @@ def safe_transform_vector(*args, **kwargs):
     return prune(_raw_safe_transform_vector(*args, **kwargs))
 
 
-def cut_splined_opposing_double_butt_joint(arrangement: DoubleButtJointTimberArrangement,
+def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: DoubleButtJointTimberArrangement,
                                            # thickness is in the axis perpendicular to the joint plane
                                            slot_thickness: Numeric,
                                            # depth is in the axis of the receiving timber, measured from the face of the butt timber that aligns with slot_facing_end_on_receiving_timber

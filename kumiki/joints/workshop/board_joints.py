@@ -283,7 +283,7 @@ def cut_tongue_and_groove_joint(
     )
 
 
-def cut_board_in_grooved_rectangular_frame_joint(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_extra_space: Numeric = scalar(0)):
+def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_extra_space: Numeric = scalar(0)):
     """
     fits boards in between the timbers using the board_in_groove_joint
 

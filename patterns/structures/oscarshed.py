@@ -10,7 +10,7 @@ sys.path.append('..')
 from kumiki import *
 from kumiki.timber import Frame
 from kumiki.ticket import TimberTicket
-from kumiki.joints.workshop.basic_joints import cut_basic_mitered_and_keyed_lap_joint
+from kumiki.joints.workshop.basic_joints import cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers
 
 
 # ============================================================================
@@ -105,7 +105,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Corner 0 (front-left): Front mudsill BOTTOM meets Left mudsill TOP
     # Front mudsill goes from corner 0 to corner 1 (BOTTOM=corner 0, TOP=corner 1)
     # Left mudsill goes from corner 3 to corner 0 (BOTTOM=corner 3, TOP=corner 0)
-    joint_corner_0 = cut_basic_mitered_and_keyed_lap_joint(
+    joint_corner_0 = cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_front,
             timber2=mudsill_left,
@@ -118,7 +118,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Corner 1 (front-right): Front mudsill TOP meets Right mudsill BOTTOM
     # Front mudsill goes from corner 0 to corner 1 (BOTTOM=corner 0, TOP=corner 1)
     # Right mudsill goes from corner 1 to corner 2 (BOTTOM=corner 1, TOP=corner 2)
-    joint_corner_1 = cut_basic_mitered_and_keyed_lap_joint(
+    joint_corner_1 = cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_front,
             timber2=mudsill_right,
@@ -131,7 +131,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Corner 2 (back-right): Right mudsill TOP meets Back mudsill BOTTOM
     # Right mudsill goes from corner 1 to corner 2 (BOTTOM=corner 1, TOP=corner 2)
     # Back mudsill goes from corner 2 to corner 3 (BOTTOM=corner 2, TOP=corner 3)
-    joint_corner_2 = cut_basic_mitered_and_keyed_lap_joint(
+    joint_corner_2 = cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_right,
             timber2=mudsill_back,
@@ -144,7 +144,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Corner 3 (back-left): Back mudsill TOP meets Left mudsill BOTTOM
     # Back mudsill goes from corner 2 to corner 3 (BOTTOM=corner 2, TOP=corner 3)
     # Left mudsill goes from corner 3 to corner 0 (BOTTOM=corner 3, TOP=corner 0)
-    joint_corner_3 = cut_basic_mitered_and_keyed_lap_joint(
+    joint_corner_3 = cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=CornerJointTimberArrangement(
             timber1=mudsill_back,
             timber2=mudsill_left,
@@ -556,7 +556,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     lap_length = inches(scalar(1, 2))  # 1.5 inches (reasonable default)
     
     # Left gooseneck joint: middle section BOTTOM end meets left section TOP end
-    front_girt_gooseneck_joint_left = cut_lapped_gooseneck_joint(
+    front_girt_gooseneck_joint_left = cut_lapped_gooseneck_joint_on_aligned_timbers(
         arrangement=SpliceJointTimberArrangement(
             timber1=front_girt_middle,
             timber2=front_girt_left,
@@ -574,7 +574,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     )
     
     # Right gooseneck joint: middle section TOP end meets right section BOTTOM end
-    front_girt_gooseneck_joint_right = cut_lapped_gooseneck_joint(
+    front_girt_gooseneck_joint_right = cut_lapped_gooseneck_joint_on_aligned_timbers(
         arrangement=SpliceJointTimberArrangement(
             timber1=front_girt_middle,
             timber2=front_girt_right,
@@ -899,7 +899,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         # Create dovetail joint with front mudsill
         # Joist runs from front (BOTTOM) to back (TOP)
         # The dovetail should be visible on the RIGHT face of the joist (facing right/positive X)
-        joint_front = cut_dropin_dovetail_butt_joint(
+        joint_front = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 butt_timber=joist,
                 receiving_timber=mudsill_front,
@@ -915,7 +915,7 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
         )
         
         # Create dovetail joint with back mudsill
-        joint_back = cut_dropin_dovetail_butt_joint(
+        joint_back = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 butt_timber=joist,
                 receiving_timber=mudsill_back,

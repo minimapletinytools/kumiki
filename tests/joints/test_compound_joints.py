@@ -17,7 +17,7 @@ def _contains(rendered, timber, global_point: V3) -> bool:
 
 
 class TestMultiCrossLapJoint:
-    """Tests for cut_multi_cross_lap_joint."""
+    """Tests for cut_multi_cross_lap_joint_on_plane_aligned_timbers."""
 
     # Board geometry used throughout:
     #
@@ -106,7 +106,7 @@ class TestMultiCrossLapJoint:
         Above the cut boundary (Z>3): board_1 present, board_0 absent.
         """
         board_0, board_1 = self._make_x_boards()
-        joint = cut_multi_cross_lap_joint(
+        joint = cut_multi_cross_lap_joint_on_plane_aligned_timbers(
             [board_0, board_1],
             starting_face_on_first_timber=TimberFace.LEFT,
         )
@@ -129,7 +129,7 @@ class TestMultiCrossLapJoint:
         board at the relevant intersection point.
         """
         board_0, board_1, board_2 = self._make_three_boards()
-        joint = cut_multi_cross_lap_joint(
+        joint = cut_multi_cross_lap_joint_on_plane_aligned_timbers(
             [board_0, board_1, board_2],
             starting_face_on_first_timber=TimberFace.LEFT,
         )
@@ -168,7 +168,7 @@ class TestMultiCrossLapJoint:
         Backward fill-cut: board_0 must not intrude into board_2's owned zone (Z > P[1]=4).
         """
         board_0, board_1, board_2 = self._make_three_boards()
-        joint = cut_multi_cross_lap_joint(
+        joint = cut_multi_cross_lap_joint_on_plane_aligned_timbers(
             [board_0, board_1, board_2],
             starting_face_on_first_timber=TimberFace.LEFT,
         )

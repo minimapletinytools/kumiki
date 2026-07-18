@@ -71,20 +71,20 @@ Per the survey (all directions/depths verified in scope at `Joint(...)` construc
 |---|---|---|---|
 | `cut_mortise_and_tenon_joint` (butt_joints.py:535, **choke point** for the 4 straight variants at :946/:1025/:1081/:1116 + basic wrappers) | tenon cutting: −`tenon_length_direction_global` (:835); mortise cutting: inverse | `tenon_length` | pegs (`peg_i`, :904-914): freedom along `peg_result.orientation_global` −Z, freed_after = peg depth + stickout; peg `(0,0)`, timbers `(0,1)` |
 | `cut_plain_butt_joint` (+`_on_face_aligned`) butt_joints.py:109/:198 | butt cutting: −`butt_direction`; receiving: inverse | **nominal**: receiving timber size along escape (`get_size_in_direction_3d`) | — |
-| `cut_tongue_and_fork_butt_joint` :267 | tongue along its length axis out of fork; fork inverse | fork/tenon engagement depth (in scope :441-444) | — |
-| `cut_wedged_half_dovetail_mortise_and_tenon_joint` :1173 | tenon along `shoulder_result.butt_direction` inverse | `tenon_depth` | wedge (`"wedge"`, :1307): drive axis from `geo.wedge_accessory_csg.transform`; wedge `(0,0)`, timbers `(0,1)` |
-| `cut_dropin_dovetail_butt_joint` :1325 | **unidirectional** single axis (drop-in direction; NOT bidirectional) | drop depth | — |
+| `cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers` :267 | tongue along its length axis out of fork; fork inverse | fork/tenon engagement depth (in scope :441-444) | — |
+| `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` :1173 | tenon along `shoulder_result.butt_direction` inverse | `tenon_depth` | wedge (`"wedge"`, :1307): drive axis from `geo.wedge_accessory_csg.transform`; wedge `(0,0)`, timbers `(0,1)` |
+| `cut_dropin_dovetail_butt_joint_on_face_aligned_timbers` :1325 | **unidirectional** single axis (drop-in direction; NOT bidirectional) | drop depth | — |
 | `cut_plain_miter_joint` (+aligned) corner_joints.py:80/:301 | each timber along its own length axis (outward) | nominal | — |
-| `cut_tongue_and_fork_corner_joint` :325 | tongue along length axis | engagement depth | — |
-| `cut_plain_corner_lap_joint` :587 | lift along lap-plane normal (both sides, opposite) | lap depth | — |
-| `cut_mitered_and_keyed_lap_joint` :699 | halves separate along `miter_normal` (:1212) | finger depth | keys (`key_i`, :1322): along `diagonal_direction` (:1124); keys `(0,0)`, timbers `(0,1)` |
+| `cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers` :325 | tongue along length axis | engagement depth | — |
+| `cut_plain_corner_lap_joint_on_plane_aligned_timbers` :587 | lift along lap-plane normal (both sides, opposite) | lap depth | — |
+| `cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers` :699 | halves separate along `miter_normal` (:1212) | finger depth | keys (`key_i`, :1322): along `diagonal_direction` (:1124); keys `(0,0)`, timbers `(0,1)` |
 | `cut_plain_cross_lap_joint` / `_house_joint` cross_joints.py:75/:381 | lift along `cutting_plane_normal_normalized` (:248), opposite per side | lap depth | — |
 | `cut_plain_butt_splice_joint_on_aligned_timbers` splice_joints.py:43 | each half along shared length axis (outward) | nominal | — |
 | `cut_plain_splice_lap_joint_on_aligned_timbers` :163 | lift perpendicular to lap plane | lap depth | — |
 | `cut_tongue_and_groove_joint` board_joints.py:24 | separation along mating axis + slide along board length (two DOFs) | groove/tongue depth; board length for slide | — |
-| `cut_splined_opposing_double_butt_joint` multi_butt_joints.py:37 | each butt timber outward along its length axis; spline along `slot_direction_global` | engagement depths | pegs `(0,0)` (dir `peg_entry_direction_global` :289), butts+spline `(0,1)` |
+| `cut_splined_opposing_double_butt_joint_on_face_aligned_timbers` multi_butt_joints.py:37 | each butt timber outward along its length axis; spline along `slot_direction_global` | engagement depths | pegs `(0,0)` (dir `peg_entry_direction_global` :289), butts+spline `(0,1)` |
 
-**Left rigid (no freedoms; code comment explaining why):** `cut_lapped_gooseneck_joint` (lift-then-slide — needs future sequenced/R6 freedom), `cut_board_in_grooved_rectangular_frame_joint` (captured panel), `cut_multi_cross_lap_joint` (woven, over-constrained; also flows through `make_compound_joint`), `cut_free_house_joint` (escape direction not derivable from arbitrary CSG). `basic_joints.py` wrappers and `decorative_joints.py` need nothing.
+**Left rigid (no freedoms; code comment explaining why):** `cut_lapped_gooseneck_joint_on_aligned_timbers` (lift-then-slide — needs future sequenced/R6 freedom), `cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers` (captured panel), `cut_multi_cross_lap_joint_on_plane_aligned_timbers` (woven, over-constrained; also flows through `make_compound_joint`), `cut_free_house_joint` (escape direction not derivable from arbitrary CSG). `basic_joints.py` wrappers and `decorative_joints.py` need nothing.
 
 ## 4. Serialization + viewer
 

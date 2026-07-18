@@ -273,7 +273,7 @@ class TestTongueAndForkJoint:
             timber1_end=TimberEnd.BOTTOM,
             timber2_end=TimberEnd.BOTTOM,
         )
-        joint = cut_tongue_and_fork_corner_joint(arrangement)
+        joint = cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement)
 
         assert len(joint.cuttings) == 2
         assert "tongue_timber" in joint.cuttings
@@ -332,7 +332,7 @@ class TestTongueAndForkJoint:
             timber2_end=TimberEnd.BOTTOM,
         )
 
-        joint_centered = cut_tongue_and_fork_corner_joint(arrangement_a)
+        joint_centered = cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(arrangement_a)
 
         tongue_timber_b = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
         fork_timber_b = create_standard_horizontal_timber(direction='y', length=100, size=(6, 6), position=(0, 0, 0))
@@ -342,7 +342,7 @@ class TestTongueAndForkJoint:
             timber1_end=TimberEnd.BOTTOM,
             timber2_end=TimberEnd.BOTTOM,
         )
-        joint_shifted = cut_tongue_and_fork_corner_joint(
+        joint_shifted = cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
             arrangement_b,
             tongue_thickness=scalar(2),
             tongue_position=scalar(2),
@@ -369,7 +369,7 @@ class TestTongueAndForkJoint:
         fork_parallel = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
 
         with pytest.raises(AssertionError, match="parallel"):
-            cut_tongue_and_fork_corner_joint(
+            cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
                 CornerJointTimberArrangement(
                     timber1=tongue_parallel,
                     timber2=fork_parallel,
@@ -388,7 +388,7 @@ class TestTongueAndForkJoint:
         )
 
         with pytest.raises(AssertionError, match="plane-aligned"):
-            cut_tongue_and_fork_corner_joint(
+            cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
                 CornerJointTimberArrangement(
                     timber1=tongue_non_plane,
                     timber2=fork_non_plane,
@@ -412,7 +412,7 @@ class TestCornerLapJoint:
             front_face_on_timber1=TimberLongFace.FRONT,
         )
 
-        joint = cut_plain_corner_lap_joint(arrangement)
+        joint = cut_plain_corner_lap_joint_on_plane_aligned_timbers(arrangement)
 
         assert len(joint.cuttings) == 2
         cutA = joint.cuttings["timberA"]
@@ -520,7 +520,7 @@ def _assert_miter_boundary_point(joint, timberA, timberB, point_global):
 
 
 class TestMiteredAndKeyedLapJoint:
-    """Test cut_mitered_and_keyed_lap_joint function."""
+    """Test cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers function."""
 
     def test_basic_right_angle_joint(self):
         """Test basic joint at 90 degrees — structure, end cuts, accessories, miter separation."""
@@ -529,7 +529,7 @@ class TestMiteredAndKeyedLapJoint:
         timberB = arrangement.timber2
         num_laps = 3
 
-        joint = cut_mitered_and_keyed_lap_joint(
+        joint = cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
             arrangement=arrangement,
             num_laps=num_laps,
             lap_thickness=inches(scalar(3, 4)),
@@ -568,7 +568,7 @@ class TestMiteredAndKeyedLapJoint:
         """Test that the joint is constructable at several valid angles."""
         for angle_deg in [60, 75, 90, 110, 130]:
             arrangement = _make_angled_arrangement(angle_deg)
-            joint = cut_mitered_and_keyed_lap_joint(
+            joint = cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
                 arrangement=arrangement,
                 num_laps=2,
             )
@@ -590,7 +590,7 @@ class TestMiteredAndKeyedLapJoint:
     def test_num_laps_2_produces_one_key(self):
         """Minimum valid num_laps=2 should produce exactly 1 key."""
         arrangement = _make_right_angle_arrangement()
-        joint = cut_mitered_and_keyed_lap_joint(
+        joint = cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
             arrangement=arrangement,
             num_laps=2,
         )
@@ -599,7 +599,7 @@ class TestMiteredAndKeyedLapJoint:
     def test_num_laps_4_produces_three_keys(self):
         """num_laps=4 should produce exactly 3 keys."""
         arrangement = _make_right_angle_arrangement()
-        joint = cut_mitered_and_keyed_lap_joint(
+        joint = cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
             arrangement=arrangement,
             num_laps=4,
         )
@@ -615,7 +615,7 @@ class TestMiteredAndKeyedLapJoint:
         """num_laps < 2 should raise ValueError."""
         arrangement = _make_right_angle_arrangement()
         with pytest.raises(ValueError, match="num_laps must be at least 2"):
-            cut_mitered_and_keyed_lap_joint(
+            cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
                 arrangement=arrangement,
                 num_laps=1,
             )
@@ -625,7 +625,7 @@ class TestMiteredAndKeyedLapJoint:
         """Angles below 45 degrees should raise ValueError."""
         arrangement = _make_angled_arrangement(30)
         with pytest.raises(ValueError, match="Angle between timbers"):
-            cut_mitered_and_keyed_lap_joint(
+            cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
                 arrangement=arrangement,
                 num_laps=2,
             )
@@ -644,14 +644,14 @@ class TestMiteredAndKeyedLapJoint:
             front_face_on_timber1=TimberLongFace.RIGHT,
         )
         with pytest.raises((ValueError, AssertionError)):
-            cut_mitered_and_keyed_lap_joint(
+            cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
                 arrangement=arrangement,
                 num_laps=2,
             )
 
 
 # ============================================================================
-# Tests for cut_dropin_dovetail_butt_joint
+# Tests for cut_dropin_dovetail_butt_joint_on_face_aligned_timbers
 # ============================================================================
 
 

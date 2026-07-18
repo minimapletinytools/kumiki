@@ -12,8 +12,8 @@ Joinery used:
 from kumiki import *
 
 # Compatibility alias for watcher reloads that may still reference the old symbol name.
-def cut_basic_mitered_and_keyed_lap_joint(arrangement: CornerJointTimberArrangement) -> Joint:
-    return cut_mitered_and_keyed_lap_joint(arrangement)
+def cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: CornerJointTimberArrangement) -> Joint:
+    return cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement)
 
 # -----------------------------------------------------------------------------
 # Dimensions
@@ -230,10 +230,10 @@ def _build_joints(
         )
 
     # Mudsills: keyed miter joints on all four corners.
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_front, base_left, TimberEnd.BOTTOM, TimberEnd.BOTTOM)))
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_front, base_right, TimberEnd.TOP, TimberEnd.BOTTOM)))
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_back, base_left, TimberEnd.BOTTOM, TimberEnd.TOP)))
-    joints.append(cut_mitered_and_keyed_lap_joint(_make_corner_arrangement(base_back, base_right, TimberEnd.TOP, TimberEnd.TOP)))
+    joints.append(cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(_make_corner_arrangement(base_front, base_left, TimberEnd.BOTTOM, TimberEnd.BOTTOM)))
+    joints.append(cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(_make_corner_arrangement(base_front, base_right, TimberEnd.TOP, TimberEnd.BOTTOM)))
+    joints.append(cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(_make_corner_arrangement(base_back, base_left, TimberEnd.BOTTOM, TimberEnd.TOP)))
+    joints.append(cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(_make_corner_arrangement(base_back, base_right, TimberEnd.TOP, TimberEnd.TOP)))
 
     # Posts -> mudsills: short tenons.
     for side, mudsill in [("Front", base_front), ("Back", base_back)]:
@@ -280,7 +280,7 @@ def _build_joints(
         joints.append(cut_plain_cross_lap_house_joint(CrossJointTimberArrangement(timber1=back_rafter, timber2=plate_back)))
 
         joints.append(
-            cut_tongue_and_fork_corner_joint(
+            cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
                 CornerJointTimberArrangement(
                     timber1=front_rafter,
                     timber2=back_rafter,

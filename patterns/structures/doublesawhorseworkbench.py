@@ -209,7 +209,7 @@ def build_double_sawhorse_workbench() -> Frame:
     # Cross laps bind the stretcher to all four posts, splitting the material
     # removal equally between stretcher and post at each crossing.
     stretcher_joints = [
-        cut_basic_plain_cross_lap_joint(
+        cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(
             CrossJointTimberArrangement(timber1=stretcher, timber2=post),
         )
         for post in (west_south_post, west_north_post,

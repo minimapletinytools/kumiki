@@ -31,7 +31,7 @@ def _find_long_face_aligned_with_direction(timber: TimberLike, direction: Direct
     return best_face.to.long_face()
 
 
-def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first_timber : TimberFace, cut_distance_ratios : List[Numeric] = []) -> Joint:
+def cut_multi_cross_lap_joint_on_plane_aligned_timbers(timbers : List[TimberLike], starting_face_on_first_timber : TimberFace, cut_distance_ratios : List[Numeric] = []) -> Joint:
   """
   Weave a chain of N timbers together with N-1 cross-lap joints, cut in order between
   timbers[n] and timbers[n+1].
@@ -56,7 +56,7 @@ def cut_multi_cross_lap_joint(timbers : List[TimberLike], starting_face_on_first
           first len(cut_distance_ratios) boundaries; any remaining boundaries are filled
           in uniformly up to the finish face.
   """
-  assert len(timbers) >= 2, "cut_multi_cross_lap_joint requires at least 2 timbers"
+  assert len(timbers) >= 2, "cut_multi_cross_lap_joint_on_plane_aligned_timbers requires at least 2 timbers"
   assert starting_face_on_first_timber in _LONG_FACES, \
       f"starting_face_on_first_timber must be a long face (RIGHT/FRONT/LEFT/BACK), got {starting_face_on_first_timber}"
 

@@ -94,14 +94,14 @@ class TestButtFamilyFreedoms:
         assert joint.cuttings["butt_timber"].assembly_ordering == Ordering(0, 0)
 
     def test_tongue_and_fork_butt(self, float_mode):
-        joint = cut_basic_tongue_and_fork_butt_joint(create_canonical_example_butt_joint_timbers())
+        joint = cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(create_canonical_example_butt_joint_timbers())
 
         assert_authored_translation(joint.cuttings["tongue_timber"].assembly_freedom, (0, -1, 0))
         assert_opposite_escape_pair(joint, "tongue_timber", "fork_timber")
 
     def test_dropin_dovetail_is_unidirectional(self, float_mode):
         arrangement = create_canonical_example_butt_joint_timbers()
-        joint = cut_basic_dropin_dovetail_butt_joint(
+        joint = cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
             dovetail_timber=arrangement.butt_timber,
             receiving_timber=arrangement.receiving_timber,
             dovetail_timber_end=arrangement.butt_timber_end,
@@ -122,7 +122,7 @@ class TestButtFamilyFreedoms:
 
     def test_dropin_housed_is_unidirectional(self, float_mode):
         arrangement = create_canonical_example_butt_joint_timbers()
-        joint = cut_basic_dropin_housed_butt_joint(
+        joint = cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(
             housed_timber=arrangement.butt_timber,
             receiving_timber=arrangement.receiving_timber,
             housed_timber_end=arrangement.butt_timber_end,
@@ -139,7 +139,7 @@ class TestButtFamilyFreedoms:
 
 class TestLapAndSpliceFreedoms:
     def test_plain_cross_lap(self, float_mode):
-        joint = cut_basic_plain_cross_lap_joint(create_canonical_example_cross_joint_timbers())
+        joint = cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(create_canonical_example_cross_joint_timbers())
 
         assert_opposite_escape_pair(joint, "timberA", "timberB")
 
@@ -171,7 +171,7 @@ class TestLockedJointFreedoms:
         arrangement = create_canonical_example_right_angle_corner_joint_timbers()
         if arrangement.front_face_on_timber1 is None:
             arrangement = replace(arrangement, front_face_on_timber1=TimberLongFace.RIGHT)
-        joint = cut_basic_mitered_and_keyed_lap_joint(arrangement)
+        joint = cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement)
 
         cutting_keys = list(joint.cuttings)
         for key in cutting_keys:
@@ -184,7 +184,7 @@ class TestLockedJointFreedoms:
 
     def test_splined_opposing_double_butt(self, float_mode):
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
-        joint = cut_basic_splined_opposing_double_butt_joint(
+        joint = cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_facing_end_on_receiving_timber=TimberEnd.TOP,
         )
@@ -209,7 +209,7 @@ class TestLockedJointFreedoms:
 class TestRigidJoints:
     def test_lapped_gooseneck_stays_rigid(self, float_mode):
         arrangement = create_canonical_example_splice_joint_timbers()
-        joint = cut_basic_lapped_gooseneck_joint(
+        joint = cut_basic_lapped_gooseneck_joint_on_aligned_timbers(
             gooseneck_timber=arrangement.timber1,
             receiving_timber=arrangement.timber2,
             receiving_timber_end=arrangement.timber2_end,

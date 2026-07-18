@@ -286,7 +286,7 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
 # ============================================================================
 
 
-def cut_lapped_gooseneck_joint(
+def cut_lapped_gooseneck_joint_on_aligned_timbers(
     arrangement: SpliceJointTimberArrangement,
     gooseneck_length: Numeric,
     gooseneck_small_width: Numeric,
@@ -600,5 +600,5 @@ def cut_lapped_gooseneck_joint(
 # Aliases for Japanese joint functions
 # ============================================================================
 
-cut_腰掛鎌継ぎ = cut_lapped_gooseneck_joint
-cut_koshikake_kama_tsugi = cut_lapped_gooseneck_joint
+cut_腰掛鎌継ぎ = cut_lapped_gooseneck_joint_on_aligned_timbers
+cut_koshikake_kama_tsugi = cut_lapped_gooseneck_joint_on_aligned_timbers

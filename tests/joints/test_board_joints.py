@@ -4,7 +4,7 @@ import pytest
 from sympy import Matrix
 
 from kumiki.joints.workshop.board_joints import (
-    cut_board_in_grooved_rectangular_frame_joint,
+    cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers,
     cut_tongue_and_groove_joint,
 )
 from kumiki.ticket import BoardTicket, TimberTicket
@@ -205,7 +205,7 @@ class TestTongueAndGrooveJoint:
 
 
 class TestBoardInGroovedRectangularFrameJoint:
-    """Tests for cut_board_in_grooved_rectangular_frame_joint."""
+    """Tests for cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers."""
 
     def _make_frame(self, *, n_boards=2, groove_extra_space=scalar(0)):
         """
@@ -269,7 +269,7 @@ class TestBoardInGroovedRectangularFrameJoint:
             ticket=TimberTicket(path="right"),
         )
 
-        joint = cut_board_in_grooved_rectangular_frame_joint(
+        joint = cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
             boards=boards,
             board_top_end_timbers=[top_timber],
             board_bottom_end_timbers=[bot_timber],

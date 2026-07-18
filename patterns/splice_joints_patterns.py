@@ -23,7 +23,7 @@ TIMBER_HEIGHT = inches(5)
 TIMBER_LENGTH = inches(48)
 TIMBER_SIZE_2D = create_v2(TIMBER_WIDTH, TIMBER_HEIGHT)
 
-from kumiki.joints.workshop.splice_joints import cut_lapped_gooseneck_joint
+from kumiki.joints.workshop.splice_joints import cut_lapped_gooseneck_joint_on_aligned_timbers
 
 def _maybe_round_timber_config(use_round_timbers: bool):
     if not use_round_timbers:
@@ -153,7 +153,7 @@ def create_simple_gooseneck_example(position: Optional[V3] = None):
     )
 
     # Create the gooseneck joint using parameters appropriate for canonical timber size
-    joint = cut_lapped_gooseneck_joint(
+    joint = cut_lapped_gooseneck_joint_on_aligned_timbers(
         arrangement=arrangement,
         gooseneck_length=inches(6),        # 6" gooseneck length
         gooseneck_small_width=inches(1),   # 1" narrow end

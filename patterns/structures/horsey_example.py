@@ -176,7 +176,7 @@ def create_sawhorse() -> Frame:
         wedge_base_extra_length=inches(1),
     )
 
-    left_post_stretcher_joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
+    left_post_stretcher_joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=left_post,
             butt_timber=stretcher,
@@ -190,7 +190,7 @@ def create_sawhorse() -> Frame:
         wedge_accessory_parameters=stretcher_wedge_params,
     )
 
-    right_post_stretcher_joint = cut_wedged_half_dovetail_mortise_and_tenon_joint(
+    right_post_stretcher_joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
             receiving_timber=right_post,
             butt_timber=stretcher,

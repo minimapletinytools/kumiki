@@ -100,25 +100,25 @@ Joint parameters are always set relative to one of the features on one of the ti
 If the user does not specify which joint, use the following (or one of its variants) as defaults:
 
 - for butt joints use cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers
-- for corner joints use cut_basic_plain_miter_joint or cut_plain_corner_lap_joint
+- for corner joints use cut_basic_plain_miter_joint or cut_plain_corner_lap_joint_on_plane_aligned_timbers
 - for splice joint use cut_basic_plain_splice_lap_joint_on_aligned_timbers
-- for cross joints use cut_basic_plain_cross_lap_joint
+- for cross joints use cut_basic_plain_cross_lap_joint_on_face_aligned_timbers
 
 The basic variants of all joints provide sensible defaults for most parameters. If there are specific needs that aren't met by the defaults, use the non basic variants next, and then finally explore using other joints all together.
 
 ### default joints for timber frames
 
 - for beam-to-post joints use cut_mortise_and_tenon_joint, with a peg if the beam butts into the post, and without a peg if the beam sits above the post
-- for tie-beams or beams under substantial loads, consider using cut_wedged_half_dovetail_mortise_and_tenon_joint instead as it's much stronger
-- for rafter-to-rafter joints use cut_tongue_and_fork_corner_joint
-- for mudsill splice joints use cut_lapped_gooseneck_joint with the gooseneck facing upwards
+- for tie-beams or beams under substantial loads, consider using cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers instead as it's much stronger
+- for rafter-to-rafter joints use cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers
+- for mudsill splice joints use cut_lapped_gooseneck_joint_on_aligned_timbers with the gooseneck facing upwards
 - for mudsill corner joints use either
-    - cut_plain_corner_lap_joint (simplest)
+    - cut_plain_corner_lap_joint_on_plane_aligned_timbers (simplest)
     - cut_mortise_and_tenon_joint (more complicated)
-    - cut_mitered_and_keyed_lap_joint (most complicated, no end grain exposed)
+    - cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers (most complicated, no end grain exposed)
 - for joist-to-beam or joist-to-mudsill joints use
-    - cut_dropin_housed_butt_joint (simplest)
-    - cut_dropin_dovetail_butt_joint (if joist needs to resist spreading forces)
+    - cut_dropin_housed_butt_joint_on_face_aligned_timbers (simplest)
+    - cut_dropin_dovetail_butt_joint_on_face_aligned_timbers (if joist needs to resist spreading forces)
 
 ## Combining everything into a Frame
 
@@ -234,7 +234,7 @@ Here are some typical guidelines:
 
 - for mudsills which are usually bolted to the foundation and experience no loads except during disaster scenarios
     - use `cut_plain_splice_lap_joint_on_aligned_timbers` for simple construction
-    - use `cut_lapped_gooseneck_joint` for premium construction
+    - use `cut_lapped_gooseneck_joint_on_aligned_timbers` for premium construction
     - you can even use `cut_plain_butt_splice_joint_on_aligned_timbers` 🫠
 - use `cut_plain_butt_splice_joint_on_aligned_timbers` as a placeholder in other scenarios until more splice joint types are added
     - otherwise never use `cut_plain_butt_splice_joint_on_aligned_timbers` as it resists no loads whatsoever
@@ -286,7 +286,7 @@ Floor beams connecting into corner posts can be joined with mortise and tenon jo
 For beams connecting into non-corner posts, you have a few options:
 
 - let the beam be continuous and split the post in two connecting to the floating floor beam with mortise and tenon joints such that there is a tiny stub post below the beam to support it from below
-- use something like the `cut_splined_opposing_double_butt_joint` (complex) (this is what we did in tinyhouse120)
+- use something like the `cut_splined_opposing_double_butt_joint_on_face_aligned_timbers` (complex) (this is what we did in tinyhouse120)
 
 ### girts between vertical members
 

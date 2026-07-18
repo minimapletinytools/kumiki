@@ -9,7 +9,7 @@ from typing import Union
 
 from kumiki.rule import V3, create_v3, scalar
 from kumiki.timber import *
-from kumiki.joints.workshop.multi_butt_joints import cut_splined_opposing_double_butt_joint
+from kumiki.joints.workshop.multi_butt_joints import cut_splined_opposing_double_butt_joint_on_face_aligned_timbers
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
 from kumiki.patternbook import Pattern
@@ -26,7 +26,7 @@ def make_splined_opposing_double_butt_joint_example(position: V3) -> Frame:
         position: Center position of the joint (V3)
     """
     arrangement = create_canonical_example_opposing_double_butt_joint_timbers(position=position)
-    joint = cut_splined_opposing_double_butt_joint(arrangement = arrangement,
+    joint = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement = arrangement,
         slot_facing_end_on_receiving_timber = TimberEnd.TOP,
         # thickness is in the axis perpendicular to the joint plane
         slot_thickness=inches(1),

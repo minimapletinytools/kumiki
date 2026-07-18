@@ -14,7 +14,7 @@ def _render_cutting(cutting: Cutting):
 
 
 class TestSplinedOpposingDoubleButtJoint:
-    """Test cut_splined_opposing_double_butt_joint function."""
+    """Test cut_splined_opposing_double_butt_joint_on_face_aligned_timbers function."""
 
     def test_arrangement_validation(self):
         """Canonical arrangement passes the cardinal-and-opposing-butts check."""
@@ -29,7 +29,7 @@ class TestSplinedOpposingDoubleButtJoint:
     def test_returns_joint_with_three_cut_timbers(self):
         """Implemented function returns all three cut timbers with one cut each."""
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
-        joint = cut_basic_splined_opposing_double_butt_joint(
+        joint = cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             TimberEnd.TOP,
         )
@@ -42,7 +42,7 @@ class TestSplinedOpposingDoubleButtJoint:
     def test_slot_point_removed_on_all_three_members(self):
         """A point known to lie inside the default slot should be removed from all three timbers."""
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
-        joint = cut_basic_splined_opposing_double_butt_joint(
+        joint = cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             TimberEnd.TOP,
         )
@@ -92,7 +92,7 @@ class TestSplinedOpposingDoubleButtJoint:
         """Increasing shoulder inset should move the butt end cut inward by that inset."""
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
 
-        joint_flush = cut_splined_opposing_double_butt_joint(
+        joint_flush = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -100,7 +100,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             shoulder_symmetric_inset=scalar(0),
         )
-        joint_inset = cut_splined_opposing_double_butt_joint(
+        joint_inset = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -122,7 +122,7 @@ class TestSplinedOpposingDoubleButtJoint:
         """Positive shoulder inset should add receiving-side shoulder notch cuts."""
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
 
-        joint_flush = cut_splined_opposing_double_butt_joint(
+        joint_flush = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -130,7 +130,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             shoulder_symmetric_inset=scalar(0),
         )
-        joint_inset = cut_splined_opposing_double_butt_joint(
+        joint_inset = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -155,7 +155,7 @@ class TestSplinedOpposingDoubleButtJoint:
             tenon_hole_offset=scalar(0),
         )
 
-        joint = cut_splined_opposing_double_butt_joint(
+        joint = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -189,7 +189,7 @@ class TestSplinedOpposingDoubleButtJoint:
             tenon_hole_offset=scalar(0),
         )
 
-        joint = cut_splined_opposing_double_butt_joint(
+        joint = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -227,7 +227,7 @@ class TestSplinedOpposingDoubleButtJoint:
             tenon_hole_offset=inches(1),
         )
 
-        joint_no_offset = cut_splined_opposing_double_butt_joint(
+        joint_no_offset = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -235,7 +235,7 @@ class TestSplinedOpposingDoubleButtJoint:
             slot_facing_end_on_receiving_timber=TimberEnd.TOP,
             peg_parameters=peg_parameters_no_offset,
         )
-        joint_offset = cut_splined_opposing_double_butt_joint(
+        joint_offset = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),
@@ -270,7 +270,7 @@ class TestSplinedOpposingDoubleButtJoint:
             tenon_hole_offset=scalar(0),
         )
 
-        joint = cut_splined_opposing_double_butt_joint(
+        joint = cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
             slot_thickness=inches(1),
             slot_depth=inches(2),

@@ -273,7 +273,7 @@ def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJoi
     return joint
 
 
-def cut_tongue_and_fork_butt_joint(
+def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
@@ -1270,7 +1270,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
 # Wedged Half-Dovetail Mortise and Tenon Joint
 # ============================================================================
 
-def cut_wedged_half_dovetail_mortise_and_tenon_joint(
+def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     dovetail_top_side_on_butt_timber: TimberLongFace,
     tenon_size: V2,
@@ -1430,7 +1430,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint(
 # ============================================================================
 
 
-def cut_dropin_dovetail_butt_joint(
+def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     receiving_timber_shoulder_inset: Numeric,
     dovetail_length: Numeric,
@@ -1673,11 +1673,11 @@ def cut_dropin_dovetail_butt_joint(
 # Aliases for Japanese joint functions
 # ============================================================================
 
-cut_蟻仕口 = cut_dropin_dovetail_butt_joint
-cut_ari_shiguchi = cut_dropin_dovetail_butt_joint
+cut_蟻仕口 = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers
+cut_ari_shiguchi = cut_dropin_dovetail_butt_joint_on_face_aligned_timbers
 
 
-def cut_dropin_housed_butt_joint(
+def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     receiving_timber_shoulder_inset: Numeric,
     housing_length: Numeric,

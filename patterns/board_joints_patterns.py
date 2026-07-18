@@ -3,7 +3,7 @@
 from sympy import Matrix
 
 from kumiki.joints.workshop.board_joints import (
-    cut_board_in_grooved_rectangular_frame_joint,
+    cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers,
     cut_tongue_and_groove_joint,
 )
 from kumiki.joints.workshop.corner_joints import cut_plain_miter_joint_on_face_aligned_timbers
@@ -145,7 +145,7 @@ def example_board_in_grooved_frame(
             )
             for i in range(n_boards)
         ]
-        board_joint = cut_board_in_grooved_rectangular_frame_joint(
+        board_joint = cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
             boards=boards,
             board_bottom_end_timbers=[bot_rail],
             board_top_end_timbers=[top_rail],
@@ -176,7 +176,7 @@ def example_board_in_grooved_frame(
             )
             for i in range(n_boards)
         ]
-        board_joint = cut_board_in_grooved_rectangular_frame_joint(
+        board_joint = cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
             boards=boards,
             board_bottom_end_timbers=[left_stile],
             board_top_end_timbers=[right_stile],

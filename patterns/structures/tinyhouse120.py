@@ -1130,7 +1130,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         (beam_left_1, TimberEnd.TOP, beam_left_2, TimberEnd.BOTTOM, post_ML),
     ]:
         bottom_beam_corner_post_joints.append(
-            cut_basic_splined_opposing_double_butt_joint(
+            cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
                 arrangement=DoubleButtJointTimberArrangement(
                     butt_timber_1=beam1,
                     butt_timber_2=beam2,
@@ -1283,7 +1283,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     for joist, front_receiver, back_receiver in floor_joist_receivers:
         floor_joist_dovetail_joints.append(
-            cut_dropin_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     butt_timber=joist,
                     receiving_timber=front_receiver,
@@ -1299,7 +1299,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             )
         )
         floor_joist_dovetail_joints.append(
-            cut_dropin_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     butt_timber=joist,
                     receiving_timber=back_receiver,
@@ -1349,7 +1349,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
     for loft_beam, front_receiver, back_receiver in loft_beam_receivers:
         loft_beam_dovetail_joints.append(
-            cut_dropin_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     butt_timber=loft_beam,
                     receiving_timber=front_receiver,
@@ -1365,7 +1365,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             )
         )
         loft_beam_dovetail_joints.append(
-            cut_dropin_dovetail_butt_joint(
+            cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     butt_timber=loft_beam,
                     receiving_timber=back_receiver,
@@ -1382,7 +1382,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         )
 
     center_support_beam_dovetail_joints: List[Joint] = [
-        cut_dropin_dovetail_butt_joint(
+        cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 butt_timber=center_support_beam,
                 receiving_timber=top_plate_front,
@@ -1396,7 +1396,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             dovetail_lateral_offset=scalar(0),
             dovetail_depth=floor_joist_dovetail_depth,
         ),
-        cut_dropin_dovetail_butt_joint(
+        cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
             arrangement=ButtJointTimberArrangement(
                 butt_timber=center_support_beam,
                 receiving_timber=top_plate_back,
@@ -1426,7 +1426,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     rafter_pair_joints: List[Joint] = []
     for front_rafter, back_rafter in rafter_pairs:
         rafter_pair_joints.append(
-            cut_tongue_and_fork_corner_joint(
+            cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
                 CornerJointTimberArrangement(
                     timber1=front_rafter,
                     timber2=back_rafter,
