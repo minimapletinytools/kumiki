@@ -3,7 +3,7 @@ name = "kumiki"
 version = "0.4.2"
 description = "A library for programmatic timber frame CAD design"
 requires-python = ">=3.10"
-license = "MIT"
+license = "MPL-2.0"
 authors = [{ name = "minimaple" }]
 readme = "README.md"
 keywords = ["timber", "woodworking", "cad", "parametric", "sympy"]
@@ -11,7 +11,7 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Intended Audience :: Manufacturing",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Mozilla Public License 2.0 (MPL 2.0)",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",

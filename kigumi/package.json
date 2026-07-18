@@ -4,6 +4,7 @@
   "description": "Kiguim is a viewer tool for Kumiki designs",
   "version": "0.4.2",
   "publisher": "minimaple",
+  "license": "MPL-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/minimapletinytools/kumiki/kigumi"
