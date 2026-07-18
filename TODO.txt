@@ -185,13 +185,25 @@ DONE-improve kiguim rendering modes
   DONE-add edge modes: no edges, overlay, no overlay (dose this work it might have z fighting issues... maybe you can hack the Z depth test to have some buffer))
   DONE-add transparent rendering mode so faces  are rendered transparent. this only appiles ot faces, not the edge lines.
   DONE-add edge thickness parameter to options
-  
+DONE-joint rename
+DONE-choose domnai for website
+DONE-wedged halfdovetail needs basic joint version
+-patern book changes 
+  -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
+  -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
 
+-maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
 
--choose domnai for website
 -enable potato (scribe) notching on the remaining joints?  
 -publish again
--fix arrangement algorithm
+-fix joint assembly algorithm 
+
+-update wedged half dovtail to support shoulder shapes and peg
+ -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
+-add relief for DropinButtJointSweepScribeReliefConfig
+
+-reimplement tongue and fork using mortise and tenon (make a short vid about this)
+  the current tongue and fork joint does not suport pegs which seems strange since a tongue and fork joint is just a simplified mortise an tenon joint. I wanted them as 2 as separate functions to simplify things, however they don't need 2 separate implementations as they do right now. "Please reimplement tongue and fork joint using cut_mortise_and_tenon_joint_on_plane_aligned_timbers, in addition, add support for pegs while you do this"
 
 
 -create test runner for examples so the exmaples are also tests :O
