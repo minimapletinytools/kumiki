@@ -187,9 +187,15 @@ DONE-improve kiguim rendering modes
   DONE-add edge thickness parameter to options
   
 
+
 -choose domnai for website
--create test runner for examples so the exmaples are also tests :O
 -enable potato (scribe) notching on the remaining joints?  
+-publish again
+-fix arrangement algorithm
+
+
+-create test runner for examples so the exmaples are also tests :O
+
 -test frame scanning fixes
 -test the install cadquery stuff 
 -test regular imperfect rectangular timber stuff

@@ -951,3 +951,47 @@ def chop_scribe_relief_and_apply(
     )
 
     return updated_cut_cutting, updated_scribed_cutting
+
+
+def _chop_scribe_relief_and_apply_for_butt_joint_arrangement(
+    arrangement: ButtJointTimberArrangement,
+    relief: Optional[ButtJointScribeReliefConfig],
+    tenon_cut: Cutting,
+    mortise_cut: Cutting,
+) -> tuple[Cutting, Cutting]:
+    """
+    Internal helper for mortise-and-tenon cutting: apply scribe relief between
+    the butt (tenon) and receiving (mortise) timbers of ``arrangement``,
+    honoring ``relief.timber_to_be_scribed`` to decide which timber is scribed
+    onto the other.
+
+    Returns ``(tenon_cut, mortise_cut)``, unchanged if ``relief`` is None.
+    """
+    if relief is None:
+        return tenon_cut, mortise_cut
+
+    tenon_timber = arrangement.butt_timber
+    mortise_timber = arrangement.receiving_timber
+
+    if relief.timber_to_be_scribed == ArrangementNames.butt_timber:
+        scribed_timber, cut_timber_for_relief = tenon_timber, mortise_timber
+        scribed_cutting, cut_cutting = tenon_cut, mortise_cut
+    elif relief.timber_to_be_scribed == ArrangementNames.receiving_timber:
+        scribed_timber, cut_timber_for_relief = mortise_timber, tenon_timber
+        scribed_cutting, cut_cutting = mortise_cut, tenon_cut
+    else:
+        raise AssertionError(
+            f"Unsupported mortise-and-tenon relief target: {relief.timber_to_be_scribed}"
+        )
+
+    updated_cut_cutting, updated_scribed_cutting = chop_scribe_relief_and_apply(
+        timber_to_be_scribed=scribed_timber,
+        timber_to_be_scribed_cutting=scribed_cutting,
+        timber_to_be_cut=cut_timber_for_relief,
+        timber_to_be_cut_cutting=cut_cutting,
+    )
+
+    if relief.timber_to_be_scribed == ArrangementNames.butt_timber:
+        return updated_scribed_cutting, updated_cut_cutting
+    else:
+        return updated_cut_cutting, updated_scribed_cutting

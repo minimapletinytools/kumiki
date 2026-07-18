@@ -13,7 +13,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, chop_scribe_relief_and_apply
+from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, _chop_scribe_relief_and_apply_for_butt_joint_arrangement
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -1000,29 +1000,12 @@ def cut_mortise_and_tenon_joint(
                 label="mortise_and_tenon",
             )
 
-    if relief is not None:
-        if relief.timber_to_be_scribed == ArrangementNames.butt_timber:
-            scribed_timber, cut_timber_for_relief = tenon_timber, mortise_timber
-            scribed_cutting, cut_cutting = tenon_cut, mortise_cut
-        elif relief.timber_to_be_scribed == ArrangementNames.receiving_timber:
-            scribed_timber, cut_timber_for_relief = mortise_timber, tenon_timber
-            scribed_cutting, cut_cutting = mortise_cut, tenon_cut
-        else:
-            raise AssertionError(
-                f"Unsupported mortise-and-tenon relief target: {relief.timber_to_be_scribed}"
-            )
-
-        updated_cut_cutting, updated_scribed_cutting = chop_scribe_relief_and_apply(
-            timber_to_be_scribed=scribed_timber,
-            timber_to_be_scribed_cutting=scribed_cutting,
-            timber_to_be_cut=cut_timber_for_relief,
-            timber_to_be_cut_cutting=cut_cutting,
-        )
-        print("meow meow meow")
-        if relief.timber_to_be_scribed == ArrangementNames.butt_timber:
-            tenon_cut, mortise_cut = updated_scribed_cutting, updated_cut_cutting
-        else:
-            mortise_cut, tenon_cut = updated_scribed_cutting, updated_cut_cutting
+    tenon_cut, mortise_cut = _chop_scribe_relief_and_apply_for_butt_joint_arrangement(
+        arrangement=arrangement,
+        relief=relief,
+        tenon_cut=tenon_cut,
+        mortise_cut=mortise_cut,
+    )
 
     # Assembly: the tenon backs out of the mortise along the tenon axis; the
     # mortise timber's view of the same separation is the inverse direction.
