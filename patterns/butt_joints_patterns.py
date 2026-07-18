@@ -205,7 +205,7 @@ from kumiki.construction import (
     ButtJointTimberArrangement,
     Stickout,
     create_axis_aligned_timber,
-    join_plane_aligned_on_place_aligned_timbers,
+    join_plane_aligned_on_plane_aligned_timbers,
 )
 from kumiki.example_shavings import (
     create_canonical_example_brace_joint_timbers,
@@ -466,7 +466,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
     )
     timber1 = brace_arrangement.timber1
     timber2 = brace_arrangement.timber2
-    brace_timber = join_plane_aligned_on_place_aligned_timbers(
+    brace_timber = join_plane_aligned_on_plane_aligned_timbers(
         timber1=timber1,
         timber2=timber2,
         location_on_timber1=timber1.length / scalar(2),

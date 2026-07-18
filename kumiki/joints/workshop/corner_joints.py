@@ -322,8 +322,10 @@ def cut_plain_miter_joint_on_face_aligned_timbers(arrangement: CornerJointTimber
         Joint object containing the two CutTimbers.
 
     Raises:
-        AssertionError: If the timbers are not orthogonal.
+        AssertionError: If the timbers are not face-aligned or not orthogonal.
     """
+    assert are_timbers_face_aligned(arrangement.timber1, arrangement.timber2), \
+        "Timbers must be face-aligned (orientations related by 90-degree rotations) for this joint type"
     # Assert that the timber length axes are perpendicular (90-degree corner)
     assert are_timbers_orthogonal(arrangement.timber1, arrangement.timber2), \
         "Timbers must have perpendicular length axes (90-degree angle) for this joint type"

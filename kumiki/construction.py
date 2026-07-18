@@ -1115,7 +1115,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     return create_timber(length=timber_length, size=size, bottom_position=bottom_pos, length_direction=length_direction, width_direction=width_direction, ticket=ticket)
 
 
-def join_plane_aligned_on_place_aligned_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
+def join_plane_aligned_on_plane_aligned_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
                                                 location_on_timber1: Numeric, location_on_timber2: Numeric,
                                                 stickout: Stickout,
                                                 size: V2,
