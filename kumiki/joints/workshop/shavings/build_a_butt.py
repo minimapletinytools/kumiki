@@ -559,9 +559,14 @@ def dovetail_tenon_geometry(
             create_v2(x_tip, scalar(0)),
         ]
 
+        # Hold flat at h_base from x_base_slot to x_base (clearance room the wedge itself never
+        # occupies), then taper from (x_base, h_base) to (x_tip, h_tip) -- the same two points
+        # that define the wedge accessory's own edge, so the slot's taper angle matches the
+        # wedge's taper angle exactly instead of being averaged over the longer x_base_slot..x_tip run.
         wedge_slot_profile_points = [
             create_v2(x_base_slot, scalar(0)),
             create_v2(x_base_slot, h_base),
+            create_v2(x_base, h_base),
             create_v2(x_tip, h_tip),
             create_v2(x_tip, scalar(0)),
         ]

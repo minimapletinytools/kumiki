@@ -24,6 +24,7 @@ from .butt_joints import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_dropin_dovetail_butt_joint_on_face_aligned_timbers,
     cut_dropin_housed_butt_joint_on_face_aligned_timbers,
+    cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
 )
 from .splice_joints import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
@@ -42,7 +43,7 @@ from kumiki.construction import (
     CrossJointTimberArrangement,
     DoubleButtJointTimberArrangement,
 )
-from .shavings.build_a_butt import SimplePegParameters
+from .shavings.build_a_butt import SimplePegParameters, DovetailTenonWedgeAccessoryParameters
 
 
 _raw_safe_dot_product = safe_dot_product
@@ -442,6 +443,87 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
         mortise_depth=mortise_depth,
         tenon_position=tenon_position,
         peg_parameters=peg_parameters,
+    )
+
+
+def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+    tenon_timber: TimberLike,
+    mortise_timber: TimberLike,
+    tenon_end: TimberEnd,
+    use_wedge: bool = False,
+) -> Joint:
+    """
+    Creates a half-dovetail mortise-and-tenon joint between two face-aligned orthogonal
+    timbers, with automatic sizing and an optional wedge.
+
+    Tenon dimensions are derived automatically: full size of the tenon timber along the axis
+    parallel to the mortise timber's length (this is also the dovetail's slope axis -- the
+    flat dovetail "top" must run along the receiving timber's length axis for its pull-out
+    resistance to sit along the joint's load axis), and 1/3 of the mortise timber's size
+    along the perpendicular axis. The tenon is a through-tenon (tenon_depth = the mortise
+    timber's full size along the entry axis), and dovetail_depth is 1/4 of the tenon's size
+    in the dovetail (length) axis. When use_wedge is True, the wedge's taper angle matches
+    the dovetail's own slope and its narrow end (wedge_small_height) is 1/8 of the tenon's
+    size in the dovetail axis. For full control over sizing, use
+    `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` directly.
+
+    Args:
+        tenon_timber: The timber that will receive the dovetail tenon cut.
+        mortise_timber: The timber that will receive the dovetail mortise.
+        tenon_end: Which end of the tenon timber gets the tenon (TOP or BOTTOM).
+        use_wedge: If True, adds a wedge accessory (and matching slot) on the dovetail's
+            flat side, tapered to match the dovetail's own slope angle.
+
+    Returns:
+        Joint object containing the two CutTimbers and, if use_wedge=True, a "wedge" accessory.
+    """
+    from sympy import atan
+
+    assert isinstance(tenon_end, TimberEnd), f"expected TimberEnd, got {type(tenon_end).__name__}"
+    assert isinstance(tenon_timber, TimberLike), f"expected TimberLike, got {type(tenon_timber).__name__}"
+    assert isinstance(mortise_timber, TimberLike), f"expected TimberLike, got {type(mortise_timber).__name__}"
+
+    # Same "side of the joint" / "length axis" derivation as cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers.
+    joint_side_mortise_timber_face = mortise_timber.get_closest_oriented_face_from_global_direction(cross_product(mortise_timber.get_length_direction_global(), tenon_timber.get_face_direction_global(tenon_end.to.face())))
+    joint_side_tenon_timber_face = tenon_timber.get_closest_oriented_face_from_global_direction(mortise_timber.get_face_direction_global(joint_side_mortise_timber_face))
+    mortise_length_on_tenon_timber_face = tenon_timber.get_closest_oriented_face_from_global_direction(mortise_timber.get_length_direction_global())
+
+    tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end.to.face())
+    mortise_entry_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(-tenon_end_direction).to.face()
+
+    # Dovetail's flat "top" (and its slope) must run along the axis parallel to the
+    # receiving timber's length -- that's a hard requirement of dovetail_tenon_geometry.
+    tenon_dovetail_axis_full_size = tenon_timber.get_size_in_face_normal_axis(mortise_length_on_tenon_timber_face)
+    tenon_dovetail_axis_dovetail_depth = tenon_dovetail_axis_full_size * scalar(1, 4)
+    tenon_dovetail_axis_size = tenon_dovetail_axis_full_size - tenon_dovetail_axis_dovetail_depth
+    tenon_other_axis_size = mortise_timber.get_size_in_face_normal_axis(joint_side_mortise_timber_face)*scalar(1, 3)
+
+    if mortise_length_on_tenon_timber_face == TimberLongFace.FRONT or mortise_length_on_tenon_timber_face == TimberLongFace.BACK:
+        tenon_size = Matrix([tenon_dovetail_axis_size, tenon_other_axis_size])
+    else:
+        tenon_size = Matrix([tenon_other_axis_size, tenon_dovetail_axis_size])
+
+    tenon_depth = mortise_timber.get_size_in_face_normal_axis(mortise_entry_face)
+
+    wedge_accessory_parameters = None
+    if use_wedge:
+        wedge_accessory_parameters = DovetailTenonWedgeAccessoryParameters(
+            wedge_angle=atan(tenon_dovetail_axis_dovetail_depth / tenon_depth),
+            wedge_small_height=tenon_dovetail_axis_size*scalar(1, 8),
+        )
+
+    arrangement = ButtJointTimberArrangement(
+        receiving_timber=cast(Timber, mortise_timber),
+        butt_timber=cast(Timber, tenon_timber),
+        butt_timber_end=tenon_end,
+    )
+    return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+        arrangement=arrangement,
+        dovetail_top_side_on_butt_timber=mortise_length_on_tenon_timber_face.to.long_face(),
+        tenon_size=tenon_size,
+        tenon_depth=tenon_depth,
+        dovetail_depth=tenon_dovetail_axis_dovetail_depth,
+        wedge_accessory_parameters=wedge_accessory_parameters,
     )
 
 

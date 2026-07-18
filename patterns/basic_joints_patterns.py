@@ -26,6 +26,7 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers,
     cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers,
     cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers,
+    cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
 )
 from kumiki.example_shavings import (
     RoundTimberConfig,
@@ -219,6 +220,36 @@ def example_basic_mortise_and_tenon_joint_with_peg(position=None, use_round_timb
     return joint
 
 
+def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(position=None, use_round_timbers=True, use_wedge=False):
+    """
+    Create a basic wedged half-dovetail mortise and tenon joint using canonical butt joint timbers.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(
+        position, timber_config=_maybe_round_timber_config(use_round_timbers)
+    )
+    joint = cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+        tenon_timber=arrangement.butt_timber,
+        mortise_timber=arrangement.receiving_timber,
+        tenon_end=arrangement.butt_timber_end,
+        use_wedge=use_wedge,
+    )
+
+    return joint
+
+
+def example_basic_wedged_half_dovetail_mortise_and_tenon_joint_with_wedge(position=None, use_round_timbers=True):
+    """
+    Create a basic wedged half-dovetail mortise and tenon joint (with the wedge accessory)
+    using canonical butt joint timbers.
+    """
+    return example_basic_wedged_half_dovetail_mortise_and_tenon_joint(
+        position, use_round_timbers=use_round_timbers, use_wedge=True
+    )
+
+
 def example_basic_mortise_and_tenon_joint_imperfect_timber(position=None):
     """
     Create a basic mortise and tenon joint using imperfect 4x4 timbers.
@@ -358,4 +389,6 @@ patterns = [
     Pattern(path="basic_joints/basic_dropin_dovetail_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_dovetail_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_dropin_housed_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_housed_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mitered_and_keyed_lap_joint", lambda_=make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_wedged_half_dovetail_mortise_and_tenon_joint), pattern_type='frame', tags=['main']),
+    Pattern(path="basic_joints/basic_wedged_half_dovetail_mortise_and_tenon/with_wedge", lambda_=make_pattern_from_joint(example_basic_wedged_half_dovetail_mortise_and_tenon_joint_with_wedge), pattern_type='frame'),
 ]

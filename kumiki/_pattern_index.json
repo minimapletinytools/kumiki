@@ -138,7 +138,9 @@
           "basic_lapped_gooseneck_joint",
           "basic_dropin_dovetail_butt_joint",
           "basic_dropin_housed_butt_joint",
-          "basic_mitered_and_keyed_lap_joint"
+          "basic_mitered_and_keyed_lap_joint",
+          "basic_wedged_half_dovetail_mortise_and_tenon",
+          "with_wedge"
         ],
         "patterns": [
           {
@@ -224,11 +226,23 @@
             "path": "basic_joints/basic_mitered_and_keyed_lap_joint",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "path": "basic_joints/basic_wedged_half_dovetail_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "basic_joints/basic_wedged_half_dovetail_mortise_and_tenon/with_wedge",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "53fc096005d8bad18ab6090409ea6536a961a0997abe3b348f42deca6e6ddfc9",
+      "sha256": "f8e90cfc8654622dfb7d8d2175f40dfc2454c2ab7d025ade755e6f7dc2aef080",
       "warnings": []
     },
     "patterns/board_joints_patterns.py": {
@@ -276,7 +290,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 723,
+          "lineno": 726,
           "name": "create_all_butt_joint_patterns"
         }
       ],
@@ -388,7 +402,7 @@
         ]
       },
       "relative_path": "butt_joints_patterns.py",
-      "sha256": "1159f5c39dcae4d725722e66988d613f48e05fe9b409d8baa72e94d120ee44c2",
+      "sha256": "665fb160062f4ff8318a294ce5096d3f7d78018045f1842712b1030b9625adb1",
       "warnings": []
     },
     "patterns/compound_joints_patterns.py": {
@@ -1068,7 +1082,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-07-18T14:06:32.559297+00:00",
+  "generated_at": "2026-07-18T15:35:18.951277+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }
