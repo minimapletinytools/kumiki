@@ -639,23 +639,26 @@ if __name__ == "__main__":
     print("✅ All examples completed successfully!")
     print('='*60)
 
-def create_dovetail_butt_joint_example(position: Optional[V3] = None):
+def create_dovetail_butt_joint_example(position: Optional[V3] = None, use_round_timbers=False):
     """
     Create a dovetail butt joint (蟻仕口 / Ari Shiguchi) using canonical 4"x5"x4' timbers.
-    
+
     This is a traditional Japanese joint where a dovetail-shaped tenon on one timber
     fits into a matching dovetail socket on another timber. The dovetail shape provides
     mechanical resistance to pulling apart.
-    
+
     Configuration:
         - Uses canonical butt joint timbers (receiving along X, dovetail/butt along Y)
-    
+
     Args:
         position: Center position of the joint (V3). Defaults to origin.
     """
     from dataclasses import replace
 
-    arrangement = create_canonical_example_butt_joint_timbers(position=position)
+    arrangement = create_canonical_example_butt_joint_timbers(
+        position=position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
+    )
     dovetail_timber = replace(arrangement.butt_timber, ticket=TimberTicket("dovetail_timber"))
     arrangement = replace(
         arrangement,
@@ -682,7 +685,7 @@ def create_dovetail_butt_joint_example(position: Optional[V3] = None):
     return frame
 
 
-def create_housed_butt_joint_example(position: Optional[V3] = None):
+def create_dropin_housed_butt_joint_example(position: Optional[V3] = None):
     """
     Create a drop-in housed butt joint using canonical 4"x5"x4' timbers.
 
@@ -732,10 +735,10 @@ def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
 
 
 patterns = [
-    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_90", lambda_=lambda center: Frame(cut_timbers=make_tongue_and_fork_butt_joint_90_example(center), name="Tongue and Fork Butt Joint 90°"), pattern_type='frame', tags=['main']),
-    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled", lambda_=lambda center: Frame(cut_timbers=make_tongue_and_fork_butt_joint_angled_example(center), name="Tongue and Fork Butt Joint (Angled)"), pattern_type='frame'),
-    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint", lambda_=lambda center: Frame(cut_timbers=make_butt_joint_example(center), name="Plain Butt Joint"), pattern_type='frame'),
-    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint_3d", lambda_=lambda center: Frame(cut_timbers=make_butt_joint_3d_angles_example(center), name="Plain Butt Joint (3D)"), pattern_type='frame'),
+    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_90", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_90_example, "Tongue and Fork Butt Joint 90°"), pattern_type='frame', tags=['main']),
+    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_angled_example, "Tongue and Fork Butt Joint (Angled)"), pattern_type='frame'),
+    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint", lambda_=_make_frame_pattern(make_butt_joint_example, "Plain Butt Joint"), pattern_type='frame'),
+    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint_3d", lambda_=_make_frame_pattern(make_butt_joint_3d_angles_example, "Plain Butt Joint (3D)"), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_basic", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_basic_face_aligned", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_round_face_aligned", lambda_=make_pattern_from_joint(example_round_mortise_and_tenon_on_face_aligned_timbers), pattern_type='frame'),
@@ -747,5 +750,5 @@ patterns = [
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/half_dovetail_mortise_and_tenon_no_wedge", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
-    Pattern(path="butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_housed_butt_joint_example), pattern_type='frame'),
+    Pattern(path="butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dropin_housed_butt_joint_example), pattern_type='frame'),
 ]
