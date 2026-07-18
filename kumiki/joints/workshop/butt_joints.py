@@ -13,7 +13,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, _chop_scribe_relief_and_apply_for_butt_joint_arrangement
+from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, chop_scribe_relief_and_apply_for_butt_joint_arrangement
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -102,17 +102,41 @@ def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace)
         return face_center
 
 
+def _apply_scribe_relief_if_configured(
+    arrangement: ButtJointTimberArrangement,
+    relief: Optional[ButtJointScribeReliefConfig],
+    butt_cut: Cutting,
+    receiving_cut: Cutting,
+) -> tuple[Cutting, Cutting]:
+    """
+    Callsite-local wrapper around ``chop_scribe_relief_and_apply_for_butt_joint_arrangement``:
+    passes ``butt_cut``/``receiving_cut`` through unchanged when ``relief`` is None, otherwise
+    delegates to apply the configured scribe relief.
+    """
+    if relief is None:
+        return butt_cut, receiving_cut
+    return chop_scribe_relief_and_apply_for_butt_joint_arrangement(
+        arrangement=arrangement,
+        relief=relief,
+        butt_cut=butt_cut,
+        receiving_cut=receiving_cut,
+    )
+
+
 # ============================================================================
 # Butt Joint Construction Functions
 # ============================================================================
 
 
-def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
+def cut_plain_butt_joint(
+    arrangement: ButtJointTimberArrangement,
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
+) -> Joint:
     """
     Creates a butt joint where the butt timber is cut flush with the face of the receiving timber.
 
     The butt timber's end is trimmed along the plane of the best-matching long face of the
-    receiving timber. The receiving timber is not cut.
+    receiving timber. The receiving timber otherwise isn't cut, aside from any scribe relief.
 
     Works for any non-parallel angle between the timbers, including oblique 3D angles.
     The cut plane follows the actual receiving face geometry rather than being perpendicular
@@ -120,6 +144,8 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
 
     Args:
         arrangement: Butt joint arrangement with butt_timber, receiving_timber, butt_timber_end.
+        relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
+            butt timber onto the receiving timber. Pass None to skip scribe relief entirely.
 
     Returns:
         Joint object containing the cut butt timber and uncut receiving timber.
@@ -176,11 +202,19 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
 
     end_cut = HalfSpace(normal=local_normal, offset=local_offset)
 
-    cut = Cutting(
+    cut_no_relief = Cutting(
         timber=butt_timber,
         maybe_top_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut,
+    )
+    receiving_cut_no_relief = Cutting(timber=receiving_timber)
+
+    cut, receiving_cut = _apply_scribe_relief_if_configured(
+        arrangement=arrangement,
+        relief=relief,
+        butt_cut=cut_no_relief,
+        receiving_cut=receiving_cut_no_relief,
     )
 
     # Assembly: a plain butt has no mechanical engagement (it is free after 0
@@ -189,8 +223,8 @@ def cut_plain_butt_joint(arrangement: ButtJointTimberArrangement) -> Joint:
     nominal_travel = receiving_timber.get_size_in_direction_3d(butt_direction)
     joint = Joint(
         cuttings={
-            "receiving_timber": Cutting(
-                timber=receiving_timber,
+            "receiving_timber": replace(
+                receiving_cut,
                 assembly_freedom=AssemblyFreedom.translation(butt_direction, freed_after=nominal_travel),
             ),
             "butt_timber": replace(
@@ -277,6 +311,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
     Creates a plain tongue-and-fork butt joint.
@@ -293,6 +328,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
             If None, defaults to 1/3 of the tongue timber dimension in that axis.
         tongue_position: Offset of the tongue center from the tongue timber
             centerline along the shared plane normal. 0 means centered.
+        relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
+            tongue (butt) timber onto the fork (receiving) timber. Pass None to skip.
 
     Returns:
         Joint containing both cut timbers.
@@ -462,7 +499,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     # axis; it passes fully through the fork, so it is free after traveling
     # the fork's thickness in that direction.
     tongue_engagement = fork_timber.get_size_in_direction_3d(tongue_end_direction)
-    tongue_cut = Cutting(
+    tongue_cut_no_relief = Cutting(
         timber=tongue_timber,
         maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.BOTTOM else None,
@@ -470,10 +507,17 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         assembly_freedom=AssemblyFreedom.translation(-tongue_end_direction, freed_after=tongue_engagement),
     )
 
-    fork_cut = Cutting(
+    fork_cut_no_relief = Cutting(
         timber=fork_timber,
         negative_csg=fork_negative_csg,
         assembly_freedom=AssemblyFreedom.translation(tongue_end_direction, freed_after=tongue_engagement),
+    )
+
+    tongue_cut, fork_cut = _apply_scribe_relief_if_configured(
+        arrangement=arrangement,
+        relief=relief,
+        butt_cut=tongue_cut_no_relief,
+        receiving_cut=fork_cut_no_relief,
     )
 
     return Joint(
@@ -1000,11 +1044,12 @@ def cut_mortise_and_tenon_joint(
                 label="mortise_and_tenon",
             )
 
-    tenon_cut, mortise_cut = _chop_scribe_relief_and_apply_for_butt_joint_arrangement(
+    tenon_cut_no_relief, mortise_cut_no_relief = tenon_cut, mortise_cut
+    tenon_cut, mortise_cut = _apply_scribe_relief_if_configured(
         arrangement=arrangement,
         relief=relief,
-        tenon_cut=tenon_cut,
-        mortise_cut=mortise_cut,
+        butt_cut=tenon_cut_no_relief,
+        receiving_cut=mortise_cut_no_relief,
     )
 
     # Assembly: the tenon backs out of the mortise along the tenon axis; the
@@ -1280,6 +1325,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     receiving_timber_mortise_extra_depth: Numeric = scalar(0),
     mortise_shoulder_inset: Numeric = scalar(0),
     wedge_accessory_parameters: Optional[DovetailTenonWedgeAccessoryParameters] = None,
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
     Create a half-dovetail mortise-and-tenon joint (with an optional wedge accessory).
@@ -1307,6 +1353,8 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         wedge_accessory_parameters: If provided, a wedge accessory is added on the
             `dovetail_top_side_on_butt_timber` side of the tenon and a matching slot is cut
             into the receiving timber.
+        relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
+            tenon (butt) timber onto the mortise (receiving) timber. Pass None to skip.
 
     Returns:
         Joint object with cuts on both timbers and (optionally) a "wedge" accessory.
@@ -1393,7 +1441,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     # wedge (if any) locks it and pops first, so the timbers slide at
     # suborder 1 when a wedge is present.
     timber_suborder = 1 if geo.wedge_accessory_csg is not None else 0
-    tenon_cut = Cutting(
+    tenon_cut_no_relief = Cutting(
         timber=tenon_timber,
         maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
@@ -1403,12 +1451,19 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         assembly_ordering=Ordering(0, timber_suborder),
     )
 
-    mortise_cut = Cutting(
+    mortise_cut_no_relief = Cutting(
         timber=mortise_timber,
         negative_csg=mortise_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
         assembly_freedom=AssemblyFreedom.translation(shoulder_result.butt_direction, freed_after=tenon_depth),
         assembly_ordering=Ordering(0, timber_suborder),
+    )
+
+    tenon_cut, mortise_cut = _apply_scribe_relief_if_configured(
+        arrangement=arrangement,
+        relief=relief,
+        butt_cut=tenon_cut_no_relief,
+        receiving_cut=mortise_cut_no_relief,
     )
 
     joint_accessories = {}
@@ -1437,7 +1492,7 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     dovetail_small_width: Numeric,
     dovetail_large_width: Numeric,
     dovetail_lateral_offset: Numeric = scalar(0),
-    dovetail_depth: Optional[Numeric] = None
+    dovetail_depth: Optional[Numeric] = None,
 ) -> Joint:
     """
     Creates a dovetail butt joint (蟻継ぎ / Ari Tsugi) between two orthogonal timbers.
@@ -1467,6 +1522,8 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         - The dovetail provides mechanical resistance to pulling apart
         - Timbers must be orthogonal (at 90 degrees) for this joint
         - No lap is used in this joint (unlike the lapped gooseneck joint)
+        - No scribe-relief support yet: the drop-in socket needs a more complex
+          notching algorithm than the shared butt-joint relief helper provides
     """
 
     require_check(arrangement.check_face_aligned_and_orthogonal())
@@ -1683,7 +1740,7 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
     housing_length: Numeric,
     housing_width: Numeric,
     housing_lateral_offset: Numeric = scalar(0),
-    housing_depth: Optional[Numeric] = None
+    housing_depth: Optional[Numeric] = None,
 ) -> Joint:
     """
     Creates a drop-in housed butt joint (housing slot pocket) between two orthogonal timbers.
@@ -1703,6 +1760,10 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
 
     Returns:
         Joint object containing the two CutTimbers with the housing cuts applied
+
+    Notes:
+        - No scribe-relief support yet: the drop-in pocket needs a more complex
+          notching algorithm than the shared butt-joint relief helper provides
     """
     require_check(arrangement.check_face_aligned_and_orthogonal())
     warn_if_arrangement_timbers_imperfect(arrangement)
