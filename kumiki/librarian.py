@@ -631,18 +631,10 @@ def discover_callable_render_parameters(
     skip_first_parameter: bool = False,
 ) -> List[RenderParameterDescriptor]:
     """Inspect a callable signature and return render-parameter descriptors."""
-    # Dynamically unpack Param default values in the callable object so that
-    # direct python calls without arguments receive raw defaults instead of Param wrappers.
-    if hasattr(callable_obj, "__defaults__") and callable_obj.__defaults__:
-        callable_obj.__defaults__ = tuple(
-            getattr(d, "default") if type(d).__name__ == "Param" else d
-            for d in callable_obj.__defaults__
-        )
-    if hasattr(callable_obj, "__kwdefaults__") and callable_obj.__kwdefaults__:
-        callable_obj.__kwdefaults__ = {
-            k: (getattr(v, "default") if type(v).__name__ == "Param" else v)
-            for k, v in callable_obj.__kwdefaults__.items()
-        }
+    # If we have already scanned this function and unpacked its defaults, return the cached descriptors.
+    cache_attr = "_kumiki_param_descriptors" if not skip_first_parameter else "_kumiki_param_descriptors_skip"
+    if hasattr(callable_obj, cache_attr):
+        return getattr(callable_obj, cache_attr)
 
     signature = inspect.signature(callable_obj)
     annotation_texts = _extract_parameter_annotation_texts(callable_obj)
@@ -659,6 +651,25 @@ def discover_callable_render_parameters(
         )
         if descriptor is not None:
             discovered.append(descriptor)
+
+    # Dynamically unpack Param default values in the callable object so that
+    # direct python calls without arguments receive raw defaults instead of Param wrappers.
+    if hasattr(callable_obj, "__defaults__") and callable_obj.__defaults__:
+        callable_obj.__defaults__ = tuple(
+            getattr(d, "default") if type(d).__name__ == "Param" else d
+            for d in callable_obj.__defaults__
+        )
+    if hasattr(callable_obj, "__kwdefaults__") and callable_obj.__kwdefaults__:
+        callable_obj.__kwdefaults__ = {
+            k: (getattr(v, "default") if type(v).__name__ == "Param" else v)
+            for k, v in callable_obj.__kwdefaults__.items()
+        }
+
+    try:
+        setattr(callable_obj, cache_attr, discovered)
+    except Exception:
+        pass
+
     return discovered
 
 
