@@ -408,7 +408,7 @@ def chop_shoulder_notch_aligned_with_timber(
 
     Unlike chop_shoulder_notch_on_timber_face which is aligned to a specific face,
     this notch is aligned to the shoulder plane derived from the butting timber's
-    approach direction (projected perpendicular to the notch timber's length axis).
+    approach direction (projected perpendicular to the notch timber's length axis if set_mortise_shoulder_parallel_to_face is not False).
 
     The notch bottom (shoulder plane) is distance_from_centerline away from the
     notch_timber's centerline. The notch opens outward from the centerline.

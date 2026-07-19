@@ -188,16 +188,32 @@ DONE-improve kiguim rendering modes
 DONE-joint rename
 DONE-choose domnai for website
 DONE-wedged halfdovetail needs basic joint version
-
--round peg rendering gets covered, but other accessories seem to show fine
--wedged half dovetail issues
+DONE-distance from centerline mesaurement in mortise and tenon joint is'nt quite whaty ou want for connecting feet into a tabletop
+  -maybe make a tenon_to_board_joint or something
+DONE-round mortise and tenon joint, the mortise hole is sometimes perpendicular with the mortise face rather than parallel with the tenon axis sometimes? Not sure why...
+DONE-the notch width isn't wide enough now that you have set_mortise_shoulder_parallel_to_face which allows lateral offset (see example_compound_angle_offset_parallel_shoulder)
+DONE-wedged half dovetail issues
   -wedge half dovtail dissamebly direciton is at a diago
   -the wedge is REQUIRED oops, please make it non optional. the small height of the wedge should be the same as the dovetail depth for dissamebly reasons but then add an extra height field to the wedge configuration if you want to make ti bigger for some reason
 
+
+-add "hole" notch style paramater for mortise and tenon joint / inset shoulder rather than clearing out the whole width of the timber...
+
+
+-round peg kigumi issues
+  -round peg rendering gets covered, but other accessories seem to show fine
+  -you can't click on top/bottom ends of round timbers to check wwhich direction they are
+  -make sure yo ucan click on 
+    -I guess that makes the maybe end cut thing tricky... because then you don't want th eredundant end cut in the CSG..I forget if that even is at hing or not though..
+    -just fix it by allowing a CSG to be tagged as a face cut for any of the faces
+
+
+
+
 -assembly branch prompts
-  -assembly happens in background thread after opening since it takes a whiel to solev, theassembly bar should show a "figuring out how to dissameble..."  loading thing at the bottom
-  - the x and warning signs don't do natyhing, should tehy have a tooltlip when you hover?  not sure what the x is ,maybe hovering over warning tooltips a list of warnings and clicking it prints to the ouptut or osmetihng
-  - the timeline should have big dots for explicit orders given by user, and small dots for implicit orders determined by the solver.
+  -assembly happens in background thread after opening since it takes a whiel to solev, load the frame first and then compute tha dissambly. the assembly bra should show a "figuring out how to dissameble..."  loading thing at the bottom while this is happening
+  DONE- the x and warning signs don't do natyhing, should tehy have a tooltlip when you hover?  not sure what the x is ,maybe hovering over warning tooltips a list of warnings and clicking it prints to the ouptut or osmetihng
+  DONE- the timeline should have big dots for explicit orders given by user, and small dots for implicit orders determined by the solver.
 
   
 -patern book changes 
@@ -208,7 +224,6 @@ DONE-wedged halfdovetail needs basic joint version
 
 -enable potato (scribe) notching on the remaining joints?  
 -publish again
--fix joint assembly algorithm 
 
 -update wedged half dovtail to support shoulder shapes and peg
  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
@@ -1057,7 +1072,7 @@ DONE-update morties and tenon to support
     DONE-plane aligned
     DONE-no alignment (most complicated)
       -for this one you need to define the shoulder plane a certain distance away from centerline
-  DONE-do the mortise_shoulder_distance_from_centerline conversion
+  DONE-do the mortise_shoulder_distance_from_centerline_or_centerplane conversion
   DONE-tenon cutting on braces seems to have broken :(
   DONE-do the generic notch function
   DONE-allow pegs to be positioned in either tenon space or mortise space via parameter

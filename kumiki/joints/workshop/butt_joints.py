@@ -585,6 +585,15 @@ class WedgeParameters:
     expand_mortise: Numeric = scalar(0)
 
 
+class InsetShoulderNotchingStyle(Enum):
+    """
+    Style of shoulder notching for mortise and tenon joints with inset shoulders.
+    The mortise timber is always the one that gets notched, never the tenon timber. 
+    This notching only manages notching from the perfect timber within parts, to notch the imperfect parts use the relief parameter.
+    """
+    NOTCH = 0
+    SCRIBE = 1
+
 # ============================================================================
 # Mortise and Tenon Joint Construction Functions
 # ============================================================================
@@ -602,6 +611,7 @@ def cut_mortise_and_tenon_joint(
     peg_parameters: Optional[SimplePegParameters] = None,
     bore_mortise_perpendicular_to_face: bool = False,
     use_round_tenon: bool = False,
+    inset_notching_style: InsetShoulderNotchingStyle = InsetShoulderNotchingStyle.NOTCH,
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
@@ -917,6 +927,10 @@ def cut_mortise_and_tenon_joint(
 
     from sympy import pi as _pi
 
+
+    # TODO if inset notching style is SCRIBE, then we don't use chop_relief_for_butt_joint_arrangement, instead take DIFFERENT(tenon_timber_prism, shoulder plane half space) and remove it from the mortise timber, this is our scribe.
+
+    
     # TODO check for face/plane aligned cases, if the shoulder is flush with the mortise entry face, and skip relief cutting in those cases (no notch needed)
     # TODO renameto shoulder_notch_relief_geom since we do generic relief cutting later too
     relief_geom = chop_relief_for_butt_joint_arrangement(
