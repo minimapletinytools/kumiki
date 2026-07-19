@@ -207,7 +207,6 @@ DONe-wedged half dovetail issues
 
 -enable potato (scribe) notching on the remaining joints?  
 -publish again
--fix joint assembly algorithm 
 
 -update wedged half dovtail to support shoulder shapes and peg
  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
