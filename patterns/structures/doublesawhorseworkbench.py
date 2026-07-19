@@ -268,9 +268,9 @@ if __name__ == "__main__":
     for cut_timber in frame.cut_timbers:
         timber = cut_timber.timber
         (x0, x1), (y0, y1), (z0, z1) = extents(timber)
-        by_name[timber.ticket.name] = ((x0, x1), (y0, y1), (z0, z1))
-        cuts_by_name[timber.ticket.name] = len(cut_timber.cuts)
-        print(f"  {timber.ticket.name:16s} x[{fmt(x0)},{fmt(x1)}] "
+        by_name[timber.ticket.path] = ((x0, x1), (y0, y1), (z0, z1))
+        cuts_by_name[timber.ticket.path] = len(cut_timber.cuts)
+        print(f"  {timber.ticket.path:16s} x[{fmt(x0)},{fmt(x1)}] "
               f"y[{fmt(y0)},{fmt(y1)}] z[{fmt(z0)},{fmt(z1)}] "
               f"cuts={len(cut_timber.cuts)}")
 
