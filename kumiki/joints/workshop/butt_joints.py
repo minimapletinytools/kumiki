@@ -594,13 +594,21 @@ def cut_mortise_and_tenon_joint(
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
 
+    # TODO implement, if set to a face, then force the mortise shoulder to be parallel to that face, if true, than compute the face on the mortise timber most parallel to the tenon axis, 
+    # If false, then the sholder is rotated along the length axis of the mortise timber to be most perpendicular to the tenon axis (it is still parallel with the length axis of the mortise timber)
+    # if the face is set in this manner, interpret mortise_shoulder_distance_from_centerline_or_centerplane as the centerplane,
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
+
+    # TODO rename to mortise_shoulder_distance_from_centerline_or_centerplane
     mortise_shoulder_distance_from_centerline: Numeric = scalar(0),
 
     tenon_position: Optional[V2] = None,
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
 
+    # TODO only makes sense for non round tenons and when entry face is provided
     bore_mortise_perpendicular_to_face: bool = False,
+
     use_round_tenon: bool = False,
 
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
