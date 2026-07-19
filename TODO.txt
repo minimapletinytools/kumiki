@@ -200,7 +200,9 @@ DONE-assembly branch prompts
   DONE- the x and warning signs don't do natyhing, should tehy have a tooltlip when you hover?  not sure what the x is ,maybe hovering over warning tooltips a list of warnings and clicking it prints to the ouptut or osmetihng
   DONE- the timeline should have big dots for explicit orders given by user, and small dots for implicit orders determined by the solver.
 DONE-add "hole" notch style paramater for mortise and tenon joint / inset shoulder rather than clearing out the whole width of the timber...
--scribe relief seems to be broken on the 2 angled inset notching style examples you added
+DONE-test regular imperfect rectangular timber stuff
+DONE-test imperfect timber ctors
+DONE-BUG scribe relief seems to be broken on the 2 angled inset notching style examples you added
 
 -round peg kigumi issues
   -round peg rendering gets covered, but other accessories seem to show fine
@@ -208,36 +210,21 @@ DONE-add "hole" notch style paramater for mortise and tenon joint / inset should
   -make sure yo ucan click on 
     -I guess that makes the maybe end cut thing tricky... because then you don't want th eredundant end cut in the CSG..I forget if that even is at hing or not though..
     -just fix it by allowing a CSG to be tagged as a face cut for any of the faces
-
-
-
-
-
 -rename dissamebly to tatamae LOL
-  
 -patern book changes 
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
-
 -maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
-
 -enable potato (scribe) notching on the remaining joints?  
--publish again
-
 -update wedged half dovtail to support shoulder shapes and peg
  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
 -add relief imple for DropinButtJointSweepScribeReliefConfig D:
-
 -reimplement tongue and fork using mortise and tenon (make a short vid about this)
   the current tongue and fork joint does not suport pegs which seems strange since a tongue and fork joint is just a simplified mortise an tenon joint. I wanted them as 2 as separate functions to simplify things, however they don't need 2 separate implementations as they do right now. "Please reimplement tongue and fork joint using cut_mortise_and_tenon_joint_on_plane_aligned_timbers, in addition, add support for pegs while you do this"
-
-
 -create test runner for examples so the exmaples are also tests :O
-
 -test frame scanning fixes
 -test the install cadquery stuff 
--test regular imperfect rectangular timber stuff
--test imperfect timber ctors
+
 -try and run a full loop agent test on this to see if it all works
 -update shed example to include panels
 -do reorg on patterns and eaxmples again

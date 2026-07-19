@@ -1156,6 +1156,9 @@ class RoundTimber(PerfectTimberWithin):
     """
     diameter: Numeric = field(kw_only=True)  # Diameter of the circular cross-section
 
+    def is_perfect_timber(self) -> bool:
+        """Round timber has a perfect cylindrical geometry, so it is perfect."""
+        return True
 
     @staticmethod
     def from_perfect_timber_within(perfect_timber: PerfectTimberWithin, diameter: Optional[Numeric] = None) -> 'RoundTimber':
@@ -1282,6 +1285,10 @@ class RegularPolygonTimber(PerfectTimberWithin):
     """
     num_sides: int = field(kw_only=True)  # Number of sides for the regular polygon (e.g., 6 for hexagon)
     
+    def is_perfect_timber(self) -> bool:
+        """Polygonal timber has a perfect regular geometry, so it is perfect."""
+        return True
+
     def _compute_polygon_vertices(self) -> List[V2]:
         """
         Compute vertices of regular polygon inscribed in the nominal bounding box.
