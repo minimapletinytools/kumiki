@@ -15,6 +15,13 @@ const VIEWER_LOG_LEVEL_ORDER = {
     error: 40,
 };
 
+// User-facing toggle for the assembly preview timeline (the package-time
+// FEATURE_FLAGS.assemblyPreview stays the master switch on top of this).
+// Read fresh at each use so toggling applies on the next refresh.
+function assemblyPreviewSettingEnabled() {
+    return vscode.workspace.getConfiguration('kigumi').get('viewer.assemblyPreview', false) === true;
+}
+
 function normalizeViewerLogLevel(level) {
     if (typeof level !== 'string') {
         return 'info';
@@ -674,7 +681,8 @@ class FrameViewSession {
             let layersData = null;
             try {
                 layersData = applyFeatureFlagsToLayersPayload(
-                    await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
+                    await this.runnerSession.slotRequest('get_layers_tree', this.slotName),
+                    { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
                 );
             } catch (err) {
                 this.log(`[layers] get_layers_tree failed: ${err.message || err}`);
@@ -931,7 +939,8 @@ class FrameViewSession {
             return;
         }
         const result = applyFeatureFlagsToLayersPayload(
-            await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
+            await this.runnerSession.slotRequest('get_layers_tree', this.slotName),
+            { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
         );
         this._postToWebview({ type: 'layersTree', payload: result });
         this._fetchAssemblyInBackground(result);

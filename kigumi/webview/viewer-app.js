@@ -360,6 +360,13 @@ if (!AssemblyTimeline) {
 // flags script isn't wired into some future embedding.
 const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 
+// The assembly preview timeline is live only when BOTH the package-time flag
+// and the user's 'kigumi.viewer.assemblyPreview' VS Code setting (injected
+// into the initial payload; default off) are on. The setting is read when the
+// viewer opens — toggling it takes effect on the next (re)open.
+const ASSEMBLY_PREVIEW_ENABLED = Boolean(FEATURE_FLAGS.assemblyPreview)
+    && INITIAL_PAYLOAD.assemblyPreviewSetting === true;
+
 // Axis-aligned bounds accumulation over flat [x,y,z,...] position arrays.
 function createBoundsAccumulator() {
     return {
@@ -542,7 +549,7 @@ class ViewerSettingsPanel {
                     <input id="footprint-toggle" type="checkbox" ?checked=${this.app.footprintsEnabled}>
                     footprint
                 </label>
-                ${FEATURE_FLAGS.assemblyPreview ? html`
+                ${ASSEMBLY_PREVIEW_ENABLED ? html`
                 <label>
                     <input id="assembly-timeline-toggle" type="checkbox" ?checked=${this.app.showAssemblyTimeline}>
                     assembly timeline
@@ -1754,10 +1761,10 @@ class KigumiViewerApp extends LitElement {
         if (typeof ui.footprintsEnabled === 'boolean') {
             this.setFootprintsEnabled(ui.footprintsEnabled);
         }
-        if (FEATURE_FLAGS.assemblyPreview && typeof ui.showAssemblyTimeline === 'boolean') {
+        if (ASSEMBLY_PREVIEW_ENABLED && typeof ui.showAssemblyTimeline === 'boolean') {
             this.setShowAssemblyTimeline(ui.showAssemblyTimeline);
         }
-        if (FEATURE_FLAGS.assemblyPreview && Number.isFinite(ui.disassemblyMultiplier)) {
+        if (ASSEMBLY_PREVIEW_ENABLED && Number.isFinite(ui.disassemblyMultiplier)) {
             this.setDisassemblyMultiplier(Number(ui.disassemblyMultiplier));
         }
         if (typeof ui.debugEnabled === 'boolean') {
@@ -2013,12 +2020,12 @@ class KigumiViewerApp extends LitElement {
             // still solving the disassembly; the solved payload arrives later
             // in an 'assemblyData' message.
             const assemblyPayload = message.payload ? message.payload.assembly : null;
-            if (FEATURE_FLAGS.assemblyPreview && assemblyPayload && assemblyPayload.pending === true) {
+            if (ASSEMBLY_PREVIEW_ENABLED && assemblyPayload && assemblyPayload.pending === true) {
                 this.assemblySolving = true;
                 this.setAssemblyData(null);
             } else {
                 this.assemblySolving = false;
-                this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
+                this.setAssemblyData(ASSEMBLY_PREVIEW_ENABLED
                     ? AssemblyTimeline.normalizeAssemblyPayload(assemblyPayload)
                     : null);
             }
@@ -2030,7 +2037,7 @@ class KigumiViewerApp extends LitElement {
 
         if (message.type === 'assemblyData') {
             this.assemblySolving = false;
-            this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
+            this.setAssemblyData(ASSEMBLY_PREVIEW_ENABLED
                 ? AssemblyTimeline.normalizeAssemblyPayload(message.payload)
                 : null);
             return;
@@ -3135,7 +3142,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     renderAssemblyTimeline() {
-        if (!FEATURE_FLAGS.assemblyPreview || !this.showAssemblyTimeline) {
+        if (!ASSEMBLY_PREVIEW_ENABLED || !this.showAssemblyTimeline) {
             return '';
         }
         if (this.assemblySolving) {

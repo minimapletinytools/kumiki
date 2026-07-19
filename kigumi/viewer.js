@@ -161,6 +161,9 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         uiState: uiState || null,
         viewerOptions: normalizeViewerOptions(viewerOptions),
         viewerSettings: (viewerSettings && typeof viewerSettings === 'object') ? viewerSettings : null,
+        // User setting for the assembly preview timeline; the webview combines
+        // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
+        assemblyPreviewSetting: vscode.workspace.getConfiguration('kigumi').get('viewer.assemblyPreview', false) === true,
     }));
 
     return template

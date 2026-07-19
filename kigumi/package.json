@@ -223,6 +223,11 @@
           "default": false,
           "description": "Show poop-tagged joints in the pattern book."
         },
+        "kigumi.viewer.assemblyPreview": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show the assembly (disassembly) preview timeline in the frame viewer. Experimental. Takes effect when a viewer is (re)opened."
+        },
         "kigumi.viewer.logRetentionDays": {
           "type": "number",
           "default": 15,

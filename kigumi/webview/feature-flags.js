@@ -23,20 +23,25 @@
     //     feature itself, and ignores the field in persisted viewer settings.
     const FEATURE_FLAGS = Object.freeze({
         // Assembly preview timeline (kumiki/assembly.py + the bottom timeline
-        // bar in the viewer). Still under active development.
+        // bar in the viewer). The flag is the package-time MASTER switch; on
+        // top of it the user-facing 'kigumi.viewer.assemblyPreview' VS Code
+        // setting (default off) toggles the feature per machine/workspace.
         assemblyPreview: true,
     });
 
-    // Strips payload fields for package-time-disabled features before a
-    // layers-tree payload reaches the webview (called from
-    // frame-view-session.js), so a gated feature is fully inert regardless of
-    // any persisted viewer settings or stale in-flight data. Pure function —
+    // Strips payload fields for disabled features before a layers-tree
+    // payload reaches the webview (called from frame-view-session.js), so a
+    // gated feature is fully inert regardless of any persisted viewer
+    // settings or stale in-flight data. Disabled means: the package-time flag
+    // is off, OR the caller passes the user setting as false. Pure function —
     // add a strip rule here alongside each new gated payload field.
-    function applyFeatureFlagsToLayersPayload(layersPayload) {
+    function applyFeatureFlagsToLayersPayload(layersPayload, options = {}) {
         if (!layersPayload || typeof layersPayload !== 'object') {
             return layersPayload;
         }
-        if (!FEATURE_FLAGS.assemblyPreview && 'assembly' in layersPayload) {
+        const assemblyEnabled = FEATURE_FLAGS.assemblyPreview
+            && options.assemblyPreviewSetting !== false;
+        if (!assemblyEnabled && 'assembly' in layersPayload) {
             const { assembly, ...rest } = layersPayload;
             return rest;
         }
