@@ -17,6 +17,8 @@ from .assembly import (
     Ordering,
     solve_assembly,
 )
+# Aliased: cutcsg (wildcard-imported above) also exports a BoundingBox.
+from .assembly import BoundingBox as AssemblyBoundingBox
 from enum import Enum
 from typing import Iterable, List, Mapping, Optional, Tuple, Union, TYPE_CHECKING, Dict, Literal, final, cast, Callable
 from dataclasses import dataclass, field, replace
@@ -2654,7 +2656,18 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
                 timber.get_bottom_position_global()
                 + timber.get_length_direction_global() * timber.length / 2
             )
-            members[key] = AssemblyMember(key=key, name=timber.ticket.path, position=centroid)
+            corners = [
+                [float(giraffe_evalf(corner_position[axis, 0])) for axis in range(3)]
+                for corner_position in (
+                    timber.get_corner_position_global(corner) for corner in TimberCorner
+                )
+            ]
+            bbox = AssemblyBoundingBox(
+                min_x=min(c[0] for c in corners), max_x=max(c[0] for c in corners),
+                min_y=min(c[1] for c in corners), max_y=max(c[1] for c in corners),
+                min_z=min(c[2] for c in corners), max_z=max(c[2] for c in corners),
+            )
+            members[key] = AssemblyMember(key=key, name=timber.ticket.path, position=centroid, bbox=bbox)
         return key
 
     def register_accessory(accessory: Accessory) -> int:
@@ -2662,7 +2675,16 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
         if key not in members:
             transform = getattr(accessory, "transform", None)
             position = transform.position if transform is not None else create_v3(0, 0, 0)
-            members[key] = AssemblyMember(key=key, name=accessory.ticket.path, position=position)
+            # Accessory extents are not modeled yet; a small box at the
+            # transform position lets the clear-out pass shove parked pegs.
+            px, py, pz = (float(giraffe_evalf(position[axis, 0])) for axis in range(3))
+            radius = 0.02
+            bbox = AssemblyBoundingBox(
+                min_x=px - radius, max_x=px + radius,
+                min_y=py - radius, max_y=py + radius,
+                min_z=pz - radius, max_z=pz + radius,
+            )
+            members[key] = AssemblyMember(key=key, name=accessory.ticket.path, position=position, bbox=bbox)
         return key
 
     def add_spec(specs: Dict[int, JointMemberSpec], key: int,

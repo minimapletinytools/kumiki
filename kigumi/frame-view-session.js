@@ -346,6 +346,20 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'assemblyFailureLog') {
+                // The ✕ on the assembly timeline was clicked: print the
+                // failure (message + diagnostics) to the output channel.
+                const lines = Array.isArray(message.lines)
+                    ? message.lines.filter((line) => typeof line === 'string')
+                    : [];
+                for (const line of lines) {
+                    this.log(`[assembly] ${line}`);
+                }
+                if (lines.length > 0 && this.channel && typeof this.channel.show === 'function') {
+                    this.channel.show(true);
+                }
+                return;
+            }
             if (message.type !== 'viewerLog') {
                 return;
             }

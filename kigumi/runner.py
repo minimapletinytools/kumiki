@@ -957,7 +957,7 @@ def _build_assembly_payload(
     Returns None when no member of any joint declares an assembly freedom
     (the viewer hides the timeline). Payload shape:
 
-        {"steps": [{"order": int, "suborder": int,
+        {"steps": [{"order": int, "suborder": int, "substep": int,  # substep is 1-based
                     "movements": [{"kumikiEphemeralId": int, "memberKey": str,
                                    "direction": [x, y, z],  # unit
                                    "distance": float,       # base freed_after amount
@@ -1011,6 +1011,7 @@ def _build_assembly_payload(
         steps_payload.append({
             "order": int(step.ordering.order),
             "suborder": int(step.ordering.suborder),
+            "substep": int(step.substep),
             "movements": movements_payload,
         })
 

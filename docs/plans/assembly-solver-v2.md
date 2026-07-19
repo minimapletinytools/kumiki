@@ -150,38 +150,49 @@ auto-sequenced exploded view for free. And it creates the home for future sequen
 freedoms (defect 8): a lift-then-slide escape is just a freedom whose stages emit
 consecutive micro-steps.
 
-### Phase 1b — simultaneous ring escape (fallback when closure fails)
+### Phase 1b — simultaneous multi-velocity escape (fallback when closure fails)
 
 Closure only finds **rigid** group motions: one group, one direction, stationary
 complement — a "two-handed" step. Assemblies exist that no two-handed step can
 separate but a simultaneous multi-velocity motion can (Snoeyink & Stolfi 1993);
 in our ray model the minimal case is a skewed ring, e.g. a 3-cycle with escapes
-+X, +Y, and (−1,−1): assigning velocities A=(1,1), B=(0,1), C=0 puts every
-pairwise relative motion on its allowed ray, yet every closure from every target
-absorbs the whole ring.
++X, +Y, and (−1,−1). Real models hit richer versions: tinyhouse120's roof needs
+each front rafter lifting along its slope-normal at 0.4× while its back rafter
+lifts at 1× so the peak fork and both laps separate together; the n-legged
+stool needs the seat still, every splayed leg sliding down its own axis, and
+the stretcher ring riding outward — multiple interacting cycles at once.
 
 Note that most realizable rings DO decompose under closure — a cardinal 4-ring
 (+X, +Y, −X, −Y around the cycle) comes apart as {A, D} sliding +X together, then
 B sliding +Y — because opposite rays pair into rigid group motions. The fallback
 triggers only when an ordering has unseparated scheduled pairs and NO closure
-candidate:
+candidate. As implemented (`_attempt_simultaneous_step`):
 
-- Contract rigid links, then solve for per-member velocities x_i on the engaged-
-  pair graph: each pair's relative velocity x_i − x_j must be zero or t_ij·r_ij
-  (t_ij ≥ 0) for one of its authored rays. Around each cycle this telescopes to
-  Σ t_ij·r_ij = 0 — a small enumeration over ray choices per pair (joints author
-  both sides, so sign freedom is the norm), then a linear feasibility check.
-- Scale the solution so every scheduled pair's relative travel reaches its
-  remaining `freed_after`; overshoot on already-freed rays is harmless.
+- Contract rigid (ray-less) pairs into clusters (union-find), then treat each
+  connected component of the ray-bearing engaged-pair graph as ONE linear
+  system: every edge's relative velocity must equal x_e·axis_e (x_e ≥ 0 for
+  half-line edges; free for bidirectional ones; non-collinear multi-ray edges
+  enumerate options under a small cap).
+- Spanning tree parametrization: cluster velocities follow from tree-edge x's;
+  each non-tree edge contributes 3 cycle-closure equations. A sign-feasible
+  nullspace vector (basis vectors and their sum first — symmetric structures'
+  solutions ARE the symmetric nullspace direction — then alternating
+  projection) gives x; velocities reconstruct through the tree.
+- Validation re-checks every engaged pair's relative velocity against its rays
+  (slightly relaxed tolerance for numeric drift); the additive gauge is fixed
+  by keep-out: try each cluster as the stationary anchor (largest first) until
+  separated pairs to parked members stop re-entering.
+- Scale so every separating pair reaches its remaining `freed_after` (max over
+  active edges — everything active fully separates, guaranteeing progress).
 - **No output change needed**: an `AssemblyStep` already carries per-member
-  direction + distance, so a ring step is simply a step with more than two
+  direction + distance, so a simultaneous step is simply a step with many
   distinct velocities; closure steps are the two-velocity special case. Members
-  traveling different t_ij distances in one step is requirement 3 appearing
+  traveling different distances in one step is requirement 3 appearing
   naturally.
-- Centering (Phase 2) applies unchanged — subtracting the weighted mean velocity
-  turns a ring escape into a symmetric pinwheel explosion.
-- If neither closure nor ring assignment succeeds, the `AssemblyFailure`
-  diagnostics report the blocking cycle(s) alongside the closure chains.
+- Centering (Phase 2) applies unchanged — subtracting the mean velocity turns
+  a ring escape into a symmetric pinwheel explosion.
+- If neither closure nor the simultaneous solve succeeds, the `AssemblyFailure`
+  diagnostics report the closure absorb-chains.
 
 ### Phase 2 — Anchored Centering (Active Group only)
 

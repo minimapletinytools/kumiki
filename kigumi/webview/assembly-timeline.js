@@ -2,15 +2,18 @@
     // Framework-agnostic domain logic for the assembly preview timeline.
     //
     // Payload shape (produced by runner.py serialize_layers -> "assembly"):
-    //   { steps: [{ order, suborder, movements: [{ kumikiEphemeralId, memberKey,
-    //                                              direction: [x, y, z],  // unit
-    //                                              distance,  // base freed_after amount
-    //                                              dragged }] }],
+    //   { steps: [{ order, suborder, substep, movements: [{ kumikiEphemeralId, memberKey,
+    //                                                       direction: [x, y, z],  // unit
+    //                                                       distance,  // base freed_after amount
+    //                                                       dragged }] }],
     //     warnings: [string],
     //     failure: { order, suborder, message, diagnostics: [string] } | null }
     //
-    // A step is one (order, suborder) extraction: the suborder sequences
-    // motion WITHIN a joint (a peg pops before the tenon slides).
+    // A step is one animated motion. (order, suborder) is the AUTHORED
+    // ordering (the suborder sequences motion within a joint — a peg pops
+    // before the tenon slides); substep (1-based) sequences the additional
+    // motions the SOLVER discovered within one ordering. Substep 1 gets a
+    // labeled timeline mark; substeps > 1 get small unlabeled ticks.
     //
     // Scrub semantics: a scrub value of k means "the first k steps are fully
     // applied"; the fractional part linearly interpolates the next step.
@@ -78,6 +81,9 @@
                 steps.push({
                     order: rawStep.order,
                     suborder: isFiniteNumber(rawStep.suborder) ? rawStep.suborder : 0,
+                    substep: isFiniteNumber(rawStep.substep) && rawStep.substep >= 1
+                        ? Math.floor(rawStep.substep)
+                        : 1,
                     movements,
                 });
             }
@@ -124,17 +130,26 @@
         return suborder === 0 ? String(step.order) : `${step.order}.${suborder}`;
     }
 
-    // Marks for the timeline track. Scrub value k = "first k steps applied",
-    // so step i gets its mark at value i + 1; value 0 is the assembled state.
-    // When a failure is present an extra '✕' mark sits past the last solved step.
-    function getTimelineMarks(steps, failure) {
-        const marks = [{ value: 0, label: 'assembled', kind: 'start' }];
+    // Interior marks for the timeline track. Scrub value k = "first k steps
+    // applied", so step i gets its mark at value i + 1. A step's FIRST substep
+    // gets a labeled 'order' mark; later substeps of the same ordering get
+    // small unlabeled 'substep' ticks.
+    //
+    // The end STATES are not marks: the viewer renders 'assembled' /
+    // 'disassembled' as labels beside the slider, and on failure the right
+    // label becomes the '✕' (the scrub range ends where disassembly first
+    // fails, so the slider's end IS the failure point).
+    function getTimelineMarks(steps) {
+        const marks = [];
         const stepList = Array.isArray(steps) ? steps : [];
         for (let index = 0; index < stepList.length; index += 1) {
-            marks.push({ value: index + 1, label: getStepLabel(stepList[index]), kind: 'order' });
-        }
-        if (failure) {
-            marks.push({ value: stepList.length + 1, label: '✕', kind: 'failure' });
+            const step = stepList[index];
+            const substep = isFiniteNumber(step.substep) && step.substep >= 1 ? step.substep : 1;
+            if (substep === 1) {
+                marks.push({ value: index + 1, label: getStepLabel(step), kind: 'order' });
+            } else {
+                marks.push({ value: index + 1, label: '', kind: 'substep' });
+            }
         }
         return marks;
     }

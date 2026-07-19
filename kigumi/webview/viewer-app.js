@@ -3098,11 +3098,21 @@ class KigumiViewerApp extends LitElement {
         if (!failure) {
             return;
         }
-        const lines = [`[assembly] ${failure.message}`, ...failure.diagnostics];
-        console.warn(lines.join('\n'));
+        const lines = [failure.message, ...failure.diagnostics];
+        console.warn(['[assembly]', ...lines].join('\n'));
         if (vscode) {
-            vscode.postMessage({ type: 'debugProbe', message: lines.join(' | ') });
+            vscode.postMessage({ type: 'assemblyFailureLog', lines });
         }
+    }
+
+    // The webview CSP blocks inline style attributes (style-src has no
+    // 'unsafe-inline'), so lit style= bindings never reach the DOM. Setting
+    // properties through the CSSOM is allowed: marks carry their position in
+    // data-left and get placed here after every render.
+    updated() {
+        this.querySelectorAll('.assembly-timeline-mark[data-left]').forEach((mark) => {
+            mark.style.left = `${mark.dataset.left}%`;
+        });
     }
 
     renderAssemblyTimeline() {
@@ -3111,13 +3121,16 @@ class KigumiViewerApp extends LitElement {
         }
         const { steps, warnings, failure } = this.assemblyData;
         const scrubMax = AssemblyTimeline.getScrubMax(steps, failure);
-        const marks = AssemblyTimeline.getTimelineMarks(steps, failure);
+        const marks = AssemblyTimeline.getTimelineMarks(steps);
+        const failureTooltip = failure
+            ? [failure.message, ...failure.diagnostics.slice(0, 3)].join('\n')
+            : '';
         return html`
             <div id="assembly-timeline"
                 aria-label="Assembly preview timeline"
                 @pointerdown=${(event) => event.stopPropagation()}
                 @mousedown=${(event) => event.stopPropagation()}>
-                <span class="assembly-timeline-title">assembly</span>
+                <span class="assembly-timeline-end-label">assembled</span>
                 <div class="assembly-timeline-track">
                     <input
                         id="assembly-scrub-slider"
@@ -3129,19 +3142,21 @@ class KigumiViewerApp extends LitElement {
                         ?disabled=${scrubMax === 0}
                         @input=${(event) => this.setAssemblyScrubValue(Number(event.target.value))}>
                     <div class="assembly-timeline-marks">
-                        ${marks.map((mark) => mark.kind === 'failure'
-                            ? html`<button
-                                class="assembly-timeline-mark assembly-timeline-mark-failure"
-                                style=${`left: ${scrubMax > 0 ? (mark.value / scrubMax) * 100 : 0}%`}
-                                type="button"
-                                title=${failure ? failure.message : ''}
-                                @click=${() => this.logAssemblyFailure()}>${mark.label}</button>`
-                            : html`<span
-                                class="assembly-timeline-mark"
-                                style=${`left: ${scrubMax > 0 ? (mark.value / scrubMax) * 100 : 0}%`}
-                                >${mark.label}</span>`)}
+                        ${marks.map((mark) => html`<span
+                            class=${mark.kind === 'substep'
+                                ? 'assembly-timeline-mark assembly-timeline-mark-substep'
+                                : 'assembly-timeline-mark'}
+                            data-left=${scrubMax > 0 ? String((mark.value / scrubMax) * 100) : '0'}
+                            >${mark.kind === 'substep' ? '·' : mark.label}</span>`)}
                     </div>
                 </div>
+                ${failure
+                    ? html`<button
+                        class="assembly-timeline-end-label assembly-timeline-failure"
+                        type="button"
+                        title=${failureTooltip}
+                        @click=${() => this.logAssemblyFailure()}>✕</button>`
+                    : html`<span class="assembly-timeline-end-label">disassembled</span>`}
                 ${warnings.length > 0
                     ? html`<span class="assembly-timeline-warnings" title=${warnings.join('\n')}>⚠ ${warnings.length}</span>`
                     : ''}
