@@ -322,18 +322,17 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
     Attributes:
         wedge_from_receiving_timber_side: If true, the wedge is designed to be cut from the receiving timber and inserted from that side. If false, the wedge is designed to be cut from the tenon timber and inserted from the tenon side. We must have tenon_depth + receiving_timber_extra_depth > the matching width on the receivingtimber for this to work
         wedge_angle: The angle of the wedge taper. 0 means a rectangular wedge, X means a wedge with an X angle taper.
-        wedge_small_height: The height of the narrow end of the wedge. Measured at tenon_length if wedge_from_receiving_timber_side is False, measured from the shoulder if wedge_from_receiving_timber_side is True. If None, dovetail_depth is used.
+        wedge_extra_height: Extra height added to the wedge. The small height of the wedge is calculated as dovetail_depth + wedge_extra_height. The reason for this is that a minimum size of dovetail_depth is required for the joint to physically assemble.
     """
     wedge_from_receiving_timber_side: bool = False
     wedge_angle: Numeric = degrees(10)
-    wedge_small_height: Optional[Numeric] = None
+    wedge_extra_height: Numeric = 0
     # the wedge length without extra is just tenon_depth
     # this one can actually be negative which you'll want to do if the tenon is not a through tenon
     wedge_tip_extra_length: Numeric = 0
     wedge_base_extra_length: Numeric = 0
 
 
-# TODO rename to half_dovetail_mortise_and_tenon_geometry
 def dovetail_tenon_geometry(
     arrangement: ButtJointTimberArrangement,
     shoulder_result: ButtJointShoulderResult,
@@ -341,10 +340,10 @@ def dovetail_tenon_geometry(
     tenon_size: V2,
     tenon_depth: Numeric,
     dovetail_depth: Numeric,
+    wedge_accessory_parameters: DovetailTenonWedgeAccessoryParameters,
     tenon_lateral_offset: Numeric = 0,
     # the extra depth for the mortise hole in the receiving timber
     receiving_timber_mortise_extra_depth: Numeric = 0,
-    wedge_accessory_parameters: Optional[DovetailTenonWedgeAccessoryParameters] = None,
 ) -> DovetailTenonGeometeryResult:
     """
     Build the tenon geometry for a dovetail shoulder. The "top" of dovetail tenon is always flush with dovetail_top_side_on_butt_timber face of the butt timber, however x/y sizing still aligns with the usual width/height axis of the butt timber.
@@ -513,10 +512,9 @@ def dovetail_tenon_geometry(
 
     wedge_accessory_csg = None
     wedge_slot_in_mortise_csg = None
-    if wedge_accessory_parameters is not None:
-        wedge_small_height_value = wedge_accessory_parameters.wedge_small_height
-        if wedge_small_height_value is None:
-            wedge_small_height_value = dovetail_depth
+    if True:
+        wedge_extra_height = getattr(wedge_accessory_parameters, "wedge_extra_height", 0)
+        wedge_small_height_value = dovetail_depth + wedge_extra_height
         wedge_angle = wedge_accessory_parameters.wedge_angle
         wedge_base_extra = wedge_accessory_parameters.wedge_base_extra_length
         wedge_tip_extra = wedge_accessory_parameters.wedge_tip_extra_length

@@ -601,8 +601,11 @@ def example_wedged_half_dovetail_mortise_and_tenon_no_wedge(position=None, use_r
         dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([inches(2), inches(2)]),
         tenon_depth=inches(5),
-        receiving_timber_mortise_extra_depth=inches(1, 2),
         dovetail_depth=inches(1, 2),
+        wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+            wedge_angle=degrees(8),
+        ),
+        receiving_timber_mortise_extra_depth=inches(1, 2),
         mortise_shoulder_inset = inches(1, 2),
     )
 

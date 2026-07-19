@@ -1321,10 +1321,10 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     tenon_size: V2,
     tenon_depth: Numeric,
     dovetail_depth: Numeric,
+    wedge_accessory_parameters: DovetailTenonWedgeAccessoryParameters,
     tenon_lateral_offset: Numeric = scalar(0),
     receiving_timber_mortise_extra_depth: Numeric = scalar(0),
     mortise_shoulder_inset: Numeric = scalar(0),
-    wedge_accessory_parameters: Optional[DovetailTenonWedgeAccessoryParameters] = None,
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
@@ -1395,9 +1395,9 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         tenon_size=tenon_size,
         tenon_depth=tenon_depth,
         dovetail_depth=dovetail_depth,
+        wedge_accessory_parameters=wedge_accessory_parameters,
         tenon_lateral_offset=tenon_lateral_offset,
         receiving_timber_mortise_extra_depth=receiving_timber_mortise_extra_depth,
-        wedge_accessory_parameters=wedge_accessory_parameters,
     )
 
     # The CSGs from dovetail_tenon_geometry are in global space. Adopt them into each
@@ -1437,9 +1437,22 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     tip_position_local = tenon_timber.transform.global_to_local(tenon_tip_position_global)
     tip_z_local = tip_position_local[2]
 
-    # Assembly: the tenon backs out of the mortise along the butt axis; the
-    # wedge (if any) locks it and pops first, so the timbers slide at
-    # suborder 1 when a wedge is present.
+    # Assembly: the tenon backs out of the mortise along a diagonal direction
+    # determined by the wedge_angle. The wedge (always present) locks it
+    # and pops first, so the timbers slide at suborder 1.
+    from sympy import cos, sin
+    wedge_angle = wedge_accessory_parameters.wedge_angle
+    cos_angle = cos(wedge_angle)
+    sin_angle = sin(wedge_angle)
+
+    top_face_dir = tenon_timber.get_face_direction_global(
+        dovetail_top_side_on_butt_timber.to.face()
+    )
+
+    tenon_disassembly_dir = -cos_angle * shoulder_result.butt_direction + sin_angle * top_face_dir
+    mortise_disassembly_dir = cos_angle * shoulder_result.butt_direction - sin_angle * top_face_dir
+    freed_dist = tenon_depth / cos_angle
+
     timber_suborder = 1 if geo.wedge_accessory_csg is not None else 0
     tenon_cut_no_relief = Cutting(
         timber=tenon_timber,
@@ -1447,7 +1460,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
         negative_csg=tenon_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
-        assembly_freedom=AssemblyFreedom.translation(-shoulder_result.butt_direction, freed_after=tenon_depth),
+        assembly_freedom=AssemblyFreedom.translation(tenon_disassembly_dir, freed_after=freed_dist),
         assembly_ordering=Ordering(0, timber_suborder),
     )
 
@@ -1455,7 +1468,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         timber=mortise_timber,
         negative_csg=mortise_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
-        assembly_freedom=AssemblyFreedom.translation(shoulder_result.butt_direction, freed_after=tenon_depth),
+        assembly_freedom=AssemblyFreedom.translation(mortise_disassembly_dir, freed_after=freed_dist),
         assembly_ordering=Ordering(0, timber_suborder),
     )
 

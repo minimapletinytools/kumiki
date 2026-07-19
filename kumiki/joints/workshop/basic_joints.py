@@ -450,7 +450,7 @@ def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbe
     tenon_timber: TimberLike,
     mortise_timber: TimberLike,
     tenon_end: TimberEnd,
-    use_wedge: bool = False,
+    use_wedge: bool = True,
 ) -> Joint:
     """
     Creates a half-dovetail mortise-and-tenon joint between two face-aligned orthogonal
@@ -505,12 +505,10 @@ def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbe
 
     tenon_depth = mortise_timber.get_size_in_face_normal_axis(mortise_entry_face)
 
-    wedge_accessory_parameters = None
-    if use_wedge:
-        wedge_accessory_parameters = DovetailTenonWedgeAccessoryParameters(
-            wedge_angle=atan(tenon_dovetail_axis_dovetail_depth / tenon_depth),
-            wedge_small_height=tenon_dovetail_axis_size*scalar(1, 8),
-        )
+    wedge_accessory_parameters = DovetailTenonWedgeAccessoryParameters(
+        wedge_angle=atan(tenon_dovetail_axis_dovetail_depth / tenon_depth),
+        wedge_extra_height=0
+    )
 
     arrangement = ButtJointTimberArrangement(
         receiving_timber=cast(Timber, mortise_timber),

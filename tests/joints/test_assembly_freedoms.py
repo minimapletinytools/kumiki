@@ -205,6 +205,27 @@ class TestLockedJointFreedoms:
         assert_authored_translation(spline.assembly_freedom)
         assert spline.assembly_ordering == Ordering(0, 1)
 
+    def test_wedged_half_dovetail_mortise_and_tenon(self, float_mode):
+        from sympy import Matrix, cos, sin
+        arrangement = create_canonical_example_butt_joint_timbers()
+        joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_depth=scalar(4),
+            dovetail_depth=scalar(1),
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+                wedge_angle=degrees(10),
+            ),
+        )
+
+        expected_angle = 10 * 3.141592653589793 / 180.0
+        expected_tenon_direction = (sin(expected_angle), -cos(expected_angle), 0.0)
+        expected_mortise_direction = (-sin(expected_angle), cos(expected_angle), 0.0)
+
+        assert_authored_translation(joint.cuttings["butt_timber"].assembly_freedom, expected_tenon_direction)
+        assert_authored_translation(joint.cuttings["receiving_timber"].assembly_freedom, expected_mortise_direction)
+
 
 class TestRigidJoints:
     def test_lapped_gooseneck_stays_rigid(self, float_mode):

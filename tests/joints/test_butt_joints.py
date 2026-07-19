@@ -1039,19 +1039,17 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         assert mortise_csg.contains_point(mortise_far_local)
 
     def test_no_wedge_accessory(self, simple_T_configuration):
-        """Without wedge_accessory_parameters, the joint has no wedge accessory."""
+        """Omitting wedge_accessory_parameters raises TypeError."""
         arrangement = self._make_arrangement(simple_T_configuration)
-        joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
-            arrangement=arrangement,
-            dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
-            tenon_depth=scalar(4),
-            dovetail_depth=scalar(1),
-        )
-        assert len(joint.jointAccessories) == 0
-        # Both timbers still render to valid CSGs.
-        _render_cutting(joint.cuttings["tenon_timber"])
-        _render_cutting(joint.cuttings["mortise_timber"])
+        import pytest
+        with pytest.raises(TypeError, match="missing.*required.*wedge_accessory_parameters"):
+            cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=arrangement,
+                dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
+                tenon_size=Matrix([scalar(2), scalar(2)]),
+                tenon_depth=scalar(4),
+                dovetail_depth=scalar(1),
+            )
 
     def test_wedge_size_unchanged_and_slot_extends_to_nominal_boundary(self, simple_T_configuration):
         """Keep wedge size unchanged while extending only the mortise slot base to nominal boundary."""
