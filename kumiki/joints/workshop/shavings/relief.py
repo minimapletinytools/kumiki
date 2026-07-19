@@ -508,24 +508,39 @@ def chop_shoulder_notch_aligned_with_timber(
     # Width must hug the butting timber exactly -- unlike span/depth,
     # overshoot here is NOT free: it would widen the housing and cut away
     # seat material. This is the true footprint of the butting timber's
-    # (perfect) cross-section sliced by the shoulder plane; the raking
-    # overhang ABOVE the shoulder plane is the wall relief prisms' job, and
-    # the rake always overhangs along +-width, never along the span, because
-    # the butting timber's length axis lies in the plane spanned by the
-    # approach direction and the notch timber's length axis by construction.
+    # (perfect) cross-section sliced by the shoulder plane.
+    #
+    # The notch width axis is the projection of the butting timber's length
+    # axis onto the shoulder plane. For the centerline-derived shoulder plane
+    # this coincides with notch_length_dir_global (no change). For
+    # face-parallel shoulder planes (compound angles) the tenon may rake in
+    # both the length and span directions of the receiving timber, so we use
+    # the actual projected tenon direction as the notch width axis to keep
+    # the notch tight against the tenon on both walls.
+    b_global = butting_centerline.direction
+    n_global = shoulder_plane.normal
+    b_in_plane = b_global - n_global * safe_dot_product(b_global, n_global)
+    b_in_plane_len_sq = safe_dot_product(b_in_plane, b_in_plane)
+    if not zero_test(b_in_plane_len_sq):
+        notch_width_axis_global = normalize_vector(b_in_plane)
+    else:
+        notch_width_axis_global = notch_length_dir_global
+
     notch_width = _perfect_cross_section_slice_span_along_plane_direction(
         butting_timber,
         shoulder_plane.normal,
-        notch_length_dir_global,
+        notch_width_axis_global,
     )
 
     approach_direction_local = safe_transform_vector(
         notch_timber.orientation.matrix.T,
         shoulder_plane_normal,
     )
-    notch_length_dir_local = create_v3(scalar(0), scalar(0), scalar(1))
+    notch_width_axis_local = normalize_vector(
+        safe_transform_vector(notch_timber.orientation.matrix.T, notch_width_axis_global)
+    )
 
-    prism_orientation = Orientation.from_z_and_x(approach_direction_local, notch_length_dir_local)
+    prism_orientation = Orientation.from_z_and_x(approach_direction_local, notch_width_axis_local)
     prism_position_local = notch_timber.transform.global_to_local(intersection_global)
 
     # this prism is the "main" part of the notch
@@ -548,11 +563,11 @@ def chop_shoulder_notch_aligned_with_timber(
         return notch_prism
 
     angle_rad = wall_relief_angle_radians
-    span_direction_local = cross_product(approach_direction_local, notch_length_dir_local)
+    span_direction_local = cross_product(approach_direction_local, notch_width_axis_local)
     span_direction_local = normalize_vector(span_direction_local)
 
-    corner_point_1 = prism_position_local + notch_length_dir_local * (notch_width / scalar(2))
-    corner_point_2 = prism_position_local - notch_length_dir_local * (notch_width / scalar(2))
+    corner_point_1 = prism_position_local + notch_width_axis_local * (notch_width / scalar(2))
+    corner_point_2 = prism_position_local - notch_width_axis_local * (notch_width / scalar(2))
 
     axis_1 = Axis(position=corner_point_1, direction=span_direction_local)
     axis_2 = Axis(position=corner_point_2, direction=span_direction_local)
