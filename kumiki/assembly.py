@@ -716,56 +716,50 @@ _SIMULTANEOUS_SPEED_EPSILON = 1e-6
 _SIMULTANEOUS_COMBO_CAP = 64
 
 
-def _nullspace_basis(rows: List[List[float]], columns: int) -> List[List[float]]:
-    """Nullspace basis of a small float matrix via Gaussian elimination with
-    partial pivoting. An empty ``rows`` yields the standard basis."""
-    if not rows:
-        return [[1.0 if i == j else 0.0 for j in range(columns)] for i in range(columns)]
-    matrix = [list(row) for row in rows]
-    pivot_column_of_row: List[int] = []
-    row_index = 0
-    for col in range(columns):
-        pivot = None
-        best = 1e-12
-        for r in range(row_index, len(matrix)):
-            if abs(matrix[r][col]) > best:
-                best = abs(matrix[r][col])
-                pivot = r
-        if pivot is None:
-            continue
-        matrix[row_index], matrix[pivot] = matrix[pivot], matrix[row_index]
-        scale = matrix[row_index][col]
-        matrix[row_index] = [v / scale for v in matrix[row_index]]
-        for r in range(len(matrix)):
-            if r != row_index and abs(matrix[r][col]) > 1e-15:
-                factor = matrix[r][col]
-                matrix[r] = [a - factor * b for a, b in zip(matrix[r], matrix[row_index])]
-        pivot_column_of_row.append(col)
-        row_index += 1
-        if row_index == len(matrix):
-            break
-    pivot_columns = set(pivot_column_of_row)
-    basis: List[List[float]] = []
-    for free_col in range(columns):
-        if free_col in pivot_columns:
-            continue
-        vector = [0.0] * columns
-        vector[free_col] = 1.0
-        for r, pivot_col in enumerate(pivot_column_of_row):
-            vector[pivot_col] = -matrix[r][free_col]
-        basis.append(vector)
-    return basis
-
-
 def _orthonormalize(vectors: List[List[float]]) -> List[List[float]]:
+    """Gram-Schmidt with a drop tolerance RELATIVE to each vector's original
+    norm. Rank decisions here must never hinge on an absolute threshold:
+    float cancellation noise in a dependent row once got counted as an extra
+    rank, which cost the nullspace the exact dimension carrying the odd-n
+    stool's simultaneous solution."""
     basis: List[List[float]] = []
     for vector in vectors:
+        original_norm = math.sqrt(sum(a * a for a in vector))
+        if original_norm < 1e-300:
+            continue
         working = list(vector)
         for existing in basis:
             projection = sum(a * b for a, b in zip(working, existing))
             working = [a - projection * b for a, b in zip(working, existing)]
         norm = math.sqrt(sum(a * a for a in working))
-        if norm > 1e-10:
+        if norm >= 1e-9 * original_norm:
+            basis.append([a / norm for a in working])
+    return basis
+
+
+def _nullspace_basis(rows: List[List[float]], columns: int) -> List[List[float]]:
+    """ORTHONORMAL nullspace basis via the row-space complement.
+
+    The row space is orthonormalized with a relative drop tolerance (that is
+    where the rank decision happens); each standard basis vector is then
+    projected onto the orthogonal complement and orthonormalized. An empty
+    ``rows`` yields the standard basis. This construction is robust against
+    the float cancellation noise that made the previous RREF implementation
+    overestimate rank (see _orthonormalize).
+    """
+    row_basis = _orthonormalize(rows) if rows else []
+    basis: List[List[float]] = []
+    for index in range(columns):
+        working = [0.0] * columns
+        working[index] = 1.0
+        for existing in row_basis:
+            projection = sum(a * b for a, b in zip(working, existing))
+            working = [a - projection * b for a, b in zip(working, existing)]
+        for existing in basis:
+            projection = sum(a * b for a, b in zip(working, existing))
+            working = [a - projection * b for a, b in zip(working, existing)]
+        norm = math.sqrt(sum(a * a for a in working))
+        if norm >= 1e-9:  # relative to |e_index| = 1
             basis.append([a / norm for a in working])
     return basis
 
@@ -831,7 +825,72 @@ def _sign_feasible_null_vector(
         result = normalize_feasible(x)
         if result is not None:
             return result
-    return None
+
+    return _lp_sign_feasible_null_vector(null_basis, half_line, scheduled)
+
+
+# Guardrails for the exact-arithmetic LP backstop: beyond these sizes the
+# rational simplex could get slow, and the heuristics-only answer stands.
+_LP_MAX_NULLSPACE_DIM = 24
+_LP_MAX_CONSTRAINTS = 96
+
+
+def _lp_sign_feasible_null_vector(
+    null_basis: List[List[float]],
+    half_line: Set[int],
+    scheduled: Set[int],
+) -> Optional[List[float]]:
+    """Exact backstop for the heuristic search (which can miss thin feasible
+    cones): maximize the total motion on scheduled coordinates over the
+    nullspace, subject to the half-line signs, with box-bounded coefficients.
+    A positive optimum IS a valid simultaneous motion; zero means none exists
+    for this ray combo. Uses sympy's rational simplex — exact, deterministic,
+    and cheap at Phase 1b's component sizes.
+    """
+    if not null_basis or not scheduled:
+        return None
+    dimension = len(null_basis[0])
+    coefficients = len(null_basis)
+    if coefficients > _LP_MAX_NULLSPACE_DIM or len(half_line) > _LP_MAX_CONSTRAINTS:
+        return None
+    try:
+        from sympy.solvers.simplex import linprog as simplex_linprog
+    except ImportError:
+        return None
+
+    rational_basis = [[sp.Rational(component) for component in vector] for vector in null_basis]
+    # Minimize the negated scheduled-motion sum; constrain -(B·λ)_e <= 0 on
+    # half-line coordinates; box λ so the LP is bounded.
+    objective = [-sum(vector[e] for e in scheduled) for vector in rational_basis]
+    constraint_rows = [
+        [-vector[e] for vector in rational_basis]
+        for e in sorted(half_line)
+    ]
+    constraint_bounds = [sp.Integer(0)] * len(constraint_rows)
+    try:
+        optimum, point = simplex_linprog(
+            objective,
+            A=constraint_rows,
+            b=constraint_bounds,
+            bounds=[(-1, 1)] * coefficients,
+        )
+    except Exception:  # noqa: BLE001 — the LP must never break solving
+        return None
+    if float(-optimum) <= 1e-9:
+        return None
+
+    coefficients_solution = [float(value) for value in point]
+    x = [
+        sum(coefficients_solution[j] * null_basis[j][e] for j in range(coefficients))
+        for e in range(dimension)
+    ]
+    largest = max(abs(value) for value in x)
+    if largest < 1e-9:
+        return None
+    x = [value / largest for value in x]
+    if not any(abs(x[e]) > 1e-9 for e in scheduled):
+        return None
+    return [0.0 if (e in half_line and value < 0.0) else value for e, value in enumerate(x)]
 
 
 def _attempt_simultaneous_step(
@@ -1037,7 +1096,7 @@ def _solve_simultaneous_component(
             local_of_edge[index] for index in component_edges
             if ordering in edge_pairs[index].scheduled_orderings
         }
-        null_basis = _orthonormalize(_nullspace_basis(rows, edge_count))
+        null_basis = _nullspace_basis(rows, edge_count)  # already orthonormal
         x = _sign_feasible_null_vector(null_basis, half_line, scheduled_locals)
         if x is None:
             continue

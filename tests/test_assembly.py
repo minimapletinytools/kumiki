@@ -7,6 +7,7 @@ names below (closure, ring escape, centering, compaction, clear-out).
 """
 
 import pytest
+from sympy import Float
 
 from kumiki.assembly import (
     AssemblyFreedom,
@@ -27,7 +28,7 @@ Z = create_v3(0, 0, 1)
 
 
 def member(key, name, x=0, y=0, z=0, bbox=None):
-    return AssemblyMember(key=key, name=name, position=create_v3(x, y, z), bbox=bbox)
+    return AssemblyMember(key=key, name=name, position=create_v3(Float(x), Float(y), Float(z)), bbox=bbox)
 
 
 def spec(freedom=None, order=0, suborder=0):
@@ -725,6 +726,148 @@ class TestRingEscape:
         )
         assert len(distances) >= 2
         assert distances[-1] > distances[0] + 1e-9
+
+
+class TestNullspaceRobustness:
+    def test_float_cancellation_noise_does_not_cost_a_dimension(self):
+        # Regression for the odd-n stool bug: a truly dependent constraint
+        # row carrying ~1e-13 float cancellation noise must not be counted
+        # as an extra rank (the lost nullspace dimension was exactly the one
+        # holding the stool's simultaneous solution).
+        import math as pymath
+        import random
+
+        from kumiki.assembly import _nullspace_basis
+
+        random.seed(1)
+        row_a = [pymath.cos(2 * pymath.pi * k / 7) for k in range(6)]
+        row_b = [pymath.sin(2 * pymath.pi * k / 7) for k in range(6)]
+        noisy_sum = [a + b + random.uniform(-1e-13, 1e-13) for a, b in zip(row_a, row_b)]
+
+        basis = _nullspace_basis([row_a, row_b, noisy_sum], 6)
+
+        assert len(basis) == 4  # rank must be 2, not 3
+        for vector in basis:
+            assert abs(sum(a * x for a, x in zip(row_a, vector))) < 1e-8
+            assert abs(sum(b * x for b, x in zip(row_b, vector))) < 1e-8
+
+    def test_empty_rows_yield_standard_basis(self):
+        from kumiki.assembly import _nullspace_basis
+
+        basis = _nullspace_basis([], 3)
+
+        assert len(basis) == 3
+
+
+class TestLpBackstop:
+    def test_lp_finds_a_measure_zero_feasible_ray(self):
+        # The feasible cone here is a single ray (b must equal a exactly), so
+        # sampling/projection heuristics can miss it; the exact LP must not.
+        from kumiki.assembly import _lp_sign_feasible_null_vector, _orthonormalize
+
+        basis = _orthonormalize([[3.0, 1.0, -1.0], [1.0, -1.0, 1.0]])
+        result = _lp_sign_feasible_null_vector(basis, half_line={0, 1, 2}, scheduled={0})
+
+        assert result is not None
+        assert result[0] == pytest.approx(1.0)
+        assert result[1] == pytest.approx(0.0, abs=1e-9)
+        assert result[2] == pytest.approx(0.0, abs=1e-9)
+
+    def test_lp_reports_infeasible_as_none(self):
+        from kumiki.assembly import _lp_sign_feasible_null_vector, _orthonormalize
+
+        basis = _orthonormalize([[1.0, -1.0]])
+        result = _lp_sign_feasible_null_vector(basis, half_line={0, 1}, scheduled={0, 1})
+
+        assert result is None
+
+
+class TestSplayedRadialStructures:
+    def build_stool_graph(self, leg_count):
+        # Abstract model of the n-legged stool: a seat, n legs whose tenons
+        # enter the seat along their own splayed axes, and a ring of
+        # stretchers tenoned between adjacent legs along the chords. No
+        # rigid group move exists; disassembly needs the whole-component
+        # simultaneous motion (seat still, legs splaying down-and-out,
+        # stretchers riding between).
+        import math as pymath
+
+        splay = pymath.radians(30)
+        members = [member(1, "seat", z=10)]
+        joints = []
+        for index in range(leg_count):
+            theta = 2 * pymath.pi * index / leg_count
+            leg_key = 10 + index
+            members.append(member(leg_key, f"leg_{index}",
+                                  x=5 * pymath.cos(theta), y=5 * pymath.sin(theta)))
+            leg_axis = create_v3(
+                Float(-pymath.sin(splay) * pymath.cos(theta)),
+                Float(-pymath.sin(splay) * pymath.sin(theta)),
+                Float(pymath.cos(splay)),
+            )
+            joints.append(AssemblyJoint(
+                name=f"seat_leg_{index}",
+                members={
+                    1: spec(AssemblyFreedom.translation(leg_axis, freed_after=1)),
+                    leg_key: spec(AssemblyFreedom.translation(-leg_axis, freed_after=1)),
+                },
+            ))
+        for index in range(leg_count):
+            next_index = (index + 1) % leg_count
+            theta = 2 * pymath.pi * index / leg_count
+            next_theta = 2 * pymath.pi * next_index / leg_count
+            chord = (pymath.cos(next_theta) - pymath.cos(theta),
+                     pymath.sin(next_theta) - pymath.sin(theta))
+            chord_norm = pymath.hypot(*chord)
+            chord_direction = create_v3(Float(chord[0] / chord_norm), Float(chord[1] / chord_norm), Float(0))
+            stretcher_key = 30 + index
+            members.append(member(stretcher_key, f"stretcher_{index}",
+                                  x=2.5 * (pymath.cos(theta) + pymath.cos(next_theta)),
+                                  y=2.5 * (pymath.sin(theta) + pymath.sin(next_theta)),
+                                  z=3))
+            # Bottom tenon into leg index: the stretcher withdraws along the
+            # chord toward the next leg; top tenon into the next leg
+            # withdraws the opposite way.
+            joints.append(AssemblyJoint(
+                name=f"stretcher_{index}_bottom",
+                members={
+                    10 + index: spec(),
+                    stretcher_key: spec(AssemblyFreedom.translation(chord_direction, freed_after=Float(0.5))),
+                },
+            ))
+            joints.append(AssemblyJoint(
+                name=f"stretcher_{index}_top",
+                members={
+                    10 + next_index: spec(),
+                    stretcher_key: spec(AssemblyFreedom.translation(-chord_direction, freed_after=Float(0.5))),
+                },
+            ))
+        return members, joints
+
+    @pytest.mark.parametrize("leg_count", [3, 4, 5])
+    def test_stool_disassembles_for_any_leg_count(self, leg_count):
+        # The odd counts regress the nullspace rank bug: the feasible
+        # simultaneous motion lived in the dimension the old RREF dropped.
+        members, joints = self.build_stool_graph(leg_count)
+
+        solution = solve_assembly(members, joints)
+        assert solution is not None
+
+        assert solution.failure is None
+        # Every seat-leg joint fully separated along its splay axis.
+        import math as pymath
+        splay = pymath.radians(30)
+        totals = total_displacements(solution)
+        for index in range(leg_count):
+            theta = 2 * pymath.pi * index / leg_count
+            axis = (-pymath.sin(splay) * pymath.cos(theta),
+                    -pymath.sin(splay) * pymath.sin(theta),
+                    pymath.cos(splay))
+            seat = totals.get(1, (0.0, 0.0, 0.0))
+            leg = totals.get(10 + index, (0.0, 0.0, 0.0))
+            relative = tuple(s - l for s, l in zip(seat, leg))
+            travel = sum(r * a for r, a in zip(relative, axis))
+            assert travel >= 1.0 - 1e-6, f"leg_{index} not separated (travel={travel})"
 
 
 class TestUnsolvable:

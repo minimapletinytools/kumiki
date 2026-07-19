@@ -402,6 +402,64 @@ against oscarshed and tinyhouse120:
 - The solver remains topological (no collision checks); a "solved" preview is still
   a preview, not a proof.
 
+## Follow-up plan: odd-n stool failure (Phase 1b nullspace rank bug) — IMPLEMENTED
+
+Status: all three fixes below are implemented; stool solves for n=3..6 (one
+simultaneous step each) and the full pattern sweep is unchanged.
+
+Symptom: `n_legged_stool` disassembles for n=4 but fails for n=3 and n=5
+("no valid extraction found"; every closure absorbs the escape partner, and
+the simultaneous solver returns None).
+
+Diagnosis (verified empirically on the captured n=3 component — 7 clusters,
+9 single-ray half-line edges, 9 cycle-constraint rows):
+
+1. The physical solution (seat still, each leg sliding down its own splay
+   axis, stretchers riding between adjacent legs) IS representable: the
+   symmetric edge vector x = [1,1,1, 0.433×6] satisfies the module's own
+   constraint rows to 4e-12 and is strictly positive on all half-line
+   coordinates.
+2. The true nullspace of those rows has dimension 4 (numpy SVD, rank 5), but
+   `_nullspace_basis`'s Gaussian elimination returns only 3 dimensions: its
+   ABSOLUTE pivot threshold (1e-12) picks up float cancellation noise in a
+   truly dependent row as a 6th pivot, overestimating rank by one — and the
+   lost direction is exactly the one carrying the feasible solution. Same
+   story at n=5 (true dim 6, computed 5). n=4 escapes by numerical luck.
+3. Handed the CORRECT nullspace basis, the existing
+   `_sign_feasible_null_vector` heuristics find the solution for both n=3
+   and n=5 — the search was never the culprit.
+
+Fix plan, in order:
+
+1. **Robust nullspace (root cause, S).** Replace the RREF-based
+   `_nullspace_basis` in the Phase 1b path with a row-space-complement
+   construction: Gram-Schmidt the constraint ROWS with a RELATIVE drop
+   tolerance (keep a row only if its orthogonal remainder is ≥ ~1e-9 of its
+   original norm) to get a correctly-ranked orthonormal row basis; then
+   project each standard basis vector onto the orthogonal complement and
+   Gram-Schmidt those (same relative tolerance) for the nullspace basis.
+   Also make `_orthonormalize`'s drop threshold relative — it has the same
+   absolute-tolerance fragility.
+2. **Exact LP backstop (robustness, S-M).** The sign-feasibility search
+   stays heuristic in principle; when it returns None, fall back to an
+   exact rational LP via `sympy.solvers.simplex.linprog` (available in the
+   pinned sympy 1.14; signature `linprog(c, A, b, A_eq, b_eq, bounds)`):
+   variables λ, x = Bλ; maximize Σ x_e over scheduled edges; constraints
+   (Bλ)_e ≥ 0 for half-line edges, λ_j ∈ [-1, 1]. Optimum > tol ⇒ normalize
+   Bλ* and proceed. This keeps edges at 0 legal (needed for partially-moving
+   components like the tinyhouse roof) while guaranteeing we never miss a
+   feasible simultaneous motion for the chosen ray combo. Components are
+   small when Phase 1b fires, so exact simplex cost is negligible; the
+   float heuristics remain the fast path.
+3. **Tests.** (a) Unit-test the new nullspace construction on a
+   trig-float rank-deficient matrix (dimension must match the analytically
+   known rank). (b) Abstract stool-shaped fixture in tests/test_assembly.py:
+   hub + n splayed spokes + chord ring, parametrized n=3,4,5 — full
+   disassembly asserted (hermetic; no pattern import). (c) Re-run the
+   pattern sweep (stool n=3..6, oscarshed, tinyhouse120, rings) — the fix
+   only ever ENLARGES the searched nullspace, so existing solves must not
+   regress.
+
 ## References
 
 - R. H. Wilson, J.-C. Latombe — *Geometric Reasoning about Mechanical Assembly*,
