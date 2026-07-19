@@ -856,7 +856,7 @@ def cut_mortise_and_tenon_joint(
         if use_round_tenon:
             # Round mortise hole at an angle: use cylinder
             mortise_radius = tenon_size[0] / scalar(2)
-            axis_direction_global = normalize_vector(-mortise_face_normal)
+            axis_direction_global = normalize_vector(tenon_end_direction)
             mortise_hole_prism_global = Cylinder(
                 axis_direction=axis_direction_global,
                 radius=mortise_radius,
@@ -892,7 +892,7 @@ def cut_mortise_and_tenon_joint(
         if use_round_tenon:
             # Round mortise hole: use cylinder with same diameter as tenon
             mortise_radius = tenon_size[0] / scalar(2)
-            axis_direction_global = normalize_vector(-mortise_face_normal)
+            axis_direction_global = normalize_vector(tenon_end_direction)
             mortise_hole_prism_global = Cylinder(
                 axis_direction=axis_direction_global,
                 radius=mortise_radius,

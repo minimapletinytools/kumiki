@@ -11,16 +11,18 @@ from kumiki.ticket import TimberTicket
 
 def build_frame(
     n: int = Param(4, description="Number of legs (at least 3)", kind="number", minimum=3),
-    stool_height: Numeric = Param(mm(450), description="Total height of the stool", kind="number"),
-    seat_diameter: Numeric = Param(mm(300), description="Diameter of the seat", kind="number"),
-    seat_thickness: Numeric = Param(mm(40), description="Thickness of the seat", kind="number"),
-    leg_diameter: Numeric = Param(mm(35), description="Diameter of the legs", kind="number"),
-    stretcher_diameter: Numeric = Param(mm(25), description="Diameter of the stretchers", kind="number"),
-    stretcher_height: Numeric = Param(mm(150), description="Height of stretchers from ground", kind="number"),
-    leg_top_radius: Numeric = Param(mm(100), description="Radial distance of leg attachment from center", kind="number"),
 ) -> Frame:
     n_int = int(scalar(n))
     assert n_int >= 3, "Number of legs must be at least 3"
+
+    stool_height: Numeric = mm(450)
+    seat_diameter: Numeric = mm(300)
+    seat_thickness: Numeric = mm(40)
+    leg_diameter: Numeric = mm(35)
+    stretcher_diameter: Numeric = mm(25)
+    stretcher_height: Numeric = mm(150)
+    leg_top_radius: Numeric = mm(100)
+    splay_angle_rad = degrees(30)
 
     # 1. Stool Seat
     # Seat is a horizontal regular rectangular timber running along the X axis.
@@ -36,7 +38,6 @@ def build_frame(
 
     # 2. Stool Legs
     # Splay angle is 10 degrees away from the center of the seat board.
-    splay_angle_rad = pi * scalar(10, 180)  # 10 degrees in radians
     cos_splay = cos(splay_angle_rad)
     sin_splay = sin(splay_angle_rad)
 
