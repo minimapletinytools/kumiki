@@ -8,6 +8,40 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.3] - 2026-07-18
+
+### kumiki
+
+#### Added
+
+- Added `cut_dropin_housed_butt_joint_on_face_aligned_timbers` (plus a `cut_basic_` variant and pattern) for drop-in housed butt joints.
+- Added `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` (plus a `cut_basic_` variant).
+- Extended scribe relief to all valid butt joints, including a new `DropinButtJointSweepScribeReliefConfig` for drop-in variants.
+- Added `stickout_length` to simple peg parameters.
+- Tenon placement is now validated: cut functions raise if the tenon would exceed the tenon timber's boundaries.
+
+#### Changed
+
+- **Breaking:** joint cut functions renamed with suffixes stating their arrangement restrictions (`_on_face_aligned_timbers`, `_on_plane_aligned_timbers`, `_on_aligned_timbers`), e.g. `cut_basic_plain_cross_lap_joint` → `cut_basic_plain_cross_lap_joint_on_face_aligned_timbers`, `cut_multi_cross_lap_joint` → `cut_multi_cross_lap_joint_on_plane_aligned_timbers`, `cut_basic_lapped_gooseneck_joint` → `cut_basic_lapped_gooseneck_joint_on_aligned_timbers`.
+  **Migrate:** append the arrangement suffix matching the joint's restriction; the pattern index / agent usage instructions list the new names.
+- **Breaking:** `join_plane_aligned_on_place_aligned_timbers` renamed to `join_plane_aligned_on_plane_aligned_timbers` (typo fix).
+- **Breaking:** the wedge in `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` is now required — `wedge_accessory_parameters` is a required parameter (it is physically required for the joint to assemble), and `cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` defaults `use_wedge=True`.
+- **Breaking:** `DovetailTenonWedgeAccessoryParameters.wedge_small_height` replaced by `wedge_extra_height`: the wedge's small height is now `dovetail_depth + wedge_extra_height`, since a minimum of `dovetail_depth` is required for the joint to physically assemble.
+  **Migrate:** remove `wedge_small_height` and, if a larger wedge is desired, set `wedge_extra_height` to the amount above `dovetail_depth`.
+- Relicensed under the Mozilla Public License 2.0.
+
+#### Fixed
+
+- Wedged half dovetail assembly freedoms: disassembly now follows the diagonal direction determined by the wedge angle instead of straight along the butt axis.
+- Fixed a scribe relief cutting bug.
+- `cut_plain_miter_joint_on_face_aligned_timbers` now actually asserts that the timbers are face-aligned.
+
+### kigumi
+
+#### Changed
+
+- Relicensed under the Mozilla Public License 2.0.
+
 ## [0.4.2] - 2026-07-12
 
 ### kumiki
