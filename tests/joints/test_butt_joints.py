@@ -1064,7 +1064,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
 
         shoulder_result = compute_butt_joint_shoulder(
             arrangement=arrangement,
-            distance_from_centerline=scalar(0),
+            distance_from_centerline_or_centerplane=scalar(0),
             up_direction=arrangement.butt_timber.get_height_direction_global(),
         )
 

@@ -287,7 +287,7 @@ def example() -> Frame:
 
     # ── Door hinge joints ─────────────────────────────────────────────────────
     # Round 1" pivot tenon on the top and bottom of the left vertical stile.
-    # mortise_shoulder_distance_from_centerline = beam/plate half-depth + 1/4" gap:
+    # mortise_shoulder_distance_from_centerline_or_centerplane = beam/plate half-depth + 1/4" gap:
     #   bottom: shoulder 1/4" above beam top face  → +3" from beam centerline
     #   top:    shoulder 1/4" below plate bot face → -3" from plate centerline
     hinge_clearance    = member_size[0] / 2 + inches(scalar(1, 4))  # 2.75" + 0.25" = 3"
@@ -305,7 +305,7 @@ def example() -> Frame:
         diameter=hinge_diameter,
         tenon_length=hinge_tenon_length,
         mortise_depth=hinge_mortise_depth,
-        mortise_shoulder_distance_from_centerline=hinge_clearance,
+        mortise_shoulder_distance_from_centerline_or_centerplane=hinge_clearance,
     )
 
     hinge_top = cut_round_mortise_and_tenon_joint(
@@ -318,7 +318,7 @@ def example() -> Frame:
         diameter=hinge_diameter,
         tenon_length=hinge_tenon_length,
         mortise_depth=hinge_mortise_depth,
-        mortise_shoulder_distance_from_centerline=hinge_clearance,
+        mortise_shoulder_distance_from_centerline_or_centerplane=hinge_clearance,
     )
 
     # ── Wall boards ───────────────────────────────────────────────────────────

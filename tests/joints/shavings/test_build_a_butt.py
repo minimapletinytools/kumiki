@@ -10,7 +10,11 @@ from kumiki.timber import (
     create_timber, create_v3
 )
 from kumiki.construction import ButtJointTimberArrangement
-from kumiki.joints.workshop.shavings.build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
+from kumiki.joints.workshop.shavings.build_a_butt import (
+    locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+    locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
+    resolve_parallel_shoulder_face,
+)
 
 
 class TestMeasureMortiseShoulderPlane:
@@ -107,3 +111,26 @@ class TestMeasureMortiseShoulderPlane:
         dot_away = safe_dot_product(direction_away, create_v3(scalar(0), scalar(0), scalar(1)))
         assert safe_compare(dot_away, 0, Comparison.LE), \
             "Negative distance should offset away from the tenon"
+
+    def test_set_mortise_shoulder_parallel_to_face(self):
+        """Test forcing the shoulder plane to be parallel to a specific face."""
+        from kumiki.timber import TimberLongFace
+        from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+        arrangement = create_canonical_example_butt_joint_timbers()
+
+        # Let's force it to be parallel to TimberLongFace.FRONT
+        resolved_face_front = resolve_parallel_shoulder_face(arrangement, TimberLongFace.FRONT)
+        plane_front = locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+            arrangement, scalar(0), resolved_face_front
+        )
+        expected_normal = arrangement.receiving_timber.get_face_direction_global(TimberLongFace.FRONT)
+        if safe_dot_product(expected_normal, plane_front.normal) < 0:
+            expected_normal = -expected_normal
+        assert are_vectors_parallel(plane_front.normal, expected_normal)
+
+        # Test with auto-detect (True)
+        resolved_face_auto = resolve_parallel_shoulder_face(arrangement, True)
+        plane_auto = locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+            arrangement, scalar(0), resolved_face_auto
+        )
+        assert plane_auto.normal is not None

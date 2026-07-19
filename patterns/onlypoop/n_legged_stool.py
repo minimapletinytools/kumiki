@@ -139,7 +139,8 @@ def build_frame(
             diameter=leg_tenon_diameter,
             tenon_length=leg_tenon_length,
             mortise_depth=seat_thickness * scalar(1/2),
-            mortise_shoulder_distance_from_centerline = seat_thickness * scalar(3,8),
+            mortise_shoulder_distance_from_centerline_or_centerplane = seat_thickness * scalar(3,8),
+            set_mortise_shoulder_parallel_to_face=TimberLongFace.RIGHT
         )
         joints.append(joint)
 
@@ -164,7 +165,7 @@ def build_frame(
             diameter=stretcher_tenon_diameter,
             tenon_length=stretcher_tenon_length,
             mortise_depth=stretcher_mortise_depth,
-            mortise_shoulder_distance_from_centerline = leg_diameter * scalar(3,8),
+            mortise_shoulder_distance_from_centerline_or_centerplane = leg_diameter * scalar(3,8),
         )
         joints.append(joint_start)
 
@@ -179,7 +180,7 @@ def build_frame(
             diameter=stretcher_tenon_diameter,
             tenon_length=stretcher_tenon_length,
             mortise_depth=stretcher_mortise_depth,
-            mortise_shoulder_distance_from_centerline = leg_diameter * scalar(3,8),
+            mortise_shoulder_distance_from_centerline_or_centerplane = leg_diameter * scalar(3,8),
         )
         joints.append(joint_end)
 

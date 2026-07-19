@@ -26,7 +26,7 @@ from kumiki.cutcsg import (
 )
 from kumiki.measuring import Plane, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
-from kumiki.timber import Cutting, TimberCenterline, TimberFace, TimberLike, TimberEnd
+from kumiki.timber import Cutting, TimberCenterline, TimberFace, TimberLike, TimberEnd, TimberLongFace
 from kumiki.timber_shavings import (
     are_timbers_plane_aligned,
     get_perfect_support_distance_from_centerline,
@@ -329,8 +329,9 @@ def _perfect_cross_section_slice_span_along_plane_direction(
 
 def does_shoulder_plane_need_notching(
     arrangement: ButtJointTimberArrangement,
-    mortise_shoulder_distance_from_centerline: Numeric,
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
     check_against_nominal_size: bool = True,
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
 ) -> bool:
     """
     Determines whether a shoulder notch is needed on the mortise timber.
@@ -340,11 +341,12 @@ def does_shoulder_plane_need_notching(
 
     Args:
         arrangement: Butt joint arrangement (receiving_timber = mortise, butt_timber = tenon).
-        mortise_shoulder_distance_from_centerline: Distance from the mortise centerline
+        mortise_shoulder_distance_from_centerline_or_centerplane: Distance from the mortise centerline
             to the shoulder plane, measured toward the tenon.
         check_against_nominal_size: If True (default), compare against the mortise timber's
             nominal half-size on the entry face (using ``get_half_nominal_size_in_face_normal_axis``).
             If False, compare against the perfect-timber half-size (``get_size_in_face_normal_axis / 2``).
+        set_mortise_shoulder_parallel_to_face: If set to a face, then force the mortise shoulder to be parallel to that face.
     """
     mortise_timber = arrangement.receiving_timber
     tenon_timber = arrangement.butt_timber
@@ -358,16 +360,37 @@ def does_shoulder_plane_need_notching(
     tenon_end_direction = tenon_timber.get_face_direction_global(
         TimberFace.TOP if tenon_end == TimberEnd.TOP else TimberFace.BOTTOM
     )
-    mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
-        -tenon_end_direction
-    ).to.face()
+    if set_mortise_shoulder_parallel_to_face is not False:
+        if set_mortise_shoulder_parallel_to_face is True:
+            x_axis = mortise_timber.get_width_direction_global()
+            y_axis = mortise_timber.get_height_direction_global()
+            dot_x = abs(safe_dot_product(tenon_end_direction, x_axis))
+            dot_y = abs(safe_dot_product(tenon_end_direction, y_axis))
+            proj = tenon_end_direction - mortise_timber.get_length_direction_global() * safe_dot_product(tenon_end_direction, mortise_timber.get_length_direction_global())
+            if dot_x < dot_y:
+                if safe_dot_product(x_axis, proj) > 0:
+                    mortise_face = TimberFace.RIGHT
+                else:
+                    mortise_face = TimberFace.LEFT
+            else:
+                if safe_dot_product(y_axis, proj) > 0:
+                    mortise_face = TimberFace.FRONT
+                else:
+                    mortise_face = TimberFace.BACK
+        else:
+            mortise_face = set_mortise_shoulder_parallel_to_face.to.face()
+    else:
+        mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
+            -tenon_end_direction
+        ).to.face()
+
     if check_against_nominal_size:
         face_half_size = mortise_timber.get_half_nominal_size_in_face_normal_axis(mortise_face)
     else:
         face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / scalar(2)
     return (
-        mortise_shoulder_distance_from_centerline < face_half_size
-        and not zero_test(face_half_size - mortise_shoulder_distance_from_centerline)
+        mortise_shoulder_distance_from_centerline_or_centerplane < face_half_size
+        and not zero_test(face_half_size - mortise_shoulder_distance_from_centerline_or_centerplane)
     )
 
 
@@ -377,6 +400,7 @@ def chop_shoulder_notch_aligned_with_timber(
     butting_timber_end: TimberEnd,
     distance_from_centerline: Numeric,
     notch_wall_relief_cut_angle_radians: Numeric = scalar(0),
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
 ) -> Union[RectangularPrism, SolidUnion]:
     """
     Create a shoulder notch on notch_timber at a given distance from its centerline,
@@ -417,12 +441,31 @@ def chop_shoulder_notch_aligned_with_timber(
     # the approach direction projected onto the plane perpendicular to the notch timber's length axis
     perpendicular_approach_direction_global = normalize_vector(projected)
 
-    shoulder_plane = locate_plane_from_edge_in_direction(
-        notch_timber,
-        TimberCenterline.CENTERLINE,
-        perpendicular_approach_direction_global,
-        distance_from_centerline,
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=butting_timber,
+        receiving_timber=notch_timber,
+        butt_timber_end=butting_timber_end,
     )
+
+    if set_mortise_shoulder_parallel_to_face:
+        from kumiki.joints.workshop.shavings.build_a_butt import (
+            locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
+            resolve_parallel_shoulder_face,
+        )
+        resolved_face = resolve_parallel_shoulder_face(arrangement, set_mortise_shoulder_parallel_to_face)
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+            arrangement,
+            distance_from_centerline,
+            resolved_face,
+        )
+    else:
+        from kumiki.joints.workshop.shavings.build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+            arrangement,
+            distance_from_centerline,
+        )
+
+    shoulder_plane_normal = shoulder_plane.normal
     butting_centerline = locate_centerline(butting_timber)
     denom = safe_dot_product(shoulder_plane.normal, butting_centerline.direction)
     assert not zero_test(denom), "Butting timber centerline is parallel to the shoulder plane"
@@ -478,7 +521,7 @@ def chop_shoulder_notch_aligned_with_timber(
 
     approach_direction_local = safe_transform_vector(
         notch_timber.orientation.matrix.T,
-        perpendicular_approach_direction_global,
+        shoulder_plane_normal,
     )
     notch_length_dir_local = create_v3(scalar(0), scalar(0), scalar(1))
 
@@ -699,11 +742,12 @@ class ShoulderReliefCSGGeometry:
 
 def chop_relief_for_butt_joint_arrangement(
     arrangement: ButtJointTimberArrangement,
-    mortise_shoulder_distance_from_centerline: Numeric,
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
     # the min is taken between this parameter and the angle the butt timber
     # approaches the shoulder plane at (both in radians)
     notch_wall_min_relief_cut_angle: Numeric = scalar(0),
     use_receiving_timber_nominal_size_for_butting_timber_relief_depth: bool = True,
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
 ) -> ShoulderReliefCSGGeometry | None:
     """
     Compute the shoulder notch on the receiving timber AND the matching
@@ -716,8 +760,9 @@ def chop_relief_for_butt_joint_arrangement(
 
     if not does_shoulder_plane_need_notching(
         arrangement,
-        mortise_shoulder_distance_from_centerline,
+        mortise_shoulder_distance_from_centerline_or_centerplane,
         check_against_nominal_size=True,
+        set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     ):
         return None
 
@@ -746,12 +791,26 @@ def chop_relief_for_butt_joint_arrangement(
     relief_angle_radians = Min(notch_wall_min_relief_cut_angle, butt_approach_angle_radians)
 
     # Shoulder plane and joint-center intersection (butt centerline meets shoulder plane).
-    shoulder_plane = locate_plane_from_edge_in_direction(
-        receiving_timber,
-        TimberCenterline.CENTERLINE,
-        -approach_into_receiving,
-        mortise_shoulder_distance_from_centerline,
-    )
+    if set_mortise_shoulder_parallel_to_face:
+        from kumiki.joints.workshop.shavings.build_a_butt import (
+            locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
+            resolve_parallel_shoulder_face,
+        )
+        resolved_face = resolve_parallel_shoulder_face(arrangement, set_mortise_shoulder_parallel_to_face)
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+            resolved_face,
+        )
+    else:
+        from kumiki.joints.workshop.shavings.build_a_butt import locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+        )
+    # The normal of the shoulder plane used in relief logic points away from the tenon.
+    # The helper functions return normal pointing towards the tenon.
+    shoulder_plane = Plane(normal=-shoulder_plane.normal, point=shoulder_plane.point)
     butt_centerline = locate_centerline(butt_timber)
     denom = safe_dot_product(shoulder_plane.normal, butt_centerline.direction)
     assert not zero_test(denom), "Butt centerline is parallel to the shoulder plane"
@@ -773,8 +832,9 @@ def chop_relief_for_butt_joint_arrangement(
         notch_timber=receiving_timber,
         butting_timber=butt_timber,
         butting_timber_end=butt_timber_end,
-        distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        distance_from_centerline=mortise_shoulder_distance_from_centerline_or_centerplane,
         notch_wall_relief_cut_angle_radians=relief_angle_radians,
+        set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     )
 
     # ------------------------------------------------------------------
@@ -789,7 +849,7 @@ def chop_relief_for_butt_joint_arrangement(
     else:
         far_face_half_size = receiving_timber.get_size_in_face_normal_axis(far_face) / scalar(2)
     receiving_extent_in_approach = (
-        mortise_shoulder_distance_from_centerline + far_face_half_size
+        mortise_shoulder_distance_from_centerline_or_centerplane + far_face_half_size
     )
 
     # TODO this is not required, only if yo uwant the -|_|- kinda shape which is useful if the relief angle is close to zero

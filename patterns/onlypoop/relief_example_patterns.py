@@ -104,7 +104,7 @@ def _build_relief_example(
     mortise_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(
         -butt_timber.get_length_direction_global()
     ).to.face()
-    mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+    mortise_shoulder_distance_from_centerline_or_centerplane = convert_mortise_shoulder_inset_to_centerline_distance(
         mortise_shoulder_inset=_SHOULDER_INSET,
         mortise_face=mortise_face,
         receiving_timber=receiving_timber,
@@ -115,7 +115,7 @@ def _build_relief_example(
         tenon_size=tenon_size,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
-        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
         bore_mortise_perpendicular_to_face=True,
     )
 
@@ -133,6 +133,33 @@ def example_rotate_height_axis(position=None, use_round_timbers=False) -> Joint:
 def example_rotate_width_and_height_axis(position=None, use_round_timbers=False) -> Joint:
     """Butt timber rotated 45 deg around both its width and height axes (compound angle)."""
     return _build_relief_example(True, True, False, use_round_timbers, position)
+
+
+def example_rotate_width_and_height_axis_parallel_shoulder(position=None, use_round_timbers=False) -> Joint:
+    """Butt timber rotated 45 deg around both its width and height axes with shoulder parallel to FRONT face."""
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+    
+    arrangement = create_canonical_example_butt_joint_timbers(position)
+    butt_timber = _rotate_butt_timber_about_joint(arrangement.butt_timber, degrees(45), _LOCAL_WIDTH_AXIS)
+    butt_timber = _rotate_butt_timber_about_joint(butt_timber, degrees(45), _LOCAL_HEIGHT_AXIS)
+    receiving_timber = arrangement.receiving_timber
+
+    rotated_arrangement = ButtJointTimberArrangement(
+        butt_timber=butt_timber,
+        receiving_timber=receiving_timber,
+        butt_timber_end=arrangement.butt_timber_end,
+        front_face_on_butt_timber=arrangement.front_face_on_butt_timber,
+    )
+
+    return cut_mortise_and_tenon_joint(
+        arrangement=rotated_arrangement,
+        tenon_size=_TENON_SIZE,
+        tenon_length=_TENON_LENGTH,
+        mortise_depth=_MORTISE_DEPTH,
+        mortise_shoulder_distance_from_centerline_or_centerplane=scalar(0),
+        set_mortise_shoulder_parallel_to_face=TimberLongFace.FRONT,
+    )
 
 
 def example_rotate_width_axis_small_timbers(position=None, use_round_timbers=False) -> Joint:
@@ -154,6 +181,7 @@ patterns = [
     Pattern(path="relief/butt_arrangement/rotate_width_axis", lambda_=make_pattern_from_joint(example_rotate_width_axis), pattern_type='frame', tags=['poop']),
     Pattern(path="relief/butt_arrangement/rotate_height_axis", lambda_=make_pattern_from_joint(example_rotate_height_axis), pattern_type='frame', tags=['poop']),
     Pattern(path="relief/butt_arrangement/rotate_width_and_height_axis", lambda_=make_pattern_from_joint(example_rotate_width_and_height_axis), pattern_type='frame', tags=['poop']),
+    Pattern(path="relief/butt_arrangement/rotate_width_and_height_axis_parallel_shoulder", lambda_=make_pattern_from_joint(example_rotate_width_and_height_axis_parallel_shoulder), pattern_type='frame', tags=['poop']),
     Pattern(path="relief/butt_arrangement/rotate_width_axis_small_timbers", lambda_=make_pattern_from_joint(example_rotate_width_axis_small_timbers), pattern_type='frame', tags=['poop']),
     Pattern(path="relief/butt_arrangement/rotate_height_axis_small_timbers", lambda_=make_pattern_from_joint(example_rotate_height_axis_small_timbers), pattern_type='frame', tags=['poop']),
     Pattern(path="relief/butt_arrangement/rotate_width_and_height_axis_small_timbers", lambda_=make_pattern_from_joint(example_rotate_width_and_height_axis_small_timbers), pattern_type='frame', tags=['poop']),

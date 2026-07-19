@@ -31,6 +31,8 @@ from kumiki.timber_shavings import are_timbers_plane_aligned
 from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder
 from .shavings.build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+    locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
+    resolve_parallel_shoulder_face,
     PegPositionResult,
     PegPositionSpace,
     SimplePegParameters,
@@ -593,24 +595,13 @@ def cut_mortise_and_tenon_joint(
     tenon_size: V2,
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
-
-    # TODO implement, if set to a face, then force the mortise shoulder to be parallel to that face, if true, than compute the face on the mortise timber most parallel to the tenon axis, 
-    # If false, then the sholder is rotated along the length axis of the mortise timber to be most perpendicular to the tenon axis (it is still parallel with the length axis of the mortise timber)
-    # if the face is set in this manner, interpret mortise_shoulder_distance_from_centerline_or_centerplane as the centerplane,
     set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
-
-    # TODO rename to mortise_shoulder_distance_from_centerline_or_centerplane
-    mortise_shoulder_distance_from_centerline: Numeric = scalar(0),
-
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric = scalar(0),
     tenon_position: Optional[V2] = None,
     wedge_parameters: Optional[WedgeParameters] = None,
     peg_parameters: Optional[SimplePegParameters] = None,
-
-    # TODO only makes sense for non round tenons and when entry face is provided
     bore_mortise_perpendicular_to_face: bool = False,
-
     use_round_tenon: bool = False,
-
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
@@ -628,7 +619,7 @@ def cut_mortise_and_tenon_joint(
         mortise_depth: Depth of the mortise (None = through mortise, only valid when
             bore_mortise_perpendicular_to_face is False).
             Measures along the tenon axis if bore_mortise_perpendicular_to_face is False; along the mortise face axis if True.
-        mortise_shoulder_distance_from_centerline: Signed distance from the mortise
+        mortise_shoulder_distance_from_centerline_or_centerplane: Signed distance from the mortise
             centerline to the shoulder plane, measured within the mortise cross-section
             in the direction toward the tenon centerline. 0 = shoulder at the mortise
             centerline. Positive pushes the shoulder toward the tenon.
@@ -653,7 +644,7 @@ def cut_mortise_and_tenon_joint(
             the other and cutting it away. Defaults to scribing the tenon (butt) timber onto the
             mortise (receiving) timber. Pass None to skip scribe relief entirely. This is separate
             from — and applied on top of — the shoulder notch/relief that
-            mortise_shoulder_distance_from_centerline may require.
+            mortise_shoulder_distance_from_centerline_or_centerplane may require.
 
     Returns:
         Joint object containing the two CutTimbers and any accessories, all in global space.
@@ -711,6 +702,10 @@ def cut_mortise_and_tenon_joint(
 
     if bore_mortise_perpendicular_to_face:
         require_check(
+            None if not use_round_tenon
+            else "bore_mortise_perpendicular_to_face cannot be True for round tenons"
+        )
+        require_check(
             None if mortise_depth is not None
             else "mortise_depth must be provided (not None) when bore_mortise_perpendicular_to_face is True"
         )
@@ -720,9 +715,18 @@ def cut_mortise_and_tenon_joint(
     # -------------------------------------------------------------------------
     # Step 3: Shoulder plane from centerline toward tenon
     # -------------------------------------------------------------------------
-    shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
-        arrangement, mortise_shoulder_distance_from_centerline
-    )
+    if set_mortise_shoulder_parallel_to_face:
+        resolved_face = resolve_parallel_shoulder_face(arrangement, set_mortise_shoulder_parallel_to_face)
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+            resolved_face,
+        )
+    else:
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+        )
     shoulder_from_tenon_end_mark = mark_distance_from_end_along_centerline(shoulder_plane, tenon_timber, tenon_end)
 
     tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
@@ -917,9 +921,10 @@ def cut_mortise_and_tenon_joint(
     # TODO renameto shoulder_notch_relief_geom since we do generic relief cutting later too
     relief_geom = chop_relief_for_butt_joint_arrangement(
         arrangement,
-        mortise_shoulder_distance_from_centerline,
+        mortise_shoulder_distance_from_centerline_or_centerplane,
         # pass pi/2 so the relief angle naturally follows the butt approach angle
         notch_wall_min_relief_cut_angle=_pi / scalar(2),
+        set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     )
 
     # -------------------------------------------------------------------------
@@ -1108,7 +1113,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
     Like the generic `cut_mortise_and_tenon_joint`, but accepts `mortise_shoulder_inset`
     measured from the mortise entry face surface (the intuitive user-facing parameter),
-    converting it internally to `mortise_shoulder_distance_from_centerline`.
+    converting it internally to `mortise_shoulder_distance_from_centerline_or_centerplane`.
 
     Args:
         arrangement: Butt joint timber arrangement (butt_timber = tenon, receiving_timber = mortise).
@@ -1149,7 +1154,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         -tenon_end_direction
     ).to.face()
 
-    mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+    mortise_shoulder_distance_from_centerline_or_centerplane = convert_mortise_shoulder_inset_to_centerline_distance(
         mortise_shoulder_inset=mortise_shoulder_inset,
         mortise_face=mortise_face,
         receiving_timber=arrangement.receiving_timber,
@@ -1160,7 +1165,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         tenon_size=tenon_size,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
-        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
         tenon_position=tenon_position,
         wedge_parameters=wedge_parameters,
         peg_parameters=peg_parameters,
@@ -1236,7 +1241,8 @@ def cut_round_mortise_and_tenon_joint(
     diameter: Numeric,
     tenon_length: Numeric,
     mortise_depth: Optional[Numeric] = None,
-    mortise_shoulder_distance_from_centerline: Numeric = scalar(0),
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric = scalar(0),
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
 ) -> Joint:
     """
     Creates a simplified round mortise and tenon joint with any orientation.
@@ -1250,7 +1256,7 @@ def cut_round_mortise_and_tenon_joint(
         diameter: Diameter of the round tenon and mortise.
         tenon_length: Length of the tenon extending from the mortise entry face.
         mortise_depth: Depth of the mortise (None = through mortise).
-        mortise_shoulder_distance_from_centerline: Signed distance from the mortise centerline
+        mortise_shoulder_distance_from_centerline_or_centerplane: Signed distance from the mortise centerline
             to the shoulder plane. 0 = shoulder at centerline.
 
     Returns:
@@ -1261,8 +1267,9 @@ def cut_round_mortise_and_tenon_joint(
         tenon_size=Matrix([diameter, diameter]),
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
-        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
         use_round_tenon=True,
+        set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     )
 
 
@@ -1303,7 +1310,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
         -tenon_end_direction
     ).to.face()
 
-    mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+    mortise_shoulder_distance_from_centerline_or_centerplane = convert_mortise_shoulder_inset_to_centerline_distance(
         mortise_shoulder_inset=mortise_shoulder_inset,
         mortise_face=mortise_face,
         receiving_timber=arrangement.receiving_timber,
@@ -1314,7 +1321,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
         tenon_size=Matrix([diameter, diameter]),
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
-        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
         use_round_tenon=True,
     )
 
@@ -1379,7 +1386,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
         -tenon_end_direction
     ).to.face()
-    mortise_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+    mortise_shoulder_distance_from_centerline_or_centerplane = convert_mortise_shoulder_inset_to_centerline_distance(
         mortise_shoulder_inset=mortise_shoulder_inset,
         mortise_face=mortise_face,
         receiving_timber=mortise_timber,
@@ -1392,7 +1399,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
 
     shoulder_result = compute_butt_joint_shoulder(
         arrangement=arrangement,
-        distance_from_centerline=mortise_shoulder_distance_from_centerline,
+        distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
         up_direction=up_direction,
     )
 
@@ -1418,7 +1425,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     # orthogonal arrangements the approach angle is pi/2 (no relief walls).
     relief_geom = chop_relief_for_butt_joint_arrangement(
         arrangement,
-        mortise_shoulder_distance_from_centerline,
+        mortise_shoulder_distance_from_centerline_or_centerplane,
         notch_wall_min_relief_cut_angle=degrees(45),
     )
     if relief_geom is not None:

@@ -90,7 +90,7 @@ def build_frame(
             tenon_size=tenon_size,
             tenon_length=tenon_len,
             mortise_depth=mortise_d,
-            mortise_shoulder_distance_from_centerline = timber_size[0] / scalar(2)
+            mortise_shoulder_distance_from_centerline_or_centerplane = timber_size[0] / scalar(2)
         )
         joints.append(joint)
 

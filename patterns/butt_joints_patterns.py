@@ -304,7 +304,7 @@ def example_round_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
         diameter=inches(3, 2),
         tenon_length=inches(3),
         mortise_depth=inches(3.25),
-        mortise_shoulder_distance_from_centerline=mortise_shoulder_distance,
+        mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance,
     )
 
 # TODO  rename example_mortise_and_tenon_with_round_timbers
@@ -437,7 +437,7 @@ def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=Fal
         tenon_size=Matrix([inches(2), inches(2)]),
         tenon_length=inches(5),
         mortise_depth=inches(3),
-        mortise_shoulder_distance_from_centerline=inches(2),
+        mortise_shoulder_distance_from_centerline_or_centerplane=inches(2),
         peg_parameters=peg_params,
         bore_mortise_perpendicular_to_face=True,
     )
@@ -723,6 +723,70 @@ def create_dropin_housed_butt_joint_example(position: Optional[V3] = None):
     return frame
 
 
+def example_compound_angle_offset_parallel_shoulder(position=None, use_round_timbers=False):
+    """
+    Mortise and tenon joint with compound angle (45 degrees in both axes),
+    1 inch lateral centerline offset, and shoulder parallel to the FRONT face.
+    """
+    from sympy import pi
+    from dataclasses import replace
+    from kumiki.rule import Orientation, degrees
+    from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+    
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+        
+    arrangement = create_canonical_example_butt_joint_timbers(position)
+    receiving_timber = arrangement.receiving_timber
+    receiving_timber = replace(receiving_timber, size=create_v2(inches(10), inches(5)))
+    butt_timber = arrangement.butt_timber
+    
+    # 1. Rotate the butt timber by 45 degrees in both local width and height axes (compound angle)
+    # Width axis is local X, height axis is local Y
+    local_x = create_v3(scalar(1), scalar(0), scalar(0))
+    local_y = create_v3(scalar(0), scalar(1), scalar(0))
+    
+    pivot_local = create_v3(scalar(0), scalar(0), butt_timber.length / scalar(2))
+    pivot_global = butt_timber.transform.position + butt_timber.transform.orientation.matrix * pivot_local
+    
+    # Rotate 45 degrees about local X
+    rot_x = Orientation.from_angle_axis(degrees(45), local_x)
+    orient_x = butt_timber.transform.orientation * rot_x
+    
+    # Rotate 45 degrees about local Y
+    rot_y = Orientation.from_angle_axis(degrees(45), local_y)
+    new_orientation = orient_x * rot_y
+    
+    new_bottom = pivot_global - new_orientation.matrix * pivot_local
+    butt_timber = replace(butt_timber, transform=Transform(position=new_bottom, orientation=new_orientation))
+    
+    # 2. Add 1 inch lateral offset along receiving timber's width direction
+    width_dir = receiving_timber.get_width_direction_global()
+    butt_timber = replace(
+        butt_timber,
+        transform=Transform(
+            position=butt_timber.transform.position + width_dir * inches(1),
+            orientation=butt_timber.transform.orientation
+        )
+    )
+    
+    rotated_arrangement = ButtJointTimberArrangement(
+        butt_timber=butt_timber,
+        receiving_timber=receiving_timber,
+        butt_timber_end=arrangement.butt_timber_end,
+        front_face_on_butt_timber=arrangement.front_face_on_butt_timber,
+    )
+    
+    return cut_mortise_and_tenon_joint(
+        arrangement=rotated_arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length=inches(5),
+        mortise_depth=inches(3),
+        mortise_shoulder_distance_from_centerline_or_centerplane=scalar(0),
+        set_mortise_shoulder_parallel_to_face=TimberLongFace.BACK,
+    )
+
+
 def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
     origin = create_v3(scalar(0), scalar(0), scalar(0))
     step = inches(24)
@@ -746,6 +810,7 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_through_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_double_angled", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/half_dovetail_mortise_and_tenon_no_wedge", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge), pattern_type='frame'),
