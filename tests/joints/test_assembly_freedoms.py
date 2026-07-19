@@ -2,9 +2,9 @@
 
 Each cut function knows its escape geometry precisely (tenon axis, lap normal,
 insertion depth), so it attaches assembly_freedom to the cuttings/accessories
-it creates; locking accessories (pegs/keys/wedges) get suborder 0 so they pop
-before the members slide (suborder 1). These tests assert the authored
-directions, depths, and suborders per joint family.
+it creates; locking accessories (pegs/keys/wedges) get suborder -1 so they pop
+before the members slide (suborder 0, the default). These tests assert the
+authored directions, depths, and suborders per joint family.
 """
 
 import pytest
@@ -73,12 +73,12 @@ class TestButtFamilyFreedoms:
         # M&T cuttings are keyed by ticket path; tenon backs out along -Y.
         assert_authored_translation(joint.cuttings["butt_timber"].assembly_freedom, (0, -1, 0))
         assert_opposite_escape_pair(joint, "butt_timber", "receiving_timber")
-        # The peg locks the joint: it pops at suborder 0 before the timbers
-        # slide at suborder 1.
+        # The peg locks the joint: it pops at suborder -1 before the timbers
+        # slide at suborder 0.
         assert "peg_0" in joint.jointAccessories
         peg = joint.jointAccessories["peg_0"]
         assert_authored_translation(peg.assembly_freedom)
-        assert peg.assembly_ordering == Ordering(-1, 0)
+        assert peg.assembly_ordering == Ordering(0, -1)
         assert joint.cuttings["butt_timber"].assembly_ordering == Ordering(0, 0)
         assert joint.cuttings["receiving_timber"].assembly_ordering == Ordering(0, 0)
 
@@ -200,7 +200,7 @@ class TestLockedJointFreedoms:
         assert peg_keys, "basic splined double butt should include default pegs"
         for peg_key in peg_keys:
             assert_authored_translation(joint.jointAccessories[peg_key].assembly_freedom)
-            assert joint.jointAccessories[peg_key].assembly_ordering == Ordering(-1, 0)
+            assert joint.jointAccessories[peg_key].assembly_ordering == Ordering(0, -1)
         spline = joint.jointAccessories["spline"]
         assert_authored_translation(spline.assembly_freedom)
         assert spline.assembly_ordering == Ordering(0, 0)

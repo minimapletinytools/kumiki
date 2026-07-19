@@ -24,7 +24,7 @@
     const FEATURE_FLAGS = Object.freeze({
         // Assembly preview timeline (kumiki/assembly.py + the bottom timeline
         // bar in the viewer). Still under active development.
-        assemblyPreview: true,
+        assemblyPreview: false,
     });
 
     // Strips payload fields for package-time-disabled features before a

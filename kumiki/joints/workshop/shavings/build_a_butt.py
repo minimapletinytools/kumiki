@@ -592,7 +592,7 @@ def dovetail_tenon_geometry(
             transform=extrusion_transform,
             positive_csg=wedge_positive_csg,
             assembly_freedom=AssemblyFreedom.translation(-wedge_drive_direction, freed_after=wedge_length),
-            assembly_ordering=Ordering(-1, 0),
+            assembly_ordering=Ordering(0, -1),
         )
 
         # The mortise cavity must also include the wedge's slot (above Y=0), so the wedge can

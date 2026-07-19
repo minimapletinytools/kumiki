@@ -1023,7 +1023,7 @@ def cut_mortise_and_tenon_joint(
                     -peg_drill_direction_global,
                     freed_after=peg_result.peg_depth + peg_result.stickout_length,
                 ),
-                assembly_ordering=Ordering(-1, 0),
+                assembly_ordering=Ordering(0, -1),
             )
             joint_accessories[f"peg_{peg_idx}"] = peg_accessory
 
@@ -1054,8 +1054,9 @@ def cut_mortise_and_tenon_joint(
 
     # Assembly: the tenon backs out of the mortise along the tenon axis; the
     # mortise timber's view of the same separation is the inverse direction.
-    # When pegs lock the joint they pop first (suborder 0), so the timbers
-    # slide at suborder 1.
+    # Locking accessories (pegs) pop first at suborder -1, so the timbers
+    # slide at the default suborder 0. with_order(n) preserves suborders, so
+    # the peg-before-slide sequencing survives frame-level ordering.
     tenon_cut_timber = replace(
         tenon_cut,
         assembly_freedom=AssemblyFreedom.translation(-tenon_length_direction_global, freed_after=tenon_length),

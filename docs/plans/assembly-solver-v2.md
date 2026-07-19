@@ -213,11 +213,42 @@ distance is individually valid.
 
 ### Phase 4 — Clear-out Propagation (Collision Avoidance)
 
-Previously freed members (accessories like pegs, or smaller timbers) that were moved in earlier steps might sit directly in the escape path of subsequent translations. To prevent visual clipping where a larger timber slides through a floating, already-freed piece, we run a topological clear-out propagation pass:
+Previously freed members (accessories like pegs, or smaller timbers) parked at
+their exploded positions may sit directly in the escape path of a later step's
+motion. To prevent visual clipping where a larger timber slides through a
+floating, already-freed piece, a clear-out pass adjusts parked members'
+positions. Inputs: an axis-aligned `bbox` per `AssemblyMember` (the Frame
+adapter computes it from timber corners; accessories get a small box around
+their transform position until real accessory extents are plumbed through).
 
-1. **Path Projection**: For each step $S$ and moving member $B$, we check all previously freed members $A$ that lie in the translation path of $B$. We project the centroids and bounding box extents of $A$ and $B$ onto the line of motion $\hat{d}$.
-2. **Clearance Check**: If the sweep of $B$'s bounding box by its translation distance $D$ overlaps with $A$'s bounding box, we determine the required overlap distance.
-3. **Pushing/Propagation**: We increase the historical displacement of $A$ (and any other previously freed members that $A$ in turn pushes) along the axis $\hat{d}$ to maintain a minimum clearance (e.g. 1 inch / 25mm).
+Run per emitted step (post-compaction), tracking each member's cumulative
+displacement so parked bboxes are evaluated where they actually float:
+
+1. **Sweep test.** For each moving member B in the step (direction d̂, distance
+   D): form the AABB hull of B's start and end boxes. Collect every parked
+   member A whose current bbox intersects that hull and whose projection
+   interval along d̂ lies ahead of B's start (A is in the path, not behind it).
+2. **Single-pass push, front-to-back.** Sort the collected members by their
+   min-projection along d̂, ascending, and process in order: push each A along
+   d̂ just far enough that its min-projection clears (a) B's end-position
+   max-projection and (b) the max-projection of every already-pushed member,
+   plus a clearance margin (default 25mm; solver parameter). Because
+   processing follows the projection order and every push is forward along
+   d̂, each parked member is pushed **at most once per step** — no recursion,
+   no mutual-push leapfrogging, termination by construction. (Attempt #1
+   implemented this as recursive pair-wise pushes; two boxes overlapping
+   perpendicular to a diagonal d̂ leapfrogged each other unboundedly.)
+3. **Emit as movements.** A push becomes an extra `MemberMovement` in that
+   step (dragged=True), so the viewer animates the parked piece drifting
+   clear; cumulative displacement is updated for later steps' sweep tests.
+
+Safety and caveats: parked members are fully separated, so translating them
+is always kinematically legal; pushes go forward along the step's escape
+flow, which in practice increases separations (a formal keep-out check
+against re-entry can be added if a model ever shows otherwise). The viewer's
+disassembly multiplier scales all distances uniformly; clearances computed at
+base scale stay clear for multiplier ≥ 1 (sub-1 multipliers may re-overlap —
+acceptable for a preview aid).
 
 ## Output & serialization changes
 
@@ -232,6 +263,10 @@ class AssemblyStep:
 `MemberMovement` is unchanged (`dragged` still distinguishes ride-alongs).
 `AssemblySolution` / `AssemblyFailure` unchanged apart from steps now carrying
 substeps; failures keep partial steps scrubbable.
+
+`AssemblyMember` gains an optional `bbox` (axis-aligned, global) for Phase 4;
+the Frame adapter fills it from timber corner positions (accessories: small
+box at the transform position for now).
 
 - runner.py `_build_assembly_payload`: add `substep` per step, outputting the centered/adjusted movements.
 - assembly-timeline.js: scrub semantics unchanged (value k = first k steps applied,
@@ -258,6 +293,63 @@ substeps; failures keep partial steps scrubbable.
 always authored DOF directions, never merged diagonals, so parallel checks compare
 authored axes against each other.
 
+## Lessons from implementation attempt #1 (must-follow)
+
+The first implementation (branch `assembly-solver-v2`, deleted 2026-07) got the
+closure planner mostly right but failed on real models. Root causes, verified
+against oscarshed and tinyhouse120:
+
+1. **Never validate the SUM of a member's motion across micro-steps.** Attempt
+   #1 added a post-hoc check that each member's total ordering-wide velocity be
+   parallel to an authored DOF. Micro-steps are *sequential*; a member extracted
+   along one DOF and later dragged along another has a diagonal sum that means
+   nothing. This single check made oscarshed (and most real models) fail after
+   the pegs popped. Per-substep motion is single-direction by construction;
+   there is nothing to validate.
+2. **Emit solved steps even when an ordering fails midway.** Attempt #1 broke
+   out before step emission, discarding every solved micro-step of the failing
+   ordering — the "pegs come out, everything else stuck" symptom. The contract
+   is: failures keep all previously solved steps scrubbable.
+3. **No sympy in inner loops.** Convert every DOF direction and freed_after to
+   floats ONCE at solve start. Attempt #1 called `giraffe_evalf` inside the
+   closure's allowed-check: 7.3M evalf calls ≈ 60s of tinyhouse120's 83s solve.
+4. **Don't re-enumerate all candidates every micro-step.** Attempt #1 re-ran
+   closure for every (pair × target × DOF) each iteration of the per-ordering
+   loop (21,612 closures on tinyhouse120). Cache closures and invalidate only
+   candidates whose members' pair states changed, or at minimum enumerate
+   lazily best-first. Budget: tinyhouse-scale (~120 members, ~140 joints)
+   must solve well under 2s.
+5. **Keep-out must not deadlock the greedy sequence.** Once pairs separate in
+   scattered directions, the strict rule "any opposing motion re-couples the
+   pair" makes re-dragged partners (moving off their own escape rays) absorb
+   the whole model, and candidates go to zero even when a valid sequence
+   exists. Mitigations, in order: (a) score candidates to penalize directions
+   opposing any separation direction held by members of G (avoid creating the
+   conflict at all — attempt #1 happily extracted studs and top plates
+   DOWNWARD, poisoning later state); (b) prefer directions that already have
+   separated pairs along them (travel is monotone); (c) before declaring
+   failure with pairs remaining, retry remaining pairs under relaxed scoring
+   (different pick order), since the deadlock is order-of-picks, not
+   infeasibility.
+6. **Key pair state by joint identity, never `joint.name`.** Names are type
+   strings ("mortise_and_tenon") shared by dozens of joints; two same-named
+   joints between the same member pair silently share one engagement state.
+   Use the joint's index in the input sequence.
+7. **Intra-joint sequencing lives in the SUBORDER.** Locking accessories
+   (pegs/keys/wedges) are authored `Ordering(0, -1)`; member timbers stay
+   `Ordering(0, 0)`. `with_order(n)` rewrites only the order and preserves
+   suborders, so peg-before-slide survives frame-level ordering. (Attempt #1
+   put pegs at order −1, which `with_order` flattened away.)
+8. **Serialize what you emit.** Attempt #1 added `substep` to `AssemblyStep`
+   but never plumbed it through runner.py, so same-labeled timeline steps
+   collided. Payload, normalization, and timeline marks must all understand
+   substeps (and Phase 4's pushed movements) end to end.
+9. **Compaction must check pair state as of that micro-step.** Attempt #1
+   consulted the mutated end-of-ordering pair states, over-merging substeps
+   that were sequentially dependent. Snapshot separation state (e.g. a
+   monotone version counter per pair) and compare against the micro-step's
+   timestamp.
+
 ## Tests
 
 - Port `tests/test_assembly.py` fixtures (same graph-builder helpers). Expected
@@ -268,7 +360,13 @@ authored axes against each other.
   lift-then-slide chain); per-pair travel across steps (joint separated by an
   earlier drag is skipped at its own step); keep-out (motion that would re-insert a
   separated joint drags the partner instead); centering invariants (unassembled frame stays anchored at 0; active moving groups center relative to each other/centroids); compaction (disjoint pegs merge into one substep; linked groups don't); clear-out propagation (previous steps' displacements adjusted to clear future steps' sweeps); determinism.
-- `tests/joints/test_assembly_freedoms.py` untouched (authoring layer is stable).
+- Clear-out: parked member in a mover's swept path gets pushed with clearance;
+  push chains resolve front-to-back in one pass (construct the attempt-#1
+  leapfrog case — two boxes overlapping perpendicular to a diagonal d̂ — and
+  assert each is pushed at most once per step); pushes appear as movements and
+  compound into later steps' sweep tests.
+- `tests/joints/test_assembly_freedoms.py`: already updated for the suborder
+  convention (accessories `(0,-1)`, timbers `(0,0)`) — keep green.
 - kigumi: timeline normalization of `substep`; offsets apply modified movements.
 
 ## Implementation order

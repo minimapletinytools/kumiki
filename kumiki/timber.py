@@ -2654,20 +2654,7 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
                 timber.get_bottom_position_global()
                 + timber.get_length_direction_global() * timber.length / 2
             )
-            from kumiki.assembly import BoundingBox
-            corners_val = [
-                timber.get_corner_position_global(c)
-                for c in TimberCorner
-            ]
-            xs = [float(giraffe_evalf(c[0, 0])) for c in corners_val]
-            ys = [float(giraffe_evalf(c[1, 0])) for c in corners_val]
-            zs = [float(giraffe_evalf(c[2, 0])) for c in corners_val]
-            bbox = BoundingBox(
-                min_x=min(xs), max_x=max(xs),
-                min_y=min(ys), max_y=max(ys),
-                min_z=min(zs), max_z=max(zs)
-            )
-            members[key] = AssemblyMember(key=key, name=timber.ticket.path, position=centroid, bbox=bbox)
+            members[key] = AssemblyMember(key=key, name=timber.ticket.path, position=centroid)
         return key
 
     def register_accessory(accessory: Accessory) -> int:
@@ -2675,17 +2662,7 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
         if key not in members:
             transform = getattr(accessory, "transform", None)
             position = transform.position if transform is not None else create_v3(0, 0, 0)
-            from kumiki.assembly import BoundingBox
-            pos_x = float(giraffe_evalf(position[0, 0]))
-            pos_y = float(giraffe_evalf(position[1, 0]))
-            pos_z = float(giraffe_evalf(position[2, 0]))
-            r = 0.05
-            bbox = BoundingBox(
-                min_x=pos_x - r, max_x=pos_x + r,
-                min_y=pos_y - r, max_y=pos_y + r,
-                min_z=pos_z - r, max_z=pos_z + r
-            )
-            members[key] = AssemblyMember(key=key, name=accessory.ticket.path, position=position, bbox=bbox)
+            members[key] = AssemblyMember(key=key, name=accessory.ticket.path, position=position)
         return key
 
     def add_spec(specs: Dict[int, JointMemberSpec], key: int,

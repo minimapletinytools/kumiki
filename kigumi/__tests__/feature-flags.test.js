@@ -1,8 +1,8 @@
 const { FEATURE_FLAGS, applyFeatureFlagsToLayersPayload } = require('../webview/feature-flags');
 
 describe('FEATURE_FLAGS', () => {
-  test('assemblyPreview is enabled', () => {
-    expect(FEATURE_FLAGS.assemblyPreview).toBe(true);
+  test('assemblyPreview ships disabled while the feature is under development', () => {
+    expect(FEATURE_FLAGS.assemblyPreview).toBe(false);
   });
 
   test('the flag registry is frozen (package-time, not runtime-mutable)', () => {
@@ -11,12 +11,12 @@ describe('FEATURE_FLAGS', () => {
 });
 
 describe('applyFeatureFlagsToLayersPayload', () => {
-  test('retains the assembly field when assemblyPreview is enabled', () => {
+  test('strips the assembly field while assemblyPreview is disabled', () => {
     const payload = { frameName: 'f', timbers: [], joints: [], assembly: { steps: [] } };
 
     const result = applyFeatureFlagsToLayersPayload(payload);
 
-    expect(result).toHaveProperty('assembly');
+    expect(result).not.toHaveProperty('assembly');
     expect(result.frameName).toBe('f');
   });
 

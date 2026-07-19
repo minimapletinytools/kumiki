@@ -433,7 +433,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
                     assembly_freedom=AssemblyFreedom.translation(
                         peg_face_normal_global, freed_after=actual_depth + stickout
                     ),
-                    assembly_ordering=Ordering(-1, 0),
+                    assembly_ordering=Ordering(0, -1),
                 )
 
         _append_pegs_for_butt(
