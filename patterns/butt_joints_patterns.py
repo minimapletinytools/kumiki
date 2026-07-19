@@ -787,6 +787,153 @@ def example_compound_angle_offset_parallel_shoulder(position=None, use_round_tim
     )
 
 
+def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
+    """
+    Mortise and tenon with an inset shoulder using the NOTCH style.
+
+    The tenon timber approaches the mortise at ~30 degrees (angled in the XY
+    plane) so the housing notch in the mortise timber is clearly visible.
+    The shoulder is inset 1" from the mortise timber's centerline.
+    The notch walls are angled (relieved) to follow the tenon rake.
+    """
+    from sympy import sqrt
+    from kumiki.rule import Orientation, degrees, radians
+    from kumiki.ticket import TimberTicket
+
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+
+    timber_size = create_v2(inches(4), inches(5))
+    timber_length = inches(48)
+
+    # Receiving (mortise) timber: runs along +X, centered at position
+    mortise_timber = create_timber(
+        length=timber_length,
+        size=timber_size,
+        bottom_position=position + create_v3(-timber_length / scalar(2), scalar(0), scalar(0)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="mortise",
+    )
+
+    # Tenon timber: approaches from below at 30 degrees from the Y axis in the XY plane.
+    # Direction: (sin30, cos30, 0) = (0.5, sqrt(3)/2, 0)
+    from sympy import sin, cos, pi, Rational
+    angle = pi / scalar(6)  # 30 degrees
+    tenon_dir = normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
+    tenon_width_dir = normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
+
+    # Place bottom of tenon timber centered so its top meets the mortise
+    tenon_bottom = position - tenon_dir * timber_length
+    tenon_timber = create_timber(
+        length=timber_length,
+        size=timber_size,
+        bottom_position=tenon_bottom,
+        length_direction=tenon_dir,
+        width_direction=tenon_width_dir,
+        ticket="tenon",
+    )
+
+    mortise_timber = _maybe_round_timber(mortise_timber, use_round_timbers)
+    tenon_timber = _maybe_round_timber(tenon_timber, use_round_timbers)
+
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=tenon_timber,
+        receiving_timber=mortise_timber,
+        butt_timber_end=TimberEnd.TOP,
+        front_face_on_butt_timber=TimberLongFace.FRONT,
+    )
+
+    return cut_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length=inches(4),
+        mortise_depth=inches(3),
+        mortise_shoulder_distance_from_centerline_or_centerplane=inches(1),
+        inset_notching_style=InsetShoulderNotchingStyle.NOTCH,
+        use_round_tenon=use_round_timbers,
+    )
+
+
+def example_inset_shoulder_scribe_angled(position=None, use_round_timbers=False):
+    """
+    Mortise and tenon with an inset shoulder using the SCRIBE style.
+
+    The tenon timber approaches the mortise at a compound angle (angled in
+    both the XY and XZ planes) so the scribe cut in the mortise timber is
+    clearly non-rectangular. The shoulder is inset 1" from the mortise
+    timber's centerline. With SCRIBE style, the mortise timber receives a
+    Difference(tenon_prism, shoulder_half_space) cut — the exact 3-D shadow
+    of the tenon — rather than a rectangular housing notch.
+    """
+    from sympy import sin, cos, pi, sqrt
+    from kumiki.rule import Orientation, degrees, radians
+    from kumiki.ticket import TimberTicket
+
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+
+    timber_size = create_v2(inches(4), inches(5))
+    timber_length = inches(48)
+
+    # Receiving (mortise) timber: runs along +X, centered at position.
+    # Widen to 10" so the compound-angle tenon shoulder fits fully inside.
+    mortise_size = create_v2(inches(10), inches(5))
+    mortise_timber = create_timber(
+        length=timber_length,
+        size=mortise_size,
+        bottom_position=position + create_v3(-timber_length / scalar(2), scalar(0), scalar(0)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="mortise",
+    )
+
+    # Tenon timber: compound angle — 30 degrees in XY plane AND 20 degrees
+    # toward +Z — so its cross-section trace on the mortise face is an
+    # obvious oblique ellipse (very different from the rectangular NOTCH).
+    angle_xy = pi / scalar(6)   # 30 deg in XY
+    angle_z  = pi / scalar(9)   # 20 deg toward Z
+    # length direction: rotate (0,1,0) by angle_xy around Z, then tilt by angle_z toward Z
+    tenon_dir = normalize_vector(create_v3(
+        sin(angle_xy) * cos(angle_z),
+        cos(angle_xy) * cos(angle_z),
+        sin(angle_z),
+    ))
+    # width direction: perpendicular to tenon_dir, mostly in XY plane
+    tenon_width_dir = normalize_vector(create_v3(cos(angle_xy), -sin(angle_xy), scalar(0)))
+
+    # Place bottom of tenon timber centered so its top meets the mortise
+    tenon_bottom = position - tenon_dir * timber_length
+    tenon_timber = create_timber(
+        length=timber_length,
+        size=timber_size,
+        bottom_position=tenon_bottom,
+        length_direction=tenon_dir,
+        width_direction=tenon_width_dir,
+        ticket="tenon",
+    )
+
+    mortise_timber = _maybe_round_timber(mortise_timber, use_round_timbers)
+    tenon_timber = _maybe_round_timber(tenon_timber, use_round_timbers)
+
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=tenon_timber,
+        receiving_timber=mortise_timber,
+        butt_timber_end=TimberEnd.TOP,
+        front_face_on_butt_timber=TimberLongFace.FRONT,
+    )
+
+    return cut_mortise_and_tenon_joint(
+        arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length=inches(4),
+        mortise_depth=inches(3),
+        mortise_shoulder_distance_from_centerline_or_centerplane=inches(1),
+        inset_notching_style=InsetShoulderNotchingStyle.SCRIBE,
+        use_round_tenon=use_round_timbers,
+    )
+
+
 def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
     origin = create_v3(scalar(0), scalar(0), scalar(0))
     step = inches(24)
@@ -816,4 +963,6 @@ patterns = [
     Pattern(path="butt_joints/half_dovetail_mortise_and_tenon_no_wedge", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dropin_housed_butt_joint_example), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_notch_angled", lambda_=make_pattern_from_joint(example_inset_shoulder_notch_angled), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_scribe_angled", lambda_=make_pattern_from_joint(example_inset_shoulder_scribe_angled), pattern_type='frame'),
 ]

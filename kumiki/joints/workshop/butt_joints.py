@@ -927,20 +927,52 @@ def cut_mortise_and_tenon_joint(
 
     from sympy import pi as _pi
 
-
-    # TODO if inset notching style is SCRIBE, then we don't use chop_relief_for_butt_joint_arrangement, instead take DIFFERENT(tenon_timber_prism, shoulder plane half space) and remove it from the mortise timber, this is our scribe.
-    assert(inset_notching_style == InsetShoulderNotchingStyle.NOTCH, "Scribe notching style is not yet implemented")
-
-    
-    # TODO check for face/plane aligned cases, if the shoulder is flush with the mortise entry face, and skip relief cutting in those cases (no notch needed)
-    # TODO renameto shoulder_notch_relief_geom since we do generic relief cutting later too
-    relief_geom = chop_relief_for_butt_joint_arrangement(
-        arrangement,
-        mortise_shoulder_distance_from_centerline_or_centerplane,
-        # pass pi/2 so the relief angle naturally follows the butt approach angle
-        notch_wall_min_relief_cut_angle=_pi / scalar(2),
-        set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
-    )
+    if inset_notching_style == InsetShoulderNotchingStyle.SCRIBE:
+        # SCRIBE style: instead of cutting a housing notch, scribe the tenon
+        # timber's full cross-section onto the mortise timber.  The region to
+        # remove from the mortise timber is the intersection of the tenon timber's
+        # perfect representation with the mortise-side of the shoulder plane.
+        #
+        # shoulder_half_space_global has normal = -shoulder_plane.normal, so
+        # it is the *tenon-side* half-space. Subtracting it from the tenon timber's
+        # csg leaves only the mortise-side portion of the tenon timber — exactly the
+        # volume the mortise timber must give up to receive the tenon timber's body.
+        if does_shoulder_plane_need_notching(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+            check_against_nominal_size=True,
+            set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
+        ):
+            tenon_timber_csg_global = adopt_csg(
+                tenon_timber.transform,
+                None,
+                tenon_timber.get_actual_csg_local(),
+            )
+            scribe_csg_global = Difference(
+                base=tenon_timber_csg_global,
+                subtract=[shoulder_half_space_global],
+            )
+            scribe_csg_mortise_local = adopt_csg(None, mortise_timber.transform, scribe_csg_global)
+            shoulder_notch_relief_geom: ShoulderReliefCSGGeometry | None = ShoulderReliefCSGGeometry(
+                receiving_timber_notch_negative_CSG=scribe_csg_mortise_local,
+                # No additional relief cut on the tenon timber for scribe style;
+                # the scribe IS the interface — the tenon prism fits exactly.
+                butting_timber_relief_negative_CSG=None,
+            )
+        else:
+            shoulder_notch_relief_geom = None
+    else:
+        # NOTCH style: cut a housing notch in the mortise timber and a matching
+        # wall-relief on the tenon timber. chop_relief_for_butt_joint_arrangement
+        # already skips (returns None) when the shoulder sits flush with or
+        # beyond the mortise entry face, so no additional guard is needed here.
+        shoulder_notch_relief_geom = chop_relief_for_butt_joint_arrangement(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+            # pass pi/2 so the relief angle naturally follows the butt approach angle
+            notch_wall_min_relief_cut_angle=_pi / scalar(2),
+            set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
+        )
 
     # -------------------------------------------------------------------------
     # make the final cut CSGs
@@ -953,9 +985,9 @@ def cut_mortise_and_tenon_joint(
 
     mortise_hole_prism_local = adopt_csg(None, mortise_timber.transform, mortise_hole_prism_global)
 
-    if relief_geom is not None:
+    if shoulder_notch_relief_geom is not None:
         mortise_negative_csg = CSGUnion(
-            children=[mortise_hole_prism_local, relief_geom.receiving_timber_notch_negative_CSG]
+            children=[mortise_hole_prism_local, shoulder_notch_relief_geom.receiving_timber_notch_negative_CSG]
         )
     else:
         mortise_negative_csg = mortise_hole_prism_local
