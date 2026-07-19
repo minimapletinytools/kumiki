@@ -1190,7 +1190,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
             length=key_depth,
             stickout_length=key_depth*scalar(1,4),
             assembly_freedom=AssemblyFreedom.translation(diagonal_direction, freed_after=key_depth * scalar(2)),
-            assembly_ordering=Ordering(0, 0),
+            assembly_ordering=Ordering(0, -1),
         )
         key_wedges.append(key_wedge)
 
@@ -1333,7 +1333,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
         assembly_freedom=AssemblyFreedom.translation(
             -directionA, freed_after=timberB.get_size_in_direction_3d(directionA)
         ),
-        assembly_ordering=Ordering(0, 1),
+        assembly_ordering=Ordering(0, 0),
     )
 
     cutB = Cutting(
@@ -1344,7 +1344,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
         assembly_freedom=AssemblyFreedom.translation(
             -directionB, freed_after=timberA.get_size_in_direction_3d(directionB)
         ),
-        assembly_ordering=Ordering(0, 1),
+        assembly_ordering=Ordering(0, 0),
     )
 
     # Create CutTimber objects

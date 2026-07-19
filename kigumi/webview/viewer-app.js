@@ -360,6 +360,13 @@ if (!AssemblyTimeline) {
 // flags script isn't wired into some future embedding.
 const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 
+// The assembly preview timeline is live only when BOTH the package-time flag
+// and the user's 'kigumi.viewer.assemblyPreview' VS Code setting (injected
+// into the initial payload; default off) are on. The setting is read when the
+// viewer opens — toggling it takes effect on the next (re)open.
+const ASSEMBLY_PREVIEW_ENABLED = Boolean(FEATURE_FLAGS.assemblyPreview)
+    && INITIAL_PAYLOAD.assemblyPreviewSetting === true;
+
 // Axis-aligned bounds accumulation over flat [x,y,z,...] position arrays.
 function createBoundsAccumulator() {
     return {
@@ -542,7 +549,7 @@ class ViewerSettingsPanel {
                     <input id="footprint-toggle" type="checkbox" ?checked=${this.app.footprintsEnabled}>
                     footprint
                 </label>
-                ${FEATURE_FLAGS.assemblyPreview ? html`
+                ${ASSEMBLY_PREVIEW_ENABLED ? html`
                 <label>
                     <input id="assembly-timeline-toggle" type="checkbox" ?checked=${this.app.showAssemblyTimeline}>
                     assembly timeline
@@ -1019,6 +1026,7 @@ class KigumiViewerApp extends LitElement {
         this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
         this.assemblyData = null;
+        this.assemblySolving = false;
         this.assemblyScrubValue = 0;
         this._assemblyOffsetsByKey = new Map();
         this.logFilterText = '';
@@ -1753,10 +1761,10 @@ class KigumiViewerApp extends LitElement {
         if (typeof ui.footprintsEnabled === 'boolean') {
             this.setFootprintsEnabled(ui.footprintsEnabled);
         }
-        if (FEATURE_FLAGS.assemblyPreview && typeof ui.showAssemblyTimeline === 'boolean') {
+        if (ASSEMBLY_PREVIEW_ENABLED && typeof ui.showAssemblyTimeline === 'boolean') {
             this.setShowAssemblyTimeline(ui.showAssemblyTimeline);
         }
-        if (FEATURE_FLAGS.assemblyPreview && Number.isFinite(ui.disassemblyMultiplier)) {
+        if (ASSEMBLY_PREVIEW_ENABLED && Number.isFinite(ui.disassemblyMultiplier)) {
             this.setDisassemblyMultiplier(Number(ui.disassemblyMultiplier));
         }
         if (typeof ui.debugEnabled === 'boolean') {
@@ -2008,12 +2016,30 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (message.type === 'layersTree') {
-            this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
-                ? AssemblyTimeline.normalizeAssemblyPayload(message.payload ? message.payload.assembly : null)
-                : null);
+            // The layers payload carries {pending: true} while the runner is
+            // still solving the disassembly; the solved payload arrives later
+            // in an 'assemblyData' message.
+            const assemblyPayload = message.payload ? message.payload.assembly : null;
+            if (ASSEMBLY_PREVIEW_ENABLED && assemblyPayload && assemblyPayload.pending === true) {
+                this.assemblySolving = true;
+                this.setAssemblyData(null);
+            } else {
+                this.assemblySolving = false;
+                this.setAssemblyData(ASSEMBLY_PREVIEW_ENABLED
+                    ? AssemblyTimeline.normalizeAssemblyPayload(assemblyPayload)
+                    : null);
+            }
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
             }
+            return;
+        }
+
+        if (message.type === 'assemblyData') {
+            this.assemblySolving = false;
+            this.setAssemblyData(ASSEMBLY_PREVIEW_ENABLED
+                ? AssemblyTimeline.normalizeAssemblyPayload(message.payload)
+                : null);
             return;
         }
 
@@ -3098,26 +3124,52 @@ class KigumiViewerApp extends LitElement {
         if (!failure) {
             return;
         }
-        const lines = [`[assembly] ${failure.message}`, ...failure.diagnostics];
-        console.warn(lines.join('\n'));
+        const lines = [failure.message, ...failure.diagnostics];
+        console.warn(['[assembly]', ...lines].join('\n'));
         if (vscode) {
-            vscode.postMessage({ type: 'debugProbe', message: lines.join(' | ') });
+            vscode.postMessage({ type: 'assemblyFailureLog', lines });
         }
     }
 
+    // The webview CSP blocks inline style attributes (style-src has no
+    // 'unsafe-inline'), so lit style= bindings never reach the DOM. Setting
+    // properties through the CSSOM is allowed: marks carry their position in
+    // data-left and get placed here after every render.
+    updated() {
+        this.querySelectorAll('.assembly-timeline-mark[data-left]').forEach((mark) => {
+            mark.style.left = `${mark.dataset.left}%`;
+        });
+    }
+
     renderAssemblyTimeline() {
-        if (!FEATURE_FLAGS.assemblyPreview || !this.showAssemblyTimeline || !this.assemblyData) {
+        if (!ASSEMBLY_PREVIEW_ENABLED || !this.showAssemblyTimeline) {
+            return '';
+        }
+        if (this.assemblySolving) {
+            return html`
+                <div id="assembly-timeline"
+                    aria-label="Assembly preview timeline"
+                    @pointerdown=${(event) => event.stopPropagation()}
+                    @mousedown=${(event) => event.stopPropagation()}>
+                    <span class="assembly-timeline-loading">figuring out how to disassemble…</span>
+                </div>
+            `;
+        }
+        if (!this.assemblyData) {
             return '';
         }
         const { steps, warnings, failure } = this.assemblyData;
         const scrubMax = AssemblyTimeline.getScrubMax(steps, failure);
-        const marks = AssemblyTimeline.getTimelineMarks(steps, failure);
+        const marks = AssemblyTimeline.getTimelineMarks(steps);
+        const failureTooltip = failure
+            ? [failure.message, ...failure.diagnostics.slice(0, 3)].join('\n')
+            : '';
         return html`
             <div id="assembly-timeline"
                 aria-label="Assembly preview timeline"
                 @pointerdown=${(event) => event.stopPropagation()}
                 @mousedown=${(event) => event.stopPropagation()}>
-                <span class="assembly-timeline-title">assembly</span>
+                <span class="assembly-timeline-end-label">assembled</span>
                 <div class="assembly-timeline-track">
                     <input
                         id="assembly-scrub-slider"
@@ -3129,19 +3181,21 @@ class KigumiViewerApp extends LitElement {
                         ?disabled=${scrubMax === 0}
                         @input=${(event) => this.setAssemblyScrubValue(Number(event.target.value))}>
                     <div class="assembly-timeline-marks">
-                        ${marks.map((mark) => mark.kind === 'failure'
-                            ? html`<button
-                                class="assembly-timeline-mark assembly-timeline-mark-failure"
-                                style=${`left: ${scrubMax > 0 ? (mark.value / scrubMax) * 100 : 0}%`}
-                                type="button"
-                                title=${failure ? failure.message : ''}
-                                @click=${() => this.logAssemblyFailure()}>${mark.label}</button>`
-                            : html`<span
-                                class="assembly-timeline-mark"
-                                style=${`left: ${scrubMax > 0 ? (mark.value / scrubMax) * 100 : 0}%`}
-                                >${mark.label}</span>`)}
+                        ${marks.map((mark) => html`<span
+                            class=${mark.kind === 'substep'
+                                ? 'assembly-timeline-mark assembly-timeline-mark-substep'
+                                : 'assembly-timeline-mark'}
+                            data-left=${scrubMax > 0 ? String((mark.value / scrubMax) * 100) : '0'}
+                            >${mark.kind === 'substep' ? '·' : mark.label}</span>`)}
                     </div>
                 </div>
+                ${failure
+                    ? html`<button
+                        class="assembly-timeline-end-label assembly-timeline-failure"
+                        type="button"
+                        title=${failureTooltip}
+                        @click=${() => this.logAssemblyFailure()}>✕</button>`
+                    : html`<span class="assembly-timeline-end-label">disassembled</span>`}
                 ${warnings.length > 0
                     ? html`<span class="assembly-timeline-warnings" title=${warnings.join('\n')}>⚠ ${warnings.length}</span>`
                     : ''}

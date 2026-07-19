@@ -566,10 +566,10 @@ def _descriptor_from_signature_parameter(
     if parameter.default is None and not annotation_is_optional:
         return None
 
-    if isinstance(parameter.default, Param):
+    if type(parameter.default).__name__ == "Param":
         declared = parameter.default
-        default_value = declared.default
-        declared_kind = declared.kind
+        default_value = getattr(declared, "default", None)
+        declared_kind = getattr(declared, "kind", None)
         if declared_kind is None:
             kind = _infer_parameter_kind(default_value, inner_annotation, inner_annotation_text)
         else:
@@ -579,20 +579,21 @@ def _descriptor_from_signature_parameter(
                     f"Parameter '{parameter.name}' has invalid kind '{declared_kind}'. "
                     f"Expected one of: {_PARAM_KIND_VALUES}"
                 )
-        options = _normalize_param_options(declared.options)
+        options = _normalize_param_options(getattr(declared, "options", None))
         if kind == "enum" and not options:
             raise ValueError(
                 f"Parameter '{parameter.name}' declared as enum must provide options"
             )
-        optional = declared.optional if declared.optional is not None else (default_value is None or annotation_is_optional)
+        declared_optional = getattr(declared, "optional", None)
+        optional = declared_optional if declared_optional is not None else (default_value is None or annotation_is_optional)
         return RenderParameterDescriptor(
             name=parameter.name,
             default_value=default_value,
             kind=kind,  # type: ignore[arg-type]
-            description=declared.description,
+            description=getattr(declared, "description", ""),
             options=options,
-            minimum=declared.minimum,
-            maximum=declared.maximum,
+            minimum=getattr(declared, "minimum", None),
+            maximum=getattr(declared, "maximum", None),
             optional=optional,
         )
 
@@ -630,6 +631,11 @@ def discover_callable_render_parameters(
     skip_first_parameter: bool = False,
 ) -> List[RenderParameterDescriptor]:
     """Inspect a callable signature and return render-parameter descriptors."""
+    # If we have already scanned this function and unpacked its defaults, return the cached descriptors.
+    cache_attr = "_kumiki_param_descriptors" if not skip_first_parameter else "_kumiki_param_descriptors_skip"
+    if hasattr(callable_obj, cache_attr):
+        return getattr(callable_obj, cache_attr)
+
     signature = inspect.signature(callable_obj)
     annotation_texts = _extract_parameter_annotation_texts(callable_obj)
     discovered: List[RenderParameterDescriptor] = []
@@ -645,6 +651,25 @@ def discover_callable_render_parameters(
         )
         if descriptor is not None:
             discovered.append(descriptor)
+
+    # Dynamically unpack Param default values in the callable object so that
+    # direct python calls without arguments receive raw defaults instead of Param wrappers.
+    if hasattr(callable_obj, "__defaults__") and callable_obj.__defaults__:
+        callable_obj.__defaults__ = tuple(
+            getattr(d, "default") if type(d).__name__ == "Param" else d
+            for d in callable_obj.__defaults__
+        )
+    if hasattr(callable_obj, "__kwdefaults__") and callable_obj.__kwdefaults__:
+        callable_obj.__kwdefaults__ = {
+            k: (getattr(v, "default") if type(v).__name__ == "Param" else v)
+            for k, v in callable_obj.__kwdefaults__.items()
+        }
+
+    try:
+        setattr(callable_obj, cache_attr, discovered)
+    except Exception:
+        pass
+
     return discovered
 
 

@@ -15,6 +15,13 @@ const VIEWER_LOG_LEVEL_ORDER = {
     error: 40,
 };
 
+// User-facing toggle for the assembly preview timeline (the package-time
+// FEATURE_FLAGS.assemblyPreview stays the master switch on top of this).
+// Read fresh at each use so toggling applies on the next refresh.
+function assemblyPreviewSettingEnabled() {
+    return vscode.workspace.getConfiguration('kigumi').get('viewer.assemblyPreview', false) === true;
+}
+
 function normalizeViewerLogLevel(level) {
     if (typeof level !== 'string') {
         return 'info';
@@ -346,6 +353,20 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'assemblyFailureLog') {
+                // The ✕ on the assembly timeline was clicked: print the
+                // failure (message + diagnostics) to the output channel.
+                const lines = Array.isArray(message.lines)
+                    ? message.lines.filter((line) => typeof line === 'string')
+                    : [];
+                for (const line of lines) {
+                    this.log(`[assembly] ${line}`);
+                }
+                if (lines.length > 0 && this.channel && typeof this.channel.show === 'function') {
+                    this.channel.show(true);
+                }
+                return;
+            }
             if (message.type !== 'viewerLog') {
                 return;
             }
@@ -660,7 +681,8 @@ class FrameViewSession {
             let layersData = null;
             try {
                 layersData = applyFeatureFlagsToLayersPayload(
-                    await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
+                    await this.runnerSession.slotRequest('get_layers_tree', this.slotName),
+                    { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
                 );
             } catch (err) {
                 this.log(`[layers] get_layers_tree failed: ${err.message || err}`);
@@ -739,6 +761,7 @@ class FrameViewSession {
                 }).catch((err) => {
                     this.log(`[layers] Failed to post layers tree: ${err.message || err}`);
                 });
+                this._fetchAssemblyInBackground(layersData);
             }
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
             this.profiler.markTiming(timing, 'refresh.end', { refresh_total_ms: Math.round(refresh_total_s * 1000) });
@@ -916,9 +939,41 @@ class FrameViewSession {
             return;
         }
         const result = applyFeatureFlagsToLayersPayload(
-            await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
+            await this.runnerSession.slotRequest('get_layers_tree', this.slotName),
+            { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
         );
         this._postToWebview({ type: 'layersTree', payload: result });
+        this._fetchAssemblyInBackground(result);
+    }
+
+    // The layers payload only announces a pending disassembly solve; the
+    // actual solve runs afterwards via get_assembly so the frame renders
+    // first (the webview shows a "figuring out how to disassemble…" state
+    // until the result lands). A generation counter drops results made stale
+    // by a newer refresh.
+    _fetchAssemblyInBackground(layersPayload) {
+        if (!layersPayload || !layersPayload.assembly || layersPayload.assembly.pending !== true) {
+            return;
+        }
+        if (!this.runnerSession) {
+            return;
+        }
+        this._assemblyFetchGeneration = (this._assemblyFetchGeneration || 0) + 1;
+        const generation = this._assemblyFetchGeneration;
+        this.runnerSession.slotRequest('get_assembly', this.slotName)
+            .then((result) => {
+                if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
+                    return;
+                }
+                this._postToWebview({ type: 'assemblyData', payload: result ? result.assembly : null });
+            })
+            .catch((err) => {
+                this.log(`[assembly] get_assembly failed: ${err.message || err}`);
+                if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
+                    return;
+                }
+                this._postToWebview({ type: 'assemblyData', payload: null });
+            });
     }
 
     getExportDirectory() {

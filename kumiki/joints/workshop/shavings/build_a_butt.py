@@ -16,7 +16,7 @@ outside of the purview of build-a-butt-joint, finish the joint:
 """
 
 from __future__ import annotations
-from typing import NamedTuple
+from typing import NamedTuple, Union
 
 from kumiki.timber import *
 from kumiki.measuring import (
@@ -50,7 +50,7 @@ def safe_transform_vector(*args, **kwargs):
     return prune(_raw_safe_transform_vector(*args, **kwargs))
 
 
-def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+def _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt(
     arrangement: ButtJointTimberArrangement,
     distance_from_centerline: Numeric,
 ) -> Plane:
@@ -60,15 +60,6 @@ def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
     The shoulder plane is parallel to the mortise timber's length axis and offset from
     the mortise centerline in the mortise cross-section toward the tenon. Its reference
     point is chosen using the tenon centerline relation.
-
-    Args:
-        arrangement: Butt joint arrangement (receiving_timber = mortise, butt_timber = tenon).
-        distance_from_centerline: Signed offset from the mortise centerline toward the tenon.
-            0 = plane through the mortise centerline. Positive = toward tenon.
-
-    Returns:
-        Plane parallel to the mortise length axis, offset by distance_from_centerline
-        from the mortise centerline toward the tenon.
     """
     mortise_timber = arrangement.receiving_timber
     tenon_timber = arrangement.butt_timber
@@ -132,6 +123,90 @@ def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
         mortise_timber, TimberCenterline.CENTERLINE, direction_in_plane, distance_from_centerline
     )
 
+
+def locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+    arrangement: ButtJointTimberArrangement,
+    distance_from_centerline: Numeric,
+) -> Plane:
+    """
+    Computes the shoulder plane of the mortise timber, offset from its centerline toward the tenon.
+
+    The shoulder plane is parallel to the mortise timber's length axis and offset from
+    the mortise centerline in the mortise cross-section toward the tenon. Its reference
+    point is chosen using the tenon centerline relation.
+
+    Args:
+        arrangement: Butt joint arrangement (receiving_timber = mortise, butt_timber = tenon).
+        distance_from_centerline: Signed offset from the mortise centerline toward the tenon.
+            0 = plane through the mortise centerline. Positive = toward tenon.
+
+    Returns:
+        Plane parallel to the mortise length axis, offset by distance_from_centerline
+        from the mortise centerline toward the tenon.
+    """
+    return _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt(
+        arrangement, distance_from_centerline
+    )
+
+
+def resolve_parallel_shoulder_face(
+    arrangement: ButtJointTimberArrangement,
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool],
+) -> TimberLongFace:
+    """
+    Resolves the parallel shoulder face. If set_mortise_shoulder_parallel_to_face is True,
+    it auto-detects the face most parallel to the tenon axis. Otherwise, returns it directly.
+    """
+    if set_mortise_shoulder_parallel_to_face is True:
+        mortise_timber = arrangement.receiving_timber
+        tenon_timber = arrangement.butt_timber
+        tenon_end = arrangement.butt_timber_end
+        tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
+        tenon_dir = -tenon_end_direction
+        
+        x_axis = mortise_timber.get_width_direction_global()
+        y_axis = mortise_timber.get_height_direction_global()
+        dot_x = abs(safe_dot_product(tenon_dir, x_axis))
+        dot_y = abs(safe_dot_product(tenon_dir, y_axis))
+        
+        if dot_x < dot_y:
+            if safe_dot_product(x_axis, tenon_dir) > 0:
+                return TimberLongFace.RIGHT
+            else:
+                return TimberLongFace.LEFT
+        else:
+            if safe_dot_product(y_axis, tenon_dir) > 0:
+                return TimberLongFace.FRONT
+            else:
+                return TimberLongFace.BACK
+    else:
+        assert isinstance(set_mortise_shoulder_parallel_to_face, TimberLongFace), "Must be a TimberLongFace"
+        return set_mortise_shoulder_parallel_to_face
+
+
+def locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+    arrangement: ButtJointTimberArrangement,
+    distance_from_centerplane: Numeric,
+    face: TimberLongFace,
+) -> Plane:
+    """
+    Computes a shoulder plane that is forced to be parallel to a specific face of the mortise timber.
+    """
+    mortise_timber = arrangement.receiving_timber
+    ref_plane = _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt(
+        arrangement, scalar(0)
+    )
+    direction_in_plane = ref_plane.normal
+
+    chosen_normal = mortise_timber.get_face_direction_global(face)
+        
+    if safe_dot_product(chosen_normal, direction_in_plane) < 0:
+        chosen_normal = -chosen_normal
+
+    return locate_plane_from_edge_in_direction(
+        mortise_timber, TimberCenterline.CENTERLINE, chosen_normal, distance_from_centerplane
+    )
+
 @dataclass(frozen=True)
 class ButtJointShoulderResult:
     """
@@ -152,8 +227,9 @@ class ButtJointShoulderResult:
 
 def compute_butt_joint_shoulder(
     arrangement: ButtJointTimberArrangement,
-    distance_from_centerline: Numeric,
+    distance_from_centerline_or_centerplane: Numeric,
     up_direction: Direction3D,
+    set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
 ) -> ButtJointShoulderResult:
     """
     Compute the shoulder plane and an oriented marking space for a butt joint.
@@ -166,10 +242,11 @@ def compute_butt_joint_shoulder(
 
     Args:
         arrangement: Butt joint arrangement (receiving_timber = mortise, butt_timber = tenon).
-        distance_from_centerline: Signed offset from the mortise centerline toward the tenon.
+        distance_from_centerline_or_centerplane: Signed offset from the mortise centerline toward the tenon.
             0 = plane through the mortise centerline. Positive = toward tenon.
         up_direction: Direction for +Y axis of the marking space. Will be orthogonalized
             against the shoulder plane normal.
+        set_mortise_shoulder_parallel_to_face: Force shoulder plane parallel to a face.
 
     Returns:
         ButtJointShoulderResult with the shoulder plane, intersection point, and marking space.
@@ -177,9 +254,15 @@ def compute_butt_joint_shoulder(
     tenon_timber = arrangement.butt_timber
     tenon_end = arrangement.butt_timber_end
 
-    shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
-        arrangement, distance_from_centerline
-    )
+    if set_mortise_shoulder_parallel_to_face:
+        resolved_face = resolve_parallel_shoulder_face(arrangement, set_mortise_shoulder_parallel_to_face)
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face(
+            arrangement, distance_from_centerline_or_centerplane, resolved_face
+        )
+    else:
+        shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+            arrangement, distance_from_centerline_or_centerplane
+        )
 
     shoulder_from_tenon_end_mark = mark_distance_from_end_along_centerline(
         shoulder_plane, tenon_timber, tenon_end
@@ -590,7 +673,7 @@ def dovetail_tenon_geometry(
             transform=extrusion_transform,
             positive_csg=wedge_positive_csg,
             assembly_freedom=AssemblyFreedom.translation(-wedge_drive_direction, freed_after=wedge_length),
-            assembly_ordering=Ordering(0, 0),
+            assembly_ordering=Ordering(0, -1),
         )
 
         # The mortise cavity must also include the wedge's slot (above Y=0), so the wedge can
@@ -730,7 +813,7 @@ def compute_peg_positions(
         arrangement: Butt joint arrangement (butt_timber = tenon, receiving_timber = mortise).
                      Must have front_face_on_butt_timber set.
         shoulder_plane: The shoulder plane in global space (from
-                        locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber).
+                        _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt).
         peg_parameters: Peg configuration (shape, positions, size, depth, offset).
         tenon_position: Offset of tenon center from timber centerline in tenon local cross-section (X, Y).
 

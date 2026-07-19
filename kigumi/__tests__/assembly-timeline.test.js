@@ -35,12 +35,21 @@ describe('normalizeAssemblyPayload', () => {
     expect(payload.failure).toBeNull();
   });
 
-  test('missing suborder defaults to 0', () => {
+  test('missing suborder defaults to 0 and missing substep defaults to 1', () => {
     const payload = normalizeAssemblyPayload({
       steps: [{ order: 2, movements: [movement('beam#0', [0, 0, 1], 4)] }],
     });
 
     expect(payload.steps[0].suborder).toBe(0);
+    expect(payload.steps[0].substep).toBe(1);
+  });
+
+  test('substep passes through', () => {
+    const payload = normalizeAssemblyPayload({
+      steps: [{ order: 2, suborder: 0, substep: 3, movements: [movement('beam#0', [0, 0, 1], 4)] }],
+    });
+
+    expect(payload.steps[0].substep).toBe(3);
   });
 
   test('invalid movements are dropped', () => {
@@ -58,6 +67,12 @@ describe('normalizeAssemblyPayload', () => {
 
     expect(payload.steps[0].movements).toHaveLength(1);
     expect(payload.steps[0].movements[0].memberKey).toBe('good#0');
+  });
+
+  test('a pending placeholder never normalizes into renderable data', () => {
+    // While the runner is still solving, the layers payload carries
+    // {pending: true}; that must never be mistaken for a solved payload.
+    expect(normalizeAssemblyPayload({ pending: true })).toBeNull();
   });
 
   test('failure-only payload is kept for the error UI', () => {
@@ -118,16 +133,15 @@ describe('computeAssemblyOffsets', () => {
 
 describe('timeline marks', () => {
   const steps = [
-    { order: 1, suborder: 0, movements: [] },
-    { order: 1, suborder: 1, movements: [] },
-    { order: 3, suborder: 0, movements: [] },
+    { order: 1, suborder: 0, substep: 1, movements: [] },
+    { order: 1, suborder: 1, substep: 1, movements: [] },
+    { order: 3, suborder: 0, substep: 1, movements: [] },
   ];
 
-  test('marks include assembled start and one mark per step with suborder labels', () => {
-    const marks = getTimelineMarks(steps, null);
+  test('one interior mark per step with suborder labels (end states are the viewer labels)', () => {
+    const marks = getTimelineMarks(steps);
 
     expect(marks).toEqual([
-      { value: 0, label: 'assembled', kind: 'start' },
       { value: 1, label: '1', kind: 'order' },
       { value: 2, label: '1.1', kind: 'order' },
       { value: 3, label: '3', kind: 'order' },
@@ -135,11 +149,34 @@ describe('timeline marks', () => {
     expect(getScrubMax(steps, null)).toBe(3);
   });
 
-  test('failure adds an ✕ mark past the last solved step', () => {
-    const failure = { order: 4, suborder: 0, message: 'stuck', diagnostics: [] };
-    const marks = getTimelineMarks(steps, failure);
+  test('solver substeps beyond the first render as unlabeled ticks', () => {
+    const substepSteps = [
+      { order: 1, suborder: 0, substep: 1, movements: [] },
+      { order: 1, suborder: 0, substep: 2, movements: [] },
+      { order: 1, suborder: 0, substep: 3, movements: [] },
+      { order: 2, suborder: 0, substep: 1, movements: [] },
+    ];
+    const marks = getTimelineMarks(substepSteps);
 
-    expect(marks[marks.length - 1]).toEqual({ value: 4, label: '✕', kind: 'failure' });
+    expect(marks).toEqual([
+      { value: 1, label: '1', kind: 'order' },
+      { value: 2, label: '', kind: 'substep' },
+      { value: 3, label: '', kind: 'substep' },
+      { value: 4, label: '2', kind: 'order' },
+    ]);
+  });
+
+  test('no marks when there are no steps', () => {
+    expect(getTimelineMarks([])).toEqual([]);
+    expect(getTimelineMarks(null)).toEqual([]);
+  });
+
+  test('failure extends the scrub range one past the last solved step', () => {
+    // The failure point is the end of the scrub range; the viewer renders the
+    // ✕ as the right-hand end label there, not as an interior mark.
+    const failure = { order: 4, suborder: 0, message: 'stuck', diagnostics: [] };
+
+    expect(getTimelineMarks(steps)).toHaveLength(3);
     expect(getScrubMax(steps, failure)).toBe(4);
   });
 });

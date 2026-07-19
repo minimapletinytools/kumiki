@@ -550,8 +550,8 @@ def giraffe_compare(a, b, comparison: Comparison, collapse_mode: CollapseMode = 
         giraffe_compare(x, 0, Comparison.EQ)   # x == 0 ?
     """
     diff = a - b
-    # Fast path: always collapse or expression is complex → evaluate numerically
-    if collapse_mode == CollapseMode.ALWAYS or _should_collapse(diff, collapse_mode):
+    # Fast path: always collapse or expression is complex or is/has a Float → evaluate numerically
+    if collapse_mode == CollapseMode.ALWAYS or _should_collapse(diff, collapse_mode) or isinstance(diff, (float, Float)) or (hasattr(diff, "has") and diff.has(Float)):
         try:
             val = float(giraffe_evalf(diff))
             return _apply_comparison(val, comparison)
