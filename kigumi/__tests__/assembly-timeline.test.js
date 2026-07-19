@@ -69,6 +69,12 @@ describe('normalizeAssemblyPayload', () => {
     expect(payload.steps[0].movements[0].memberKey).toBe('good#0');
   });
 
+  test('a pending placeholder never normalizes into renderable data', () => {
+    // While the runner is still solving, the layers payload carries
+    // {pending: true}; that must never be mistaken for a solved payload.
+    expect(normalizeAssemblyPayload({ pending: true })).toBeNull();
+  });
+
   test('failure-only payload is kept for the error UI', () => {
     const payload = normalizeAssemblyPayload({
       steps: [],

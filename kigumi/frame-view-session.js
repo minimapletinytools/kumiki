@@ -753,6 +753,7 @@ class FrameViewSession {
                 }).catch((err) => {
                     this.log(`[layers] Failed to post layers tree: ${err.message || err}`);
                 });
+                this._fetchAssemblyInBackground(layersData);
             }
             this.profiler.markTiming(timing, 'webview.renderFrameViewer.end');
             this.profiler.markTiming(timing, 'refresh.end', { refresh_total_ms: Math.round(refresh_total_s * 1000) });
@@ -933,6 +934,37 @@ class FrameViewSession {
             await this.runnerSession.slotRequest('get_layers_tree', this.slotName)
         );
         this._postToWebview({ type: 'layersTree', payload: result });
+        this._fetchAssemblyInBackground(result);
+    }
+
+    // The layers payload only announces a pending disassembly solve; the
+    // actual solve runs afterwards via get_assembly so the frame renders
+    // first (the webview shows a "figuring out how to disassemble…" state
+    // until the result lands). A generation counter drops results made stale
+    // by a newer refresh.
+    _fetchAssemblyInBackground(layersPayload) {
+        if (!layersPayload || !layersPayload.assembly || layersPayload.assembly.pending !== true) {
+            return;
+        }
+        if (!this.runnerSession) {
+            return;
+        }
+        this._assemblyFetchGeneration = (this._assemblyFetchGeneration || 0) + 1;
+        const generation = this._assemblyFetchGeneration;
+        this.runnerSession.slotRequest('get_assembly', this.slotName)
+            .then((result) => {
+                if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
+                    return;
+                }
+                this._postToWebview({ type: 'assemblyData', payload: result ? result.assembly : null });
+            })
+            .catch((err) => {
+                this.log(`[assembly] get_assembly failed: ${err.message || err}`);
+                if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
+                    return;
+                }
+                this._postToWebview({ type: 'assemblyData', payload: null });
+            });
     }
 
     getExportDirectory() {

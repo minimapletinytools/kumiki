@@ -930,13 +930,31 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             "jointKumikiEphemeralId": accessory_kumiki_ephemeral_to_joint.get(entry["kumikiEphemeralId"]),
         })
 
+    # Solving the disassembly can take a while on big frames, so the layers
+    # payload only announces whether a solve is COMING ({"pending": true});
+    # the extension then issues a separate get_assembly request and forwards
+    # the solved payload to the viewer, which shows a loading state meanwhile.
     return {
         "frameName": frame.name if hasattr(frame, "name") else None,
         "timbers": timbers_payload,
         "accessories": accessories_payload,
         "joints": joints_payload,
-        "assembly": _build_assembly_payload(frame, timber_entries, accessory_entries),
+        "assembly": {"pending": True} if _frame_has_assembly_freedoms(frame) else None,
     }
+
+
+def _frame_has_assembly_freedoms(frame: Any) -> bool:
+    """Cheap gate mirroring solve_frame_assembly's: does any joint member
+    declare an assembly freedom? (No solving involved.)"""
+    source_joints = list(getattr(frame, "source_joints", ()) or ())
+    for joint in source_joints:
+        for cutting in joint.cuttings.values():
+            if cutting.assembly_freedom is not None:
+                return True
+        for accessory in joint.jointAccessories.values():
+            if accessory.assembly_freedom is not None:
+                return True
+    return False
 
 
 def _assembly_float(value: Any) -> float:
@@ -2227,6 +2245,14 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
     if command == "get_layers_tree":
         ss = _resolve_slot(state, payload)
         return state, make_success_response(request_id, command, serialize_layers(ss.frame)), False
+
+    if command == "get_assembly":
+        # Deferred from get_layers_tree so the frame renders before the
+        # (potentially slow) disassembly solve runs.
+        ss = _resolve_slot(state, payload)
+        timber_entries, accessory_entries = _assign_member_keys(ss.frame)
+        assembly_payload = _build_assembly_payload(ss.frame, timber_entries, accessory_entries)
+        return state, make_success_response(request_id, command, {"assembly": assembly_payload}), False
 
     if command == "get_csg_tree":
         ss = _resolve_slot(state, payload)

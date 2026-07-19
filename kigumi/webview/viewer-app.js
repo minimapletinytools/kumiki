@@ -1019,6 +1019,7 @@ class KigumiViewerApp extends LitElement {
         this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
         this.assemblyData = null;
+        this.assemblySolving = false;
         this.assemblyScrubValue = 0;
         this._assemblyOffsetsByKey = new Map();
         this.logFilterText = '';
@@ -2008,12 +2009,30 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (message.type === 'layersTree') {
-            this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
-                ? AssemblyTimeline.normalizeAssemblyPayload(message.payload ? message.payload.assembly : null)
-                : null);
+            // The layers payload carries {pending: true} while the runner is
+            // still solving the disassembly; the solved payload arrives later
+            // in an 'assemblyData' message.
+            const assemblyPayload = message.payload ? message.payload.assembly : null;
+            if (FEATURE_FLAGS.assemblyPreview && assemblyPayload && assemblyPayload.pending === true) {
+                this.assemblySolving = true;
+                this.setAssemblyData(null);
+            } else {
+                this.assemblySolving = false;
+                this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
+                    ? AssemblyTimeline.normalizeAssemblyPayload(assemblyPayload)
+                    : null);
+            }
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
             }
+            return;
+        }
+
+        if (message.type === 'assemblyData') {
+            this.assemblySolving = false;
+            this.setAssemblyData(FEATURE_FLAGS.assemblyPreview
+                ? AssemblyTimeline.normalizeAssemblyPayload(message.payload)
+                : null);
             return;
         }
 
@@ -3116,7 +3135,20 @@ class KigumiViewerApp extends LitElement {
     }
 
     renderAssemblyTimeline() {
-        if (!FEATURE_FLAGS.assemblyPreview || !this.showAssemblyTimeline || !this.assemblyData) {
+        if (!FEATURE_FLAGS.assemblyPreview || !this.showAssemblyTimeline) {
+            return '';
+        }
+        if (this.assemblySolving) {
+            return html`
+                <div id="assembly-timeline"
+                    aria-label="Assembly preview timeline"
+                    @pointerdown=${(event) => event.stopPropagation()}
+                    @mousedown=${(event) => event.stopPropagation()}>
+                    <span class="assembly-timeline-loading">figuring out how to disassemble…</span>
+                </div>
+            `;
+        }
+        if (!this.assemblyData) {
             return '';
         }
         const { steps, warnings, failure } = this.assemblyData;
