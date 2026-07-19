@@ -48,7 +48,7 @@
       "kigumi": [
         {
           "id": "kigumi.explorer",
-          "name": "Kigumi Explorer 🐺",
+          "name": "Kigumi Explorer 🦝",
           "icon": "templogo.png"
         }
       ]
@@ -217,6 +217,11 @@
           "type": "boolean",
           "default": false,
           "description": "Automatically refresh open Kigumi viewers when watched files change."
+        },
+        "kigumi.viewer.showPoopTaggedJoints": {
+          "type": "boolean",
+          "default": false,
+          "description": "Show poop-tagged joints in the pattern book."
         },
         "kigumi.viewer.logRetentionDays": {
           "type": "number",

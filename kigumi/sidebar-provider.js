@@ -347,10 +347,12 @@ class KigumiSidebarProvider {
     }
 
     async _scanWorkspace(workspaceRoot, timeoutMs) {
+        const showPoop = vscode.workspace.getConfiguration('kigumi').get('viewer.showPoopTaggedJoints', false);
         const result = await scanWorkspaceForFrames(workspaceRoot, {
             timeoutMs,
             pythonCommand: this.options.getPythonCommand?.(),
             logLine: this.options.logLine,
+            showPoopTaggedJoints: showPoop,
         });
 
         return {

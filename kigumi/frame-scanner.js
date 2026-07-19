@@ -130,7 +130,7 @@ async function scanWorkspaceForFrames(workspaceRoot, options = {}) {
         const relPath = rec.relative_path || path.relative(workspaceRoot, rec.file_path);
         const allPatterns = Array.isArray(rec.patterns) ? rec.patterns : [];
         const sidebarPatterns = allPatterns.filter(
-            (p) => !Array.isArray(p.tags) || !p.tags.includes('poop')
+            (p) => options.showPoopTaggedJoints || !Array.isArray(p.tags) || !p.tags.includes('poop')
         );
         patternbookFiles.push({
             filePath: rec.file_path,
