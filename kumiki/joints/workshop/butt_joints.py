@@ -1023,7 +1023,7 @@ def cut_mortise_and_tenon_joint(
                     -peg_drill_direction_global,
                     freed_after=peg_result.peg_depth + peg_result.stickout_length,
                 ),
-                assembly_ordering=Ordering(0, 0),
+                assembly_ordering=Ordering(-1, 0),
             )
             joint_accessories[f"peg_{peg_idx}"] = peg_accessory
 
@@ -1056,16 +1056,15 @@ def cut_mortise_and_tenon_joint(
     # mortise timber's view of the same separation is the inverse direction.
     # When pegs lock the joint they pop first (suborder 0), so the timbers
     # slide at suborder 1.
-    timber_suborder = 1 if joint_accessories else 0
     tenon_cut_timber = replace(
         tenon_cut,
         assembly_freedom=AssemblyFreedom.translation(-tenon_length_direction_global, freed_after=tenon_length),
-        assembly_ordering=Ordering(0, timber_suborder),
+        assembly_ordering=Ordering(0, 0),
     )
     mortise_cut_timber = replace(
         mortise_cut,
         assembly_freedom=AssemblyFreedom.translation(tenon_length_direction_global, freed_after=tenon_length),
-        assembly_ordering=Ordering(0, timber_suborder),
+        assembly_ordering=Ordering(0, 0),
     )
 
     return Joint(
@@ -1439,8 +1438,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
 
     # Assembly: the tenon backs out of the mortise along the butt axis; the
     # wedge (if any) locks it and pops first, so the timbers slide at
-    # suborder 1 when a wedge is present.
-    timber_suborder = 1 if geo.wedge_accessory_csg is not None else 0
+    # suborder 0 when a wedge is present.
     tenon_cut_no_relief = Cutting(
         timber=tenon_timber,
         maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
@@ -1448,7 +1446,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         negative_csg=tenon_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
         assembly_freedom=AssemblyFreedom.translation(-shoulder_result.butt_direction, freed_after=tenon_depth),
-        assembly_ordering=Ordering(0, timber_suborder),
+        assembly_ordering=Ordering(0, 0),
     )
 
     mortise_cut_no_relief = Cutting(
@@ -1456,7 +1454,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         negative_csg=mortise_negative_local,
         label="wedged_half_dovetail_mortise_and_tenon",
         assembly_freedom=AssemblyFreedom.translation(shoulder_result.butt_direction, freed_after=tenon_depth),
-        assembly_ordering=Ordering(0, timber_suborder),
+        assembly_ordering=Ordering(0, 0),
     )
 
     tenon_cut, mortise_cut = _apply_scribe_relief_if_configured(

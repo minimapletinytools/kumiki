@@ -78,9 +78,9 @@ class TestButtFamilyFreedoms:
         assert "peg_0" in joint.jointAccessories
         peg = joint.jointAccessories["peg_0"]
         assert_authored_translation(peg.assembly_freedom)
-        assert peg.assembly_ordering == Ordering(0, 0)
-        assert joint.cuttings["butt_timber"].assembly_ordering == Ordering(0, 1)
-        assert joint.cuttings["receiving_timber"].assembly_ordering == Ordering(0, 1)
+        assert peg.assembly_ordering == Ordering(-1, 0)
+        assert joint.cuttings["butt_timber"].assembly_ordering == Ordering(0, 0)
+        assert joint.cuttings["receiving_timber"].assembly_ordering == Ordering(0, 0)
 
     def test_mortise_and_tenon_without_pegs_has_no_suborder(self, float_mode):
         arrangement = create_canonical_example_butt_joint_timbers()
@@ -176,11 +176,11 @@ class TestLockedJointFreedoms:
         cutting_keys = list(joint.cuttings)
         for key in cutting_keys:
             assert_authored_translation(joint.cuttings[key].assembly_freedom)
-            assert joint.cuttings[key].assembly_ordering == Ordering(0, 1)
+            assert joint.cuttings[key].assembly_ordering == Ordering(0, 0)
         assert "key_0" in joint.jointAccessories
         key_wedge = joint.jointAccessories["key_0"]
         assert_authored_translation(key_wedge.assembly_freedom)
-        assert key_wedge.assembly_ordering == Ordering(0, 0)
+        assert key_wedge.assembly_ordering == Ordering(0, -1)
 
     def test_splined_opposing_double_butt(self, float_mode):
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
@@ -192,7 +192,7 @@ class TestLockedJointFreedoms:
         # Butt timbers pull back along their own axes (butt 1 runs +Y, butt 2 -Y).
         assert_authored_translation(joint.cuttings["butt_timber_1"].assembly_freedom, (0, -1, 0))
         assert_authored_translation(joint.cuttings["butt_timber_2"].assembly_freedom, (0, 1, 0))
-        assert joint.cuttings["butt_timber_1"].assembly_ordering == Ordering(0, 1)
+        assert joint.cuttings["butt_timber_1"].assembly_ordering == Ordering(0, 0)
         # The receiving timber has no single escape while both butts oppose it.
         assert joint.cuttings["receiving_timber"].assembly_freedom is None
         # Pegs pop first; the spline slides with the members.
@@ -200,10 +200,10 @@ class TestLockedJointFreedoms:
         assert peg_keys, "basic splined double butt should include default pegs"
         for peg_key in peg_keys:
             assert_authored_translation(joint.jointAccessories[peg_key].assembly_freedom)
-            assert joint.jointAccessories[peg_key].assembly_ordering == Ordering(0, 0)
+            assert joint.jointAccessories[peg_key].assembly_ordering == Ordering(-1, 0)
         spline = joint.jointAccessories["spline"]
         assert_authored_translation(spline.assembly_freedom)
-        assert spline.assembly_ordering == Ordering(0, 1)
+        assert spline.assembly_ordering == Ordering(0, 0)
 
 
 class TestRigidJoints:

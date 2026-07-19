@@ -167,10 +167,13 @@ class TestSolveAssemblyBasics:
         assert solution is not None
 
         moved = movements_by_key(solution.steps[0])
-        assert len(moved) == 1
-        mover_key, movement = next(iter(moved.items()))
-        assert movement.dragged is False
-        assert_direction(movement, (-1, 0, 0) if mover_key == 1 else (1, 0, 0))
+        assert len(moved) == 2
+        assert 1 in moved
+        assert 2 in moved
+        assert moved[1].dragged is False
+        assert moved[2].dragged is True
+        assert_direction(moved[1], (-1, 0, 0))
+        assert_direction(moved[2], (1, 0, 0))
 
 
 class TestDofRanking:
@@ -329,9 +332,20 @@ class TestDragPropagation:
         assert solution is not None
 
         assert solution.failure is None
-        assert any("board" in warning and "cancelled out" in warning for warning in solution.warnings)
-        for step in solution.steps:
-            assert 5 not in movements_by_key(step)
+        assert not solution.warnings
+        assert len(solution.steps) == 2
+        moved1 = movements_by_key(solution.steps[0])
+        moved2 = movements_by_key(solution.steps[1])
+        assert 1 in moved1
+        assert 3 in moved1
+        assert 5 in moved1
+        assert 4 in moved1
+        assert 2 not in moved1
+        assert 3 in moved2
+        assert 1 in moved2
+        assert 5 in moved2
+        assert 2 in moved2
+        assert 4 not in moved2
 
 
 class TestSuborders:
@@ -522,6 +536,6 @@ class TestUnsolvable:
         assert [step.ordering for step in solution.steps] == [Ordering(1, 0)]
         assert solution.failure is not None
         assert solution.failure.ordering == Ordering(2, 0)
-        assert "no workable DOF" in solution.failure.message
+        assert "moved in a non-allowed direction" in solution.failure.message
         assert len(solution.failure.diagnostics) > 0
         assert any("drag chain" in diagnostic for diagnostic in solution.failure.diagnostics)

@@ -433,7 +433,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
                     assembly_freedom=AssemblyFreedom.translation(
                         peg_face_normal_global, freed_after=actual_depth + stickout
                     ),
-                    assembly_ordering=Ordering(0, 0),
+                    assembly_ordering=Ordering(-1, 0),
                 )
 
         _append_pegs_for_butt(
@@ -488,19 +488,19 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
     butt_1_cut = replace(
         butt_1_cut,
         assembly_freedom=AssemblyFreedom.translation(butt_1_escape_direction, freed_after=spline_length / scalar(2)),
-        assembly_ordering=Ordering(0, member_suborder),
+        assembly_ordering=Ordering(0, 0),
     )
     butt_2_cut = replace(
         butt_2_cut,
         assembly_freedom=AssemblyFreedom.translation(butt_2_escape_direction, freed_after=spline_length / scalar(2)),
-        assembly_ordering=Ordering(0, member_suborder),
+        assembly_ordering=Ordering(0, 0),
     )
 
     spline = CSGAccessory(
         transform=spline_transform,
         positive_csg=spline_positive_csg,
         assembly_freedom=AssemblyFreedom.translation(-slot_direction_global, freed_after=effective_slot_depth),
-        assembly_ordering=Ordering(0, member_suborder),
+        assembly_ordering=Ordering(0, 0),
     )
     joint_accessories["spline"] = spline
 

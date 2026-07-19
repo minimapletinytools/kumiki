@@ -971,7 +971,7 @@ def _build_assembly_payload(
     the timeline stays scrubbable up to the failure point.
     """
     try:
-        from kumiki.timber import solve_frame_assembly
+        from kumiki.timber import solve_frame_assembly, add_milestone
     except ImportError:
         return None
 
@@ -982,6 +982,7 @@ def _build_assembly_payload(
         member_key_by_kumiki_id[entry["kumikiEphemeralId"]] = entry["memberKey"]
 
     try:
+        add_milestone('solving assemblies')
         solution = solve_frame_assembly(frame)
     except Exception as exc:  # noqa: BLE001 — assembly must never break the layers tree
         log_stderr(f"[assembly] solve failed: {exc}")
