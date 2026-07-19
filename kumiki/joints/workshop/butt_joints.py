@@ -929,6 +929,7 @@ def cut_mortise_and_tenon_joint(
 
 
     # TODO if inset notching style is SCRIBE, then we don't use chop_relief_for_butt_joint_arrangement, instead take DIFFERENT(tenon_timber_prism, shoulder plane half space) and remove it from the mortise timber, this is our scribe.
+    assert(inset_notching_style == InsetShoulderNotchingStyle.NOTCH, "Scribe notching style is not yet implemented")
 
     
     # TODO check for face/plane aligned cases, if the shoulder is flush with the mortise entry face, and skip relief cutting in those cases (no notch needed)
