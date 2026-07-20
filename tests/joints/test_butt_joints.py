@@ -568,6 +568,7 @@ class TestPegStuff:
         )
         
         peg = joint.jointAccessories["peg_0"]
+        assert isinstance(peg, Peg), "Expected peg to be a Peg instance"
         assert peg.stickout_length == 0
 
     # 🐪
@@ -1043,7 +1044,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         arrangement = self._make_arrangement(simple_T_configuration)
         import pytest
         with pytest.raises(TypeError, match="missing.*required.*wedge_accessory_parameters"):
-            cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+            cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(  # type: ignore[missing-argument]
                 arrangement=arrangement,
                 dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
                 tenon_size=Matrix([scalar(2), scalar(2)]),

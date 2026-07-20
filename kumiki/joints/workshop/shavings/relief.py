@@ -751,7 +751,7 @@ class ShoulderReliefCSGGeometry:
       (tenon) timber, expressed in that timber's local frame. ``None`` only
       when no relief geometry is necessary (currently always populated).
     """
-    receiving_timber_notch_negative_CSG: Union[RectangularPrism, SolidUnion]
+    receiving_timber_notch_negative_CSG: CutCSG
     butting_timber_relief_negative_CSG: CutCSG | None
 
 

@@ -61,7 +61,7 @@ def build_shed_frame() -> Frame:
         create_v2(base_width, base_length),     # Corner 2: North-East
         create_v2(scalar(0), base_length)       # Corner 3: North-West
     ]
-    footprint = Footprint(footprint_corners)
+    footprint = Footprint(footprint_corners)  # type: ignore[arg-type]
 
     # 2. Place mudsills on the inside of the footprint on all 4 sides
     # Side 0 (South): Corner 0 -> Corner 1
@@ -311,4 +311,5 @@ if __name__ == "__main__":
     for ct in frame.cut_timbers:
         print(f"  - {ct.timber.ticket.path} (Length: {float(ct.timber.length):.2f}m / {float(ct.timber.length) * 39.3701 / 12:.2f} ft)")
     for acc in frame.accessories:
-        print(f"  - Peg at {acc.transform.position}")
+        if isinstance(acc, Peg):
+            print(f"  - Peg at {acc.transform.position}")
