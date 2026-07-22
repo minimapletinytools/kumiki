@@ -243,7 +243,11 @@ Here are some typical guidelines:
 
 ### tenon sizing
 
-As a general rule of thumb, the tenon should be 1/3 the width of the face its entering into in the mortise timber. The height (the axis that aligns with the length axis of the mortise timber) should be slightly less than the height or width (depending on orientation) of the tenon timber. Bigger tenons are stronger and making it slightly smaller creates a nice lip on the shoulder that looks nicer.
+As a general rule of thumb, the tenon should be 1/3 the width of the face its entering into in the mortise timber. Specifically, the tenon width and the width of wood housing on either side of the mortise hole should be similar in width. 
+
+Thus, when butting a smaller timber into a larger one, you may want to do a "barefaced" tenon, where one side of the tenon is flush with one face of the tenon timber. Just make sure the side of the timber it is flush with is the side closer to the center of the mortise timber.
+
+The height (the axis that aligns with the length axis of the mortise timber) should be slightly less than the height or width (depending on orientation) of the tenon timber. Bigger tenons are stronger and making it slightly smaller creates a nice lip on the shoulder that looks nicer. 
 
 ### tenon positioning
 
