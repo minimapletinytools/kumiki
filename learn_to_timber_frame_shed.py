@@ -19,6 +19,68 @@ from kumiki.joints.workshop.butt_joints import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_dropin_housed_butt_joint_on_face_aligned_timbers
 )
+from kumiki.timber import Timber, TimberLongEdge, TimberLongFace, SomeTimberFace
+
+OPPOSITE_LONG_FACE = {
+    TimberLongFace.RIGHT: TimberLongFace.LEFT,
+    TimberLongFace.LEFT: TimberLongFace.RIGHT,
+    TimberLongFace.FRONT: TimberLongFace.BACK,
+    TimberLongFace.BACK: TimberLongFace.FRONT,
+}
+
+def make_timber_imperfect_opposite_edge(
+    timber: PerfectTimberWithin,
+    reference_edge: Union[TimberLongEdge, Tuple[SomeTimberFace, SomeTimberFace]],
+    extra_amount: Numeric = inches(1,2)
+) -> Timber:
+    """
+    Returns a Timber whose actual cross-sectional size is enlarged by `extra_amount` (default 1/2")
+    on the faces opposite to the specified `reference_edge`.
+
+    Args:
+        timber: The base PerfectTimberWithin (or Timber).
+        reference_edge: The TimberLongEdge (or tuple of two adjacent faces) defining the reference edge.
+        extra_amount: The additional thickness to add to the opposite faces (default 1/2").
+
+    Returns:
+        A new Timber instance with asymmetric nominal_half_sizes.
+    """
+    w_half = timber.size[0] / scalar(2)
+    h_half = timber.size[1] / scalar(2)
+
+    right_half = w_half
+    left_half = w_half
+    front_half = h_half
+    back_half = h_half
+
+    if isinstance(reference_edge, TimberLongEdge):
+        _edge_map = {
+            TimberLongEdge.RIGHT_FRONT: (TimberLongFace.RIGHT, TimberLongFace.FRONT),
+            TimberLongEdge.FRONT_LEFT:  (TimberLongFace.FRONT, TimberLongFace.LEFT),
+            TimberLongEdge.LEFT_BACK:   (TimberLongFace.LEFT,  TimberLongFace.BACK),
+            TimberLongEdge.BACK_RIGHT:  (TimberLongFace.BACK,  TimberLongFace.RIGHT),
+        }
+        ref_f1, ref_f2 = _edge_map[reference_edge]
+    else:
+        ref_f1, ref_f2 = reference_edge
+
+    opp_f1 = OPPOSITE_LONG_FACE[TimberLongFace(ref_f1.value)]
+    opp_f2 = OPPOSITE_LONG_FACE[TimberLongFace(ref_f2.value)]
+
+    for opp in (opp_f1, opp_f2):
+        if opp == TimberLongFace.RIGHT:
+            right_half += extra_amount
+        elif opp == TimberLongFace.LEFT:
+            left_half += extra_amount
+        elif opp == TimberLongFace.FRONT:
+            front_half += extra_amount
+        elif opp == TimberLongFace.BACK:
+            back_half += extra_amount
+
+    width_halves = create_v2(right_half, left_half)
+    height_halves = create_v2(front_half, back_half)
+
+    return Timber.from_perfect_timber_within(timber, nominal_half_sizes=(width_halves, height_halves))
 
 # ============================================================================
 # PARAMETERS - Modify these to adjust the shed base design
@@ -372,6 +434,17 @@ def build_shed_frame() -> Frame:
         footprint, 3, mid_side_distance, post_height, FootprintLocation.INSIDE, post_size,
         ticket=TimberTicket(path="west-center-post", tags=("post",))
     )
+
+    # Enlarge posts by 1/2" on the faces opposite to their reference edges:
+    # - Corner posts reference edge: outside corner (LEFT_BACK)
+    # - West center post reference edge: north outside corner (LEFT_BACK)
+    # - East center post reference edge: north outside corner (BACK_RIGHT)
+    post_sw = make_timber_imperfect_opposite_edge(post_sw, TimberLongEdge.LEFT_BACK)
+    post_se = make_timber_imperfect_opposite_edge(post_se, TimberLongEdge.LEFT_BACK)
+    post_ne = make_timber_imperfect_opposite_edge(post_ne, TimberLongEdge.LEFT_BACK)
+    post_nw = make_timber_imperfect_opposite_edge(post_nw, TimberLongEdge.LEFT_BACK)
+    post_west_center = make_timber_imperfect_opposite_edge(post_west_center, TimberLongEdge.LEFT_BACK)
+    post_east_center = make_timber_imperfect_opposite_edge(post_east_center, TimberLongEdge.BACK_RIGHT)
 
     # --- Post-to-mudsill mortise and tenon joints ---
     # Each post (butt_timber, BOTTOM end) joints into the top face of its adjacent mudsill
