@@ -7,6 +7,7 @@ from kumiki import (
     Difference,
     EmptyCSG,
     HalfSpace,
+    Intersection,
     Orientation,
     RectangularPrism,
     SolidUnion,
@@ -136,6 +137,33 @@ class TestTriangles:
 
         assert mesh.is_watertight
         assert mesh.volume > 8.0
+
+    def test_triangulate_intersection_with_geometrically_empty_operand_is_empty(self):
+        # A Difference of two coincident prisms is geometrically empty (zero
+        # volume) but is NOT a symbolic EmptyCSG node, so the EmptyCSG-typed
+        # short-circuit in _mesh_intersection can't catch it. Regression test
+        # for a bug where intersecting such an operand with a non-empty prism
+        # incorrectly returned the *other*, non-empty operand in full instead
+        # of the empty set (A ∩ ∅ must be ∅).
+        prism = RectangularPrism(
+            size=create_v2(scalar(2), scalar(2)),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(2),
+        )
+        geometrically_empty = Difference(base=prism, subtract=[prism])
+
+        other = RectangularPrism(
+            size=create_v2(scalar(4), scalar(4)),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(4),
+        )
+
+        mesh = triangulate_cutcsg(Intersection(left=geometrically_empty, right=other)).mesh
+
+        assert len(mesh.vertices) == 0
+        assert len(mesh.faces) == 0
 
     def test_raw_raycast_first_hits_top_face(self):
         prism = RectangularPrism(
