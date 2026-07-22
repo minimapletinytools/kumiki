@@ -211,7 +211,15 @@ def _mesh_intersection(csg: Intersection) -> TriangleMesh:
 def _run_boolean(operation: str, meshes: Sequence[trimesh.Trimesh]) -> trimesh.Trimesh:
     # Filter out empty meshes (those with no vertices)
     non_empty_meshes = [mesh for mesh in meshes if len(mesh.vertices) > 0]
-    
+
+    # An empty operand forces the whole result empty for intersection (A ∩ ∅ = ∅),
+    # and for difference when the *base* (meshes[0]) is the empty one (∅ − X = ∅).
+    if len(non_empty_meshes) < len(meshes):
+        if operation == "intersection":
+            return trimesh.Trimesh(vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64))
+        if operation == "difference" and len(meshes) > 0 and len(meshes[0].vertices) == 0:
+            return trimesh.Trimesh(vertices=np.empty((0, 3)), faces=np.empty((0, 3), dtype=np.int64))
+
     if len(non_empty_meshes) == 0:
         # All meshes are empty, return an empty mesh
         print(
