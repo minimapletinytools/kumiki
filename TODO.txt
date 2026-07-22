@@ -85,7 +85,7 @@ def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1:
 
   Currently, all timbers are their "perfect timber within" size, but so lets ask the agent to make their actual sizes a little larger to see the relief cutting detail. 
 
-  make the mudsills actual sizes 1/2" larger than their perfect timber within size. We only want to do this on the faces opposite to the reference edge. the reference edge is the bottom outside corner in global space. Add a helper function that enlargens the timbers by 1/2" opposite to the some reference edge as we'll be doing this to all the timbers.
+  Make the post actual sizes 1/2" larger than their perfect timber within size. We only want to do this on the faces opposite to the reference edge. the reference edge is the outside corner for the corner posts, the north outside corner for the west midposts. Make a helper function that enlargens the timbers by 1/2" opposite to the some reference edge as we'll be doing this to more of the timbers.
 
   now repeat for each of the posts, the outside corner of the posts is the reference edge, for the middle post, chooset he outside north face for the west one and the outside south face for the east one.
 
@@ -203,7 +203,7 @@ DONE-add "hole" notch style paramater for mortise and tenon joint / inset should
 DONE-test regular imperfect rectangular timber stuff
 DONE-test imperfect timber ctors
 DONE-BUG scribe relief seems to be broken on the 2 angled inset notching style examples you added
-
+-add additional freedom perpendicular to mortise timbre if bore_mortise_perpendicular_to_face is true in mortise and tenon joint
 -round peg kigumi issues
   -round peg rendering gets covered, but other accessories seem to show fine
   -you can't click on top/bottom ends of round timbers to check wwhich direction they are
