@@ -416,13 +416,18 @@ def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: in
     #   X-axis (width/size[0]) = width_direction = (0, 0, 1) = vertical (up)
     #   Y-axis (height/size[1]) = length × face = perpendicular to boundary in XY plane
     #   Z-axis (length) = length_direction = along boundary side
-    # Therefore, size[1] is the dimension perpendicular to the boundary
+    # Therefore, size[1] is the dimension perpendicular to the boundary, and
+    # size[0] is the vertical dimension.
     timber_height = size[1]
-    
+    timber_vertical_size = size[0]
+
     # Calculate bottom position based on location type
-    # Start at the start_point on the boundary side - keep exact
-    bottom_position = create_v3(start_point[0], start_point[1], scalar(0))
-    
+    # Start at the start_point on the boundary side. The cross-section is
+    # centered on bottom_position, so raise it by half the vertical size
+    # to put the timber's -Z face (rather than its midline) on the footprint
+    # plane — the mudsill should sit above the footprint, not straddle it.
+    bottom_position = create_v3(start_point[0], start_point[1], timber_vertical_size / scalar(2))
+
     # Apply offset based on location type
     if location_type == FootprintLocation.INSIDE:
         # Position so one edge lies on the boundary side, timber extends inward

@@ -206,7 +206,13 @@ DONE-test imperfect timber ctors
 DONE-BUG scribe relief seems to be broken on the 2 angled inset notching style examples you added
 DONE-get rid of notch style inset notching...
 -make sure mudsill on footprint gets created ABOVE the footprint
--add additional freedom perpendicular to mortise timbre if bore_mortise_perpendicular_to_face is true in mortise and tenon joint
+
+-lets fix freedoms on several joints:
+  -in mortise and tenon joint, if bore_mortise_perpendicular_to_face is true, then there is an additional freedom perpendicular to the mortise timber.
+  -cut_lapped_gooseneck_joint_on_aligned_timbers does not have a freedom, just set the freedom so that it lifts out in the direction of front_face_on_timber1 and the distance until separation is just gooseneck_depth
+  -for plain butt joint, plain splice joint, and miter join,t the freedom distance should just be 0. we add an additional amount in the dissamebly code to ensure there is visual separation. 
+
+
 -round peg kigumi issues
   -round peg rendering gets covered, but other accessories seem to show fine
   -you can't click on top/bottom ends of round timbers to check wwhich direction they are

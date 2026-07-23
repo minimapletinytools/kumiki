@@ -346,8 +346,11 @@ class TestTimberCreation:
         # Bottom position Y should be half timber height (perpendicular dimension) inside the footprint
         assert timber_inside.get_bottom_position_global()[1] == timber_height / scalar(2)
         assert timber_inside.get_bottom_position_global()[0] == 0  # X unchanged
-        assert timber_inside.get_bottom_position_global()[2] == 0  # Z at ground
-        
+        # Z should be half the vertical size (size[0]) so the timber's -Z face
+        # (not its midline) sits on the footprint plane, i.e. the timber is
+        # placed entirely above the footprint.
+        assert timber_inside.get_bottom_position_global()[2] == timber_width / scalar(2)
+
         # Test OUTSIDE positioning
         timber_outside = create_horizontal_timber_on_footprint(
             footprint, 0, FootprintLocation.OUTSIDE, size, length=scalar(2)
@@ -357,8 +360,8 @@ class TestTimberCreation:
         # Note: get_inward_normal returns Direction3D with exact Numeric types
         assert timber_outside.get_bottom_position_global()[1] == -timber_height / scalar(2)
         assert timber_outside.get_bottom_position_global()[0] == 0  # X unchanged
-        assert timber_outside.get_bottom_position_global()[2] == 0  # Z at ground
-        
+        assert timber_outside.get_bottom_position_global()[2] == timber_width / scalar(2)
+
         # Test CENTER positioning
         timber_center = create_horizontal_timber_on_footprint(
             footprint, 0, FootprintLocation.CENTER, size, length=scalar(2)
@@ -366,7 +369,7 @@ class TestTimberCreation:
         # Centerline should be on the boundary side
         assert timber_center.get_bottom_position_global()[1] == scalar(0)  # Y on boundary
         assert timber_center.get_bottom_position_global()[0] == scalar(0)  # X unchanged
-        assert timber_center.get_bottom_position_global()[2] == scalar(0)  # Z at ground
+        assert timber_center.get_bottom_position_global()[2] == timber_width / scalar(2)
         
         # Verify all timbers have correct length direction (along +X for bottom side)
         assert timber_inside.get_length_direction_global()[0] == scalar(1)
