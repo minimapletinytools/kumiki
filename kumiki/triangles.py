@@ -189,7 +189,24 @@ def _mesh_difference(csg: Difference) -> TriangleMesh:
         return TriangleMesh(mesh=empty, face_sources=tuple())
     meshes = [triangulate_cutcsg(csg.base).mesh]
     for child in csg.subtract:
-        _collect_subtract_meshes(child, meshes)
+        # Flattening a SolidUnion into its individual members (rather than
+        # unioning them first) is normally the safer, cheaper path -- see
+        # _collect_subtract_meshes. But occasionally one flattened member
+        # triangulates to a non-watertight mesh on its own (e.g. a scribe-relief
+        # Intersection whose clipping plane lands exactly coincident with an
+        # internal seam of one of its operands -- a known weak spot for the
+        # underlying mesh boolean engine), and handing that directly to a
+        # multi-body difference silently corrupts the *entire* result instead
+        # of just that member. When that happens, fall back to unioning this
+        # child into a single mesh first: the non-watertight piece is typically
+        # redundant with a sibling in the same union (e.g. fully enclosed by an
+        # adjacent shoulder half-space), so the union naturally absorbs/heals it.
+        flattened: list = []
+        _collect_subtract_meshes(child, flattened)
+        if all(m.is_watertight for m in flattened if len(m.vertices) > 0):
+            meshes.extend(flattened)
+        else:
+            meshes.append(triangulate_cutcsg(child).mesh)
     result_mesh = _run_boolean("difference", meshes)
     return TriangleMesh(mesh=result_mesh)
 
