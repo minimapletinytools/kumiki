@@ -105,7 +105,6 @@ def _get_face_center_position(timber: PerfectTimberWithin, face: SomeTimberFace)
 
 
 def _apply_scribe_relief_if_configured(
-    arrangement: ButtJointTimberArrangement,
     relief: Optional[ButtJointScribeReliefConfig],
     butt_cut: Cutting,
     receiving_cut: Cutting,
@@ -118,7 +117,6 @@ def _apply_scribe_relief_if_configured(
     if relief is None:
         return butt_cut, receiving_cut
     return chop_scribe_relief_and_apply_for_butt_joint_arrangement(
-        arrangement=arrangement,
         relief=relief,
         butt_cut=butt_cut,
         receiving_cut=receiving_cut,
@@ -213,7 +211,6 @@ def cut_plain_butt_joint(
     receiving_cut_no_relief = Cutting(timber=receiving_timber)
 
     cut, receiving_cut = _apply_scribe_relief_if_configured(
-        arrangement=arrangement,
         relief=relief,
         butt_cut=cut_no_relief,
         receiving_cut=receiving_cut_no_relief,
@@ -516,7 +513,6 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     )
 
     tongue_cut, fork_cut = _apply_scribe_relief_if_configured(
-        arrangement=arrangement,
         relief=relief,
         butt_cut=tongue_cut_no_relief,
         receiving_cut=fork_cut_no_relief,
@@ -1106,7 +1102,6 @@ def cut_mortise_and_tenon_joint(
 
     tenon_cut_no_relief, mortise_cut_no_relief = tenon_cut, mortise_cut
     tenon_cut, mortise_cut = _apply_scribe_relief_if_configured(
-        arrangement=arrangement,
         relief=relief,
         butt_cut=tenon_cut_no_relief,
         receiving_cut=mortise_cut_no_relief,
@@ -1535,7 +1530,6 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     )
 
     tenon_cut, mortise_cut = _apply_scribe_relief_if_configured(
-        arrangement=arrangement,
         relief=relief,
         butt_cut=tenon_cut_no_relief,
         receiving_cut=mortise_cut_no_relief,

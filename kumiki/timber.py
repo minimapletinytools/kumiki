@@ -986,8 +986,19 @@ class PerfectTimberWithin(ABC):
                 equality_test(width_halves[1], w_half) and
                 equality_test(height_halves[0], h_half) and
                 equality_test(height_halves[1], h_half))
-    
-    
+
+    def get_imperfect_fringe_csg_local(self) -> CutCSG:
+        """
+        Returns the CSG (local coordinates) of the region where this timber's actual
+        geometry sticks out beyond its perfect-timber-within boundary, i.e. actual
+        minus perfect.
+        """
+        if self.is_perfect_timber():
+            return EmptyCSG()
+        return Difference(
+            base=self.get_extended_actual_csg_local(extend_bot=False, extend_top=False),
+            subtract=[self.get_perfect_timber_within_csg_local()],
+        )
 
 
 # TODO HomeDepotTimber or like BoxTimber or NominalTimber, sticktimber and dressedtimber are also cute names?

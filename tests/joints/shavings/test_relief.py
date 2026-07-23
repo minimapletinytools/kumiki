@@ -302,9 +302,8 @@ class TestChopScribeRelief:
         )
 
         scribed_overlap_csg_local, scribe_relief_csg_local = chop_scribe_relief(
-            timber_to_be_scribed=timber_to_be_scribed,
             timber_to_be_scribed_cutting=Cutting(timber=timber_to_be_scribed),
-            timber_to_be_cut=timber_to_be_cut,
+            timber_to_be_cut_cutting=Cutting(timber=timber_to_be_cut),
         )
 
         assert isinstance(scribed_overlap_csg_local, Intersection)

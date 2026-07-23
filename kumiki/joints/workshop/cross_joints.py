@@ -349,19 +349,15 @@ def cut_plain_cross_lap_joint(
     if relief is not None:
         if relief.timber_to_be_scribed == ArrangementNames.cross_timber_1:
             scribed_key, cut_key = "timberA", "timberB"
-            scribed_timber, cut_timber = timberA, timberB
         elif relief.timber_to_be_scribed == ArrangementNames.cross_timber_2:
             scribed_key, cut_key = "timberB", "timberA"
-            scribed_timber, cut_timber = timberB, timberA
         else:
             raise AssertionError(
                 f"Unsupported cross-joint relief target: {relief.timber_to_be_scribed}"
             )
 
         updated_cut_cutting, updated_scribed_cutting = chop_scribe_relief_and_apply(
-            timber_to_be_scribed=scribed_timber,
             timber_to_be_scribed_cutting=cuttings[scribed_key],
-            timber_to_be_cut=cut_timber,
             timber_to_be_cut_cutting=cuttings[cut_key],
         )
         cuttings[scribed_key] = updated_scribed_cutting

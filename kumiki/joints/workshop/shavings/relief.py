@@ -923,12 +923,15 @@ def chop_relief_for_butt_joint_arrangement(
 
 
 def chop_scribe_relief(
-    timber_to_be_scribed: TimberLike,
     timber_to_be_scribed_cutting: Cutting,
-    timber_to_be_cut: TimberLike,
+    timber_to_be_cut_cutting: Cutting,
 ) -> tuple[CutCSG, CutCSG]:
     """
     scribes timber_to_be_scribed onto timber_to_be_cut such that the entirety of timber_to_be_scribed is cut out of timber_to_be_cut excluding the perfect timber within portion of timber_to_be_cut
+
+    Both timbers are given as their (already cut) ``Cutting``, each of which carries
+    its own timber via ``Cutting.timber`` -- callers never need to pass the bare
+    timbers separately.
 
     timber_to_be_scribed_cutting is the cutting already computed for timber_to_be_scribed
     elsewhere in the current joint (e.g. the tenon's shoulder cut, plus any end cut) --
@@ -938,16 +941,19 @@ def chop_scribe_relief(
 
     returns a pair of CSG geometries, the first to be removed from timber_to_be_scribed and the second to be removed from timber_to_be_cut, both expressed in their respective local frames
     """
+    timber_to_be_scribed = timber_to_be_scribed_cutting.timber
+    timber_to_be_cut = timber_to_be_cut_cutting.timber
+
     timber_to_be_scribed_actual_csg_global = adopt_csg(
         timber_to_be_scribed.transform,
         None,
         timber_to_be_scribed.get_extended_actual_csg_local(extend_bot=False, extend_top=False),
     )
 
-    timber_to_be_scribed_perfect_csg_global = adopt_csg(
+    timber_to_be_scribed_imperfect_fringe_csg_global = adopt_csg(
         timber_to_be_scribed.transform,
         None,
-        timber_to_be_scribed.get_perfect_timber_within_csg_local(),
+        timber_to_be_scribed.get_imperfect_fringe_csg_local(),
     )
 
     timber_to_be_scribed_own_cuts_global = adopt_csg(
@@ -964,10 +970,7 @@ def chop_scribe_relief(
 
     # seems to create triangulation artifacts when used on circular timbers with trimesh right now :(
     scribed_relief_global = Intersection(
-        left=Difference(
-            timber_to_be_scribed_actual_csg_global,
-            subtract=[timber_to_be_scribed_perfect_csg_global],
-        ),
+        left=timber_to_be_scribed_imperfect_fringe_csg_global,
         right=timber_to_be_cut_perfect_csg_global,
     )
 
@@ -1001,25 +1004,29 @@ def chop_scribe_relief(
 
 
 def chop_scribe_relief_and_apply(
-    timber_to_be_scribed: TimberLike,
     timber_to_be_scribed_cutting: Cutting,
-    timber_to_be_cut: TimberLike,
     timber_to_be_cut_cutting: Cutting,
 ) -> tuple[Cutting, Cutting]:
     """
     Apply scribe relief cuts from ``chop_scribe_relief`` to the given cuttings, unioning the
     new relief CSGs into each cutting's existing ``negative_csg``.
 
+    Both timbers are given as their (already cut) ``Cutting``, each of which carries
+    its own timber via ``Cutting.timber`` -- callers never need to pass the bare
+    timbers separately.
+
     Returns ``(updated_cut_cutting, updated_scribed_cutting)`` (matching the order of
     the early-return path when both timbers are perfect).
     """
+    timber_to_be_scribed = timber_to_be_scribed_cutting.timber
+    timber_to_be_cut = timber_to_be_cut_cutting.timber
+
     if timber_to_be_scribed.is_perfect_timber() and timber_to_be_cut.is_perfect_timber():
         return timber_to_be_cut_cutting, timber_to_be_scribed_cutting
 
     scribed_relief_csg_local, cut_relief_csg_local = chop_scribe_relief(
-        timber_to_be_scribed=timber_to_be_scribed,
         timber_to_be_scribed_cutting=timber_to_be_scribed_cutting,
-        timber_to_be_cut=timber_to_be_cut,
+        timber_to_be_cut_cutting=timber_to_be_cut_cutting,
     )
 
     def _union_into(existing: Optional[CutCSG], new: CutCSG) -> CutCSG:
@@ -1044,28 +1051,22 @@ def chop_scribe_relief_and_apply(
 
 
 def chop_scribe_relief_and_apply_for_butt_joint_arrangement(
-    arrangement: ButtJointTimberArrangement,
     relief: ButtJointScribeReliefConfig,
     butt_cut: Cutting,
     receiving_cut: Cutting,
 ) -> tuple[Cutting, Cutting]:
     """
     Helper shared by the butt-joint cutting functions: apply scribe relief
-    between the butt and receiving timbers of ``arrangement``, honoring
+    between the butt and receiving timbers, honoring
     ``relief.timber_to_be_scribed`` to decide which timber is scribed onto the
     other.
 
     ``relief`` is required here -- callers are responsible for skipping this
     call entirely when relief isn't configured (e.g. it's None).
     """
-    butt_timber = arrangement.butt_timber
-    receiving_timber = arrangement.receiving_timber
-
     if relief.timber_to_be_scribed == ArrangementNames.butt_timber:
-        scribed_timber, cut_timber_for_relief = butt_timber, receiving_timber
         scribed_cutting, cut_cutting = butt_cut, receiving_cut
     elif relief.timber_to_be_scribed == ArrangementNames.receiving_timber:
-        scribed_timber, cut_timber_for_relief = receiving_timber, butt_timber
         scribed_cutting, cut_cutting = receiving_cut, butt_cut
     else:
         raise AssertionError(
@@ -1073,9 +1074,7 @@ def chop_scribe_relief_and_apply_for_butt_joint_arrangement(
         )
 
     updated_cut_cutting, updated_scribed_cutting = chop_scribe_relief_and_apply(
-        timber_to_be_scribed=scribed_timber,
         timber_to_be_scribed_cutting=scribed_cutting,
-        timber_to_be_cut=cut_timber_for_relief,
         timber_to_be_cut_cutting=cut_cutting,
     )
 
