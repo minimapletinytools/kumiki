@@ -587,8 +587,10 @@ class InsetShoulderNotchingStyle(Enum):
     The mortise timber is always the one that gets notched, never the tenon timber. 
     This notching only manages notching from the perfect timber within parts, to notch the imperfect parts use the relief parameter.
     """
-    NOTCH = 0
-    SCRIBE = 1
+    # relieves just enough wood to allow the tenon timber to fit all the way to the shoulder
+    SCRIBE = 0
+    # relieves some extra wood, TODO maybe just get rid of this option....
+    NOTCH = 1
 
 # ============================================================================
 # Mortise and Tenon Joint Construction Functions
@@ -607,7 +609,7 @@ def cut_mortise_and_tenon_joint(
     peg_parameters: Optional[SimplePegParameters] = None,
     bore_mortise_perpendicular_to_face: bool = False,
     use_round_tenon: bool = False,
-    inset_notching_style: InsetShoulderNotchingStyle = InsetShoulderNotchingStyle.NOTCH,
+    inset_notching_style: InsetShoulderNotchingStyle = InsetShoulderNotchingStyle.SCRIBE,
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """

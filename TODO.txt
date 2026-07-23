@@ -203,6 +203,7 @@ DONE-add "hole" notch style paramater for mortise and tenon joint / inset should
 DONE-test regular imperfect rectangular timber stuff
 DONE-test imperfect timber ctors
 DONE-BUG scribe relief seems to be broken on the 2 angled inset notching style examples you added
+-make sure mudsill on footprint gets created ABOVE the footprint
 -add additional freedom perpendicular to mortise timbre if bore_mortise_perpendicular_to_face is true in mortise and tenon joint
 -round peg kigumi issues
   -round peg rendering gets covered, but other accessories seem to show fine
