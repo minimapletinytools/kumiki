@@ -944,7 +944,10 @@ def cut_mortise_and_tenon_joint(
             tenon_timber_csg_global = adopt_csg(
                 tenon_timber.transform,
                 None,
-                tenon_timber.get_actual_csg_local(),
+                tenon_timber.get_extended_actual_csg_local(
+                    extend_bot=(tenon_end == TimberEnd.BOTTOM),
+                    extend_top=(tenon_end == TimberEnd.TOP),
+                ),
             )
             scribe_csg_global = Difference(
                 base=tenon_timber_csg_global,
