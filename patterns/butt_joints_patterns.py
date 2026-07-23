@@ -792,12 +792,16 @@ def example_compound_angle_offset_parallel_shoulder(position=None, use_round_tim
 
 def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
     """
-    Mortise and tenon with an inset shoulder using the NOTCH style.
+    Mortise and tenon with an inset shoulder, angled.
+
+    NOTE: this used to demonstrate the NOTCH style (a housing notch cut into
+    the mortise timber), but that style has been disabled — see the
+    commented-out code in cut_mortise_and_tenon_joint. This now produces the
+    same SCRIBE-style result as example_inset_shoulder_scribe_angled, just
+    with a simpler (non-compound) approach angle.
 
     The tenon timber approaches the mortise at ~30 degrees (angled in the XY
-    plane) so the housing notch in the mortise timber is clearly visible.
-    The shoulder is inset 1" from the mortise timber's centerline.
-    The notch walls are angled (relieved) to follow the tenon rake.
+    plane). The shoulder is inset 1" from the mortise timber's centerline.
     """
     from sympy import sqrt
     from kumiki.rule import Orientation, degrees, radians
@@ -853,7 +857,6 @@ def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
         tenon_length=inches(4),
         mortise_depth=inches(3),
         mortise_shoulder_distance_from_centerline_or_centerplane=inches(1),
-        inset_notching_style=InsetShoulderNotchingStyle.NOTCH,
         use_round_tenon=use_round_timbers,
     )
 
@@ -932,7 +935,6 @@ def example_inset_shoulder_scribe_angled(position=None, use_round_timbers=False)
         tenon_length=inches(4),
         mortise_depth=inches(3),
         mortise_shoulder_distance_from_centerline_or_centerplane=inches(1),
-        inset_notching_style=InsetShoulderNotchingStyle.SCRIBE,
         use_round_tenon=use_round_timbers,
     )
 

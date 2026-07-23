@@ -14,6 +14,7 @@ def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1:
   # position boards in the inside rectangle of the frame, if horizontal, then top end points to hor_side1 else points to vert_side1, sticking beyond the frame by depth, and overlapping each other by overlap
   # offset into the normal plane of the frame by lateral_offset_from_hor_side1, specifically, determine the normal plane using the coordinate axis of hor_side1 that is perpendicular to the plane
 
+-quick video converting n-legged stool top into a round top
 
 - outdoor shower
   - 4x3 footprint, door on fornt 4' side, lean top awning with taller side on front side
@@ -203,7 +204,7 @@ DONE-add "hole" notch style paramater for mortise and tenon joint / inset should
 DONE-test regular imperfect rectangular timber stuff
 DONE-test imperfect timber ctors
 DONE-BUG scribe relief seems to be broken on the 2 angled inset notching style examples you added
--get rid of notch style inset notching...
+DONE-get rid of notch style inset notching...
 -make sure mudsill on footprint gets created ABOVE the footprint
 -add additional freedom perpendicular to mortise timbre if bore_mortise_perpendicular_to_face is true in mortise and tenon joint
 -round peg kigumi issues
