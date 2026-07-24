@@ -614,6 +614,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         scarf_length: Numeric,
         dado_depth: Numeric,
         dado_height: Numeric, 
+        # TODO add support to handle stub_tenon_width = 0 without generating extra dud geometry, also set this to 0 by defalut I guess?
         stub_tenon_width: Numeric,
         stepped_shoulder_length: Optional[Numeric] = None,
         joint_center_relative_to_timber1_end: Numeric = scalar(0),
@@ -648,14 +649,103 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         "arrangement.front_face_on_timber1 must be set to determine the joint orientation"
     )
 
-    # assert that stub_tenon_width is less than dimension in the front_face_on_timber1 normal axis
-    # assert dado_height is less than half the dimension in the front_face_on_timber1 parallel non-length axis
-    # assert dado_depth is less than (scarf_length - stepped_shoulder_depth) / 2
+    timber1 = arrangement.timber1
+    timber2 = arrangement.timber2
+    timber1_end = arrangement.timber1_end
+    timber2_end = arrangement.timber2_end
+    front_face = arrangement.front_face_on_timber1
+    v_face = front_face.rotate_right()
+
+    if stepped_shoulder_length is None:
+        stepped_shoulder_length = stepped_shoulder_depth
+
+    SL = scarf_length
+    DD = dado_depth
+    DH = dado_height
+    SSD = stepped_shoulder_depth
+    SSL = stepped_shoulder_length
+    STW = stub_tenon_width
+
+    require_check(None if DD > 0 else "dado_depth must be positive")
+    require_check(None if DH > 0 else "dado_height must be positive")
+    require_check(None if SSD > 0 else "stepped_shoulder_depth must be positive")
+    require_check(None if SL > 0 else "scarf_length must be positive")
+    require_check(None if STW > 0 else "stub_tenon_width must be positive")
+
+    H = timber1.get_size_in_face_normal_axis(v_face)
+    depth_size = timber1.get_size_in_face_normal_axis(front_face)
+
+    require_check(None if STW < depth_size else "stub_tenon_width must be less than the timber's dimension in the front_face_on_timber1 normal axis")
+    require_check(None if DH < H / scalar(2) else "dado_height must be less than half the timber's dimension in the front_face_on_timber1-adjacent axis")
+    require_check(None if DD < (SL - SSD) / scalar(2) else "dado_depth must be less than (scarf_length - stepped_shoulder_depth) / 2")
+    require_check(None if DH >= SSD else "dado_height must be at least stepped_shoulder_depth")
+
 
     # determine the scarf joint center is global space:
     # it is in the plane of front_face_on_timber1 
     # from the appropriat end of timber1 translate by  joint_center_relative_to_timber1_end in the appropritae direction
     # then translate laterally by lateral_offset_from_midline in the local axis perpendicular to the length axis and front_face_on_timber1 axis (TODO make sure sign convention is consistent, should this be relative to timber as it is in the comment right now or relative to the joint arrangment? I forget!)
+
+    scarf_joint_center_global = timber1.get_end_position_global(timber1_end) - timber1.get_length_direction_global() * joint_center_relative_to_timber1_end + timber1.get_face_direction_global(v_face) * lateral_offset_from_midline
+
+    # -------------------------------------------------------------------------
+    # Profile points (see the docstring diagram / step comments below for the
+    # derivation). All in the shared (u, v) marking frame.
+    #
+    #   "right"/+u = towards timber1, "up"/+v = towards +v_dir.
+    #   first find the "corner of the dado" by going right by scarf_length / 2
+    #   1. from the corner of the dado go up by dado_height
+    #   2. then go left by dado_depth
+    #   3. then go up to the face of timber1 ("stub_tenon_face")
+    #   starting back at the corner of the dado, the other side of the profile:
+    #   4. go left by (scarf_length + stepped_shoulder_length)/2 and down by
+    #      stepped_shoulder_depth/2 (the lower oblique scarf face)
+    #   5. then go up by stepped_shoulder_depth (the peg-hole wall)
+    #   6. go to the opposite corner of the dado: left by
+    #      (scarf_length - stepped_shoulder_length)/2 and up by stepped_shoulder_depth/2
+    #      (the upper oblique scarf face)
+    #   7. go down by dado_height
+    #   8. go right by dado_depth
+    #   9. go down to the face of timber1
+    #
+    # NOTE: steps 4 and 6 use stepped_shoulder_length (not stepped_shoulder_depth)
+    # for their horizontal component — the pseudocode this was transcribed from
+    # only ever wrote stepped_shoulder_depth there, which left stepped_shoulder_length
+    # unused. Substituting it here is what gives that parameter any effect, and it
+    # reproduces the literal pseudocode exactly whenever stepped_shoulder_length
+    # defaults to stepped_shoulder_depth (the "rectangular peg hole" case) — the
+    # oblique-angle claim in the docstring is about that default case.
+    # -------------------------------------------------------------------------
+    corner = (SL / scalar(2), scalar(0))
+    p1 = (corner[0], DH)
+    p2 = (p1[0] - DD, DH)
+    p3 = (p2[0], H / scalar(2))
+    p4 = (corner[0] - (SL + SSL) / scalar(2), -SSD / scalar(2))
+    p5 = (p4[0], SSD / scalar(2))
+    p6 = (p5[0] - (SL - SSL) / scalar(2), SSD)
+    p7 = (p6[0], p6[1] - DH)
+    p8 = (p7[0] + DD, p7[1])
+    p9 = (p8[0], -H / scalar(2))
+
+    # so the complete profile is now
+    # profile_points = [p3, p2, p1, corner, p4, p5, p6, p7, p8, p9]
+
+    # TODO
+    # this profile is just a line, to complete the profile into something that can be cut off from timber 1, complete the connection by
+    # mark a plane orthognal to the length axis scarf_length/2 left of the center point
+    # extend p3 to this point, call it p10
+    # extend p9 to this point, call it p11
+    # connect the two points with a vertical line
+    # so we get profile_points = [p3, p2, p1, corner, p4, p5, p6, p7, p8, p9, p11, p10]
+
+    # TODO temporarily extrude this profile by in both directions by the timber's dimension in the front_face_on_timber1 normal axis and return a joint cutting this out of timber1. just for testing!
+
+    
+
+
+
+
+    # ignore this stuff below, just notes
 
     # now draw the main profile for the timber1 scarf joint, "right" here means towards timber1:
     # first find the "corner of the dado" by going right by scarf_length / 2
@@ -687,10 +777,12 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
 
 
     pass
+
+
 # ============================================================================
 # Aliases for Japanese joint functions
 # ============================================================================
 
-cut_腰掛鎌継ぎ_joint_on_aligned_timbers = cut_lapped_gooseneck_joint_on_aligned_timberstop
+cut_腰掛鎌継ぎ_joint_on_aligned_timbers = cut_lapped_gooseneck_joint_on_aligned_timbers
 cut_koshikake_kama_tsugi_joint_on_aligned_timbers = cut_lapped_gooseneck_joint_on_aligned_timbers
 cut_kanawa_tsugi_joint_on_aligned_timbers = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
