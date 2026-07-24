@@ -608,8 +608,87 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
 
 
 
+def _decompose_simple_polygon_into_convex_pieces(points: List[Tuple[Numeric, Numeric]]) -> List[List[Tuple[Numeric, Numeric]]]:
+    """
+    Decompose a simple (non-self-intersecting) polygon, given as an ordered
+    list of (u, v) points, into convex quads/triangles whose union equals the
+    polygon — via horizontal (constant-v) trapezoidal decomposition.
+
+    Splits the polygon at every vertex's v-coordinate, and within each
+    resulting v-band, finds every edge active there, sorts their u-crossings
+    left to right, and pairs them up with the standard even-odd polygon-fill
+    rule (1st-2nd pair is interior, 3rd-4th pair is interior, and so on).
+    This handles overlapping v-ranges between edges correctly (unlike naively
+    treating each edge as its own independent band), and degenerate edges
+    that double back along another edge (contributing paired, zero-width
+    crossings) simply cancel out.
+
+    Args:
+        points: Ordered polygon vertices (u, v), last connects back to first.
+            v need not be monotonic along the boundary.
+
+    Returns:
+        List of convex pieces, each a list of (u, v) points (quad or
+        triangle) suitable for ConvexPolygonExtrusion.
+    """
+    n = len(points)
+    edges: List[Tuple[Numeric, Numeric, Numeric, Numeric]] = []  # (v_lo, v_hi, u_at_v_lo, u_at_v_hi)
+    for i in range(n):
+        a = points[i]
+        b = points[(i + 1) % n]
+        if safe_zero_test(a[1] - b[1]):
+            continue  # horizontal edge: no v-crossings, doesn't bound any band
+        if safe_compare(a[1], b[1], Comparison.LT):
+            edges.append((a[1], b[1], a[0], b[0]))
+        else:
+            edges.append((b[1], a[1], b[0], a[0]))
+
+    breakpoints: List[Numeric] = sorted((p[1] for p in points), key=giraffe_evalf)
+    deduped_breakpoints: List[Numeric] = []
+    for v in breakpoints:
+        if not deduped_breakpoints or not safe_zero_test(v - deduped_breakpoints[-1]):
+            deduped_breakpoints.append(v)
+
+    pieces: List[List[Tuple[Numeric, Numeric]]] = []
+    for i in range(len(deduped_breakpoints) - 1):
+        v_lo, v_hi = deduped_breakpoints[i], deduped_breakpoints[i + 1]
+        v_mid = (v_lo + v_hi) / scalar(2)
+
+        crossings = []  # (u_at_v_mid, u_at_v_lo, u_at_v_hi)
+        for (e_v_lo, e_v_hi, e_u_lo, e_u_hi) in edges:
+            if safe_compare(e_v_lo, v_mid, Comparison.LE) and safe_compare(v_mid, e_v_hi, Comparison.LE):
+                t_lo = (v_lo - e_v_lo) / (e_v_hi - e_v_lo)
+                t_hi = (v_hi - e_v_lo) / (e_v_hi - e_v_lo)
+                t_mid = (v_mid - e_v_lo) / (e_v_hi - e_v_lo)
+                u_lo = e_u_lo + t_lo * (e_u_hi - e_u_lo)
+                u_hi = e_u_lo + t_hi * (e_u_hi - e_u_lo)
+                u_mid = e_u_lo + t_mid * (e_u_hi - e_u_lo)
+                crossings.append((u_mid, u_lo, u_hi))
+        crossings.sort(key=lambda c: giraffe_evalf(c[0]))
+
+        require_check(
+            None if len(crossings) % 2 == 0
+            else "profile polygon is not simple: odd number of boundary crossings in a v-band"
+        )
+
+        for j in range(0, len(crossings) - 1, 2):
+            _, u_left_lo, u_left_hi = crossings[j]
+            _, u_right_lo, u_right_hi = crossings[j + 1]
+            # A degenerate (zero-area, e.g. two edges retracing the same line)
+            # pair — both corners coincide at both v_lo and v_hi — contributes
+            # nothing and isn't a valid convex polygon; skip it.
+            if safe_zero_test(u_right_lo - u_left_lo) and safe_zero_test(u_right_hi - u_left_hi):
+                continue
+            pieces.append([
+                (u_left_lo, v_lo), (u_right_lo, v_lo),
+                (u_right_hi, v_hi), (u_left_hi, v_hi),
+            ])
+
+    return pieces
+
+
 def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
-        arrangement: SpliceJointTimberArrangement, 
+        arrangement: SpliceJointTimberArrangement,
         stepped_shoulder_depth: Numeric,
         scarf_length: Numeric,
         dado_depth: Numeric,
@@ -682,11 +761,22 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
 
 
     # determine the scarf joint center is global space:
-    # it is in the plane of front_face_on_timber1 
+    # it is in the plane of front_face_on_timber1
     # from the appropriat end of timber1 translate by  joint_center_relative_to_timber1_end in the appropritae direction
     # then translate laterally by lateral_offset_from_midline in the local axis perpendicular to the length axis and front_face_on_timber1 axis (TODO make sure sign convention is consistent, should this be relative to timber as it is in the comment right now or relative to the joint arrangment? I forget!)
 
-    scarf_joint_center_global = timber1.get_end_position_global(timber1_end) - timber1.get_length_direction_global() * joint_center_relative_to_timber1_end + timber1.get_face_direction_global(v_face) * lateral_offset_from_midline
+    # u_dir: +u = "towards timber1" = further into timber1's body, away from the joint end.
+    # (get_face_direction_global(timber1_end) is the OUTWARD normal at that end, i.e.
+    # pointing away from the body, so its negation points into the body.)
+    u_dir = -timber1.get_face_direction_global(timber1_end)
+    v_dir = timber1.get_face_direction_global(v_face)
+
+    if timber1_end == TimberEnd.TOP:
+        timber1_end_position_global = locate_top_center_position(timber1).position
+    else:
+        timber1_end_position_global = timber1.get_bottom_position_global()
+
+    scarf_joint_center_global = timber1_end_position_global + u_dir * joint_center_relative_to_timber1_end + v_dir * lateral_offset_from_midline
 
     # -------------------------------------------------------------------------
     # Profile points (see the docstring diagram / step comments below for the
@@ -722,7 +812,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     p3 = (p2[0], H / scalar(2))
     p4 = (corner[0] - (SL + SSL) / scalar(2), -SSD / scalar(2))
     p5 = (p4[0], SSD / scalar(2))
-    p6 = (p5[0] - (SL - SSL) / scalar(2), SSD)
+    p6 = (p5[0] - (SL - SSL) / scalar(2), 0)
     p7 = (p6[0], p6[1] - DH)
     p8 = (p7[0] + DD, p7[1])
     p9 = (p8[0], -H / scalar(2))
@@ -730,17 +820,88 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     # so the complete profile is now
     # profile_points = [p3, p2, p1, corner, p4, p5, p6, p7, p8, p9]
 
-    # TODO
-    # this profile is just a line, to complete the profile into something that can be cut off from timber 1, complete the connection by
-    # mark a plane orthognal to the length axis scarf_length/2 left of the center point
-    # extend p3 to this point, call it p10
-    # extend p9 to this point, call it p11
-    # connect the two points with a vertical line
-    # so we get profile_points = [p3, p2, p1, corner, p4, p5, p6, p7, p8, p9, p11, p10]
+    # Close the profile: mark a plane orthogonal to the length axis scarf_length/2
+    # left of the center point (u = -scarf_length/2, the same u as p6/p7), extend
+    # p3 and p9 out to it (p10, p11), and connect them with a vertical line. This
+    # closing edge runs along the timber's own top/bottom faces (p10-p3 at
+    # v = H/2, p9-p11 at v = -H/2) and the left wall (p11-p10 at u = -SL/2), so it
+    # doesn't cut anything by itself — it just closes the boundary into a proper
+    # simple polygon.
+    left_boundary_u = -SL / scalar(2)
+    p10 = (left_boundary_u, p3[1])
+    p11 = (left_boundary_u, p9[1])
+    profile_points = [p3, p2, p1, corner, p4, p5, p6, p7, p8, p9, p11, p10]
 
-    # TODO temporarily extrude this profile by in both directions by the timber's dimension in the front_face_on_timber1 normal axis and return a joint cutting this out of timber1. just for testing!
+    # -------------------------------------------------------------------------
+    # TEST-ONLY: decompose the profile into convex pieces and cut it out of
+    # timber1 alone, extruded generously through the front_face_on_timber1 axis
+    # in both directions, just to check the profile shape by itself before
+    # building out timber2, the stub tenon, and assembly freedoms.
+    #
+    # ConvexPolygonExtrusion requires convex polygons; profile_points as a whole
+    # is not convex — and worse, v is not monotonic along the boundary (e.g. it
+    # descends corner -> p4 then climbs back up p4 -> p5 -> p6), so a naive
+    # "one convex piece per edge, from that edge out to the left wall" pass is
+    # WRONG wherever v-ranges from different edges overlap: e.g. p1-corner
+    # (v in [0, DH], reaching out to u=corner) and p4-p5 (v in [-SSD/2, SSD/2],
+    # only reaching to u=p4) both cover v in [0, SSD/2] — the true boundary
+    # there is the peg-hole wall at p4, not corner, since the peg-hole is a
+    # notch cut INTO the region p1-corner would otherwise claim. Decomposing
+    # per edge misses that the two interact.
+    #
+    # _decompose_simple_polygon_into_convex_pieces handles this generally via
+    # horizontal (constant-v) trapezoidal decomposition: split at every
+    # vertex's v, and within each band pick up ALL edges active there, pairing
+    # up their u-crossings left-to-right by the even-odd rule (matching
+    # standard polygon-fill semantics) rather than assuming one edge per band.
+    # -------------------------------------------------------------------------
+    depth_dir = timber1.get_face_direction_global(front_face)
+    profile_orientation = Orientation(Matrix([
+        [u_dir[0], v_dir[0], depth_dir[0]],
+        [u_dir[1], v_dir[1], depth_dir[1]],
+        [u_dir[2], v_dir[2], depth_dir[2]],
+    ]))
+    profile_transform = Transform(position=scarf_joint_center_global, orientation=profile_orientation)
 
-    
+    convex_pieces = [
+        ConvexPolygonExtrusion(
+            points=[create_v2(u, v) for (u, v) in quad],
+            transform=profile_transform,
+            start_distance=-depth_size,
+            end_distance=depth_size,
+        )
+        for quad in _decompose_simple_polygon_into_convex_pieces(profile_points)
+    ]
+
+    profile_csg_global = SolidUnion(convex_pieces)
+    profile_csg_local = adopt_csg(None, timber1.transform, profile_csg_global)
+
+    # The profile's own left wall (u = left_boundary_u) is where every piece
+    # stops — it doesn't reach any further left by itself. So it can't remove
+    # any of timber1's raw material beyond that wall (e.g. the deliberately
+    # generous test overlap past the joint, used above only so the profile has
+    # something to cut into on that side). Add an explicit end cut there too,
+    # truncating timber1 flush at u = left_boundary_u.
+    left_boundary_global = scarf_joint_center_global + u_dir * left_boundary_u
+    left_boundary_distance_from_bottom = safe_dot_product(
+        left_boundary_global - timber1.get_bottom_position_global(),
+        timber1.get_length_direction_global(),
+    )
+
+    timber1_test_cut = Cutting(
+        timber=timber1,
+        maybe_top_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.BOTTOM else None,
+        negative_csg=profile_csg_local,
+        label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
+    )
+
+    return Joint(
+        cuttings={timber1.ticket.path: timber1_test_cut},
+        ticket=JointTicket(joint_type="half_blind_tenoned_dadoed_rabbeted_scarf"),
+        jointAccessories={},
+    )
+
 
 
 

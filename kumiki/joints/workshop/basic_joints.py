@@ -399,9 +399,9 @@ def cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     if arrangement.front_face_on_timber1 is None:
         arrangement = replace(arrangement, front_face_on_timber1=front_face)
 
-    timber_width = arrangement.timber1.get_size_in_face_normal_axis(front_face)
+    timber_width = arrangement.timber1.get_size_in_face_normal_axis(front_face.rotate_right())
     stepped_shoulder_depth = timber_width * scalar(1, 5)
-    scarf_length = stepped_shoulder_depth * scalar(4)
+    scarf_length = timber_width * scalar(4)
     dado_depth = timber_width * scalar(1, 5)
     dado_height = timber_width * scalar(1, 5)
     stub_tenon_width = timber_width * scalar(1, 5)
