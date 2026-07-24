@@ -896,8 +896,74 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
     )
 
+    # -------------------------------------------------------------------------
+    # TEST-ONLY: timber2's profile is the SAME shape, reflected through the
+    # joint center — negate both u and v. This works out to a clean point
+    # reflection of the whole profile (not just a u-mirror) because corner and
+    # p6 are themselves exact point-reflections of each other (both sit at
+    # v = 0, at u = +-SL/2) — and so, it turns out, are the rest of the
+    # corresponding pairs: p1<->p7, p2<->p8, p3<->p9. Reflecting preserves
+    # winding order (unlike a plain mirror), so reflecting profile_points'
+    # vertices in place, keeping the same sequence, is already a valid closed
+    # polygon.
+    #
+    # p3 and p9 swap which end of the timber they sit near under this
+    # reflection: p3 (was v = H/2, the "top") lands at v = -H/2, and p9 (was
+    # v = -H/2) lands at v = H/2. So it's p9's reflection that now extends to
+    # the top closure point, and p3's reflection that extends to the bottom
+    # one — the reverse of p10/p11's roles for timber1.
+    # -------------------------------------------------------------------------
+    def reflect(p: Tuple[Numeric, Numeric]) -> Tuple[Numeric, Numeric]:
+        return (-p[0], -p[1])
+
+    corner2 = reflect(corner)
+    p1_2 = reflect(p1)
+    p2_2 = reflect(p2)
+    p3_2 = reflect(p3)
+    p4_2 = reflect(p4)
+    p5_2 = reflect(p5)
+    p6_2 = reflect(p6)
+    p7_2 = reflect(p7)
+    p8_2 = reflect(p8)
+    p9_2 = reflect(p9)
+
+    right_boundary_u = -left_boundary_u
+    p10_2 = (right_boundary_u, p9_2[1])
+    p11_2 = (right_boundary_u, p3_2[1])
+    profile_points_2 = [p3_2, p2_2, p1_2, corner2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2]
+
+    convex_pieces_2 = [
+        ConvexPolygonExtrusion(
+            points=[create_v2(u, v) for (u, v) in quad],
+            transform=profile_transform,
+            start_distance=-depth_size,
+            end_distance=depth_size,
+        )
+        for quad in _decompose_simple_polygon_into_convex_pieces(profile_points_2)
+    ]
+
+    profile_csg_2_global = SolidUnion(convex_pieces_2)
+    profile_csg_2_local = adopt_csg(None, timber2.transform, profile_csg_2_global)
+
+    right_boundary_global = scarf_joint_center_global + u_dir * right_boundary_u
+    right_boundary_distance_from_bottom = safe_dot_product(
+        right_boundary_global - timber2.get_bottom_position_global(),
+        timber2.get_length_direction_global(),
+    )
+
+    timber2_test_cut = Cutting(
+        timber=timber2,
+        maybe_top_end_cut_distance_from_bottom=right_boundary_distance_from_bottom if timber2_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=right_boundary_distance_from_bottom if timber2_end == TimberEnd.BOTTOM else None,
+        negative_csg=profile_csg_2_local,
+        label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
+    )
+
     return Joint(
-        cuttings={timber1.ticket.path: timber1_test_cut},
+        cuttings={
+            timber1.ticket.path: timber1_test_cut,
+            timber2.ticket.path: timber2_test_cut,
+        },
         ticket=JointTicket(joint_type="half_blind_tenoned_dadoed_rabbeted_scarf"),
         jointAccessories={},
     )
