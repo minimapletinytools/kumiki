@@ -155,7 +155,7 @@ def resolve_parallel_shoulder_face(
 ) -> TimberLongFace:
     """
     Resolves the parallel shoulder face. If set_mortise_shoulder_parallel_to_face is True,
-    it auto-detects the face most parallel to the tenon axis. Otherwise, returns it directly.
+    it auto-detects the long face most perpendicular to the tenon axis. Otherwise, returns it directly.
     """
     if set_mortise_shoulder_parallel_to_face is True:
         mortise_timber = arrangement.receiving_timber
@@ -292,6 +292,10 @@ def compute_butt_joint_shoulder(
 def build_dovetail_shoulder_geometery(
     arrangement: ButtJointTimberArrangement,
     shoulder_result: ButtJointShoulderResult,
+
+    # TODO pass in dovetail side on butt timberargument
+    #dovetail_pointy_face_on_butt_timber : TimberLongFace,
+
     dovetail_depth: Numeric
     ) -> CutCSG:
     """
@@ -305,8 +309,10 @@ def build_dovetail_shoulder_geometery(
            \      |
             \     |
     _________\    |
-          | ^     |
-          | dovetail_depth
+      ^   | ^     |
+      |   | dovetail_depth
+      | 
+      dovetail_pointy_face_on_butt_timber
 
 
     The resulting CutCSG object is in global space. It includes part of the butt timber itself, not just the dovetail shape.
@@ -728,6 +734,9 @@ class PegPositionSpace(Enum):
     """Which timber's coordinate space to use when interpreting peg positions and orientations."""
     TENON = 1
     MORTISE = 2
+
+    BUTT = 1
+    RECEIVING = 2
 
 
 # TODO add tenon bore offset parameter, it could be none | auto | Numeric

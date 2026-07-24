@@ -1395,7 +1395,17 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     wedge_accessory_parameters: DovetailTenonWedgeAccessoryParameters,
     tenon_lateral_offset: Numeric = scalar(0),
     receiving_timber_mortise_extra_depth: Numeric = scalar(0),
+
     mortise_shoulder_inset: Numeric = scalar(0),
+
+    # TODO 
+    # cuts a dovetail shaped shoulder using build_dovetail_shoulder_geometery
+    # the dovetail_pointy_face_on_butt_timber is the face opposite to dovetail_top_side_on_butt_timber
+    #dovetail_shoulder_depth: Numeric = scalar(0),
+
+    # TODO
+    #peg_parameters: Optional[SimplePegParameters] = None,
+
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
