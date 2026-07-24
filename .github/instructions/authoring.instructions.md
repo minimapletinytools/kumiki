@@ -129,6 +129,19 @@ Variable naming rules:
 
 Use nested functions to create local variable scopes where helpful (especially to keep naming simple).
 
+### orientation conventions
+
+Joints parameters are almost always provided in local space of the timbers the joint is being cut on. Often times there will be some ambiguity to which orientation the parameters are taken from. The comments on the parameters should always be extremely explicit about this. In general, go by the following conventions:
+
+TODO finish this section
+
+- V2 position measuremens reltaive to the centerline TODO see how you do tenon position in morties and tenon joint
+- lateral measurements relative to the centerline are follow the sign convention of TODO also should be based no tenon position in mortise and tenon joint
+- measurments from timber faces have the + sign pointing into the timber which is opposite to the face normal axis convention we use for most other measurements in those axis.  
+
+
+
+
 ### Assertions
 
 In general, any assumption or constraint on the input parameters should be asserted with an informative error message. 

@@ -170,6 +170,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 :: TODO
 
+-update agent insturctions on orientation conventions
 
 -round peg kigumi issues
   -round peg rendering gets covered, but other accessories seem to show fine
