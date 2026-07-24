@@ -170,6 +170,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
 def cut_plain_splice_lap_joint_on_aligned_timbers(
     arrangement: SpliceJointTimberArrangement,
     lap_length: Numeric,
+    # TODO rename to top_lap_shoulder_position_from_timber1_end
     top_lap_shoulder_position_from_top_lap_shoulder_timber_end: Numeric,
     lap_depth: Optional[Numeric] = None
 ) -> Joint:
@@ -287,6 +288,8 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
 # ============================================================================
 
 
+# TODO comment where the start of the gooseneck is determined
+# TODO add a shoulder_position_from_timberx_end parameter to specify the position (should be right where the gooseneck shape starts in one direction and the lap starts in the other direction)
 def cut_lapped_gooseneck_joint_on_aligned_timbers(
     arrangement: SpliceJointTimberArrangement,
     gooseneck_length: Numeric,
@@ -603,9 +606,57 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
     )
 
 
+
+
+def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+        arrangement: SpliceJointTimberArrangement, 
+        stepped_shoulder_depth: Numeric,
+        scarf_length: Numeric,
+        dado_depth: Numeric,
+        dado_height: Numeric, 
+        stub_tenon_width: Numeric,
+        stepped_shoulder_length: Optional[Numeric] = None,
+        joint_center_relative_to_timber1_end: Numeric = scalar(0),
+        lateral_offset_from_midline: Numeric = scalar(0)) -> Joint:
+    """ 
+    arrangement.front_face_on_timber1 determines the face which scarf cut profile is visible on.
+
+    stepped_shoulder_depth: (Tsuki-tsuke (突付)) determines the depth of the stepped shoulder cut in the scarf joint, the 2 stepped shoulders form the pin hole for the square peg forming the Kusabi-ana (楔穴) 
+
+    scarf_length: determines the length of the scarf cut on ecah timber, it is meansured the corner that lies on the midline of the scarf joint of the opposite dadoes of the joint when fully assembled
+
+    dado_depth: the "depth" of both dadoes (measured in the length axis of the timbers)
+
+    dado_height: the "height" of both dadoes (measured in the long face axis of the long face adjacent front_face_on_timber1), the dado width is always the entire size of the timber in the front_face_on_timber1 axis
+
+    stub_tenon_width: the "width" of the stub tenon (measured in the long face axis of the long face adjacent front_face_on_timber1), the stub tenon depth is always the distance from the surface to the dado wall.
+
+    stepped_shoulder_length: determines the length of the stepped shoulder cut in the scarf joint, if None, defaults to stepped_shoulder_depth (forming a rectangular peg hole)
+
+    the oblique scarf face angle (Sogi-michi (斜面)) is determined by the stepped_shoulder_depth and the scarf_half_length
+
+    joint_center_relative_to_timber1_end: determines the "center" of the joint (right in the middle of the rectangular peg hole) measured inward from the joint end of timber1. (positive means the joint center is further into timber1)
+
+    lateral_offset_from_midline determines the lateral offset of the joint profiles centerline from the midline of front_face_on_timber1
+
+    all measurements are done relative to timber1, timber2 is expected to share the same axis and be the same size as timber1.
+    """
+    require_check(arrangement.check_face_aligned_and_parallel_axis())
+    # TODO assert timber2 is same size as timber1
+    warn_if_arrangement_timbers_imperfect(arrangement)
+    assert arrangement.front_face_on_timber1 is not None, (
+        "arrangement.front_face_on_timber1 must be set to determine the joint orientation"
+    )
+
+    # assert that stub_tenon_width is less than dimension in the front_face_on_timber1 normal axis
+    # assert dado_height is less than half the dimension in the front_face_on_timber1 parallel non-length axis
+    # assert dado_depth is less than (scarf_length - stepped_shoulder_depth) / 2
+
+    pass
 # ============================================================================
 # Aliases for Japanese joint functions
 # ============================================================================
 
-cut_腰掛鎌継ぎ = cut_lapped_gooseneck_joint_on_aligned_timbers
-cut_koshikake_kama_tsugi = cut_lapped_gooseneck_joint_on_aligned_timbers
+cut_腰掛鎌継ぎ_joint_on_aligned_timbers = cut_lapped_gooseneck_joint_on_aligned_timbers
+cut_koshikake_kama_tsugi_joint_on_aligned_timbers = cut_lapped_gooseneck_joint_on_aligned_timbers
+cut_kanawa_tsugi_joint_on_aligned_timbers = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
