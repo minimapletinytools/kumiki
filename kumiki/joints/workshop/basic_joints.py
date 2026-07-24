@@ -30,6 +30,7 @@ from .splice_joints import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_splice_lap_joint_on_aligned_timbers,
     cut_lapped_gooseneck_joint_on_aligned_timbers,
+    cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers,
 )
 from .cross_joints import (
     cut_plain_cross_lap_joint,
@@ -367,6 +368,55 @@ def cut_basic_plain_splice_lap_joint_on_aligned_timbers(
         lap_length,
         top_lap_shoulder_position_from_top_lap_shoulder_timber_end=lap_length
     )
+
+
+def cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+    arrangement: SpliceJointTimberArrangement,
+) -> Joint:
+    """
+    Creates a half-blind tenoned, dadoed, rabbeted scarf joint (金輪継ぎ / Kanawa Tsugi)
+    with default proportions.
+
+    Stepped shoulder depth is 1/5 of timber 1's dimension in front_face_on_timber1 normal axis.
+    Scarf length is 4× stepped shoulder depth.
+    Dado depth and height are 1/5 of stepped shoulder depth.
+    Stub tenon width is 1/5 of stepped shoulder depth.
+
+    Args:
+        arrangement: Splice joint timber arrangement. Timbers must be face-aligned with parallel axes.
+
+    Returns:
+        Joint object containing the two CutTimbers.
+    """
+    error = arrangement.check_face_aligned_and_parallel_axis()
+    assert error is None, error
+
+    front_face = (
+        arrangement.front_face_on_timber1
+        if arrangement.front_face_on_timber1 is not None
+        else TimberLongFace.FRONT
+    )
+    if arrangement.front_face_on_timber1 is None:
+        arrangement = replace(arrangement, front_face_on_timber1=front_face)
+
+    timber_width = arrangement.timber1.get_size_in_face_normal_axis(front_face)
+    stepped_shoulder_depth = timber_width * scalar(1, 5)
+    scarf_length = stepped_shoulder_depth * scalar(4)
+    dado_depth = timber_width * scalar(1, 5)
+    dado_height = timber_width * scalar(1, 5)
+    stub_tenon_width = timber_width * scalar(1, 5)
+
+    return cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+        arrangement=arrangement,
+        stepped_shoulder_depth=stepped_shoulder_depth,
+        scarf_length=scarf_length,
+        dado_depth=dado_depth,
+        dado_height=dado_height,
+        stub_tenon_width=stub_tenon_width,
+    )
+
+
+cut_basic_kanawa_tsugi_joint_on_aligned_timbers = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers
 
 
 # ============================================================================

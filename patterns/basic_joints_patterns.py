@@ -27,6 +27,7 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers,
     cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers,
     cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
+    cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers,
 )
 from kumiki.example_shavings import (
     RoundTimberConfig,
@@ -372,6 +373,28 @@ def example_basic_mitered_and_keyed_lap_joint(position=None):
     return joint
 
 
+def example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint(position=None):
+    """
+    Create a basic half-blind tenoned, dadoed, rabbeted scarf joint (金輪継ぎ / Kanawa Tsugi)
+    using canonical splice joint timbers.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    from kumiki.construction import SpliceJointTimberArrangement
+    arrangement = create_canonical_example_splice_joint_timbers(position)
+    joint = cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+        SpliceJointTimberArrangement(
+            timber1=arrangement.timber1,
+            timber2=arrangement.timber2,
+            timber1_end=arrangement.timber1_end,
+            timber2_end=arrangement.timber2_end,
+            front_face_on_timber1=TimberLongFace.FRONT,
+        )
+    )
+    return joint
+
+
 patterns = [
     Pattern(path="basic_joints/basic_miter_joint", lambda_=make_pattern_from_joint(example_basic_miter_joint), pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_miter_joint_face_aligned", lambda_=make_pattern_from_joint(example_basic_miter_joint_face_aligned), pattern_type='frame'),
@@ -382,6 +405,7 @@ patterns = [
     Pattern(path="basic_joints/basic_house_joint", lambda_=make_pattern_from_joint(example_basic_house_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_splined_opposing_double_butt_joint", lambda_=make_pattern_from_joint(example_basic_splined_opposing_double_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_splice_lap_joint", lambda_=make_pattern_from_joint(example_basic_splice_lap_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint", lambda_=make_pattern_from_joint(example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint), pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_mortise_and_tenon/with_peg", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint_with_peg), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mortise_and_tenon/imperfect_timber", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint_imperfect_timber), pattern_type='frame'),
