@@ -216,19 +216,18 @@ def cut_plain_butt_joint(
         receiving_cut=receiving_cut_no_relief,
     )
 
-    # Assembly: a plain butt has no mechanical engagement (it is free after 0
-    # travel), so use the receiving timber's thickness along the butt axis as
-    # a nominal freed_after to make the preview separation visible.
-    nominal_travel = receiving_timber.get_size_in_direction_3d(butt_direction)
+    # Assembly: a plain butt has no mechanical engagement, so it is free after
+    # 0 travel. Disassembly code adds its own visual-separation padding on top
+    # of freed_after, so no nominal travel is needed here.
     joint = Joint(
         cuttings={
             "receiving_timber": replace(
                 receiving_cut,
-                assembly_freedom=AssemblyFreedom.translation(butt_direction, freed_after=nominal_travel),
+                assembly_freedom=AssemblyFreedom.translation(butt_direction, freed_after=scalar(0)),
             ),
             "butt_timber": replace(
                 cut,
-                assembly_freedom=AssemblyFreedom.translation(-butt_direction, freed_after=nominal_travel),
+                assembly_freedom=AssemblyFreedom.translation(-butt_direction, freed_after=scalar(0)),
             ),
         },
         ticket=JointTicket(joint_type="plain_butt"),
@@ -1108,14 +1107,33 @@ def cut_mortise_and_tenon_joint(
     # Locking accessories (pegs) pop first at suborder -1, so the timbers
     # slide at the default suborder 0. with_order(n) preserves suborders, so
     # the peg-before-slide sequencing survives frame-level ordering.
+    tenon_freedom = AssemblyFreedom.translation(-tenon_length_direction_global, freed_after=tenon_length)
+    mortise_freedom = AssemblyFreedom.translation(tenon_length_direction_global, freed_after=tenon_length)
+
+    if bore_mortise_perpendicular_to_face:
+        # The mortise hole is bored straight into the receiving face rather
+        # than along the tenon's own axis, so the embedded tenon stub sits in
+        # a straight-walled pocket. That gives the mortise timber a second
+        # way to escape: sliding straight out along the face normal (instead
+        # of along the tenon axis) clears the pocket after mortise_depth of
+        # travel, since the pocket has constant cross-section along that axis.
+        tenon_freedom = AssemblyFreedom.combine(
+            tenon_freedom,
+            AssemblyFreedom.translation(-mortise_face_normal, freed_after=mortise_depth),
+        )
+        mortise_freedom = AssemblyFreedom.combine(
+            mortise_freedom,
+            AssemblyFreedom.translation(mortise_face_normal, freed_after=mortise_depth),
+        )
+
     tenon_cut_timber = replace(
         tenon_cut,
-        assembly_freedom=AssemblyFreedom.translation(-tenon_length_direction_global, freed_after=tenon_length),
+        assembly_freedom=tenon_freedom,
         assembly_ordering=Ordering(0, 0),
     )
     mortise_cut_timber = replace(
         mortise_cut,
-        assembly_freedom=AssemblyFreedom.translation(tenon_length_direction_global, freed_after=tenon_length),
+        assembly_freedom=mortise_freedom,
         assembly_ordering=Ordering(0, 0),
     )
 

@@ -26,26 +26,36 @@ def unit(direction):
     return tuple(float(giraffe_evalf(direction[index, 0])) for index in range(3))
 
 
-def assert_authored_translation(freedom, expected_direction=None):
-    """The freedom exists, its first DOF is a unit direction with positive travel."""
+def assert_authored_translation(freedom, expected_direction=None, expect_zero_freed_after=False):
+    """The freedom exists, its first DOF is a unit direction with travel.
+
+    Joints with no mechanical engagement (plain butt, splice, miter) are
+    authored with freed_after=0 — the disassembly code adds its own
+    visual-separation padding on top — so callers for those joints pass
+    expect_zero_freed_after=True instead of expecting positive travel.
+    """
     assert freedom is not None, "expected the cut function to author an assembly freedom"
     assert len(freedom.translations) >= 1
     dof = freedom.translations[0]
     direction = unit(dof.direction)
     magnitude = sum(component ** 2 for component in direction) ** 0.5
     assert magnitude == pytest.approx(1.0, abs=1e-6)
-    assert float(giraffe_evalf(dof.freed_after)) > 0
+    freed_after = float(giraffe_evalf(dof.freed_after))
+    if expect_zero_freed_after:
+        assert freed_after == pytest.approx(0.0, abs=1e-9)
+    else:
+        assert freed_after > 0
     if expected_direction is not None:
         for actual, expected in zip(direction, expected_direction):
             assert actual == pytest.approx(expected, abs=1e-6)
 
 
-def assert_opposite_escape_pair(joint, key_a, key_b):
+def assert_opposite_escape_pair(joint, key_a, key_b, expect_zero_freed_after=False):
     """Both sides of an interface get inverse escape directions."""
     freedom_a = joint.cuttings[key_a].assembly_freedom
     freedom_b = joint.cuttings[key_b].assembly_freedom
-    assert_authored_translation(freedom_a)
-    assert_authored_translation(freedom_b)
+    assert_authored_translation(freedom_a, expect_zero_freed_after=expect_zero_freed_after)
+    assert_authored_translation(freedom_b, expect_zero_freed_after=expect_zero_freed_after)
     direction_a = unit(freedom_a.translations[0].direction)
     direction_b = unit(freedom_b.translations[0].direction)
     dot = sum(a * b for a, b in zip(direction_a, direction_b))
@@ -55,11 +65,17 @@ def assert_opposite_escape_pair(joint, key_a, key_b):
 class TestButtFamilyFreedoms:
     def test_plain_butt(self, float_mode):
         # Canonical: butt timber runs +Y, TOP end into the receiving timber.
+        # A plain butt has no mechanical engagement, so freed_after is 0;
+        # disassembly code adds its own visual-separation padding on top.
         joint = cut_basic_plain_butt_joint(create_canonical_example_butt_joint_timbers())
 
-        assert_authored_translation(joint.cuttings["butt_timber"].assembly_freedom, (0, -1, 0))
-        assert_authored_translation(joint.cuttings["receiving_timber"].assembly_freedom, (0, 1, 0))
-        assert_opposite_escape_pair(joint, "butt_timber", "receiving_timber")
+        assert_authored_translation(
+            joint.cuttings["butt_timber"].assembly_freedom, (0, -1, 0), expect_zero_freed_after=True
+        )
+        assert_authored_translation(
+            joint.cuttings["receiving_timber"].assembly_freedom, (0, 1, 0), expect_zero_freed_after=True
+        )
+        assert_opposite_escape_pair(joint, "butt_timber", "receiving_timber", expect_zero_freed_after=True)
 
     def test_mortise_and_tenon_with_pegs(self, float_mode):
         arrangement = create_canonical_example_butt_joint_timbers()
@@ -148,15 +164,19 @@ class TestLapAndSpliceFreedoms:
 
         # Each timber pulls back along its own axis (timber1 runs +Y, timber2 +X;
         # the joint is at their BOTTOM ends, so escapes point away: +Y and +X).
-        assert_authored_translation(joint.cuttings["timberA"].assembly_freedom)
-        assert_authored_translation(joint.cuttings["timberB"].assembly_freedom)
+        # A miter has no mechanical engagement, so freed_after is 0; disassembly
+        # code adds its own visual-separation padding on top.
+        assert_authored_translation(joint.cuttings["timberA"].assembly_freedom, expect_zero_freed_after=True)
+        assert_authored_translation(joint.cuttings["timberB"].assembly_freedom, expect_zero_freed_after=True)
 
     def test_plain_butt_splice(self, float_mode):
+        # A plain butt splice has no mechanical engagement, so freed_after is
+        # 0; disassembly code adds its own visual-separation padding on top.
         joint = cut_basic_plain_butt_splice_joint_on_aligned_timbers(
             create_canonical_example_splice_joint_timbers()
         )
 
-        assert_opposite_escape_pair(joint, "timberA", "timberB")
+        assert_opposite_escape_pair(joint, "timberA", "timberB", expect_zero_freed_after=True)
 
     def test_plain_splice_lap(self, float_mode):
         joint = cut_basic_plain_splice_lap_joint_on_aligned_timbers(
@@ -227,16 +247,32 @@ class TestLockedJointFreedoms:
         assert_authored_translation(joint.cuttings["receiving_timber"].assembly_freedom, expected_mortise_direction)
 
 
-class TestRigidJoints:
-    def test_lapped_gooseneck_stays_rigid(self, float_mode):
+class TestApproximatedJointFreedoms:
+    def test_lapped_gooseneck_lifts_along_front_face(self, float_mode):
         arrangement = create_canonical_example_splice_joint_timbers()
+        gooseneck_timber = arrangement.timber1
+        receiving_timber = arrangement.timber2
+        gooseneck_face = TimberLongFace.RIGHT
         joint = cut_basic_lapped_gooseneck_joint_on_aligned_timbers(
-            gooseneck_timber=arrangement.timber1,
-            receiving_timber=arrangement.timber2,
+            gooseneck_timber=gooseneck_timber,
+            receiving_timber=receiving_timber,
             receiving_timber_end=arrangement.timber2_end,
-            gooseneck_timber_face=TimberLongFace.RIGHT,
+            gooseneck_timber_face=gooseneck_face,
         )
 
-        # Lift-then-slide cannot be expressed as one translation yet.
-        for cutting in joint.cuttings.values():
-            assert cutting.assembly_freedom is None
+        # The real extraction is lift-then-slide, which cannot be expressed as
+        # one translation yet; as an approximation, the joint is authored as a
+        # straight lift along front_face_on_timber1, freed after gooseneck_depth.
+        expected_direction = unit(gooseneck_timber.get_face_direction_global(gooseneck_face))
+        expected_gooseneck_depth = float(giraffe_evalf(
+            gooseneck_timber.get_size_in_face_normal_axis(gooseneck_face) / scalar(2)
+        ))
+
+        gooseneck_cutting = joint.cuttings[gooseneck_timber.ticket.path]
+        receiving_cutting = joint.cuttings[receiving_timber.ticket.path]
+
+        assert_authored_translation(gooseneck_cutting.assembly_freedom, expected_direction)
+        assert float(giraffe_evalf(gooseneck_cutting.assembly_freedom.translations[0].freed_after)) == pytest.approx(
+            expected_gooseneck_depth, abs=1e-6
+        )
+        assert_opposite_escape_pair(joint, gooseneck_timber.ticket.path, receiving_timber.ticket.path)

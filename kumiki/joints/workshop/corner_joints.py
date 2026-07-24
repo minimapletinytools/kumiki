@@ -272,16 +272,15 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     )
 
     # Assembly: a miter has no mechanical engagement — each timber pulls back
-    # along its own axis. Use the partner's thickness along that axis as a
-    # nominal freed_after so the preview separation is visible.
+    # along its own axis and is free after 0 travel. Disassembly code adds its
+    # own visual-separation padding on top of freed_after, so no nominal
+    # travel is needed here.
     cutA = Cutting(
         timber=timberA,
         maybe_top_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_A,
-        assembly_freedom=AssemblyFreedom.translation(
-            -directionA, freed_after=timberB.get_size_in_direction_3d(directionA)
-        ),
+        assembly_freedom=AssemblyFreedom.translation(-directionA, freed_after=scalar(0)),
     )
 
     cutB = Cutting(
@@ -289,9 +288,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
         maybe_top_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_B,
-        assembly_freedom=AssemblyFreedom.translation(
-            -directionB, freed_after=timberA.get_size_in_direction_3d(directionB)
-        ),
+        assembly_freedom=AssemblyFreedom.translation(-directionB, freed_after=scalar(0)),
     )
 
     # Create CutTimbers with cuts passed at construction

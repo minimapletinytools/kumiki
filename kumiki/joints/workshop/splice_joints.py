@@ -130,8 +130,9 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
     distance_B_from_end = timberB.length - distance_B_from_bottom if timberB_end == TimberEnd.TOP else distance_B_from_bottom
 
     # Assembly: a plain butt splice has no engagement — each half pulls back
-    # along its own axis. Use the larger cross-section dimension as a nominal
-    # freed_after so the preview separation is visible.
+    # along its own axis and is free after 0 travel. Disassembly code adds its
+    # own visual-separation padding on top of freed_after, so no nominal
+    # travel is needed here.
     endA_direction = timberA.get_face_direction_global(timberA_end)
     endB_direction = timberB.get_face_direction_global(timberB_end)
 
@@ -141,7 +142,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         maybe_top_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=None,
-        assembly_freedom=AssemblyFreedom.translation(-endA_direction, freed_after=max_dimension),
+        assembly_freedom=AssemblyFreedom.translation(-endA_direction, freed_after=scalar(0)),
     )
 
     cutB = Cutting(
@@ -149,7 +150,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         maybe_top_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=None,
-        assembly_freedom=AssemblyFreedom.translation(-endB_direction, freed_after=max_dimension),
+        assembly_freedom=AssemblyFreedom.translation(-endB_direction, freed_after=scalar(0)),
     )
 
     # Create CutTimbers with cuts passed at construction
@@ -568,24 +569,30 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
     else:
         receiving_timber_negative_csg = gooseneck_csg_on_receiving_timber
 
+    # Assembly: the real extraction is lifting the head out of the socket and
+    # THEN sliding along the run (a sequenced motion), which cannot be
+    # expressed as a single half-interval translation yet. As an approximation
+    # until richer R6 freedom shapes exist, treat it as a straight lift along
+    # front_face_on_timber1, freed after gooseneck_depth of travel.
+    gooseneck_timber_freedom = AssemblyFreedom.translation(gooseneck_face_direction, freed_after=gooseneck_depth)
+    receiving_timber_freedom = AssemblyFreedom.translation(-gooseneck_face_direction, freed_after=gooseneck_depth)
+
     # Create Cut objects for each timber
     receiving_timber_cut_obj = Cutting(
         timber=receiving_timber,
         maybe_top_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberEnd.BOTTOM else None,
-        negative_csg=receiving_timber_negative_csg
+        negative_csg=receiving_timber_negative_csg,
+        assembly_freedom=receiving_timber_freedom,
     )
     gooseneck_timber_cut_obj = Cutting(
         timber=gooseneck_timber,
         maybe_top_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberEnd.BOTTOM else None,
-        negative_csg=gooseneck_timber_combined_csg
+        negative_csg=gooseneck_timber_combined_csg,
+        assembly_freedom=gooseneck_timber_freedom,
     )
 
-    # Assembly: no freedoms are set — a gooseneck extracts by lifting the head
-    # out of the socket and THEN sliding along the run (a sequenced motion),
-    # which cannot be expressed as a single half-interval translation yet. The
-    # connection is treated as rigid until richer R6 freedom shapes exist.
     return Joint(
         cuttings={
             receiving_timber.ticket.path: receiving_timber_cut_obj,
