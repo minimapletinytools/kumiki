@@ -734,6 +734,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     timber2_end = arrangement.timber2_end
     front_face = arrangement.front_face_on_timber1
     v_face = front_face.rotate_right()
+    
 
     if stepped_shoulder_length is None:
         stepped_shoulder_length = stepped_shoulder_depth
@@ -771,14 +772,16 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     u_dir = -timber1.get_face_direction_global(timber1_end)
     v_dir = timber1.get_face_direction_global(v_face)
 
+    # TODO is this the sign we want?
+    lateral_dir = arrangement.timber1.get_face_direction_global(front_face)
+
     if timber1_end == TimberEnd.TOP:
         timber1_end_position_global = locate_top_center_position(timber1).position
     else:
         timber1_end_position_global = timber1.get_bottom_position_global()
 
-    scarf_joint_center_global = timber1_end_position_global + u_dir * joint_center_relative_to_timber1_end + v_dir * lateral_offset_from_midline
+    scarf_joint_center_global = timber1_end_position_global + u_dir * joint_center_relative_to_timber1_end + lateral_dir * lateral_offset_from_midline
 
-    timber1_stub_tenon_starting_point = timber1_end_position_global + u_dir * joint_center_relative_to_timber1_end + v_dir * lateral_offset_from_midline
 
     # -------------------------------------------------------------------------
     # Profile points (see the docstring diagram / step comments below for the
@@ -877,7 +880,25 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     ]
 
     profile_csg_global = SolidUnion(convex_pieces)
-    profile_csg_local = adopt_csg(None, timber1.transform, profile_csg_global)
+
+
+    # now lets make the stub tennon
+    v_face_size = timber1.get_size_in_face_normal_axis(v_face)
+    timber1_stub_tenon_middle_surface_outer_edge_point = scarf_joint_center_global - scarf_length / scalar(2) * u_dir - v_dir * v_face_size / scalar(2)
+    timber1_stub_tenon_middle_surface_inner_edge_point = timber1_stub_tenon_middle_surface_outer_edge_point + u_dir * dado_depth
+    timber1_stub_tenon_start = (timber1_stub_tenon_middle_surface_outer_edge_point + timber1_stub_tenon_middle_surface_inner_edge_point) / scalar(2)
+    timber1_stub_tenon_prism = RectangularPrism(
+        transform=Transform(position=timber1_stub_tenon_start, orientation=Orientation.from_z_and_y(v_dir, u_dir)),
+        start_distance = 0,
+        end_distance = v_face_size / scalar(2) - dado_depth,
+        size = create_v2(stub_tenon_width, dado_depth),
+    )
+
+    with_stub_global = Difference(profile_csg_global, [timber1_stub_tenon_prism])
+
+
+
+    timber1_negative_csg_local = adopt_csg(None, timber1.transform, with_stub_global)
 
     # The profile's own left wall (u = left_boundary_u) is where every piece
     # stops — it doesn't reach any further left by itself. So it can't remove
@@ -895,7 +916,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         timber=timber1,
         maybe_top_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.BOTTOM else None,
-        negative_csg=profile_csg_local,
+        negative_csg=timber1_negative_csg_local,
         label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
     )
 
@@ -953,6 +974,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         right_boundary_global - timber2.get_bottom_position_global(),
         timber2.get_length_direction_global(),
     )
+
 
     timber2_test_cut = Cutting(
         timber=timber2,
