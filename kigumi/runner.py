@@ -2249,10 +2249,18 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
     if command == "get_assembly":
         # Deferred from get_layers_tree so the frame renders before the
         # (potentially slow) disassembly solve runs.
+        slot_name = _resolve_slot_name(state, payload)
         ss = _resolve_slot(state, payload)
+        log_stderr(f"[assembly] [{slot_name}] Starting assembly solve for frame '{getattr(ss.frame, 'name', '?')}' ({len(ss.frame.cut_timbers)} timbers)...")
+        t0 = time.monotonic()
         timber_entries, accessory_entries = _assign_member_keys(ss.frame)
         assembly_payload = _build_assembly_payload(ss.frame, timber_entries, accessory_entries)
-        return state, make_success_response(request_id, command, {"assembly": assembly_payload}), False
+        assembly_s = time.monotonic() - t0
+        log_stderr(f"[assembly] [{slot_name}] Assembly solve completed in {assembly_s:.3f}s")
+        return state, make_success_response(request_id, command, {
+            "assembly": assembly_payload,
+            "profiling": {"assembly_s": assembly_s},
+        }), False
 
     if command == "get_csg_tree":
         ss = _resolve_slot(state, payload)

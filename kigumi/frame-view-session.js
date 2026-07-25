@@ -223,6 +223,7 @@ class FrameViewSession {
         this.profiler.markTiming(initTiming, 'initialize.runner.start');
         try {
             await this.runnerSession.start();
+            this._slotIsFresh = true;
         } catch (startError) {
             this.profiler.markTiming(initTiming, 'initialize.runner.error', {
                 message: startError && startError.message ? startError.message : String(startError),
@@ -625,6 +626,7 @@ class FrameViewSession {
         this.runnerSession = new PythonRunnerSession(this.filePath, this.context, this.channel);
         this._setupRunnerMilestoneHandler();
         await this.runnerSession.start();
+        this._slotIsFresh = true;
     }
 
     async refresh(reason = 'manual render') {
@@ -656,12 +658,20 @@ class FrameViewSession {
             await this.ensureRunnerSession();
             this.profiler.markTiming(timing, 'ensureRunner.end');
 
-            this.profiler.markTiming(timing, 'runner.reload_example.start');
-            const reloadResult = await this.runnerSession.slotRequest('reload_example', this.slotName, {
-                filePath: this.filePath,
-                renderParameters: this.renderParameters,
-            });
-            this.profiler.markTiming(timing, 'runner.reload_example.end');
+            let reloadResult = null;
+            if (this._slotIsFresh && (!this.renderParameters || Object.keys(this.renderParameters).length === 0)) {
+                this.log(`[refresh] Skipping reload_example for ${path.basename(this.filePath)} (slot freshly loaded during runner launch)`);
+                this._slotIsFresh = false;
+                reloadResult = { profiling: { reload_s: 0 } };
+            } else {
+                this._slotIsFresh = false;
+                this.profiler.markTiming(timing, 'runner.reload_example.start');
+                reloadResult = await this.runnerSession.slotRequest('reload_example', this.slotName, {
+                    filePath: this.filePath,
+                    renderParameters: this.renderParameters,
+                });
+                this.profiler.markTiming(timing, 'runner.reload_example.end');
+            }
 
             this.profiler.markTiming(timing, 'runner.get_frame.start');
             const frameData = await this.runnerSession.slotRequest('get_frame', this.slotName);
@@ -960,15 +970,20 @@ class FrameViewSession {
         }
         this._assemblyFetchGeneration = (this._assemblyFetchGeneration || 0) + 1;
         const generation = this._assemblyFetchGeneration;
+        this.log(`[assembly] Requesting background assembly solve for ${path.basename(this.filePath)}...`);
+        const startMs = Date.now();
         this.runnerSession.slotRequest('get_assembly', this.slotName)
             .then((result) => {
+                const elapsedMs = Date.now() - startMs;
+                this.log(`[assembly] Background assembly solve finished in ${elapsedMs}ms`);
                 if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
                     return;
                 }
                 this._postToWebview({ type: 'assemblyData', payload: result ? result.assembly : null });
             })
             .catch((err) => {
-                this.log(`[assembly] get_assembly failed: ${err.message || err}`);
+                const elapsedMs = Date.now() - startMs;
+                this.log(`[assembly] get_assembly failed after ${elapsedMs}ms: ${err.message || err}`);
                 if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
                     return;
                 }
