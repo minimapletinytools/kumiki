@@ -648,9 +648,6 @@ def cut_mortise_and_tenon_joint(
     mortise_timber = arrangement.receiving_timber
     tenon_end = arrangement.butt_timber_end
 
-    # TODO fix relief, not sure why it broke again..
-    warn_if_arrangement_timbers_imperfect(arrangement)
-
     # Default tenon_position to centered (0, 0)
     if tenon_position is None:
         tenon_position = Matrix([scalar(0), scalar(0)])

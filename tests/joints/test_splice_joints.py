@@ -380,8 +380,8 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
         dof2 = cut2.assembly_freedom.translations[0]
         assert dof1.freed_after == DD
         assert dof2.freed_after == DD
-        assert vector_magnitude(dof1.direction - expected_direction) < scalar(1e-9)
-        assert vector_magnitude(dof2.direction + expected_direction) < scalar(1e-9)
+        assert vector_magnitude(dof1.direction + expected_direction) < scalar(1e-9)
+        assert vector_magnitude(dof2.direction - expected_direction) < scalar(1e-9)
 
         # A Kusabi wedge peg accessory fills the peg hole.
         assert "peg" in joint.jointAccessories

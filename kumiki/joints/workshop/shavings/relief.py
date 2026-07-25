@@ -878,7 +878,7 @@ def chop_relief_for_butt_joint_arrangement(
 
     halfspace_global = HalfSpace(
         normal=approach_into_receiving,
-        offset=safe_dot_product(-approach_into_receiving, far_face_point_global),
+        offset=safe_dot_product(approach_into_receiving, far_face_point_global),
     )
 
     # 3. Prism matching the butt timber's perfect cross-section, extending
