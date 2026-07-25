@@ -879,64 +879,9 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         for quad in _decompose_simple_polygon_into_convex_pieces(profile_points)
     ]
 
-    profile_csg_global = SolidUnion(convex_pieces)
+    timber1_profile_csg_global = SolidUnion(convex_pieces)
 
-
-    # now lets make the stub tennon
-    v_face_size = timber1.get_size_in_face_normal_axis(v_face)
-    timber1_stub_tenon_middle_surface_outer_edge_point = scarf_joint_center_global - scarf_length / scalar(2) * u_dir - v_dir * v_face_size / scalar(2)
-    timber1_stub_tenon_middle_surface_inner_edge_point = timber1_stub_tenon_middle_surface_outer_edge_point + u_dir * dado_depth
-    timber1_stub_tenon_start = (timber1_stub_tenon_middle_surface_outer_edge_point + timber1_stub_tenon_middle_surface_inner_edge_point) / scalar(2)
-    timber1_stub_tenon_prism = RectangularPrism(
-        transform=Transform(position=timber1_stub_tenon_start, orientation=Orientation.from_z_and_y(v_dir, u_dir)),
-        start_distance = 0,
-        end_distance = v_face_size / scalar(2) - dado_depth,
-        size = create_v2(stub_tenon_width, dado_depth),
-    )
-
-    with_stub_global = Difference(profile_csg_global, [timber1_stub_tenon_prism])
-
-
-
-    timber1_negative_csg_local = adopt_csg(None, timber1.transform, with_stub_global)
-
-    # The profile's own left wall (u = left_boundary_u) is where every piece
-    # stops — it doesn't reach any further left by itself. So it can't remove
-    # any of timber1's raw material beyond that wall (e.g. the deliberately
-    # generous test overlap past the joint, used above only so the profile has
-    # something to cut into on that side). Add an explicit end cut there too,
-    # truncating timber1 flush at u = left_boundary_u.
-    left_boundary_global = scarf_joint_center_global + u_dir * left_boundary_u
-    left_boundary_distance_from_bottom = safe_dot_product(
-        left_boundary_global - timber1.get_bottom_position_global(),
-        timber1.get_length_direction_global(),
-    )
-
-    timber1_test_cut = Cutting(
-        timber=timber1,
-        maybe_top_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.TOP else None,
-        maybe_bottom_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.BOTTOM else None,
-        negative_csg=timber1_negative_csg_local,
-        label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
-    )
-
-    # -------------------------------------------------------------------------
-    # TEST-ONLY: timber2's profile is the SAME shape, reflected through the
-    # joint center — negate both u and v. This works out to a clean point
-    # reflection of the whole profile (not just a u-mirror) because corner and
-    # p6 are themselves exact point-reflections of each other (both sit at
-    # v = 0, at u = +-SL/2) — and so, it turns out, are the rest of the
-    # corresponding pairs: p1<->p7, p2<->p8, p3<->p9. Reflecting preserves
-    # winding order (unlike a plain mirror), so reflecting profile_points'
-    # vertices in place, keeping the same sequence, is already a valid closed
-    # polygon.
-    #
-    # p3 and p9 swap which end of the timber they sit near under this
-    # reflection: p3 (was v = H/2, the "top") lands at v = -H/2, and p9 (was
-    # v = -H/2) lands at v = H/2. So it's p9's reflection that now extends to
-    # the top closure point, and p3's reflection that extends to the bottom
-    # one — the reverse of p10/p11's roles for timber1.
-    # -------------------------------------------------------------------------
+    
     def reflect(p: Tuple[Numeric, Numeric]) -> Tuple[Numeric, Numeric]:
         return (-p[0], -p[1])
 
@@ -966,8 +911,46 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         for quad in _decompose_simple_polygon_into_convex_pieces(profile_points_2)
     ]
 
-    profile_csg_2_global = SolidUnion(convex_pieces_2)
-    profile_csg_2_local = adopt_csg(None, timber2.transform, profile_csg_2_global)
+    timber2_profile_csg_global = SolidUnion(convex_pieces_2)
+
+
+
+    # now lets make the stub tenons
+    v_face_size = timber1.get_size_in_face_normal_axis(v_face)
+    timber1_stub_tenon_middle_surface_outer_edge_point = scarf_joint_center_global - scarf_length / scalar(2) * u_dir - v_dir * v_face_size / scalar(2)
+    timber1_stub_tenon_middle_surface_inner_edge_point = timber1_stub_tenon_middle_surface_outer_edge_point + u_dir * dado_depth
+    timber1_stub_tenon_start = (timber1_stub_tenon_middle_surface_outer_edge_point + timber1_stub_tenon_middle_surface_inner_edge_point) / scalar(2)
+    timber1_stub_tenon_prism = RectangularPrism(
+        transform=Transform(position=timber1_stub_tenon_start, orientation=Orientation.from_z_and_y(v_dir, u_dir)),
+        start_distance = 0,
+        end_distance = v_face_size / scalar(2) - dado_depth,
+        size = create_v2(stub_tenon_width, dado_depth),
+    )
+
+    def reflect_about_joint_center(point : V3):
+        relative = point - scarf_joint_center_global
+        reflected = -relative
+        return reflected + scarf_joint_center_global
+
+    timber2_stub_tenon_prism = RectangularPrism(
+        transform=Transform(position=reflect_about_joint_center(timber1_stub_tenon_start), orientation=Orientation.from_z_and_y(-v_dir, -u_dir)),
+        start_distance = 0,
+        end_distance = v_face_size / scalar(2) - dado_depth,
+        size = create_v2(stub_tenon_width, dado_depth),
+    )
+
+
+    timber1_with_stubs_global = SolidUnion([Difference(timber1_profile_csg_global, [timber1_stub_tenon_prism]), timber2_stub_tenon_prism])
+    timber1_negative_csg_local = adopt_csg(None, timber1.transform, timber1_with_stubs_global)
+
+    timber2_with_stubs_global = SolidUnion([Difference(timber2_profile_csg_global, [timber2_stub_tenon_prism]), timber1_stub_tenon_prism])
+    timber2_negative_csg_local = adopt_csg(None, timber2.transform, timber2_with_stubs_global)
+
+    left_boundary_global = scarf_joint_center_global + u_dir * left_boundary_u
+    left_boundary_distance_from_bottom = safe_dot_product(
+        left_boundary_global - timber1.get_bottom_position_global(),
+        timber1.get_length_direction_global(),
+    )
 
     right_boundary_global = scarf_joint_center_global + u_dir * right_boundary_u
     right_boundary_distance_from_bottom = safe_dot_product(
@@ -975,13 +958,29 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         timber2.get_length_direction_global(),
     )
 
+    timber1_test_cut = Cutting(
+        timber=timber1,
+        maybe_top_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.BOTTOM else None,
+        negative_csg=timber1_negative_csg_local,
+        label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
+    )
 
     timber2_test_cut = Cutting(
         timber=timber2,
         maybe_top_end_cut_distance_from_bottom=right_boundary_distance_from_bottom if timber2_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=right_boundary_distance_from_bottom if timber2_end == TimberEnd.BOTTOM else None,
-        negative_csg=profile_csg_2_local,
+        negative_csg=timber2_negative_csg_local,
         label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
+    )
+    front_face_dir = arrangement.timber1.get_face_direction_global(arrangement.front_face_on_timber1)
+    peg = Peg(
+            transform = Transform(position = scarf_joint_center_global, orientation=Orientation.from_z_and_y(front_face_dir, v_dir)),
+            size = create_v2(stepped_shoulder_length, stepped_shoulder_depth),
+            shape = PegShape.SQUARE,
+            forward_length = depth_size * scalar(3/5),
+            stickout_length = depth_size * scalar(3/5),
+            
     )
 
     return Joint(
@@ -990,7 +989,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
             timber2.ticket.path: timber2_test_cut,
         },
         ticket=JointTicket(joint_type="half_blind_tenoned_dadoed_rabbeted_scarf"),
-        jointAccessories={},
+        jointAccessories={"peg": peg},
     )
 
 
