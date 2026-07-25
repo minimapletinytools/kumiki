@@ -778,6 +778,8 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
 
     scarf_joint_center_global = timber1_end_position_global + u_dir * joint_center_relative_to_timber1_end + v_dir * lateral_offset_from_midline
 
+    timber1_stub_tenon_starting_point = timber1_end_position_global + u_dir * joint_center_relative_to_timber1_end + v_dir * lateral_offset_from_midline
+
     # -------------------------------------------------------------------------
     # Profile points (see the docstring diagram / step comments below for the
     # derivation). All in the shared (u, v) marking frame.
@@ -867,6 +869,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         ConvexPolygonExtrusion(
             points=[create_v2(u, v) for (u, v) in quad],
             transform=profile_transform,
+            # TODO instead of extruding depth_size, find the distance from the center to the actual faces of the timber so we're only cutting a minimal amount.
             start_distance=-depth_size,
             end_distance=depth_size,
         )
