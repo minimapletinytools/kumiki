@@ -48,7 +48,7 @@ raises NotImplementedError when it encounters one.
 import math
 from collections import deque
 from dataclasses import dataclass
-from typing import Dict, List, Mapping, Optional, Sequence, Set, Tuple
+from typing import Callable, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
 import sympy as sp
 
@@ -1200,6 +1200,7 @@ def solve_assembly(
     members: Sequence[AssemblyMember],
     joints: Sequence[AssemblyJoint],
     clearout_clearance: float = _DEFAULT_CLEAROUT_CLEARANCE,
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> Optional[AssemblySolution]:
     """Solve the disassembly sequence for an abstract assembly graph.
 
@@ -1316,6 +1317,8 @@ def solve_assembly(
             ordering_substeps.append((dict(movements), set(primaries), sequence))
 
         while failure is None:
+            if should_cancel is not None and should_cancel():
+                return None
             scheduled_pairs = [
                 pair for pair in pairs
                 if not pair.separated and ordering in pair.scheduled_orderings

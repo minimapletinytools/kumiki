@@ -15,7 +15,9 @@ import importlib
 import importlib.util
 import json
 import os
+import select
 import sys
+import threading
 import time
 import traceback
 from dataclasses import dataclass, field
@@ -1000,7 +1002,7 @@ def _build_assembly_payload(
         member_key_by_kumiki_id[entry["kumikiEphemeralId"]] = entry["memberKey"]
 
     try:
-        solution = solve_frame_assembly(frame)
+        solution = solve_frame_assembly(frame, should_cancel=should_cancel)
     except Exception as exc:  # noqa: BLE001 — assembly must never break the layers tree
         log_stderr(f"[assembly] solve failed: {exc}")
         return {
@@ -2186,6 +2188,14 @@ def _opt_dict(payload: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
     return value if isinstance(value, dict) else None
 
 
+_active_assembly_cancels: Dict[str, threading.Event] = {}
+
+def _cancel_active_assembly(slot_name: str) -> None:
+    event = _active_assembly_cancels.pop(slot_name, None)
+    if event is not None:
+        event.set()
+
+
 def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerState, Dict[str, Any], bool]:
     request_id = request.get("id")
     command = request.get("command")
@@ -2199,6 +2209,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "reload_example":
         slot_name = _resolve_slot_name(state, payload)
+        _cancel_active_assembly(slot_name)
         old_slot = state.slots.get(slot_name)
         next_path = payload.get("filePath", str(state.get_slot(slot_name).file_path))
         render_parameters = _opt_dict(payload, "renderParameters")
@@ -2251,16 +2262,41 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         # (potentially slow) disassembly solve runs.
         slot_name = _resolve_slot_name(state, payload)
         ss = _resolve_slot(state, payload)
-        log_stderr(f"[assembly] [{slot_name}] Starting assembly solve for frame '{getattr(ss.frame, 'name', '?')}' ({len(ss.frame.cut_timbers)} timbers)...")
+
+        _cancel_active_assembly(slot_name)
+        cancel_event = threading.Event()
+        _active_assembly_cancels[slot_name] = cancel_event
+
+        log_stderr(f"[assembly] [{slot_name}] Starting async background assembly solve for frame '{getattr(ss.frame, 'name', '?')}' ({len(ss.frame.cut_timbers)} timbers)...")
         t0 = time.monotonic()
-        timber_entries, accessory_entries = _assign_member_keys(ss.frame)
-        assembly_payload = _build_assembly_payload(ss.frame, timber_entries, accessory_entries)
-        assembly_s = time.monotonic() - t0
-        log_stderr(f"[assembly] [{slot_name}] Assembly solve completed in {assembly_s:.3f}s")
-        return state, make_success_response(request_id, command, {
-            "assembly": assembly_payload,
-            "profiling": {"assembly_s": assembly_s},
-        }), False
+
+        def _worker():
+            try:
+                timber_entries, accessory_entries = _assign_member_keys(ss.frame)
+                payload_data = _build_assembly_payload(
+                    ss.frame, timber_entries, accessory_entries, should_cancel=cancel_event.is_set
+                )
+                assembly_s = time.monotonic() - t0
+                _active_assembly_cancels.pop(slot_name, None)
+                if not cancel_event.is_set():
+                    log_stderr(f"[assembly] [{slot_name}] Background assembly solve completed in {assembly_s:.3f}s")
+                    emit_message({
+                        "type": "assembly_result",
+                        "slot": slot_name,
+                        "result": {"assembly": payload_data},
+                        "profiling": {"assembly_s": assembly_s},
+                    })
+                else:
+                    log_stderr(f"[assembly] [{slot_name}] Background assembly solve canceled after {assembly_s:.3f}s")
+            except Exception as exc:
+                _active_assembly_cancels.pop(slot_name, None)
+                if not cancel_event.is_set():
+                    log_stderr(f"[assembly] [{slot_name}] Background assembly solve failed: {exc}")
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        thread.start()
+
+        return state, make_success_response(request_id, command, {"assembly": {"pending": True}}), False
 
     if command == "get_csg_tree":
         ss = _resolve_slot(state, payload)
@@ -2308,6 +2344,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "load_slot":
         slot_name = _require_str(payload, "slot", "load_slot requires payload.slot")
+        _cancel_active_assembly(slot_name)
         file_path = _require_str(payload, "filePath", "load_slot requires payload.filePath")
         render_parameters = _opt_dict(payload, "renderParameters")
         t0 = time.monotonic()
@@ -2330,6 +2367,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "unload_slot":
         slot_name = _require_str(payload, "slot", "unload_slot requires payload.slot")
+        _cancel_active_assembly(slot_name)
         if slot_name == state.active_slot:
             raise ValueError(f"Cannot unload the active slot '{slot_name}'")
         removed = slot_name in state.slots

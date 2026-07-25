@@ -466,6 +466,13 @@ class PythonRunnerSession {
             return;
         }
 
+        if (message.type === 'assembly_result') {
+            if (typeof this.onAssemblyResult === 'function') {
+                this.onAssemblyResult(message);
+            }
+            return;
+        }
+
         if (Object.prototype.hasOwnProperty.call(message, 'id')) {
             const pending = this.pending.get(message.id);
             if (!pending) {

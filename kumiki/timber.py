@@ -2642,7 +2642,10 @@ def add_milestone(name: str):
     stdout.flush()
 
 
-def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
+def solve_frame_assembly(
+    frame: Frame,
+    should_cancel: Optional[Callable[[], bool]] = None,
+) -> Optional[AssemblySolution]:
     """Solve the disassembly sequence for a frame's source joints.
 
     Adapts the frame into the abstract assembly graph of kumiki/assembly.py —
@@ -2732,4 +2735,4 @@ def solve_frame_assembly(frame: Frame) -> Optional[AssemblySolution]:
             joint_name = joint.ticket.joint_type or "joint"
         assembly_joints.append(AssemblyJoint(name=joint_name, members=specs))
 
-    return solve_assembly(list(members.values()), assembly_joints)
+    return solve_assembly(list(members.values()), assembly_joints, should_cancel=should_cancel)

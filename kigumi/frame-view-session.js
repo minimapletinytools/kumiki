@@ -1481,6 +1481,14 @@ class FrameViewSession {
             this.profiler.addMilestone(name);
             this.postLoadingStatus(name);
         };
+        this.runnerSession.onAssemblyResult = (message) => {
+            if (!message || message.slot !== this.slotName || this.isDisposed) {
+                return;
+            }
+            const assemblyData = message.result ? message.result.assembly : null;
+            this.log(`[assembly] Received background assembly result (${message.profiling ? message.profiling.assembly_s + 's' : ''})`);
+            this._postToWebview({ type: 'assemblyData', payload: assemblyData });
+        };
     }
 }
 
