@@ -201,6 +201,10 @@ kumiki currently has limited support for "boards" for more general purpose woodw
   -"Example Frames" -> "Examples"
 -do example cleanup
 
+
+-add stl support for joint accessories so you can use framing hardware
+
+-do V2 of assembly allowing multi step dissameblies
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
 -add an optional scale ruler to the view and havei t default off
@@ -242,15 +246,12 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 
--add screw joint
--add stl support for joint accessories so you can use framing hardware
 
 
 -JOINTS
   DONE-finish build a butt joint to do the wedged dovetail morties and tenon
   DONE-wedged_half_dovetail_mortise_and_tenon
-  -I guessy ou probably want to do tusked mortise and tenon joint too
-  -cut_dropin_housed_butt_joint
+  DONE-cut_dropin_housed_butt_joint
     -assert that timbers are face aligned (orthogonal not required)
     -assert that faces of both timbers on the "front" of the joint 
     -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
@@ -260,6 +261,9 @@ kumiki currently has limited support for "boards" for more general purpose woodw
     -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
     -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
     -leave a TODO to add notching for non perfect timbers
+  -kanawa tsugi joint
+  -add screw joint
+  -I guessy ou probably want to do tusked mortise and tenon joint too
   -do the castle joint 3 way joint thingy that should be easy?
     -may as well do the oscar hsed 3 way joint hingy as well
   -do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
@@ -278,24 +282,11 @@ kumiki currently has limited support for "boards" for more general purpose woodw
   -drop in house joint + notching only on one side
     -update drop in dovetail joint to notch only on one side
     -ideally mortise and tenon joint can notch only on one side too... so maybe we should just make notching config genericall ysupport this
+  -dovetail splined tenon butt joint thingy (figure out what it's cutally called in japnasee)
 
 -do spiral castle design hehe
   -you need the castle joint I guess, time to try out 3 way joints
--do tinyhouse shed
-  DONE-fix joists between intermediate posts, they should mortise and tenon into the posts
-  DONE-make floor joist dovetails smaller so they don't intersect with the post tenons
-  DONE-add pegs to all horizontal mortise and tenons
-  DONE-adjust tenons so the are measured from the outside reference faces
-  DONE-add new joints for floor beams
-  DONE-add double buttj oint to floor beams
-  IGNORE-make rafter logic not suck lol...
-  -lower rafters to be flush with ridge beam and then use housed dovetail joints on ridge beam
-    -use cross lap point on the other side (you may need ot update cross lap joint to work on non FAT timbers)
-  -do yo uneed/want more rafters?
-  
 
-
--consider making a brace function that both creates a timber and joins it!
 -add CutCSG::get_surface_curvature(point: V3) -> Optional[Tuple[V3, Numeric, V3, Numeric]] (returns derivative and basis for the derivative) so you can properly do the point on boundary check.. welly ou may as well just have a get_surface_info that returns stuff like its curvature, whether it's an edge or face, and the curvature info.
 
 
@@ -335,7 +326,21 @@ M4
 
 
 :: TODONE 
+DONE/IGNORE-do tinyhouse shed
+  DONE-fix joists between intermediate posts, they should mortise and tenon into the posts
+  DONE-make floor joist dovetails smaller so they don't intersect with the post tenons
+  DONE-add pegs to all horizontal mortise and tenons
+  DONE-adjust tenons so the are measured from the outside reference faces
+  DONE-add new joints for floor beams
+  DONE-add double buttj oint to floor beams
+  IGNORE-make rafter logic not suck lol...
+  -lower rafters to be flush with ridge beam and then use housed dovetail joints on ridge beam
+    -use cross lap point on the other side (you may need ot update cross lap joint to work on non FAT timbers)
+  -do yo uneed/want more rafters?
+  
 
+
+IGNORE-consider making a brace function that both creates a timber and joins it!
 DONE-have claude do a refactor pass on kumiki...
 IGNORE-aderss # TODO DELETE this does not do anything meaningufl, just determines whether we
 DONE-address # TODO maybe better to add an empty flag to BoundingBox rather than returning a 0-size box which could be misinterpreted as a point
