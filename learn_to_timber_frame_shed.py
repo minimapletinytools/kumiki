@@ -892,6 +892,16 @@ def build_shed_frame() -> Frame:
         ticket=TimberTicket(path="North Girt", tags=("beam", "girt"))
     )
 
+    # Enlarge girts by 1/2" on faces opposite to upper outside reference edge relative to footprint:
+    # - West girts reference edge: upper outside edge (BACK_RIGHT)
+    # - East girts reference edge: upper outside edge (RIGHT_FRONT)
+    # - North girt reference edge: upper outside edge (BACK_RIGHT)
+    w_s_girt = make_timber_imperfect_opposite_edge(w_s_girt, TimberLongEdge.BACK_RIGHT)
+    w_n_girt = make_timber_imperfect_opposite_edge(w_n_girt, TimberLongEdge.BACK_RIGHT)
+    e_s_girt = make_timber_imperfect_opposite_edge(e_s_girt, TimberLongEdge.RIGHT_FRONT)
+    e_n_girt = make_timber_imperfect_opposite_edge(e_n_girt, TimberLongEdge.RIGHT_FRONT)
+    n_girt = make_timber_imperfect_opposite_edge(n_girt, TimberLongEdge.BACK_RIGHT)
+
     # --- Barefaced Mortise & Tenon Joints with Round Pegs for Wall Girts ---
     #
     # Spec: 1.5" thick × 4" wide (Z axis) × 4" deep into post. Round pegs.
@@ -1065,6 +1075,12 @@ def build_shed_frame() -> Frame:
         lateral_position_measurement=scalar(0),
         ticket=TimberTicket(path="South East Girt", tags=("beam", "girt"))
     )
+
+    # Enlarge south girts by 1/2" on faces opposite to upper outside reference edge relative to footprint:
+    # - South West girt reference edge: upper outside edge (RIGHT_FRONT)
+    # - South East girt reference edge: upper outside edge (BACK_RIGHT)
+    s_w_girt = make_timber_imperfect_opposite_edge(s_w_girt, TimberLongEdge.RIGHT_FRONT)
+    s_e_girt = make_timber_imperfect_opposite_edge(s_e_girt, TimberLongEdge.BACK_RIGHT)
 
     sw_bareface_pos = create_v2(scalar(0), -inches(5, 4))  # -1.25" towards inside face (BACK = Y=4")
     se_bareface_pos = create_v2(scalar(0), inches(5, 4))   # +1.25" towards inside face (FRONT = Y=4")
