@@ -1008,43 +1008,6 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     )
 
 
-
-
-
-    # ignore this stuff below, just notes
-
-    # now draw the main profile for the timber1 scarf joint, "right" here means towards timber1:
-    # first find the "corner of the dado" by going right by scarf_length / 2
-    # the points of teh profile a given by the following instructions, built around the "corner of the dado" point:
-    # 1. from "corner of the dado" go up by dado_height
-    # 2. then go left by dado_depth 
-    # 3. then go up to face of timber1, we will call this the "stub_tenon_face" of timber1 and this point determines the stub tenon shoulder line when traced into the front_face_on_timber1 normal axis
-    # starting back at "corner of the dado" we will build the other side of the profile:
-    # 4. go left by (scarf_length + stepped_shoulder_depth)/2 and down by stepped_shoulder_depth/2 
-    # 5. then go up by stepped_shoulder_depth
-    # 6. go to the opposite "corner of the dado" by going left by (scarf_length - stepped_shoulder_depth)/2 and up by stepped_shoulder_depth/2
-    # 7. go down by dado_height
-    # 8. go right by dado_depth
-    # 9. go down to the face of timber1
-    # invert all operations to produce the timber2 extrusion profile
-
-    # extrude the profile to the opposite face to front_face_on_timber1
-
-    # find the centerline along stub_tenon_face and intersect it with the stub tenon shoulder line to find the starting ponit for the stub tenon. from this point, make a prism that is stub_tenon_width wide (centered on the point) and dado_depth deep (in the opposite direction of the timber1 end face), extrude into the face by the distance we traveled in step 3 (i.e. so it meets the point at step 2 on the front_face_on_timber1 normal axis)
-
-    # the stub tenon prism of timber 1 is substracted from the extrusion profile timber1
-    # the stub tenon prism on from timber2 is then added to the extrusion profile of timber1
-
-    # repeat for timber2 
-
-    # return the finalized joint
-    # the assembly freedom is in the direction of the line formed at step 4, the freedom distace is dado_depth
-    # leave a comment that there is a followup disassembly step in the front_face_on_timber1 direction, but that's not supported yet
-
-
-    pass
-
-
 # ============================================================================
 # Aliases for Japanese joint functions
 # ============================================================================
