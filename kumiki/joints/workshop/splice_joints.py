@@ -958,12 +958,26 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         timber2.get_length_direction_global(),
     )
 
+    # Assembly: the first disassembly motion is sliding along the lower
+    # oblique scarf face, i.e. the line from "corner" to p4 (see step 4
+    # above), freed after dado_depth of travel. timber1 slides in the
+    # corner->p4 direction, timber2 slides the opposite way (the same
+    # pattern used for the gooseneck joint above). Fully separating the
+    # joint actually requires a SECOND, follow-up step sliding along
+    # front_face_on_timber1's normal (to clear the half-blind stub tenon) —
+    # that sequenced (slide-then-lift) motion isn't expressible as a single
+    # translation yet.
+    disassembly_direction = u_dir * (p4[0] - corner[0]) + v_dir * (p4[1] - corner[1])
+    timber1_freedom = AssemblyFreedom.translation(-disassembly_direction, freed_after=DD)
+    timber2_freedom = AssemblyFreedom.translation(disassembly_direction, freed_after=DD)
+
     timber1_test_cut = Cutting(
         timber=timber1,
         maybe_top_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.BOTTOM else None,
         negative_csg=timber1_negative_csg_local,
         label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
+        assembly_freedom=timber1_freedom,
     )
 
     timber2_test_cut = Cutting(
@@ -972,6 +986,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         maybe_bottom_end_cut_distance_from_bottom=right_boundary_distance_from_bottom if timber2_end == TimberEnd.BOTTOM else None,
         negative_csg=timber2_negative_csg_local,
         label="half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY",
+        assembly_freedom=timber2_freedom,
     )
     front_face_dir = arrangement.timber1.get_face_direction_global(arrangement.front_face_on_timber1)
     peg = Peg(
@@ -980,7 +995,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
             shape = PegShape.SQUARE,
             forward_length = depth_size * scalar(3/5),
             stickout_length = depth_size * scalar(3/5),
-            
+
     )
 
     return Joint(

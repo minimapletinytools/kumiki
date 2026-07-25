@@ -23,7 +23,10 @@ TIMBER_HEIGHT = inches(5)
 TIMBER_LENGTH = inches(48)
 TIMBER_SIZE_2D = create_v2(TIMBER_WIDTH, TIMBER_HEIGHT)
 
-from kumiki.joints.workshop.splice_joints import cut_lapped_gooseneck_joint_on_aligned_timbers
+from kumiki.joints.workshop.splice_joints import (
+    cut_lapped_gooseneck_joint_on_aligned_timbers,
+    cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers,
+)
 
 def _maybe_round_timber_config(use_round_timbers: bool):
     if not use_round_timbers:
@@ -172,6 +175,69 @@ def create_simple_gooseneck_example(position: Optional[V3] = None):
 
 
 
+def create_half_blind_tenoned_dadoed_rabbeted_scarf_example(position: Optional[V3] = None):
+    """
+    Create a half-blind tenoned, dadoed, rabbeted scarf joint (Kanawa Tsugi
+    style) example using two 4"x5"x4' timbers.
+
+    Unlike the other splice examples, the two raw timbers must physically
+    overlap near the joint center — the profile only carves the shape within
+    that overlap, it doesn't create material — so this doesn't use
+    create_canonical_example_splice_joint_timbers (which places timbers flush,
+    touching at a single point with no overlap).
+
+    Args:
+        position: Center position of the joint (V3). Defaults to origin.
+    """
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+
+    overlap = inches(8)  # how far each timber's raw body extends past the joint center
+
+    # timber1's TOP (joint end) sits overlap past position; timber2's BOTTOM
+    # (joint end) sits overlap before position — so both physically reach
+    # into the other's territory near the joint.
+    timber1 = create_timber(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=position + create_v3(-TIMBER_LENGTH + overlap, scalar(0), scalar(0)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="scarf_timber1",
+    )
+    timber2 = create_timber(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=position + create_v3(-overlap, scalar(0), scalar(0)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="scarf_timber2",
+    )
+
+    arrangement = SpliceJointTimberArrangement(
+        timber1=timber1,
+        timber2=timber2,
+        timber1_end=TimberEnd.TOP,
+        timber2_end=TimberEnd.BOTTOM,
+        front_face_on_timber1=TimberLongFace.RIGHT,
+    )
+
+    joint = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
+        arrangement=arrangement,
+        stepped_shoulder_depth=inches(1),
+        scarf_length=inches(10),
+        dado_depth=inches(1),
+        dado_height=inches(1.5),
+        stub_tenon_width=inches(1.5),
+        joint_center_relative_to_timber1_end=overlap,
+    )
+
+    return Frame.from_joints(
+        [joint],
+        name="Half-Blind Tenoned Dadoed Rabbeted Scarf Joint",
+    )
+
+
 def create_all_splice_joint_patterns(use_round_timbers=False) -> Frame:
     origin = create_v3(scalar(0), scalar(0), scalar(0))
     step = inches(24)
@@ -185,4 +251,5 @@ patterns = [
     Pattern(path="splice_joints/plain_butt_splice_joint", lambda_=lambda center: Frame(cut_timbers=make_splice_joint_example(center), name="Plain Butt Splice Joint"), pattern_type='frame', tags=['main']),
     Pattern(path="splice_joints/plain_splice_lap_joint", lambda_=lambda center: Frame(cut_timbers=make_splice_lap_joint_example(center), name="Plain Splice Lap Joint"), pattern_type='frame'),
     Pattern(path="splice_joints/lapped_gooseneck_splice_joint", lambda_=make_pattern_from_frame(create_simple_gooseneck_example), pattern_type='frame'),
+    Pattern(path="splice_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint", lambda_=make_pattern_from_frame(create_half_blind_tenoned_dadoed_rabbeted_scarf_example), pattern_type='frame'),
 ]

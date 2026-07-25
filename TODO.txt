@@ -169,8 +169,9 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 :: TODO
-
+-make assembiles work in patterns
 -update agent insturctions on orientation conventions
+-give the footprint  rendering a color and amke it turn on/offable (or have swatches to change its collor or transparent)
 
 -round peg kigumi issues
   -round peg rendering gets covered, but other accessories seem to show fine
@@ -178,7 +179,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
   -make sure yo ucan click on 
     -I guess that makes the maybe end cut thing tricky... because then you don't want th eredundant end cut in the CSG..I forget if that even is at hing or not though..
     -just fix it by allowing a CSG to be tagged as a face cut for any of the faces
--rename dissamebly to tatamae LOL
+-rename dissamebly to tatamae LOL`
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
@@ -203,6 +204,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 
 
 -add stl support for joint accessories so you can use framing hardware
+
 
 -do V2 of assembly allowing multi step dissameblies
 -new kigumi icon
@@ -261,7 +263,7 @@ kumiki currently has limited support for "boards" for more general purpose woodw
     -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
     -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
     -leave a TODO to add notching for non perfect timbers
-  -kanawa tsugi joint
+  DONE-kanawa tsugi joint
   -add screw joint
   -I guessy ou probably want to do tusked mortise and tenon joint too
   -do the castle joint 3 way joint thingy that should be easy?
