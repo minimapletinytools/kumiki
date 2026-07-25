@@ -8,6 +8,44 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.4] - 2026-07-25
+
+### kumiki
+
+#### Added
+
+- Added `cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers` (Kanawa Tsugi style scarf joint): half-blind tenoned, dadoed, and rabbeted, with a Kusabi wedge peg accessory (plus a `cut_basic_` variant and a structure example).
+- Added `set_mortise_shoulder_parallel_to_face` parameter to mortise-and-tenon joints.
+- New assembly solver (moving-group closure + simultaneous escape) handles interlocked/simultaneous disassembly sequences the previous solver couldn't.
+- `cut_lapped_gooseneck_joint_on_aligned_timbers` now authors an assembly freedom (lift-out along `front_face_on_timber1`); `cut_mortise_and_tenon_joint` with `bore_mortise_perpendicular_to_face=True` now authors an additional perpendicular assembly freedom.
+
+#### Changed
+
+- **Breaking:** removed `inset_notching_style` / `InsetShoulderNotchingStyle` from `cut_mortise_and_tenon_joint` — scribe notching is now the only behavior.
+  **Migrate:** drop the `inset_notching_style` argument; scribe-style notching is applied automatically.
+- Plain butt, plain butt splice, and plain miter joints now use `freed_after=0` for their assembly freedom instead of a nominal-travel hack (disassembly visualization already adds its own separation padding).
+
+#### Fixed
+
+- Fixed `create_horizontal_timber_on_footprint` placing mudsills straddling the footprint plane instead of sitting above it.
+- Fixed a sign error in `chop_relief_for_butt_joint_arrangement` that could silently produce empty/degenerate geometry for butt joints anchored far from the global origin (e.g. wedged half-dovetail tie beams cut at both ends fell back to bounding-box placeholders, or crashed headless rendering).
+- Fixed several other scribe-relief bugs.
+- Fixed round mortise-and-tenon joints occasionally boring the mortise hole perpendicular to the tenon axis instead of parallel.
+- Fixed odd-N stool disassembly (robust nullspace rank + exact LP backstop).
+
+### kigumi
+
+#### Added
+
+- Integrated the new assembly solver into the viewer, solved in the background after the frame loads.
+- Added `kigumi.viewer.assemblyPreview` VS Code setting (default off).
+- Added a setting to show poop-tagged joints in the pattern book.
+
+#### Fixed
+
+- Fixed a duplicate-refresh bug in the viewer.
+- Fixed an async event handling issue in the viewer/runner communication.
+
 ## [0.4.3] - 2026-07-18
 
 ### kumiki
