@@ -8,6 +8,31 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-07-26
+
+### kumiki
+
+#### Added
+
+- Added a "learn to timber frame shed" structure example (a full 61-timber shed frame).
+
+#### Fixed
+
+- Fixed assembly freedom for the tongue-and-fork corner joint.
+- Fixed assembly freedom for the keyed miter joint.
+
+### kigumi
+
+#### Added
+
+- Added a footprint render color picker (four swatches: slate, moss, orange, and transparent to disable footprint rendering entirely); orange is now the default, and fill opacity was bumped up ~10 points across all colors.
+
+#### Fixed
+
+- Fixed a thread-safety bug in the Python runner: the main request loop and the background assembly-solve thread both wrote to stdout unsynchronized, letting a large response and a background solve result interleave and corrupt the newline-delimited JSON protocol. Writes are now serialized through a lock.
+- Fixed a race where the webview's eager `requestLayersTree` request on mount kicked off a redundant background assembly solve competing with the initial `get_geometry` call for CPU/GIL time, badly inflating load time for complex frames. Removed the eager request entirely -- layers/assembly data is now always pushed proactively by the extension once it's actually ready (on refresh completion, or immediately from cache on a panel reopen).
+- Fixed the assembly-preview timeline appearing to do nothing (no "still solving" indicator, nothing when finished) on slow solves: the background solve request's immediate acknowledgment was mistakenly posted to the webview as if it were the final result, prematurely clearing the "solving" state well before the real solve completed.
+
 ## [0.4.4] - 2026-07-25
 
 ### kumiki
