@@ -133,14 +133,10 @@ Use nested functions to create local variable scopes where helpful (especially t
 
 Joints parameters are almost always provided in local space of the timbers the joint is being cut on. Often times there will be some ambiguity to which orientation the parameters are taken from. The comments on the parameters should always be extremely explicit about this. In general, go by the following conventions:
 
-TODO finish this section
-
-- V2 position measuremens reltaive to the centerline TODO see how you do tenon position in morties and tenon joint
-- lateral measurements relative to the centerline are follow the sign convention of TODO also should be based no tenon position in mortise and tenon joint
-- measurments from timber faces have the + sign pointing into the timber which is opposite to the face normal axis convention we use for most other measurements in those axis.  
-
-
-
+- V2 position measurements in the timber's cross sectional planes are taken relative to its centerline with +x towards the RIGHT face normal axis and +y towards the FRONT face normal axis. Notably, we use this convention regardless of which end of the timber we are working on.
+- Lateral measurements (perpendicular to the timber's length axis) are also taken relative to the centerline with the + direction in either the RIGHT or FRONT face normal axis.
+- In general, if there is any ambiguity, we try to match to the timber's local coordinate system.
+- Measurments taken from timber faces have the + sign pointing into the timber which is the opposite direction of its face normal axis.
 
 ### Assertions
 
