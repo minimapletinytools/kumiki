@@ -966,13 +966,17 @@ class FrameViewSession {
         this.log(`[assembly] Requesting background assembly solve for ${path.basename(this.filePath)}...`);
         const startMs = Date.now();
         this.runnerSession.slotRequest('get_assembly', this.slotName)
-            .then((result) => {
+            .then(() => {
+                // This only resolves the *request* -- runner.py always
+                // acks get_assembly immediately with {pending: true} and
+                // solves in a background thread. The real result arrives
+                // later as a separate 'assembly_result' event, handled by
+                // onAssemblyResult (see _setupRunnerMilestoneHandler).
+                // Posting this ack's payload as if it were the solved data
+                // would wipe out the "still solving" UI state almost
+                // instantly, well before the actual solve finishes.
                 const elapsedMs = Date.now() - startMs;
-                this.log(`[assembly] Background assembly solve finished in ${elapsedMs}ms`);
-                if (generation !== this._assemblyFetchGeneration || this.isDisposed) {
-                    return;
-                }
-                this._postToWebview({ type: 'assemblyData', payload: result ? result.assembly : null });
+                this.log(`[assembly] Background assembly solve request acknowledged in ${elapsedMs}ms (solving in background)`);
             })
             .catch((err) => {
                 const elapsedMs = Date.now() - startMs;
