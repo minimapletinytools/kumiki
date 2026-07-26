@@ -172,6 +172,8 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 DONE-give the footprint  rendering a color and amke it turn on/offable (or have swatches to change its collor or transparent)
 DONE-update agent insturctions on orientation conventions
 
+- do another example/pattern cleanup
+
 -make assembiles work in patterns
 
 -round peg kigumi issues
