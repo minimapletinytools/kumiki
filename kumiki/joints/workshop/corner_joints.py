@@ -559,10 +559,16 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         negative_csg=CSGUnion(children=tongue_negative_parts),
         # Assembly: the tongue withdraws out of the fork slot along its axis;
         # it engages the fork's full thickness in that direction.
-        assembly_freedom=AssemblyFreedom.translation(
-            -tongue_end_direction,
-            freed_after=fork_timber.get_size_in_direction_3d(tongue_end_direction),
-        ),
+        assembly_freedom=AssemblyFreedom.combine(
+            AssemblyFreedom.translation(
+                -tongue_end_direction,
+                freed_after=fork_timber.get_size_in_direction_3d(tongue_end_direction),
+            ),
+            AssemblyFreedom.translation(
+                fork_end_direction,
+                freed_after=fork_timber.get_size_in_direction_3d(fork_end_direction),
+            ),
+        )
     )
 
     fork_cut = Cutting(
@@ -570,10 +576,16 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=fork_negative_parts),
-        assembly_freedom=AssemblyFreedom.translation(
-            tongue_end_direction,
-            freed_after=fork_timber.get_size_in_direction_3d(tongue_end_direction),
-        ),
+        assembly_freedom=AssemblyFreedom.combine(
+            AssemblyFreedom.translation(
+                tongue_end_direction,
+                freed_after=fork_timber.get_size_in_direction_3d(tongue_end_direction),
+            ),
+            AssemblyFreedom.translation(
+                -fork_end_direction,
+                freed_after=fork_timber.get_size_in_direction_3d(fork_end_direction),
+            ),
+        )
     )
 
     return Joint(
