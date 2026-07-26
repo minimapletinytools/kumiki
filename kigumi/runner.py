@@ -971,6 +971,7 @@ def _build_assembly_payload(
     frame: Any,
     timber_entries: List[Dict[str, Any]],
     accessory_entries: List[Dict[str, Any]],
+    should_cancel: Optional[Any] = None,
 ) -> Optional[Dict[str, Any]]:
     """Solve the frame's assembly sequence for the viewer's preview timeline.
 
