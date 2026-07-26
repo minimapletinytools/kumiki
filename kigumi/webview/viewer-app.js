@@ -1292,9 +1292,10 @@ class KigumiViewerApp extends LitElement {
             this._layersView.addEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.addEventListener('layer-state-sync', this.onLayerStateSync);
         }
-        if (vscode) {
-            vscode.postMessage({ type: 'requestLayersTree' });
-        }
+        // Layers tree (and any background assembly solve) data arrives
+        // unprompted, pushed by the extension host once it's actually ready
+        // (either from a completed refresh, or immediately from cache on a
+        // panel reopen) -- no need to request it here.
 
         this.emitViewerLog('viewer-ready', {});
     }

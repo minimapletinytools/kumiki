@@ -82,6 +82,7 @@ class FrameViewSession {
         this._lastFrameData = null;
         this._lastGeometryData = null;
         this._lastProfiling = null;
+        this._lastLayersData = null;
     }
 
     // Project root for this session: the runner's resolved root if available,
@@ -311,12 +312,6 @@ class FrameViewSession {
             if (message.type === 'requestCSGByPath') {
                 this._handleRequestCSGByPath(message).catch((err) => {
                     this.log(`[layers] requestCSGByPath error: ${err.message || err}`);
-                });
-                return;
-            }
-            if (message.type === 'requestLayersTree') {
-                this._handleRequestLayersTree(message).catch((err) => {
-                    this.log(`[layers] requestLayersTree error: ${err.message || err}`);
                 });
                 return;
             }
@@ -560,6 +555,15 @@ class FrameViewSession {
                 loadingText: '',
                 keepLoading: false,
             }, this.refreshOptions, this.viewerSettings);
+            if (this._lastLayersData) {
+                this.panel.webview.postMessage({
+                    type: 'layersTree',
+                    payload: this._lastLayersData,
+                }).catch((err) => {
+                    this.log(`[layers] Failed to post layers tree: ${err.message || err}`);
+                });
+                this._fetchAssemblyInBackground(this._lastLayersData);
+            }
             this.log(`[reopen] Re-rendered from cached data for slot '${this.slotName}'`);
         } else {
             initializeFrameViewer(this.panel, this.filePath, {
@@ -764,6 +768,7 @@ class FrameViewSession {
             this._lastFrameData = frameData;
             this._lastGeometryData = geometryData;
             this._lastProfiling = profiling;
+            this._lastLayersData = layersData;
             if (layersData && this.panel && !this.isDisposed) {
                 this.panel.webview.postMessage({
                     type: 'layersTree',
@@ -942,18 +947,6 @@ class FrameViewSession {
         } catch (err) {
             this.log(`[layers] find_csg_by_path failed: ${err.message || err}`);
         }
-    }
-
-    async _handleRequestLayersTree(message) {
-        if (!this.runnerSession) {
-            return;
-        }
-        const result = applyFeatureFlagsToLayersPayload(
-            await this.runnerSession.slotRequest('get_layers_tree', this.slotName),
-            { assemblyPreviewSetting: assemblyPreviewSettingEnabled() }
-        );
-        this._postToWebview({ type: 'layersTree', payload: result });
-        this._fetchAssemblyInBackground(result);
     }
 
     // The layers payload only announces a pending disassembly solve; the

@@ -146,8 +146,18 @@ def log_stderr(message: str) -> None:
     print(message, file=sys.stderr, flush=True)
 
 
+# stdout carries the newline-delimited JSON protocol and is written from both
+# the main request/response loop and the background assembly-solve thread
+# (see the `get_assembly` handler below). A write of more than PIPE_BUF bytes
+# is not atomic, so unsynchronized concurrent prints can interleave their
+# bytes on the pipe and corrupt the line-based protocol -- serialize all
+# stdout writes through this lock.
+_stdout_lock = threading.Lock()
+
+
 def emit_message(payload: Dict[str, Any]) -> None:
-    print(json.dumps(payload), flush=True)
+    with _stdout_lock:
+        print(json.dumps(payload), flush=True)
 
 
 def serialize_sympy(obj: Any) -> Any:
