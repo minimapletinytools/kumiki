@@ -19,6 +19,17 @@ const VALID_GEOMETRY_MODES = new Set(['actual', 'perfectTimberWithin']);
 //   modes, only the edges' depth behavior differs.
 const VALID_EDGE_MODES = new Set(['none', 'overlay', 'noOverlay']);
 
+// Footprint render color swatches. 'transparent' has no fill/edge entry --
+// it means "don't render the footprint at all" (group.visible = false)
+// rather than a color to apply.
+const FOOTPRINT_COLOR_SWATCHES = {
+    slate: { fill: 0xb8bec8, edge: 0x3b4250 },
+    moss: { fill: 0x9dc8a0, edge: 0x2f5233 },
+    orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
+};
+const FOOTPRINT_COLOR_IDS = ['slate', 'moss', 'orange', 'transparent'];
+const DEFAULT_FOOTPRINT_COLOR = 'orange';
+
 function normalizeV3RenderParameterValue(value) {
     if (value && typeof value === 'object' && !Array.isArray(value)) {
         return {
@@ -545,10 +556,18 @@ class ViewerSettingsPanel {
                     <input id="reflections-toggle" type="checkbox" ?checked=${this.app.reflectionsEnabled}>
                     reflection
                 </label>
-                <label>
-                    <input id="footprint-toggle" type="checkbox" ?checked=${this.app.footprintsEnabled}>
+                <span class="swatch-group" role="group" aria-label="footprint color">
                     footprint
-                </label>
+                    ${FOOTPRINT_COLOR_IDS.map((colorId) => html`
+                        <button
+                            id="footprint-color-${colorId}"
+                            type="button"
+                            class="color-swatch color-swatch-${colorId}"
+                            title=${colorId === 'transparent' ? 'transparent (hide footprint)' : colorId}
+                            aria-label=${colorId === 'transparent' ? 'transparent (hide footprint)' : colorId}
+                            aria-pressed=${String(this.app.footprintColor === colorId)}></button>
+                    `)}
+                </span>
                 ${ASSEMBLY_PREVIEW_ENABLED ? html`
                 <label>
                     <input id="assembly-timeline-toggle" type="checkbox" ?checked=${this.app.showAssemblyTimeline}>
@@ -696,7 +715,12 @@ class ViewerSettingsPanel {
             },
             { id: 'shadows-toggle', on: 'change', apply: (el) => app.setShadowsEnabled(el.checked) },
             { id: 'reflections-toggle', on: 'change', apply: (el) => app.setReflectionsEnabled(el.checked) },
-            { id: 'footprint-toggle', on: 'change', apply: (el) => app.setFootprintsEnabled(el.checked) },
+            ...FOOTPRINT_COLOR_IDS.map((colorId) => ({
+                id: `footprint-color-${colorId}`,
+                on: 'click',
+                apply: () => app.setFootprintColor(colorId),
+                sync: (el) => { el.setAttribute('aria-pressed', String(app.footprintColor === colorId)); },
+            })),
             {
                 id: 'debug-toggle', on: 'change',
                 apply: (el, renderRoot) => {
@@ -1019,7 +1043,7 @@ class KigumiViewerApp extends LitElement {
         this.edgeLineThicknessPx = 1.5;
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
-        this.footprintsEnabled = true;
+        this.footprintColor = DEFAULT_FOOTPRINT_COLOR;
         this.footprintObjects = [];
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
@@ -1542,7 +1566,7 @@ class KigumiViewerApp extends LitElement {
         this.setCenterGizmoEnabled(this.showCenterGizmo);
         this.setShadowsEnabled(this.shadowsEnabled);
         this.setReflectionsEnabled(this.reflectionsEnabled);
-        this.setFootprintsEnabled(this.footprintsEnabled);
+        this.setFootprintColor(this.footprintColor);
 
         this.updateCamera();
         const animate = () => {
@@ -1698,7 +1722,7 @@ class KigumiViewerApp extends LitElement {
                 edgeLineThicknessPx: Number(this.edgeLineThicknessPx),
                 shadowsEnabled: Boolean(this.shadowsEnabled),
                 reflectionsEnabled: Boolean(this.reflectionsEnabled),
-                footprintsEnabled: Boolean(this.footprintsEnabled),
+                footprintColor: String(this.footprintColor || DEFAULT_FOOTPRINT_COLOR),
                 showAssemblyTimeline: Boolean(this.showAssemblyTimeline),
                 disassemblyMultiplier: Number(this.disassemblyMultiplier),
                 debugEnabled: Boolean(this.debugEnabled),
@@ -1758,8 +1782,12 @@ class KigumiViewerApp extends LitElement {
         if (typeof ui.reflectionsEnabled === 'boolean') {
             this.setReflectionsEnabled(ui.reflectionsEnabled);
         }
-        if (typeof ui.footprintsEnabled === 'boolean') {
-            this.setFootprintsEnabled(ui.footprintsEnabled);
+        if (typeof ui.footprintColor === 'string') {
+            this.setFootprintColor(ui.footprintColor);
+        } else if (typeof ui.footprintsEnabled === 'boolean') {
+            // Back-compat for settings saved before footprintColor replaced
+            // the footprintsEnabled boolean.
+            this.setFootprintColor(ui.footprintsEnabled ? DEFAULT_FOOTPRINT_COLOR : 'transparent');
         }
         if (ASSEMBLY_PREVIEW_ENABLED && typeof ui.showAssemblyTimeline === 'boolean') {
             this.setShowAssemblyTimeline(ui.showAssemblyTimeline);
@@ -3263,15 +3291,31 @@ class KigumiViewerApp extends LitElement {
         this.updateReflectionTransforms();
     }
 
-    setFootprintsEnabled(enabled) {
-        this.footprintsEnabled = enabled;
+    setFootprintColor(color) {
+        const next = FOOTPRINT_COLOR_IDS.includes(color) ? color : DEFAULT_FOOTPRINT_COLOR;
+        if (this.footprintColor === next) {
+            return;
+        }
+        this.footprintColor = next;
+        const visible = next !== 'transparent';
+        const swatch = FOOTPRINT_COLOR_SWATCHES[next];
         if (Array.isArray(this.footprintObjects)) {
             for (const obj of this.footprintObjects) {
-                if (obj && obj.group) {
-                    obj.group.visible = enabled;
+                if (!obj || !obj.group) {
+                    continue;
+                }
+                obj.group.visible = visible;
+                if (swatch) {
+                    if (obj.fillMaterial) {
+                        obj.fillMaterial.color.setHex(swatch.fill);
+                    }
+                    if (obj.edgeMaterial) {
+                        obj.edgeMaterial.color.setHex(swatch.edge);
+                    }
                 }
             }
         }
+        this.requestUpdate();
     }
 
     disposeFootprintObjects() {
@@ -3297,6 +3341,7 @@ class KigumiViewerApp extends LitElement {
     rebuildFootprints(footprints) {
         this.disposeFootprintObjects();
         const list = Array.isArray(footprints) ? footprints : [];
+        const swatch = FOOTPRINT_COLOR_SWATCHES[this.footprintColor] || FOOTPRINT_COLOR_SWATCHES[DEFAULT_FOOTPRINT_COLOR];
         for (const footprint of list) {
             const corners = (footprint && Array.isArray(footprint.corners)) ? footprint.corners : [];
             if (corners.length < 3) {
@@ -3312,9 +3357,9 @@ class KigumiViewerApp extends LitElement {
             shape.closePath();
             const fillGeometry = new THREE.ShapeGeometry(shape);
             const fillMaterial = new THREE.MeshBasicMaterial({
-                color: 0xb8bec8,
+                color: swatch.fill,
                 transparent: true,
-                opacity: 0.3,
+                opacity: 0.4,
                 side: THREE.DoubleSide,
                 depthWrite: false,
             });
@@ -3325,7 +3370,7 @@ class KigumiViewerApp extends LitElement {
             const edgePoints = corners.map((c) => new THREE.Vector3(c[0], c[1], 0));
             edgePoints.push(new THREE.Vector3(corners[0][0], corners[0][1], 0));
             const edgeGeometry = new THREE.BufferGeometry().setFromPoints(edgePoints);
-            const edgeMaterial = new THREE.LineBasicMaterial({ color: 0x3b4250 });
+            const edgeMaterial = new THREE.LineBasicMaterial({ color: swatch.edge });
             const edgeLine = new THREE.Line(edgeGeometry, edgeMaterial);
             edgeLine.renderOrder = 0;
 
@@ -3334,7 +3379,7 @@ class KigumiViewerApp extends LitElement {
             group.position.z = 0.0015;
             group.add(fillMesh);
             group.add(edgeLine);
-            group.visible = this.footprintsEnabled;
+            group.visible = this.footprintColor !== 'transparent';
             if (this.scene) {
                 this.scene.add(group);
             }
