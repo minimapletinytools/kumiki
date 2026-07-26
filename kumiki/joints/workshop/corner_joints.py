@@ -1186,7 +1186,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
             height=key_thickness,
             length=key_depth,
             stickout_length=key_depth*scalar(1,4),
-            assembly_freedom=AssemblyFreedom.translation(diagonal_direction, freed_after=key_depth * scalar(2)),
+            assembly_freedom=AssemblyFreedom.translation(-diagonal_direction, freed_after=key_depth * scalar(2)),
             assembly_ordering=Ordering(0, -1),
         )
         key_wedges.append(key_wedge)
