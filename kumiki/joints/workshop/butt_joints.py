@@ -1114,6 +1114,7 @@ def cut_mortise_and_tenon_joint(
         # way to escape: sliding straight out along the face normal (instead
         # of along the tenon axis) clears the pocket after mortise_depth of
         # travel, since the pocket has constant cross-section along that axis.
+        assert mortise_depth is not None  # enforced above: required when bore_mortise_perpendicular_to_face is True
         tenon_freedom = AssemblyFreedom.combine(
             tenon_freedom,
             AssemblyFreedom.translation(-mortise_face_normal, freed_after=mortise_depth),

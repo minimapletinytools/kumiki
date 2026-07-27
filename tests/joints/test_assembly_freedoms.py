@@ -272,7 +272,9 @@ class TestApproximatedJointFreedoms:
         receiving_cutting = joint.cuttings[receiving_timber.ticket.path]
 
         assert_authored_translation(gooseneck_cutting.assembly_freedom, expected_direction)
-        assert float(giraffe_evalf(gooseneck_cutting.assembly_freedom.translations[0].freed_after)) == pytest.approx(
+        gooseneck_freedom = gooseneck_cutting.assembly_freedom
+        assert gooseneck_freedom is not None
+        assert float(giraffe_evalf(gooseneck_freedom.translations[0].freed_after)) == pytest.approx(
             expected_gooseneck_depth, abs=1e-6
         )
         assert_opposite_escape_pair(joint, gooseneck_timber.ticket.path, receiving_timber.ticket.path)

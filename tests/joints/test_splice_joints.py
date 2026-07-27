@@ -351,6 +351,8 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
             timber1_end=TimberEnd.TOP, timber2_end=TimberEnd.BOTTOM,
             front_face_on_timber1=TimberLongFace.RIGHT,
         )
+        front_face_on_timber1 = arrangement.front_face_on_timber1
+        assert front_face_on_timber1 is not None
 
         SL, DD, DH, SSD, STW = inches(10), inches(1), inches(1.5), inches(1), inches(1.5)
         joint = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
@@ -372,12 +374,16 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
         # Assembly freedom: slide along the corner->p4 oblique face, freed
         # after dado_depth, in opposite directions for the two timbers.
         u_dir = -timber1.get_face_direction_global(arrangement.timber1_end)
-        v_face = arrangement.front_face_on_timber1.rotate_right()
+        v_face = front_face_on_timber1.rotate_right()
         v_dir = timber1.get_face_direction_global(v_face)
         expected_direction = safe_normalize_vector(u_dir * (-(SL + SSD) / scalar(2)) + v_dir * (-SSD / scalar(2)))
 
-        dof1 = cut1.assembly_freedom.translations[0]
-        dof2 = cut2.assembly_freedom.translations[0]
+        freedom1 = cut1.assembly_freedom
+        freedom2 = cut2.assembly_freedom
+        assert freedom1 is not None
+        assert freedom2 is not None
+        dof1 = freedom1.translations[0]
+        dof2 = freedom2.translations[0]
         assert dof1.freed_after == DD
         assert dof2.freed_after == DD
         assert vector_magnitude(dof1.direction + expected_direction) < scalar(1e-9)
@@ -386,13 +392,14 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
         # A Kusabi wedge peg accessory fills the peg hole.
         assert "peg" in joint.jointAccessories
         peg = joint.jointAccessories["peg"]
+        assert isinstance(peg, Peg)
         assert peg.shape == PegShape.SQUARE
 
         # Each timber retains its own stub tenon peg (solid) and has a
         # pocket cut for the other timber's peg, so the two interlock.
         csg1 = _render_cutting(cut1)
         csg2 = _render_cutting(cut2)
-        depth_dir = timber1.get_face_direction_global(arrangement.front_face_on_timber1)
+        depth_dir = timber1.get_face_direction_global(front_face_on_timber1)
         H = timber1.get_size_in_face_normal_axis(v_face)
         joint_center = locate_top_center_position(timber1).position + u_dir * overlap
 

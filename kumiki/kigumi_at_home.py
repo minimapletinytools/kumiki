@@ -434,7 +434,7 @@ def _render_scene_to_png_bytes(
     then crashes on. The PNG bytes are already captured before close() runs,
     so the crash would otherwise discard a perfectly good render.
     """
-    import pyglet
+    import pyglet  # type: ignore[unresolved-import]
     from trimesh.util import BytesIO
     from trimesh.viewer.windowed import SceneViewer
 
