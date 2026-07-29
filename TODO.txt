@@ -1,3 +1,16 @@
+::: 7/29 board notes
+
+board related joints
+
+-you should do the FauxTimber thing again that changes the timber orientation so you can use existing cuts on it. Make sure to convert the maybe end cuts into actual cuts when rotating back
+-multi morise and tenon
+  -this could be a compound joint helpre that calls morties and tenon joint in a regular pattern
+-wooden hinge joint :O
+-reinforced_butt_joint(reinforcement_parameters) could be bsicuti, dowel spline, pocket hole screw, etc (maybe separate function for ecah is better)
+-finger joint
+-sliding dovetail
+-make some placeholders for the 
+- rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
 
 
 :: 6/28 CONTENT PLAN

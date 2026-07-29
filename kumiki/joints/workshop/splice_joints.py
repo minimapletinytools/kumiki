@@ -746,6 +746,12 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     SSL = stepped_shoulder_length
     STW = stub_tenon_width
 
+    require_check(
+        None if SSL == SSD
+        else "stepped_shoulder_length must equal stepped_shoulder_depth: the Kusabi peg accessory "
+             "(kumiki.timber.Peg) only supports a square or round cross-section, so a non-square "
+             "peg hole can't yet be represented by an accessory"
+    )
     require_check(None if DD > 0 else "dado_depth must be positive")
     require_check(None if DH > 0 else "dado_height must be positive")
     require_check(None if SSD > 0 else "stepped_shoulder_depth must be positive")
@@ -989,9 +995,11 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         assembly_freedom=timber2_freedom,
     )
     front_face_dir = arrangement.timber1.get_face_direction_global(arrangement.front_face_on_timber1)
+
+    # TODO don't use a peg, use a wedge
     peg = Peg(
             transform = Transform(position = scarf_joint_center_global, orientation=Orientation.from_z_and_y(front_face_dir, v_dir)),
-            size = create_v2(stepped_shoulder_length, stepped_shoulder_depth),
+            size = stepped_shoulder_depth,
             shape = PegShape.SQUARE,
             forward_length = depth_size * scalar(3/5),
             stickout_length = depth_size * scalar(3/5),
