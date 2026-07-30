@@ -16,7 +16,8 @@ board related joints
 -dado_joint (edge to face)
 -dovetail_corner_joint
 -Half-blind dovetail corenr joint
--rabet_corner_joint/rabet_edge_joint (there should be rabet on one side and on both side variants)
+-rabet_corner_joint/rabet_edge_joint (single/dobule variants)
+-drawer lock joint, there are 2 variants, one with a double and one tha's a sigle and dado mayb ecall the single and dode one a dado and rabet joint
 -splined miter joint
 -bridge joint(just tongue nad fork)
 -Breadboard end (this is an end to edge dado joint)
