@@ -1,3 +1,6 @@
+
+can you summarize our discussion, plesae include the various unravel/many unravel signatures we proposed. rite it to a
+  7-29-2026_unravel_discussion.mid file or something.
 ::: 7/29 board notes
 
 board related joints
@@ -7,10 +10,25 @@ board related joints
   -this could be a compound joint helpre that calls morties and tenon joint in a regular pattern
 -wooden hinge joint :O
 -reinforced_butt_joint(reinforcement_parameters) could be bsicuti, dowel spline, pocket hole screw, etc (maybe separate function for ecah is better)
--finger joint
+-reinforced_edge_joint
+-reinforced_corner_butt_joint
+-reinforce_corner_miter_joint
+-dado_joint (edge to face)
+-dovetail_corner_joint
+-Half-blind dovetail corenr joint
+-rabet_corner_joint/rabet_edge_joint (there should be rabet on one side and on both side variants)
+-splined miter joint
+-bridge joint(just tongue nad fork)
+-Breadboard end (this is an end to edge dado joint)
+-haunced tenon lol ugh
+-shiplap
+-cleat joint (not really a joint)
+
+-finger corner joint (or box joint)
+-finger splice joint 
 -sliding dovetail
 -make some placeholders for the 
-- rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
+-rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
 
 
 :: 6/28 CONTENT PLAN
