@@ -124,7 +124,6 @@
       "patternbook": {
         "pattern_names": [
           "basic_miter_joint",
-          "basic_miter_joint_face_aligned",
           "basic_tongue_and_fork_corner_joint",
           "basic_butt_joint",
           "basic_butt_splice_joint",
@@ -132,15 +131,13 @@
           "basic_house_joint",
           "basic_splined_opposing_double_butt_joint",
           "basic_splice_lap_joint",
+          "basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint",
           "basic_mortise_and_tenon",
-          "with_peg",
-          "imperfect_timber",
           "basic_lapped_gooseneck_joint",
           "basic_dropin_dovetail_butt_joint",
           "basic_dropin_housed_butt_joint",
           "basic_mitered_and_keyed_lap_joint",
-          "basic_wedged_half_dovetail_mortise_and_tenon",
-          "with_wedge"
+          "basic_wedged_half_dovetail_mortise_and_tenon"
         ],
         "patterns": [
           {
@@ -149,11 +146,6 @@
             "tags": [
               "main"
             ]
-          },
-          {
-            "path": "basic_joints/basic_miter_joint_face_aligned",
-            "pattern_type": "frame",
-            "tags": []
           },
           {
             "path": "basic_joints/basic_tongue_and_fork_corner_joint",
@@ -191,21 +183,16 @@
             "tags": []
           },
           {
+            "path": "basic_joints/basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
             "path": "basic_joints/basic_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": [
               "main"
             ]
-          },
-          {
-            "path": "basic_joints/basic_mortise_and_tenon/with_peg",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "basic_joints/basic_mortise_and_tenon/imperfect_timber",
-            "pattern_type": "frame",
-            "tags": []
           },
           {
             "path": "basic_joints/basic_lapped_gooseneck_joint",
@@ -233,16 +220,11 @@
             "tags": [
               "main"
             ]
-          },
-          {
-            "path": "basic_joints/basic_wedged_half_dovetail_mortise_and_tenon/with_wedge",
-            "pattern_type": "frame",
-            "tags": []
           }
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "f8e90cfc8654622dfb7d8d2175f40dfc2454c2ab7d025ade755e6f7dc2aef080",
+      "sha256": "af9b25ef0a15fe013ba9feecf7a98fbaa8c400fa70aa6c1bd0c73a14652e75bf",
       "warnings": []
     },
     "patterns/board_joints_patterns.py": {
@@ -290,7 +272,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 726,
+          "lineno": 942,
           "name": "create_all_butt_joint_patterns"
         }
       ],
@@ -310,11 +292,14 @@
           "mortise_and_tenon_through_tenon",
           "mortise_and_tenon_inset_shoulder",
           "mortise_and_tenon_double_angled",
+          "mortise_and_tenon_compound_offset_parallel_shoulder",
           "brace_joint_mortise_and_tenon",
           "wedged_half_dovetail_mortise_and_tenon",
           "half_dovetail_mortise_and_tenon_no_wedge",
           "cut_dropin_dovetail_butt_joint_on_face_aligned_timbers",
-          "cut_dropin_housed_butt_joint_on_face_aligned_timbers"
+          "cut_dropin_housed_butt_joint_on_face_aligned_timbers",
+          "mortise_and_tenon_inset_shoulder_notch_angled",
+          "mortise_and_tenon_inset_shoulder_scribe_angled"
         ],
         "patterns": [
           {
@@ -375,6 +360,11 @@
             "tags": []
           },
           {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
             "path": "butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon",
             "pattern_type": "frame",
             "tags": []
@@ -398,11 +388,21 @@
             "path": "butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_notch_angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_scribe_angled",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "butt_joints_patterns.py",
-      "sha256": "665fb160062f4ff8318a294ce5096d3f7d78018045f1842712b1030b9625adb1",
+      "sha256": "b2d454123d53f17b4246e9520bce07d8666a97d4917e2d5a8d45004525232d3a",
       "warnings": []
     },
     "patterns/compound_joints_patterns.py": {
@@ -727,6 +727,29 @@
       "sha256": "7aba361ecd812ce1851c346906f72ca3f35f952feebf8df6de5f9d3ff7e9e52b",
       "warnings": []
     },
+    "patterns/onlypoop/n_legged_stool.py": {
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 12,
+          "name": "build_frame"
+        },
+        {
+          "kind": "var",
+          "lineno": 190,
+          "name": "example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_onlypoop_n_legged_stool",
+      "multiple_frames": true,
+      "patternbook": null,
+      "relative_path": "onlypoop/n_legged_stool.py",
+      "sha256": "860fea49d1cdc16d33220e1c57cc247470d07073fc9053660c67f9b3e3426a5a",
+      "warnings": []
+    },
     "patterns/onlypoop/relief_example_patterns.py": {
       "chosen_frame_kind": null,
       "chosen_frame_name": null,
@@ -739,6 +762,7 @@
           "rotate_width_axis",
           "rotate_height_axis",
           "rotate_width_and_height_axis",
+          "rotate_width_and_height_axis_parallel_shoulder",
           "rotate_width_axis_small_timbers",
           "rotate_height_axis_small_timbers",
           "rotate_width_and_height_axis_small_timbers"
@@ -760,6 +784,13 @@
           },
           {
             "path": "relief/butt_arrangement/rotate_width_and_height_axis",
+            "pattern_type": "frame",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "relief/butt_arrangement/rotate_width_and_height_axis_parallel_shoulder",
             "pattern_type": "frame",
             "tags": [
               "poop"
@@ -789,7 +820,30 @@
         ]
       },
       "relative_path": "onlypoop/relief_example_patterns.py",
-      "sha256": "5757a77bdc8db3a6545a7d097f91a1250ef7c1dec2566a17b5f24fbffb04a024",
+      "sha256": "f60119e292c72ef554611c6719e9ed01355eeb21be1949853795256bba9cb508",
+      "warnings": []
+    },
+    "patterns/onlypoop/simple_simultaneous_assembly.py": {
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 12,
+          "name": "build_frame"
+        },
+        {
+          "kind": "var",
+          "lineno": 99,
+          "name": "example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_onlypoop_simple_simultaneous_assembly",
+      "multiple_frames": true,
+      "patternbook": null,
+      "relative_path": "onlypoop/simple_simultaneous_assembly.py",
+      "sha256": "27bf0e45bfac4a590bb8159463267f45aee435bb8fb8877b3729359da8f6c78d",
       "warnings": []
     },
     "patterns/patternbook_patterns.py": {
@@ -888,7 +942,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 175,
+          "lineno": 241,
           "name": "create_all_splice_joint_patterns"
         }
       ],
@@ -899,7 +953,8 @@
         "pattern_names": [
           "plain_butt_splice_joint",
           "plain_splice_lap_joint",
-          "lapped_gooseneck_splice_joint"
+          "lapped_gooseneck_splice_joint",
+          "half_blind_tenoned_dadoed_rabbeted_scarf_joint"
         ],
         "patterns": [
           {
@@ -918,11 +973,16 @@
             "path": "splice_joints/lapped_gooseneck_splice_joint",
             "pattern_type": "frame",
             "tags": []
+          },
+          {
+            "path": "splice_joints/half_blind_tenoned_dadoed_rabbeted_scarf_joint",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "splice_joints_patterns.py",
-      "sha256": "b0de40b7d24743527102b423ebdc1eda1cd1bfe627c941a5fda8e0a41ff18e84",
+      "sha256": "83743ae65f802c22cdc5a457f07cbae349d56f2038462c9f16ce84dad31bcff1",
       "warnings": []
     },
     "patterns/structures/assembly_preview_demo.py": {
@@ -968,7 +1028,25 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/doublesawhorseworkbench.py",
-      "sha256": "73d7e0fe666bf50bbcb6daa261bedfd2aba24d8d6d8955c6d95280f6737b5c6b",
+      "sha256": "e2c8d47c73dfe13b2a1e71e8f7656d1aa1eaf5ec31d93e6ca25d05adc859f747",
+      "warnings": []
+    },
+    "patterns/structures/half_blind_tenoned_dadoed_rabbeted_scarf_joint.py": {
+      "chosen_frame_kind": "function",
+      "chosen_frame_name": "example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 33,
+          "name": "example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_half_blind_tenoned_dadoed_rabbeted_scarf_joint",
+      "multiple_frames": false,
+      "patternbook": null,
+      "relative_path": "structures/half_blind_tenoned_dadoed_rabbeted_scarf_joint.py",
+      "sha256": "c39c73e3dbec70cab041313ece10f5c79101f1fed28d74bbe628b7f91f2b947b",
       "warnings": []
     },
     "patterns/structures/horsey_example.py": {
@@ -992,6 +1070,29 @@
       "patternbook": null,
       "relative_path": "structures/horsey_example.py",
       "sha256": "130683fd96c59ec7fe42d7d5d3a5a0d92df715f96082d6f2440ea67c80f1207b",
+      "warnings": []
+    },
+    "patterns/structures/learn_to_timber_frame_shed.py": {
+      "chosen_frame_kind": "var",
+      "chosen_frame_name": "example",
+      "frames": [
+        {
+          "kind": "function",
+          "lineno": 128,
+          "name": "build_shed_frame"
+        },
+        {
+          "kind": "var",
+          "lineno": 1413,
+          "name": "example"
+        }
+      ],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_structures_learn_to_timber_frame_shed",
+      "multiple_frames": true,
+      "patternbook": null,
+      "relative_path": "structures/learn_to_timber_frame_shed.py",
+      "sha256": "0b79b4d40fa86b24d7ec26a22dbc0815ca90638594ffd53b87e7dde6eebc3e74",
       "warnings": []
     },
     "patterns/structures/multi_cross_lap_post.py": {
@@ -1082,7 +1183,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-07-18T15:35:18.951277+00:00",
+  "generated_at": "2026-07-31T01:09:45.373167+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }
