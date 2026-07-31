@@ -208,11 +208,14 @@ kumiki currently has limited support for "boards" for more general purpose woodw
 DONE-give the footprint  rendering a color and amke it turn on/offable (or have swatches to change its collor or transparent)
 DONE-update agent insturctions on orientation conventions
 DONE/IGNORE-try and run a full loop agent test on this to see if it all works
+DONE-round peg rendering gets covered, but other accessories seem to show fine
+
+
 -BUG when reusing the kigumi viewer to open a new pattern, it does not refresh the pattern parameters section, so the old parameters stay.
+
+-BUG you can't click on top/bottom ends of round timbers to check wwhich direction they are
+
 -do another example/pattern cleanup
--round peg kigumi issues
-  -round peg rendering gets covered, but other accessories seem to show fine
-  -you can't click on top/bottom ends of round timbers to check wwhich direction they are
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible

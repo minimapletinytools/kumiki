@@ -1574,6 +1574,7 @@ class KigumiViewerApp extends LitElement {
             this.animationHandle = requestAnimationFrame(animate);
             this.stepCameraAnimation();
             this.renderCameraGizmo();
+            this.updateCylinderSilhouettes();
             this.renderer.render(this.scene, this.camera);
         };
         animate();
@@ -3795,6 +3796,80 @@ class KigumiViewerApp extends LitElement {
         if (bundle.reflection && bundle.reflection.material && typeof bundle.reflection.material.dispose === 'function') {
             bundle.reflection.material.dispose();
         }
+        // cylinderSilhouette.line is a child of bundle.edges (removed above) and
+        // shares bundle.edges.material (disposed above) -- only its own geometry
+        // needs disposing here.
+        if (bundle.cylinderSilhouette) {
+            bundle.cylinderSilhouette.line.geometry.dispose();
+        }
+    }
+
+    // The true silhouette of a cylinder viewed by a point camera is exactly
+    // two straight lines parallel to its axis (this holds exactly, not just
+    // approximately, under perspective projection -- the tangency condition
+    // works out to be independent of position along the axis).
+    //
+    // Those two lines sit at the radial direction u (pointing from the axis
+    // straight at the camera) rotated by +/- acos(radius / d), where d is the
+    // camera's distance from the axis line -- NOT at u itself (u projects to
+    // the middle of the visible cylinder, bisecting it, rather than outlining
+    // it). At typical viewing distances (d >> radius) that angle is close to
+    // 90 degrees, but computing it exactly keeps close-up views correct too.
+    //
+    // Returns a flat 12-number [x,y,z, x,y,z, ...] array for
+    // LineSegmentsGeometry.setPositions, or null if the camera is inside (or
+    // on) the infinite cylindrical shell, where no real tangent lines exist.
+    _silhouetteLinePositions(axisStart, axisEnd, radius, cameraPos) {
+        const axisVec = new THREE.Vector3().subVectors(axisEnd, axisStart);
+        const axisLen = axisVec.length();
+        if (axisLen < 1e-9) {
+            return null;
+        }
+        const axisDir = axisVec.divideScalar(axisLen);
+
+        const toCam = new THREE.Vector3().subVectors(cameraPos, axisStart);
+        const along = toCam.dot(axisDir);
+        const w = toCam.sub(axisDir.clone().multiplyScalar(along)); // perpendicular component
+        const d = w.length();
+        if (d <= radius + 1e-9) {
+            return null;
+        }
+        const u = w.divideScalar(d); // unit radial direction, axis -> camera
+        const v = new THREE.Vector3().crossVectors(axisDir, u); // perpendicular to both
+
+        const cosPhi = radius / d;
+        const sinPhi = Math.sqrt(Math.max(0, 1 - cosPhi * cosPhi));
+        const uPart = u.multiplyScalar(cosPhi);
+        const n1 = new THREE.Vector3().addVectors(uPart, v.clone().multiplyScalar(sinPhi));
+        const n2 = new THREE.Vector3().addVectors(uPart, v.multiplyScalar(-sinPhi));
+
+        const offset1 = n1.multiplyScalar(radius);
+        const offset2 = n2.multiplyScalar(radius);
+
+        const p1a = new THREE.Vector3().addVectors(axisStart, offset1);
+        const p1b = new THREE.Vector3().addVectors(axisEnd, offset1);
+        const p2a = new THREE.Vector3().addVectors(axisStart, offset2);
+        const p2b = new THREE.Vector3().addVectors(axisEnd, offset2);
+
+        return [...p1a.toArray(), ...p1b.toArray(), ...p2a.toArray(), ...p2b.toArray()];
+    }
+
+    // Called every frame from the render loop -- recomputes the camera-facing
+    // silhouette lines for every round accessory (see cylinderAxis / the
+    // creation site in updateMeshScene).
+    updateCylinderSilhouettes() {
+        for (const bundle of this.meshObjectsByKey.values()) {
+            const cyl = bundle.cylinderSilhouette;
+            if (!cyl) {
+                continue;
+            }
+            const positions = this._silhouetteLinePositions(cyl.axisStart, cyl.axisEnd, cyl.radius, this.camera.position);
+            if (!positions) {
+                continue;
+            }
+            cyl.line.geometry.setPositions(positions);
+            cyl.line.computeLineDistances();
+        }
     }
 
     rebuildTimberTable(meshes) {
@@ -4108,6 +4183,27 @@ class KigumiViewerApp extends LitElement {
             reflectionMesh.receiveShadow = false;
             reflectionMesh.visible = this.reflectionsEnabled;
 
+            // Round accessories (pegs, dowels, ...) come with cylinderAxis: their
+            // barrel is a faceted polygon under the hood, so EdgesGeometry's fixed
+            // angle threshold above never catches the curved side (only the flat
+            // end caps). Add the two true, camera-facing tangent lines instead,
+            // parented under edgeMesh so they inherit its visibility/offset for
+            // free; updateCylinderSilhouettes() recomputes them every frame.
+            let cylinderSilhouette = null;
+            if (mesh.cylinderAxis) {
+                const axisStart = new THREE.Vector3(...mesh.cylinderAxis.axisStart);
+                const axisEnd = new THREE.Vector3(...mesh.cylinderAxis.axisEnd);
+                const radius = mesh.cylinderAxis.radius;
+                const silhouetteGeometry = new THREE.LineSegmentsGeometry();
+                const initialPositions = this._silhouetteLinePositions(axisStart, axisEnd, radius, this.camera.position)
+                    || [...axisStart.toArray(), ...axisEnd.toArray(), ...axisStart.toArray(), ...axisEnd.toArray()];
+                silhouetteGeometry.setPositions(initialPositions);
+                const silhouetteLine = new THREE.LineSegments2(silhouetteGeometry, materialSet.edge);
+                silhouetteLine.computeLineDistances();
+                edgeMesh.add(silhouetteLine);
+                cylinderSilhouette = { axisStart, axisEnd, radius, line: silhouetteLine };
+            }
+
             this.scene.add(solidMesh);
             this.scene.add(edgeMesh);
             this.scene.add(reflectionMesh);
@@ -4119,6 +4215,7 @@ class KigumiViewerApp extends LitElement {
                 mesh: solidMesh,
                 edges: edgeMesh,
                 reflection: reflectionMesh,
+                cylinderSilhouette,
             });
             meshBuildMs += performance.now() - meshT0;
             processed += 1;

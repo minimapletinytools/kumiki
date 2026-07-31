@@ -180,6 +180,11 @@ def serialize_vector(vec: Any) -> Any:
         return str(vec)
 
 
+def _vector3_to_floats(vec: Any) -> list:
+    """Exact float triple from a 3x1 sympy Matrix, for numeric (non-display) use."""
+    return [float(vec[i, 0]) for i in range(3)]
+
+
 def get_timber_display_name(timber: Any) -> str:
     if hasattr(timber, "ticket") and hasattr(timber.ticket, "path"):
         return timber.ticket.path
@@ -475,7 +480,9 @@ def _accessory_to_triangle_mesh_payload(
     accessory_key: str,
     accessory_name: str,
 ) -> Dict[str, Any]:
-    from kumiki.cutcsg import adopt_csg
+    import math
+
+    from kumiki.cutcsg import Cylinder, adopt_csg
     from kumiki.rule import Transform
     from kumiki.triangles import triangulate_cutcsg
 
@@ -495,7 +502,7 @@ def _accessory_to_triangle_mesh_payload(
 
     accessory_kumiki_id = int(accessory.ticket.kumiki_id) if getattr(accessory, "ticket", None) is not None else 0
     accessory_tags = _normalize_ticket_tags(getattr(accessory, "ticket", None))
-    return _base_member_payload(
+    payload = _base_member_payload(
         name=accessory_name,
         member_type="accessory",
         member_key=accessory_key,
@@ -511,6 +518,31 @@ def _accessory_to_triangle_mesh_payload(
         nominal_width=dims[0],
         nominal_height=dims[1],
     )
+
+    # Round accessories (pegs, dowels, ...) mesh as a faceted polygon
+    # approximation, so EdgesGeometry's fixed angle threshold never catches
+    # the curved barrel -- only the flat end caps get outlined. Ship the
+    # exact cylinder primitive so the viewer can draw the two true,
+    # camera-facing silhouette lines each frame instead (see
+    # updateCylinderSilhouettes() in viewer-app.js).
+    if (
+        isinstance(global_csg, Cylinder)
+        and global_csg.start_distance is not None
+        and global_csg.end_distance is not None
+    ):
+        axis = _vector3_to_floats(global_csg.axis_direction)
+        axis_len = math.sqrt(sum(c * c for c in axis)) or 1.0
+        axis = [c / axis_len for c in axis]
+        position = _vector3_to_floats(global_csg.position)
+        start = float(global_csg.start_distance)
+        end = float(global_csg.end_distance)
+        payload["cylinderAxis"] = {
+            "axisStart": [position[i] + axis[i] * start for i in range(3)],
+            "axisEnd": [position[i] + axis[i] * end for i in range(3)],
+            "radius": float(global_csg.radius),
+        }
+
+    return payload
 
 
 def _cut_timber_to_bbox_mesh_payload(
