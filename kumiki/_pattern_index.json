@@ -124,6 +124,7 @@
       "patternbook": {
         "pattern_names": [
           "basic_miter_joint",
+          "basic_miter_joint_face_aligned",
           "basic_tongue_and_fork_corner_joint",
           "basic_butt_joint",
           "basic_butt_splice_joint",
@@ -146,6 +147,11 @@
             "tags": [
               "main"
             ]
+          },
+          {
+            "path": "basic_joints/basic_miter_joint_face_aligned",
+            "pattern_type": "frame",
+            "tags": []
           },
           {
             "path": "basic_joints/basic_tongue_and_fork_corner_joint",
@@ -224,7 +230,7 @@
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "af9b25ef0a15fe013ba9feecf7a98fbaa8c400fa70aa6c1bd0c73a14652e75bf",
+      "sha256": "ac4327bb50cb72e6e0c4409e73f06d0d27e58663fc822cfb2809ea8fa093afef",
       "warnings": []
     },
     "patterns/board_joints_patterns.py": {
@@ -1183,7 +1189,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-07-31T01:09:45.373167+00:00",
+  "generated_at": "2026-07-31T01:14:49.477901+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }
