@@ -108,7 +108,7 @@ function normalizeViewerOptions(viewerOptions) {
 function createInitialViewState() {
     return {
         phase: ViewerPhase.BOOTING,
-        loadingText: 'raising frame',
+        loadingText: t('viewer.chrome.loading.raisingFrame'),
         refreshToken: 0,
         error: null,
         sourceHasPendingChanges: false,
@@ -130,6 +130,7 @@ const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : nul
 const VIEWER_APP_VERSION = '2026.03.17.4';
 const SelectionStore = window.SelectionStore;
 const CameraController = window.CameraController;
+const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
     tagged: 0x4fc3f7,
@@ -268,6 +269,7 @@ function createTheme(theme) {
 const THEMES = Object.freeze({
     'cream': createTheme({
         label: 'Cream',
+        labelKey: 'viewer.themes.cream',
         gradientTop: '#fff8dc',
         gradientBottom: '#ffeef4',
         timberProfileId: 'timber-warm',
@@ -275,6 +277,7 @@ const THEMES = Object.freeze({
     }),
     'sky': createTheme({
         label: 'Sky',
+        labelKey: 'viewer.themes.sky',
         gradientTop: '#cde4ff',
         gradientBottom: '#e6f2ff',
         timberProfileId: 'timber-default',
@@ -282,6 +285,7 @@ const THEMES = Object.freeze({
     }),
     'forest': createTheme({
         label: 'Forest Mist',
+        labelKey: 'viewer.themes.forestMist',
         gradientTop: '#d4ead0',
         gradientBottom: '#e8f5ea',
         timberProfileId: 'timber-warm',
@@ -289,6 +293,7 @@ const THEMES = Object.freeze({
     }),
     'warm-white': createTheme({
         label: 'Warm White',
+        labelKey: 'viewer.themes.warmWhite',
         gradientTop: '#fdfaf5',
         gradientBottom: '#f8f4ee',
         timberProfileId: 'timber-warm',
@@ -296,6 +301,7 @@ const THEMES = Object.freeze({
     }),
     'linen': createTheme({
         label: 'Linen',
+        labelKey: 'viewer.themes.linen',
         gradientTop: '#f5efe0',
         gradientBottom: '#ece6d5',
         pattern: 'linen',
@@ -304,6 +310,7 @@ const THEMES = Object.freeze({
     }),
     'slate': createTheme({
         label: 'Slate Night',
+        labelKey: 'viewer.themes.slateNight',
         gradientTop: '#1a2030',
         gradientBottom: '#2a3244',
         timberProfileId: 'timber-dark',
@@ -514,22 +521,25 @@ class ViewerSettingsPanel {
     }
 
     render() {
+        const footprintColorLabel = (colorId) => (colorId === 'transparent'
+            ? t('viewer.options.footprint.color.transparent')
+            : t(`viewer.options.footprint.color.${colorId}`));
         return html`
-            <section id="render-controls" aria-label="Viewer options">
+            <section id="render-controls" aria-label=${t('viewer.options.ariaLabel')}>
                 <label>
                     <input id="center-gizmo-toggle" type="checkbox" ?checked=${this.app.showCenterGizmo}>
-                    center gizmo
+                    ${t('viewer.options.centerGizmo')}
                 </label>
                 <label>
-                    edges
+                    ${t('viewer.options.edges.label')}
                     <select id="edge-mode-select" .value=${this.app.edgeMode || 'overlay'}>
-                        <option value="none">no edges</option>
-                        <option value="overlay">overlay</option>
-                        <option value="noOverlay">no overlay</option>
+                        <option value="none">${t('viewer.options.edges.none')}</option>
+                        <option value="overlay">${t('viewer.options.edges.overlay')}</option>
+                        <option value="noOverlay">${t('viewer.options.edges.noOverlay')}</option>
                     </select>
                 </label>
                 <label>
-                    edge line visibility (${this.app.edgeLineVisibilityPercent}%)
+                    ${t('viewer.options.edgeVisibility.label', { percent: this.app.edgeLineVisibilityPercent })}
                     <input
                         id="edge-visibility-slider"
                         type="range"
@@ -539,7 +549,7 @@ class ViewerSettingsPanel {
                         .value=${String(this.app.edgeLineVisibilityPercent)}>
                 </label>
                 <label>
-                    edge thickness (${this.app.edgeLineThicknessPx}px)
+                    ${t('viewer.options.edgeThickness.label', { px: this.app.edgeLineThicknessPx })}
                     <input
                         id="edge-thickness-slider"
                         type="range"
@@ -550,31 +560,31 @@ class ViewerSettingsPanel {
                 </label>
                 <label>
                     <input id="shadows-toggle" type="checkbox" ?checked=${this.app.shadowsEnabled}>
-                    shadows
+                    ${t('viewer.options.shadows')}
                 </label>
                 <label>
                     <input id="reflections-toggle" type="checkbox" ?checked=${this.app.reflectionsEnabled}>
-                    reflection
+                    ${t('viewer.options.reflection')}
                 </label>
-                <span class="swatch-group" role="group" aria-label="footprint color">
-                    footprint
+                <span class="swatch-group" role="group" aria-label=${t('viewer.options.footprint.ariaLabel')}>
+                    ${t('viewer.options.footprint.label')}
                     ${FOOTPRINT_COLOR_IDS.map((colorId) => html`
                         <button
                             id="footprint-color-${colorId}"
                             type="button"
                             class="color-swatch color-swatch-${colorId}"
-                            title=${colorId === 'transparent' ? 'transparent (hide footprint)' : colorId}
-                            aria-label=${colorId === 'transparent' ? 'transparent (hide footprint)' : colorId}
+                            title=${footprintColorLabel(colorId)}
+                            aria-label=${footprintColorLabel(colorId)}
                             aria-pressed=${String(this.app.footprintColor === colorId)}></button>
                     `)}
                 </span>
                 ${ASSEMBLY_PREVIEW_ENABLED ? html`
                 <label>
                     <input id="assembly-timeline-toggle" type="checkbox" ?checked=${this.app.showAssemblyTimeline}>
-                    assembly timeline
+                    ${t('viewer.options.assemblyTimeline')}
                 </label>
                 <label>
-                    disassembly spacing (×${this.app.disassemblyMultiplier})
+                    ${t('viewer.options.disassemblySpacing.label', { multiplier: this.app.disassemblyMultiplier })}
                     <input
                         id="disassembly-multiplier-slider"
                         type="range"
@@ -585,21 +595,21 @@ class ViewerSettingsPanel {
                 </label>` : ''}
                 <label>
                     <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
-                    debug info
+                    ${t('viewer.options.debugInfo')}
                 </label>
                 <label>
                     <input id="left-click-rotate-toggle" type="checkbox" ?checked=${this.app.leftClickDragRotatesCamera}>
-                    left click to rotate camera
+                    ${t('viewer.options.leftClickRotate')}
                 </label>
                 <label>
-                    geometry
+                    ${t('viewer.options.geometry.label')}
                     <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
-                        <option value="actual">actual</option>
-                        <option value="perfectTimberWithin">perfect timber within</option>
+                        <option value="actual">${t('viewer.options.geometry.actual')}</option>
+                        <option value="perfectTimberWithin">${t('viewer.options.geometry.perfectTimberWithin')}</option>
                     </select>
                 </label>
                 <label>
-                    unselected visibility (${100 - this.app.unselectedTransparencyPercent}%)
+                    ${t('viewer.options.unselectedVisibility.label', { percent: 100 - this.app.unselectedTransparencyPercent })}
                     <input
                         id="unselected-transparency-slider"
                         type="range"
@@ -609,7 +619,7 @@ class ViewerSettingsPanel {
                         .value=${String(100 - this.app.unselectedTransparencyPercent)}>
                 </label>
                 <label>
-                    selected visibility (${100 - this.app.selectedTransparencyPercent}%)
+                    ${t('viewer.options.selectedVisibility.label', { percent: 100 - this.app.selectedTransparencyPercent })}
                     <input
                         id="selected-transparency-slider"
                         type="range"
@@ -619,15 +629,15 @@ class ViewerSettingsPanel {
                         .value=${String(100 - this.app.selectedTransparencyPercent)}>
                 </label>
                 <label>
-                    theme
+                    ${t('viewer.options.theme.label')}
                     <select id="theme-select" .value=${this.app.activeTheme}>
-                        ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${theme.label}</option>`)}
+                        ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${t(theme.labelKey)}</option>`)}
                     </select>
                 </label>
                 <button
                     id="save-settings-btn"
                     type="button"
-                    title="Save current viewer options to .kigumi/kigumi-settings.json"
+                    title=${t('viewer.options.saveSettings.title')}
                     @click=${() => {
                         if (vscode) {
                             vscode.postMessage({
@@ -635,41 +645,41 @@ class ViewerSettingsPanel {
                                 settings: this.app.collectViewerSettingsPayload(),
                             });
                         }
-                    }}>save settings</button>
-                <div class="viewer-settings-divider" role="separator" aria-label="Export options"></div>
-                <div class="viewer-settings-subtitle">export options</div>
+                    }}>${t('viewer.options.saveSettings')}</button>
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
                 <label>
                     <input id="export-format-stl-toggle" type="checkbox" ?checked=${this.app.exportFormatStlEnabled}>
-                    stl
+                    ${t('viewer.options.export.stl')}
                 </label>
                 <label>
                     <input id="export-format-3mf-toggle" type="checkbox" ?checked=${this.app.exportFormat3mfEnabled}>
-                    3mf
+                    ${t('viewer.options.export.3mf')}
                 </label>
                 <label>
                     <input id="export-format-obj-toggle" type="checkbox" ?checked=${this.app.exportFormatObjEnabled}>
-                    obj
+                    ${t('viewer.options.export.obj')}
                 </label>
                 <label>
                     <input id="export-format-step-toggle" type="checkbox" ?checked=${this.app.exportFormatStepEnabled}>
-                    step
+                    ${t('viewer.options.export.step')}
                 </label>
                 <label>
                     <input id="export-combined-toggle" type="checkbox" ?checked=${this.app.exportCombinedEnabled}>
-                    combined file
+                    ${t('viewer.options.export.combinedFile')}
                 </label>
                 <label>
                     <input id="export-individual-toggle" type="checkbox" ?checked=${this.app.exportIndividualsEnabled}>
-                    individual files
+                    ${t('viewer.options.export.individualFiles')}
                 </label>
                 <label>
                     <input id="export-accessories-toggle" type="checkbox" ?checked=${this.app.exportAccessoriesEnabled}>
-                    include accessories
+                    ${t('viewer.options.export.includeAccessories')}
                 </label>
                 <button
                     id="export-files-btn"
                     type="button"
-                    title="Export all selected formats"
+                    title=${t('viewer.options.export.exportButton.title')}
                     @click=${() => {
                         if (vscode) {
                             vscode.postMessage({
@@ -680,20 +690,20 @@ class ViewerSettingsPanel {
                                 includeAccessories: this.app.exportAccessoriesEnabled,
                             });
                         }
-                    }}>export</button>
+                    }}>${t('viewer.options.export.exportButton')}</button>
                 ${this.app.cadqueryOcpInstalled === false
                     ? html`<button
                         id="install-cadquery-ocp-btn"
                         type="button"
-                        title="Install cadquery-ocp for STEP export"
+                        title=${t('viewer.options.export.installCadquery.title')}
                         ?disabled=${this.app.installingCadqueryOcp === true}
                         @click=${() => {
                             if (vscode) {
                                 vscode.postMessage({ type: 'requestInstallCadqueryOcp' });
                             }
                         }}>${this.app.installingCadqueryOcp === true
-                            ? 'installing cadquery...'
-                            : 'install cadquery for step export'}</button>`
+                            ? t('viewer.options.export.installingCadquery')
+                            : t('viewer.options.export.installCadquery')}</button>`
                     : ''}
             </section>
         `;
@@ -886,7 +896,7 @@ class ViewerParameterPanel {
                         ?checked=${Boolean(value)}
                         ?disabled=${disabled}
                         @change=${(event) => this.app.setPendingRenderParameterValue(param.name, Boolean(event.target.checked))}>
-                    <span>enabled</span>
+                    <span>${t('common.enabled')}</span>
                 </label>
             `;
         }
@@ -943,7 +953,7 @@ class ViewerParameterPanel {
 
         const enabled = this.app.isOptionalRenderParameterEnabled(param);
         const editorValue = this.app.getRenderParameterEditorValue(param);
-        const displayValue = enabled ? (param.kind === 'v3' ? this.formatV3Display(editorValue) : String(editorValue ?? '')) : 'none';
+        const displayValue = enabled ? (param.kind === 'v3' ? this.formatV3Display(editorValue) : String(editorValue ?? '')) : t('viewer.frameParams.optionalDisabledValue');
         
         return html`
             <div class="parameter-row parameter-row-optional" style=${enabled ? 'opacity:1;' : 'opacity:0.62;'}>
@@ -970,22 +980,22 @@ class ViewerParameterPanel {
         const params = this.app.renderParameterSchema;
         const hasPendingChanges = this.app.hasPendingRenderParameterChanges();
         return html`
-            <section id="parameter-controls" aria-label="Frame parameters">
+            <section id="parameter-controls" aria-label=${t('viewer.frameParams.ariaLabel')}>
                 <div class="parameter-header">
-                    <div class="parameter-controls-title">frame parameters</div>
+                    <div class="parameter-controls-title">${t('viewer.frameParams.title')}</div>
                     <div class="parameter-refresh-controls">
                         ${hasPendingChanges
-                            ? html`<span class="parameter-changes-indicator">changes detected</span>`
+                            ? html`<span class="parameter-changes-indicator">${t('viewer.frameParams.changesDetected')}</span>`
                             : ''}
                         <button
                             id="refresh-btn"
                             type="button"
-                            title="Refresh using current parameter values"
-                            @click=${() => this.app.requestRefreshWithPendingParameters()}>refresh</button>
+                            title=${t('viewer.frameParams.refresh.title')}
+                            @click=${() => this.app.requestRefreshWithPendingParameters()}>${t('viewer.frameParams.refresh')}</button>
                     </div>
                 </div>
                 ${params.length === 0
-                    ? html`<div class="parameter-empty">No parameters exposed by this frame or pattern.</div>`
+                    ? html`<div class="parameter-empty">${t('viewer.frameParams.empty')}</div>`
                     : html`
                         <div class="parameter-list">
                             ${params.map((param, index) => html`
@@ -1149,41 +1159,41 @@ class KigumiViewerApp extends LitElement {
         const cameraMode = this.cameraController.getCameraMode();
         const hasPendingChanges = this.hasPendingRenderParameterChanges() || this.viewState.sourceHasPendingChanges;
         const navigationHint = this.leftClickDragRotatesCamera
-            ? 'left/right drag orbit • middle drag pan • scroll zoom • F focus'
-            : 'right drag orbit • middle drag pan • scroll zoom • F focus';
+            ? t('viewer.chrome.navHint.leftClick')
+            : t('viewer.chrome.navHint.rightClick');
         return html`
-            <button id="to-v3d" title="Scroll back to top">to v3d view</button>
+            <button id="to-v3d" title=${t('viewer.chrome.toV3d.title')}>${t('viewer.chrome.toV3d')}</button>
             <div id="viewport">
                 ${hasPendingChanges
                     ? html`<button
                         id="top-center-refresh-btn"
                         type="button"
-                        title="Refresh using current parameter values"
+                        title=${t('viewer.frameParams.refresh.title')}
                         @click=${() => this.requestRefreshWithPendingParameters()}>
-                            <span class="top-center-refresh-primary">refresh</span>
-                            <span class="top-center-refresh-secondary">changes detected</span>
+                            <span class="top-center-refresh-primary">${t('viewer.frameParams.refresh')}</span>
+                            <span class="top-center-refresh-secondary">${t('viewer.frameParams.changesDetected')}</span>
                         </button>`
                     : ''}
                 <canvas id="c"></canvas>
                 <div id="loading-overlay" class=${this.isOverlayVisible() ? 'visible' : ''}>
                     <div id="loading-text">${this.viewState.loadingText}</div>
-                    <button id="output-btn" type="button" title="Open Kigumi output channel" style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">view output</button>
+                    <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
                 </div>
                 <div id="info"></div>
                 <kigumi-layers-view id="layers-view"></kigumi-layers-view>
-                <div id="gizmo-panel" aria-label="Camera and light gizmos">
+                <div id="gizmo-panel" aria-label=${t('viewer.chrome.gizmoPanel.ariaLabel')}>
                     <div class="gizmo-block">
-                        <div class="gizmo-title">camera</div>
+                        <div class="gizmo-title">${t('viewer.chrome.gizmo.camera')}</div>
                         <canvas id="gizmo-cube-c"></canvas>
                     </div>
-                    <button id="focus-btn" type="button" title="Focus selection">focus</button>
+                    <button id="focus-btn" type="button" title=${t('viewer.chrome.gizmo.focus.title')}>${t('viewer.chrome.gizmo.focus')}</button>
                     <button
                         id="camera-mode-btn"
                         type="button"
-                        title="Toggle camera mode: standard keeps camera up aligned to world Z"
-                    >📷 ${cameraMode === 'standard' ? 'standard' : 'free'}</button>
+                        title=${t('viewer.chrome.gizmo.cameraMode.title')}
+                    >📷 ${cameraMode === 'standard' ? t('viewer.chrome.gizmo.cameraMode.standard') : t('viewer.chrome.gizmo.cameraMode.free')}</button>
                     <div class="gizmo-block">
-                        <div class="gizmo-title">light</div>
+                        <div class="gizmo-title">${t('viewer.chrome.gizmo.light')}</div>
                         <canvas id="light-dial-c"></canvas>
                     </div>
                 </div>
@@ -1197,43 +1207,43 @@ class KigumiViewerApp extends LitElement {
             </div>
             <div id="panels">
                 <div class="panel-box">
-                    <div class="panel-title">Member List</div>
-                    <div id="member-list-options" aria-label="Member list options">
+                    <div class="panel-title">${t('viewer.memberList.title')}</div>
+                    <div id="member-list-options" aria-label=${t('viewer.memberList.ariaLabel')}>
                         <label>
                             <input id="member-opt-rough-length" type="checkbox" ?checked=${this.memberListOptions.showRoughLength}>
-                            show rough length (exact + ${this.memberListRoughLengthAllowanceMm})
+                            ${t('viewer.memberList.opt.roughLength', { allowance: this.memberListRoughLengthAllowanceMm })}
                         </label>
                         <label>
                             <input id="member-opt-sizes" type="checkbox" ?checked=${this.memberListOptions.showNominalSizes}>
-                            show perfect timber within/nominal sizes
+                            ${t('viewer.memberList.opt.sizes')}
                         </label>
                         <label>
                             <input id="member-opt-csg" type="checkbox" ?checked=${this.memberListOptions.showCsgFeatureCount}>
-                            show CSG/feature count
+                            ${t('viewer.memberList.opt.csg')}
                         </label>
                         <label>
                             <input id="member-opt-tags" type="checkbox" ?checked=${this.memberListOptions.showTags}>
-                            show tags
+                            ${t('viewer.memberList.opt.tags')}
                         </label>
                     </div>
                     <details id="member-list-legend" open>
-                        <summary>Legend</summary>
+                        <summary>${t('viewer.memberList.legend.summary')}</summary>
                         <div class="member-list-legend-body">
-                            <p><strong>length</strong>: exact length of timber after making all joint cuts (add a bit to this for rough cut length) / rough cut length (depending on option)</p>
-                            <p><strong>size toggle</strong>: when enabled, width/height columns show nominal sizes (from get_nominal_size). when disabled, they show perfect sizes (from get_perfect_size).</p>
-                            <p><strong>#CSGs</strong>: total constructive solid geometry nodes used for the member.</p>
-                            <p><strong>#Features</strong>: number of named CSG features on that member.</p>
-                            <p><strong>tags</strong>: all ticket tags attached to the member.</p>
+                            <p><strong>${t('viewer.memberList.legend.length.term')}</strong>: ${t('viewer.memberList.legend.length.desc')}</p>
+                            <p><strong>${t('viewer.memberList.legend.sizeToggle.term')}</strong>: ${t('viewer.memberList.legend.sizeToggle.desc')}</p>
+                            <p><strong>${t('viewer.memberList.legend.csg.term')}</strong>: ${t('viewer.memberList.legend.csg.desc')}</p>
+                            <p><strong>${t('viewer.memberList.legend.features.term')}</strong>: ${t('viewer.memberList.legend.features.desc')}</p>
+                            <p><strong>${t('viewer.memberList.legend.tags.term')}</strong>: ${t('viewer.memberList.legend.tags.desc')}</p>
                         </div>
                     </details>
                     <div id="timber-panel">
                         <table>
                             <thead>
                                 <tr>
-                                    <th>#</th><th>Type</th><th>Name</th>
-                                    <th data-col="tags">Tags</th>
-                                    <th data-col="length">Length (Exact)</th><th data-col="width">Width</th><th data-col="height">Height</th>
-                                    <th data-col="csg">#CSGs</th><th data-col="feature">#Features</th>
+                                    <th>#</th><th>${t('viewer.memberList.table.type')}</th><th>${t('viewer.memberList.table.name')}</th>
+                                    <th data-col="tags">${t('viewer.memberList.table.tags')}</th>
+                                    <th data-col="length">${t('viewer.memberList.table.length')}</th><th data-col="width">${t('viewer.memberList.table.width')}</th><th data-col="height">${t('viewer.memberList.table.height')}</th>
+                                    <th data-col="csg">${t('viewer.memberList.legend.csg.term')}</th><th data-col="feature">${t('viewer.memberList.legend.features.term')}</th>
                                 </tr>
                             </thead>
                             <tbody id="timber-rows"></tbody>
@@ -1242,17 +1252,17 @@ class KigumiViewerApp extends LitElement {
                 </div>
                 <div id="log-panel-box" class="panel-box">
                     <div class="panel-title">
-                        Log Output
+                        ${t('viewer.log.title')}
                         <div id="log-panel-toolbar">
-                            <input id="log-filter" type="text" placeholder="filter…">
-                            <button id="log-clear-btn" type="button">clear</button>
-                            <button id="log-open-output-btn" type="button">open VS Code output</button>
+                            <input id="log-filter" type="text" placeholder=${t('viewer.log.filter.placeholder')}>
+                            <button id="log-clear-btn" type="button">${t('viewer.log.clear')}</button>
+                            <button id="log-open-output-btn" type="button">${t('viewer.log.openOutput')}</button>
                         </div>
                     </div>
                     <div id="log-output"></div>
                 </div>
                 <div class="panel-box">
-                    <div class="panel-title">Raw Python Output</div>
+                    <div class="panel-title">${t('viewer.rawOutput.title')}</div>
                     <pre id="raw-output"></pre>
                 </div>
             </div>
@@ -1265,7 +1275,7 @@ class KigumiViewerApp extends LitElement {
         window.addEventListener('message', this.onWindowMessage);
         this.applyPersistedViewerSettings(INITIAL_PAYLOAD.viewerSettings || null);
         this.setViewerOptions(INITIAL_PAYLOAD.viewerOptions);
-        this.setViewPhase(ViewerPhase.WAITING_FOR_RUNNER, 'raising frame', { refreshToken: 0 });
+        this.setViewPhase(ViewerPhase.WAITING_FOR_RUNNER, t('viewer.chrome.loading.raisingFrame'), { refreshToken: 0 });
         void this.beginPayloadApplication(INITIAL_PAYLOAD);
         
         // Setup selection listener
@@ -3178,10 +3188,10 @@ class KigumiViewerApp extends LitElement {
         if (this.assemblySolving) {
             return html`
                 <div id="assembly-timeline"
-                    aria-label="Assembly preview timeline"
+                    aria-label=${t('viewer.assembly.ariaLabel')}
                     @pointerdown=${(event) => event.stopPropagation()}
                     @mousedown=${(event) => event.stopPropagation()}>
-                    <span class="assembly-timeline-loading">figuring out how to disassemble…</span>
+                    <span class="assembly-timeline-loading">${t('viewer.assembly.solving')}</span>
                 </div>
             `;
         }
@@ -3196,10 +3206,10 @@ class KigumiViewerApp extends LitElement {
             : '';
         return html`
             <div id="assembly-timeline"
-                aria-label="Assembly preview timeline"
+                aria-label=${t('viewer.assembly.ariaLabel')}
                 @pointerdown=${(event) => event.stopPropagation()}
                 @mousedown=${(event) => event.stopPropagation()}>
-                <span class="assembly-timeline-end-label">assembled</span>
+                <span class="assembly-timeline-end-label">${t('viewer.assembly.assembled')}</span>
                 <div class="assembly-timeline-track">
                     <input
                         id="assembly-scrub-slider"
@@ -3225,7 +3235,7 @@ class KigumiViewerApp extends LitElement {
                         type="button"
                         title=${failureTooltip}
                         @click=${() => this.logAssemblyFailure()}>✕</button>`
-                    : html`<span class="assembly-timeline-end-label">disassembled</span>`}
+                    : html`<span class="assembly-timeline-end-label">${t('viewer.assembly.disassembled')}</span>`}
                 ${warnings.length > 0
                     ? html`<span class="assembly-timeline-warnings" title=${warnings.join('\n')}>⚠ ${warnings.length}</span>`
                     : ''}
@@ -4277,16 +4287,16 @@ class KigumiViewerApp extends LitElement {
 
     defaultLoadingTextForPhase(phase) {
         if (phase === ViewerPhase.BOOTING) {
-            return 'starting viewer';
+            return t('viewer.chrome.loading.startingViewer');
         }
         if (phase === ViewerPhase.WAITING_FOR_RUNNER) {
-            return 'raising frame';
+            return t('viewer.chrome.loading.raisingFrame');
         }
         if (phase === ViewerPhase.APPLYING_GEOMETRY) {
-            return 'cutting joints 0/0';
+            return t('viewer.chrome.loading.cuttingJoints', { processed: 0, total: 0 });
         }
         if (phase === ViewerPhase.ERROR) {
-            return 'viewer error';
+            return t('viewer.chrome.loading.viewerError');
         }
         return '';
     }
@@ -4385,7 +4395,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        this.setViewPhase(ViewerPhase.APPLYING_GEOMETRY, uiState.loadingText || 'raising frame', {
+        this.setViewPhase(ViewerPhase.APPLYING_GEOMETRY, uiState.loadingText || t('viewer.chrome.loading.raisingFrame'), {
             refreshToken,
             error: null,
         });
@@ -4397,7 +4407,7 @@ class KigumiViewerApp extends LitElement {
         this.updateInfo(frameData);
         const applyStartMs = performance.now();
         const completed = await this.updateMeshScene(geometryData, refreshToken, (processed, total) => {
-            this.setViewPhase(ViewerPhase.APPLYING_GEOMETRY, `cutting joints ${processed}/${total}`, {
+            this.setViewPhase(ViewerPhase.APPLYING_GEOMETRY, t('viewer.chrome.loading.cuttingJoints', { processed, total }), {
                 refreshToken,
                 error: null,
             });

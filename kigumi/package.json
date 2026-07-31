@@ -48,7 +48,7 @@
       "kigumi": [
         {
           "id": "kigumi.explorer",
-          "name": "Kigumi Explorer 🦒",
+          "name": "Kigumi Explorer 🐘",
           "icon": "templogo.png"
         }
       ]
@@ -56,87 +56,87 @@
     "commands": [
       {
         "command": "kigumi.openCurrentFileInViewer",
-        "title": "Kigumi: Open Current File In Viewer",
+        "title": "%command.openCurrentFileInViewer.title%",
         "icon": "$(play)"
       },
       {
         "command": "kigumi.initializeProjectInWorkspace",
-        "title": "Kigumi: Initialize Project",
+        "title": "%command.initializeProjectInWorkspace.title%",
         "icon": "$(rocket)"
       },
       {
         "command": "kigumi.refreshSidebar",
-        "title": "Kigumi: Refresh Sidebar",
+        "title": "%command.refreshSidebar.title%",
         "icon": "$(refresh)"
       },
       {
         "command": "kigumi.toggleGroupByPatternbook",
-        "title": "Kigumi: Toggle Patternbook Grouping",
+        "title": "%command.toggleGroupByPatternbook.title%",
         "icon": "$(list-tree)"
       },
       {
         "command": "kigumi.updateKumiki",
-        "title": "Kigumi: Update Kumiki",
+        "title": "%command.updateKumiki.title%",
         "icon": "$(cloud-download)"
       },
       {
         "command": "kigumi.openWebsite",
-        "title": "Kigumi: Open Kumiki Website",
+        "title": "%command.openWebsite.title%",
         "icon": "$(link-external)"
       },
       {
         "command": "kigumi.toggleAutoRefreshOnFileChange",
-        "title": "Kigumi: Toggle Auto Refresh On File Change",
+        "title": "%command.toggleAutoRefreshOnFileChange.title%",
         "icon": "$(sync)"
       },
       {
         "command": "kigumi.automationListSessions",
-        "title": "Kigumi: Automation List Sessions"
+        "title": "%command.automationListSessions.title%"
       },
       {
         "command": "kigumi.automationOpenFileInViewer",
-        "title": "Kigumi: Automation Open File In Viewer"
+        "title": "%command.automationOpenFileInViewer.title%"
       },
       {
         "command": "kigumi.automationRefreshSession",
-        "title": "Kigumi: Automation Refresh Session"
+        "title": "%command.automationRefreshSession.title%"
       },
       {
         "command": "kigumi.automationReadSessionLogs",
-        "title": "Kigumi: Automation Read Session Logs"
+        "title": "%command.automationReadSessionLogs.title%"
       },
       {
         "command": "kigumi.automationGetCameraState",
-        "title": "Kigumi: Automation Get Camera State"
+        "title": "%command.automationGetCameraState.title%"
       },
       {
         "command": "kigumi.automationSetCameraState",
-        "title": "Kigumi: Automation Set Camera State"
+        "title": "%command.automationSetCameraState.title%"
       },
       {
         "command": "kigumi.captureScreenshot",
-        "title": "Kigumi: Automation Capture Screenshot"
+        "title": "%command.captureScreenshot.title%"
       },
       {
         "command": "kigumi.explorer",
-        "title": "Kigumi: Open Explorer",
+        "title": "%command.explorer.title%",
         "icon": "$(file-directory)"
       },
       {
         "command": "kigumi.viewPatternSource",
-        "title": "View Source",
+        "title": "%command.viewPatternSource.title%",
         "category": "Kigumi",
         "icon": "$(go-to-file)"
       },
       {
         "command": "kigumi.duplicatePatternToWorkspace",
-        "title": "Duplicate To Workspace",
+        "title": "%command.duplicatePatternToWorkspace.title%",
         "category": "Kigumi",
         "icon": "$(copy)"
       },
       {
         "command": "kigumi.openPatternInNewWindow",
-        "title": "Open in New Tab",
+        "title": "%command.openPatternInNewWindow.title%",
         "category": "Kigumi"
       }
     ],
@@ -211,28 +211,28 @@
         "kigumi.viewer.openInSplitView": {
           "type": "boolean",
           "default": false,
-          "description": "Open the Kigumi viewer in a new editor column beside the active one. When off, the viewer opens in the active column."
+          "description": "%config.openInSplitView.description%"
         },
         "kigumi.viewer.autoRefreshOnFileChange": {
           "type": "boolean",
           "default": false,
-          "description": "Automatically refresh open Kigumi viewers when watched files change."
+          "description": "%config.autoRefreshOnFileChange.description%"
         },
         "kigumi.viewer.showPoopTaggedJoints": {
           "type": "boolean",
           "default": false,
-          "description": "Show poop-tagged joints in the pattern book."
+          "description": "%config.showPoopTaggedJoints.description%"
         },
         "kigumi.viewer.assemblyPreview": {
           "type": "boolean",
           "default": false,
-          "description": "Show the assembly (disassembly) preview timeline in the frame viewer. Experimental. Takes effect when a viewer is (re)opened."
+          "description": "%config.assemblyPreview.description%"
         },
         "kigumi.viewer.logRetentionDays": {
           "type": "number",
           "default": 15,
           "minimum": 0,
-          "description": "Delete Kigumi log files in .kigumi/logs that are older than this many days when the extension starts or the setting changes."
+          "description": "%config.logRetentionDays.description%"
         }
       }
     }

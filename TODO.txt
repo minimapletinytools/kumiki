@@ -213,7 +213,7 @@ DONE-BUG when reusing the kigumi viewer to open a new pattern, it does not refre
 DONE-BUG you can't click on top/bottom ends of round timbers to check wwhich direction they are
 DONE-icon change
 
--add loclaization
+DONE-add loclaization (en/ja, auto-detected from VS Code's display language; viewer webview + sidebar + package.json contributions; no manual override yet)
 
 
 -do another example/pattern cleanup

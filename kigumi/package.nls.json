@@ -1,0 +1,26 @@
+{
+  "command.openCurrentFileInViewer.title": "Kigumi: Open Current File In Viewer",
+  "command.initializeProjectInWorkspace.title": "Kigumi: Initialize Project",
+  "command.refreshSidebar.title": "Kigumi: Refresh Sidebar",
+  "command.toggleGroupByPatternbook.title": "Kigumi: Toggle Patternbook Grouping",
+  "command.updateKumiki.title": "Kigumi: Update Kumiki",
+  "command.openWebsite.title": "Kigumi: Open Kumiki Website",
+  "command.toggleAutoRefreshOnFileChange.title": "Kigumi: Toggle Auto Refresh On File Change",
+  "command.automationListSessions.title": "Kigumi: Automation List Sessions",
+  "command.automationOpenFileInViewer.title": "Kigumi: Automation Open File In Viewer",
+  "command.automationRefreshSession.title": "Kigumi: Automation Refresh Session",
+  "command.automationReadSessionLogs.title": "Kigumi: Automation Read Session Logs",
+  "command.automationGetCameraState.title": "Kigumi: Automation Get Camera State",
+  "command.automationSetCameraState.title": "Kigumi: Automation Set Camera State",
+  "command.captureScreenshot.title": "Kigumi: Automation Capture Screenshot",
+  "command.explorer.title": "Kigumi: Open Explorer",
+  "command.viewPatternSource.title": "View Source",
+  "command.duplicatePatternToWorkspace.title": "Duplicate To Workspace",
+  "command.openPatternInNewWindow.title": "Open in New Tab",
+
+  "config.openInSplitView.description": "Open the Kigumi viewer in a new editor column beside the active one. When off, the viewer opens in the active column.",
+  "config.autoRefreshOnFileChange.description": "Automatically refresh open Kigumi viewers when watched files change.",
+  "config.showPoopTaggedJoints.description": "Show poop-tagged joints in the pattern book.",
+  "config.assemblyPreview.description": "Show the assembly (disassembly) preview timeline in the frame viewer. Experimental. Takes effect when a viewer is (re)opened.",
+  "config.logRetentionDays.description": "Delete Kigumi log files in .kigumi/logs that are older than this many days when the extension starts or the setting changes."
+}

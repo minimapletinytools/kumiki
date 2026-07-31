@@ -1,0 +1,26 @@
+{
+  "command.openCurrentFileInViewer.title": "Kigumi: 現在のファイルをビューアーで開く",
+  "command.initializeProjectInWorkspace.title": "Kigumi: プロジェクトを初期化",
+  "command.refreshSidebar.title": "Kigumi: サイドバーを更新",
+  "command.toggleGroupByPatternbook.title": "Kigumi: パターンブックでのグループ化を切り替え",
+  "command.updateKumiki.title": "Kigumi: Kumikiを更新",
+  "command.openWebsite.title": "Kigumi: Kumikiのウェブサイトを開く",
+  "command.toggleAutoRefreshOnFileChange.title": "Kigumi: ファイル変更時の自動更新を切り替え",
+  "command.automationListSessions.title": "Kigumi: 自動化 - セッション一覧",
+  "command.automationOpenFileInViewer.title": "Kigumi: 自動化 - ビューアーでファイルを開く",
+  "command.automationRefreshSession.title": "Kigumi: 自動化 - セッションを更新",
+  "command.automationReadSessionLogs.title": "Kigumi: 自動化 - セッションログを読み取る",
+  "command.automationGetCameraState.title": "Kigumi: 自動化 - カメラ状態を取得",
+  "command.automationSetCameraState.title": "Kigumi: 自動化 - カメラ状態を設定",
+  "command.captureScreenshot.title": "Kigumi: 自動化 - スクリーンショットを撮影",
+  "command.explorer.title": "Kigumi: エクスプローラーを開く",
+  "command.viewPatternSource.title": "ソースを表示",
+  "command.duplicatePatternToWorkspace.title": "ワークスペースに複製",
+  "command.openPatternInNewWindow.title": "新しいタブで開く",
+
+  "config.openInSplitView.description": "Kigumiビューアーをアクティブなエディターの隣に新しい列で開きます。オフの場合、ビューアーはアクティブな列で開きます。",
+  "config.autoRefreshOnFileChange.description": "監視対象のファイルが変更されたときに、開いているKigumiビューアーを自動的に更新します。",
+  "config.showPoopTaggedJoints.description": "パターンブックでpoopタグ付きの仕口を表示します。",
+  "config.assemblyPreview.description": "フレームビューアーに組み立て(分解)プレビュータイムラインを表示します。実験的機能です。ビューアーを(再)起動すると反映されます。",
+  "config.logRetentionDays.description": "拡張機能の起動時、または設定変更時に、.kigumi/logs内の指定日数より古いKigumiログファイルを削除します。"
+}

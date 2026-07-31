@@ -6,6 +6,7 @@ const vscode = require('vscode');
 const path = require('path');
 const fs = require('fs');
 const { requestWebviewRoundTrip } = require('./webview-request');
+const { resolveLocale, loadCatalog, createTranslator } = require('./i18n');
 
 const initializedPanels = new WeakSet();
 const webviewDir = path.join(__dirname, 'webview');
@@ -59,7 +60,7 @@ function initializeFrameViewer(panel, filePath, options = {}, isLocalDev = false
 
     const loadingText = typeof options.loadingText === 'string' && options.loadingText
         ? options.loadingText
-        : 'initial creation';
+        : createTranslator(vscode.env.language)('viewer.chrome.loading.initialCreation');
     const viewerOptions = normalizeViewerOptions(options.viewerOptions);
     const viewerSettings = (options.viewerSettings && typeof options.viewerSettings === 'object')
         ? options.viewerSettings
@@ -139,6 +140,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const template = fs.readFileSync(templatePath, 'utf8');
 
     const appJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer-app.js'))).toString();
+    const i18nJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'i18n.js'))).toString();
     const selectionStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-store.js'))).toString();
     const layerStateStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layer-state-store.js'))).toString();
     const layersPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layers-panel.js'))).toString();
@@ -153,6 +155,10 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const lineSegments2JsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'LineSegments2.js'))).toString();
     const litJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'lit.min.js'))).toString();
     const nonce = getNonce();
+    // Locale is resolved once, server-side, from VS Code's own display
+    // language — no user-facing override yet, this purely auto-follows
+    // vscode.env.language (falls back to 'en' if unsupported/unset).
+    const locale = resolveLocale(vscode.env.language);
 
     const payloadJson = escapeScriptJson(JSON.stringify({
         frame: frameData,
@@ -164,12 +170,15 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         // User setting for the assembly preview timeline; the webview combines
         // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
         assemblyPreviewSetting: vscode.workspace.getConfiguration('kigumi').get('viewer.assemblyPreview', false) === true,
+        i18n: { locale, strings: loadCatalog(locale) },
     }));
 
     return template
         .replace(/__CSP_SOURCE__/g, webview.cspSource)
         .replace(/__NONCE__/g, nonce)
+        .replace('__LOCALE__', locale)
         .replace('__INITIAL_PAYLOAD_JSON__', payloadJson)
+        .replace('__I18N_JS_URI__', i18nJsUri)
         .replace('__SELECTION_STORE_JS_URI__', selectionStoreJsUri)
         .replace('__LAYER_STATE_STORE_JS_URI__', layerStateStoreJsUri)
         .replace('__LAYERS_PANEL_JS_URI__', layersPanelJsUri)

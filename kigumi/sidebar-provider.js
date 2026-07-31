@@ -4,6 +4,12 @@ const { scanWorkspaceForFrames } = require('./frame-scanner');
 const { discoverDependencyContent } = require('./discovery-adapter');
 const { getInitializationStatus, isInitializationInProgress } = require('./project-initializer');
 const { groupPatternsByPatternbook } = require('./pattern-source-utils');
+const { createTranslator } = require('./i18n');
+
+// Resolved once from VS Code's own display language (no user override yet —
+// changing VS Code's display language requires a restart anyway, same as
+// vscode.l10n).
+const t = createTranslator(vscode.env && vscode.env.language);
 
 class SidebarNode {
     constructor({ key, type, label, collapsibleState = vscode.TreeItemCollapsibleState.None, command, description, tooltip, iconPath, data, contextValue }) {
@@ -437,8 +443,8 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'project-status-local-dev',
                 type: 'projectStatusAction',
-                label: 'Kumiki Dev Mode',
-                description: 'kumiki repo detected',
+                label: t('sidebar.kumikiDevMode'),
+                description: t('sidebar.kumikiDevMode.desc'),
                 iconPath: new vscode.ThemeIcon('beaker'),
                 contextValue: 'projectStatusAction',
                 command: {
@@ -450,8 +456,8 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'project-status-initializing',
                 type: 'projectStatusAction',
-                label: 'Initializing project...',
-                description: 'Setting up .venv and Kumiki',
+                label: t('sidebar.initializingProject'),
+                description: t('sidebar.initializingProject.desc'),
                 iconPath: new vscode.ThemeIcon('loading~spin'),
                 contextValue: 'projectStatusAction',
             }));
@@ -459,8 +465,8 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'project-status-initialize',
                 type: 'projectStatusAction',
-                label: '[ Initialize Project ] 🖱️',
-                description: 'Create .kigumi config and .venv',
+                label: t('sidebar.initializeProjectAction'),
+                description: t('sidebar.initializeProjectAction.desc'),
                 collapsibleState: vscode.TreeItemCollapsibleState.None,
                 command: {
                     title: 'Initialize project',
@@ -472,11 +478,11 @@ class KigumiSidebarProvider {
         } else {
             const projectLabel = initStatus && initStatus.projectRoot
                 ? path.basename(initStatus.projectRoot)
-                : 'current workspace';
+                : t('sidebar.currentWorkspace');
             nodes.push(new SidebarNode({
                 key: 'project-status-initialized',
                 type: 'projectStatusAction',
-                label: 'Project Initialized',
+                label: t('sidebar.projectInitialized'),
                 description: projectLabel,
                 iconPath: new vscode.ThemeIcon('pass'),
                 contextValue: 'projectStatusAction',
@@ -495,8 +501,8 @@ class KigumiSidebarProvider {
                 nodes.push(new SidebarNode({
                     key: 'kumiki-version-up-to-date',
                     type: 'kumikiVersionAction',
-                    label: `Kumiki up to date: v${installed}`,
-                    description: 'latest from PyPI',
+                    label: t('sidebar.kumikiUpToDate', { version: installed }),
+                    description: t('sidebar.kumikiUpToDate.desc'),
                     iconPath: new vscode.ThemeIcon('verified-filled'),
                     contextValue: 'kumikiVersionAction',
                 }));
@@ -504,8 +510,8 @@ class KigumiSidebarProvider {
                 nodes.push(new SidebarNode({
                     key: 'kumiki-version-update',
                     type: 'kumikiVersionAction',
-                    label: `[ Update Kumiki from v${installed} -> v${latest} ] 🖱️`,
-                    description: 'Install latest from PyPI',
+                    label: t('sidebar.updateKumikiAction', { installed, latest }),
+                    description: t('sidebar.updateKumikiAction.desc'),
                     command: {
                         title: 'Update Kumiki',
                         command: 'kigumi.updateKumiki',
@@ -519,7 +525,7 @@ class KigumiSidebarProvider {
         nodes.push(new SidebarNode({
             key: 'kumiki-website-action',
             type: 'kumikiWebsiteAction',
-            label: '[ Go to Kumiki Website ] 🖱️',
+            label: t('sidebar.goToWebsiteAction'),
             description: 'github.com/minimapletinytools/kumiki',
             command: {
                 title: 'Open Kumiki Website',
@@ -533,7 +539,7 @@ class KigumiSidebarProvider {
         nodes.push(new SidebarNode({
             key: 'frames-root',
             type: 'framesRoot',
-            label: this._state.isScanning ? 'Frames (scanning...)' : `Frames (${wsFrameCount})`,
+            label: this._state.isScanning ? t('sidebar.framesScanning') : t('sidebar.frames', { count: wsFrameCount }),
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             iconPath: new vscode.ThemeIcon(this._state.isScanning ? 'loading~spin' : 'home'),
         }));
@@ -543,7 +549,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'example-frames-root',
                 type: 'exampleFramesRoot',
-                label: 'Example Frames',
+                label: t('sidebar.exampleFrames'),
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 iconPath: new vscode.ThemeIcon('symbol-folder'),
             }));
@@ -552,7 +558,7 @@ class KigumiSidebarProvider {
         nodes.push(new SidebarNode({
             key: 'patterns-root',
             type: 'patternsRoot',
-            label: this._state.isScanning ? 'Patterns (scanning...)' : 'Patterns',
+            label: this._state.isScanning ? t('sidebar.patternsScanning') : t('sidebar.patterns'),
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             iconPath: new vscode.ThemeIcon(this._state.isScanning ? 'loading~spin' : 'book'),
         }));
@@ -562,7 +568,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'errors-root',
                 type: 'errorsRoot',
-                label: `Scan Issues (${totalErrors})`,
+                label: t('sidebar.scanIssues', { count: totalErrors }),
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 iconPath: new vscode.ThemeIcon('warning'),
             }));
@@ -579,8 +585,8 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: 'project-header-action:no-workspace',
                 type: 'projectHeaderAction',
-                label: '[ Open Workspace Folder ]',
-                description: 'required for initialization',
+                label: t('sidebar.openWorkspaceFolderAction'),
+                description: t('sidebar.openWorkspaceFolderAction.desc'),
                 iconPath: new vscode.ThemeIcon('folder-opened'),
                 contextValue: 'projectHeaderAction',
             })];
@@ -590,8 +596,8 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: 'project-header-action:local-dev',
                 type: 'projectHeaderAction',
-                label: '[ Local Development Mode ]',
-                description: 'workspace is kumiki source',
+                label: t('sidebar.localDevelopmentModeAction'),
+                description: t('sidebar.localDevelopmentModeAction.desc'),
                 iconPath: new vscode.ThemeIcon('beaker'),
                 contextValue: 'projectHeaderAction',
                 command: {
@@ -605,8 +611,8 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: 'project-header-action:initialized',
                 type: 'projectHeaderAction',
-                label: '[ Project Initialized ]',
-                description: '.kigumi + .venv ready',
+                label: t('sidebar.projectInitializedAction'),
+                description: t('sidebar.projectInitializedAction.desc'),
                 iconPath: new vscode.ThemeIcon('pass'),
                 contextValue: 'projectHeaderAction',
                 command: {
@@ -620,8 +626,8 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: 'project-header-action:existing',
                 type: 'projectHeaderAction',
-                label: '[ Finish Project Setup ]',
-                description: 'project files detected',
+                label: t('sidebar.finishProjectSetupAction'),
+                description: t('sidebar.finishProjectSetupAction.desc'),
                 iconPath: new vscode.ThemeIcon('warning'),
                 contextValue: 'projectHeaderAction',
                 command: {
@@ -634,8 +640,8 @@ class KigumiSidebarProvider {
         return [new SidebarNode({
             key: 'project-header-action:init',
             type: 'projectHeaderAction',
-            label: '[ Initialize Current Project ]',
-            description: 'create .kigumi config and .venv',
+            label: t('sidebar.initializeCurrentProjectAction'),
+            description: t('sidebar.initializeCurrentProjectAction.desc'),
             iconPath: new vscode.ThemeIcon('tools'),
             contextValue: 'projectHeaderAction',
             command: {
@@ -651,7 +657,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'frames-scanning',
                 type: 'loading',
-                label: 'Scanning workspace...',
+                label: t('sidebar.scanningWorkspace'),
                 iconPath: new vscode.ThemeIcon('loading~spin'),
             }));
         }
@@ -662,8 +668,8 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'frames-empty',
                 type: 'placeholder',
-                label: 'No frame definitions found',
-                description: this._state.workspaceRoot ? '' : 'Open a workspace',
+                label: t('sidebar.noFrameDefinitionsFound'),
+                description: this._state.workspaceRoot ? '' : t('sidebar.openAWorkspace'),
                 iconPath: new vscode.ThemeIcon('circle-slash'),
             }));
             return nodes;
@@ -696,7 +702,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'library-frames:kumiki',
                 type: 'libraryFrameGroup',
-                label: 'Kumiki',
+                label: t('sidebar.kumiki'),
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 iconPath: new vscode.ThemeIcon('package'),
                 data: { items: shippedFrames },
@@ -750,8 +756,8 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'patterns-scanning',
                 type: 'loading',
-                label: 'Scanning...',
-                description: 'searching workspace and dependencies',
+                label: t('sidebar.scanning'),
+                description: t('sidebar.scanningDesc'),
                 iconPath: new vscode.ThemeIcon('loading~spin'),
             }));
         }
@@ -761,7 +767,7 @@ class KigumiSidebarProvider {
         nodes.push(new SidebarNode({
             key: 'pattern-section:workspace-patternbooks',
             type: 'patternSection',
-            label: `Workspace (${pbCount})`,
+            label: t('sidebar.workspace', { count: pbCount }),
             collapsibleState: vscode.TreeItemCollapsibleState.Expanded,
             iconPath: new vscode.ThemeIcon('folder-opened'),
             data: { sectionKey: 'workspace-patternbooks' },
@@ -773,7 +779,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'pattern-section:shipped-patterns',
                 type: 'patternSection',
-                label: `Kumiki (${shippedCount})`,
+                label: t('sidebar.kumikiCount', { count: shippedCount }),
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 iconPath: new vscode.ThemeIcon('package'),
                 data: { sectionKey: 'shipped-patterns' },
@@ -786,7 +792,7 @@ class KigumiSidebarProvider {
             nodes.push(new SidebarNode({
                 key: 'pattern-section:dependency-patterns',
                 type: 'patternSection',
-                label: `Dependencies (${depCount})`,
+                label: t('sidebar.dependencies', { count: depCount }),
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 iconPath: new vscode.ThemeIcon('extensions'),
                 data: { sectionKey: 'dependency-patterns' },
@@ -824,8 +830,8 @@ class KigumiSidebarProvider {
                 return [new SidebarNode({
                     key: 'workspace-patternbooks-empty',
                     type: 'placeholder',
-                    label: 'No patterns found',
-                    description: 'Files with patterns = [...] will appear here',
+                    label: t('sidebar.noPatternsFound'),
+                    description: t('sidebar.noPatternsFoundHint'),
                     iconPath: new vscode.ThemeIcon('circle-slash'),
                 })];
             }
@@ -869,7 +875,7 @@ class KigumiSidebarProvider {
                     key: `workspace-pattern-folder:${childPath}`,
                     type: 'workspacePatternFolder',
                     label: seg,
-                    description: isMain ? 'main' : undefined,
+                    description: isMain ? t('sidebar.mainBadge') : undefined,
                     collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                     command: isMain ? {
                         title: 'Open pattern',
@@ -916,7 +922,7 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: `workspace-pb-empty:${pb && pb.filePath}`,
                 type: 'placeholder',
-                label: 'No patterns found',
+                label: t('sidebar.noPatternsFound'),
                 iconPath: new vscode.ThemeIcon('circle-slash'),
             })];
         }
@@ -972,7 +978,7 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: 'workspace-patterns-empty',
                 type: 'placeholder',
-                label: 'No patterns found',
+                label: t('sidebar.noPatternsFound'),
                 iconPath: new vscode.ThemeIcon('circle-slash'),
             })];
         }
@@ -986,7 +992,7 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: `patterns-empty:${sectionKey}`,
                 type: 'placeholder',
-                label: 'No patterns found',
+                label: t('sidebar.noPatternsFound'),
                 iconPath: new vscode.ThemeIcon('circle-slash'),
             })];
         }
@@ -1023,7 +1029,9 @@ class KigumiSidebarProvider {
                 key: `patternbook-group:${sectionKey}:${patternbookName}`,
                 type: 'patternbookGroup',
                 label: patternbookName,
-                description: `${items.length} pattern${items.length === 1 ? '' : 's'}`,
+                description: items.length === 1
+                    ? t('sidebar.patternCount.singular', { count: items.length })
+                    : t('sidebar.patternCount.plural', { count: items.length }),
                 collapsibleState: vscode.TreeItemCollapsibleState.Collapsed,
                 command: {
                     title: 'Open patternbook',
@@ -1053,7 +1061,7 @@ class KigumiSidebarProvider {
             return [new SidebarNode({
                 key: `patternbook-empty:${sectionKey}:${patternbookName}`,
                 type: 'placeholder',
-                label: 'No patterns found',
+                label: t('sidebar.noPatternsFound'),
                 iconPath: new vscode.ThemeIcon('circle-slash'),
             })];
         }

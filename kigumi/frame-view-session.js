@@ -7,6 +7,10 @@ const { RefreshProfiler } = require('./refresh-profiler');
 const { createFrameViewer, initializeFrameViewer, renderFrameViewer, requestViewerScreenshot } = require('./viewer');
 const { requestWebviewRoundTrip } = require('./webview-request');
 const { applyFeatureFlagsToLayersPayload } = require('./webview/feature-flags');
+const { createTranslator } = require('./i18n');
+
+// Resolved once from VS Code's own display language (no user override yet).
+const t = createTranslator(vscode.env && vscode.env.language);
 
 const VIEWER_LOG_LEVEL_ORDER = {
     debug: 10,
@@ -1040,7 +1044,7 @@ class FrameViewSession {
             const formatLabel = normalizedFormat.toUpperCase();
             this.log(`[export] ${formatLabel} export failed: ${details.message}`);
 
-            const openOutputAction = 'Open Kigumi Output';
+            const openOutputAction = t('message.action.openKigumiOutput');
             const installHint = normalizedFormat === 'step' && details.message.includes('cadquery-ocp')
                 ? ' Install STEP support with: pip install cadquery-ocp'
                 : normalizedFormat === '3mf' && details.message.includes('3MF export requires')
@@ -1064,7 +1068,7 @@ class FrameViewSession {
             .filter((entry) => entry === 'stl' || entry === '3mf' || entry === 'obj' || entry === 'step'))];
 
         if (formats.length === 0) {
-            void vscode.window.showWarningMessage('Select at least one export format.');
+            void vscode.window.showWarningMessage(t('message.selectExportFormat'));
             return;
         }
 
@@ -1073,7 +1077,7 @@ class FrameViewSession {
         const includeAccessories = message.includeAccessories !== false;
 
         if (!includeCombined && !includeIndividuals) {
-            void vscode.window.showWarningMessage('Enable combined and/or individual export.');
+            void vscode.window.showWarningMessage(t('message.enableExportMode'));
             return;
         }
 
@@ -1186,11 +1190,11 @@ class FrameViewSession {
             }
 
             await this._pushCadqueryStatus();
-            void vscode.window.showInformationMessage('Kigumi installed cadquery-ocp for STEP export.');
+            void vscode.window.showInformationMessage(t('message.cadqueryInstalled'));
         } catch (error) {
             const details = this.extractRunnerErrorDetails(error);
             this.log(`[export] cadquery-ocp install failed: ${details.message}`);
-            const openOutputAction = 'Open Kigumi Output';
+            const openOutputAction = t('message.action.openKigumiOutput');
             const choice = await vscode.window.showErrorMessage(
                 `Failed to install cadquery-ocp: ${details.message}`,
                 openOutputAction
@@ -1390,9 +1394,11 @@ class FrameViewSession {
 
         this.channel.show(true);
         const location = this.parseTracebackLocation(details.traceback);
-        const actions = ['Open Kigumi Output'];
+        const openOutputAction = t('message.action.openKigumiOutput');
+        const goToErrorAction = t('message.action.goToError');
+        const actions = [openOutputAction];
         if (location) {
-            actions.push('Go to Error');
+            actions.push(goToErrorAction);
         }
 
         const choice = await vscode.window.showErrorMessage(
@@ -1400,10 +1406,10 @@ class FrameViewSession {
             ...actions
         );
 
-        if (choice === 'Open Kigumi Output') {
+        if (choice === openOutputAction) {
             this.channel.show(true);
         }
-        if (choice === 'Go to Error' && location) {
+        if (choice === goToErrorAction && location) {
             await this.openTracebackLocation(location);
         }
 

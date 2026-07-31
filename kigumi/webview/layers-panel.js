@@ -2,6 +2,13 @@
     // LayersPanel renders a collapsible overlay tree on the left edge of the viewport.
     // It syncs bidirectionally with SelectionStore: canvas clicks highlight the
     // corresponding row, and clicking a row updates the canvas selection.
+    const _i18nStrings = (globalScope.__KIGUMI_INITIAL_PAYLOAD__
+        && globalScope.__KIGUMI_INITIAL_PAYLOAD__.i18n
+        && globalScope.__KIGUMI_INITIAL_PAYLOAD__.i18n.strings) || {};
+    const t = globalScope.KigumiI18n
+        ? globalScope.KigumiI18n.createTranslator(_i18nStrings)
+        : (key) => key;
+
     class LayersPanel {
         constructor(selectionManager, layerStateStore) {
             this.selectionManager = selectionManager;
@@ -101,9 +108,9 @@
 
             const toggleBtn = document.createElement('button');
             toggleBtn.className = 'lp-toggle-btn' + (this.collapsed ? ' lp-toggle-collapsed' : '');
-            toggleBtn.title = this.collapsed ? 'Expand layers' : 'Collapse layers';
+            toggleBtn.title = this.collapsed ? t('viewer.layers.expand.title') : t('viewer.layers.collapse.title');
             if (this.collapsed) {
-                toggleBtn.innerHTML = '<span class="lp-toggle-chev">▸</span><span class="lp-toggle-label">timber list</span>';
+                toggleBtn.innerHTML = `<span class="lp-toggle-chev">▸</span><span class="lp-toggle-label">${t('viewer.layers.toggleLabel')}</span>`;
             } else {
                 toggleBtn.textContent = '◁';
             }
@@ -117,7 +124,7 @@
 
             const header = document.createElement('div');
             header.className = 'lp-header';
-            header.textContent = 'Layers';
+            header.textContent = t('viewer.layers.header');
             this.el.appendChild(header);
 
             // Search input
@@ -126,7 +133,7 @@
             const filterInput = document.createElement('input');
             filterInput.className = 'lp-filter-input';
             filterInput.type = 'text';
-            filterInput.placeholder = 'Search…';
+            filterInput.placeholder = t('viewer.layers.search.placeholder');
             filterInput.value = this.filterText;
             filterInput.addEventListener('input', (e) => {
                 this.filterText = e.target.value;
@@ -150,8 +157,8 @@
         _renderTree() {
             if (!this._treeEl) return;
             this._treeEl.innerHTML = '';
-            this._renderSection(this._treeEl, 'timbers', 'Timbers', () => this._buildTimberRows());
-            this._renderSection(this._treeEl, 'joints', 'Joints', () => this._buildJointRows());
+            this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
+            this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
             this._syncHighlight();
         }
 
@@ -235,7 +242,7 @@
                 const lockBtn = document.createElement('button');
                 lockBtn.className = 'lp-icon-btn lp-btn-lock';
                 lockBtn.dataset.action = 'lock';
-                lockBtn.title = 'Lock';
+                lockBtn.title = t('viewer.layers.lock.title');
                 lockBtn.textContent = '🔒';
                 lockBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -246,7 +253,7 @@
                 const hideBtn = document.createElement('button');
                 hideBtn.className = 'lp-icon-btn lp-btn-hide';
                 hideBtn.dataset.action = 'hide';
-                hideBtn.title = 'Hide';
+                hideBtn.title = t('viewer.layers.hide.title');
                 hideBtn.textContent = '👁';
                 hideBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
@@ -409,14 +416,14 @@
             if (anyHidden) {
                 const btn = document.createElement('button');
                 btn.className = 'lp-footer-btn';
-                btn.textContent = 'show all';
+                btn.textContent = t('viewer.layers.footer.showAll');
                 btn.addEventListener('click', () => this.layerStateStore.showAll());
                 this._footerEl.appendChild(btn);
             }
             if (anyLocked) {
                 const btn = document.createElement('button');
                 btn.className = 'lp-footer-btn';
-                btn.textContent = 'unlock all';
+                btn.textContent = t('viewer.layers.footer.unlockAll');
                 btn.addEventListener('click', () => this.layerStateStore.unlockAll());
                 this._footerEl.appendChild(btn);
             }
@@ -431,11 +438,11 @@
                 const hideBtn = row.querySelector('[data-action="hide"]');
                 if (lockBtn) {
                     lockBtn.classList.toggle('lp-active', state.locked);
-                    lockBtn.title = state.locked ? 'Unlock' : 'Lock';
+                    lockBtn.title = state.locked ? t('viewer.layers.unlock.title') : t('viewer.layers.lock.title');
                 }
                 if (hideBtn) {
                     hideBtn.classList.toggle('lp-active', state.hidden);
-                    hideBtn.title = state.hidden ? 'Show' : 'Hide';
+                    hideBtn.title = state.hidden ? t('viewer.layers.show.title') : t('viewer.layers.hide.title');
                 }
             }
             this._renderFooter();

@@ -12,6 +12,10 @@ const {
     isInitializationInProgress,
     getWorkspaceKumikiVersionInfo,
 } = require('./project-initializer');
+const { createTranslator } = require('./i18n');
+
+// Resolved once from VS Code's own display language (no user override yet).
+const t = createTranslator(vscode.env && vscode.env.language);
 
 let outputChannel = null;
 const frameSessions = new Map();       // filePath → FrameViewSession (main sessions)
@@ -196,7 +200,7 @@ function activate(context) {
         } catch (error) {
             outputChannel.show(true);
             if (!error || !error.kigumiErrorNotified) {
-                vscode.window.showErrorMessage(`Kigumi error: ${error.message}`);
+                vscode.window.showErrorMessage(t('message.kigumiError', { error: error.message }));
             }
         }
     });
@@ -209,7 +213,7 @@ function activate(context) {
             });
         } catch (error) {
             outputChannel.show(true);
-            vscode.window.showErrorMessage(`Open current file failed: ${error.message || error}`);
+            vscode.window.showErrorMessage(t('message.openCurrentFileFailed', { error: error.message || error }));
         }
     });
 
@@ -253,7 +257,7 @@ function activate(context) {
             nextValue,
             vscode.ConfigurationTarget.Workspace
         );
-        vscode.window.showInformationMessage(`Kigumi auto refresh on file change ${nextValue ? 'enabled' : 'disabled'}.`);
+        vscode.window.showInformationMessage(t('message.autoRefreshToggled', { state: nextValue ? t('common.enabled') : t('common.disabled') }));
         return { enabled: nextValue };
     });
 
@@ -396,7 +400,7 @@ function activate(context) {
         const sourceFile = patternRecord && patternRecord.sourceFile;
         const patternName = patternRecord && patternRecord.patternName;
         if (!sourceFile) {
-            vscode.window.showErrorMessage('Pattern entry is missing a source file.');
+            vscode.window.showErrorMessage(t('message.patternMissingSourceFile'));
             return;
         }
 
@@ -405,7 +409,7 @@ function activate(context) {
             runner = await _getOrCreateBackgroundRunner(sourceFile, context);
         } catch (error) {
             outputChannel.appendLine(`Open pattern error: ${error.message}\n${error.stack}`);
-            vscode.window.showErrorMessage(`Failed to start Kigumi runner: ${error.message}`);
+            vscode.window.showErrorMessage(t('message.failedToStartRunner', { error: error.message }));
             return;
         }
 
@@ -423,7 +427,7 @@ function activate(context) {
         const sourceFile = data && data.sourceFile;
         const patternName = data && data.patternName;
         if (!sourceFile) {
-            vscode.window.showErrorMessage('Pattern entry is missing a source file.');
+            vscode.window.showErrorMessage(t('message.patternMissingSourceFile'));
             return;
         }
 
@@ -432,7 +436,7 @@ function activate(context) {
             runner = await _getOrCreateBackgroundRunner(sourceFile, context);
         } catch (error) {
             outputChannel.appendLine(`Open pattern error: ${error.message}\n${error.stack}`);
-            vscode.window.showErrorMessage(`Failed to start Kigumi runner: ${error.message}`);
+            vscode.window.showErrorMessage(t('message.failedToStartRunner', { error: error.message }));
             return;
         }
 
@@ -458,14 +462,14 @@ function activate(context) {
     // --- Open Patternbook Group ---
     register(context, 'kigumi.openPatternbookGroup', async (groupData) => {
         if (!groupData || !groupData.patterns || groupData.patterns.length === 0) {
-            vscode.window.showErrorMessage('Patternbook has no patterns.');
+            vscode.window.showErrorMessage(t('message.patternbookHasNoPatterns'));
             return;
         }
 
         // Open the first pattern in the patternbook (which will load the whole patternbook)
         const firstPattern = groupData.patterns[0];
         if (!firstPattern || !firstPattern.sourceFile) {
-            vscode.window.showErrorMessage('Cannot find pattern source file.');
+            vscode.window.showErrorMessage(t('message.cannotFindPatternSourceFile'));
             return;
         }
 
@@ -475,7 +479,7 @@ function activate(context) {
             await _openBookFromWebview(runner, firstPattern.sourceFile, context);
         } catch (error) {
             outputChannel.appendLine(`Open patternbook error: ${error.message}\n${error.stack}`);
-            vscode.window.showErrorMessage(`Failed to open patternbook: ${error.message}`);
+            vscode.window.showErrorMessage(t('message.failedToOpenPatternbook', { error: error.message }));
         }
     });
 
@@ -485,13 +489,13 @@ function activate(context) {
         const sourcePath = _extractSourcePathFromSidebarElement(selectedElement);
 
         if (!selectedElement || !sourcePath) {
-            vscode.window.showErrorMessage('Please select a pattern or frame first.');
+            vscode.window.showErrorMessage(t('message.selectPatternOrFrameFirst'));
             return;
         }
 
         const workspaceRoot = getWorkspaceRoot();
         if (!workspaceRoot) {
-            vscode.window.showErrorMessage('Open a workspace folder first.');
+            vscode.window.showErrorMessage(t('message.openWorkspaceFolderFirst'));
             return;
         }
 
@@ -512,11 +516,11 @@ function activate(context) {
                 const uri = vscode.Uri.file(readOnlyPath);
                 const doc = await vscode.workspace.openTextDocument(uri);
                 await vscode.window.showTextDocument(doc);
-                vscode.window.showInformationMessage(`Opened read-only copy of pattern. Edit the original or create a new pattern.`);
+                vscode.window.showInformationMessage(t('message.openedReadOnlyPatternCopy'));
             }
         } catch (error) {
             outputChannel.appendLine(`View source error: ${error.message}\n${error.stack}`);
-            vscode.window.showErrorMessage(`Failed to view pattern source: ${error.message}`);
+            vscode.window.showErrorMessage(t('message.failedToViewPatternSource', { error: error.message }));
         }
     });
 
@@ -524,19 +528,19 @@ function activate(context) {
     register(context, 'kigumi.duplicatePatternToWorkspace', async (elementArg) => {
         const selectedElement = elementArg || sidebarProvider?.getSelectedElementData();
         if (!_isDuplicableLibraryElement(selectedElement)) {
-            vscode.window.showErrorMessage('Duplicate to workspace is only available for library patterns and patternbooks.');
+            vscode.window.showErrorMessage(t('message.duplicateToWorkspaceUnavailable'));
             return;
         }
 
         const sourcePath = _extractSourcePathFromSidebarElement(selectedElement);
         if (!sourcePath) {
-            vscode.window.showErrorMessage('Cannot determine source file for selected item.');
+            vscode.window.showErrorMessage(t('message.cannotDetermineSourceFile'));
             return;
         }
 
         const workspaceRoot = getWorkspaceRoot();
         if (!workspaceRoot) {
-            vscode.window.showErrorMessage('Open a workspace folder first.');
+            vscode.window.showErrorMessage(t('message.openWorkspaceFolderFirst'));
             return;
         }
 
@@ -548,7 +552,7 @@ function activate(context) {
             const doc = await vscode.workspace.openTextDocument(uri);
             await vscode.window.showTextDocument(doc);
             
-            vscode.window.showInformationMessage(`Pattern duplicated to: ${path.relative(workspaceRoot, newPath)}`);
+            vscode.window.showInformationMessage(t('message.patternDuplicatedTo', { path: path.relative(workspaceRoot, newPath) }));
             
             // Refresh sidebar to show the new pattern
             if (sidebarProvider) {
@@ -556,7 +560,7 @@ function activate(context) {
             }
         } catch (error) {
             outputChannel.appendLine(`Duplicate pattern error: ${error.message}\n${error.stack}`);
-            vscode.window.showErrorMessage(`Failed to duplicate pattern: ${error.message}`);
+            vscode.window.showErrorMessage(t('message.failedToDuplicatePattern', { error: error.message }));
         }
     });
 
@@ -569,7 +573,7 @@ function activate(context) {
             if (!mainSession) {
                 const editor = vscode.window.activeTextEditor;
                 if (!editor || editor.document.languageId !== 'python') {
-                    vscode.window.showErrorMessage('Open a Python file first, then run Render Kigumi before browsing patterns.');
+                    vscode.window.showErrorMessage(t('message.openPythonFileBeforeBrowsing'));
                     return;
                 }
                 if (editor.document.isDirty) {
@@ -580,21 +584,21 @@ function activate(context) {
 
             const runner = mainSession.runnerSession;
             if (!runner || !runner.isAlive()) {
-                vscode.window.showErrorMessage('Kigumi runner is not running. Run Render Kigumi first.');
+                vscode.window.showErrorMessage(t('message.runnerNotRunningRunFirst'));
                 return;
             }
 
             // Query available patterns
             const result = await runner.request('list_available_patterns');
             if (!result || !result.sources || result.sources.length === 0) {
-                vscode.window.showInformationMessage('No patterns found in shipped library or local project.');
+                vscode.window.showInformationMessage(t('message.noPatternsFoundLibraryOrProject'));
                 return;
             }
 
             // Build QuickPick items
             const items = [];
             for (const source of result.sources) {
-                const sourceLabel = source.source === 'shipped' ? 'Shipped Library' : 'Local Project';
+                const sourceLabel = source.source === 'shipped' ? t('message.shippedLibrary') : t('message.localProject');
                 items.push({ label: sourceLabel, kind: vscode.QuickPickItemKind.Separator });
                 for (const pattern of source.patterns) {
                     const groupsStr = pattern.groups.length > 0 ? ` (${pattern.groups.join(', ')})` : '';
@@ -609,7 +613,7 @@ function activate(context) {
             }
 
             const picked = await vscode.window.showQuickPick(items, {
-                placeHolder: 'Select a pattern to view',
+                placeHolder: t('message.selectPatternToView'),
                 matchOnDescription: true,
                 matchOnDetail: true,
             });
@@ -633,7 +637,7 @@ function activate(context) {
         } catch (error) {
             outputChannel.show(true);
             if (!error || !error.kigumiErrorNotified) {
-                vscode.window.showErrorMessage(`Browse Patterns error: ${error.message}`);
+                vscode.window.showErrorMessage(t('message.browsePatternsError', { error: error.message }));
             }
         }
     });
@@ -642,7 +646,7 @@ function activate(context) {
     // --- Unload Pattern command ---
     register(context, 'kigumi.unloadPattern', async function () {
         if (patternSessions.size === 0) {
-            vscode.window.showInformationMessage('No pattern viewers are open.');
+            vscode.window.showInformationMessage(t('message.noPatternViewersOpen'));
             return;
         }
 
@@ -653,7 +657,7 @@ function activate(context) {
         }
 
         const picked = await vscode.window.showQuickPick(items, {
-            placeHolder: 'Select a pattern to unload',
+            placeHolder: t('message.selectPatternToUnload'),
         });
         if (!picked) {
             return;
@@ -736,12 +740,12 @@ function activate(context) {
         const activeFilePath = getActivePythonFilePath();
         const workspaceRoot = getWorkspaceRoot();
         if (!workspaceRoot && !activeFilePath) {
-            vscode.window.showErrorMessage('Open a workspace folder or open a Python file first.');
+            vscode.window.showErrorMessage(t('message.openWorkspaceOrPythonFileFirst'));
             return;
         }
 
         if (isInitializationInProgress()) {
-            vscode.window.showInformationMessage('Kigumi initialization is already in progress.');
+            vscode.window.showInformationMessage(t('message.initializationAlreadyInProgress'));
             return;
         }
 
@@ -749,7 +753,7 @@ function activate(context) {
 
         const initStatus = getInitializationStatus(rootHint, activeFilePath);
         if (initStatus.projectStatus === 'local-dev') {
-            vscode.window.showInformationMessage('Local development mode: using workspace kumiki source; initialization is disabled.');
+            vscode.window.showInformationMessage(t('message.localDevModeInitDisabled'));
             if (sidebarProvider) {
                 await sidebarProvider.refresh(true);
             }
@@ -757,7 +761,7 @@ function activate(context) {
         }
 
         if (initStatus.isInitialized) {
-            vscode.window.showInformationMessage('Project initialized: .kigumi/kumiki.yaml, .kigumi/kigumi.yaml, .venv, and my_cute_frame.py are present.');
+            vscode.window.showInformationMessage(t('message.projectAlreadyInitialized'));
             if (sidebarProvider) {
                 await sidebarProvider.refresh(true);
             }
@@ -768,7 +772,7 @@ function activate(context) {
             let initializeResult = null;
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Initializing Kigumi project',
+                title: t('message.initializingProjectProgress'),
                 cancellable: false,
             }, async () => {
                 const initializePromise = initializeWorkspaceProject(rootHint, activeFilePath);
@@ -786,13 +790,13 @@ function activate(context) {
                 }
             }
             const kumikiVer = initializeResult && initializeResult.kumikiVersion ? ` (kumiki ${initializeResult.kumikiVersion})` : '';
-            vscode.window.showInformationMessage(`Kigumi workspace initialized${kumikiVer}.`);
+            vscode.window.showInformationMessage(t('message.workspaceInitialized', { kumikiVer }));
         } catch (error) {
             if (error && error.code === 'INITIALIZATION_IN_PROGRESS') {
-                vscode.window.showInformationMessage('Kigumi initialization is already in progress.');
+                vscode.window.showInformationMessage(t('message.initializationAlreadyInProgress'));
             } else {
                 outputChannel.show(true);
-                vscode.window.showErrorMessage(`Initialize project failed: ${error.message || error}`);
+                vscode.window.showErrorMessage(t('message.initializeProjectFailed', { error: error.message || error }));
             }
         } finally {
             if (sidebarProvider) {
@@ -805,12 +809,12 @@ function activate(context) {
         const activeFilePath = getActivePythonFilePath();
         const workspaceRoot = getWorkspaceRoot();
         if (!workspaceRoot && !activeFilePath) {
-            vscode.window.showErrorMessage('Open a workspace folder or open a Python file first.');
+            vscode.window.showErrorMessage(t('message.openWorkspaceOrPythonFileFirst'));
             return;
         }
 
         if (isInitializationInProgress()) {
-            vscode.window.showInformationMessage('Kigumi update is already in progress.');
+            vscode.window.showInformationMessage(t('message.updateAlreadyInProgress'));
             return;
         }
 
@@ -818,20 +822,20 @@ function activate(context) {
         try {
             await vscode.window.withProgress({
                 location: vscode.ProgressLocation.Notification,
-                title: 'Updating Kumiki',
+                title: t('message.updatingKumikiProgress'),
                 cancellable: false,
             }, async () => {
                 const result = await updateWorkspaceKumiki(rootHint, activeFilePath);
                 logKumikiInstallResult('update', result);
                 const ver = result && result.kumikiVersion ? ` to ${result.kumikiVersion}` : '';
-                vscode.window.showInformationMessage(`Kumiki updated${ver}.`);
+                vscode.window.showInformationMessage(t('message.kumikiUpdated', { ver }));
             });
         } catch (error) {
             if (error && error.code === 'INITIALIZATION_IN_PROGRESS') {
-                vscode.window.showInformationMessage('Kigumi update is already in progress.');
+                vscode.window.showInformationMessage(t('message.updateAlreadyInProgress'));
             } else {
                 outputChannel.show(true);
-                vscode.window.showErrorMessage(`Update Kumiki failed: ${error.message || error}`);
+                vscode.window.showErrorMessage(t('message.updateKumikiFailed', { error: error.message || error }));
             }
         } finally {
             if (sidebarProvider) {
@@ -880,13 +884,13 @@ function getActivePythonFilePath() {
 async function renderActiveEditor(context, options = {}) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-        vscode.window.showErrorMessage('No active editor!');
+        vscode.window.showErrorMessage(t('message.noActiveEditor'));
         return;
     }
 
     const document = editor.document;
     if (document.languageId !== 'python') {
-        vscode.window.showErrorMessage('Current file is not a Python file!');
+        vscode.window.showErrorMessage(t('message.currentFileNotPython'));
         return;
     }
 
@@ -906,7 +910,7 @@ async function renderActiveEditor(context, options = {}) {
 
 async function openFileInViewer(filePath, context) {
     if (!filePath || typeof filePath !== 'string') {
-        vscode.window.showErrorMessage('No file path provided.');
+        vscode.window.showErrorMessage(t('message.noFilePathProvided'));
         return;
     }
 
@@ -1005,7 +1009,7 @@ async function createPatternSession(runner, slotName, sourceFile, patternName, c
 
 async function _openPatternFromWebview(runner, patternName, sourceFile, context, { forceNewWindow = false } = {}) {
     if (!runner || !runner.isAlive()) {
-        vscode.window.showErrorMessage('Kigumi runner is not running.');
+        vscode.window.showErrorMessage(t('message.runnerNotRunning'));
         return;
     }
 
@@ -1046,7 +1050,7 @@ async function _openPatternFromWebview(runner, patternName, sourceFile, context,
  */
 async function _openBookFromWebview(runner, sourceFile, context) {
     if (!runner || !runner.isAlive()) {
-        vscode.window.showErrorMessage('Kigumi runner is not running.');
+        vscode.window.showErrorMessage(t('message.runnerNotRunning'));
         return;
     }
 
