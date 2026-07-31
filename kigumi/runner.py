@@ -1678,6 +1678,29 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
         return "face"
 
     if isinstance(csg, Cylinder):
+        n = [float(csg.axis_direction[i]) for i in range(3)]
+        c = [float(csg.position[i]) for i in range(3)]
+        d = [pt[i] - c[i] for i in range(3)]
+        along = _dot3(d, n)
+        perp = [d[i] - along * n[i] for i in range(3)]
+        dist = _dot3(perp, perp) ** 0.5
+        r = float(csg.radius)
+        z0 = float(csg.start_distance) if csg.start_distance is not None else None
+        z1 = float(csg.end_distance) if csg.end_distance is not None else None
+
+        # Flat end caps (top/bottom) are distinguishable, like a prism's end
+        # faces; the round barrel isn't split into left/right/front/back, so
+        # every point on it stays "cylindrical_surface".
+        candidates: List[Tuple[str, float]] = [("cylindrical_surface", abs(dist - r))]
+        if z0 is not None and dist <= r + eps:
+            candidates.append(("bottom", abs(along - z0)))
+        if z1 is not None and dist <= r + eps:
+            candidates.append(("top", abs(along - z1)))
+
+        within_eps = [(label, d) for label, d in candidates if d < eps]
+        if within_eps:
+            within_eps.sort(key=lambda c: c[1])
+            return within_eps[0][0]
         return "cylindrical_surface"
 
     return "face"
