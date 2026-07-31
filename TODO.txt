@@ -1,6 +1,3 @@
-
-can you summarize our discussion, plesae include the various unravel/many unravel signatures we proposed. rite it to a
-  7-29-2026_unravel_discussion.mid file or something.
 ::: 7/29 board notes
 
 board related joints
@@ -13,21 +10,28 @@ board related joints
 -reinforced_edge_joint
 -reinforced_corner_butt_joint
 -reinforce_corner_miter_joint
--dado_joint (edge to face)
 -dovetail_corner_joint
 -Half-blind dovetail corenr joint
--rabet_corner_joint/rabet_edge_joint (single/dobule variants)
--drawer lock joint, there are 2 variants, one with a double and one tha's a sigle and dado mayb ecall the single and dode one a dado and rabet joint
+-route-a-corner/edge
+  -corner
+    -rabet_corner_joint/rabet_edge_joint (single/dobule variants)
+    -drawer lock joint, there are 2 variants, one with a double and one tha's a sigle and dado mayb ecall the single and dode one a dado and rabet joint
+  -Breadboard end (this is an end to edge dado joint)
+  -shiplap
+  -cleat joint (not really a joint)
+  -dado_joint (edge to face)
+
+-sliding dovetail (maybe you want tapered variants)
+
 -splined miter joint
 -bridge joint(just tongue nad fork)
--Breadboard end (this is an end to edge dado joint)
+
 -haunced tenon lol ugh
--shiplap
--cleat joint (not really a joint)
+
 
 -finger corner joint (or box joint)
 -finger splice joint 
--sliding dovetail
+
 -make some placeholders for the 
 -rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
 
