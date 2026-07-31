@@ -211,6 +211,10 @@ DONE/IGNORE-try and run a full loop agent test on this to see if it all works
 DONE-round peg rendering gets covered, but other accessories seem to show fine
 DONE-BUG when reusing the kigumi viewer to open a new pattern, it does not refresh the pattern parameters section, so the old parameters stay.
 DONE-BUG you can't click on top/bottom ends of round timbers to check wwhich direction they are
+DONE-icon change
+
+-add loclaization
+
 
 -do another example/pattern cleanup
 -patern book changes
@@ -240,8 +244,7 @@ DONE-BUG you can't click on top/bottom ends of round timbers to check wwhich dir
   -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
   -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
   -"Example Frames" -> "Examples"
--do example cleanup
-
+-selecting cylinders, their surfaces render over the ends, I guess atht's probably intentional TBH...
 
 
 -do V2 of assembly allowing multi step dissameblies
