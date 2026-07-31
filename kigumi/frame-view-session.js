@@ -589,6 +589,14 @@ class FrameViewSession {
     reassignPattern({ slotName, patternName, filePath }) {
         this.slotName = slotName;
         this.patternName = patternName;
+        // The new slot was just raised fresh server-side (raise_specific_pattern,
+        // called by the caller before this), with its own pattern's defaults --
+        // not the previous pattern's. Without this reset, refresh() would see a
+        // non-fresh slot and send the old pattern's leftover renderParameters
+        // into reload_example, leaking stale (and, for same-named parameters,
+        // silently wrong) values into the new pattern's parameters panel.
+        this.renderParameters = {};
+        this._slotIsFresh = true;
         if (filePath !== this.filePath) {
             this.filePath = filePath;
             if (this.fileWatcher) {

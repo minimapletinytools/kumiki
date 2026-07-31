@@ -209,9 +209,7 @@ DONE-give the footprint  rendering a color and amke it turn on/offable (or have 
 DONE-update agent insturctions on orientation conventions
 DONE/IGNORE-try and run a full loop agent test on this to see if it all works
 DONE-round peg rendering gets covered, but other accessories seem to show fine
-
-
--BUG when reusing the kigumi viewer to open a new pattern, it does not refresh the pattern parameters section, so the old parameters stay.
+DONE-BUG when reusing the kigumi viewer to open a new pattern, it does not refresh the pattern parameters section, so the old parameters stay.
 
 -BUG you can't click on top/bottom ends of round timbers to check wwhich direction they are
 
