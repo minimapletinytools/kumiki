@@ -207,7 +207,7 @@ class TestTongueAndGrooveJoint:
 class TestBoardInGroovedRectangularFrameJoint:
     """Tests for cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers."""
 
-    def _make_frame(self, *, n_boards=2, groove_extra_space=scalar(0)):
+    def _make_frame(self, *, n_boards=2):
         """
         Build a panel of *n_boards* side-by-side boards and four surrounding
         frame timbers, all with identity orientation for simplicity.
@@ -275,7 +275,6 @@ class TestBoardInGroovedRectangularFrameJoint:
             board_bottom_end_timbers=[bot_timber],
             board_left_side_timbers=[left_timber],
             board_right_side_timbers=[right_timber],
-            groove_extra_space=groove_extra_space,
         )
         return joint, boards, [top_timber, bot_timber, left_timber, right_timber]
 
@@ -299,27 +298,17 @@ class TestBoardInGroovedRectangularFrameJoint:
             assert cutting.negative_csg is None
 
     def test_groove_thickness_matches_board(self):
-        """Groove Y-size equals board thickness when groove_extra_space=0.
+        """Groove Y-size equals board thickness.
 
         Side timbers share the reference board's orientation so the prism
         size is not permuted by adopt_csg; we can check size[1] directly.
         """
         board_thickness = scalar(2)
-        joint, _, _ = self._make_frame(groove_extra_space=scalar(0))
+        joint, _, _ = self._make_frame()
 
         left_prism = joint.cuttings["left"].negative_csg
         assert isinstance(left_prism, RectangularPrism)
         assert equality_test(left_prism.size[1], board_thickness)
-
-    def test_groove_extra_space_widens_groove(self):
-        """Groove Y-size grows by groove_extra_space."""
-        board_thickness = scalar(2)
-        extra           = scalar(1, 4)
-        joint, _, _ = self._make_frame(groove_extra_space=extra)
-
-        left_prism = joint.cuttings["left"].negative_csg
-        assert isinstance(left_prism, RectangularPrism)
-        assert equality_test(left_prism.size[1], board_thickness + extra)
 
     def test_groove_width_spans_full_panel(self):
         """Groove X-size equals total panel width (n_boards × board_width)."""

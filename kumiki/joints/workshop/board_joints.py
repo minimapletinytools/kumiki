@@ -283,8 +283,7 @@ def cut_tongue_and_groove_joint(
     )
 
 
-# TODO remove groove_extra_space arg
-def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_extra_space: Numeric = scalar(0)):
+def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike]):
     """
     fits boards in between the timbers using the board_in_groove_joint
 
@@ -302,7 +301,6 @@ def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards:
         board_bottom_end_timbers: A list of timbers that will have grooves cut to receive the "bottom" end of the boards
         board_left_side_timbers: A list of timbers that will have grooves cut to receive the "left" side of the boards
         board_right_side_timbers: A list of timbers that will have grooves cut to receive the "right" side of the boards
-        groove_extra_space: Extra space to add to the groove depth beyond the board thickness, to allow for easier fitting of the boards into the grooves
     """
      
     assert boards, "boards must not be empty"
@@ -376,7 +374,7 @@ def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards:
     x_center = (min_x + max_x) / scalar(2)
     y_center = (min_y + max_y) / scalar(2)  # = 0 for coplanar boards
     x_size   = max_x - min_x
-    y_size   = (max_y - min_y) + groove_extra_space
+    y_size   = max_y - min_y
     z_span   = max_z - min_z
 
     # Build the groove prism in the reference board's local coordinate frame.

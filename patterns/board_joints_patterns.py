@@ -74,7 +74,6 @@ def example_board_in_grooved_frame(
     member_size = inches(2)
     board_thickness = inches(3, 4)
     groove_depth = inches(3, 8)
-    groove_extra = inches(1, 16)
 
     # Inner face positions (where each frame member faces inward).
     inner_x_min = member_size            # left stile inner face
@@ -151,7 +150,6 @@ def example_board_in_grooved_frame(
             board_top_end_timbers=[top_rail],
             board_left_side_timbers=[left_stile],
             board_right_side_timbers=[right_stile],
-            groove_extra_space=groove_extra,
         )
     else:
         # Boards run in X (local Z = global X), stacked in Z.
@@ -182,7 +180,6 @@ def example_board_in_grooved_frame(
             board_top_end_timbers=[right_stile],
             board_left_side_timbers=[bot_rail],
             board_right_side_timbers=[top_rail],
-            groove_extra_space=groove_extra,
         )
 
     # Miter joints at the four frame corners.
