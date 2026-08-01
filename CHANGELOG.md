@@ -8,6 +8,21 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.6] - 2026-07-31
+
+### kigumi
+
+#### Added
+
+- Added localization support (English/Japanese, auto-detected from VS Code's display language) across the viewer webview, sidebar, and package.json contributions. No manual language override yet.
+- Round accessories and timbers (pegs, dowels) now render two camera-facing silhouette lines tracing their true tangent outline, since `EdgesGeometry`'s fixed dihedral-angle threshold never picks up a cylinder's faceted barrel (only its flat end caps).
+- Sidebar icons: pattern items now use the `library` codicon, folders that are also directly-openable patterns use `folder-library`, the top-level Frames root uses `home`, and the top-level Patterns root uses `book`.
+
+#### Fixed
+
+- Fixed clicking the top/bottom end faces of round timbers always reporting "cylindrical_surface" instead of "top"/"bottom" (the barrel's curved side still isn't split into left/right/front/back, which is correct/expected).
+- Fixed reusing an existing viewer panel to open a different pattern (from the sidebar) leaving the previous pattern's parameter values applied — the panel now correctly resets to the new pattern's own parameter schema and defaults.
+
 ## [0.4.5] - 2026-07-26
 
 ### kumiki

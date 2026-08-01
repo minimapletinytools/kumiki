@@ -212,11 +212,9 @@ DONE-round peg rendering gets covered, but other accessories seem to show fine
 DONE-BUG when reusing the kigumi viewer to open a new pattern, it does not refresh the pattern parameters section, so the old parameters stay.
 DONE-BUG you can't click on top/bottom ends of round timbers to check wwhich direction they are
 DONE-icon change
-
 DONE-add loclaization (en/ja, auto-detected from VS Code's display language; viewer webview + sidebar + package.json contributions; no manual override yet)
+DONE/IGNORE-do another example/pattern cleanup
 
-
--do another example/pattern cleanup
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
