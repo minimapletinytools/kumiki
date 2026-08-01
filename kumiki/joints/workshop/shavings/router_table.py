@@ -28,7 +28,7 @@ def route_profile(arrangement: CornerJointTimberArrangement, profile: List[V2]) 
     # actually may as well generalize that check to the last n point sin the profile!
 
     #draw the profile on timber1, to complete the profile, you go from the last point in the profile (profile[-1]) on timber1 to (0, profile[-1].y) and then (0,0), and then for timber2 its (proflie[-1].x, 0) and then (0,0), this will complete the profile
-    # make the profile convex with _decompose_simple_polygon_into_convex_pieces
+    # make the profile convex with decompose_simple_polygon_into_convex_pieces
     # extrude the profile on timber 1 to the face opposite of front_face_on_timber1
     # similar extrude the profile on timber2 across the entire dimension (you will need to figure this out as it may not align with timber1)
 

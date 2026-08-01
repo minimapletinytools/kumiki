@@ -607,86 +607,6 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
 
 
 
-# TODO move into cutcsg.py
-def _decompose_simple_polygon_into_convex_pieces(points: List[Tuple[Numeric, Numeric]]) -> List[List[Tuple[Numeric, Numeric]]]:
-    """
-    Decompose a simple (non-self-intersecting) polygon, given as an ordered
-    list of (u, v) points, into convex quads/triangles whose union equals the
-    polygon — via horizontal (constant-v) trapezoidal decomposition.
-
-    Splits the polygon at every vertex's v-coordinate, and within each
-    resulting v-band, finds every edge active there, sorts their u-crossings
-    left to right, and pairs them up with the standard even-odd polygon-fill
-    rule (1st-2nd pair is interior, 3rd-4th pair is interior, and so on).
-    This handles overlapping v-ranges between edges correctly (unlike naively
-    treating each edge as its own independent band), and degenerate edges
-    that double back along another edge (contributing paired, zero-width
-    crossings) simply cancel out.
-
-    Args:
-        points: Ordered polygon vertices (u, v), last connects back to first.
-            v need not be monotonic along the boundary.
-
-    Returns:
-        List of convex pieces, each a list of (u, v) points (quad or
-        triangle) suitable for ConvexPolygonExtrusion.
-    """
-    n = len(points)
-    edges: List[Tuple[Numeric, Numeric, Numeric, Numeric]] = []  # (v_lo, v_hi, u_at_v_lo, u_at_v_hi)
-    for i in range(n):
-        a = points[i]
-        b = points[(i + 1) % n]
-        if safe_zero_test(a[1] - b[1]):
-            continue  # horizontal edge: no v-crossings, doesn't bound any band
-        if safe_compare(a[1], b[1], Comparison.LT):
-            edges.append((a[1], b[1], a[0], b[0]))
-        else:
-            edges.append((b[1], a[1], b[0], a[0]))
-
-    breakpoints: List[Numeric] = sorted((p[1] for p in points), key=giraffe_evalf)
-    deduped_breakpoints: List[Numeric] = []
-    for v in breakpoints:
-        if not deduped_breakpoints or not safe_zero_test(v - deduped_breakpoints[-1]):
-            deduped_breakpoints.append(v)
-
-    pieces: List[List[Tuple[Numeric, Numeric]]] = []
-    for i in range(len(deduped_breakpoints) - 1):
-        v_lo, v_hi = deduped_breakpoints[i], deduped_breakpoints[i + 1]
-        v_mid = (v_lo + v_hi) / scalar(2)
-
-        crossings = []  # (u_at_v_mid, u_at_v_lo, u_at_v_hi)
-        for (e_v_lo, e_v_hi, e_u_lo, e_u_hi) in edges:
-            if safe_compare(e_v_lo, v_mid, Comparison.LE) and safe_compare(v_mid, e_v_hi, Comparison.LE):
-                t_lo = (v_lo - e_v_lo) / (e_v_hi - e_v_lo)
-                t_hi = (v_hi - e_v_lo) / (e_v_hi - e_v_lo)
-                t_mid = (v_mid - e_v_lo) / (e_v_hi - e_v_lo)
-                u_lo = e_u_lo + t_lo * (e_u_hi - e_u_lo)
-                u_hi = e_u_lo + t_hi * (e_u_hi - e_u_lo)
-                u_mid = e_u_lo + t_mid * (e_u_hi - e_u_lo)
-                crossings.append((u_mid, u_lo, u_hi))
-        crossings.sort(key=lambda c: giraffe_evalf(c[0]))
-
-        require_check(
-            None if len(crossings) % 2 == 0
-            else "profile polygon is not simple: odd number of boundary crossings in a v-band"
-        )
-
-        for j in range(0, len(crossings) - 1, 2):
-            _, u_left_lo, u_left_hi = crossings[j]
-            _, u_right_lo, u_right_hi = crossings[j + 1]
-            # A degenerate (zero-area, e.g. two edges retracing the same line)
-            # pair — both corners coincide at both v_lo and v_hi — contributes
-            # nothing and isn't a valid convex polygon; skip it.
-            if safe_zero_test(u_right_lo - u_left_lo) and safe_zero_test(u_right_hi - u_left_hi):
-                continue
-            pieces.append([
-                (u_left_lo, v_lo), (u_right_lo, v_lo),
-                (u_right_hi, v_hi), (u_left_hi, v_hi),
-            ])
-
-    return pieces
-
-
 def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         arrangement: SpliceJointTimberArrangement,
         stepped_shoulder_depth: Numeric,
@@ -860,7 +780,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     # notch cut INTO the region p1-corner would otherwise claim. Decomposing
     # per edge misses that the two interact.
     #
-    # _decompose_simple_polygon_into_convex_pieces handles this generally via
+    # decompose_simple_polygon_into_convex_pieces handles this generally via
     # horizontal (constant-v) trapezoidal decomposition: split at every
     # vertex's v, and within each band pick up ALL edges active there, pairing
     # up their u-crossings left-to-right by the even-odd rule (matching
@@ -876,13 +796,15 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
 
     convex_pieces = [
         ConvexPolygonExtrusion(
-            points=[create_v2(u, v) for (u, v) in quad],
+            points=quad,
             transform=profile_transform,
             # TODO instead of extruding depth_size, find the distance from the center to the actual faces of the timber so we're only cutting a minimal amount.
             start_distance=-depth_size,
             end_distance=depth_size,
         )
-        for quad in _decompose_simple_polygon_into_convex_pieces(profile_points)
+        for quad in decompose_simple_polygon_into_convex_pieces(
+            [create_v2(u, v) for (u, v) in profile_points]
+        )
     ]
 
     timber1_profile_csg_global = SolidUnion(convex_pieces)
@@ -909,12 +831,14 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
 
     convex_pieces_2 = [
         ConvexPolygonExtrusion(
-            points=[create_v2(u, v) for (u, v) in quad],
+            points=quad,
             transform=profile_transform,
             start_distance=-depth_size,
             end_distance=depth_size,
         )
-        for quad in _decompose_simple_polygon_into_convex_pieces(profile_points_2)
+        for quad in decompose_simple_polygon_into_convex_pieces(
+            [create_v2(u, v) for (u, v) in profile_points_2]
+        )
     ]
 
     timber2_profile_csg_global = SolidUnion(convex_pieces_2)
