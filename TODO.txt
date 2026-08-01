@@ -215,6 +215,13 @@ DONE-icon change
 DONE-add loclaization (en/ja, auto-detected from VS Code's display language; viewer webview + sidebar + package.json contributions; no manual override yet)
 DONE/IGNORE-do another example/pattern cleanup
 
+-furniture joints
+  -create board panel arrangement List[Board] and update borad joints to use this
+  -finish cut_board_in_dado_joint_on_plane_aligned_timbers
+  -do router joint stuff
+  -do router video
+  
+
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible

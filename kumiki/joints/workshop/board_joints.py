@@ -283,6 +283,7 @@ def cut_tongue_and_groove_joint(
     )
 
 
+# TODO remove groove_extra_space arg
 def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike], groove_extra_space: Numeric = scalar(0)):
     """
     fits boards in between the timbers using the board_in_groove_joint
@@ -421,3 +422,26 @@ def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards:
         cuttings=cuttings,
         ticket=JointTicket(joint_type="board_in_grooved_frame"),
     )
+
+
+
+def cut_board_in_dado_joint_on_plane_aligned_timbers(boards : List[Board], dado_timbers : List[TimberLike], dado_depth : Numeric = scalar(0)):
+    """
+    cuts boards to fit in dados on dado_timbers. The dadoes are dado_depth deep, so the boards are cut to fit excatly in the dadosinto the grooves on the dado_timbers
+
+    Args:
+        boards: A list of boards to be fitted into the dadoes
+        dado_timbers: A list of timbers that will have dadoes cut to receive the boards. Dadoes are measured from the perfect timber within of the dado timbers!
+    """
+    assert False, "not implemented yet"
+    # TODO
+    # assert boards are all coplanar and have the same thickness
+    # assert everything is plane aligned
+    # first assemble the boars into a "panel" and determine it's centerlines and it's orientation
+    # for each dado timber, run a heuristic to determine which face to cut the dado on, it should be such that "most" of the board is away from the face and the long face is chosen such that it is perpendicular to the board plane
+    # for each dado timber, determine the plane that forms the bottom of the dado, give it a normal as wel
+    # assert that these planes form a convex shape (could be open, but not concave)
+    # cut each of thesee planes from all of the boards that intersect it
+    # construct rectangular prisms to form the dadoes, make sure the prism extend sto the acutal timber size not just teh perfect timber within
+    # finis the joint and return it
+    pass

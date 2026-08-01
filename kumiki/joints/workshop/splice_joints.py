@@ -607,7 +607,7 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
 
 
 
-
+# TODO move into cutcsg.py
 def _decompose_simple_polygon_into_convex_pieces(points: List[Tuple[Numeric, Numeric]]) -> List[List[Tuple[Numeric, Numeric]]]:
     """
     Decompose a simple (non-self-intersecting) polygon, given as an ordered

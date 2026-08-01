@@ -1851,7 +1851,13 @@ class CornerJointTimberArrangement:
 
     def compute_normalized_timber_cross_product(self) -> Direction3D:
         """Compute the normalized cross product of timber1 and timber2 length directions."""
-        return normalize_vector(cross_product(self.timber1.get_length_direction_global(), self.timber2.get_length_direction_global()))
+        return normalize_vector(cross_product(self.timber1.get_face_direction_global(self.timber1_end), self.timber2.get_face_direction_global(self.timber2_end)))
+
+    def is_timber2_left_of_timber1(self) -> bool:
+        """returns true if timber2 is to the left of timber1 when looking down the length of timber1 and standing on the front face of timber1"""
+        assert self.front_face_on_timber1 is not None, "front_face_on_timber1 must be specified to determine left/right orientation"
+        cross_product_vector = cross_product(self.timber1.get_face_direction_global(self.timber1_end), self.timber2.get_face_direction_global(self.timber2_end))
+        return cross_product_vector.dot(self.timber1.get_face_direction_global(self.front_face_on_timber1)) > 0
 
     def check_plane_aligned(self) -> Optional[str]:
         """Return None if timbers are plane-aligned and front face is in plane, else an error message."""
