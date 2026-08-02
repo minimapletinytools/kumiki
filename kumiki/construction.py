@@ -1542,49 +1542,6 @@ class ButtJointTimberArrangement:
             return "receiving_timber must be perfect"
         return None
 
-
-# same ass ButtJointTimberArrangement but allows for any orientation of butting, not just end face butting into long face
-@dataclass(frozen=True)
-class ButtJointBoardArrangement:
-    butt_timber: TimberLike
-    receiving_timber: TimberLike
-    butt_timber_face: TimberFace
-    front_face_on_butt_timber: Optional[TimberFace] = None
-
-    
-    def __post_init__(self):
-        if self.front_face_on_butt_timber is not None:
-            assert self.butt_timber_face.is_perpendicular(self.front_face_on_butt_timber), "front_face_on_butt_timber must be an orthogonal face to butt_timber_face"
-
-    def check_orthogonal(self) -> Optional[str]:
-        """Return None if timbers are orthogonal, else an error message.
-        Timbers are orthogonal in this arrangement if butt_timber_face is parallel to some face on the receiving_timber
-        """
-        butt_face_direction = self.butt_timber.get_face_direction_global(self.butt_timber_face)
-        receiving_axis_directions = [
-            self.receiving_timber.get_length_direction_global(),
-            self.receiving_timber.get_width_direction_global(),
-            self.receiving_timber.get_height_direction_global(),
-        ]
-        for axis_direction in receiving_axis_directions:
-            if equality_test(Abs(numeric_dot_product(butt_face_direction, axis_direction)), 1):
-                return None
-        return "butt_timber_face must be parallel to some face on receiving_timber"
-
-    def check_face_aligned(self) -> Optional[str]:
-        """Return None if timbers are face-aligned, else an error message."""
-        if not are_timbers_face_aligned(self.butt_timber, self.receiving_timber):
-            return "Timbers must be face-aligned"
-        return None
-        
-    def check_perfection(self) -> Optional[str]:
-        """Return None if both timbers are perfect, else an error message."""
-        if not self.butt_timber.is_perfect_timber():
-            return "butt_timber must be perfect"
-        if not self.receiving_timber.is_perfect_timber():
-            return "receiving_timber must be perfect"
-        return None
-
 @dataclass(frozen=True)
 class DoubleButtJointTimberArrangement:
     """Two butt timbers meeting a single receiving timber.
@@ -1987,6 +1944,97 @@ class BraceJointTimberArrangement:
         return None
 
 
+
+# same ass ButtJointTimberArrangement but allows for any orientation of butting, not just end face butting into long face
+@dataclass(frozen=True)
+class ButtJointBoardArrangement:
+    butt_timber: TimberLike
+    receiving_timber: TimberLike
+    butt_timber_face: TimberFace
+    front_face_on_butt_timber: Optional[TimberFace] = None
+
+    
+    def __post_init__(self):
+        if self.front_face_on_butt_timber is not None:
+            assert self.butt_timber_face.is_perpendicular(self.front_face_on_butt_timber), "front_face_on_butt_timber must be an orthogonal face to butt_timber_face"
+
+    def check_orthogonal(self) -> Optional[str]:
+        """Return None if timbers are orthogonal, else an error message.
+        Timbers are orthogonal in this arrangement if butt_timber_face is parallel to some face on the receiving_timber
+        """
+        butt_face_direction = self.butt_timber.get_face_direction_global(self.butt_timber_face)
+        receiving_axis_directions = [
+            self.receiving_timber.get_length_direction_global(),
+            self.receiving_timber.get_width_direction_global(),
+            self.receiving_timber.get_height_direction_global(),
+        ]
+        for axis_direction in receiving_axis_directions:
+            if equality_test(Abs(numeric_dot_product(butt_face_direction, axis_direction)), 1):
+                return None
+        return "butt_timber_face must be parallel to some face on receiving_timber"
+
+    def check_face_aligned(self) -> Optional[str]:
+        """Return None if timbers are face-aligned, else an error message."""
+        if not are_timbers_face_aligned(self.butt_timber, self.receiving_timber):
+            return "Timbers must be face-aligned"
+        return None
+        
+    def check_perfection(self) -> Optional[str]:
+        """Return None if both timbers are perfect, else an error message."""
+        if not self.butt_timber.is_perfect_timber():
+            return "butt_timber must be perfect"
+        if not self.receiving_timber.is_perfect_timber():
+            return "receiving_timber must be perfect"
+        return None
+
+
+@dataclass(frozen=True)
+class PanelBoardArrangement:
+    boards: List[Board]
+
+    def check_parallal_coplanar_and_same_thickness(self) -> Optional[str]:
+        """Return None if all boards are parallel (same orientation), share the
+        same thickness, and are coplanar (all measured against boards[0]), else
+        an error message describing the first violation found.
+        """
+        if not self.boards:
+            return "boards must not be empty"
+
+        ref = self.boards[0]
+        board_thickness = ref.size[1]
+
+        for i, b in enumerate(self.boards[1:], start=1):
+            for r in range(3):
+                for c in range(3):
+                    if not equality_test(
+                        b.transform.orientation.matrix[r, c],
+                        ref.transform.orientation.matrix[r, c],
+                    ):
+                        return (
+                            f"all boards must have the same orientation "
+                            f"(board {i} differs from board 0 at [{r},{c}])"
+                        )
+            if not equality_test(b.size[1], board_thickness):
+                return (
+                    f"all boards must have the same thickness "
+                    f"(board {i} has {b.size[1]}, board 0 has {board_thickness})"
+                )
+            pos_in_ref_local = ref.transform.global_to_local(b.transform.position)
+            if not equality_test(pos_in_ref_local[1], scalar(0)):
+                return (
+                    f"board {i} is not coplanar with board 0 "
+                    f"(Y offset = {pos_in_ref_local[1]} in ref local frame)"
+                )
+        return None
+
+@dataclass(frozen=True)
+class ExtendedTimberArrangement:
+    timbers: List[TimberLike]
+
+    def check_parallel(self) -> Optional[str]:
+        pass
+
+    def check_coaxial_face_aligned_and_same_size(self) -> Optional[str]:
 # =========================================
 # internal helpers
 # =========================================
