@@ -206,6 +206,33 @@ class TimberFace(Enum):
         else:  # BACK
             return TimberFace.FRONT
 
+    def rotate_about(self, face: 'TimberFace') -> 'TimberFace':
+        """
+        Rotate this face by 90 degrees about `face`'s outward-normal axis
+        (a quarter turn using the right-hand rule around that normal).
+
+        If this face IS the rotation axis (self == face or self ==
+        face.get_opposite_face()), it lies on the axis and is unaffected by
+        the rotation, so it is returned unchanged.
+        """
+        if self == face or self == face.get_opposite_face():
+            return self
+
+        # Each cycle lists the 4 faces perpendicular to the rotation axis, in
+        # the order a right-hand rotation about that axis's outward normal
+        # maps them (self -> next element, wrapping around).
+        cycles = {
+            TimberFace.TOP: [TimberFace.RIGHT, TimberFace.FRONT, TimberFace.LEFT, TimberFace.BACK],
+            TimberFace.BOTTOM: [TimberFace.RIGHT, TimberFace.BACK, TimberFace.LEFT, TimberFace.FRONT],
+            TimberFace.RIGHT: [TimberFace.FRONT, TimberFace.TOP, TimberFace.BACK, TimberFace.BOTTOM],
+            TimberFace.LEFT: [TimberFace.FRONT, TimberFace.BOTTOM, TimberFace.BACK, TimberFace.TOP],
+            TimberFace.FRONT: [TimberFace.RIGHT, TimberFace.BOTTOM, TimberFace.LEFT, TimberFace.TOP],
+            TimberFace.BACK: [TimberFace.RIGHT, TimberFace.TOP, TimberFace.LEFT, TimberFace.BOTTOM],
+        }
+        cycle = cycles[face]
+        index = cycle.index(self)
+        return cycle[(index + 1) % len(cycle)]
+
 class TimberEnd(Enum):
     TOP = 1
     BOTTOM = 2

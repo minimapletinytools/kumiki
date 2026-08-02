@@ -553,6 +553,39 @@ class TestEnumsAndDataStructures:
         assert not TimberFace.TOP.is_perpendicular(TimberFace.TOP)
         assert not TimberFace.BOTTOM.is_perpendicular(TimberFace.BOTTOM)
     
+    def test_timber_face_rotate_about(self):
+        """Test TimberFace.rotate_about() method."""
+        # Rotating about TOP's normal (+Z) axis, right-hand rule:
+        # RIGHT -> FRONT -> LEFT -> BACK -> RIGHT
+        assert TimberFace.RIGHT.rotate_about(TimberFace.TOP) == TimberFace.FRONT
+        assert TimberFace.FRONT.rotate_about(TimberFace.TOP) == TimberFace.LEFT
+        assert TimberFace.LEFT.rotate_about(TimberFace.TOP) == TimberFace.BACK
+        assert TimberFace.BACK.rotate_about(TimberFace.TOP) == TimberFace.RIGHT
+
+        # Rotating about BOTTOM's normal (-Z) is the reverse cycle
+        assert TimberFace.RIGHT.rotate_about(TimberFace.BOTTOM) == TimberFace.BACK
+        assert TimberFace.BACK.rotate_about(TimberFace.BOTTOM) == TimberFace.LEFT
+        assert TimberFace.LEFT.rotate_about(TimberFace.BOTTOM) == TimberFace.FRONT
+        assert TimberFace.FRONT.rotate_about(TimberFace.BOTTOM) == TimberFace.RIGHT
+
+        # A face on the rotation axis is unaffected
+        assert TimberFace.TOP.rotate_about(TimberFace.TOP) == TimberFace.TOP
+        assert TimberFace.BOTTOM.rotate_about(TimberFace.TOP) == TimberFace.BOTTOM
+
+        # Four quarter-turns about the same axis return to the start
+        face = TimberFace.RIGHT
+        for _ in range(4):
+            face = face.rotate_about(TimberFace.FRONT)
+        assert face == TimberFace.RIGHT
+
+        # A rotated face is always perpendicular to the rotation axis
+        # (unless it started on the axis, handled above)
+        for axis in TimberFace:
+            for face in TimberFace:
+                if face == axis or face == axis.get_opposite_face():
+                    continue
+                assert face.rotate_about(axis).is_perpendicular(axis)
+
     def test_timber_reference_long_face_to_timber_face(self):
         """Test TimberLongFace.to.face() conversion method."""
         assert TimberLongFace.RIGHT.to.face() == TimberFace.RIGHT
