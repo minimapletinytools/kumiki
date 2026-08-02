@@ -472,7 +472,11 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
 
     # just assert that all timbers are perfect, our algorithm doesnt' actually need this but better just to assert for now.
 
+    
     # extract the joint shoulder which is just the entry face of the receiving timber
+
+    # assert that the butting face extends by at least dovetail_depth beyond the shoulder plane
+
     # first set the marking space to be on the centerline of front_face_on_butt_timber where it intersects the joint shoulder
     # the +z direction is in the butt_timber_face direction and the +y direction is in the front_face_on_butt_timber direction
     # compute lateral_axis_face = front_face_on_butt_timber.rotate_about(butt_timber_face)
