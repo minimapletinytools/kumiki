@@ -154,7 +154,8 @@ class TimberFace(Enum):
             return create_v3(scalar(0), scalar(1), scalar(0))
         else:  # BACK
             return create_v3(scalar(0), scalar(-1), scalar(0))
-    
+
+    # TODO rename to is_orthogonal?
     def is_perpendicular(self, other: 'TimberFace') -> bool:
         """
         Check if two faces are perpendicular to each other.
@@ -1374,11 +1375,9 @@ class RegularPolygonTimber(PerfectTimberWithin):
 
 
 
-# Type alias for all timber-like objects (excludes Board)
-# TimberLike objects are timbers that can be used in structural joinery
-# TODO come up with a cuter name for this
-TimberLike = Union[Timber, MeshTimber, RoundTimber, RegularPolygonTimber]
-BoardLike = Union[Board]
+# Type alias for all timber-like objects. This could/should just be an alias for PerfectTimberWithin but isn't for some odd reason.
+TimberLike = Union[Timber, MeshTimber, RoundTimber, RegularPolygonTimber, Board]
+
 
 # ============================================================================
 # Joint Related Types and Functions

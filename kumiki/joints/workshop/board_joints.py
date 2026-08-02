@@ -5,7 +5,7 @@ Contains functions for creating joints between boards.
 
 import warnings
 from dataclasses import replace
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 from sympy import Matrix
 
@@ -18,7 +18,7 @@ from kumiki.rule import (
     equality_test,
 )
 from kumiki.cutcsg import RectangularPrism, SolidUnion, adopt_csg
-from kumiki.construction import Transform, Orientation
+from kumiki.construction import Transform, Orientation, ButtJointBoardArrangement
 from kumiki.timber_shavings import are_timbers_face_aligned
 
 
@@ -283,6 +283,7 @@ def cut_tongue_and_groove_joint(
     )
 
 
+# TODO rename to cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers
 def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike]):
     """
     fits boards in between the timbers using the board_in_groove_joint
@@ -423,7 +424,7 @@ def cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards:
 
 
 
-def cut_board_in_dado_joint_on_plane_aligned_timbers(boards : List[Board], dado_timbers : List[TimberLike], dado_depth : Numeric = scalar(0)):
+def cut_practice_board_in_dado_joint_on_plane_aligned_timbers(boards : List[Board], dado_timbers : List[TimberLike], dado_depth : Numeric = scalar(0)):
     """
     cuts boards to fit in dados on dado_timbers. The dadoes are dado_depth deep, so the boards are cut to fit excatly in the dadosinto the grooves on the dado_timbers
 
@@ -442,4 +443,23 @@ def cut_board_in_dado_joint_on_plane_aligned_timbers(boards : List[Board], dado_
     # cut each of thesee planes from all of the boards that intersect it
     # construct rectangular prisms to form the dadoes, make sure the prism extend sto the acutal timber size not just teh perfect timber within
     # finis the joint and return it
+    pass
+
+#
+#   ____
+#___\  /___ <-dovetail_depth
+#    ^
+#    dovetail_small_width
+def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric, lateral_offset: Numeric = 0, shorten_dovetail_by: Numeric = 0, extend_front_dovetail_housing_by: Union[None, Numeric] = 0, taper_angle: Numeric = 0):
+    """
+        cuts a sliding dovetail joint, the dovetail slides in from the front_face_on_butt_timber direction
+
+        dovetail_depth: the depth of the dovetail, see diagram
+        dovetail_small_width: the width of the smaller part of the dovetail, see diagram
+        dovetail_angle: the angle the dovetail expands by from the smaller part of the dovetail
+        lateral_offset: offset the dovetail from the centerline by this amount (sign based on local axis of the butting timber and not based on front_face_on_butt_timber)
+        shorten_dovetail_by: shortens the dovetail from front_face_on_butt_timber by this amount
+        extend_front_dovetail_housing_by: extend the front side of the dovetail housing from the end of the shortened dovetail by this amount. If `None` extends all the way through. Note that the back side is always extended to the end of the receiving timber so that the joint can be assembled. 
+        taper_angle: the narrower side is always pointing towards front_face_on_butt_timber
+    """
     pass

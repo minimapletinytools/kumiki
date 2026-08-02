@@ -37,6 +37,10 @@ from kumiki.joints.workshop.mortise_and_tenon_joint import cut_mortise_and_tenon
 The top-level `from kumiki import *` re-exports everything from workshop, so existing
 patterns don't need to change their import style.
 
+### Practice joints
+
+Joint functions are prefixed *cut_practice_..* if their interfaces are still a work in progress. Expect these interfaces to change.
+
 ## Stable Joint Requirements
  
 - must follow the joint style guide

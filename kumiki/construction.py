@@ -1526,12 +1526,12 @@ class ButtJointTimberArrangement:
             return "front_face_on_butt_timber must point in the aligned plane normal"
         return None
 
+
+    # TODO rename to check_face_aligned, orthogonal constraint is redundant
     def check_face_aligned_and_orthogonal(self) -> Optional[str]:
-        """Return None if timbers are face-aligned and orthogonal, else an error message."""
+        """Return None if timbers are face-aligned, else an error message."""
         if not are_timbers_face_aligned(self.butt_timber, self.receiving_timber):
             return "Timbers must be face-aligned"
-        if not are_timbers_orthogonal(self.butt_timber, self.receiving_timber):
-            return "Timbers must be orthogonal"
         return None
     
     def check_perfection(self) -> Optional[str]:
@@ -1542,6 +1542,38 @@ class ButtJointTimberArrangement:
             return "receiving_timber must be perfect"
         return None
 
+
+# same ass ButtJointTimberArrangement but allows for any orientation of butting, not just end face butting into long face
+@dataclass(frozen=True)
+class ButtJointBoardArrangement:
+    butt_timber: TimberLike
+    receiving_timber: TimberLike
+    butt_timber_face: TimberFace
+    front_face_on_butt_timber: Optional[TimberFace] = None
+
+    
+    def __post_init__(self):
+        if self.front_face_on_butt_timber is not None:
+            assert self.butt_timber_face.is_perpendicular(self.front_face_on_butt_timber), "front_face_on_butt_timber must be an orthogonal face to butt_timber_face"
+
+    def check_orthogonal(self) -> Optional[str]:
+        """Return None if timbers are orthogonal, else an error message.
+        Timbers are orthogonal in this arrangement if butt_timber_face is parallel to some face on the receiving_timber
+        """
+
+    def check_face_aligned(self) -> Optional[str]:
+        """Return None if timbers are face-aligned, else an error message."""
+        if not are_timbers_face_aligned(self.butt_timber, self.receiving_timber):
+            return "Timbers must be face-aligned"
+        return None
+        
+    def check_perfection(self) -> Optional[str]:
+        """Return None if both timbers are perfect, else an error message."""
+        if not self.butt_timber.is_perfect_timber():
+            return "butt_timber must be perfect"
+        if not self.receiving_timber.is_perfect_timber():
+            return "receiving_timber must be perfect"
+        return None
 
 @dataclass(frozen=True)
 class DoubleButtJointTimberArrangement:

@@ -19,23 +19,21 @@ Since faces live on solid objects, they are "sided" objects:
 
 - we say 2 faces are *oriented* if they share the same normal, and *opposite* if their normals are opposites
 
-# Timber
+# Timbers, Boards, and PerfectTimberWithin
 
-A *Timber* is one of the fundamental building blocks of your structure and the majority of Kumiki is designed around this class.
+We use the term "timber" and "board" both syntatically and semantically.
 
-```
-class Timber:
-    length : float
-    size : V2
-    bottom_position : V3
-    length_direction : TimberFace
-    width_direction : TimberFace
-```
+Syntactically, it will refer to various classes defined in timber.py which all share the `PerfectTimberWithin` abstract base class and are the building objects of all frames in kumiki.
 
+Semantically, a Timber is a "long" piece of wood (counted using 根 in Chinese or 本 in Japanese) and a board is a a "flat" piece of wood (counted using 张 or 块 in Chinese, and 枚 in Japanese)
+
+A "block" of wood, that is something that is neither long or flat (counted using 块 in Chinese or 個 in Japanese), however it is currently not distinct from "board" in the current version of kumiki.
+
+All timbers and boards are oriented, with the grain running from the `BOTTOM` to `TOP` face. The wide "flat" faces of the boards are the "FRONT" and "BACK" faces. 
 
 ## timber position and orientation
 
-Timbers are referenced in their own local coordinate system.
+Timbers are referenced in their own local coordinate system, which is also referred to as a `Transform` or `MarkingSpace`.
 
 The *bottom point* of a timber is on the bottom face of the timber and in the center of its cross section. The bottom point is located at the origin of the timber's local coordinate system.
 
@@ -43,21 +41,17 @@ The *centerline* of the timber is the line that runs from bottom to top.
 
 By default, a timber is oriented with its bottom cross section centered on the XY plane and running up in the Y direction. We use the following names for each axis
 
-- Z axis: *length axis* of the timber
-- X axis: *width axis* of the timber
-- Y axis: *height axis* of the timber
-
-To orient the timber we position, we often position the +Z and +X axis of the timber.
-
-- A timber is *axis aligned* if its length vector is parallel to the +Z axis and its face vectors are parallel to either the X or Y axis.
-- Timbers are *face aligned* if each of the 6 faces of one timber is parallel with one of the 6 faces of the other timbers. 
-- Timbers are *plane aligned* if 2 of the 4 long faces on one timber are parallel to 2 of 4 long faces on the other timbers. These faces are parallel to the *parallel face plane*.
+- Z axis: *length axis* of the timber, and the *length* of the timber is its dimension in this axis
+- X axis: *width axis* of the timber, and the *width* of the timber is its dimension in this axis
+- Y axis: *height axis* of the timber, and the *height* of the timber is its dimension in this axis
 
 We often do not care to distinguish between 2 opposing faces on a timber thus:
 
-- the *width-sides* of a timber are the 2 faces perpendicular to its local X axis
-- the *height-sides* of a timber are the 2 faces perpendicular to its local Y axis
+- the *X-sides* of a timber are the 2 faces perpendicular to its local X axis
+- the *Y-sides* of a timber are the 2 faces perpendicular to its local Y axis
 - the *ends* of a timber are the 2 faces perpendicular to its local Z axis
+
+When authoring joints, we often work within some sub local MarkingSpace to a timber (sometimes explicit in code, usually just commented) which is usually based on some local +z direction (almost always the joint end direction) and some +y direction (depends on what we're trying to do). In these cases, "width" and "height" are the x-axis and y-axis dimensions relative to that MarkingSpace. In general, when working in a local space relative to a timber, "width" and "height" becomes contextual, and no longer refers to its local width and height.
 
 When we do care about referencing a specific face, we may do so relative to its local coordinate system. We may refer to each face with the following names:
 
@@ -168,6 +162,12 @@ use `create_vertical_timber_on_footprint_corner` to create "posts" on the corner
 - If it is on the inside of the boundary corner, position the post such that it overlaps with the inside of the boundary, has one vertex of its bottom face lying on the boundary corner, and has 2 edges of its bottom face aligning with the 2 boundary sides coming out of the boundary corner. 
 - If it is on the outside of the boundary corner, then position the post first on the inside of the boundary corner, and take the vertex of its bottom face that is opposite to the vertex lying on the boundary corner and move it so that the opposite vertex is instead on the boundary corner.
 
+## Arrangements
+
+Before joining timbers, timbers are collected into arrangements which determine the timbers involved in a joint and some additional paremeters needed to orient the joint. These are a convenience wrapper class that collect common "arrangement" properties and checks for reuse across joints.
+
+Arrangements come in two varieties, "timber" and "board" arrangements. The difference is semantic and not syntactic. All timber/board classes can be put into either arrangement. Timbers are long 
+
 
 ## Joining Timbers
  
@@ -194,7 +194,17 @@ Once your timbers have been created, it's time to cut them to make joints.
 
 ## Arrangements
 
-Joints functions take arrangements (defined in construction.py) which are collections of timbers involved in a joint as well as some optional orientation paremeters. Arrangements contain check functions to ensure alignment assumptions needed by the joint.
+Joints functions take arrangements (defined in construction.py) which are collections of timbers involved in a joint as well as some optional orientation paremeters. 
+
+Arrangements contain check functions to ensure alignment assumptions needed by the joint:
+
+- A timber is *axis aligned* if its length vector is parallel to the +Z axis and its face vectors are parallel to either the X or Y axis.
+- Timbers are *face aligned* if each of the 6 faces of one timber is parallel with one of the 6 faces of the other timbers. 
+- Timbers are *plane aligned* if 2 of the 4 long faces on one timber are parallel to 2 of 4 long faces on the other timbers. These faces are in the  *parallel face plane*.
+
+Some alignment assumptions are joint orientation specific:
+
+- Boards are *orthogonal* if the 2 faces to be joined are parallel to each other. 
 
 ## Cuttings
 
