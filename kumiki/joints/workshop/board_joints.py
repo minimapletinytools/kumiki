@@ -462,4 +462,35 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         extend_front_dovetail_housing_by: extend the front side of the dovetail housing from the end of the shortened dovetail by this amount. If `None` extends all the way through. Note that the back side is always extended to the end of the receiving timber so that the joint can be assembled. 
         taper_angle: the narrower side is always pointing towards front_face_on_butt_timber
     """
+    assert False, "not implemented yet"
+
+    # assert the arrangement is orthognal
+
+    # compute the entry face in the receiving timber
+
+    # assert that the receiving face is perfect
+
+    # just assert that all timbers are perfect, our algorithm doesnt' actually need this but better just to assert for now.
+
+    # extract the joint shoulder which is just the entry face of the receiving timber
+    # first set the marking space to be on the centerline of front_face_on_butt_timber where it intersects the joint shoulder
+    # the +z direction is in the butt_timber_face direction and the +y direction is in the front_face_on_butt_timber direction
+    # compute lateral_axis_face = front_face_on_butt_timber.rotate_about(butt_timber_face)
+    # compute lateral_dimension = butt_timber.get_size_in_face_normal_axis(lateral_axis_face) <- actually this needs to be actual dimension not PTW dimension
+    # start from center and go left by lateral_dimension/2
+    # then go right by (lateral_dimension-dovetail_small_width)/2
+    # then go up by dovetail_depth and left by cos(dovetail_angle)*dovetail_depth
+    # form here repeat the pattern mirrored to do the other half of the dovetail
+    # now form "box" out of this by taking the two ends, and going up far enough to the butt_timber_face actual end (not ptw) and complete the box
+
+    # now extrude the profile on the dovetail timber starting at shorten_dovetail_by and all the way to its end (actual dimension end, not PTW dimension)
+    # from the shorten_dovetail_by starting position of the extrude, make a rectangular prism that is lateral_dimension x dovetail_depth and extrude in the opposite direction to the opposite end (again actual dimension)
+
+    # now create a new profile for the receiving timber
+    # start at -(dovetail_small_width)/2
+    # then go up by dovetail_depth and left by cos(dovetail_angle)*dovetail_depth
+    # then repeat the pattern mirrored on the other size
+    # then close the box
+
+    # agani from the shorten_dovetail_by starting position, extrude in the -butt_timber.butt_timber_face global direction all teh way to the receving timber end face (actual dimension gani) and then by extend_front_dovetail_housing_by in the other direction
     pass
