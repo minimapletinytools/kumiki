@@ -115,7 +115,7 @@ DONE-probably drop the board/timber class distinction
   -it's weird cuz then in arrangements when we say "timber arrangement" and "board arrangement" it becomes semantic, not syntactic
 
 -furniture joints
-  -probably rename t opractice joint
+  DONE-probably rename t opractice joint
   -create BoardPanelArrangement List[Board] and update borad joints to use this
   -create ExtendedTimberArrangement List[TimberLike]
   -finish cut_board_in_dado_joint_on_plane_aligned_timbers
