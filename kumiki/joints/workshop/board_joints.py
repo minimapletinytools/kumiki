@@ -7,19 +7,32 @@ import warnings
 from dataclasses import replace
 from typing import Dict, List, Tuple, Union
 
-from sympy import Matrix
+from sympy import Matrix, cos, tan
 
-from kumiki.timber import AssemblyFreedom, Board, TimberLike, Cutting, Joint, JointTicket
+from kumiki.timber import AssemblyFreedom, Board, TimberLike, TimberFace, Cutting, Joint, JointTicket
 from kumiki.rule import (
     Numeric,
+    V3,
     scalar,
+    create_v2,
     Comparison,
     safe_compare,
+    safe_dot_product,
+    safe_normalize_vector,
     equality_test,
 )
-from kumiki.cutcsg import RectangularPrism, SolidUnion, adopt_csg
+from kumiki.cutcsg import (
+    RectangularPrism,
+    ConvexPolygonExtrusion,
+    SolidUnion,
+    Difference,
+    Intersection,
+    HalfSpace,
+    adopt_csg,
+)
 from kumiki.construction import Transform, Orientation, ButtJointBoardArrangement
 from kumiki.timber_shavings import are_timbers_face_aligned
+from kumiki.measuring import locate_face
 
 
 def cut_tongue_and_groove_joint(
@@ -445,12 +458,63 @@ def cut_practice_board_in_dado_joint_on_plane_aligned_timbers(boards : List[Boar
     # finis the joint and return it
     pass
 
+def _lateral_positive_dovetail_face(butt_timber_face: TimberFace, front_face_on_butt_timber: TimberFace) -> TimberFace:
+    """
+    The "positive" face (RIGHT, FRONT, or TOP) of whichever axis group is NOT
+    used by butt_timber_face or front_face_on_butt_timber.
+
+    Since those two faces are perpendicular (different axis groups), exactly one
+    of the three axis groups {RIGHT/LEFT, FRONT/BACK, TOP/BOTTOM} is left over --
+    this is the lateral axis. lateral_offset is measured along this face's own
+    (positive) direction, regardless of which specific signed face
+    (butt_timber_face vs its opposite, etc.) was actually passed in.
+    """
+    axis_groups = (
+        (TimberFace.RIGHT, TimberFace.LEFT),
+        (TimberFace.FRONT, TimberFace.BACK),
+        (TimberFace.TOP, TimberFace.BOTTOM),
+    )
+    used_faces = {
+        butt_timber_face, butt_timber_face.get_opposite_face(),
+        front_face_on_butt_timber, front_face_on_butt_timber.get_opposite_face(),
+    }
+    for positive_face, _negative_face in axis_groups:
+        if positive_face not in used_faces:
+            return positive_face
+    raise AssertionError(
+        "unreachable: butt_timber_face and front_face_on_butt_timber are perpendicular, "
+        "so exactly one axis group must be left over for the lateral axis"
+    )
+
+
+def _dovetail_trapezoid_points(
+    dovetail_small_width: Numeric,
+    dovetail_depth: Numeric,
+    dovetail_angle: Numeric,
+    lateral_offset: Numeric,
+) -> List[V3]:
+    """
+    The dovetail's cross-sectional trapezoid in the (lateral=u, depth=z) plane,
+    narrow at z=0 (the shoulder) and flaring outward by cos(dovetail_angle) per
+    unit of depth as z increases (see the ASCII diagram on
+    cut_practice_sliding_dovetail_joint_on_orthogonal_boards).
+    """
+    half_small = dovetail_small_width / scalar(2)
+    flare = cos(dovetail_angle) * dovetail_depth
+    return [
+        create_v2(lateral_offset - half_small, scalar(0)),
+        create_v2(lateral_offset - half_small - flare, dovetail_depth),
+        create_v2(lateral_offset + half_small + flare, dovetail_depth),
+        create_v2(lateral_offset + half_small, scalar(0)),
+    ]
+
+
 #
 #   ____
 #___\  /___ <-dovetail_depth
 #    ^
 #    dovetail_small_width
-def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric, lateral_offset: Numeric = 0, shorten_dovetail_by: Numeric = 0, extend_front_dovetail_housing_by: Union[None, Numeric] = 0, taper_angle: Numeric = 0):
+def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric, lateral_offset: Numeric = scalar(0), shorten_dovetail_by: Numeric = scalar(0), extend_front_dovetail_housing_by: Union[None, Numeric] = scalar(0), taper_angle: Numeric = scalar(0)) -> Joint:
     """
         cuts a sliding dovetail joint, the dovetail slides in from the front_face_on_butt_timber direction
 
@@ -459,42 +523,214 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         dovetail_angle: the angle the dovetail expands by from the smaller part of the dovetail
         lateral_offset: offset the dovetail from the centerline by this amount (sign based on local axis of the butting timber and not based on front_face_on_butt_timber)
         shorten_dovetail_by: shortens the dovetail from front_face_on_butt_timber by this amount
-        extend_front_dovetail_housing_by: extend the front side of the dovetail housing from the end of the shortened dovetail by this amount. If `None` extends all the way through. Note that the back side is always extended to the end of the receiving timber so that the joint can be assembled. 
+        extend_front_dovetail_housing_by: extend the front side of the dovetail housing from the end of the shortened dovetail by this amount. If `None` extends all the way through. Note that the back side is always extended to the end of the receiving timber so that the joint can be assembled.
         taper_angle: the narrower side is always pointing towards front_face_on_butt_timber
     """
-    assert False, "not implemented yet"
+    butt_timber = arrangement.butt_timber
+    receiving_timber = arrangement.receiving_timber
+    butt_timber_face = arrangement.butt_timber_face
+    assert arrangement.front_face_on_butt_timber is not None, (
+        "front_face_on_butt_timber is required for cut_practice_sliding_dovetail_joint_on_orthogonal_boards"
+    )
+    front_face_on_butt_timber = arrangement.front_face_on_butt_timber
 
-    # assert the arrangement is orthognal
+    orthogonal_error = arrangement.check_orthogonal()
+    assert orthogonal_error is None, orthogonal_error
 
-    # compute the entry face in the receiving timber
+    # Just assert that all timbers are perfect -- our algorithm doesn't actually
+    # need this (every dimension query below is already correct for asymmetric
+    # nominal_half_sizes), but it's simpler and safer to require it for now.
+    perfection_error = arrangement.check_perfection()
+    assert perfection_error is None, perfection_error
 
-    # assert that the receiving face is perfect
+    depth_dir = butt_timber.get_face_direction_global(butt_timber_face)
+    slide_dir = butt_timber.get_face_direction_global(front_face_on_butt_timber)
+    lateral_positive_face = _lateral_positive_dovetail_face(butt_timber_face, front_face_on_butt_timber)
+    lateral_dir = butt_timber.get_face_direction_global(lateral_positive_face)
 
-    # just assert that all timbers are perfect, our algorithm doesnt' actually need this but better just to assert for now.
+    # The entry face in the receiving timber: whichever of its faces points
+    # back out toward butt_timber (opposite of the direction butt_timber_face
+    # points, since that direction points FROM butt_timber INTO receiving_timber).
+    entry_face = receiving_timber.get_closest_oriented_face_from_global_direction(-depth_dir)
+    assert receiving_timber.is_face_perfect(entry_face), (
+        "receiving_timber's entry face must be perfect"
+    )
 
-    
-    # extract the joint shoulder which is just the entry face of the receiving timber
+    # The joint shoulder is just the entry face of the receiving timber.
+    shoulder = locate_face(receiving_timber, entry_face)
+    front_face_plane = locate_face(butt_timber, front_face_on_butt_timber)
 
-    # assert that the butting face extends by at least dovetail_depth beyond the shoulder plane
+    # Marking space origin: on the centerline of front_face_on_butt_timber
+    # (i.e. on that face's own plane, centered laterally) where it intersects
+    # the joint shoulder. depth_dir is guaranteed non-perpendicular to
+    # shoulder.normal by check_orthogonal (they're parallel), so this
+    # line-plane intersection is always well-defined.
+    t = safe_dot_product(shoulder.point - front_face_plane.point, shoulder.normal) / safe_dot_product(depth_dir, shoulder.normal)
+    marking_origin = front_face_plane.point + depth_dir * t
 
-    # first set the marking space to be on the centerline of front_face_on_butt_timber where it intersects the joint shoulder
-    # the +z direction is in the butt_timber_face direction and the +y direction is in the front_face_on_butt_timber direction
-    # compute lateral_axis_face = front_face_on_butt_timber.rotate_about(butt_timber_face)
-    # compute lateral_dimension = butt_timber.get_size_in_face_normal_axis(lateral_axis_face) <- actually this needs to be actual dimension not PTW dimension
-    # start from center and go left by lateral_dimension/2
-    # then go right by (lateral_dimension-dovetail_small_width)/2
-    # then go up by dovetail_depth and left by cos(dovetail_angle)*dovetail_depth
-    # form here repeat the pattern mirrored to do the other half of the dovetail
-    # now form "box" out of this by taking the two ends, and going up far enough to the butt_timber_face actual end (not ptw) and complete the box
+    def s_coord(point: V3) -> Numeric:
+        """Signed distance from marking_origin along slide_dir (the marking space's own 'y' axis)."""
+        return safe_dot_product(point - marking_origin, slide_dir)
 
-    # now extrude the profile on the dovetail timber starting at shorten_dovetail_by and all the way to its end (actual dimension end, not PTW dimension)
-    # from the shorten_dovetail_by starting position of the extrude, make a rectangular prism that is lateral_dimension x dovetail_depth and extrude in the opposite direction to the opposite end (again actual dimension)
+    # butt_timber's own actual face position, in the depth direction, must
+    # extend at least dovetail_depth beyond the shoulder -- otherwise there
+    # isn't enough of butt_timber's own material to carve the tongue into.
+    butt_face_point = locate_face(butt_timber, butt_timber_face).point
+    depth_extent = safe_dot_product(butt_face_point - marking_origin, depth_dir)
+    assert safe_compare(depth_extent - dovetail_depth, 0, Comparison.GE), (
+        "butt_timber's butting face must extend by at least dovetail_depth beyond the joint shoulder"
+    )
 
-    # now create a new profile for the receiving timber
-    # start at -(dovetail_small_width)/2
-    # then go up by dovetail_depth and left by cos(dovetail_angle)*dovetail_depth
-    # then repeat the pattern mirrored on the other size
-    # then close the box
+    lateral_dimension = butt_timber.get_size_in_face_normal_axis(lateral_positive_face)
 
-    # agani from the shorten_dovetail_by starting position, extrude in the -butt_timber.butt_timber_face global direction all teh way to the receving timber end face (actual dimension gani) and then by extend_front_dovetail_housing_by in the other direction
-    pass
+    # Slide-axis (s) reference positions, all measured from marking_origin.
+    s_butt_front = s_coord(front_face_plane.point)  # == 0 by construction
+    s_butt_back = s_coord(locate_face(butt_timber, front_face_on_butt_timber.get_opposite_face()).point)
+
+    receiving_back_face = receiving_timber.get_closest_oriented_face_from_global_direction(-slide_dir)
+    receiving_front_face = receiving_back_face.get_opposite_face()
+    s_receiving_back = s_coord(locate_face(receiving_timber, receiving_back_face).point)
+    s_receiving_front = s_coord(locate_face(receiving_timber, receiving_front_face).point)
+
+    # The tongue itself is set back from butt_timber's own front face by
+    # shorten_dovetail_by, and runs all the way to butt_timber's own actual end.
+    s_tongue_front = s_butt_front - shorten_dovetail_by
+    s_tongue_back = s_butt_back
+
+    # The housing's back side always extends to receiving_timber's own actual
+    # end (so the joint can be assembled); the front side either extends past
+    # the shortened tongue position by extend_front_dovetail_housing_by, or --
+    # if None -- all the way through receiving_timber's own front face.
+    if extend_front_dovetail_housing_by is None:
+        s_housing_front = s_receiving_front
+    else:
+        s_housing_front = s_tongue_front + extend_front_dovetail_housing_by
+    s_housing_back = s_receiving_back
+
+    # Profile transform: local X = lateral, local Y = depth, local Z = slide
+    # (the extrusion axis for both ConvexPolygonExtrusion and RectangularPrism
+    # below). Matches the pseudocode's marking space convention (+z = depth =
+    # butt_timber_face direction, +y = slide = front_face_on_butt_timber
+    # direction), just relabeled to fit ConvexPolygonExtrusion's XY-profile /
+    # Z-extrusion convention.
+    profile_orientation = Orientation(Matrix([
+        [lateral_dir[0], depth_dir[0], slide_dir[0]],
+        [lateral_dir[1], depth_dir[1], slide_dir[1]],
+        [lateral_dir[2], depth_dir[2], slide_dir[2]],
+    ]))
+    profile_transform = Transform(position=marking_origin, orientation=profile_orientation)
+
+    # taper_angle tapers the ENTIRE dovetail cross-section (independent of
+    # depth/z) so it narrows uniformly toward front_face_on_butt_timber,
+    # implemented as two half-space clips on top of the (already-flared)
+    # untapered shapes below. reduction(s) = tan(taper_angle) * (s -
+    # s_receiving_back) -- anchored at s_receiving_back (the housing's
+    # mandatory back extent) so the tongue and housing taper identically and
+    # still mate exactly at every slide position.
+    def _taper_intersection(csg):
+        if safe_compare(taper_angle, 0, Comparison.EQ):
+            return csg
+        taper_k = tan(taper_angle)
+        # Generously large so the clip is a no-op at s_receiving_back and only
+        # narrows the shape further toward the front.
+        clip_half_width = lateral_dimension
+        for sign in (scalar(1), scalar(-1)):
+            outward_normal = safe_normalize_vector(lateral_dir * sign + slide_dir * taper_k)
+            point_on_boundary = marking_origin + lateral_dir * (sign * clip_half_width) + slide_dir * s_receiving_back
+            inward_normal = -outward_normal
+            offset = safe_dot_product(inward_normal, point_on_boundary)
+            csg = Intersection(csg, HalfSpace(normal=inward_normal, offset=offset))
+        return csg
+
+    def _trapezoid_extrusion(s_start: Numeric, s_end: Numeric, label: str):
+        points = _dovetail_trapezoid_points(dovetail_small_width, dovetail_depth, dovetail_angle, lateral_offset)
+        extrusion = ConvexPolygonExtrusion(
+            points=points,
+            transform=profile_transform,
+            start_distance=s_start,
+            end_distance=s_end,
+            label=label,
+        )
+        assert extrusion.is_valid(), f"dovetail trapezoid profile is not a valid convex polygon (label={label})"
+        return _taper_intersection(extrusion)
+
+    # --- butt_timber's cut: remove everything except the tongue ---
+    tongue_cuts: List = []
+    if safe_compare(s_tongue_back, s_tongue_front, Comparison.LT):
+        # Full box (butt_timber's own actual cross-section) over the tongue's
+        # slide range, minus the dovetail trapezoid -- leaves just the tongue
+        # sticking out, wings removed.
+        box_transform = Transform(
+            position=marking_origin + depth_dir * (depth_extent / scalar(2)),
+            orientation=profile_orientation,
+        )
+        box_prism = RectangularPrism(
+            size=Matrix([lateral_dimension, depth_extent]),
+            transform=box_transform,
+            start_distance=s_tongue_back,
+            end_distance=s_tongue_front,
+            label="dovetail_wings",
+        )
+        trapezoid_for_tongue = _trapezoid_extrusion(s_tongue_back, s_tongue_front, "dovetail_tongue_profile")
+        tongue_cuts.append(Difference(base=box_prism, subtract=[trapezoid_for_tongue]))
+
+    # Near-front clearance cut: for the shortened segment (butt_timber's own
+    # front face back to where the tongue starts), no tongue exists at all, so
+    # remove butt_timber's FULL depth-axis extent there (not just
+    # dovetail_depth) -- otherwise the excess raw material beyond
+    # dovetail_depth (present because the canonical/raw arrangement generously
+    # overlaps, same as every other joint in this codebase) would still
+    # protrude straight through receiving_timber, uncut, in this segment.
+    if safe_compare(shorten_dovetail_by, 0, Comparison.GT):
+        clearance_transform = Transform(
+            position=marking_origin + depth_dir * (depth_extent / scalar(2)),
+            orientation=profile_orientation,
+        )
+        clearance_prism = RectangularPrism(
+            size=Matrix([lateral_dimension, depth_extent]),
+            transform=clearance_transform,
+            start_distance=s_tongue_front,
+            end_distance=s_butt_front,
+            label="dovetail_shortened_clearance",
+        )
+        tongue_cuts.append(clearance_prism)
+
+    assert tongue_cuts, "shorten_dovetail_by leaves no material for butt_timber's own actual depth extent to cut"
+    butt_negative_csg = SolidUnion(children=tongue_cuts, label="sliding_dovetail") if len(tongue_cuts) > 1 else tongue_cuts[0]
+
+    butt_cutting = Cutting(
+        timber=butt_timber,
+        negative_csg=adopt_csg(None, butt_timber.transform, butt_negative_csg),
+        label="sliding_dovetail",
+    )
+
+    # --- receiving_timber's cut: the dovetail-shaped housing groove ---
+    assert safe_compare(s_housing_back, s_housing_front, Comparison.LT), (
+        "extend_front_dovetail_housing_by leaves no housing length to cut"
+    )
+    housing_csg = _trapezoid_extrusion(s_housing_back, s_housing_front, "dovetail_housing")
+    receiving_cutting = Cutting(
+        timber=receiving_timber,
+        negative_csg=adopt_csg(None, receiving_timber.transform, housing_csg),
+        label="sliding_dovetail",
+    )
+
+    # Assembly: the tongue slides free of the housing by withdrawing along
+    # +slide_dir (the reverse of insertion) for the full housing length.
+    escape_freed_after = s_housing_front - s_housing_back
+    butt_cutting = replace(
+        butt_cutting,
+        assembly_freedom=AssemblyFreedom.translation(slide_dir, freed_after=escape_freed_after),
+    )
+    receiving_cutting = replace(
+        receiving_cutting,
+        assembly_freedom=AssemblyFreedom.translation(-slide_dir, freed_after=escape_freed_after),
+    )
+
+    return Joint(
+        cuttings={
+            butt_timber.ticket.path: butt_cutting,
+            receiving_timber.ticket.path: receiving_cutting,
+        },
+        ticket=JointTicket(joint_type="sliding_dovetail"),
+    )

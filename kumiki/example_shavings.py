@@ -10,15 +10,17 @@ from typing import Optional, Tuple
 from dataclasses import dataclass
 
 from kumiki.timber import (
-    Timber, TimberEnd, TimberLongFace,
-    create_timber, normalize_vector,
+    Timber, TimberEnd, TimberFace, TimberLongFace,
+    Board, create_timber, compute_timber_orientation, normalize_vector,
     RoundTimber, MeshTimber, RegularPolygonTimber,
 )
 from kumiki.rule import (
-    V2, V3, Numeric, create_v2, create_v3, inches, radians, scalar,
+    V2, V3, Numeric, Transform, create_v2, create_v3, inches, radians, scalar,
 )
+from kumiki.ticket import BoardTicket
 from kumiki.construction import (
     ButtJointTimberArrangement,
+    ButtJointBoardArrangement,
     DoubleButtJointTimberArrangement,
     SpliceJointTimberArrangement,
     CornerJointTimberArrangement,
@@ -525,4 +527,163 @@ def create_canonical_example_opposing_double_butt_joint_timbers(
         butt_timber_1_end=TimberEnd.TOP,
         butt_timber_2_end=TimberEnd.TOP,
         front_face_on_butt_timber_1=TimberLongFace.RIGHT,
+    )
+
+
+# ============================================================================
+# Canonical example board arrangements
+# ============================================================================
+
+# Standard dimensions for canonical example board joints: 1" x 6" x 1' boards
+# (1" thick, 6" wide, 12" long -- a standard "1x6" board).
+_CANONICAL_EXAMPLE_BOARD_WIDTH = inches(6)      # X dimension (inches)
+_CANONICAL_EXAMPLE_BOARD_THICKNESS = inches(1)  # Y dimension (inches)
+_CANONICAL_EXAMPLE_BOARD_LENGTH = inches(12)    # 1 foot
+_CANONICAL_EXAMPLE_BOARD_SIZE = create_v2(_CANONICAL_EXAMPLE_BOARD_WIDTH, _CANONICAL_EXAMPLE_BOARD_THICKNESS)
+
+
+def _resolve_canonical_board_dimensions(
+    board_size: Optional[V2],
+    board_length: Optional[Numeric],
+) -> Tuple[V2, Numeric]:
+    resolved_size = board_size if board_size is not None else _CANONICAL_EXAMPLE_BOARD_SIZE
+    resolved_length = board_length if board_length is not None else _CANONICAL_EXAMPLE_BOARD_LENGTH
+    return resolved_size, resolved_length
+
+
+def _create_example_board(
+    *,
+    length: Numeric,
+    size: V2,
+    bottom_position: V3,
+    length_direction: V3,
+    width_direction: V3,
+    ticket: str,
+) -> Board:
+    orientation = compute_timber_orientation(length_direction, width_direction)
+    return Board(
+        length=length,
+        size=size,
+        transform=Transform(position=bottom_position, orientation=orientation),
+        ticket=BoardTicket(path=ticket),
+    )
+
+
+def create_canonical_example_board_butt_joint_boards_side_to_face(
+    position: Optional[V3] = None,
+    board_size: Optional[V2] = None,
+    board_length: Optional[Numeric] = None,
+) -> ButtJointBoardArrangement:
+    """
+    Create a canonical board butt joint arrangement where butt_timber's RIGHT
+    face (a side/edge face, running its thickness x length) butts into
+    receiving_timber's FRONT face (a broad face, running its width x length).
+
+    All canonical example board joints are 1"x6"x1' boards (1" thick, 6" wide,
+    12" long).
+
+    receiving_timber has identity orientation: length runs along +Z, width
+    along +X, so its FRONT face points in the +Y direction.
+    butt_timber's length runs along +X, its RIGHT face points in the -Y
+    direction (directly into receiving_timber's FRONT face), and its TOP end
+    (front_face_on_butt_timber) points in the +Z direction.
+    Both boards' centerlines cross at position.
+
+    Args:
+        position: Center position of the joint. Defaults to origin.
+        board_size: Optional (width, thickness) override. Defaults to 6"x1".
+        board_length: Optional length override. Defaults to 12".
+    """
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+    resolved_size, resolved_length = _resolve_canonical_board_dimensions(board_size, board_length)
+
+    # receiving_timber: identity orientation, length along +Z, center at position.
+    receiving_bottom = position + create_v3(scalar(0), scalar(0), -resolved_length / scalar(2))
+    receiving_timber = _create_example_board(
+        length=resolved_length,
+        size=resolved_size,
+        bottom_position=receiving_bottom,
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        ticket="receiving_timber",
+    )
+
+    # butt_timber: length along +X, RIGHT face (width axis) points -Y directly
+    # into receiving_timber's FRONT face; center at position.
+    butt_bottom = position + create_v3(-resolved_length / scalar(2), scalar(0), scalar(0))
+    butt_timber = _create_example_board(
+        length=resolved_length,
+        size=resolved_size,
+        bottom_position=butt_bottom,
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(-1), scalar(0)),
+        ticket="butt_timber",
+    )
+
+    return ButtJointBoardArrangement(
+        butt_timber=butt_timber,
+        receiving_timber=receiving_timber,
+        butt_timber_face=TimberFace.RIGHT,
+        front_face_on_butt_timber=TimberFace.TOP,
+    )
+
+
+def create_canonical_example_board_butt_joint_boards_end_to_face(
+    position: Optional[V3] = None,
+    board_size: Optional[V2] = None,
+    board_length: Optional[Numeric] = None,
+) -> ButtJointBoardArrangement:
+    """
+    Create a canonical board butt joint arrangement where butt_timber's TOP
+    end (the classic shelf-end-into-case-side configuration) butts into
+    receiving_timber's FRONT face (a broad face, running its width x length).
+
+    All canonical example board joints are 1"x6"x1' boards (1" thick, 6" wide,
+    12" long).
+
+    receiving_timber has identity orientation: length runs along +Z, width
+    along +X, so its FRONT face points in the +Y direction.
+    butt_timber's length runs along -Y so its TOP end points directly into
+    receiving_timber's FRONT face, and its RIGHT face (front_face_on_butt_timber)
+    points in the +Z direction.
+    Both boards' centerlines cross at position.
+
+    Args:
+        position: Center position of the joint. Defaults to origin.
+        board_size: Optional (width, thickness) override. Defaults to 6"x1".
+        board_length: Optional length override. Defaults to 12".
+    """
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+    resolved_size, resolved_length = _resolve_canonical_board_dimensions(board_size, board_length)
+
+    # receiving_timber: identity orientation, length along +Z, center at position.
+    receiving_bottom = position + create_v3(scalar(0), scalar(0), -resolved_length / scalar(2))
+    receiving_timber = _create_example_board(
+        length=resolved_length,
+        size=resolved_size,
+        bottom_position=receiving_bottom,
+        length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        ticket="receiving_timber",
+    )
+
+    # butt_timber: length along -Y so its TOP end points directly into
+    # receiving_timber's FRONT face; center at position.
+    butt_bottom = position + create_v3(scalar(0), resolved_length / scalar(2), scalar(0))
+    butt_timber = _create_example_board(
+        length=resolved_length,
+        size=resolved_size,
+        bottom_position=butt_bottom,
+        length_direction=create_v3(scalar(0), scalar(-1), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="butt_timber",
+    )
+
+    return ButtJointBoardArrangement(
+        butt_timber=butt_timber,
+        receiving_timber=receiving_timber,
+        butt_timber_face=TimberFace.TOP,
+        front_face_on_butt_timber=TimberFace.RIGHT,
     )

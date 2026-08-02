@@ -1,15 +1,22 @@
 """Tongue-and-groove board joint example using PatternBook."""
 
+from dataclasses import replace
+
 from sympy import Matrix
 
 from kumiki.joints.workshop.board_joints import (
     cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers,
+    cut_practice_sliding_dovetail_joint_on_orthogonal_boards,
     cut_tongue_and_groove_joint,
 )
 from kumiki.joints.workshop.corner_joints import cut_plain_miter_joint_on_face_aligned_timbers
 from kumiki.construction import CornerJointTimberArrangement
+from kumiki.example_shavings import (
+    create_canonical_example_board_butt_joint_boards_side_to_face,
+    create_canonical_example_board_butt_joint_boards_end_to_face,
+)
 from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame
-from kumiki.rule import feet, inches
+from kumiki.rule import degrees, feet, inches
 from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.timber import Board, Frame, Orientation, Timber, TimberEnd, Transform, create_v3
 
@@ -214,9 +221,72 @@ def example_board_in_grooved_frame(
     )
 
 
+def _joint_with_ticket_prefix(joint, prefix: str):
+    """Return a copy of `joint` with every timber's ticket path prefixed.
+
+    Both canonical board butt-joint arrangements name their boards
+    "butt_timber" / "receiving_timber", so combining two such joints into one
+    Frame needs distinct names to avoid Frame.from_joints treating them as
+    the same (differently-positioned) timber.
+    """
+    new_cuttings = {}
+    for name, cutting in joint.cuttings.items():
+        new_ticket = replace(cutting.timber.ticket, path=f"{prefix}{name}")
+        new_timber = replace(cutting.timber, ticket=new_ticket)
+        new_cuttings[new_ticket.path] = replace(cutting, timber=new_timber)
+    return replace(joint, cuttings=new_cuttings)
+
+
+def example_sliding_dovetail_boards() -> Frame:
+    """Sliding dovetail joint demonstrated on both canonical board arrangements.
+
+    side_to_face: butt_timber's RIGHT (side/edge) face dovetails into
+    receiving_timber's FRONT (broad) face. Placed at the origin.
+
+    end_to_face: butt_timber's TOP end dovetails into receiving_timber's FRONT
+    face -- the classic shelf-end-into-case-side configuration. Placed
+    alongside the first example (offset in X) so both render without
+    overlapping.
+    """
+    dovetail_depth = inches(1, 4)
+    dovetail_small_width = inches(1, 2)
+    dovetail_angle = degrees(80)
+
+    side_to_face_arrangement = create_canonical_example_board_butt_joint_boards_side_to_face(
+        position=create_v3(inches(0), inches(0), inches(0)),
+    )
+    side_to_face_joint = cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
+        side_to_face_arrangement,
+        dovetail_depth=dovetail_depth,
+        dovetail_small_width=dovetail_small_width,
+        dovetail_angle=dovetail_angle,
+    )
+
+    end_to_face_arrangement = create_canonical_example_board_butt_joint_boards_end_to_face(
+        position=create_v3(inches(24), inches(0), inches(0)),
+    )
+    end_to_face_joint = cut_practice_sliding_dovetail_joint_on_orthogonal_boards(
+        end_to_face_arrangement,
+        dovetail_depth=dovetail_depth,
+        dovetail_small_width=dovetail_small_width,
+        dovetail_angle=dovetail_angle,
+        shorten_dovetail_by=inches(1),
+        extend_front_dovetail_housing_by=inches(1, 2),
+    )
+
+    return Frame.from_joints(
+        [
+            _joint_with_ticket_prefix(side_to_face_joint, "side_to_face_"),
+            _joint_with_ticket_prefix(end_to_face_joint, "end_to_face_"),
+        ],
+        name="Sliding Dovetail Boards",
+    )
+
+
 patterns = [
     Pattern(path="board_joints/tongue_and_groove", lambda_=make_pattern_from_joint(example_tongue_and_groove), pattern_type='frame', tags=['main']),
     Pattern(path="board_joints/board_in_grooved_frame", lambda_=make_pattern_from_frame(example_board_in_grooved_frame), pattern_type='frame', tags=['main']),
+    Pattern(path="board_joints/sliding_dovetail", lambda_=make_pattern_from_frame(example_sliding_dovetail_boards), pattern_type='frame', tags=['main']),
 ]
 
 

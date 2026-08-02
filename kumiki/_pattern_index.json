@@ -235,21 +235,27 @@
     },
     "patterns/board_joints_patterns.py": {
       "chosen_frame_kind": "function",
-      "chosen_frame_name": "example_board_in_grooved_frame",
+      "chosen_frame_name": "example_sliding_dovetail_boards",
       "frames": [
         {
           "kind": "function",
-          "lineno": 56,
+          "lineno": 63,
           "name": "example_board_in_grooved_frame"
+        },
+        {
+          "kind": "function",
+          "lineno": 240,
+          "name": "example_sliding_dovetail_boards"
         }
       ],
       "load_error": null,
       "module_name": "giraffe_librarian_dynamic_board_joints_patterns",
-      "multiple_frames": false,
+      "multiple_frames": true,
       "patternbook": {
         "pattern_names": [
           "tongue_and_groove",
-          "board_in_grooved_frame"
+          "board_in_grooved_frame",
+          "sliding_dovetail"
         ],
         "patterns": [
           {
@@ -265,11 +271,18 @@
             "tags": [
               "main"
             ]
+          },
+          {
+            "path": "board_joints/sliding_dovetail",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
           }
         ]
       },
       "relative_path": "board_joints_patterns.py",
-      "sha256": "f08f05e57994b9de3ed8977e0e54a4b9dfa5fc30acf4bc1eaec9e334e026c909",
+      "sha256": "2862d208550f46c55048d8db6e063eed4f93766de91dd69b72a5cef306f6f8f1",
       "warnings": []
     },
     "patterns/butt_joints_patterns.py": {
@@ -1189,7 +1202,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-07-31T01:14:49.477901+00:00",
+  "generated_at": "2026-08-02T19:52:06.597748+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

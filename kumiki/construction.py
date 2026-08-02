@@ -1560,6 +1560,16 @@ class ButtJointBoardArrangement:
         """Return None if timbers are orthogonal, else an error message.
         Timbers are orthogonal in this arrangement if butt_timber_face is parallel to some face on the receiving_timber
         """
+        butt_face_direction = self.butt_timber.get_face_direction_global(self.butt_timber_face)
+        receiving_axis_directions = [
+            self.receiving_timber.get_length_direction_global(),
+            self.receiving_timber.get_width_direction_global(),
+            self.receiving_timber.get_height_direction_global(),
+        ]
+        for axis_direction in receiving_axis_directions:
+            if equality_test(Abs(numeric_dot_product(butt_face_direction, axis_direction)), 1):
+                return None
+        return "butt_timber_face must be parallel to some face on receiving_timber"
 
     def check_face_aligned(self) -> Optional[str]:
         """Return None if timbers are face-aligned, else an error message."""
