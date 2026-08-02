@@ -21,7 +21,7 @@ board related joints
   -cleat joint (not really a joint)
   -dado_joint (edge to face)
 
--sliding dovetail (maybe you want tapered variants)
+DONE-sliding dovetail (maybe you want tapered variants)
   -the tricky thing about this is th edovetail can be on edge or end...
 -blind housed dovetail
 
@@ -111,7 +111,7 @@ DONE-icon change
 DONE-add loclaization (en/ja, auto-detected from VS Code's display language; viewer webview + sidebar + package.json contributions; no manual override yet)
 DONE/IGNORE-do another example/pattern cleanup
 
--probably drop the board/timber class distinction
+DONE-probably drop the board/timber class distinction
   -it's weird cuz then in arrangements when we say "timber arrangement" and "board arrangement" it becomes semantic, not syntactic
 
 -furniture joints

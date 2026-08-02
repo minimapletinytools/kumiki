@@ -84,7 +84,7 @@ Per the survey (all directions/depths verified in scope at `Joint(...)` construc
 | `cut_tongue_and_groove_joint` board_joints.py:24 | separation along mating axis + slide along board length (two DOFs) | groove/tongue depth; board length for slide | — |
 | `cut_splined_opposing_double_butt_joint_on_face_aligned_timbers` multi_butt_joints.py:37 | each butt timber outward along its length axis; spline along `slot_direction_global` | engagement depths | pegs `(0,0)` (dir `peg_entry_direction_global` :289), butts+spline `(0,1)` |
 
-**Left rigid (no freedoms; code comment explaining why):** `cut_lapped_gooseneck_joint_on_aligned_timbers` (lift-then-slide — needs future sequenced/R6 freedom), `cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers` (captured panel), `cut_multi_cross_lap_joint_on_plane_aligned_timbers` (woven, over-constrained; also flows through `make_compound_joint`), `cut_free_house_joint` (escape direction not derivable from arbitrary CSG). `basic_joints.py` wrappers and `decorative_joints.py` need nothing.
+**Left rigid (no freedoms; code comment explaining why):** `cut_lapped_gooseneck_joint_on_aligned_timbers` (lift-then-slide — needs future sequenced/R6 freedom), `cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers` (captured panel), `cut_multi_cross_lap_joint_on_plane_aligned_timbers` (woven, over-constrained; also flows through `make_compound_joint`), `cut_free_house_joint` (escape direction not derivable from arbitrary CSG). `basic_joints.py` wrappers and `decorative_joints.py` need nothing.
 
 ## 4. Serialization + viewer
 

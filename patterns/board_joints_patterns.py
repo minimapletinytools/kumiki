@@ -5,7 +5,7 @@ from dataclasses import replace
 from sympy import Matrix
 
 from kumiki.joints.workshop.board_joints import (
-    cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers,
+    cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers,
     cut_practice_sliding_dovetail_joint_on_orthogonal_boards,
     cut_tongue_and_groove_joint,
 )
@@ -151,7 +151,7 @@ def example_board_in_grooved_frame(
             )
             for i in range(n_boards)
         ]
-        board_joint = cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
+        board_joint = cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
             boards=boards,
             board_bottom_end_timbers=[bot_rail],
             board_top_end_timbers=[top_rail],
@@ -181,7 +181,7 @@ def example_board_in_grooved_frame(
             )
             for i in range(n_boards)
         ]
-        board_joint = cut_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
+        board_joint = cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
             boards=boards,
             board_bottom_end_timbers=[left_stile],
             board_top_end_timbers=[right_stile],
