@@ -5,7 +5,7 @@ Contains functions for creating joints between boards.
 
 import warnings
 from dataclasses import replace
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, Optional
 
 from sympy import Matrix, cos, tan
 
@@ -514,7 +514,7 @@ def _dovetail_trapezoid_points(
 #___\  /___ <-dovetail_depth
 #    ^
 #    dovetail_small_width
-def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric, lateral_offset: Numeric = scalar(0), shorten_dovetail_by: Numeric = scalar(0), extend_front_dovetail_housing_by: Union[None, Numeric] = scalar(0), taper_angle: Numeric = scalar(0)) -> Joint:
+def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric, lateral_offset: Numeric = scalar(0), dovetail_length: Optional[Numeric] = None, shorten_dovetail_by: Numeric = scalar(0), extend_front_dovetail_housing_by: Union[None, Numeric] = scalar(0), taper_angle: Numeric = scalar(0)) -> Joint:
     """
         cuts a sliding dovetail joint, the dovetail slides in from the front_face_on_butt_timber direction
 
@@ -522,6 +522,7 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         dovetail_small_width: the width of the smaller part of the dovetail, see diagram
         dovetail_angle: the angle the dovetail expands by from the smaller part of the dovetail
         lateral_offset: offset the dovetail from the centerline by this amount (sign based on local axis of the butting timber and not based on front_face_on_butt_timber)
+        dovetail_length: the length of the dovetail on the butting timber, measurement starts from where shorten_dovetail_by defines the start of the dovetail.
         shorten_dovetail_by: shortens the dovetail from front_face_on_butt_timber by this amount
         extend_front_dovetail_housing_by: extend the front side of the dovetail housing from the end of the shortened dovetail by this amount. If `None` extends all the way through. Note that the back side is always extended to the end of the receiving timber so that the joint can be assembled.
         taper_angle: the narrower side is always pointing towards front_face_on_butt_timber
@@ -593,9 +594,18 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
     s_receiving_front = s_coord(locate_face(receiving_timber, receiving_front_face).point)
 
     # The tongue itself is set back from butt_timber's own front face by
-    # shorten_dovetail_by, and runs all the way to butt_timber's own actual end.
+    # shorten_dovetail_by. From there it either runs all the way to
+    # butt_timber's own actual end (dovetail_length=None), or is limited to
+    # exactly dovetail_length -- only the tongue is shortened this way; the
+    # housing on receiving_timber is untouched by dovetail_length.
     s_tongue_front = s_butt_front - shorten_dovetail_by
-    s_tongue_back = s_butt_back
+    if dovetail_length is None:
+        s_tongue_back = s_butt_back
+    else:
+        s_tongue_back = s_tongue_front - dovetail_length
+        assert safe_compare(s_tongue_back - s_butt_back, 0, Comparison.GE), (
+            "dovetail_length exceeds the material available on butt_timber past shorten_dovetail_by"
+        )
 
     # The housing's back side always extends to receiving_timber's own actual
     # end (so the joint can be assembled); the front side either extends past
@@ -654,23 +664,29 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         assert extrusion.is_valid(), f"dovetail trapezoid profile is not a valid convex polygon (label={label})"
         return _taper_intersection(extrusion)
 
+    def _full_depth_box(s_start: Numeric, s_end: Numeric, label: str):
+        """Plain box spanning butt_timber's own full actual depth extent
+        (lateral_dimension x depth_extent), over a given slide-axis range --
+        used to clear away material where no tongue exists at all."""
+        transform = Transform(
+            position=marking_origin + depth_dir * (depth_extent / scalar(2)),
+            orientation=profile_orientation,
+        )
+        return RectangularPrism(
+            size=Matrix([lateral_dimension, depth_extent]),
+            transform=transform,
+            start_distance=s_start,
+            end_distance=s_end,
+            label=label,
+        )
+
     # --- butt_timber's cut: remove everything except the tongue ---
     tongue_cuts: List = []
     if safe_compare(s_tongue_back, s_tongue_front, Comparison.LT):
         # Full box (butt_timber's own actual cross-section) over the tongue's
         # slide range, minus the dovetail trapezoid -- leaves just the tongue
         # sticking out, wings removed.
-        box_transform = Transform(
-            position=marking_origin + depth_dir * (depth_extent / scalar(2)),
-            orientation=profile_orientation,
-        )
-        box_prism = RectangularPrism(
-            size=Matrix([lateral_dimension, depth_extent]),
-            transform=box_transform,
-            start_distance=s_tongue_back,
-            end_distance=s_tongue_front,
-            label="dovetail_wings",
-        )
+        box_prism = _full_depth_box(s_tongue_back, s_tongue_front, "dovetail_wings")
         trapezoid_for_tongue = _trapezoid_extrusion(s_tongue_back, s_tongue_front, "dovetail_tongue_profile")
         tongue_cuts.append(Difference(base=box_prism, subtract=[trapezoid_for_tongue]))
 
@@ -682,20 +698,16 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
     # overlaps, same as every other joint in this codebase) would still
     # protrude straight through receiving_timber, uncut, in this segment.
     if safe_compare(shorten_dovetail_by, 0, Comparison.GT):
-        clearance_transform = Transform(
-            position=marking_origin + depth_dir * (depth_extent / scalar(2)),
-            orientation=profile_orientation,
-        )
-        clearance_prism = RectangularPrism(
-            size=Matrix([lateral_dimension, depth_extent]),
-            transform=clearance_transform,
-            start_distance=s_tongue_front,
-            end_distance=s_butt_front,
-            label="dovetail_shortened_clearance",
-        )
-        tongue_cuts.append(clearance_prism)
+        tongue_cuts.append(_full_depth_box(s_tongue_front, s_butt_front, "dovetail_shortened_clearance"))
 
-    assert tongue_cuts, "shorten_dovetail_by leaves no material for butt_timber's own actual depth extent to cut"
+    # Near-back clearance cut: dovetail_length can leave the tongue short of
+    # butt_timber's own actual end. Only the tongue is shortened this way --
+    # the housing on receiving_timber keeps its own full range -- so the same
+    # full-depth clearance is needed here too, past the tongue's back end.
+    if safe_compare(s_tongue_back - s_butt_back, 0, Comparison.GT):
+        tongue_cuts.append(_full_depth_box(s_butt_back, s_tongue_back, "dovetail_length_clearance"))
+
+    assert tongue_cuts, "shorten_dovetail_by/dovetail_length leaves no material for butt_timber's own actual depth extent to cut"
     butt_negative_csg = SolidUnion(children=tongue_cuts, label="sliding_dovetail") if len(tongue_cuts) > 1 else tongue_cuts[0]
 
     butt_cutting = Cutting(

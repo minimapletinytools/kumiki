@@ -270,8 +270,10 @@ def example_sliding_dovetail_boards() -> Frame:
         dovetail_depth=dovetail_depth,
         dovetail_small_width=dovetail_small_width,
         dovetail_angle=dovetail_angle,
+        dovetail_length=inches(3),
         shorten_dovetail_by=inches(1),
         extend_front_dovetail_housing_by=inches(1, 2),
+        
     )
 
     return Frame.from_joints(
