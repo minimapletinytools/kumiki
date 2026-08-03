@@ -14,6 +14,7 @@ from tests.testing_shavings import (
     assert_vectors_perpendicular
 )
 from kumiki.rule import inches, feet
+from kumiki.ticket import BoardTicket, TimberTicket
 
 # ============================================================================
 # Tests for construction.py - Timber Creation and Manipulation
@@ -2265,4 +2266,66 @@ class TestAttachTimber:
         assert simplify(v[0] - x) == 0, f"x: got {v[0]}, expected {x}"
         assert simplify(v[1] - y) == 0, f"y: got {v[1]}, expected {y}"
         assert simplify(v[2] - z) == 0, f"z: got {v[2]}, expected {z}"
+
+
+class TestPanelBoardArrangement:
+    """Tests for PanelBoardArrangement.check_parallal_coplanar_and_same_thickness."""
+
+    def _make_board(self, x, y=None, width=scalar(6), thickness=scalar(1)):
+        return Board(
+            length=scalar(12),
+            size=create_v2(width, thickness),
+            transform=Transform(position=create_v3(x, y or scalar(0), scalar(0)), orientation=Orientation.identity()),
+            ticket=BoardTicket(path=f"board_{x}"),
+        )
+
+    def test_valid_panel_passes(self):
+        boards = [self._make_board(scalar(0)), self._make_board(scalar(6)), self._make_board(scalar(12))]
+        assert PanelBoardArrangement(boards=boards).check_parallal_coplanar_and_same_thickness() is None
+
+    def test_non_coplanar_board_fails(self):
+        boards = [self._make_board(scalar(0)), self._make_board(scalar(6), y=scalar("0.5"))]
+        result = PanelBoardArrangement(boards=boards).check_parallal_coplanar_and_same_thickness()
+        assert result is not None and "coplanar" in result
+
+
+class TestExtendedTimberArrangement:
+    """Tests for ExtendedTimberArrangement's check_* methods."""
+
+    def _make_timber(self, z, orientation=None, width=scalar(4), height=scalar(6)):
+        return Timber(
+            length=scalar(12),
+            size=create_v2(width, height),
+            transform=Transform(position=create_v3(scalar(0), scalar(0), z), orientation=orientation or Orientation.identity()),
+            ticket=TimberTicket(path=f"timber_{z}"),
+        )
+
+    def test_parallel_and_face_aligned_pass(self):
+        arrangement = ExtendedTimberArrangement(timbers=[self._make_timber(scalar(0)), self._make_timber(scalar(3))])
+        assert arrangement.check_parallel() is None
+        assert arrangement.check_face_aligned() is None
+
+    def test_coaxial_rotated_with_swapped_dimensions_passes(self):
+        # 90-degree twist about the shared centerline with width/height swapped
+        # should still be considered "same size" per-orientation, not local.
+        ref = self._make_timber(scalar(0), width=scalar(4), height=scalar(6))
+        rotated = self._make_timber(
+            scalar(3),
+            orientation=Orientation.from_angle_axis(degrees(90), create_v3(0, 0, 1)),
+            width=scalar(6),
+            height=scalar(4),
+        )
+        result = ExtendedTimberArrangement(timbers=[ref, rotated]).check_coaxial_face_aligned_and_same_size()
+        assert result is None
+
+    def test_off_axis_timber_fails_coaxial(self):
+        ref = self._make_timber(scalar(0))
+        off_axis = Timber(
+            length=scalar(12),
+            size=create_v2(scalar(4), scalar(6)),
+            transform=Transform(position=create_v3(scalar(1), scalar(0), scalar(0)), orientation=Orientation.identity()),
+            ticket=TimberTicket(path="off_axis"),
+        )
+        result = ExtendedTimberArrangement(timbers=[ref, off_axis]).check_coaxial_face_aligned_and_same_size()
+        assert result is not None and "coaxial" in result
 

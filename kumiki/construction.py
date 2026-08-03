@@ -2032,9 +2032,76 @@ class ExtendedTimberArrangement:
     timbers: List[TimberLike]
 
     def check_parallel(self) -> Optional[str]:
-        pass
+        """Return None if all timbers have parallel length directions
+        (measured against timbers[0]), else an error message.
+        """
+        if not self.timbers:
+            return "timbers must not be empty"
+
+        ref = self.timbers[0]
+        for i, t in enumerate(self.timbers[1:], start=1):
+            if not are_timbers_parallel(ref, t):
+                return f"all timbers must be parallel (timber {i} is not parallel to timber 0)"
+        return None
+
+    def check_face_aligned(self) -> Optional[str]:
+        """Return None if all timbers are face-aligned (measured against
+        timbers[0]), else an error message.
+        """
+        if not self.timbers:
+            return "timbers must not be empty"
+
+        ref = self.timbers[0]
+        for i, t in enumerate(self.timbers[1:], start=1):
+            if not are_timbers_face_aligned(ref, t):
+                return f"all timbers must be face-aligned (timber {i} is not face-aligned with timber 0)"
+        return None
 
     def check_coaxial_face_aligned_and_same_size(self) -> Optional[str]:
+        """Return None if all timbers share the same centerline (coaxial),
+        are face-aligned, and have the same cross-sectional size, else an
+        error message describing the first violation found (measured
+        against timbers[0]).
+
+        "Same size" is checked along matching GLOBAL directions rather than
+        local (width, height) indices: a face-aligned timber may be rotated
+        90 degrees about the shared centerline relative to timbers[0], in
+        which case its local width/height are swapped relative to global
+        space even though its physical cross-section matches.
+        """
+        if not self.timbers:
+            return "timbers must not be empty"
+
+        ref = self.timbers[0]
+        ref_length_dir = ref.get_length_direction_global()
+        ref_width_dir = ref.get_width_direction_global()
+        ref_height_dir = ref.get_height_direction_global()
+        ref_position = ref.get_bottom_position_global()
+
+        for i, t in enumerate(self.timbers[1:], start=1):
+            if not are_timbers_parallel(ref, t):
+                return f"all timbers must be coaxial (timber {i} is not even parallel to timber 0)"
+
+            offset = t.get_bottom_position_global() - ref_position
+            perpendicular_offset = offset - ref_length_dir * safe_dot_product(offset, ref_length_dir)
+            if not zero_test(safe_dot_product(perpendicular_offset, perpendicular_offset)):
+                return f"all timbers must be coaxial (timber {i}'s centerline does not lie on timber 0's centerline)"
+
+            if not are_timbers_face_aligned(ref, t):
+                return f"all timbers must be face-aligned (timber {i} is not face-aligned with timber 0)"
+
+            if not equality_test(t.get_size_in_direction_3d(ref_width_dir), ref.size[0]):
+                return (
+                    f"all timbers must have the same cross-sectional size "
+                    f"(timber {i}'s size does not match timber 0 along timber 0's width direction)"
+                )
+            if not equality_test(t.get_size_in_direction_3d(ref_height_dir), ref.size[1]):
+                return (
+                    f"all timbers must have the same cross-sectional size "
+                    f"(timber {i}'s size does not match timber 0 along timber 0's height direction)"
+                )
+        return None
+
 # =========================================
 # internal helpers
 # =========================================
