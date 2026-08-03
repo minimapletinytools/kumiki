@@ -11,6 +11,7 @@ from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.rule import equality_test, scalar
 from kumiki.timber import Board, Orientation, Timber, Transform, create_v3
 from kumiki.cutcsg import RectangularPrism, SolidUnion
+from kumiki.construction import ExtendedTimberArrangement, PanelBoardArrangement
 
 
 def _make_boards(
@@ -270,11 +271,10 @@ class TestBoardInGroovedRectangularFrameJoint:
         )
 
         joint = cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
-            boards=boards,
-            board_top_end_timbers=[top_timber],
-            board_bottom_end_timbers=[bot_timber],
-            board_left_side_timbers=[left_timber],
-            board_right_side_timbers=[right_timber],
+            boards=PanelBoardArrangement(boards=boards),
+            frame_timbers=ExtendedTimberArrangement(
+                timbers=[top_timber, bot_timber, left_timber, right_timber]
+            ),
         )
         return joint, boards, [top_timber, bot_timber, left_timber, right_timber]
 

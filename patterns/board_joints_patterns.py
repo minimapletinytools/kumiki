@@ -10,7 +10,7 @@ from kumiki.joints.workshop.board_joints import (
     cut_tongue_and_groove_joint,
 )
 from kumiki.joints.workshop.corner_joints import cut_plain_miter_joint_on_face_aligned_timbers
-from kumiki.construction import CornerJointTimberArrangement
+from kumiki.construction import CornerJointTimberArrangement, ExtendedTimberArrangement, PanelBoardArrangement
 from kumiki.example_shavings import (
     create_canonical_example_board_butt_joint_boards_side_to_face,
     create_canonical_example_board_butt_joint_boards_end_to_face,
@@ -152,11 +152,8 @@ def example_board_in_grooved_frame(
             for i in range(n_boards)
         ]
         board_joint = cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
-            boards=boards,
-            board_bottom_end_timbers=[bot_rail],
-            board_top_end_timbers=[top_rail],
-            board_left_side_timbers=[left_stile],
-            board_right_side_timbers=[right_stile],
+            boards=PanelBoardArrangement(boards=boards),
+            frame_timbers=ExtendedTimberArrangement(timbers=[top_rail, bot_rail, left_stile, right_stile]),
         )
     else:
         # Boards run in X (local Z = global X), stacked in Z.
@@ -182,11 +179,8 @@ def example_board_in_grooved_frame(
             for i in range(n_boards)
         ]
         board_joint = cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
-            boards=boards,
-            board_bottom_end_timbers=[left_stile],
-            board_top_end_timbers=[right_stile],
-            board_left_side_timbers=[bot_rail],
-            board_right_side_timbers=[top_rail],
+            boards=PanelBoardArrangement(boards=boards),
+            frame_timbers=ExtendedTimberArrangement(timbers=[right_stile, left_stile, bot_rail, top_rail]),
         )
 
     # Miter joints at the four frame corners.

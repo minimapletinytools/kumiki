@@ -116,8 +116,9 @@ DONE-probably drop the board/timber class distinction
 
 -furniture joints
   DONE-probably rename t opractice joint
-  -create BoardPanelArrangement List[Board] and update borad joints to use this
-  -create ExtendedTimberArrangement List[TimberLike]
+  DONE-create BoardPanelArrangement List[Board] and update borad joints to use this
+  DONE-create ExtendedTimberArrangement List[TimberLike]
+  -update joints to use new arrangements
   -finish cut_board_in_dado_joint_on_plane_aligned_timbers
   -do router joint stuff
   -do router video

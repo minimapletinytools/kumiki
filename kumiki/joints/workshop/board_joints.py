@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple, Union, Optional
 
 from sympy import Matrix, cos, tan
 
-from kumiki.timber import AssemblyFreedom, Board, TimberLike, TimberFace, Cutting, Joint, JointTicket
+from kumiki.timber import AssemblyFreedom, Board, TimberFace, Cutting, Joint, JointTicket, require_check
 from kumiki.rule import (
     Numeric,
     V3,
@@ -30,8 +30,13 @@ from kumiki.cutcsg import (
     HalfSpace,
     adopt_csg,
 )
-from kumiki.construction import Transform, Orientation, ButtJointBoardArrangement
-from kumiki.timber_shavings import are_timbers_face_aligned
+from kumiki.construction import (
+    Transform,
+    Orientation,
+    ButtJointBoardArrangement,
+    PanelBoardArrangement,
+    ExtendedTimberArrangement,
+)
 from kumiki.measuring import locate_face
 
 
@@ -296,8 +301,10 @@ def cut_tongue_and_groove_joint(
     )
 
 
-# TODO rename to cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers
-def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(boards: List[Board], board_top_end_timbers: List[TimberLike], board_bottom_end_timbers: List[TimberLike], board_left_side_timbers: List[TimberLike], board_right_side_timbers: List[TimberLike]):
+def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers(
+    boards: PanelBoardArrangement,
+    frame_timbers: ExtendedTimberArrangement,
+) -> Joint:
     """
     fits boards in between the timbers using the board_in_groove_joint
 
@@ -310,46 +317,18 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
     TODO add an optional maybe_end_cut_boards_to_groove_depth parameter. If provided the boards are extended with end cuts to fit into the grooves on the board_top/bottom_end_timbers
 
     Args:
-        boards: A list of boards to be fitted into the grooves
-        board_top_end_timbers: A list of timbers that will have grooves cut to receive the "top" end of the boards
-        board_bottom_end_timbers: A list of timbers that will have grooves cut to receive the "bottom" end of the boards
-        board_left_side_timbers: A list of timbers that will have grooves cut to receive the "left" side of the boards
-        board_right_side_timbers: A list of timbers that will have grooves cut to receive the "right" side of the boards
+        boards: Panel of boards to be fitted into the grooves.
+        frame_timbers: The surrounding frame timbers (top/bottom/left/right) that will have grooves cut to receive the board panel's edges.
     """
-     
-    assert boards, "boards must not be empty"
+    require_check(boards.check_parallal_coplanar_and_same_thickness())
 
-    ref = boards[0]
+    board_list = boards.boards
+    ref = board_list[0]
     board_thickness = ref.size[1]
 
-    # Assert all boards have the same orientation matrix and thickness.
-    for i, b in enumerate(boards[1:], start=1):
-        for r in range(3):
-            for c in range(3):
-                assert equality_test(
-                    b.transform.orientation.matrix[r, c],
-                    ref.transform.orientation.matrix[r, c],
-                ), (
-                    f"all boards must have the same orientation "
-                    f"(board {i} differs from board 0 at [{r},{c}])"
-                )
-        assert equality_test(b.size[1], board_thickness), (
-            f"all boards must have the same thickness "
-            f"(board {i} has {b.size[1]}, board 0 has {board_thickness})"
-        )
-
-    # Assert all frame timbers are face-aligned with the boards.
-    all_frame_timbers: List[TimberLike] = (
-        board_top_end_timbers
-        + board_bottom_end_timbers
-        + board_left_side_timbers
-        + board_right_side_timbers
+    require_check(
+        ExtendedTimberArrangement(timbers=[ref, *frame_timbers.timbers]).check_face_aligned()
     )
-    for t in all_frame_timbers:
-        assert are_timbers_face_aligned(t, ref), (
-            f"all frame timbers must be face-aligned with the boards, "
-            f"but timber '{t.ticket.path}' is not"
-        )
 
     # Compute the bounding box of all boards in the reference board's local frame.
     # Board local: X = width, Y = thickness, Z = length.
@@ -369,13 +348,9 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
     min_z =  scalar(0)
     max_z =  ref.length
 
-    for i, b in enumerate(boards[1:], start=1):
+    for i, b in enumerate(board_list[1:], start=1):
+        # Coplanarity is already guaranteed by the PanelBoardArrangement check above.
         pos_in_ref_local = ref.transform.global_to_local(b.transform.position)
-        # Coplanar assertion: Y offset of board bottom in ref local frame must be zero.
-        assert equality_test(pos_in_ref_local[1], scalar(0)), (
-            f"board {i} is not coplanar with board 0 "
-            f"(Y offset = {pos_in_ref_local[1]} in ref local frame)"
-        )
         x_lo = pos_in_ref_local[0] - b.size[0] / scalar(2)
         x_hi = pos_in_ref_local[0] + b.size[0] / scalar(2)
         z_lo = pos_in_ref_local[2]
@@ -408,7 +383,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
     # Re-express the groove prism in each frame timber's local coordinate frame
     # and build a Cutting for each timber.
     cuttings: Dict[str, Cutting] = {}
-    for timber in all_frame_timbers:
+    for timber in frame_timbers.timbers:
         groove_in_timber_local = adopt_csg(
             ref.transform, timber.transform, groove_prism_ref_local
         )
@@ -419,7 +394,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
         )
 
     # Include boards as uncut members so the returned joint can form a complete frame.
-    for board in boards:
+    for board in board_list:
         cuttings[board.ticket.path] = Cutting(
             timber=board,
             negative_csg=None,
@@ -437,7 +412,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
 
 
 
-def cut_practice_board_in_dado_joint_on_plane_aligned_timbers(boards : List[Board], dado_timbers : List[TimberLike], dado_depth : Numeric = scalar(0)):
+def cut_practice_board_in_dado_joint_on_plane_aligned_timbers(boards : PanelBoardArrangement, dado_timbers : ExtendedTimberArrangement, dado_depth : Numeric = scalar(0)):
     """
     cuts boards to fit in dados on dado_timbers. The dadoes are dado_depth deep, so the boards are cut to fit excatly in the dadosinto the grooves on the dado_timbers
 

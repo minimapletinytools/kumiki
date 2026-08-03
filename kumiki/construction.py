@@ -2027,9 +2027,18 @@ class PanelBoardArrangement:
                 )
         return None
 
+
+# TODO rename this?
 @dataclass(frozen=True)
 class ExtendedTimberArrangement:
+    """
+    Just a list of timbers, with no real restriction until check functions are called...
+    """
     timbers: List[TimberLike]
+
+    def check_plane_aligned(self) -> Optional[str]:
+        # TODO
+        pass
 
     def check_parallel(self) -> Optional[str]:
         """Return None if all timbers have parallel length directions
