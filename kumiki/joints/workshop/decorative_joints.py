@@ -12,11 +12,6 @@ from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, ad
 from kumiki.measuring import get_center_point_on_face_global
 
 
-# A tiny relative pull-in applied so a cylinder's flat end cap lands strictly
-# inside the timber's actual face rather than exactly on it (see
-# cut_practice_rafter_tail_scallop_decoration for why this matters).
-_SCALLOP_WIDTH_CLEARANCE_FRACTION = scalar(1, 1000000)
-
 
 # The two faces adjacent to each edge -- literally the two faces named in the
 # edge's own enum member name (e.g. RIGHT_FRONT is the edge where the RIGHT
@@ -208,27 +203,14 @@ def cut_practice_rafter_tail_scallop_decoration(
     # cut_side and the length axis (rotating cut_side 90 degrees about
     # end_side's own axis lands on it); it extrudes across the timber's full
     # actual (nominal) width on that axis so the scallop reaches both sides.
-    #
-    # The extrusion is pulled in from the exact nominal half-size by a tiny
-    # relative clearance: a cylinder's flat end cap landing EXACTLY on the
-    # timber's own actual side face (rather than strictly inside or clearly
-    # outside it) is a known hard case for the CSG boolean/triangulation
-    # pipeline (the cap's circular boundary and the face's rectangular
-    # boundary coincide/cross at multiple points), producing a non-watertight
-    # mesh. Overshooting past the face doesn't avoid this -- only staying
-    # strictly inside does -- so we pull in by a negligible fraction instead
-    # of reaching for the boundary exactly.
     perp_face = cut_face.rotate_about(end_face)
     perp_face_opposite = perp_face.get_opposite_face()
-    half_extent = timber.get_half_nominal_size_in_face_normal_axis(perp_face)
-    half_extent_opposite = timber.get_half_nominal_size_in_face_normal_axis(perp_face_opposite)
-    clearance = _SCALLOP_WIDTH_CLEARANCE_FRACTION
     cylinder = Cylinder(
         axis_direction=timber.get_face_direction_global(perp_face),
         radius=radius,
         position=center,
-        start_distance=-half_extent_opposite * (scalar(1) - clearance),
-        end_distance=half_extent * (scalar(1) - clearance),
+        start_distance=-timber.get_half_nominal_size_in_face_normal_axis(perp_face_opposite),
+        end_distance=timber.get_half_nominal_size_in_face_normal_axis(perp_face),
     )
 
     negative_csg = adopt_csg(None, timber.transform, cylinder)
