@@ -669,7 +669,8 @@
       "patternbook": {
         "pattern_names": [
           "roundover",
-          "roundover_imperfect"
+          "roundover_imperfect",
+          "rafter_tail_scallop"
         ],
         "patterns": [
           {
@@ -685,11 +686,18 @@
             "tags": [
               "main"
             ]
+          },
+          {
+            "path": "decorative_joints/rafter_tail_scallop",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
           }
         ]
       },
       "relative_path": "decorative_joints_patterns.py",
-      "sha256": "8d1ce8268eeed4c5f337958741a5542ae92bd29d6812b1a9fc0ed28a45896981",
+      "sha256": "ff0db6bab787f6f50457259f26000e2cc44d23297948581643b4eedd51490375",
       "warnings": []
     },
     "patterns/free_joints_patterns.py": {
@@ -1223,7 +1231,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-08-03T04:20:06.326390+00:00",
+  "generated_at": "2026-08-03T05:07:03.132804+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

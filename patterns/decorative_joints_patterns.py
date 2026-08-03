@@ -47,6 +47,23 @@ def example_roundover_imperfect() -> Joint:
     )
 
 
+def example_rafter_tail_scallop_decoration() -> Joint:
+    """A rafter tail with a scalloped decorative cut on its underside near the tail end."""
+    timber = Timber(
+        length=feet(4),
+        size=Matrix([inches(4), inches(6)]),
+        transform=Transform.identity(),
+        ticket=TimberTicket(path="timber"),
+    )
+    return cut_practice_rafter_tail_scallop_decoration(
+        timber=timber,
+        end_side=TimberEnd.TOP,
+        cut_side=TimberLongFace.BACK,
+        scallop_height=inches(2),
+        scallop_length=inches(4),
+    )
+
+
 patterns = [
     Pattern(
         path="decorative_joints/roundover",
@@ -57,6 +74,12 @@ patterns = [
     Pattern(
         path="decorative_joints/roundover_imperfect",
         lambda_=make_pattern_from_joint(example_roundover_imperfect),
+        pattern_type='frame',
+        tags=['main'],
+    ),
+    Pattern(
+        path="decorative_joints/rafter_tail_scallop",
+        lambda_=make_pattern_from_joint(example_rafter_tail_scallop_decoration),
         pattern_type='frame',
         tags=['main'],
     ),

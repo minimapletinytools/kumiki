@@ -5,11 +5,14 @@ import math
 import pytest
 from sympy import Matrix
 
-from kumiki.joints.workshop.decorative_joints import cut_practice_roundover_decoration
+from kumiki.joints.workshop.decorative_joints import (
+    cut_practice_roundover_decoration,
+    cut_practice_rafter_tail_scallop_decoration,
+)
 from kumiki.ticket import TimberTicket
 from kumiki.rule import scalar, Transform
-from kumiki.timber import Timber, TimberEdge
-from kumiki.cutcsg import Difference
+from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberLongFace
+from kumiki.cutcsg import Difference, Cylinder
 from kumiki.triangles import triangulate_cutcsg
 
 WIDTH = scalar(4)
@@ -113,3 +116,68 @@ class TestRoundoverDecoration:
         timber = _make_timber()
         with pytest.raises(AssertionError, match="too large"):
             cut_practice_roundover_decoration(timber, [TimberEdge.RIGHT_FRONT], WIDTH)
+
+
+class TestRafterTailScallopDecoration:
+    """Tests for cut_practice_rafter_tail_scallop_decoration."""
+
+    def test_scallop_cut_is_watertight_and_removes_expected_material(self):
+        # end_side=TOP, cut_side=BACK: scallop cut into the BACK face near the
+        # TOP end, extruded across the full WIDTH (the axis perpendicular to
+        # both BACK and TOP).
+        scallop_height = scalar(2)
+        scallop_length = scalar(4)
+        radius = (scallop_length ** 2 + scallop_height ** 2) / (2 * scallop_height)
+
+        timber = _make_timber()
+        joint = cut_practice_rafter_tail_scallop_decoration(
+            timber,
+            end_side=TimberEnd.TOP,
+            cut_side=TimberLongFace.BACK,
+            scallop_height=scallop_height,
+            scallop_length=scallop_length,
+        )
+
+        assert joint.ticket.joint_type == "rafter_tail_scallop_decoration"
+        assert joint.is_decorative()
+        cutting = joint.cuttings["timber"]
+        assert cutting.negative_csg is not None
+
+        # The circle must be perpendicular (not tangent) to end_side at point
+        # A: its center lies exactly ON end_side's plane (local x=0, i.e. the
+        # same Z as the end), offset only along cut_side's axis (Y here).
+        # Verify by construction: the center must be equidistant (= radius)
+        # from both A=(0,-3,12) [on cut_side, scallop_length in from the end]
+        # and A itself, and the circle's radius must match the closed-form
+        # tangent-perpendicular-at-A solution.
+        cylinder = cutting.negative_csg
+        assert isinstance(cylinder, Cylinder)
+        expected_center = Matrix([0.0, -float(HEIGHT) / 2 - (float(radius) - float(scallop_height)), float(LENGTH)])
+        for i in range(3):
+            assert cylinder.position[i] == pytest.approx(float(expected_center[i]))
+        assert cylinder.radius == pytest.approx(float(radius))
+
+        full_prism = timber.get_perfect_timber_within_csg_local()
+        result_csg = Difference(base=full_prism, subtract=[cutting.negative_csg])
+        mesh = triangulate_cutcsg(result_csg).mesh
+        assert mesh.is_watertight
+
+        original_volume = float(WIDTH) * float(HEIGHT) * float(LENGTH)
+        removed = original_volume - mesh.volume
+        # The removed shape is the raw circle (radius computed above), clipped
+        # by the timber's actual boundaries, so it's positive but strictly
+        # less than the full circle's own cross-sectional area extruded
+        # across the width.
+        assert 0 < removed < math.pi * float(radius) ** 2 * float(WIDTH)
+
+        # A point in the middle of the scalloped-out region (between the end
+        # and where the curve meets cut_side) should be removed...
+        mid_scallop = Matrix([0.0, -float(HEIGHT) / 2, float(LENGTH) - 2.0])
+        assert cutting.negative_csg.contains_point(mid_scallop)
+        # ...while the flat run of cut_side well before the scallop begins,
+        # and the FRONT half of the cross-section at the very end, are both
+        # untouched.
+        far_flat_region = Matrix([0.0, -float(HEIGHT) / 2, 2.0])
+        assert not cutting.negative_csg.contains_point(far_flat_region)
+        front_half_at_end = Matrix([0.0, 2.0, float(LENGTH)])
+        assert not cutting.negative_csg.contains_point(front_half_at_end)
