@@ -191,6 +191,12 @@ Do not write too many tests that aren't actually testing geometry. We want quali
 Tests marked with a `# 🐪` have been hand verified to be relevant, never mark tests as `# 🐪` unless the user gives the ok. Never delete tests marked with `# 🐪` and be more cautious when modifying them. In contrast, tests not marked with a `# 🐪` can be deleted and rewritten.
 
 
+### dealing with Z-fighting issues
+
+For the most part the trimesh library should properly deal with overlapping faces and Z fighting type issues but sometimes it fails. In these case DO NOT add small offsets in attempt to resolve the issue. Work together with the developer to find a better way to resolve it. 
+
+CSGs should never make small accomodations for floating epsilon type errors. We may look into more systematic ways to do this in the future.  
+
 ## Authoring Patterns and Example Frames
 
 Patterns are simple examples demonstrating joints or other deconstruted concepts in Kumiki. They are intended to be used as a reference source.
