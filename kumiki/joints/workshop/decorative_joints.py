@@ -143,3 +143,29 @@ def cut_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]
         cuttings={timber.ticket.path: cutting},
         ticket=JointTicket(joint_type="roundover_decoration"),
     )
+
+
+
+
+#_______________
+#               |
+#______________◜  ←scallop_height
+#      ↑       ↑
+#      |       scallop_width
+#    cut_side
+
+def cut_practice_rafter_tail_scallop_decoration(timber: TimberLike, end_side: TimberEnd, cut_side: TimberLongFace, scallop_height: Numeric, scallop_length: Numeric) -> Joint:
+    """
+    cuts out a "scallop" shape from cut_side from scallop_height measured up from cut_side on the end_side
+    to scallop_width measured inwards from the end on the cut_side
+    the scallop is the circle touching the 2 points above such that the circle is peprendicular with the end_side face.
+    """
+
+    # set the marking space where the centerplane of the timber intersects cut_side face and the end_side face (there are 2 centerplanse and only one of them intersect the 2 faces)
+    # the +x axis points towards end_side direction and the +y axis pointing away from the cut_side face direciton
+    # from this point, go up by scallop_height to find point A and left by scallop_width to find point B
+    # find that touch both point A and B and is perpendicular to the end_side face at point A, the circle is in the centerpalne of the timber (the same one we intersected)
+    # create a cylinder that reaches to both sides of the actual timber (so rotate cut_face  by 90, and then find its half nominal dimensions to determine extrusion distances)
+
+    # return the joint with the cylinder as its negative csg
+    pass

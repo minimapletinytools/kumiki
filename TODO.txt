@@ -110,18 +110,16 @@ DONE-BUG you can't click on top/bottom ends of round timbers to check wwhich dir
 DONE-icon change
 DONE-add loclaization (en/ja, auto-detected from VS Code's display language; viewer webview + sidebar + package.json contributions; no manual override yet)
 DONE/IGNORE-do another example/pattern cleanup
-
 DONE-probably drop the board/timber class distinction
   -it's weird cuz then in arrangements when we say "timber arrangement" and "board arrangement" it becomes semantic, not syntactic
-
+DONE-decorative joint
+  DONE-roundover cut
 
 -be consistent... rename nominal size to actual size or true size
 
 
 -tusked mortise and tenon joint
--decorative joint
-  -round cut
-  -roundover cut
+
 
 -furniture joints
   DONE-probably rename t opractice joint
