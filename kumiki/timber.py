@@ -2205,6 +2205,9 @@ class Joint:
     ticket: JointTicket
     jointAccessories: Dict[str, Accessory] = field(default_factory=dict)
 
+    def is_decorative(self) -> bool:
+        return len(self.cuttings) == 1
+
     def with_order(
         self,
         order: Union[

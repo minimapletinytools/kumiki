@@ -114,6 +114,11 @@ DONE/IGNORE-do another example/pattern cleanup
 DONE-probably drop the board/timber class distinction
   -it's weird cuz then in arrangements when we say "timber arrangement" and "board arrangement" it becomes semantic, not syntactic
 
+-tusked mortise and tenon joint
+-decorative joint
+  -round cut
+  -roundover cut
+
 -furniture joints
   DONE-probably rename t opractice joint
   DONE-create BoardPanelArrangement List[Board] and update borad joints to use this
