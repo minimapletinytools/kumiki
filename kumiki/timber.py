@@ -1405,6 +1405,9 @@ class RegularPolygonTimber(PerfectTimberWithin):
 # Type alias for all timber-like objects. This could/should just be an alias for PerfectTimberWithin but isn't for some odd reason.
 TimberLike = Union[Timber, MeshTimber, RoundTimber, RegularPolygonTimber, Board]
 
+# type alias for all block-like timber objects
+BlockLike = Union[Timber,Board]
+
 
 # ============================================================================
 # Joint Related Types and Functions

@@ -114,6 +114,10 @@ DONE/IGNORE-do another example/pattern cleanup
 DONE-probably drop the board/timber class distinction
   -it's weird cuz then in arrangements when we say "timber arrangement" and "board arrangement" it becomes semantic, not syntactic
 
+
+-be consistent... rename nominal size to actual size or true size
+
+
 -tusked mortise and tenon joint
 -decorative joint
   -round cut

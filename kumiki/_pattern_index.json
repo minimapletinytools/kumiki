@@ -244,7 +244,7 @@
         },
         {
           "kind": "function",
-          "lineno": 240,
+          "lineno": 234,
           "name": "example_sliding_dovetail_boards"
         }
       ],
@@ -282,7 +282,7 @@
         ]
       },
       "relative_path": "board_joints_patterns.py",
-      "sha256": "2862d208550f46c55048d8db6e063eed4f93766de91dd69b72a5cef306f6f8f1",
+      "sha256": "28dc5587d525622b37f723b1dcdfe350b94da2ff860cba790390047352172652",
       "warnings": []
     },
     "patterns/butt_joints_patterns.py": {
@@ -666,9 +666,30 @@
       "load_error": null,
       "module_name": "giraffe_librarian_dynamic_decorative_joints_patterns",
       "multiple_frames": false,
-      "patternbook": null,
+      "patternbook": {
+        "pattern_names": [
+          "roundover",
+          "roundover_imperfect"
+        ],
+        "patterns": [
+          {
+            "path": "decorative_joints/roundover",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          },
+          {
+            "path": "decorative_joints/roundover_imperfect",
+            "pattern_type": "frame",
+            "tags": [
+              "main"
+            ]
+          }
+        ]
+      },
       "relative_path": "decorative_joints_patterns.py",
-      "sha256": "08534f6018e0554fe911162477462ded050385b8fb476077810552620f9aa62f",
+      "sha256": "8d1ce8268eeed4c5f337958741a5542ae92bd29d6812b1a9fc0ed28a45896981",
       "warnings": []
     },
     "patterns/free_joints_patterns.py": {
@@ -1202,7 +1223,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-08-02T19:52:06.597748+00:00",
+  "generated_at": "2026-08-03T04:20:06.326390+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }
