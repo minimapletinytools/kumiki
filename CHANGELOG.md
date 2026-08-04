@@ -8,6 +8,20 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Changed
+
+- **Breaking:** `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` no longer takes a separate `dovetail_top_side_on_butt_timber` parameter.
+  **Migrate:** set `arrangement.top_face_on_butt_timber` instead.
+- **Breaking:** renamed the "nominal size" (rough/as-sawn stock boundary) concept to "rough" throughout the timber sizing API -- "nominal" collided with the opposite meaning used in standard lumber terminology (a "2x4" is nominally 2"x4" but dressed/actual size is smaller). `Timber.nominal_half_sizes` / `Timber.from_perfect_timber_within(nominal_half_sizes=...)` are renamed to `rough_half_sizes`; `kumiki.timber_shavings.get_nominal_support_distance_from_centerline` / `get_nominal_support_distance` are renamed to `get_rough_support_distance_from_centerline` / `get_rough_support_distance`; `does_shoulder_plane_need_notching`'s `check_against_nominal_size` and `chop_relief_for_butt_joint_arrangement`'s `use_receiving_timber_nominal_size_for_butting_timber_relief_depth` are renamed to their `rough` equivalents; `kumiki.example_shavings.CanonicalSquareNominalHalfSizes` / `NominalTimberConfig` are renamed to `CanonicalSquareRoughHalfSizes` / `RoughTimberConfig`. None of these have compatibility shims.
+  **Migrate:** rename call sites accordingly (`nominal` -> `rough`).
+- `ButtJointTimberArrangement.check_plane_aligned()` now also requires `top_face_on_butt_timber` (when set) to not be parallel to the joint alignment plane; `check_face_aligned_and_orthogonal()` gained the same check. Previously neither method validated `top_face_on_butt_timber` at all, and only `check_plane_aligned()` validated `front_face_on_butt_timber`.
+
+#### Deprecated
+
+- `PerfectTimberWithin.get_nominal_half_sizes` / `get_nominal_size` / `get_nominal_size_in_face_normal_axis` / `get_half_nominal_size_in_face_normal_axis`, in favor of `get_rough_half_sizes` / `get_rough_size` / `get_rough_size_in_face_normal_axis` / `get_half_rough_size_in_face_normal_axis` (same rough/nominal rename as above). Unlike the renames above, these specific methods keep working -- they emit a `DeprecationWarning` and forward to the new names.
+
 ## [0.4.6] - 2026-07-31
 
 ### kigumi
