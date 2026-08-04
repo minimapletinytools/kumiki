@@ -36,7 +36,7 @@ _CANONICAL_EXAMPLE_TIMBER_LENGTH = inches(48)  # 4 feet = 48 inches
 _CANONICAL_EXAMPLE_TIMBER_SIZE = create_v2(_CANONICAL_EXAMPLE_TIMBER_WIDTH, _CANONICAL_EXAMPLE_TIMBER_HEIGHT)
 
 
-CanonicalSquareNominalHalfSizes = Tuple[Numeric, Numeric, Numeric, Numeric]
+CanonicalSquareRoughHalfSizes = Tuple[Numeric, Numeric, Numeric, Numeric]
 CanonicalExampleTimber = Timber | MeshTimber | RoundTimber | RegularPolygonTimber
 
 
@@ -51,11 +51,11 @@ class RoundTimberConfig:
 
 
 @dataclass(frozen=True)
-class NominalTimberConfig:
-    half_sizes: CanonicalSquareNominalHalfSizes
+class RoughTimberConfig:
+    half_sizes: CanonicalSquareRoughHalfSizes
 
 
-CanonicalExampleTimberConfig = PerfectTimberConfig | RoundTimberConfig | NominalTimberConfig
+CanonicalExampleTimberConfig = PerfectTimberConfig | RoundTimberConfig | RoughTimberConfig
 
 
 def _resolve_canonical_timber_dimensions(
@@ -95,14 +95,14 @@ def _create_configurable_example_timber(
     if isinstance(timber_config, PerfectTimberConfig):
         return base_timber
 
-    if isinstance(timber_config, NominalTimberConfig):
+    if isinstance(timber_config, RoughTimberConfig):
         right_half, left_half, front_half, back_half = timber_config.half_sizes
         return Timber(
             length=length,
             size=size,
             transform=base_timber.transform,
             ticket=base_timber.ticket,
-            nominal_half_sizes=(create_v2(right_half, left_half), create_v2(front_half, back_half)),
+            rough_half_sizes=(create_v2(right_half, left_half), create_v2(front_half, back_half)),
         )
 
     if isinstance(timber_config, RoundTimberConfig):

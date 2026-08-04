@@ -136,7 +136,7 @@ class TestChopReliefForButtJointArrangement:
             butt_timber_end=TimberEnd.BOTTOM,
         )
 
-        # Mortise is 6x6, so nominal entry face half-size = 3.
+        # Mortise is 6x6, so rough entry face half-size = 3.
         # An inset shoulder at distance 2 from the centerline (< 3) requires notching.
         inset_distance = scalar(2)
         geom = chop_relief_for_butt_joint_arrangement(
@@ -152,14 +152,14 @@ class TestChopReliefForButtJointArrangement:
         assert geom.butting_timber_relief_negative_CSG is not None
         assert isinstance(geom.butting_timber_relief_negative_CSG, Difference)
 
-        # A flush shoulder (distance equal to nominal half-size) needs no notch.
+        # A flush shoulder (distance equal to rough half-size) needs no notch.
         tenon_end_direction = tenon_timber.get_face_direction_global(
             TimberFace.BOTTOM
         )
         entry_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
             -tenon_end_direction
         ).to.face()
-        face_half_size = mortise_timber.get_half_nominal_size_in_face_normal_axis(
+        face_half_size = mortise_timber.get_half_rough_size_in_face_normal_axis(
             entry_face
         )
         assert (
@@ -295,7 +295,7 @@ class TestChopScribeRelief:
                 width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
                 ticket="timber_to_be_scribed",
             ),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(3)),
                 create_v2(scalar(4), scalar(4)),
             ),

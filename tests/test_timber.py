@@ -1459,15 +1459,15 @@ class TestGetSizeInDirection:
         assert t.get_size_in_direction_3d(create_v3(5, 0, 0)) == scalar(4)
 
 
-class TestGetNominalHalfSizes:
-    """Tests for get_nominal_half_sizes and get_half_nominal_size_in_face_normal_axis."""
+class TestGetRoughHalfSizes:
+    """Tests for get_rough_half_sizes and get_half_rough_size_in_face_normal_axis."""
 
     # -- symmetric defaults on each subclass --
 
     def test_timber_default_symmetric(self):
         """Timber with no override returns symmetric halves of self.size."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
-        width_halves, height_halves = t.get_nominal_half_sizes()
+        width_halves, height_halves = t.get_rough_half_sizes()
         assert width_halves[0] == scalar(2)
         assert width_halves[1] == scalar(2)
         assert height_halves[0] == scalar(3)
@@ -1480,7 +1480,7 @@ class TestGetNominalHalfSizes:
             size=create_v2(scalar(10), scalar(8)),
             transform=Transform.identity(),
         )
-        width_halves, height_halves = b.get_nominal_half_sizes()
+        width_halves, height_halves = b.get_rough_half_sizes()
         assert width_halves[0] == scalar(5)
         assert width_halves[1] == scalar(5)
         assert height_halves[0] == scalar(4)
@@ -1494,7 +1494,7 @@ class TestGetNominalHalfSizes:
             transform=Transform.identity(),
             diameter=scalar(12),
         )
-        width_halves, height_halves = rt.get_nominal_half_sizes()
+        width_halves, height_halves = rt.get_rough_half_sizes()
         assert width_halves[0] == scalar(6)
         assert width_halves[1] == scalar(6)
         assert height_halves[0] == scalar(6)
@@ -1503,87 +1503,87 @@ class TestGetNominalHalfSizes:
     # -- custom asymmetric half-sizes on Timber --
 
     def test_timber_custom_asymmetric(self):
-        """Timber with explicit asymmetric nominal_half_sizes returns them."""
+        """Timber with explicit asymmetric rough_half_sizes returns them."""
         t = Timber(
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),   # right=3, left=1
                 create_v2(scalar(4), scalar(2)),   # front=4, back=2
             ),
         )
-        width_halves, height_halves = t.get_nominal_half_sizes()
+        width_halves, height_halves = t.get_rough_half_sizes()
         assert width_halves[0] == scalar(3)
         assert width_halves[1] == scalar(1)
         assert height_halves[0] == scalar(4)
         assert height_halves[1] == scalar(2)
 
-    # -- get_nominal_size_in_face_normal_axis still returns full size --
+    # -- get_rough_size_in_face_normal_axis still returns full size --
 
-    def test_full_nominal_size_symmetric(self):
-        """get_nominal_size_in_face_normal_axis returns full width/height for symmetric timber."""
+    def test_full_rough_size_symmetric(self):
+        """get_rough_size_in_face_normal_axis returns full width/height for symmetric timber."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
-        assert t.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(4)
-        assert t.get_nominal_size_in_face_normal_axis(TimberFace.LEFT) == scalar(4)
-        assert t.get_nominal_size_in_face_normal_axis(TimberFace.FRONT) == scalar(6)
-        assert t.get_nominal_size_in_face_normal_axis(TimberFace.BACK) == scalar(6)
-        assert t.get_nominal_size_in_face_normal_axis(TimberFace.TOP) == scalar(100)
+        assert t.get_rough_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(4)
+        assert t.get_rough_size_in_face_normal_axis(TimberFace.LEFT) == scalar(4)
+        assert t.get_rough_size_in_face_normal_axis(TimberFace.FRONT) == scalar(6)
+        assert t.get_rough_size_in_face_normal_axis(TimberFace.BACK) == scalar(6)
+        assert t.get_rough_size_in_face_normal_axis(TimberFace.TOP) == scalar(100)
 
-    def test_full_nominal_size_asymmetric(self):
-        """get_nominal_size_in_face_normal_axis returns right+left / front+back for asymmetric timber."""
+    def test_full_rough_size_asymmetric(self):
+        """get_rough_size_in_face_normal_axis returns right+left / front+back for asymmetric timber."""
         t = Timber(
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),   # right=3, left=1 → total 4
                 create_v2(scalar(4), scalar(2)),   # front=4, back=2 → total 6
             ),
         )
-        assert t.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(4)
-        assert t.get_nominal_size_in_face_normal_axis(TimberFace.FRONT) == scalar(6)
+        assert t.get_rough_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(4)
+        assert t.get_rough_size_in_face_normal_axis(TimberFace.FRONT) == scalar(6)
 
 
-    # -- get_half_nominal_size_in_face_normal_axis per-face --
+    # -- get_half_rough_size_in_face_normal_axis per-face --
 
-    def test_half_nominal_size_symmetric(self):
-        """get_half_nominal_size_in_face_normal_axis returns half of size for symmetric timber."""
+    def test_half_rough_size_symmetric(self):
+        """get_half_rough_size_in_face_normal_axis returns half of size for symmetric timber."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(2)
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.LEFT) == scalar(2)
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.FRONT) == scalar(3)
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.BACK) == scalar(3)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(2)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.LEFT) == scalar(2)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.FRONT) == scalar(3)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.BACK) == scalar(3)
 
-    def test_half_nominal_size_asymmetric(self):
-        """get_half_nominal_size_in_face_normal_axis returns correct per-face values for asymmetric timber."""
+    def test_half_rough_size_asymmetric(self):
+        """get_half_rough_size_in_face_normal_axis returns correct per-face values for asymmetric timber."""
         t = Timber(
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),   # right=3, left=1
                 create_v2(scalar(4), scalar(2)),   # front=4, back=2
             ),
         )
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(3)
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.LEFT) == scalar(1)
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.FRONT) == scalar(4)
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberFace.BACK) == scalar(2)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.RIGHT) == scalar(3)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.LEFT) == scalar(1)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.FRONT) == scalar(4)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberFace.BACK) == scalar(2)
 
-    def test_half_nominal_size_raises_for_end_faces(self):
-        """get_half_nominal_size_in_face_normal_axis raises ValueError for TOP/BOTTOM."""
+    def test_half_rough_size_raises_for_end_faces(self):
+        """get_half_rough_size_in_face_normal_axis raises ValueError for TOP/BOTTOM."""
         t = create_standard_vertical_timber()
         with pytest.raises(ValueError):
-            t.get_half_nominal_size_in_face_normal_axis(TimberFace.TOP)
+            t.get_half_rough_size_in_face_normal_axis(TimberFace.TOP)
         with pytest.raises(ValueError):
-            t.get_half_nominal_size_in_face_normal_axis(TimberFace.BOTTOM)
+            t.get_half_rough_size_in_face_normal_axis(TimberFace.BOTTOM)
 
-    def test_half_nominal_size_accepts_long_face(self):
-        """get_half_nominal_size_in_face_normal_axis works with TimberLongFace."""
+    def test_half_rough_size_accepts_long_face(self):
+        """get_half_rough_size_in_face_normal_axis works with TimberLongFace."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberLongFace.RIGHT) == scalar(2)
-        assert t.get_half_nominal_size_in_face_normal_axis(TimberLongFace.FRONT) == scalar(3)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberLongFace.RIGHT) == scalar(2)
+        assert t.get_half_rough_size_in_face_normal_axis(TimberLongFace.FRONT) == scalar(3)
 
     # -- is_perfect_timber --
 
@@ -1598,7 +1598,7 @@ class TestGetNominalHalfSizes:
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),
                 create_v2(scalar(3), scalar(3)),
             ),
@@ -1624,7 +1624,7 @@ class TestGetNominalHalfSizes:
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),   # right=3, left=1 → total=4, offset_x=+1
                 create_v2(scalar(4), scalar(2)),   # front=4, back=2 → total=6, offset_y=+1
             ),

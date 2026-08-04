@@ -622,11 +622,11 @@ def dovetail_tenon_geometry(
             x_tip = tenon_depth + wedge_tip_extra
 
             # Only the mortise slot is extended: grow from the base side until
-            # the nominal receiving-timber boundary in this axis.
-            receiving_nominal_boundary = -arrangement.receiving_timber.get_size_in_direction_3d(
+            # the perfect receiving-timber boundary in this axis.
+            receiving_perfect_boundary = -arrangement.receiving_timber.get_size_in_direction_3d(
                 into_mortise_dir
             )
-            x_base_slot = min(x_base, receiving_nominal_boundary)
+            x_base_slot = min(x_base, receiving_perfect_boundary)
         else:
             # (0,0) at the receiving timber's far face. The wedge points back toward the butt
             # timber. The earlier wedge-fit assertion guarantees this case is only used when the

@@ -116,7 +116,7 @@ DONE-decorative joint
   DONE-roundover cut
 
 -be consistent... rename nominal size to actual size or true size
-
+  -rough is cute... but rough lengt his alreday used in kigumi...
 
 -tusked mortise and tenon joint
 

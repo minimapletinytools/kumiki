@@ -24,7 +24,7 @@ def example_roundover_decoration() -> Joint:
 def example_roundover_imperfect() -> Joint:
     """A single edge rounded over on an imperfect timber.
 
-    The timber's actual (nominal/rough-stock) dimensions are 1 inch more than
+    The timber's actual (rough-stock) dimensions are 1 inch more than
     its perfect timber within on the RIGHT and FRONT sides -- exactly the two
     faces adjacent to the rounded-over RIGHT_FRONT edge -- demonstrating that
     the round-over cut reaches out to the actual, oversized corner rather
@@ -35,7 +35,7 @@ def example_roundover_imperfect() -> Joint:
         size=Matrix([inches(4), inches(4)]),
         transform=Transform.identity(),
         ticket=TimberTicket(path="timber"),
-        nominal_half_sizes=(
+        rough_half_sizes=(
             create_v2(inches(2 + 1), inches(2)),  # width: right_half (+1"), left_half (perfect)
             create_v2(inches(2 + 1), inches(2)),  # height: front_half (+1"), back_half (perfect)
         ),

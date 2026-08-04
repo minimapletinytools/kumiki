@@ -43,7 +43,7 @@ def make_timber_imperfect_opposite_edge(
         extra_amount: The additional thickness to add to the opposite faces (default 1/2").
 
     Returns:
-        A new Timber instance with asymmetric nominal_half_sizes.
+        A new Timber instance with asymmetric rough_half_sizes.
     """
     w_half = timber.size[0] / scalar(2)
     h_half = timber.size[1] / scalar(2)
@@ -80,7 +80,7 @@ def make_timber_imperfect_opposite_edge(
     width_halves = create_v2(right_half, left_half)
     height_halves = create_v2(front_half, back_half)
 
-    return Timber.from_perfect_timber_within(timber, nominal_half_sizes=(width_halves, height_halves))
+    return Timber.from_perfect_timber_within(timber, rough_half_sizes=(width_halves, height_halves))
 
 # ============================================================================
 # PARAMETERS - Modify these to adjust the shed base design

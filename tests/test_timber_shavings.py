@@ -213,32 +213,32 @@ class TestSupportDistance:
         expected = scalar(5) / sqrt(2)
         assert simplify(result - expected) == 0
 
-    def test_nominal_support_distance_from_centerline_asymmetric(self):
+    def test_rough_support_distance_from_centerline_asymmetric(self):
         t = Timber(
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),
                 create_v2(scalar(4), scalar(2)),
             ),
         )
-        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(3)
-        assert get_nominal_support_distance_from_centerline(t, create_v2(-1, 0)) == scalar(1)
-        assert get_nominal_support_distance_from_centerline(t, create_v2(0, 1)) == scalar(4)
-        assert get_nominal_support_distance_from_centerline(t, create_v2(0, -1)) == scalar(2)
+        assert get_rough_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(3)
+        assert get_rough_support_distance_from_centerline(t, create_v2(-1, 0)) == scalar(1)
+        assert get_rough_support_distance_from_centerline(t, create_v2(0, 1)) == scalar(4)
+        assert get_rough_support_distance_from_centerline(t, create_v2(0, -1)) == scalar(2)
 
-    def test_nominal_and_perfect_from_centerline_differ_when_asymmetric(self):
+    def test_rough_and_perfect_from_centerline_differ_when_asymmetric(self):
         t = Timber(
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),
                 create_v2(scalar(4), scalar(2)),
             ),
         )
-        assert get_nominal_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(3)
+        assert get_rough_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(3)
         assert get_perfect_support_distance_from_centerline(t, create_v2(1, 0)) == scalar(2)
 
     def test_perfect_support_distance_from_position_3d(self):
@@ -246,18 +246,18 @@ class TestSupportDistance:
         assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, 1)) == scalar(90)
         assert get_perfect_support_distance(t, create_v3(0, 0, 10), create_v3(0, 0, -1)) == scalar(10)
 
-    def test_nominal_support_distance_from_position_3d_asymmetric(self):
+    def test_rough_support_distance_from_position_3d_asymmetric(self):
         t = Timber(
             length=scalar(100),
             size=create_v2(scalar(4), scalar(6)),
             transform=Transform.identity(),
-            nominal_half_sizes=(
+            rough_half_sizes=(
                 create_v2(scalar(3), scalar(1)),
                 create_v2(scalar(4), scalar(2)),
             ),
         )
         # Along +x, support plane is at x=+3; from x=-1 distance is 4.
-        result = get_nominal_support_distance(
+        result = get_rough_support_distance(
             t,
             position_from_bottom=create_v3(-1, 0, 0),
             direction=create_v3(1, 0, 0),

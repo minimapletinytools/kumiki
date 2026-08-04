@@ -697,7 +697,7 @@
         ]
       },
       "relative_path": "decorative_joints_patterns.py",
-      "sha256": "ff0db6bab787f6f50457259f26000e2cc44d23297948581643b4eedd51490375",
+      "sha256": "e67906d023168c848c61bbfd7aaa5d23dd27a66b522758beb7d93faf8158d99b",
       "warnings": []
     },
     "patterns/free_joints_patterns.py": {
@@ -1140,7 +1140,7 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/learn_to_timber_frame_shed.py",
-      "sha256": "0b79b4d40fa86b24d7ec26a22dbc0815ca90638594ffd53b87e7dde6eebc3e74",
+      "sha256": "d58f943eace5224e4529c0094069327b12ac2c1a327bb291d908c781fe7eb6ef",
       "warnings": []
     },
     "patterns/structures/multi_cross_lap_post.py": {
@@ -1231,7 +1231,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-08-03T05:07:03.132804+00:00",
+  "generated_at": "2026-08-04T00:06:21.738161+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

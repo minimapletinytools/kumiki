@@ -515,7 +515,7 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
 
     # Just assert that all timbers are perfect -- our algorithm doesn't actually
     # need this (every dimension query below is already correct for asymmetric
-    # nominal_half_sizes), but it's simpler and safer to require it for now.
+    # rough_half_sizes), but it's simpler and safer to require it for now.
     perfection_error = arrangement.check_perfection()
     assert perfection_error is None, perfection_error
 

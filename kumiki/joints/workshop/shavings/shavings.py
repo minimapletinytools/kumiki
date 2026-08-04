@@ -289,7 +289,7 @@ def check_timber_overlap_for_splice_joint_is_sensible(
     return None
 
 
-# TODO add nominal dimension variant instead
+# TODO add rough dimension variant instead
 # TODO when you add actual dimensions on top of perfect timber within dimensions, you probably want a version that sizes to the actual dimensions...
 def chop_timber_end_with_prism(timber: TimberLike, end: TimberEnd, distance_from_end_to_cut: Numeric) -> RectangularPrism:
     """

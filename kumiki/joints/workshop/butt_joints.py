@@ -919,7 +919,7 @@ def cut_mortise_and_tenon_joint(
     if does_shoulder_plane_need_notching(
         arrangement,
         mortise_shoulder_distance_from_centerline_or_centerplane,
-        check_against_nominal_size=True,
+        check_against_rough_size=True,
         set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     ):
         tenon_timber_csg_global = adopt_csg(

@@ -46,8 +46,8 @@ def _available_extent_in_face_normal_axis(timber: BlockLike, face: TimberFace) -
     return timber.get_size_in_face_normal_axis(face) / scalar(2)
 
 
-def _nominal_excess_in_face_normal_axis(timber: BlockLike, face: TimberFace) -> Numeric:
-    """Extra distance the nominal (rough-stock) boundary extends beyond the
+def _rough_excess_in_face_normal_axis(timber: BlockLike, face: TimberFace) -> Numeric:
+    """Extra distance the rough-stock boundary extends beyond the
     perfect timber's boundary in the direction of `face`.
 
     Always 0 for TOP/BOTTOM: edges on the timber's ends are pinned to the
@@ -56,7 +56,7 @@ def _nominal_excess_in_face_normal_axis(timber: BlockLike, face: TimberFace) -> 
     """
     if face in (TimberFace.TOP, TimberFace.BOTTOM):
         return scalar(0)
-    return timber.get_half_nominal_size_in_face_normal_axis(face) - _available_extent_in_face_normal_axis(timber, face)
+    return timber.get_half_rough_size_in_face_normal_axis(face) - _available_extent_in_face_normal_axis(timber, face)
 
 
 def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric) -> Difference:
@@ -66,7 +66,7 @@ def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric
     Starts from the edge's perfect (finished-dimension) corner, builds a
     cylinder of `radius` tangent to both adjacent faces running the length of
     the edge, and a square prism spanning from that cylinder out to the
-    nominal (rough-stock) corner -- so any imperfect excess material beyond
+    rough-stock corner -- so any imperfect excess material beyond
     the perfect corner is also removed -- then subtracts the cylinder from
     the prism to leave a quarter-round fillet-shaped negative volume.
     """
@@ -95,8 +95,8 @@ def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric
         end_distance=edge_length,
     )
 
-    excess_a = _nominal_excess_in_face_normal_axis(timber, face_a)
-    excess_b = _nominal_excess_in_face_normal_axis(timber, face_b)
+    excess_a = _rough_excess_in_face_normal_axis(timber, face_a)
+    excess_b = _rough_excess_in_face_normal_axis(timber, face_b)
 
     profile_orientation = Orientation(Matrix([
         [dir_a[0], dir_b[0], edge_dir[0]],
@@ -202,15 +202,15 @@ def cut_practice_rafter_tail_scallop_decoration(
     # The cylinder's axis is the cross-sectional axis perpendicular to both
     # cut_side and the length axis (rotating cut_side 90 degrees about
     # end_side's own axis lands on it); it extrudes across the timber's full
-    # actual (nominal) width on that axis so the scallop reaches both sides.
+    # actual (rough) width on that axis so the scallop reaches both sides.
     perp_face = cut_face.rotate_about(end_face)
     perp_face_opposite = perp_face.get_opposite_face()
     cylinder = Cylinder(
         axis_direction=timber.get_face_direction_global(perp_face),
         radius=radius,
         position=center,
-        start_distance=-timber.get_half_nominal_size_in_face_normal_axis(perp_face_opposite),
-        end_distance=timber.get_half_nominal_size_in_face_normal_axis(perp_face),
+        start_distance=-timber.get_half_rough_size_in_face_normal_axis(perp_face_opposite),
+        end_distance=timber.get_half_rough_size_in_face_normal_axis(perp_face),
     )
 
     negative_csg = adopt_csg(None, timber.transform, cylinder)

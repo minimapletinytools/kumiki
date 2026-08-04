@@ -37,11 +37,11 @@ from .timber import *
 # The direction does not have to point directly toward a face. For diagonal
 # directions, the support plane may touch an edge or corner instead.
 #
-# "Nominal" and "perfect" describe two different bounding boxes:
+# "Rough" and "perfect" describe two different bounding boxes:
 #
-# - Nominal support uses the timber's nominal half-sizes. These may be
+# - Rough support uses the timber's rough half-sizes. These may be
 #   asymmetric around the centerline if the modeled perfect timber lies within
-#   a nominal timber envelope.
+#   a rough timber envelope.
 #
 # - Perfect support uses the perfect dimensions of the perfect timber. Its
 #   cross-section is assumed to be centered on the local X/Y centerline, so its
@@ -108,9 +108,9 @@ def _support_distance_local(
     return support_value - safe_dot_product(d, position_local)
 
 
-def get_nominal_support_distance_from_centerline(timber: PerfectTimberWithin, direction: V2) -> Numeric:
+def get_rough_support_distance_from_centerline(timber: PerfectTimberWithin, direction: V2) -> Numeric:
     """distance from cross-section centerline to support plane of the actual timber dimensions in direction"""
-    width_halves, height_halves = timber.get_nominal_half_sizes()
+    width_halves, height_halves = timber.get_rough_half_sizes()
     return _support_distance_local(
         position_local=create_v3(scalar(0), scalar(0), scalar(0)),
         direction_local=create_v3(direction[0], direction[1], scalar(0)),
@@ -139,9 +139,9 @@ def get_perfect_support_distance_from_centerline(timber: PerfectTimberWithin, di
     )
 
 
-def get_nominal_support_distance(timber: PerfectTimberWithin, position_from_bottom: V3, direction: V3) -> Numeric:
+def get_rough_support_distance(timber: PerfectTimberWithin, position_from_bottom: V3, direction: V3) -> Numeric:
     """distance from a 3D local position to support plane of the actual timber dimensions in direction"""
-    width_halves, height_halves = timber.get_nominal_half_sizes()
+    width_halves, height_halves = timber.get_rough_half_sizes()
     return _support_distance_local(
         position_local=position_from_bottom,
         direction_local=direction,

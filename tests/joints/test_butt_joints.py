@@ -1052,8 +1052,8 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
                 dovetail_depth=scalar(1),
             )
 
-    def test_wedge_size_unchanged_and_slot_extends_to_nominal_boundary(self, simple_T_configuration):
-        """Keep wedge size unchanged while extending only the mortise slot base to nominal boundary."""
+    def test_wedge_size_unchanged_and_slot_extends_to_perfect_boundary(self, simple_T_configuration):
+        """Keep wedge size unchanged while extending only the mortise slot base to perfect boundary."""
         arrangement = self._make_arrangement(simple_T_configuration)
         receiving_timber = arrangement.receiving_timber
 
@@ -1100,8 +1100,8 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         wedge_slot_x_values = [p[0] for p in wedge_slot.points]
 
         into_mortise_dir = shoulder_result.butt_direction
-        receiving_nominal_boundary = -receiving_timber.get_size_in_direction_3d(into_mortise_dir)
-        expected_slot_x_base = min(-base_extra, receiving_nominal_boundary)
+        receiving_perfect_boundary = -receiving_timber.get_size_in_direction_3d(into_mortise_dir)
+        expected_slot_x_base = min(-base_extra, receiving_perfect_boundary)
 
         assert min(wedge_slot_x_values) == expected_slot_x_base
 

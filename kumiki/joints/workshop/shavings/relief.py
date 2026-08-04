@@ -330,7 +330,7 @@ def _perfect_cross_section_slice_span_along_plane_direction(
 def does_shoulder_plane_need_notching(
     arrangement: ButtJointTimberArrangement,
     mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
-    check_against_nominal_size: bool = True,
+    check_against_rough_size: bool = True,
     set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
 ) -> bool:
     """
@@ -343,8 +343,8 @@ def does_shoulder_plane_need_notching(
         arrangement: Butt joint arrangement (receiving_timber = mortise, butt_timber = tenon).
         mortise_shoulder_distance_from_centerline_or_centerplane: Distance from the mortise centerline
             to the shoulder plane, measured toward the tenon.
-        check_against_nominal_size: If True (default), compare against the mortise timber's
-            nominal half-size on the entry face (using ``get_half_nominal_size_in_face_normal_axis``).
+        check_against_rough_size: If True (default), compare against the mortise timber's
+            rough half-size on the entry face (using ``get_half_rough_size_in_face_normal_axis``).
             If False, compare against the perfect-timber half-size (``get_size_in_face_normal_axis / 2``).
         set_mortise_shoulder_parallel_to_face: If set to a face, then force the mortise shoulder to be parallel to that face.
     """
@@ -384,8 +384,8 @@ def does_shoulder_plane_need_notching(
             -tenon_end_direction
         ).to.face()
 
-    if check_against_nominal_size:
-        face_half_size = mortise_timber.get_half_nominal_size_in_face_normal_axis(mortise_face)
+    if check_against_rough_size:
+        face_half_size = mortise_timber.get_half_rough_size_in_face_normal_axis(mortise_face)
     else:
         face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / scalar(2)
     return (
@@ -415,7 +415,7 @@ def chop_shoulder_notch_aligned_with_timber(
     The notch width is along the notch_timber's length axis and hugs the
     butting timber's shoulder-plane slice exactly (its perfect cross-section;
     imperfect material beyond that is scribe relief's job, not the housing's).
-    The span and depth clear the notch timber's entire nominal cross-section
+    The span and depth clear the notch timber's entire rough cross-section
     via a worst-case corner-radius bound -- overshoot is free in both of those
     directions (the span channel exits the timber's sides, the depth exits its
     outer face) so neither needs to be exact.
@@ -482,14 +482,14 @@ def chop_shoulder_notch_aligned_with_timber(
     # axis, span runs across the notch timber's cross-section.
     # ------------------------------------------------------------------
 
-    # Span and depth must clear the notch timber's entire nominal
+    # Span and depth must clear the notch timber's entire rough
     # (imperfect-bounding) cross-section regardless of how that cross-section
     # is rotated about the length axis, and overshoot in both directions is
     # free (span exits the timber's sides, depth exits its outer face), so
     # both are sized from the worst-case corner radius -- the farthest any
-    # nominal-corner can be from the centerline under any rotation -- rather
+    # rough-corner can be from the centerline under any rotation -- rather
     # than computed exactly for the specific directions.
-    notch_timber_width_halves, notch_timber_height_halves = notch_timber.get_nominal_half_sizes()
+    notch_timber_width_halves, notch_timber_height_halves = notch_timber.get_rough_half_sizes()
     max_corner_radius = sqrt(
         Max(notch_timber_width_halves[0], notch_timber_width_halves[1]) ** 2
         + Max(notch_timber_height_halves[0], notch_timber_height_halves[1]) ** 2
@@ -621,13 +621,13 @@ def chop_shoulder_notch_on_timber_face(
             f"notch_wall_relief_cut_angle must be between 0 and 90 degrees, got {notch_wall_relief_cut_angle}"
         )
 
-    # Use nominal half-sizes so asymmetric timbers (where the centerline isn't
-    # at the geometric center of the nominal bounding box) place the notch at
+    # Use rough half-sizes so asymmetric timbers (where the centerline isn't
+    # at the geometric center of the rough bounding box) place the notch at
     # the correct face plane.
-    half_face_offset = timber.get_half_nominal_size_in_face_normal_axis(notch_face)
+    half_face_offset = timber.get_half_rough_size_in_face_normal_axis(notch_face)
 
     if notch_face == TimberFace.FRONT:
-        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT)
+        cross_span = timber.get_rough_size_in_face_normal_axis(TimberFace.RIGHT)
         position = create_v3(scalar(0), half_face_offset - notch_depth, distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(scalar(0), scalar(1), scalar(0)),
@@ -645,7 +645,7 @@ def chop_shoulder_notch_on_timber_face(
             distance_along_timber - notch_width / scalar(2),
         )
     elif notch_face == TimberFace.BACK:
-        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.RIGHT)
+        cross_span = timber.get_rough_size_in_face_normal_axis(TimberFace.RIGHT)
         position = create_v3(scalar(0), -half_face_offset + notch_depth, distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(scalar(0), scalar(-1), scalar(0)),
@@ -663,7 +663,7 @@ def chop_shoulder_notch_on_timber_face(
             distance_along_timber - notch_width / scalar(2),
         )
     elif notch_face == TimberFace.RIGHT:
-        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT)
+        cross_span = timber.get_rough_size_in_face_normal_axis(TimberFace.FRONT)
         position = create_v3(half_face_offset - notch_depth, scalar(0), distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(scalar(1), scalar(0), scalar(0)),
@@ -681,7 +681,7 @@ def chop_shoulder_notch_on_timber_face(
             distance_along_timber - notch_width / scalar(2),
         )
     else:
-        cross_span = timber.get_nominal_size_in_face_normal_axis(TimberFace.FRONT)
+        cross_span = timber.get_rough_size_in_face_normal_axis(TimberFace.FRONT)
         position = create_v3(-half_face_offset + notch_depth, scalar(0), distance_along_timber)
         orientation = Orientation.from_z_and_x(
             create_v3(scalar(-1), scalar(0), scalar(0)),
@@ -699,7 +699,7 @@ def chop_shoulder_notch_on_timber_face(
             distance_along_timber - notch_width / scalar(2),
         )
 
-    notch_additional_depth = timber.get_half_nominal_size_in_face_normal_axis(notch_face)
+    notch_additional_depth = timber.get_half_rough_size_in_face_normal_axis(notch_face)
 
     notch_prism = RectangularPrism(
         size=prism_size,
@@ -761,7 +761,7 @@ def chop_relief_for_butt_joint_arrangement(
     # the min is taken between this parameter and the angle the butt timber
     # approaches the shoulder plane at (both in radians)
     notch_wall_min_relief_cut_angle: Numeric = scalar(0),
-    use_receiving_timber_nominal_size_for_butting_timber_relief_depth: bool = True,
+    use_receiving_timber_rough_size_for_butting_timber_relief_depth: bool = True,
     set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
 ) -> ShoulderReliefCSGGeometry | None:
     """
@@ -769,14 +769,14 @@ def chop_relief_for_butt_joint_arrangement(
     relief cut on the butting timber for a butt-joint arrangement.
 
     Returns ``None`` when no notch is required (shoulder sits at or past the
-    receiving timber's nominal entry face).
+    receiving timber's rough entry face).
     """
     from sympy import sqrt
 
     if not does_shoulder_plane_need_notching(
         arrangement,
         mortise_shoulder_distance_from_centerline_or_centerplane,
-        check_against_nominal_size=True,
+        check_against_rough_size=True,
         set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     ):
         return None
@@ -859,8 +859,8 @@ def chop_relief_for_butt_joint_arrangement(
     far_face = receiving_timber.get_closest_oriented_long_face_from_global_direction(
         butt_end_direction_global
     ).to.face()
-    if use_receiving_timber_nominal_size_for_butting_timber_relief_depth:
-        far_face_half_size = receiving_timber.get_half_nominal_size_in_face_normal_axis(far_face)
+    if use_receiving_timber_rough_size_for_butting_timber_relief_depth:
+        far_face_half_size = receiving_timber.get_half_rough_size_in_face_normal_axis(far_face)
     else:
         far_face_half_size = receiving_timber.get_size_in_face_normal_axis(far_face) / scalar(2)
     receiving_extent_in_approach = (
