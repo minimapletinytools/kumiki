@@ -1396,27 +1396,42 @@ class TuskEntryFace(Enum):
     Top = 1
 
 class TuskParameters():
+    tusk_height: Numeric
     tusk_small_width: Numeric
     # defaults to 1/3 of length of the tusk that's in the tenon
-    tusk_front_stickout: Optional[Numeric] = None
+    tusk_tip_stickout: Optional[Numeric] = None
     # defaults to 1/3 of length of the tusk that's in the tenon
     tusk_back_stickout: Optional[Numeric] = None
     tusk_angle: Numeric = degrees(10)
     entry_face: TuskEntryFace = TuskEntryFace.Front
 
 
-def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tenon_size: V2,
     tenon_length_past_opposite_shoulder: Numeric,
+    # the tusk is always centered on the tenon
     tusk_parameters: TuskParameters,
     tenon_position: Optional[V2] = None,
     mortise_shoulder_inset: Numeric = scalar(0),
     measure_opposite_shoulder_from: MeasureOppositeShoulderFrom = MeasureOppositeShoulderFrom.Perfect,
+    # measured inward towards the timber, allowed to be negative as if measure_opposite_shoulder_from is Rough
     opposite_mortise_shoulder_inset: Numeric = scalar(0),
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     assert False, "not implemented yet"
+
+    # first compute the opposite shoulder face accounting for measure_opposite_shoulder_from and opposite_mortise_shoulder_inset, measuer its distance from the inset mortise shoulder face
+    # then tenon length is that length + tenon_length_past_opposite_shoulder
+    # mortise is always a through mortise
+    # use cut_mortise_and_tenon_joint code to cut the tenon and mortise hole
+
+    # next shape the tusk based on its parameters create the tusk accessory and cut the tusk shape from the tenon, 
+    # this logic should be very very similar to the wedge logic used in same way as we did the wedge for cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers
+
+    # compute the full tusk length
+    # cut a rectangular prism into the mortise timber so that the tusk can slide in, thus it needs to extend from the entry tusk hole on the tenon by the full tusk length, and past the exit tusk hole of the tenon by tusk_back_stickout
+    # only do this if needed, which is to say the opposite shoulder face is smaller than the rough dimension on the tenno exit face
 
 
 

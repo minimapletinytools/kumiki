@@ -418,7 +418,9 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
     wedge_extra_height: Numeric = 0
     # the wedge length without extra is just tenon_depth
     # this one can actually be negative which you'll want to do if the tenon is not a through tenon
+    # TODO rename extra_length to stickout
     wedge_tip_extra_length: Numeric = 0
+    # TODO rename to wedge_back_extra_length
     wedge_base_extra_length: Numeric = 0
 
 
