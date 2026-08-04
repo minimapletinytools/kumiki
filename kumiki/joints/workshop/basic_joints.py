@@ -753,3 +753,39 @@ def cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
     return cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(
         arrangement=arrangement
     )
+
+
+def cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+    arrangement: ButtJointTimberArrangement,
+):
+    
+    assert False, "not implemented"
+    arrangement.check_plane_aligned()
+
+    if arrangement.front_face_on_butt_timber is None:
+        # TODO use relpace syntax or whatever
+        #arrangement.front_face_on_butt_timber = arrangement.butt_timber.get_closest_oriented_long_face_from_global_direction(arrangement.compute_normalized_timber_cross_product())
+        pass
+    if arrangement.top_face_on_butt_timber is None:
+        # TODO use relpace syntax or whatever
+        #arrangement.top_face_on_butt_timber = front_face.rotate_right()
+        pass
+
+
+
+    tenon_size = create_V2(arrangement.butt_timber.get_size_in_face_normal_axis(arrangement.front_face_on_butt_timber)/scalar(3), arrangement.butt_timber.get_size_in_face_normal_axis(arrangement.top_face_on_butt_timber)*scalar(4/5))
+
+    mortise_insertion_face = arrangement.receiving_timber.get_closest_oriented_long_face_from_global_direction(-arrangement.butt_timber.get_face_direction_global(arrangement.butt_timber_end))
+    # center to center
+    mortise_length = arrangement.receiving_timber.get_size_in_face_normal_axis(mortise_insertion_face)
+    acute_angle = arrangement.compute_arrangement_acute_angle()
+    # center to tip
+    mortise_length_tip = mortise_length + tenon_size[1] * cos(acute_angle) / 2
+    tenon_length_past_opposite_shoulder = max(mortise_length_tip, tenon_size[0]*2)
+
+    tusk = TuskParameters(
+        tusk_height = tenon_size[1] * scalar(2/5),
+        tusk_small_width = min(tenon_length_past_opposite_shoulder/scalar(2), min(tenon_size[0], tenon_size[1]))
+    )
+
+    #return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(TODO finish)
