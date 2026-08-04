@@ -1380,12 +1380,53 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     )
 
 
+
+class MeasureOppositeShoulderFrom(Enum):
+    Perfect = 0
+    Rough = 1
+
+
+class TuskEntryFace(Enum):
+    """
+    The face the tusk enters from referring to
+    ButtJointTimberArrangement.front_face_on_butt_timber
+    ButtJointTimberArrangement.top_face_on_butt_timber
+    """
+    Front = 0
+    Top = 1
+
+class TuskParameters():
+    tusk_small_width: Numeric
+    # defaults to 1/3 of length of the tusk that's in the tenon
+    tusk_front_stickout: Optional[Numeric] = None
+    # defaults to 1/3 of length of the tusk that's in the tenon
+    tusk_back_stickout: Optional[Numeric] = None
+    tusk_angle: Numeric = degrees(10)
+    entry_face: TuskEntryFace = TuskEntryFace.Front
+
+
+def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+    arrangement: ButtJointTimberArrangement,
+    tenon_size: V2,
+    tenon_length_past_opposite_shoulder: Numeric,
+    tusk_parameters: TuskParameters,
+    tenon_position: Optional[V2] = None,
+    mortise_shoulder_inset: Numeric = scalar(0),
+    measure_opposite_shoulder_from: MeasureOppositeShoulderFrom = MeasureOppositeShoulderFrom.Perfect,
+    opposite_mortise_shoulder_inset: Numeric = scalar(0),
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
+) -> Joint:
+    assert False, "not implemented yet"
+
+
+
 # ============================================================================
 # Wedged Half-Dovetail Mortise and Tenon Joint
 # ============================================================================
 
 def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
+    # TODO replace with arrangement.top_face_on_butt_timber
     dovetail_top_side_on_butt_timber: TimberLongFace,
     tenon_size: V2,
     tenon_depth: Numeric,

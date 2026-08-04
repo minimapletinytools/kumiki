@@ -115,9 +115,10 @@ DONE-probably drop the board/timber class distinction
 DONE-decorative joint
   DONE-roundover cut
 
--be consistent... rename nominal size to actual size or true size
+DONE-be consistent... rename nominal size to actual size or true size
   -rough is cute... but rough lengt his alreday used in kigumi...
 
+-do the top_face_on_butt_timber thing for the half dovetail wedged mortise and tenonj oint
 -tusked mortise and tenon joint
 
 
