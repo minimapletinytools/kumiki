@@ -876,14 +876,16 @@ def tusk_tenon_geometry(
 
     mortise_clearance_negative_csg = None
     if safe_compare(rough_half_extent_past_opposite_shoulder, scalar(0), Comparison.GT):
-        # A plain box (not tapered like the key itself) spanning the key's full crosswise
-        # footprint, extended a bit past the rough boundary for slide-in clearance -- just
-        # enough room for the tapered key to be slid crosswise into place through whatever
-        # rough stock still surrounds the tenon at this position.
-        clearance_y_end = rough_half_extent_past_opposite_shoulder + tusk_back_stickout
+        # A plain rectangular prism (not tapered like the key itself) that lets the tapered
+        # key slide crosswise into place: same width as the key (Z, tusk_thickness), height
+        # from the opposite shoulder out to the rough face (Y), and long enough (X) for the
+        # key to be slid in from fully retracted -- one full tusk-length behind the tenon
+        # face -- forward to its seated tip position.
+        clearance_x_start = -full_tusk_length
+        clearance_y_end = rough_half_extent_past_opposite_shoulder
         clearance_profile_points = [
-            create_v2(x_near, scalar(0)),
-            create_v2(x_near, clearance_y_end),
+            create_v2(clearance_x_start, scalar(0)),
+            create_v2(clearance_x_start, clearance_y_end),
             create_v2(x_far, clearance_y_end),
             create_v2(x_far, scalar(0)),
         ]

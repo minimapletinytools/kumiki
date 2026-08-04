@@ -117,7 +117,8 @@ DONE-decorative joint
 DONE-be consistent... rename nominal size to actual size or true size
   -rough is cute... but rough lengt his alreday used in kigumi...
 DONE-do the top_face_on_butt_timber thing for the half dovetail wedged mortise and tenonj oint
--tusked mortise and tenon joint
+DONE-tusked mortise and tenon joint
+-mortise_clearance_negative_csg computation wrong for tusked mrotise and tenon joint
 
 
 -furniture joints
