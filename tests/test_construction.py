@@ -2365,15 +2365,15 @@ class TestButtJointTimberArrangement:
         assert arrangement.check_plane_aligned() is None
         assert arrangement.check_face_aligned_and_orthogonal() is None
 
-    def test_top_face_parallel_instead_of_orthogonal_fails(self):
+    def test_top_face_parallel_to_joint_plane_fails(self):
         # LEFT points +-Z, same axis as the (correct) RIGHT front face --
-        # parallel to the joint plane, not orthogonal to it.
+        # parallel to the joint plane, which top_face_on_butt_timber must avoid.
         arrangement = self._make_arrangement(front=TimberLongFace.RIGHT, top=TimberLongFace.LEFT)
         result = arrangement.check_plane_aligned()
-        assert result is not None and "top_face_on_butt_timber" in result and "orthogonal" in result
+        assert result is not None and "top_face_on_butt_timber" in result and "must not be parallel" in result
         # The same helper backs check_face_aligned_and_orthogonal too.
         result = arrangement.check_face_aligned_and_orthogonal()
-        assert result is not None and "orthogonal" in result
+        assert result is not None and "must not be parallel" in result
 
     def test_only_top_face_set_still_checked(self):
         arrangement = self._make_arrangement(top=TimberLongFace.FRONT)
