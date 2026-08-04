@@ -40,6 +40,8 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 :: 6/28 CONTENT PLAN
 
+-do the butt crack table 
+
 - do fill_with_boards helper function
 
 def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1: TimberLike, vert_side2: TimberLike,  orientation : Literal["horizontal", "vertical"] = "horizontal", depth : Tuple[Number,Number,Number,Number] = (0,0,0,0), overlap : Number = 0, lateral_offset_from_hor_side1) : List[Board]
@@ -118,8 +120,10 @@ DONE-be consistent... rename nominal size to actual size or true size
   -rough is cute... but rough lengt his alreday used in kigumi...
 DONE-do the top_face_on_butt_timber thing for the half dovetail wedged mortise and tenonj oint
 DONE-tusked mortise and tenon joint
--mortise_clearance_negative_csg computation wrong for tusked mrotise and tenon joint
+DONE-mortise_clearance_negative_csg computation wrong for tusked mrotise and tenon joint
 
+-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
+  -this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
 
 -furniture joints
   DONE-probably rename t opractice joint
@@ -130,22 +134,16 @@ DONE-tusked mortise and tenon joint
   -do router joint stuff
   -do router video
   
-
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
 -maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
 -update shed example to include panels
   -make a video about this maybe after you do some more edge joints
-
-
 -add wedges to mortise and tenon 
 -rename dissamebly to tatamae LOL`
 -make assembiles work in patterns
-
-
 -add stl support for joint accessories so you can use framing hardware
-
 -enable potato (scribe) notching on the remaining joints?
 -update wedged half dovtail to support shoulder shapes and peg
  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
