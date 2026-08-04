@@ -41,6 +41,8 @@ from .shavings.build_a_butt import (
     dovetail_tenon_geometry,
     DovetailTenonGeometeryResult,
     DovetailTenonWedgeAccessoryParameters,
+    tusk_tenon_geometry,
+    TuskTenonGeometryResult,
 )
 
 
@@ -1395,7 +1397,9 @@ class TuskEntryFace(Enum):
     Front = 0
     Top = 1
 
+@dataclass(frozen=True)
 class TuskParameters():
+    # TODO rename to tusk_thickness
     tusk_height: Numeric
     tusk_small_width: Numeric
     # defaults to 1/3 of length of the tusk that's in the tenon
@@ -1419,19 +1423,167 @@ def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
     opposite_mortise_shoulder_inset: Numeric = scalar(0),
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
-    assert False, "not implemented yet"
+    """
+    Creates a through mortise-and-tenon joint locked by a tapered crosswise key (a "tusk")
+    driven through the protruding tenon, bearing against the receiving timber's exit face.
 
-    # first compute the opposite shoulder face accounting for measure_opposite_shoulder_from and opposite_mortise_shoulder_inset, measuer its distance from the inset mortise shoulder face
-    # then tenon length is that length + tenon_length_past_opposite_shoulder
-    # mortise is always a through mortise
-    # use cut_mortise_and_tenon_joint code to cut the tenon and mortise hole
+    The tenon is always a through-tenon: its length is computed as the distance from the
+    mortise entry shoulder to an "opposite shoulder" reference on the far side of the
+    receiving timber (see measure_opposite_shoulder_from / opposite_mortise_shoulder_inset),
+    plus tenon_length_past_opposite_shoulder. The tusk hole is cut through the tenon at that
+    opposite-shoulder position, entering from arrangement.front_face_on_butt_timber or
+    arrangement.top_face_on_butt_timber (per tusk_parameters.entry_face), centered on the
+    tenon.
 
-    # next shape the tusk based on its parameters create the tusk accessory and cut the tusk shape from the tenon, 
-    # this logic should be very very similar to the wedge logic used in same way as we did the wedge for cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers
+    Args:
+        arrangement: Butt joint arrangement (butt_timber = tenon, receiving_timber = mortise).
+            Must satisfy arrangement.check_plane_aligned(), and whichever of
+            front_face_on_butt_timber/top_face_on_butt_timber tusk_parameters.entry_face
+            selects must be set.
+        tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
+        tenon_length_past_opposite_shoulder: How far the tenon (and tusk hole) extends past
+            the opposite shoulder reference.
+        tusk_parameters: Tusk shape parameters.
+        tenon_position: Offset of the tenon center from the timber centerline in the tenon's
+            local cross-section. (0, 0) = centered on the centerline.
+        mortise_shoulder_inset: Distance from the mortise entry face to the shoulder plane,
+            measured perpendicular to the face inward. 0 = shoulder flush with the entry face.
+        measure_opposite_shoulder_from: Whether the opposite shoulder reference is measured
+            against the receiving timber's perfect or rough boundary.
+        opposite_mortise_shoulder_inset: Distance the opposite shoulder reference is moved
+            inward (toward the entry shoulder) from that boundary. May be negative.
+        relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
+            tenon (butt) timber onto the mortise (receiving) timber. Pass None to skip.
 
-    # compute the full tusk length
-    # cut a rectangular prism into the mortise timber so that the tusk can slide in, thus it needs to extend from the entry tusk hole on the tenon by the full tusk length, and past the exit tusk hole of the tenon by tusk_back_stickout
-    # only do this if needed, which is to say the opposite shoulder face is smaller than the rough dimension on the tenno exit face
+    Returns:
+        Joint object with cuts on both timbers and a "tusk" accessory.
+    """
+
+    arrangement.check_plane_aligned()
+    
+    tenon_timber = arrangement.butt_timber
+    mortise_timber = arrangement.receiving_timber
+    tenon_end = arrangement.butt_timber_end
+
+    # Mirrors cut_mortise_and_tenon_joint_on_plane_aligned_timbers' own mortise-face and
+    # shoulder-inset handling (duplicated here rather than threading it back out of that
+    # function) because the opposite-shoulder math below needs the raw centerline distance.
+    tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
+    mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
+        -tenon_end_direction
+    ).to.face()
+    entry_shoulder_distance_from_centerline = convert_mortise_shoulder_inset_to_centerline_distance(
+        mortise_shoulder_inset=mortise_shoulder_inset,
+        mortise_face=mortise_face,
+        receiving_timber=mortise_timber,
+    )
+
+    # Opposite shoulder: the reference position on the far side of the receiving timber where
+    # the tenon "exits" and the tusk hole is centered. Measured from centerline in the same
+    # sign convention as entry_shoulder_distance_from_centerline (positive = toward the tenon).
+    opposite_face = mortise_face.get_opposite_face()
+    if measure_opposite_shoulder_from == MeasureOppositeShoulderFrom.Perfect:
+        opposite_shoulder_distance_from_centerline = -convert_mortise_shoulder_inset_to_centerline_distance(
+            mortise_shoulder_inset=opposite_mortise_shoulder_inset,
+            mortise_face=opposite_face,
+            receiving_timber=mortise_timber,
+        )
+    else:
+        opposite_shoulder_distance_from_centerline = (
+            -mortise_timber.get_half_rough_size_in_face_normal_axis(opposite_face)
+            + opposite_mortise_shoulder_inset
+        )
+
+    distance_between_shoulders = entry_shoulder_distance_from_centerline - opposite_shoulder_distance_from_centerline
+    tenon_length = distance_between_shoulders + tenon_length_past_opposite_shoulder
+
+    base_joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_size=tenon_size,
+        tenon_length=tenon_length,
+        mortise_depth=None,
+        tenon_position=tenon_position,
+        mortise_shoulder_inset=mortise_shoulder_inset,
+        relief=relief,
+    )
+
+    # -------------------------------------------------------------------------
+    # Tusk: crosswise locking key through the tenon, positioned at the opposite shoulder.
+    # -------------------------------------------------------------------------
+    entry_face_designation = (
+        arrangement.front_face_on_butt_timber
+        if tusk_parameters.entry_face == TuskEntryFace.Front
+        else arrangement.top_face_on_butt_timber
+    )
+    assert entry_face_designation is not None, (
+        "arrangement.front_face_on_butt_timber/top_face_on_butt_timber (per tusk_parameters.entry_face) "
+        "must be set to determine which face the tusk enters from"
+    )
+    entry_axis_extent = (
+        tenon_size[0] if entry_face_designation in (TimberLongFace.RIGHT, TimberLongFace.LEFT) else tenon_size[1]
+    )
+
+    # Recompute the entry shoulder's marking origin (mirrors cut_mortise_and_tenon_joint's own
+    # marking_origin_global) to locate the opposite-shoulder reference point in 3D.
+    up_direction = tenon_timber.get_height_direction_global()
+    shoulder_result = compute_butt_joint_shoulder(
+        arrangement=arrangement,
+        distance_from_centerline_or_centerplane=entry_shoulder_distance_from_centerline,
+        up_direction=up_direction,
+    )
+    resolved_tenon_position = tenon_position if tenon_position is not None else Matrix([scalar(0), scalar(0)])
+    tenon_right = tenon_timber.get_face_direction_global(TimberFace.RIGHT)
+    tenon_front = tenon_timber.get_face_direction_global(TimberFace.FRONT)
+    entry_marking_origin_global = (
+        shoulder_result.marking_space.transform.position
+        + tenon_right * resolved_tenon_position[0]
+        + tenon_front * resolved_tenon_position[1]
+    )
+    opposite_shoulder_position_global = (
+        entry_marking_origin_global + shoulder_result.butt_direction * distance_between_shoulders
+    )
+
+    rough_half_extent = mortise_timber.get_half_rough_size_in_face_normal_axis(opposite_face)
+    rough_half_extent_past_opposite_shoulder = rough_half_extent + opposite_shoulder_distance_from_centerline
+
+    tusk_geo = tusk_tenon_geometry(
+        arrangement=arrangement,
+        opposite_shoulder_position_global=opposite_shoulder_position_global,
+        tenon_length_direction=shoulder_result.butt_direction,
+        entry_face_designation=entry_face_designation,
+        entry_axis_extent=entry_axis_extent,
+        tusk_parameters=tusk_parameters,
+        rough_half_extent_past_opposite_shoulder=rough_half_extent_past_opposite_shoulder,
+    )
+
+    tenon_hole_local = adopt_csg(None, tenon_timber.transform, tusk_geo.tenon_hole_negative_csg)
+
+    tenon_cut = base_joint.cuttings[tenon_timber.ticket.path]
+    mortise_cut = base_joint.cuttings[mortise_timber.ticket.path]
+    assert tenon_cut.negative_csg is not None and mortise_cut.negative_csg is not None
+
+    tenon_cut = replace(
+        tenon_cut,
+        negative_csg=CSGUnion(children=[tenon_cut.negative_csg, tenon_hole_local]),
+    )
+    if tusk_geo.mortise_clearance_negative_csg is not None:
+        mortise_clearance_local = adopt_csg(None, mortise_timber.transform, tusk_geo.mortise_clearance_negative_csg)
+        mortise_cut = replace(
+            mortise_cut,
+            negative_csg=CSGUnion(children=[mortise_cut.negative_csg, mortise_clearance_local]),
+        )
+
+    joint_accessories = dict(base_joint.jointAccessories)
+    joint_accessories["tusk"] = tusk_geo.tusk_accessory_csg
+
+    return Joint(
+        cuttings={
+            tenon_timber.ticket.path: tenon_cut,
+            mortise_timber.ticket.path: mortise_cut,
+        },
+        ticket=JointTicket(joint_type="tusked_mortise_and_tenon"),
+        jointAccessories=joint_accessories,
+    )
 
 
 

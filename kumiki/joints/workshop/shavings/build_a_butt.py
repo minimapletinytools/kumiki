@@ -726,6 +726,181 @@ def dovetail_tenon_geometry(
         wedge_accessory_csg=wedge_accessory_csg,
     )
 
+
+# ============================================================================
+# Tusk Tenon Geometry
+# ============================================================================
+
+class TuskTenonGeometryResult(NamedTuple):
+    """
+    Result of computing the geometry for a tusk tenon's crosswise locking key.
+
+    Attributes:
+        tenon_hole_negative_csg: The crosswise hole cut through the (through-)tenon that the
+            tusk key slides into.
+        mortise_clearance_negative_csg: Extra clearance cut into the receiving (mortise)
+            timber, only present when its rough stock still surrounds the tenon at the tusk
+            hole's position (None otherwise).
+        tusk_accessory_csg: The tusk key itself.
+    """
+    tenon_hole_negative_csg: CutCSG
+    mortise_clearance_negative_csg: Optional[CutCSG]
+    tusk_accessory_csg: CSGAccessory
+
+
+def tusk_tenon_geometry(
+    arrangement: ButtJointTimberArrangement,
+    opposite_shoulder_position_global: V3,
+    tenon_length_direction: Direction3D,
+    entry_face_designation: TimberLongFace,
+    entry_axis_extent: Numeric,
+    tusk_parameters: Any,
+    rough_half_extent_past_opposite_shoulder: Numeric,
+) -> TuskTenonGeometryResult:
+    """
+    Build the crosswise locking key ("tusk") for a through mortise-and-tenon joint, the hole
+    cut through the tenon for it, and (if needed) extra clearance cut into the receiving
+    timber so the key can be slid crosswise into place.
+
+    Mirrors dovetail_tenon_geometry's wedge: the key is a tapered prism, driven crosswise
+    (perpendicular to the tenon's own length, through one of the tenon's long faces --
+    entry_face_designation) through a hole in the through-tenon, positioned at the "opposite
+    shoulder" reference. Like the wedge, it is asymmetric -- one side (Y=0) is flush with the
+    opposite shoulder plane (the receiving timber's exit face), and the other side tapers
+    (per tusk_angle) into the tenon's own body. The key's taper runs along the tenon's own
+    length axis (the narrow, leading edge sits deepest, at the far side of the tenon's own
+    cross-section; the taper continues into the back/tip stickout regions), so driving it in
+    wedges the tenon's shoulder tight against the receiving timber's exit face. It is centered
+    on the tenon's other cross axis (tusk_height).
+
+        entry_face_designation
+           v
+    _______|_______
+           |
+        ___|
+       /   \\___          <- tapers down to tusk_small_width at X=entry_axis_extent
+    __/________\\_______ <- flush at Y=0 (opposite shoulder plane / receiving timber exit face)
+     tusk_back_       tusk_tip_
+     stickout          stickout
+           |<-- entry_axis_extent -->|
+
+    Args:
+        arrangement: Butt joint arrangement (butt_timber = tenon, receiving_timber = mortise).
+        opposite_shoulder_position_global: Center of the tenon's cross-section at the
+            "opposite shoulder" reference position (where the tusk hole is centered along the
+            tenon's length axis).
+        tenon_length_direction: Direction from the entry shoulder toward the tenon's tip.
+        entry_face_designation: Which of the tenon's long faces the tusk is driven in from.
+        entry_axis_extent: The tenon's own cross-sectional size along the entry axis.
+        tusk_parameters: Tusk shape parameters.
+        rough_half_extent_past_opposite_shoulder: How far the receiving timber's rough stock
+            extends past the "opposite shoulder" reference, measured along
+            tenon_length_direction. <= 0 means no rough excess there (no clearance needed).
+
+    Returns:
+        TuskTenonGeometryResult with the tenon hole, optional mortise clearance, and the tusk
+        accessory, all in global space.
+    """
+    from sympy import tan as _sym_tan
+
+    tenon_timber = arrangement.butt_timber
+
+    tusk_tip_stickout = (
+        entry_axis_extent / scalar(3)
+        if tusk_parameters.tusk_tip_stickout is None
+        else tusk_parameters.tusk_tip_stickout
+    )
+    tusk_back_stickout = (
+        entry_axis_extent / scalar(3)
+        if tusk_parameters.tusk_back_stickout is None
+        else tusk_parameters.tusk_back_stickout
+    )
+
+    entry_normal = tenon_timber.get_face_direction_global(entry_face_designation.to.face())
+    drive_direction = -entry_normal
+
+    # Extrusion local frame: X = drive direction (crosswise, into the tenon from the entry
+    # face), Y = tenon's own length axis (the taper direction -- this is what converts driving
+    # the key in into a lengthwise tightening force against the shoulder), Z = the tenon's
+    # other cross axis (constant, = tusk_height).
+    extrusion_orientation = Orientation.from_x_and_y(
+        x_direction=drive_direction,
+        y_direction=tenon_length_direction,
+    )
+    tusk_origin_global = opposite_shoulder_position_global + entry_normal * (entry_axis_extent / scalar(2))
+    extrusion_transform = Transform(position=tusk_origin_global, orientation=extrusion_orientation)
+
+    half_height = tusk_parameters.tusk_height / scalar(2)
+    tan_tusk_angle = _sym_tan(tusk_parameters.tusk_angle)
+
+    # X=0 is the entry face; X=entry_axis_extent is the tenon's own far cross-face. The taper
+    # is referenced (at its small value) at the far side, so the key's narrow, leading edge is
+    # driven in deepest first, exactly like a simple wedge/shim. Y=0 is flush with the opposite
+    # shoulder plane (mirroring the wedge's flush side against dovetail_top_side_on_butt_timber)
+    # -- the key's solid is one-sided (Y from 0 to width(x)), not centered, so its flat face
+    # bears directly against the receiving timber's exit face.
+    x_near = -tusk_back_stickout
+    x_far = entry_axis_extent + tusk_tip_stickout
+    width_near = tusk_parameters.tusk_small_width + (entry_axis_extent - x_near) * tan_tusk_angle
+    width_far = tusk_parameters.tusk_small_width + (entry_axis_extent - x_far) * tan_tusk_angle
+
+    tusk_profile_points = [
+        create_v2(x_near, scalar(0)),
+        create_v2(x_near, width_near),
+        create_v2(x_far, width_far),
+        create_v2(x_far, scalar(0)),
+    ]
+
+    tenon_hole_negative_csg = ConvexPolygonExtrusion(
+        points=tusk_profile_points,
+        transform=extrusion_transform,
+        start_distance=-half_height,
+        end_distance=half_height,
+    )
+
+    full_tusk_length = entry_axis_extent + tusk_tip_stickout + tusk_back_stickout
+    tusk_positive_csg = ConvexPolygonExtrusion(
+        points=tusk_profile_points,
+        transform=Transform.identity(),
+        start_distance=-half_height,
+        end_distance=half_height,
+    )
+    # Assembly: the tusk backs out the way it was driven in. It locks the joint, so it pops
+    # first, at suborder -1, before the timbers themselves slide apart.
+    tusk_accessory_csg = CSGAccessory(
+        transform=extrusion_transform,
+        positive_csg=tusk_positive_csg,
+        assembly_freedom=AssemblyFreedom.translation(entry_normal, freed_after=full_tusk_length),
+        assembly_ordering=Ordering(0, -1),
+    )
+
+    mortise_clearance_negative_csg = None
+    if safe_compare(rough_half_extent_past_opposite_shoulder, scalar(0), Comparison.GT):
+        # A plain box (not tapered like the key itself) spanning the key's full crosswise
+        # footprint, extended a bit past the rough boundary for slide-in clearance -- just
+        # enough room for the tapered key to be slid crosswise into place through whatever
+        # rough stock still surrounds the tenon at this position.
+        clearance_y_end = rough_half_extent_past_opposite_shoulder + tusk_back_stickout
+        clearance_profile_points = [
+            create_v2(x_near, scalar(0)),
+            create_v2(x_near, clearance_y_end),
+            create_v2(x_far, clearance_y_end),
+            create_v2(x_far, scalar(0)),
+        ]
+        mortise_clearance_negative_csg = ConvexPolygonExtrusion(
+            points=clearance_profile_points,
+            transform=extrusion_transform,
+            start_distance=-half_height,
+            end_distance=half_height,
+        )
+
+    return TuskTenonGeometryResult(
+        tenon_hole_negative_csg=tenon_hole_negative_csg,
+        mortise_clearance_negative_csg=mortise_clearance_negative_csg,
+        tusk_accessory_csg=tusk_accessory_csg,
+    )
+
+
 # ============================================================================
 # Peg Geometry
 # ============================================================================
