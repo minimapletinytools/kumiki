@@ -585,36 +585,6 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timb
     )
 
 
-# TODO DELET THIS
-def example_wedged_half_dovetail_mortise_and_tenon_no_wedge(position=None, use_round_timbers=False):
-    """
-    Half-dovetail mortise and tenon (no wedge accessory) on the canonical
-    4"x5"x4' butt joint timbers. The dovetail's flat (top) side sits on the
-    FRONT face of the butt timber (along the receiving timber's length axis).
-    """
-    if position is None:
-        position = create_v3(0, 0, 0)
-
-    arrangement = replace(
-        create_canonical_example_butt_joint_timbers(
-            position,
-            timber_config=_maybe_round_timber_config(use_round_timbers),
-        ),
-        top_face_on_butt_timber=TimberLongFace.FRONT,
-    )
-    return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
-        tenon_depth=inches(5),
-        dovetail_depth=inches(1, 2),
-        wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
-            wedge_angle=degrees(8),
-        ),
-        receiving_timber_mortise_extra_depth=inches(1, 2),
-        mortise_shoulder_inset = inches(1, 2),
-    )
-
-
 def example_tusked_mortise_and_tenon(position=None, use_round_timbers=False):
     """
     Through mortise-and-tenon joint on the canonical 4"x5"x4' butt joint
@@ -639,7 +609,7 @@ def example_tusked_mortise_and_tenon(position=None, use_round_timbers=False):
         tenon_size=Matrix([inches(2), inches(2)]),
         tenon_length_past_opposite_shoulder=inches(3),
         tusk_parameters=TuskParameters(
-            tusk_height=inches(scalar(3, 2)),
+            tusk_thickness=inches(scalar(3, 2)),
             tusk_small_width=inches(1),
             tusk_angle=degrees(10),
             tusk_tip_stickout=inches(1),
@@ -1004,10 +974,9 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
-    Pattern(path="butt_joints/half_dovetail_mortise_and_tenon_no_wedge", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon_no_wedge), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dropin_housed_butt_joint_example), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_notch_angled", lambda_=make_pattern_from_joint(example_inset_shoulder_notch_angled), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_scribe_angled", lambda_=make_pattern_from_joint(example_inset_shoulder_scribe_angled), pattern_type='frame'),
-    Pattern(path="butt_joints/mortise_and_tenon/tusked_mortise_and_tenon", lambda_=make_pattern_from_joint(example_tusked_mortise_and_tenon), pattern_type='frame'),
+    Pattern(path="butt_joints/tusked_mortise_and_tenon", lambda_=make_pattern_from_joint(example_tusked_mortise_and_tenon), pattern_type='frame'),
 ]

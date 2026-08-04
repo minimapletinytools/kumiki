@@ -28,6 +28,7 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_mitered_and_keyed_lap_joint_on_plane_aligned_timbers,
     cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers,
+    cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers,
 )
 from kumiki.example_shavings import (
     RoundTimberConfig,
@@ -330,6 +331,22 @@ def example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint(position=None):
     return joint
 
 
+def example_basic_tusked_mortise_and_tenon_joint(position=None):
+    """
+    Create a basic tusked through mortise-and-tenon joint using canonical butt joint timbers.
+    All sizing (tenon dimensions, stickout, and tusk shape) is derived automatically from the
+    arrangement.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(position)
+    joint = cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement
+    )
+    return joint
+
+
 patterns = [
     Pattern(path="basic_joints/basic_miter_joint", lambda_=make_pattern_from_joint(example_basic_miter_joint), pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_miter_joint_face_aligned", lambda_=make_pattern_from_joint(example_basic_miter_joint_face_aligned), pattern_type='frame'),
@@ -347,4 +364,5 @@ patterns = [
     Pattern(path="basic_joints/basic_dropin_housed_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_housed_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mitered_and_keyed_lap_joint", lambda_=make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_wedged_half_dovetail_mortise_and_tenon_joint), pattern_type='frame', tags=['main']),
+    Pattern(path="basic_joints/basic_tusked_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_tusked_mortise_and_tenon_joint), pattern_type='frame'),
 ]

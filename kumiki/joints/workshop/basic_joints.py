@@ -810,7 +810,7 @@ def cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
     tenon_length_past_opposite_shoulder = max(mortise_length_tip, front_face_size*2)
 
     tusk = TuskParameters(
-        tusk_height = top_face_size * scalar(2/5),
+        tusk_thickness = top_face_size * scalar(2/5),
         tusk_small_width = min(tenon_length_past_opposite_shoulder/scalar(2), min(front_face_size, top_face_size))
     )
 

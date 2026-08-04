@@ -1399,8 +1399,7 @@ class TuskEntryFace(Enum):
 
 @dataclass(frozen=True)
 class TuskParameters():
-    # TODO rename to tusk_thickness
-    tusk_height: Numeric
+    tusk_thickness: Numeric
     tusk_small_width: Numeric
     # defaults to 1/3 of length of the tusk that's in the tenon
     tusk_tip_stickout: Optional[Numeric] = None

@@ -771,7 +771,7 @@ def tusk_tenon_geometry(
     length axis (the narrow, leading edge sits deepest, at the far side of the tenon's own
     cross-section; the taper continues into the back/tip stickout regions), so driving it in
     wedges the tenon's shoulder tight against the receiving timber's exit face. It is centered
-    on the tenon's other cross axis (tusk_height).
+    on the tenon's other cross axis (tusk_thickness).
 
         entry_face_designation
            v
@@ -806,12 +806,12 @@ def tusk_tenon_geometry(
     tenon_timber = arrangement.butt_timber
 
     tusk_tip_stickout = (
-        entry_axis_extent / scalar(3)
+        entry_axis_extent * scalar(2/3)
         if tusk_parameters.tusk_tip_stickout is None
         else tusk_parameters.tusk_tip_stickout
     )
     tusk_back_stickout = (
-        entry_axis_extent / scalar(3)
+        entry_axis_extent * scalar(2/3)
         if tusk_parameters.tusk_back_stickout is None
         else tusk_parameters.tusk_back_stickout
     )
@@ -822,7 +822,7 @@ def tusk_tenon_geometry(
     # Extrusion local frame: X = drive direction (crosswise, into the tenon from the entry
     # face), Y = tenon's own length axis (the taper direction -- this is what converts driving
     # the key in into a lengthwise tightening force against the shoulder), Z = the tenon's
-    # other cross axis (constant, = tusk_height).
+    # other cross axis (constant, = tusk_thickness).
     extrusion_orientation = Orientation.from_x_and_y(
         x_direction=drive_direction,
         y_direction=tenon_length_direction,
@@ -830,7 +830,7 @@ def tusk_tenon_geometry(
     tusk_origin_global = opposite_shoulder_position_global + entry_normal * (entry_axis_extent / scalar(2))
     extrusion_transform = Transform(position=tusk_origin_global, orientation=extrusion_orientation)
 
-    half_height = tusk_parameters.tusk_height / scalar(2)
+    half_thickness = tusk_parameters.tusk_thickness / scalar(2)
     tan_tusk_angle = _sym_tan(tusk_parameters.tusk_angle)
 
     # X=0 is the entry face; X=entry_axis_extent is the tenon's own far cross-face. The taper
@@ -854,16 +854,16 @@ def tusk_tenon_geometry(
     tenon_hole_negative_csg = ConvexPolygonExtrusion(
         points=tusk_profile_points,
         transform=extrusion_transform,
-        start_distance=-half_height,
-        end_distance=half_height,
+        start_distance=-half_thickness,
+        end_distance=half_thickness,
     )
 
     full_tusk_length = entry_axis_extent + tusk_tip_stickout + tusk_back_stickout
     tusk_positive_csg = ConvexPolygonExtrusion(
         points=tusk_profile_points,
         transform=Transform.identity(),
-        start_distance=-half_height,
-        end_distance=half_height,
+        start_distance=-half_thickness,
+        end_distance=half_thickness,
     )
     # Assembly: the tusk backs out the way it was driven in. It locks the joint, so it pops
     # first, at suborder -1, before the timbers themselves slide apart.
@@ -890,8 +890,8 @@ def tusk_tenon_geometry(
         mortise_clearance_negative_csg = ConvexPolygonExtrusion(
             points=clearance_profile_points,
             transform=extrusion_transform,
-            start_distance=-half_height,
-            end_distance=half_height,
+            start_distance=-half_thickness,
+            end_distance=half_thickness,
         )
 
     return TuskTenonGeometryResult(
