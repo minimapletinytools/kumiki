@@ -8,7 +8,13 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.7] - 2026-08-04
+
 ### kumiki
+
+#### Added
+
+- Added a tusked (keyed) through mortise-and-tenon joint: `cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers` (plus a `cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers` convenience wrapper and pattern examples). The tenon's length is derived from an "opposite shoulder" reference on the far side of the receiving timber (`MeasureOppositeShoulderFrom` selects whether that's measured against the timber's perfect or rough boundary, with an optional `opposite_mortise_shoulder_inset`), and a tapered crosswise key (`TuskParameters`, entering from `TuskEntryFace.Front` or `.Top`, flush against the opposite shoulder plane on one side like the dovetail wedge) locks the joint, with a matching clearance cut automatically added to the receiving timber when its rough stock would otherwise block the key's slide-in path.
 
 #### Changed
 
