@@ -122,6 +122,10 @@ DONE-do the top_face_on_butt_timber thing for the half dovetail wedged mortise a
 DONE-tusked mortise and tenon joint
 DONE-mortise_clearance_negative_csg computation wrong for tusked mrotise and tenon joint
 
+
+-do joint rename to match what's in your new book
+-add shouder to cross lap joint
+
 -cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
   -this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
 
