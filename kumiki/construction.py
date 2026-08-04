@@ -1513,9 +1513,16 @@ class ButtJointTimberArrangement:
         key = "normalized_timber_cross_product"
         if self._memo.get(key) is not None:
             return self._memo[key]
-        result = normalize_vector(cross_product(self.butt_timber.get_length_direction_global(), self.receiving_timber.get_length_direction_global()))
+
+        result = normalize_vector(cross_product(self.butt_timber.get_face_direction_global(self.butt_timber_end), self.receiving_timber.get_length_direction_global()))
         self._memo[key] = result
         return result
+
+    def compute_arrangement_acute_angle(self) -> Numeric:
+        """Compute the angle between the 2 timbers"""
+        dot = safe_dot_product(self.butt_timber.get_face_direction_global(self.butt_timber_end), self.receiving_timber.get_length_direction_global())
+        from sympy import acos
+        return acos(dot)
 
 
 
