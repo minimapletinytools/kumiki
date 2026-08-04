@@ -2329,3 +2329,53 @@ class TestExtendedTimberArrangement:
         result = ExtendedTimberArrangement(timbers=[ref, off_axis]).check_coaxial_face_aligned_and_same_size()
         assert result is not None and "coaxial" in result
 
+
+class TestButtJointTimberArrangement:
+    """Tests for ButtJointTimberArrangement's front/top face orientation checks."""
+
+    def _make_arrangement(self, *, front=None, top=None):
+        size = create_v2(scalar(4), scalar(6))
+        receiving_timber = create_timber(
+            length=scalar(48), size=size,
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(1, 0, 0),
+            width_direction=create_v3(0, 1, 0),
+            ticket="receiving",
+        )
+        # butt_timber's length is +Y; joint alignment plane normal is
+        # cross(+Y, +X) = -Z, so a face pointing +-Z is parallel to the
+        # joint plane, and a face pointing +-X is orthogonal to it.
+        butt_timber = create_timber(
+            length=scalar(48), size=size,
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(0, 1, 0),
+            width_direction=create_v3(0, 0, 1),
+            ticket="butt",
+        )
+        return ButtJointTimberArrangement(
+            butt_timber=butt_timber,
+            receiving_timber=receiving_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+            front_face_on_butt_timber=front,
+            top_face_on_butt_timber=top,
+        )
+
+    def test_correct_front_and_top_pass(self):
+        arrangement = self._make_arrangement(front=TimberLongFace.RIGHT, top=TimberLongFace.FRONT)
+        assert arrangement.check_plane_aligned() is None
+        assert arrangement.check_face_aligned_and_orthogonal() is None
+
+    def test_top_face_parallel_instead_of_orthogonal_fails(self):
+        # LEFT points +-Z, same axis as the (correct) RIGHT front face --
+        # parallel to the joint plane, not orthogonal to it.
+        arrangement = self._make_arrangement(front=TimberLongFace.RIGHT, top=TimberLongFace.LEFT)
+        result = arrangement.check_plane_aligned()
+        assert result is not None and "top_face_on_butt_timber" in result and "orthogonal" in result
+        # The same helper backs check_face_aligned_and_orthogonal too.
+        result = arrangement.check_face_aligned_and_orthogonal()
+        assert result is not None and "orthogonal" in result
+
+    def test_only_top_face_set_still_checked(self):
+        arrangement = self._make_arrangement(top=TimberLongFace.FRONT)
+        assert arrangement.check_plane_aligned() is None
+

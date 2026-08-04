@@ -1501,10 +1501,12 @@ class ButtJointTimberArrangement:
     receiving_timber: TimberLike
     butt_timber_end: TimberEnd
     front_face_on_butt_timber: Optional[TimberLongFace] = None
+    top_face_on_butt_timber: Optional[TimberLongFace] = None
 
     # this is totally silly. please delete me. We're not doing any hard computations in here...
     # I'm leavin git here as an example of a potential optimization we could do.
     _memo: Dict[str, Any] = field(default_factory=dict, repr=False)
+
 
     def compute_normalized_timber_cross_product(self) -> Direction3D:
         """Compute the normalized cross product of the butt timber and receiving timber length directions."""
@@ -1515,16 +1517,41 @@ class ButtJointTimberArrangement:
         self._memo[key] = result
         return result
 
-    def check_plane_aligned(self) -> Optional[str]:
-        """Return None if timbers are plane-aligned and front face is in plane, else an error message."""
-        if not are_timbers_plane_aligned(self.butt_timber, self.receiving_timber):
-            return "Timbers must be plane-aligned"
+
+
+    def _check_front_and_top_face_orientation(self) -> Optional[str]:
+        """Return None if front_face_on_butt_timber (when set) is parallel to the
+        joint alignment plane and top_face_on_butt_timber (when set) is
+        orthogonal to it, else an error message.
+        
+        when the arrangement is face aligned or plane aligned, front_face_on_butt_timber and top_face_on_butt_timber have canonical interpretations relative to the timber orientation
+        the "parallel face plane" is the plane that both timbers timbers share long faces that are parallel to that plane
+        
+        # ││ top_face_on_butt_timber (must be perpendicular face to the parallel face plane)
+        # ││ v
+        # │├────
+        # │├──── front_face_on_butt_timber (must be parallel to the parallel face plane)
+        # ││
+        # ││
+
+        """
         if self.front_face_on_butt_timber is not None and not are_vectors_parallel(
             self.butt_timber.get_face_direction_global(self.front_face_on_butt_timber),
             self.compute_normalized_timber_cross_product(),
         ):
-            return "front_face_on_butt_timber must point in the aligned plane normal"
+            return "front_face_on_butt_timber must be parallel to the joint alignment plane"
+        if self.top_face_on_butt_timber is not None and not are_vectors_perpendicular(
+            self.butt_timber.get_face_direction_global(self.top_face_on_butt_timber),
+            self.compute_normalized_timber_cross_product(),
+        ):
+            return "top_face_on_butt_timber must be orthogonal to the joint alignment plane"
         return None
+
+    def check_plane_aligned(self) -> Optional[str]:
+        """Return None if timbers are plane-aligned and front/top face are in plane, else an error message."""
+        if not are_timbers_plane_aligned(self.butt_timber, self.receiving_timber):
+            return "Timbers must be plane-aligned"
+        return self._check_front_and_top_face_orientation()
 
 
     # TODO rename to check_face_aligned, orthogonal constraint is redundant
@@ -1532,7 +1559,7 @@ class ButtJointTimberArrangement:
         """Return None if timbers are face-aligned, else an error message."""
         if not are_timbers_face_aligned(self.butt_timber, self.receiving_timber):
             return "Timbers must be face-aligned"
-        return None
+        return self._check_front_and_top_face_orientation()
     
     def check_perfection(self) -> Optional[str]:
         """Return None if both timbers are perfect, else an error message."""
