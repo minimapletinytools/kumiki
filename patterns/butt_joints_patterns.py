@@ -619,6 +619,140 @@ def example_tusked_mortise_and_tenon(position=None, use_round_timbers=False):
     )
 
 
+def example_tusked_mortise_and_tenon_entry_from_top(position=None, use_round_timbers=False):
+    """
+    Tusked through mortise-and-tenon joint with the tusk driven in from the TOP face
+    (the butt timber's FRONT face, orthogonal to the joint alignment plane) instead of the
+    default front-face entry -- otherwise identical to example_tusked_mortise_and_tenon.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = replace(
+        create_canonical_example_butt_joint_timbers(
+            position,
+            timber_config=_maybe_round_timber_config(use_round_timbers),
+        ),
+        top_face_on_butt_timber=TimberLongFace.FRONT,
+    )
+    return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length_past_opposite_shoulder=inches(3),
+        tusk_parameters=TuskParameters(
+            tusk_thickness=inches(scalar(3, 2)),
+            tusk_small_width=inches(1),
+            tusk_angle=degrees(10),
+            tusk_tip_stickout=inches(1),
+            tusk_back_stickout=inches(1),
+            entry_face=TuskEntryFace.Top,
+        ),
+    )
+
+
+def example_tusked_mortise_and_tenon_opposite_shoulder_inset_from_top(position=None, use_round_timbers=False):
+    """
+    Tusked through mortise-and-tenon joint with a 1" opposite-shoulder inset: the tusk hole
+    (and the tenon's overall length) sit 1" further into the receiving timber than its exit
+    face, instead of flush with it. The tusk is driven in from the TOP face (the butt timber's
+    FRONT face, orthogonal to the joint alignment plane), same as example_tusked_mortise_and_tenon_entry_from_top.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = replace(
+        create_canonical_example_butt_joint_timbers(
+            position,
+            timber_config=_maybe_round_timber_config(use_round_timbers),
+        ),
+        top_face_on_butt_timber=TimberLongFace.FRONT,
+    )
+    return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length_past_opposite_shoulder=inches(3),
+        opposite_mortise_shoulder_inset=inches(1),
+        tusk_parameters=TuskParameters(
+            tusk_thickness=inches(scalar(3, 2)),
+            tusk_small_width=inches(1),
+            tusk_angle=degrees(10),
+            tusk_tip_stickout=inches(1),
+            tusk_back_stickout=inches(1),
+            entry_face=TuskEntryFace.Top,
+        ),
+    )
+
+
+def _make_rough_receiving_timber_arrangement(position=None):
+    """
+    Canonical butt joint arrangement, but the receiving timber's BACK face -- the tenon's
+    "opposite shoulder" axis -- is oversized rough stock (4" actual vs. its 2.5" perfect
+    half-size), simulating as-sawn material that hasn't been dressed down to its final
+    envelope yet. Shared by the rough/perfect opposite-shoulder examples below so they're
+    directly comparable.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_butt_joint_timbers(position)
+    receiving_timber = replace(
+        arrangement.receiving_timber,
+        rough_half_sizes=(create_v2(inches(2), inches(2)), create_v2(inches(scalar(5, 2)), inches(4))),
+    )
+    return replace(arrangement, receiving_timber=receiving_timber)
+
+
+def example_tusked_mortise_and_tenon_opposite_shoulder_from_perfect(position=None):
+    """
+    Tusked through mortise-and-tenon joint against a receiving timber with oversized rough
+    stock on its exit face (see _make_rough_receiving_timber_arrangement). With the default
+    measure_opposite_shoulder_from=Perfect, the tusk hole is positioned at the receiving
+    timber's *perfect* exit face (2.5" from centerline) even though the *actual* rough stock
+    extends to 4" -- so 1.5" of rough excess still surrounds the tenon there, and the joint
+    automatically cuts extra clearance into the receiving timber so the tusk can still slide
+    into place. Compare with example_tusked_mortise_and_tenon_opposite_shoulder_from_rough.
+    """
+    arrangement = _make_rough_receiving_timber_arrangement(position)
+    return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length_past_opposite_shoulder=inches(3),
+        measure_opposite_shoulder_from=MeasureOppositeShoulderFrom.Perfect,
+        tusk_parameters=TuskParameters(
+            tusk_thickness=inches(scalar(3, 2)),
+            tusk_small_width=inches(1),
+            tusk_angle=degrees(10),
+            tusk_tip_stickout=inches(1),
+            tusk_back_stickout=inches(1),
+            entry_face=TuskEntryFace.Front,
+        ),
+    )
+
+
+def example_tusked_mortise_and_tenon_opposite_shoulder_from_rough(position=None):
+    """
+    Same oversized receiving timber as example_tusked_mortise_and_tenon_opposite_shoulder_from_perfect,
+    but with measure_opposite_shoulder_from=Rough: the tusk hole is positioned at the receiving
+    timber's *actual* rough exit face (4" from centerline) instead of its perfect one, so the
+    tenon is correspondingly longer and no extra mortise clearance cut is needed.
+    """
+    arrangement = _make_rough_receiving_timber_arrangement(position)
+    return cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_length_past_opposite_shoulder=inches(3),
+        measure_opposite_shoulder_from=MeasureOppositeShoulderFrom.Rough,
+        tusk_parameters=TuskParameters(
+            tusk_thickness=inches(scalar(3, 2)),
+            tusk_small_width=inches(1),
+            tusk_angle=degrees(10),
+            tusk_tip_stickout=inches(1),
+            tusk_back_stickout=inches(1),
+            entry_face=TuskEntryFace.Front,
+        ),
+    )
+
+
 if __name__ == "__main__":
     # Run all examples
     examples = [
@@ -979,4 +1113,8 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_notch_angled", lambda_=make_pattern_from_joint(example_inset_shoulder_notch_angled), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_scribe_angled", lambda_=make_pattern_from_joint(example_inset_shoulder_scribe_angled), pattern_type='frame'),
     Pattern(path="butt_joints/tusked_mortise_and_tenon", lambda_=make_pattern_from_joint(example_tusked_mortise_and_tenon), pattern_type='frame'),
+    Pattern(path="butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_entry_from_top", lambda_=make_pattern_from_joint(example_tusked_mortise_and_tenon_entry_from_top), pattern_type='frame'),
+    Pattern(path="butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_inset_from_top", lambda_=make_pattern_from_joint(example_tusked_mortise_and_tenon_opposite_shoulder_inset_from_top), pattern_type='frame'),
+    Pattern(path="butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_perfect", lambda_=make_pattern_from_joint(example_tusked_mortise_and_tenon_opposite_shoulder_from_perfect), pattern_type='frame'),
+    Pattern(path="butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_rough", lambda_=make_pattern_from_joint(example_tusked_mortise_and_tenon_opposite_shoulder_from_rough), pattern_type='frame'),
 ]
