@@ -291,7 +291,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 942,
+          "lineno": 946,
           "name": "create_all_butt_joint_patterns"
         }
       ],
@@ -421,7 +421,7 @@
         ]
       },
       "relative_path": "butt_joints_patterns.py",
-      "sha256": "b2d454123d53f17b4246e9520bce07d8666a97d4917e2d5a8d45004525232d3a",
+      "sha256": "bb8b1a4d8d3b7ee891d4b1c6558f4afd70035b5eec06f553a4ac40ff876799ea",
       "warnings": []
     },
     "patterns/compound_joints_patterns.py": {
@@ -1117,7 +1117,7 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/horsey_example.py",
-      "sha256": "130683fd96c59ec7fe42d7d5d3a5a0d92df715f96082d6f2440ea67c80f1207b",
+      "sha256": "a1f47cfa7a775de76eb0cb459c9bc6a16330c727a98b3c3f73beef1b52308a44",
       "warnings": []
     },
     "patterns/structures/learn_to_timber_frame_shed.py": {
@@ -1140,7 +1140,7 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/learn_to_timber_frame_shed.py",
-      "sha256": "d58f943eace5224e4529c0094069327b12ac2c1a327bb291d908c781fe7eb6ef",
+      "sha256": "ea70325da893f1c39640864a95b6089de45397a4facb7893d3348d314ec7c788",
       "warnings": []
     },
     "patterns/structures/multi_cross_lap_post.py": {
@@ -1231,7 +1231,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-08-04T00:06:21.738161+00:00",
+  "generated_at": "2026-08-04T02:00:03.850631+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

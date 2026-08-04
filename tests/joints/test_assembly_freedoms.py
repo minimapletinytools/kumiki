@@ -227,10 +227,9 @@ class TestLockedJointFreedoms:
 
     def test_wedged_half_dovetail_mortise_and_tenon(self, float_mode):
         from sympy import Matrix, cos, sin
-        arrangement = create_canonical_example_butt_joint_timbers()
+        arrangement = replace(create_canonical_example_butt_joint_timbers(), top_face_on_butt_timber=TimberLongFace.FRONT)
         joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
             tenon_size=Matrix([scalar(2), scalar(2)]),
             tenon_depth=scalar(4),
             dovetail_depth=scalar(1),

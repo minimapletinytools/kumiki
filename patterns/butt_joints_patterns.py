@@ -562,19 +562,21 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timb
     if position is None:
         position = create_v3(0, 0, 0)
 
-    arrangement = create_canonical_example_butt_joint_timbers(
-        position,
-        timber_config=_maybe_round_timber_config(use_round_timbers),
+    arrangement = replace(
+        create_canonical_example_butt_joint_timbers(
+            position,
+            timber_config=_maybe_round_timber_config(use_round_timbers),
+        ),
+        top_face_on_butt_timber=TimberLongFace.FRONT,
     )
     return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([inches(2), inches(4)]),
         tenon_depth=inches(4),
         dovetail_depth=inches(1, 2),
         mortise_shoulder_inset = inches(1, 2),
         receiving_timber_mortise_extra_depth=inches(1, 2),
-        
+
         wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
             wedge_angle=degrees(8),
             wedge_tip_extra_length=inches(1),
@@ -592,13 +594,15 @@ def example_wedged_half_dovetail_mortise_and_tenon_no_wedge(position=None, use_r
     if position is None:
         position = create_v3(0, 0, 0)
 
-    arrangement = create_canonical_example_butt_joint_timbers(
-        position,
-        timber_config=_maybe_round_timber_config(use_round_timbers),
+    arrangement = replace(
+        create_canonical_example_butt_joint_timbers(
+            position,
+            timber_config=_maybe_round_timber_config(use_round_timbers),
+        ),
+        top_face_on_butt_timber=TimberLongFace.FRONT,
     )
     return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([inches(2), inches(2)]),
         tenon_depth=inches(5),
         dovetail_depth=inches(1, 2),

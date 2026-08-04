@@ -566,10 +566,10 @@ def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbe
         receiving_timber=cast(Timber, mortise_timber),
         butt_timber=cast(Timber, tenon_timber),
         butt_timber_end=tenon_end,
+        top_face_on_butt_timber=mortise_length_on_tenon_timber_face.to.long_face(),
     )
     return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        dovetail_top_side_on_butt_timber=mortise_length_on_tenon_timber_face.to.long_face(),
         tenon_size=tenon_size,
         tenon_depth=tenon_depth,
         dovetail_depth=tenon_dovetail_axis_dovetail_depth,

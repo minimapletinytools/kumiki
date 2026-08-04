@@ -954,6 +954,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
             butt_timber=tenon_timber,
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
+            top_face_on_butt_timber=TimberLongFace.RIGHT,
         )
 
     def test_general_wedged_half_dovetail_mortise_and_tenon(self, simple_T_configuration):
@@ -981,7 +982,6 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
 
         joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
             tenon_size=tenon_size,
             tenon_depth=tenon_depth,
             dovetail_depth=dovetail_depth,
@@ -1046,7 +1046,6 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         with pytest.raises(TypeError, match="missing.*required.*wedge_accessory_parameters"):
             cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(  # type: ignore[missing-argument]
                 arrangement=arrangement,
-                dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
                 tenon_size=Matrix([scalar(2), scalar(2)]),
                 tenon_depth=scalar(4),
                 dovetail_depth=scalar(1),

@@ -182,8 +182,8 @@ def create_sawhorse() -> Frame:
             butt_timber=stretcher,
             butt_timber_end=TimberEnd.BOTTOM,  # Left end of stretcher
             front_face_on_butt_timber=TimberLongFace.LEFT,
+            top_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in post's Z direction)
         tenon_depth=stretcher_tenon_depth,
         dovetail_depth=dovetail_depth_for_stretcher,
@@ -196,8 +196,8 @@ def create_sawhorse() -> Frame:
             butt_timber=stretcher,
             butt_timber_end=TimberEnd.TOP,  # Right end of stretcher
             front_face_on_butt_timber=TimberLongFace.LEFT,
+            top_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        dovetail_top_side_on_butt_timber=TimberLongFace.FRONT,
         tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in post's Z direction)
         tenon_depth=stretcher_tenon_depth,
         dovetail_depth=dovetail_depth_for_stretcher,

@@ -1426,8 +1426,6 @@ def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
 def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
-    # TODO replace with arrangement.top_face_on_butt_timber
-    dovetail_top_side_on_butt_timber: TimberLongFace,
     tenon_size: V2,
     tenon_depth: Numeric,
     dovetail_depth: Numeric,
@@ -1437,9 +1435,9 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
 
     mortise_shoulder_inset: Numeric = scalar(0),
 
-    # TODO 
+    # TODO
     # cuts a dovetail shaped shoulder using build_dovetail_shoulder_geometery
-    # the dovetail_pointy_face_on_butt_timber is the face opposite to dovetail_top_side_on_butt_timber
+    # the dovetail_pointy_face_on_butt_timber is the face opposite to arrangement.top_face_on_butt_timber
     #dovetail_shoulder_depth: Numeric = scalar(0),
 
     # TODO
@@ -1451,14 +1449,13 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     Create a half-dovetail mortise-and-tenon joint (with an optional wedge accessory).
 
     Built on top of `dovetail_tenon_geometry`. The "top" of the dovetail is flush with
-    `dovetail_top_side_on_butt_timber`; the opposite side slopes outward by `dovetail_depth`
+    `arrangement.top_face_on_butt_timber`; the opposite side slopes outward by `dovetail_depth`
     over `tenon_depth` to give the joint its mechanical pull-out resistance.
 
     Args:
         arrangement: Butt joint arrangement (butt_timber = tenon, receiving_timber = mortise).
-            Must be face-aligned and orthogonal.
-        dovetail_top_side_on_butt_timber: Which face of the butt timber the dovetail's flat
-            "top" is flush with. The opposite face is the sloped side.
+            Must be face-aligned and orthogonal, with top_face_on_butt_timber set to the
+            face the dovetail's flat "top" is flush with (the opposite face is the sloped side).
         tenon_size: Cross-section of the tenon (X = butt RIGHT axis, Y = butt TOP axis).
         tenon_depth: Depth of the tenon into the receiving timber, measured from the shoulder.
         dovetail_depth: How far the sloped side of the dovetail kicks out over `tenon_depth`.
@@ -1471,7 +1468,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
             entry face (the default). Positive pushes the shoulder deeper into the receiving
             timber.
         wedge_accessory_parameters: If provided, a wedge accessory is added on the
-            `dovetail_top_side_on_butt_timber` side of the tenon and a matching slot is cut
+            `arrangement.top_face_on_butt_timber` side of the tenon and a matching slot is cut
             into the receiving timber.
         relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
             tenon (butt) timber onto the mortise (receiving) timber. Pass None to skip.
@@ -1479,6 +1476,10 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     Returns:
         Joint object with cuts on both timbers and (optionally) a "wedge" accessory.
     """
+    assert arrangement.top_face_on_butt_timber is not None, (
+        "arrangement.top_face_on_butt_timber must be set to determine the dovetail's flat side"
+    )
+    dovetail_top_side_on_butt_timber = arrangement.top_face_on_butt_timber
     tenon_timber = arrangement.butt_timber
     mortise_timber = arrangement.receiving_timber
     tenon_end = arrangement.butt_timber_end
