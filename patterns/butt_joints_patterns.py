@@ -579,8 +579,8 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timb
 
         wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
             wedge_angle=degrees(8),
-            wedge_tip_extra_length=inches(1),
-            wedge_base_extra_length=inches(1),
+            wedge_tip_stickout=inches(1),
+            wedge_back_extra_length=inches(1),
         ),
     )
 

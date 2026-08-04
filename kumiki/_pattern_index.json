@@ -111,7 +111,7 @@
         ]
       },
       "relative_path": "CSG_debug_patterns.py",
-      "sha256": "c21d88e759918a187d217051d620be4d96a3cfe5a9362fa6da84d0e780ba6fed",
+      "sha256": "abdda0d9c1a15995feadfea114479321d78aa1ceba4eaaa08428cb520a944281",
       "warnings": []
     },
     "patterns/basic_joints_patterns.py": {
@@ -421,7 +421,7 @@
         ]
       },
       "relative_path": "butt_joints_patterns.py",
-      "sha256": "bb8b1a4d8d3b7ee891d4b1c6558f4afd70035b5eec06f553a4ac40ff876799ea",
+      "sha256": "b647b729567ecdce97e11efca79912a6dd65a49217357c75a4e21cebc7f24ddd",
       "warnings": []
     },
     "patterns/compound_joints_patterns.py": {
@@ -1117,7 +1117,7 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/horsey_example.py",
-      "sha256": "a1f47cfa7a775de76eb0cb459c9bc6a16330c727a98b3c3f73beef1b52308a44",
+      "sha256": "992358f31c97858457dc40293778c680e2307f42720c86af0c3a916a17be078a",
       "warnings": []
     },
     "patterns/structures/learn_to_timber_frame_shed.py": {
@@ -1231,7 +1231,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-08-04T02:00:03.850631+00:00",
+  "generated_at": "2026-08-04T02:44:19.164061+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

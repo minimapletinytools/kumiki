@@ -396,13 +396,13 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
 
 
         __
-        | \ wedge_tip_extra_length 
+        | \ wedge_tip_stickout
       __|  \____________________ <- wedge_small_height measured at this line
         |   \
         |    \
         |     \
       __|      \________________
-        |       \ wedge_base_extra_length
+        |       \ wedge_back_extra_length
         |________\
         
     
@@ -416,12 +416,10 @@ class DovetailTenonWedgeAccessoryParameters(NamedTuple):
     wedge_from_receiving_timber_side: bool = False
     wedge_angle: Numeric = degrees(10)
     wedge_extra_height: Numeric = 0
-    # the wedge length without extra is just tenon_depth
+    # the wedge length without stickout is just tenon_depth
     # this one can actually be negative which you'll want to do if the tenon is not a through tenon
-    # TODO rename extra_length to stickout
-    wedge_tip_extra_length: Numeric = 0
-    # TODO rename to wedge_back_extra_length
-    wedge_base_extra_length: Numeric = 0
+    wedge_tip_stickout: Numeric = 0
+    wedge_back_extra_length: Numeric = 0
 
 
 def dovetail_tenon_geometry(
@@ -480,11 +478,11 @@ def dovetail_tenon_geometry(
         total_depth = tenon_depth + receiving_timber_mortise_extra_depth
         # If the mortise is shallower than the timber's width in the receiving axis, wedge fit is constrained
         if safe_compare(total_depth, receiving_axis_width, Comparison.LT):
-            wedge_tip_extra_length = getattr(wedge_accessory_parameters, "wedge_tip_extra_length", None)
+            wedge_tip_stickout = getattr(wedge_accessory_parameters, "wedge_tip_stickout", None)
 
-            if wedge_tip_extra_length is not None and safe_compare(wedge_tip_extra_length, receiving_timber_mortise_extra_depth, Comparison.GT):
+            if wedge_tip_stickout is not None and safe_compare(wedge_tip_stickout, receiving_timber_mortise_extra_depth, Comparison.GT):
                 raise AssertionError(
-                    f"wedge_tip_extra_length ({wedge_tip_extra_length}) must be <= receiving_timber_mortise_extra_depth ({receiving_timber_mortise_extra_depth}) for wedge to fit!"
+                    f"wedge_tip_stickout ({wedge_tip_stickout}) must be <= receiving_timber_mortise_extra_depth ({receiving_timber_mortise_extra_depth}) for wedge to fit!"
                 )
             if getattr(wedge_accessory_parameters, "wedge_from_receiving_timber_side", False):
                 raise AssertionError(
@@ -590,11 +588,11 @@ def dovetail_tenon_geometry(
 
     # ---- Wedge accessory (optional) ----
     # The wedge's flat side sits on top of dovetail_top_side_on_butt_timber. Its length is
-    # wedge_base_extra_length + tenon_depth + wedge_tip_extra_length. In the extrusion frame
+    # wedge_back_extra_length + tenon_depth + wedge_tip_stickout. In the extrusion frame
     # (origin = shoulder, +X = into mortise, +Y = out of dovetail_top_side):
     #   - if wedge_from_receiving_timber_side is False, the wedge spec origin is at the shoulder
-    #     (X=0); the base extends "back" by wedge_base_extra (X<0) and the tip extends "forward"
-    #     by wedge_tip_extra past tenon_depth. wedge_small_height is measured at the tenon tip
+    #     (X=0); the base extends "back" by wedge_back_extra (X<0) and the tip extends "forward"
+    #     by wedge_tip_stickout past tenon_depth. wedge_small_height is measured at the tenon tip
     #     (X = tenon_depth).
     #   - if wedge_from_receiving_timber_side is True, the wedge spec origin is on the receiving
     #     timber's far face; the wedge enters from there and points back toward the butt timber.
@@ -607,21 +605,21 @@ def dovetail_tenon_geometry(
         wedge_extra_height = getattr(wedge_accessory_parameters, "wedge_extra_height", 0)
         wedge_small_height_value = dovetail_depth + wedge_extra_height
         wedge_angle = wedge_accessory_parameters.wedge_angle
-        wedge_base_extra = wedge_accessory_parameters.wedge_base_extra_length
-        wedge_tip_extra = wedge_accessory_parameters.wedge_tip_extra_length
+        wedge_back_extra = wedge_accessory_parameters.wedge_back_extra_length
+        wedge_tip_stickout = wedge_accessory_parameters.wedge_tip_stickout
 
         tan_wedge_angle = _sym_tan(wedge_angle)
 
         # Thicknesses at the base (large) and tip (small) ends.
-        # The small_height reference is wedge_tip_extra away from the tip end (toward base),
-        # so distance from base to small_height ref = wedge_base_extra + tenon_depth.
-        h_base = wedge_small_height_value + (wedge_base_extra + tenon_depth) * tan_wedge_angle
-        h_tip = wedge_small_height_value - wedge_tip_extra * tan_wedge_angle
+        # The small_height reference is wedge_tip_stickout away from the tip end (toward base),
+        # so distance from base to small_height ref = wedge_back_extra + tenon_depth.
+        h_base = wedge_small_height_value + (wedge_back_extra + tenon_depth) * tan_wedge_angle
+        h_tip = wedge_small_height_value - wedge_tip_stickout * tan_wedge_angle
 
         if not wedge_accessory_parameters.wedge_from_receiving_timber_side:
             # (0,0) at shoulder; base back, tip forward.
-            x_base = -wedge_base_extra
-            x_tip = tenon_depth + wedge_tip_extra
+            x_base = -wedge_back_extra
+            x_tip = tenon_depth + wedge_tip_stickout
 
             # Only the mortise slot is extended: grow from the base side until
             # the perfect receiving-timber boundary in this axis.
@@ -636,8 +634,8 @@ def dovetail_tenon_geometry(
             receiving_axis_width = arrangement.receiving_timber.get_size_in_face_normal_axis(
                 dovetail_top_side_on_butt_timber.to.face()
             )
-            x_base = receiving_axis_width + wedge_base_extra
-            x_tip = -wedge_tip_extra
+            x_base = receiving_axis_width + wedge_back_extra
+            x_tip = -wedge_tip_stickout
             x_base_slot = max(x_base, receiving_axis_width)
 
         # Profile points (CW in math orientation) in the extrusion frame X-Y plane.
@@ -676,7 +674,7 @@ def dovetail_tenon_geometry(
             if wedge_accessory_parameters.wedge_from_receiving_timber_side
             else into_mortise_dir
         )
-        wedge_length = wedge_base_extra + tenon_depth + wedge_tip_extra
+        wedge_length = wedge_back_extra + tenon_depth + wedge_tip_stickout
         wedge_accessory_csg = CSGAccessory(
             transform=extrusion_transform,
             positive_csg=wedge_positive_csg,

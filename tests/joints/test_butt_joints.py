@@ -987,7 +987,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
             dovetail_depth=dovetail_depth,
             wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
                 wedge_angle=_degrees(8),
-                wedge_base_extra_length=scalar(1, 2),
+                wedge_back_extra_length=scalar(1, 2),
             ),
         )
 
@@ -1057,7 +1057,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         receiving_timber = arrangement.receiving_timber
 
         tenon_depth = scalar(4)
-        base_extra = scalar(1, 2)
+        back_extra = scalar(1, 2)
         dovetail_depth = scalar(1)
 
         shoulder_result = compute_butt_joint_shoulder(
@@ -1075,7 +1075,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
             dovetail_depth=dovetail_depth,
             wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
                 wedge_angle=_degrees(8),
-                wedge_base_extra_length=base_extra,
+                wedge_back_extra_length=back_extra,
             ),
         )
 
@@ -1084,8 +1084,8 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         assert isinstance(wedge.positive_csg, ConvexPolygonExtrusion)
         wedge_x_values = [p[0] for p in wedge.positive_csg.points]
 
-        # Wedge geometry should remain unchanged (base side = -wedge_base_extra).
-        assert min(wedge_x_values) == -base_extra
+        # Wedge geometry should remain unchanged (base side = -wedge_back_extra).
+        assert min(wedge_x_values) == -back_extra
 
         assert isinstance(geo.mortise_negative_csg, SolidUnion)
         slot_candidates = [
@@ -1100,7 +1100,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
 
         into_mortise_dir = shoulder_result.butt_direction
         receiving_perfect_boundary = -receiving_timber.get_size_in_direction_3d(into_mortise_dir)
-        expected_slot_x_base = min(-base_extra, receiving_perfect_boundary)
+        expected_slot_x_base = min(-back_extra, receiving_perfect_boundary)
 
         assert min(wedge_slot_x_values) == expected_slot_x_base
 

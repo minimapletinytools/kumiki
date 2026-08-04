@@ -590,10 +590,10 @@ def example_dovetail_tenon_geometry_raw():
             #wedge_from_receiving_timber_side: bool = False
             #wedge_angle: Numeric = degrees(10)
             #wedge_small_height: Optional[Numeric] = None
-            # the wedge length without extra is just tenon_depth
+            # the wedge length without stickout is just tenon_depth
             # this one can actually be negative which you'll want to do if the tenon is not a through tenon
-            #wedge_tip_extra_length: Numeric = 0
-            #wedge_base_extra_length: Numeric = 0
+            #wedge_tip_stickout: Numeric = 0
+            #wedge_back_extra_length: Numeric = 0
         )
     )
 

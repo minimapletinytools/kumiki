@@ -172,8 +172,8 @@ def create_sawhorse() -> Frame:
     stretcher_tenon_depth = post_size[0] + inches(1)  # through post + 1" stickout
     stretcher_wedge_params = DovetailTenonWedgeAccessoryParameters(
         wedge_from_receiving_timber_side=True,
-        wedge_tip_extra_length=inches(1),
-        wedge_base_extra_length=inches(1),
+        wedge_tip_stickout=inches(1),
+        wedge_back_extra_length=inches(1),
     )
 
     left_post_stretcher_joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
