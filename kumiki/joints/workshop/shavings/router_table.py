@@ -13,12 +13,12 @@ from kumiki.timber import Cutting
 def find_corner_marking_space(arrangement: CornerJointTimberArrangement) -> MarkingSpace:
     # returns the pointy corner position of timber1 on front_face_on_timber1
     # the orientation is looking in the timber1_end direction and standing on front_face_on_timber1
-    pass
+    assert False, "not implemented yet"
 
 
 def set_normal_corner_joint_end_cuts_on_cutting(arrangement : CornerJointTimberArrangement, cutting: Cutting) -> Cutting:
     # set the end cuts the same way you would in plain_miter_joint
-    pass
+    assert False, "not implemented yet"
 
 def route_profile(arrangement: CornerJointTimberArrangement, profile: List[V2]) -> Tuple[ConvexPolygonExtrusion, ConvexPolygonExtrusion]:
 
@@ -32,9 +32,9 @@ def route_profile(arrangement: CornerJointTimberArrangement, profile: List[V2]) 
     # extrude the profile on timber 1 to the face opposite of front_face_on_timber1
     # similar extrude the profile on timber2 across the entire dimension (you will need to figure this out as it may not align with timber1)
 
-    pass
+    assert False, "not implemented yet"
 
 
 def double_rabbet_profile() -> List[V2]:
     # returns a profile for a double rabbet joint
-    pass
+    assert False, "not implemented yet"
