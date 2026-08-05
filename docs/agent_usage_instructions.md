@@ -139,6 +139,25 @@ The `example` function name is special, it is what kigumi will scan for and rend
 
 Supported arguments types added to the `example` function will be displayed in the parametrization section in Kigumi. However remember that since the update flow is agentic, having constants in the example file is often better. All arguments to the `example` function must have default values.
 
+# Code Style Guide
+
+## give timbers descriptive names
+
+Timbers should have descriptive names, typically identifying their purpose and location. Use N/S/W/E convention for location when appropriate, for example "corner_post_NW".
+
+## optionally tag timbers into groups
+
+Timbers can be tagged through their ticket. Timbers on structures often come in sets which share common poperties and each such set should have a tag. For example "posts" "rafter" "corner post" "mudsill" "girt" etc. 
+
+## define varibales for lumber sizes
+
+Avoid inline sizes for timber dimensions. Even if the timber is only used once. Create a clearly variable based on the timber name or tag to define the timber size. 
+Joint configuration paraemters can be inlined if they are used only once. If they are shared across several joints, make them into a variable. 
+
+### be mindful of nominal lumber sizes
+
+Lumber sizes are often specified in nominal dimensions and not their actual dimensions. This will often be the case for standard dimension construction lumber. For example, if the author says "2x4", they are most likely referring to a nominal 2x4 timber which is in actuality closer to 1.5" x 3.5". In general, reduce both nominoal dimension by 0.5" for standard construction lumber to get their acutal dimensions. To make matters a little more confusing, we have the concept of "rough" dimensions in kumiki, which allows the actual dimension of the lumber to be larger than the perfect timber within dimension of the lumber from which all measurements are made. By default, make all timbers perfect (rough and perfect dimensions are the same) unless the users asks otherwise. 
+
 # Validation Workflow
 
 When authoring a frame for the user, always test locally first just by running the python script directly to confirm there are no errors and the logging looks accurate. There are several additional ways you can test and validate the output
