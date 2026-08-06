@@ -112,7 +112,7 @@ class TestButtFamilyFreedoms:
     def test_tongue_and_fork_butt(self, float_mode):
         joint = cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(create_canonical_example_butt_joint_timbers())
 
-        assert_authored_translation(joint.cuttings["tongue_timber"].assembly_freedom, (0, -1, 0))
+        assert_authored_translation(joint.cuttings["tongue_timber"].assembly_freedom, (0, 1, 0))
         assert_opposite_escape_pair(joint, "tongue_timber", "fork_timber")
 
     def test_dropin_dovetail_is_unidirectional(self, float_mode):

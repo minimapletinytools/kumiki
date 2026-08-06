@@ -102,7 +102,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
         receiving_timber=receiving_timber,
         butt_timber_end=TimberEnd.BOTTOM,
     )
-joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
+    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 

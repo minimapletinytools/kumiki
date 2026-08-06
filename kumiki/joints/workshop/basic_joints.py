@@ -156,10 +156,10 @@ def cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     Creates a tongue-and-fork butt joint.
 
     Convenience wrapper around `cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers`. Timbers must be
-    plane-aligned and non-parallel. The receiving (fork) timber is not end-cut.
+    plane-aligned and non-parallel. The receiving (tongue) timber is not end-cut.
 
     Args:
-        arrangement: Butt arrangement where butt_timber is tongue and receiving_timber is fork.
+        arrangement: Butt arrangement where butt_timber is fork and receiving_timber is tongue.
         tongue_thickness: Tongue thickness along shared plane normal. None defaults to 1/3
             of tongue timber dimension in that axis.
         tongue_position: Offset of tongue center from centerline in shared plane normal axis.

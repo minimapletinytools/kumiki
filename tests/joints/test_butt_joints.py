@@ -210,17 +210,18 @@ class TestButtJoint:
 
 
 class TestTongueAndForkButtJoint:
-    def test_tongue_and_fork_butt_joint_structure_and_no_fork_end_cut(self):
+    def test_tongue_and_fork_butt_joint_structure_and_no_tongue_end_cut(self):
         """
-        Verify the butt variant produces the right structure: tongue timber
-        gets an end cut and cheek removal, fork timber gets a slot but NO end cut.
+        Verify the butt variant produces the right structure:
+        - Fork timber (butt timber) gets a slot and an end cut.
+        - Tongue timber (receiving timber) gets cheek removal and NO end cut.
         """
-        tongue_timber = create_standard_horizontal_timber(direction='y', length=100, size=(6, 6), position=(0, 0, 0))
-        fork_timber = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
+        fork_butt_timber = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
+        tongue_rec_timber = create_standard_horizontal_timber(direction='y', length=100, size=(6, 6), position=(0, -50, 0))
 
         arrangement = ButtJointTimberArrangement(
-            butt_timber=tongue_timber,
-            receiving_timber=fork_timber,
+            butt_timber=fork_butt_timber,
+            receiving_timber=tongue_rec_timber,
             butt_timber_end=TimberEnd.TOP,
         )
         joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
@@ -232,14 +233,14 @@ class TestTongueAndForkButtJoint:
         tongue_cut = joint.cuttings["tongue_timber"]
         fork_cut = joint.cuttings["fork_timber"]
 
-        # Tongue timber has cheek removal and an end cut
-        assert tongue_cut.negative_csg is not None
-        assert tongue_cut.get_maybe_top_end_cut() is not None
-
-        # Fork timber has a slot but NO end cut
+        # Fork timber (butt timber) has slot and end cut
         assert fork_cut.negative_csg is not None
-        assert fork_cut.get_maybe_top_end_cut() is None
-        assert fork_cut.get_maybe_bottom_end_cut() is None
+        assert fork_cut.get_maybe_top_end_cut() is not None
+
+        # Tongue timber (receiving timber) has cheek removal but NO end cut
+        assert tongue_cut.negative_csg is not None
+        assert tongue_cut.get_maybe_top_end_cut() is None
+        assert tongue_cut.get_maybe_bottom_end_cut() is None
 
         # Verify cuts produce valid CSG
         tongue_csg = _render_cutting(joint.cuttings["tongue_timber"])
