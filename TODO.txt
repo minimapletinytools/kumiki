@@ -124,13 +124,16 @@ DONE-mortise_clearance_negative_csg computation wrong for tusked mrotise and ten
 
 
 -cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
-  -this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
+  DONE-this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
   -add inset shoulder arg 
 
--add cut_end_mortise_and_tenon_joint
-  -maybe has a different tenon position and sizing args tenon_distance_from_end, and tenon_rel_width which ismeasured in the length axis of the mortise timbe,r and height in the other axiis
-    -change the FAT/PAT morties and tenon joints to use thees sizing args :O
+-update mortise and tenon joint to use relative position tenon parameters (see notes in file)
+-add cut_mortise_and_tenon_jcorner_oint (see notes in file)
 
+
+-consider doing the big 1 joint per file reorg
+  -decide how to reorg examples too...
+  -maybe get ird of folder + example support, examples are always leaf nodes?
 -do joint rename to match what's in your new book
   -add shouder to cross lap joint
 

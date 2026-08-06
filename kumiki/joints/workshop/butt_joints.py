@@ -261,6 +261,7 @@ def cut_plain_butt_joint_on_face_aligned_timbers(arrangement: ButtJointTimberArr
     return cut_plain_butt_joint(arrangement)
 
 
+# TODO DELETE ME
 def cut_plain_butt_joint_on_face_aligned_timbers_DEPRECATED(arrangement: ButtJointTimberArrangement) -> Joint:
     """
     DEPRECATED: Use `cut_plain_butt_joint_on_face_aligned_timbers` instead.
@@ -1148,6 +1149,13 @@ def cut_mortise_and_tenon_joint(
     )
 
 
+
+# TODO deprecate tenon_size (make it optional) and replace with tenon_width_relative_to_joint and tenon_height_relative_to_joint
+# you can make the function work with either or for now, tenon_size is just computed from the other args
+# tenon_width_relative_to_joint: Numeric,
+# tenon_height_relative_to_joint: Numeric,
+# compute tenon_size based on tenon_width_relative_to_joint and tenon_height_relative_to_joint (figure out which axis is which dimension)
+# TODO do the same for face aligned timbers variant
 def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tenon_size: V2,
@@ -1381,6 +1389,37 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
         mortise_shoulder_distance_from_centerline_or_centerplane=mortise_shoulder_distance_from_centerline_or_centerplane,
         use_round_tenon=True,
     )
+
+
+def cut_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
+    arrangement: CornerJointTimberArrangement,
+    tenon_width_relative_to_joint: Numeric,
+    tenon_height_relative_to_joint: Numeric,
+    tenon_length: Numeric,
+    tenon_distance_from_end: Numeric = 0,
+    tenon_lateral_offset: Numeric = 0,
+    mortise_depth: Optional[Numeric] = None,
+    mortise_shoulder_inset: Numeric = scalar(0),
+    peg_parameters: Optional[SimplePegParameters] = None,
+    relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
+) -> Joint:
+    """
+        arrangement: timber1 is the tenon timber, timber2 is the mortise timber, front_face_on_timber1 is the peg entry face
+        tenon_width_relative_to_joint: the "width" of the tenon which is in the axis that's parallel to the joint plane
+        tenon_height_relative_to_joint: the "height" of the tenon which is in the axis that's perpendicular to the joint plane
+        tenon_length: see cut_mortise_and_tenon_joint
+        tenon_distance_from_end: the position of the tenon measured from arrangement.timber2_end, defaults to 0, meaning that the side of the tenon is exposed (i.e. a tongue and fork corner joint)
+        tenon_lateral_offset: lateral offset of the tenon in the axis that's perpendicular to the joint plane, sign is based off the matching local axis of the tenon timber
+        mortise_depth: see cut_mortise_and_tenon_joint
+        mortise_shoulder_inset: see cut_mortise_and_tenon_joint
+        peg_parameters: see cut_mortise_and_tenon_joint
+        relief: see cut_mortise_and_tenon_joint
+    """
+    assert "Not Implemented"
+    #
+    # compute tenon_position based on tenon_distance_from_end and tenon_lateral_offset
+    # call cut_mortise_and_tenon_joint_on_plane_aligned_timbers
+
 
 
 
