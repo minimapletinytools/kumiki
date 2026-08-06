@@ -248,6 +248,21 @@ class TestTongueAndForkButtJoint:
         assert tongue_csg is not None
         assert fork_csg is not None
 
+    def test_tongue_and_fork_butt_joint_angled_end_cut_extends_to_furthest_tip(self):
+        """
+        Verify that for an angled joint, the end cut distance extends further out than
+        the centerline intersection distance to encompass the full angled cut.
+        """
+        from patterns.butt_joints_patterns import make_tongue_and_fork_butt_joint_angled_example
+        cut_timbers = make_tongue_and_fork_butt_joint_angled_example(create_v3(0, 0, 0))
+        fork_cut_timber = [ct for ct in cut_timbers if "butt" in str(ct.timber.ticket)][0]
+        fork_cut = fork_cut_timber.cuts[0]
+
+        assert fork_cut.maybe_bottom_end_cut_distance_from_bottom is not None
+        # At 138 degrees, the furthest tip distance is strictly less (further into joint / further out from top)
+        # than the centerline intersection distance
+        assert safe_compare(fork_cut.maybe_bottom_end_cut_distance_from_bottom, 0, Comparison.LT)
+
 
 
 

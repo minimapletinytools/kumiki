@@ -123,11 +123,17 @@ DONE-tusked mortise and tenon joint
 DONE-mortise_clearance_negative_csg computation wrong for tusked mrotise and tenon joint
 
 
--do joint rename to match what's in your new book
--add shouder to cross lap joint
-
 -cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
   -this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
+  -add inset shoulder arg 
+
+-add cut_end_mortise_and_tenon_joint
+  -maybe has a different tenon position and sizing args tenon_distance_from_end, and tenon_rel_width which ismeasured in the length axis of the mortise timbe,r and height in the other axiis
+    -change the FAT/PAT morties and tenon joints to use thees sizing args :O
+
+-do joint rename to match what's in your new book
+  -add shouder to cross lap joint
+
 
 -furniture joints
   DONE-probably rename t opractice joint

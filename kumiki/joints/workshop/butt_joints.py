@@ -418,18 +418,27 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     assert safe_compare(fork_slot_depth, 0, Comparison.GT), \
         "Fork slot depth must be > 0; check timber arrangement and end selections"
 
-    # -------------------------------------------------------------------------
-    # Fork timber cuts (butt_timber: central slot removed + end cut at far face)
-    # -------------------------------------------------------------------------
+    # Fork slot: bounded at the shoulder by shoulder_half_space so the slot shoulder matches the angle of the receiving timber face
+    shoulder_half_space_global = HalfSpace(
+        normal=-shoulder_plane.normal,
+        offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
+    )
+    shoulder_half_space_local = adopt_csg(None, fork_timber.transform, shoulder_half_space_global)
+
     fork_slot_end_overshoot = max(tongue_timber.size[0], tongue_timber.size[1])
+    fork_slot_back_extension = max(fork_timber.size[0], fork_timber.size[1]) * scalar(2)
     fork_max_cross = max(fork_timber.size[0], fork_timber.size[1]) * scalar(2)
     fork_slot_prism_global = RectangularPrism(
         size=create_v2(fork_max_cross, tongue_thickness),
         transform=marking_space.transform,
-        start_distance=-scalar(0.01),
+        start_distance=-fork_slot_back_extension,
         end_distance=fork_slot_depth + fork_slot_end_overshoot,
     )
-    fork_slot_csg_local = adopt_csg(None, fork_timber.transform, fork_slot_prism_global)
+    fork_slot_prism_local = adopt_csg(None, fork_timber.transform, fork_slot_prism_global)
+    fork_slot_csg_local = Intersection(
+        left=shoulder_half_space_local,
+        right=fork_slot_prism_local,
+    )
 
     fork_end_hs_normal_global = (
         fork_far_face_normal_global
@@ -444,10 +453,24 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         - safe_dot_product(fork_end_hs_normal_global, fork_timber.get_bottom_position_global())
     )
     fork_end_cut = HalfSpace(normal=fork_end_cut_local_normal, offset=fork_end_cut_local_offset)
-    fork_end_cut_distance_from_bottom = safe_dot_product(
-        fork_far_face_point_global - fork_timber.get_bottom_position_global(),
-        fork_timber.get_length_direction_global(),
-    )
+    # Calculate local z coordinates of the 4 cross-section corners on fork_end_cut plane
+    sx = fork_timber.size[0] / scalar(2)
+    sy = fork_timber.size[1] / scalar(2)
+    corners = [(sx, sy), (sx, -sy), (-sx, sy), (-sx, -sy)]
+    nx, ny, nz = fork_end_cut.normal[0], fork_end_cut.normal[1], fork_end_cut.normal[2]
+    
+    z_corners = []
+    if not zero_test(nz):
+        for cx, cy in corners:
+            cz = (fork_end_cut.offset - nx * cx - ny * cy) / nz
+            z_corners.append(cz)
+    else:
+        z_corners = [fork_timber.length / scalar(2)]
+
+    if fork_end == TimberEnd.TOP:
+        fork_end_cut_distance_from_bottom = max(z_corners)
+    else:
+        fork_end_cut_distance_from_bottom = min(z_corners)
 
     fork_negative_csg = CSGUnion(children=[fork_slot_csg_local, fork_end_cut])
 
