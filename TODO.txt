@@ -128,7 +128,7 @@ DONE-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
 
 
 DONE-update mortise and tenon joint to use relative position tenon parameters (see notes in file)
-  -update all patterns to use the new relative paraemteres
+  DONE-update all patterns to use the new relative paraemteres
 -add cut_mortise_and_tenon_corner_oint (see notes in file)
 
 -new notching plan

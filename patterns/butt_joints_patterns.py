@@ -240,13 +240,13 @@ def example_basic_mortise_and_tenon(position=None, use_round_timbers=False):
         position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
-    tenon_size = Matrix([inches(2), inches(2)])
     tenon_length = inches(3)  # 3" long tenon
     mortise_depth = inches(7, 2)  # 3.5" deep mortise (slightly deeper than tenon)
 
     joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
     )
@@ -256,7 +256,8 @@ def example_basic_mortise_and_tenon(position=None, use_round_timbers=False):
 def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_round_timbers=False):
     """
     Basic blind mortise and tenon using cut_mortise_and_tenon_joint_on_face_aligned_timbers.
-    Canonical 4"x5"x4' butt joint timbers, 2"x2" tenon, 3" long, 3.5" deep mortise.
+    Canonical 4"x5"x4' butt joint timbers, 3" wide x 1" tall tenon (relative to the joint
+    plane), 3" long, 3.5" deep mortise.
     """
     if position is None:
         position = create_v3(0, 0, 0)
@@ -267,7 +268,8 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers(position=None, use_r
     )
     return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(7, 2),
     )
@@ -326,7 +328,8 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers(po
 
     return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=round_arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(7, 2),
     )
@@ -339,7 +342,7 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_wedge(position=
 def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(position=None, use_round_timbers=False):
     """
     Through tenon with 3" stickout past the mortise timber, and the tenon offset
-    so that one side of the tenon lines up with the edge of the butt timber.
+    so that one side of the tenon sits near the edge of the butt timber.
 
     Canonical timbers: butt is 4"x5" along +Y, receiving is 4"x5" along +X.
     The butt timber TOP end faces the receiving timber. The tenon enters the
@@ -348,8 +351,8 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(p
 
     tenon_length = half the receiving timber entry dimension + 3" stickout
                  = 5/2 + 3 = 5.5"
-    tenon_position X offset = butt_timber half-width - tenon half-width
-                            = 4/2 - 2/2 = 1"
+    Tenon is 3" wide (relative to the joint plane) x 1" tall, offset 1" from
+    centerline along the width axis.
     """
     if position is None:
         position = create_v3(0, 0, 0)
@@ -360,7 +363,8 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon(p
     )
     return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(11, 2),
         mortise_depth=None,
         tenon_position=Matrix([inches(0), inches(1)]),
@@ -381,7 +385,8 @@ def example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_s
     )
     return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=Matrix([inches(2), inches(2)]),
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(7, 2),
         mortise_shoulder_inset=inches(1, 2),
@@ -500,8 +505,8 @@ def example_mortise_and_tenon_45_degree_relative_tenon_size(position=None, use_r
         arrangement=arrangement,
         tenon_width_relative_to_joint=inches(3),
         tenon_height_relative_to_joint=inches(1),
-        tenon_length=inches(4),
-        mortise_depth=inches(3),
+        tenon_length=inches(3),
+        mortise_depth=inches(4),
     )
 
 
@@ -551,8 +556,9 @@ def example_brace_joint(position=None, use_round_timbers=False):
     )
     
     # Define tenon dimensions (smaller than full timber size)
-    tenon_size = Matrix([inches(2), inches(2)])  # 2" x 2" tenon
-    tenon_length = inches(5) 
+    tenon_width_relative_to_joint = inches(3)  # 3" wide (parallel to the joint plane)
+    tenon_height_relative_to_joint = inches(1)  # 1" tall (perpendicular to the joint plane)
+    tenon_length = inches(5)
     mortise_depth = inches(2) 
 
         
@@ -581,7 +587,8 @@ def example_brace_joint(position=None, use_round_timbers=False):
     )
     joint1 = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement1,
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         peg_parameters=peg_params,
@@ -599,7 +606,8 @@ def example_brace_joint(position=None, use_round_timbers=False):
     )
     joint2 = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement2,
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         peg_parameters=peg_params,
@@ -995,6 +1003,7 @@ def example_compound_angle_offset_parallel_shoulder(position=None, use_round_tim
     )
 
 
+# TODO rename to example_inset_shoulder_angled
 def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
     """
     Mortise and tenon with an inset shoulder, angled.
@@ -1059,13 +1068,13 @@ def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
     return cut_mortise_and_tenon_joint(
         arrangement=arrangement,
         tenon_size=Matrix([inches(2), inches(2)]),
-        tenon_length=inches(4),
-        mortise_depth=inches(3),
+        tenon_length=inches(3),
+        mortise_depth=inches(4),
         mortise_shoulder_distance_from_centerline_or_centerplane=inches(1),
         use_round_tenon=use_round_timbers,
     )
 
-
+# TODO rename to example_inset_shoulder_double_angled
 def example_inset_shoulder_scribe_angled(position=None, use_round_timbers=False):
     """
     Mortise and tenon with an inset shoulder using the SCRIBE style.
@@ -1137,8 +1146,8 @@ def example_inset_shoulder_scribe_angled(position=None, use_round_timbers=False)
     return cut_mortise_and_tenon_joint(
         arrangement=arrangement,
         tenon_size=Matrix([inches(2), inches(2)]),
-        tenon_length=inches(4),
-        mortise_depth=inches(3),
+        tenon_length=inches(3),
+        mortise_depth=inches(4),
         mortise_shoulder_distance_from_centerline_or_centerplane=inches(1),
         use_round_tenon=use_round_timbers,
     )
@@ -1165,7 +1174,7 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_round_face_aligned", lambda_=make_pattern_from_joint(example_round_mortise_and_tenon_on_face_aligned_timbers), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_basic_face_aligned_round_timbers", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_two_round_timbers), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_through_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon), pattern_type='frame'),
-    Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_face_aligned_inset_shoulder", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_double_angled", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_45_degree_relative_tenon_size", lambda_=make_pattern_from_joint(example_mortise_and_tenon_45_degree_relative_tenon_size), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
