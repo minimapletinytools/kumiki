@@ -312,6 +312,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
+    shoulder_inset: Numeric = scalar(0),
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
@@ -328,6 +329,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
             If None, defaults to 1/3 of the receiving timber dimension in that axis.
         tongue_position: Offset of the tongue center from the receiving timber
             centerline along the shared plane normal. 0 means centered.
+        shoulder_inset: Distance from the receiving timber entry face to the shoulder plane,
+            measured perpendicular to the face inward. 0 = shoulder flush with the entry face.
         relief: Scribe-relief configuration for imperfect timbers. Defaults to scribing the
             fork (butt) timber onto the tongue (receiving) timber. Pass None to skip.
 
@@ -379,7 +382,11 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     # Shoulder plane (M&T pattern): compute on tongue (receiving) timber
     # -------------------------------------------------------------------------
     fork_entry_long_face = tongue_timber.get_closest_oriented_long_face_from_global_direction(-fork_end_direction)
-    fork_shoulder_distance = tongue_timber.get_size_in_face_normal_axis(fork_entry_long_face) / scalar(2)
+    fork_shoulder_distance = convert_mortise_shoulder_inset_to_centerline_distance(
+        mortise_shoulder_inset=shoulder_inset,
+        mortise_face=fork_entry_long_face.to.face(),
+        receiving_timber=tongue_timber,
+    )
 
     shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
         arrangement, fork_shoulder_distance
@@ -476,8 +483,14 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     fork_negative_csg = CSGUnion(children=[fork_slot_csg_local, fork_end_cut])
 
     # -------------------------------------------------------------------------
-    # Tongue timber cuts (receiving_timber: 2 cheeks removed)
+    # Tongue timber cuts (receiving_timber: housing + 2 cheeks removed)
     # -------------------------------------------------------------------------
+    shoulder_half_space_tongue_global = HalfSpace(
+        normal=-shoulder_plane.normal,
+        offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
+    )
+    shoulder_half_space_tongue_local = adopt_csg(None, tongue_timber.transform, shoulder_half_space_tongue_global)
+
     overshoot = max(tongue_timber.size[0], tongue_timber.size[1]) * scalar(2)
     tongue_cheek_box_global = RectangularPrism(
         size=create_v2(fork_width_along_tongue, tongue_normal_dimension * scalar(2)),
@@ -485,17 +498,27 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         start_distance=-overshoot,
         end_distance=fork_slot_depth + overshoot,
     )
+    tongue_cheek_box_local = adopt_csg(None, tongue_timber.transform, tongue_cheek_box_global)
+
     tongue_central_prism_global = RectangularPrism(
         size=create_v2(fork_width_along_tongue * scalar(3), tongue_thickness),
         transform=marking_space.transform,
         start_distance=-overshoot * scalar(2),
         end_distance=fork_slot_depth + overshoot * scalar(2),
     )
-    tongue_negative_csg_global = Difference(
-        base=tongue_cheek_box_global,
-        subtract=[tongue_central_prism_global],
+    tongue_central_prism_local = adopt_csg(None, tongue_timber.transform, tongue_central_prism_global)
+
+    # The tongue only exists on the joint side of shoulder_plane (inside shoulder_half_space).
+    # Between entry face and shoulder_plane, the full housing box is removed to house the fork stem.
+    tongue_preserved_local = Intersection(
+        left=shoulder_half_space_tongue_local,
+        right=tongue_central_prism_local,
     )
-    tongue_negative_csg_local = adopt_csg(None, tongue_timber.transform, tongue_negative_csg_global)
+
+    tongue_negative_csg_local = Difference(
+        base=tongue_cheek_box_local,
+        subtract=[tongue_preserved_local],
+    )
 
     # -------------------------------------------------------------------------
     # Assemble cuts and joint
@@ -1415,7 +1438,7 @@ def cut_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
         peg_parameters: see cut_mortise_and_tenon_joint
         relief: see cut_mortise_and_tenon_joint
     """
-    assert "Not Implemented"
+    raise NotImplementedError("Not Implemented")
     #
     # compute tenon_position based on tenon_distance_from_end and tenon_lateral_offset
     # call cut_mortise_and_tenon_joint_on_plane_aligned_timbers

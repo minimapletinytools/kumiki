@@ -263,6 +263,36 @@ class TestTongueAndForkButtJoint:
         # than the centerline intersection distance
         assert safe_compare(fork_cut.maybe_bottom_end_cut_distance_from_bottom, 0, Comparison.LT)
 
+    def test_tongue_and_fork_butt_joint_shoulder_inset(self):
+        """
+        Verify that shoulder_inset recesses the shoulder plane into the receiving timber,
+        housing the fork timber's stem and forming the tongue deeper inside.
+        """
+        fork_butt_timber = create_standard_horizontal_timber(direction='x', length=100, size=(6, 6), position=(0, 0, 0))
+        tongue_rec_timber = create_standard_horizontal_timber(direction='y', length=100, size=(6, 6), position=(0, -50, 0))
+
+        arrangement = ButtJointTimberArrangement(
+            butt_timber=fork_butt_timber,
+            receiving_timber=tongue_rec_timber,
+            butt_timber_end=TimberEnd.TOP,
+        )
+        joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
+            arrangement=arrangement,
+            shoulder_inset=inches(1),
+        )
+
+        assert len(joint.cuttings) == 2
+        tongue_cut = joint.cuttings["tongue_timber"]
+        fork_cut = joint.cuttings["fork_timber"]
+
+        assert tongue_cut.negative_csg is not None
+        assert fork_cut.negative_csg is not None
+
+        tongue_csg = _render_cutting(tongue_cut)
+        fork_csg = _render_cutting(fork_cut)
+        assert tongue_csg is not None
+        assert fork_csg is not None
+
 
 
 

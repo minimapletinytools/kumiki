@@ -63,11 +63,11 @@ def make_tongue_and_fork_butt_joint_90_example(position: V3, use_round_timbers=F
         position=position,
         timber_config=_maybe_round_timber_config(use_round_timbers),
     )
-    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
+    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement, shoulder_inset = inches(1))
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
-def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
+def make_tongue_and_fork_butt_joint_angled_inset_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
     """
     Create a tongue-and-fork butt joint at 138 degrees.
     The butt (tongue) timber approaches the receiving (fork) timber at an angle.
@@ -102,7 +102,7 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
         receiving_timber=receiving_timber,
         butt_timber_end=TimberEnd.BOTTOM,
     )
-    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
+    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement, shoulder_inset = inches(1))
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
@@ -1087,7 +1087,7 @@ def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
     step = inches(24)
     all_timbers = []
     all_timbers += make_tongue_and_fork_butt_joint_90_example(origin, use_round_timbers)
-    all_timbers += make_tongue_and_fork_butt_joint_angled_example(origin + create_v3(step, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_tongue_and_fork_butt_joint_angled_inset_example(origin + create_v3(step, scalar(0), scalar(0)), use_round_timbers)
     all_timbers += make_butt_joint_example(origin + create_v3(step * 2, scalar(0), scalar(0)), use_round_timbers)
     all_timbers += make_butt_joint_3d_angles_example(origin + create_v3(step * 3, scalar(0), scalar(0)), use_round_timbers)
     return Frame(cut_timbers=all_timbers, name="Butt Joint Patterns")
@@ -1095,7 +1095,7 @@ def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
 
 patterns = [
     Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_90", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_90_example, "Tongue and Fork Butt Joint 90°"), pattern_type='frame', tags=['main']),
-    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_angled_example, "Tongue and Fork Butt Joint (Angled)"), pattern_type='frame'),
+    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_angled_inset_example, "Tongue and Fork Butt Joint (Angled + Inset)"), pattern_type='frame'),
     Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint", lambda_=_make_frame_pattern(make_butt_joint_example, "Plain Butt Joint"), pattern_type='frame'),
     Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint_3d", lambda_=_make_frame_pattern(make_butt_joint_3d_angles_example, "Plain Butt Joint (3D)"), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_basic", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon), pattern_type='frame'),

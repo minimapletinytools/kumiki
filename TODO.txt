@@ -122,10 +122,15 @@ DONE-do the top_face_on_butt_timber thing for the half dovetail wedged mortise a
 DONE-tusked mortise and tenon joint
 DONE-mortise_clearance_negative_csg computation wrong for tusked mrotise and tenon joint
 
-
--cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
+DONE-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
   DONE-this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
-  -add inset shoulder arg 
+  DONE-add inset shoulder arg 
+
+  
+-add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber
+-add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
+
+
 
 -update mortise and tenon joint to use relative position tenon parameters (see notes in file)
 -add cut_mortise_and_tenon_jcorner_oint (see notes in file)

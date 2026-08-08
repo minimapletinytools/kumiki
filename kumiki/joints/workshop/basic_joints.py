@@ -151,6 +151,7 @@ def cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     tongue_thickness: Optional[Numeric] = None,
     tongue_position: Numeric = scalar(0),
+    shoulder_inset: Numeric = scalar(0),
 ) -> Joint:
     """
     Creates a tongue-and-fork butt joint.
@@ -163,6 +164,7 @@ def cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         tongue_thickness: Tongue thickness along shared plane normal. None defaults to 1/3
             of tongue timber dimension in that axis.
         tongue_position: Offset of tongue center from centerline in shared plane normal axis.
+        shoulder_inset: Distance from receiving timber entry face to shoulder plane.
 
     Returns:
         Joint object containing both cut timbers.
@@ -173,6 +175,7 @@ def cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tongue_thickness=tongue_thickness,
         tongue_position=tongue_position,
+        shoulder_inset=shoulder_inset,
     )
 
 
