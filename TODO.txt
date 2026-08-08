@@ -129,12 +129,13 @@ DONE-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
 
 DONE-update mortise and tenon joint to use relative position tenon parameters (see notes in file)
   DONE-update all patterns to use the new relative paraemteres
--add cut_mortise_and_tenon_corner_oint (see notes in file)
+DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
 
 -new notching plan
   -update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
   -add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber, you can modify make chop_shoulder_notch_on_timber_face into an internal function and then call it from teh new one.
   -add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
+  -FAT/PAT mortise and tenon joints now allow notched style and do it themselves rather than pass arg to parent
 
 
 -consider doing the big 1 joint per file reorg
@@ -171,7 +172,7 @@ DONE-update mortise and tenon joint to use relative position tenon parameters (s
  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
 -add relief imple for DropinButtJointSweepScribeReliefConfig D:
 -reimplement tongue and fork using mortise and tenon (make a short vid about this)
-  the current tongue and fork joint does not suport pegs which seems strange since a tongue and fork joint is just a simplified mortise an tenon joint. I wanted them as 2 as separate functions to simplify things, however they don't need 2 separate implementations as they do right now. "Please reimplement tongue and fork joint using cut_mortise_and_tenon_joint_on_plane_aligned_timbers, in addition, add support for pegs while you do this"
+  the current tongue and fork joint does not suport pegs which eems strange since a tongue and fork joint is just a simplified mortise an tenon joint. I wanted them as 2 as separate functions to simplify things, however they don't need 2 separate implementations as they do right now. "Please reimplement tongue and fork joint using cut_mortise_and_tenon_joint_on_plane_aligned_timbers, in addition, add support for pegs while you do this"
 -create test runner for examples so the exmaples are also tests :O
 -test frame scanning fixes
 -test the install cadquery stuff 

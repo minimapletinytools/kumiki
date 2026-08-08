@@ -1486,7 +1486,7 @@ def cut_round_mortise_and_tenon_joint_on_plane_aligned_timbers(
     )
 
 
-def cut_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
+def cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
     arrangement: CornerJointTimberArrangement,
     tenon_width_relative_to_joint: Numeric,
     tenon_height_relative_to_joint: Numeric,
@@ -1503,17 +1503,116 @@ def cut_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
         tenon_width_relative_to_joint: the "width" of the tenon which is in the axis that's parallel to the joint plane
         tenon_height_relative_to_joint: the "height" of the tenon which is in the axis that's perpendicular to the joint plane
         tenon_length: see cut_mortise_and_tenon_joint
-        tenon_distance_from_end: the position of the tenon measured from arrangement.timber2_end, defaults to 0, meaning that the side of the tenon is exposed (i.e. a tongue and fork corner joint)
+        tenon_distance_from_end: distance, along the axis parallel to the joint plane, from the face on
+            timber1 (the tenon timber) that aligns with timber2's end face to the near edge of the
+            tenon. Defaults to 0, meaning the tenon sits flush with that face -- the side of the tenon
+            is exposed, i.e. a tongue and fork corner joint. Positive values inset the tenon, leaving a
+            "horn" of timber2 material past the joint on that side (a blind mortise corner joint).
         tenon_lateral_offset: lateral offset of the tenon in the axis that's perpendicular to the joint plane, sign is based off the matching local axis of the tenon timber
         mortise_depth: see cut_mortise_and_tenon_joint
         mortise_shoulder_inset: see cut_mortise_and_tenon_joint
         peg_parameters: see cut_mortise_and_tenon_joint
         relief: see cut_mortise_and_tenon_joint
+
+    Raises:
+        KumikiArrangementError: If the arrangement is not plane-aligned.
     """
-    raise NotImplementedError("Not Implemented")
-    #
-    # call cut_mortise_and_tenon_joint_on_plane_aligned_timbers
-    # add 2 maybe end cuts based on the perfect dimension of the timbers, so the tenon timber gets a maybe end cut to the opposing face oof the tenon on the receiving timber, and vise versa for the mortise timber
+    require_check(arrangement.check_plane_aligned())
+
+    tenon_timber = arrangement.timber1
+    mortise_timber = arrangement.timber2
+    tenon_end = arrangement.timber1_end
+    mortise_end = arrangement.timber2_end
+
+    # -------------------------------------------------------------------------
+    # tenon_position: width-axis component (parallel to the joint plane) is
+    # derived from tenon_distance_from_end, measured from the tenon timber's
+    # own face that aligns with the mortise timber's end face. Height-axis
+    # component (perpendicular to the joint plane) is tenon_lateral_offset directly.
+    # -------------------------------------------------------------------------
+    joint_plane_normal = arrangement.compute_normalized_timber_cross_product()
+    height_face = tenon_timber.get_closest_oriented_long_face_from_global_direction(joint_plane_normal)
+    height_index = tenon_timber.get_size_index_in_long_face_normal_axis(height_face)
+    width_index = 1 - height_index
+
+    mortise_end_direction = mortise_timber.get_face_direction_global(mortise_end)
+    width_axis_positive_direction = (
+        tenon_timber.get_width_direction_global() if width_index == 0 else tenon_timber.get_height_direction_global()
+    )
+    width_sign = scalar(1) if safe_dot_product(mortise_end_direction, width_axis_positive_direction) > 0 else scalar(-1)
+
+    half_tenon_timber_width = tenon_timber.size[width_index] / scalar(2)
+    tenon_width_position = width_sign * (
+        half_tenon_timber_width - tenon_distance_from_end - tenon_width_relative_to_joint / scalar(2)
+    )
+
+    tenon_position_components: List[Optional[Numeric]] = [None, None]
+    tenon_position_components[width_index] = tenon_width_position
+    tenon_position_components[height_index] = tenon_lateral_offset
+    tenon_position = Matrix(tenon_position_components)
+
+    butt_arrangement = ButtJointTimberArrangement(
+        butt_timber=tenon_timber,
+        receiving_timber=mortise_timber,
+        butt_timber_end=tenon_end,
+        front_face_on_butt_timber=arrangement.front_face_on_timber1,
+    )
+
+    joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=butt_arrangement,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
+        tenon_length=tenon_length,
+        tenon_position=tenon_position,
+        mortise_depth=mortise_depth,
+        mortise_shoulder_inset=mortise_shoulder_inset,
+        peg_parameters=peg_parameters,
+        relief=relief,
+    )
+
+    # -------------------------------------------------------------------------
+    # Corner end cuts: each timber's own stock is trimmed flush with the
+    # opposing timber's outer (far) face, so neither timber's material
+    # protrudes past the other's boundary at the corner.
+    # -------------------------------------------------------------------------
+    tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
+    mortise_entry_long_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(-tenon_end_direction)
+    mortise_far_face = mortise_entry_long_face.to.face().get_opposite_face()
+    mortise_far_face_point_global = get_center_point_on_face_global(mortise_far_face, mortise_timber)
+
+    tenon_end_cut_distance_from_bottom = safe_dot_product(
+        mortise_far_face_point_global - tenon_timber.get_bottom_position_global(),
+        tenon_timber.get_length_direction_global(),
+    )
+
+    tenon_entry_long_face = tenon_timber.get_closest_oriented_long_face_from_global_direction(-mortise_end_direction)
+    tenon_far_face = tenon_entry_long_face.to.face().get_opposite_face()
+    tenon_far_face_point_global = get_center_point_on_face_global(tenon_far_face, tenon_timber)
+
+    mortise_end_cut_distance_from_bottom = safe_dot_product(
+        tenon_far_face_point_global - mortise_timber.get_bottom_position_global(),
+        mortise_timber.get_length_direction_global(),
+    )
+
+    tenon_cutting = replace(
+        joint.cuttings[tenon_timber.ticket.path],
+        maybe_top_end_cut_distance_from_bottom=tenon_end_cut_distance_from_bottom if tenon_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=tenon_end_cut_distance_from_bottom if tenon_end == TimberEnd.BOTTOM else None,
+    )
+    mortise_cutting = replace(
+        joint.cuttings[mortise_timber.ticket.path],
+        maybe_top_end_cut_distance_from_bottom=mortise_end_cut_distance_from_bottom if mortise_end == TimberEnd.TOP else None,
+        maybe_bottom_end_cut_distance_from_bottom=mortise_end_cut_distance_from_bottom if mortise_end == TimberEnd.BOTTOM else None,
+    )
+
+    return replace(
+        joint,
+        cuttings={
+            tenon_timber.ticket.path: tenon_cutting,
+            mortise_timber.ticket.path: mortise_cutting,
+        },
+        ticket=JointTicket(joint_type="mortise_and_tenon_corner"),
+    )
 
 
 

@@ -620,6 +620,36 @@ def example_brace_joint(position=None, use_round_timbers=False):
     return Frame.from_joints([miter_joint, joint1, joint2], name="Brace Joint with Mortise and Tenon")
 
 
+# NOTE: cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers is not yet implemented
+# (see kumiki/joints/workshop/butt_joints.py); this pattern is here to drive that work.
+# TODO: once patterns get reorganized into per-joint-family folders, this belongs in a
+# corner_joints patterns module rather than here (path is already namespaced accordingly).
+def example_mortise_and_tenon_corner_joint(position=None, use_round_timbers=False):
+    """
+    Corner mortise and tenon joint via cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers.
+
+    Canonical right-angle corner arrangement: timber1 (tenon) points +Y, timber2
+    (mortise) points +X, meeting at their BOTTOM ends, both 4"x5"x4'.
+
+    Tenon is 3" wide (parallel to the joint plane) x 1" tall (perpendicular to the
+    joint plane). tenon_distance_from_end defaults to 0, so the tenon sits flush
+    with timber2's end -- a tongue-and-fork style corner joint.
+    """
+    if position is None:
+        position = create_v3(0, 0, 0)
+
+    arrangement = create_canonical_example_right_angle_corner_joint_timbers(
+        position,
+        timber_config=_maybe_round_timber_config(use_round_timbers),
+    )
+
+    return cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
+        tenon_length=inches(3),
+        mortise_depth=inches(4),
+    )
 
 
 def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timbers=False):
@@ -1179,6 +1209,10 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_45_degree_relative_tenon_size", lambda_=make_pattern_from_joint(example_mortise_and_tenon_45_degree_relative_tenon_size), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),
+    # cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers is not implemented yet; kept
+    # under butt_joints_patterns.py for now (see NOTE on example_mortise_and_tenon_corner_joint),
+    # but namespaced under corner_joints/ since that's where it belongs.
+    Pattern(path="corner_joints/mortise_and_tenon_corner_joint/mortise_and_tenon_corner_joint", lambda_=make_pattern_from_joint(example_mortise_and_tenon_corner_joint), pattern_type='frame'),
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dropin_housed_butt_joint_example), pattern_type='frame'),

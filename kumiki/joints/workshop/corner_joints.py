@@ -338,7 +338,7 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
 ) -> Joint:
     """
     Creates a plain tongue-and-fork corner joint (corner bridle style).
-    Note, you can make an identical joint with cut_mortise_and_tenon_corner_joint_on_plane_aligned_timbers setting tenon_distance_from_end to 0
+    Note, you can make an identical joint with cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers setting tenon_distance_from_end to 0
 
     In this joint, timber1 forms the tongue (material removed on both cheeks), and timber2
     forms the fork (slot cut into its end). Tongue thickness is measured along the shared
