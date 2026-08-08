@@ -934,9 +934,7 @@ def cut_mortise_and_tenon_joint(
     # (when shoulder is inset from the mortise entry face)
     # -------------------------------------------------------------------------
 
-    # SCRIBE style: instead of cutting a housing notch, scribe the tenon
-    # timber's full cross-section onto the mortise timber.  The region to
-    # remove from the mortise timber is the intersection of the tenon timber's
+    # The region to remove from the mortise timber is the intersection of the tenon timber's
     # perfect representation with the mortise-side of the shoulder plane.
     #
     # shoulder_half_space_global has normal = -shoulder_plane.normal, so

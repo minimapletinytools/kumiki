@@ -126,14 +126,14 @@ DONE-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
   DONE-this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
   DONE-add inset shoulder arg 
 
-  
--add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber
--add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
-
-
 
 -update mortise and tenon joint to use relative position tenon parameters (see notes in file)
 -add cut_mortise_and_tenon_jcorner_oint (see notes in file)
+
+-new notching plan
+  -update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
+  -add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber, you can modify make chop_shoulder_notch_on_timber_face into an internal function and then call it from teh new one.
+  -add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
 
 
 -consider doing the big 1 joint per file reorg

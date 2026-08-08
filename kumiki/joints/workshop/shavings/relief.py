@@ -591,6 +591,7 @@ def chop_shoulder_notch_aligned_with_timber(
     return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
 
 
+# TODO make internal _chop_shoulder_notch_on_timber_face 
 def chop_shoulder_notch_on_timber_face(
     timber: TimberLike,
     # TODO TimberLongFace
@@ -738,6 +739,35 @@ def chop_shoulder_notch_on_timber_face(
 
     return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
 
+
+def chop_butt_joint_shoulder_notch_on_plane_aligned_timbers_2sided(
+    arrangement: ButtJointTimberArrangement,
+    notch_angle: Optional[Numeric] = None
+):
+    """
+    almost identical to chop_shoulder_notch_on_timber_face except assumes plane aligned
+    
+
+    replaces both chop_shoulder_notch_* functions
+    """
+    assert "Not Implemented"
+
+    error = arrangement.check_plane_aligned()
+    assert error is None, error
+
+    #assert given notch angle is <= 1/2*approach angle or set it to 1/2*approach angle
+
+
+def chop_butt_joint_shoulder_4sided(
+    arrangement: ButtJointTimberArrangement,
+    notch_wall_relief_cut_angle: Optional[Numeric] = None
+):
+    """
+
+
+    replaces both chop_shoulder_notch_* functions
+    """
+    assert "Not Implemented"
 
 
 @dataclass(frozen=True)
