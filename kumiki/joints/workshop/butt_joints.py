@@ -1512,8 +1512,8 @@ def cut_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
     """
     raise NotImplementedError("Not Implemented")
     #
-    # compute tenon_position based on tenon_distance_from_end and tenon_lateral_offset
     # call cut_mortise_and_tenon_joint_on_plane_aligned_timbers
+    # add 2 maybe end cuts based on the perfect dimension of the timbers, so the tenon timber gets a maybe end cut to the opposing face oof the tenon on the receiving timber, and vise versa for the mortise timber
 
 
 
