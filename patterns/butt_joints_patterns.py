@@ -443,6 +443,68 @@ def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=Fal
     )
 
 
+def example_mortise_and_tenon_45_degree_relative_tenon_size(position=None, use_round_timbers=False):
+    """
+    Mortise and tenon on plane-aligned timbers, tenon timber approaching at 45
+    degrees (in the XY plane) via cut_mortise_and_tenon_joint_on_plane_aligned_timbers.
+
+    Demonstrates tenon_width_relative_to_joint / tenon_height_relative_to_joint instead
+    of tenon_size: the tenon is 3" wide along the axis parallel to the shared joint
+    plane, and 1" tall along the axis perpendicular to it.
+    """
+    from sympy import sin, cos, pi
+
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+
+    timber_size = create_v2(inches(4), inches(5))
+    timber_length = inches(48)
+
+    # Receiving (mortise) timber: runs along +X, centered at position
+    mortise_timber = create_timber(
+        length=timber_length,
+        size=timber_size,
+        bottom_position=position + create_v3(-timber_length / scalar(2), scalar(0), scalar(0)),
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="mortise",
+    )
+
+    # Tenon timber: approaches from below at 45 degrees from the Y axis in the XY plane.
+    # Direction: (sin45, cos45, 0)
+    angle = pi / scalar(4)  # 45 degrees
+    tenon_dir = normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
+    tenon_width_dir = normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
+
+    tenon_bottom = position - tenon_dir * timber_length
+    tenon_timber = create_timber(
+        length=timber_length,
+        size=timber_size,
+        bottom_position=tenon_bottom,
+        length_direction=tenon_dir,
+        width_direction=tenon_width_dir,
+        ticket="tenon",
+    )
+
+    mortise_timber = _maybe_round_timber(mortise_timber, use_round_timbers)
+    tenon_timber = _maybe_round_timber(tenon_timber, use_round_timbers)
+
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=tenon_timber,
+        receiving_timber=mortise_timber,
+        butt_timber_end=TimberEnd.TOP,
+        front_face_on_butt_timber=TimberLongFace.FRONT,
+    )
+
+    return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
+        tenon_length=inches(4),
+        mortise_depth=inches(3),
+    )
+
+
 def example_brace_joint(position=None, use_round_timbers=False):
     """
     Create a brace joint with mortise and tenon connections.
@@ -1105,6 +1167,7 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_through_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_through_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_on_face_aligned_timbers_with_inset_mortise_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_double_angled", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_45_degree_relative_tenon_size", lambda_=make_pattern_from_joint(example_mortise_and_tenon_45_degree_relative_tenon_size), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),

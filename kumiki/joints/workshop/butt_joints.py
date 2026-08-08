@@ -962,8 +962,6 @@ def cut_mortise_and_tenon_joint(
         scribe_csg_mortise_local = adopt_csg(None, mortise_timber.transform, scribe_csg_global)
         shoulder_notch_relief_geom: ShoulderReliefCSGGeometry | None = ShoulderReliefCSGGeometry(
             receiving_timber_notch_negative_CSG=scribe_csg_mortise_local,
-            # No additional relief cut on the tenon timber for scribe style;
-            # the scribe IS the interface — the tenon prism fits exactly.
             butting_timber_relief_negative_CSG=None,
         )
     else:
@@ -1171,16 +1169,61 @@ def cut_mortise_and_tenon_joint(
 
 
 
-# TODO deprecate tenon_size (make it optional) and replace with tenon_width_relative_to_joint and tenon_height_relative_to_joint
-# you can make the function work with either or for now, tenon_size is just computed from the other args
-# tenon_width_relative_to_joint: Numeric,
-# tenon_height_relative_to_joint: Numeric,
-# compute tenon_size based on tenon_width_relative_to_joint and tenon_height_relative_to_joint (figure out which axis is which dimension)
-# TODO do the same for face aligned timbers variant
+def _resolve_tenon_size_relative_to_joint(
+    arrangement: ButtJointTimberArrangement,
+    tenon_size: Optional[V2],
+    tenon_width_relative_to_joint: Optional[Numeric],
+    tenon_height_relative_to_joint: Optional[Numeric],
+) -> V2:
+    """
+    Resolve a tenon's (X, Y) cross-sectional size, either from the raw local-space
+    tenon_size or from the joint-relative width/height pair.
+
+    tenon_width_relative_to_joint is the tenon dimension along the axis parallel to
+    the joint plane (the plane the two arrangement timbers share); tenon_height_relative_to_joint
+    is the dimension along the axis perpendicular to that plane. Exactly one of
+    tenon_size or the (width, height) pair must be provided.
+    """
+    has_relative_pair = tenon_width_relative_to_joint is not None or tenon_height_relative_to_joint is not None
+    require_check(
+        None if (tenon_width_relative_to_joint is None) == (tenon_height_relative_to_joint is None)
+        else "tenon_width_relative_to_joint and tenon_height_relative_to_joint must be provided together"
+    )
+    require_check(
+        None if tenon_size is None or not has_relative_pair
+        else "Provide either tenon_size or (tenon_width_relative_to_joint and tenon_height_relative_to_joint), not both"
+    )
+    require_check(
+        None if tenon_size is not None or has_relative_pair
+        else "Must provide either tenon_size or (tenon_width_relative_to_joint and tenon_height_relative_to_joint)"
+    )
+
+    if tenon_size is not None:
+        warnings.warn(
+            "tenon_size is deprecated in favor of tenon_width_relative_to_joint and "
+            "tenon_height_relative_to_joint, which size the tenon relative to the joint "
+            "plane instead of the tenon timber's local X/Y axes.",
+            stacklevel=3,
+        )
+        return tenon_size
+
+    joint_plane_normal = arrangement.compute_normalized_timber_cross_product()
+    height_face = arrangement.butt_timber.get_closest_oriented_long_face_from_global_direction(joint_plane_normal)
+    height_index = arrangement.butt_timber.get_size_index_in_long_face_normal_axis(height_face)
+    width_index = 1 - height_index
+
+    resolved_size: List[Optional[Numeric]] = [None, None]
+    resolved_size[height_index] = tenon_height_relative_to_joint
+    resolved_size[width_index] = tenon_width_relative_to_joint
+    return Matrix(resolved_size)
+
+
 def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
-    tenon_size: V2,
     tenon_length: Numeric,
+    tenon_size: Optional[V2] = None,
+    tenon_width_relative_to_joint: Optional[Numeric] = None,
+    tenon_height_relative_to_joint: Optional[Numeric] = None,
     mortise_depth: Optional[Numeric] = None,
     tenon_position: Optional[V2] = None,
     mortise_shoulder_inset: Numeric = scalar(0),
@@ -1204,9 +1247,17 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
     Args:
         arrangement: Butt joint timber arrangement (butt_timber = tenon, receiving_timber = mortise).
             Must satisfy arrangement.check_plane_aligned().
-        tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
         tenon_length: Length of the tenon extending from the mortise entry face. For angled
             joints, set this slightly longer than expected.
+        tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
+            Deprecated in favor of tenon_width_relative_to_joint / tenon_height_relative_to_joint;
+            provide this or that pair, not both.
+        tenon_width_relative_to_joint: Tenon dimension along the axis parallel to the joint
+            plane (the plane shared by the two arrangement timbers). Must be provided together
+            with tenon_height_relative_to_joint, and only when tenon_size is not provided.
+        tenon_height_relative_to_joint: Tenon dimension along the axis perpendicular to the
+            joint plane. Must be provided together with tenon_width_relative_to_joint, and only
+            when tenon_size is not provided.
         mortise_depth: Depth of the mortise (None = through mortise, only valid when
             bore_mortise_perpendicular_to_face is False).
         tenon_position: Offset of the tenon center from the timber centerline in the tenon's
@@ -1226,9 +1277,18 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
     Raises:
         CheckFailure: If the arrangement is not plane-aligned.
+        KumikiArrangementError: If tenon sizing args are not provided as exactly one of
+            tenon_size or (tenon_width_relative_to_joint, tenon_height_relative_to_joint).
     """
 
     require_check(arrangement.check_plane_aligned())
+
+    tenon_size = _resolve_tenon_size_relative_to_joint(
+        arrangement=arrangement,
+        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
+    )
 
     # -------------------------------------------------------------------------
     # Step 2: Determine which face of the mortise timber the tenon enters from
@@ -1264,8 +1324,10 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
 def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
-    tenon_size: V2,
     tenon_length: Numeric,
+    tenon_size: Optional[V2] = None,
+    tenon_width_relative_to_joint: Optional[Numeric] = None,
+    tenon_height_relative_to_joint: Optional[Numeric] = None,
     mortise_depth: Optional[Numeric] = None,
     tenon_position: Optional[V2] = None,
     mortise_shoulder_inset: Numeric = scalar(0),
@@ -1288,8 +1350,16 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     Args:
         arrangement: Butt joint timber arrangement (butt_timber = tenon, receiving_timber = mortise).
             Must satisfy arrangement.check_face_aligned_and_orthogonal().
-        tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
         tenon_length: Length of the tenon extending from the mortise entry face.
+        tenon_size: Cross-sectional size of the tenon (X, Y) in the tenon timber's local space.
+            Deprecated in favor of tenon_width_relative_to_joint / tenon_height_relative_to_joint;
+            provide this or that pair, not both.
+        tenon_width_relative_to_joint: Tenon dimension along the axis parallel to the joint
+            plane (the plane shared by the two arrangement timbers). Must be provided together
+            with tenon_height_relative_to_joint, and only when tenon_size is not provided.
+        tenon_height_relative_to_joint: Tenon dimension along the axis perpendicular to the
+            joint plane. Must be provided together with tenon_width_relative_to_joint, and only
+            when tenon_size is not provided.
         mortise_depth: Depth of the mortise (None = through mortise).
         tenon_position: Offset of the tenon center from the timber centerline in the tenon's
             local cross-section. (0, 0) = centered on the centerline.
@@ -1305,6 +1375,8 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
 
     Raises:
         CheckFailure: If the arrangement is not face-aligned and orthogonal.
+        KumikiArrangementError: If tenon sizing args are not provided as exactly one of
+            tenon_size or (tenon_width_relative_to_joint, tenon_height_relative_to_joint).
     """
 
     require_check(arrangement.check_face_aligned_and_orthogonal())
@@ -1312,6 +1384,8 @@ def cut_mortise_and_tenon_joint_on_face_aligned_timbers(
     return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         arrangement=arrangement,
         tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_position,
@@ -2009,6 +2083,7 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     marking_receiving = mark_distance_from_end_along_centerline(dovetail_centerline, receiving_timber)
     receiving_timber_notch_center = marking_receiving.distance
 
+    # TODO do a scribe style relief instead of using chop_shoulder_notch_on_timber_face same as you did with mortise and tenon joint
     # Create shoulder notch if inset is specified
     if receiving_timber_shoulder_inset > 0:
         # Notch dimensions match the dovetail timber's cross-section at the housing

@@ -127,8 +127,9 @@ DONE-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
   DONE-add inset shoulder arg 
 
 
--update mortise and tenon joint to use relative position tenon parameters (see notes in file)
--add cut_mortise_and_tenon_jcorner_oint (see notes in file)
+DONE-update mortise and tenon joint to use relative position tenon parameters (see notes in file)
+  -update all patterns to use the new relative paraemteres
+-add cut_mortise_and_tenon_corner_oint (see notes in file)
 
 -new notching plan
   -update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)

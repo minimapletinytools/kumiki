@@ -518,6 +518,77 @@ class TestMortiseAndTenonGeometry:
 
 
 
+class TestMortiseAndTenonRelativeTenonSizing:
+
+    def test_relative_sizing_matches_equivalent_tenon_size(self, simple_T_configuration):
+        """tenon_width/height_relative_to_joint should produce the same cut geometry
+        as the equivalent explicit tenon_size, with width mapped to the axis parallel
+        to the joint plane and height mapped to the axis perpendicular to it.
+
+        For this face-aligned T-configuration (vertical tenon into horizontal mortise
+        along the mortise's length axis), the joint plane is the tenon's XZ plane, so
+        width -> tenon local X (tenon_size[0]) and height -> tenon local Y (tenon_size[1]).
+        """
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        with pytest.warns(UserWarning, match="deprecated"):
+            joint_explicit = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=arrangement,
+                tenon_size=Matrix([scalar(1), scalar(2)]),
+                tenon_length=scalar(4),
+                mortise_depth=scalar(5),
+            )
+        joint_relative = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            tenon_width_relative_to_joint=scalar(1),
+            tenon_height_relative_to_joint=scalar(2),
+            tenon_length=scalar(4),
+            mortise_depth=scalar(5),
+        )
+
+        assert joint_explicit.cuttings["tenon_timber"].negative_csg == joint_relative.cuttings["tenon_timber"].negative_csg
+        assert joint_explicit.cuttings["mortise_timber"].negative_csg == joint_relative.cuttings["mortise_timber"].negative_csg
+
+    def test_relative_sizing_requires_exactly_one_form(self, simple_T_configuration):
+        """Exactly one of tenon_size or the (width, height) pair must be given."""
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        # Neither provided
+        with pytest.raises(KumikiArrangementError):
+            cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=arrangement,
+                tenon_length=scalar(4),
+            )
+
+        # Only one of the relative pair provided
+        with pytest.raises(KumikiArrangementError):
+            cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=arrangement,
+                tenon_width_relative_to_joint=scalar(1),
+                tenon_length=scalar(4),
+            )
+
+        # Both tenon_size and the relative pair provided
+        with pytest.raises(KumikiArrangementError):
+            cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=arrangement,
+                tenon_size=Matrix([scalar(1), scalar(2)]),
+                tenon_width_relative_to_joint=scalar(1),
+                tenon_height_relative_to_joint=scalar(2),
+                tenon_length=scalar(4),
+            )
+
+
 # ============================================================================
 # Tests for Peg Orientation
 # ============================================================================
