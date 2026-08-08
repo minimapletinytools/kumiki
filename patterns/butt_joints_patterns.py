@@ -649,6 +649,9 @@ def example_mortise_and_tenon_corner_joint(position=None, use_round_timbers=Fals
         tenon_height_relative_to_joint=inches(1),
         tenon_length=inches(3),
         mortise_depth=inches(4),
+        # setting this to zero means the tenon is exposed at the end!!
+        tenon_distance_from_end = inches(0), 
+        tenon_lateral_offset = inches(1)
     )
 
 
@@ -1212,7 +1215,7 @@ patterns = [
     # cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers is not implemented yet; kept
     # under butt_joints_patterns.py for now (see NOTE on example_mortise_and_tenon_corner_joint),
     # but namespaced under corner_joints/ since that's where it belongs.
-    Pattern(path="corner_joints/mortise_and_tenon_corner_joint/mortise_and_tenon_corner_joint", lambda_=make_pattern_from_joint(example_mortise_and_tenon_corner_joint), pattern_type='frame'),
+    Pattern(path="corner_joints/mortise_and_tenon/mortise_and_tenon_corner_joint", lambda_=make_pattern_from_joint(example_mortise_and_tenon_corner_joint), pattern_type='frame'),
     Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dropin_housed_butt_joint_example), pattern_type='frame'),
