@@ -17,6 +17,7 @@ from .joints.workshop.shavings import *
 from .joints.workshop.corner_joints import *
 from .joints.workshop.splice_joints import *
 from .joints.workshop.butt_joints import *
+from .joints.workshop.mortise_and_tenon_joints import *
 from .joints.workshop.multi_butt_joints import *
 from .joints.workshop.cross_joints import *
 from .joints.workshop.board_joints import *

@@ -23,9 +23,11 @@ from .butt_joints import (
     cut_plain_butt_joint,
     cut_plain_butt_joint_on_face_aligned_timbers,
     cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers,
-    cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_dropin_dovetail_butt_joint_on_face_aligned_timbers,
     cut_dropin_housed_butt_joint_on_face_aligned_timbers,
+)
+from .mortise_and_tenon_joints import (
+    cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers,
     TuskParameters,

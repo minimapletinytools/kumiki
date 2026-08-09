@@ -1,3 +1,41 @@
+:: 8/8/2026 table script
+
+A while back I made this cute little coffee table, lets model it today in kumiki.
+
+let's build a cute coffe table, begin by establishing a footprint that is 18"x32".
+On the inside corners, create table "legs" that are 1.5" square and 18" tall.
+
+connect the legs together with four 3/4" stretchers. don't use any joints yet.
+the 2 stretchers running along the long side should have their tops flush with the tops of legs, and the 2 short stertchers should have their top side 3/8" above the tops of the legs so we can cut sliding dovetail joints on the excess later.
+the bottoms of all stretchres should be 3" below the top of the legs.
+
+now joint the stretchers to the legs using tusked mortise and tenon joints, the tenon pairs at each corner need to be offset so that they don't intersect each other. the tenons sholud be 3/4" wide and 3/4" in height. the tusk should enter horizontally.
+
+BTW you don't have to use AI, you can certainly write the code yourself if you want, and it's not that complicated. Let's take a look at the basic structure.
+You can see first we create the feet of our coffee table on our "footprint" using "create vertical timber on footprint"
+Next we create stretchers by connecting the feet using the "attach_face_algined_timber" function. Face aligned just means that all faces on all timbers are either parallel or perpendicular.
+BTW the long list of parameters here may look scary but really each of them is straight forward to understand and are intended to give you full control over exactly how your timbers are positioned relative to the timber its being attached to. You don't really need to care about this,most of these parameters have sensible defaults you can just let the agent figure it out for you instead.
+then we join the stretchers to the to feet using tusked mortise and tenon joints. We're not using them here, but all joints have "basic" versions that choose sensible defaults for most of the parameters..
+
+let's proceed with the rest of the build
+
+Add 2 boards to form a table top such that they sit on top of the 4 legs. the boards should be 44" long and 12" wide. The boards are placed running along the long side of the table with one on each side of the centerline in this axis.
+
+join each board to each short stretcher using a sliding dovetail joint. The dovetails enter from the center of the boards so that there is no visible mark along the outside edge
+
+now cut the ends of each board into a "bun shape". There should be a 3' radius arc tangent to the middle edge of each board at each end. You will need to make a custom joint to do this. 
+BTW I'm really proud of this cute detail on the table. I wanted to highlight that the top is split in two and joined without glue or fasteners, so I picked a profile you couldn't easily cut on a single board. It also looks like a butt crack.
+
+Ok we're almost done, you'll see on the actual table there are these poplar stretchers at the bottoms as well. They're simply housed into the legs with no joinery holding them in place? Why? well my housemate said they wanted to weave a bottom tray to the table yet there seems to be no tray in sight :(.
+
+Join the the legs 2" from the bottom with 1"x2" stretchers. To prevent the stretchers from intersecting each other, first cut plain miter joints on each of the 4 corners. Then roundover each long edge of the stretcher and finally use a house joint to attach them to the legs (the stretcher is the housed timber). 
+
+
+I hope you enjoyed this video. I started adding more and more furniture joints so I thought this might be a fun design to demo them. If you enjoyed this video please like and subscribe and let me know in the comments what you'd like to see more of.
+
+
+
+
 ::: 7/29 board notes
 
 board related joints
@@ -28,7 +66,7 @@ DONE-sliding dovetail (maybe you want tapered variants)
 -splined miter joint
 -bridge joint(just tongue nad fork)
 
--haunced tenon lol ugh
+-haunched tenon lol ugh
 
 
 -finger corner joint (or box joint)
@@ -121,18 +159,15 @@ DONE-be consistent... rename nominal size to actual size or true size
 DONE-do the top_face_on_butt_timber thing for the half dovetail wedged mortise and tenonj oint
 DONE-tusked mortise and tenon joint
 DONE-mortise_clearance_negative_csg computation wrong for tusked mrotise and tenon joint
-
 DONE-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
   DONE-this is silly, fork should be on butt timber... otherwise just use rtoise and tenon
   DONE-add inset shoulder arg 
-
-
 DONE-update mortise and tenon joint to use relative position tenon parameters (see notes in file)
   DONE-update all patterns to use the new relative paraemteres
 DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
 
 -new notching plan
-  -update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
+  DONE/IGNORE-update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
   -add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber, you can modify make chop_shoulder_notch_on_timber_face into an internal function and then call it from teh new one.
   -add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
   -FAT/PAT mortise and tenon joints now allow notched style and do it themselves rather than pass arg to parent
@@ -143,6 +178,25 @@ DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
   -maybe get ird of folder + example support, examples are always leaf nodes?
 -do joint rename to match what's in your new book
   -add shouder to cross lap joint
+
+
+
+"I'm maple, and this is how I used kumiki and AI to create this 16x12 shed design (text overlay: it's the one from the learn to timber frame book)
+
+First, I ask the agent to establish the footprint of the building creating the sills and joists using mortise and tenon joinery for the corners and drop in joints for the joists.
+
+On each corner and side I have the agent place larger posts, capping each longer side with a beefy top plate (maybe show a cute cow graphic here)
+The shorter sides are joined together with a wedged half dovetail joint.
+
+Next we'll need girts to support the posts, and lets not forgot to add room for a door. (uhm, this was really quite a few prompts to get here, maybe show a sequence of shots as the girts and doors get added, or just show the final show after everything is added , I tihnk that's fine too.)
+
+I got a little eager here and prompted the agent too much at once so the braces are a mess, (show the clip with the bad braces) but it was easy enough to fix with a few clarifications.
+
+Lastly, I ask the agent add rafters aligning the second to last ones flush with the outside face of the structure.
+
+Amazing that's all it took. If you like to see more content like this please like, subscribe and stay tuned :O
+
+
 
 
 -furniture joints

@@ -686,6 +686,7 @@ class PerfectTimberWithin(ABC):
     def get_half_nominal_size_in_face_normal_axis(self, face: SomeTimberFace) -> Numeric:
         return self.get_half_rough_size_in_face_normal_axis(face)
 
+    # TODO DELETE replace with or forward call to get_perfect_support_distance_from_centerline
     def get_size_in_direction_2d(self, direction: V2) -> Numeric:
         """
         Get the size of the timber's cross-section measured along an arbitrary 2D direction.
@@ -706,6 +707,7 @@ class PerfectTimberWithin(ABC):
         d = normalize_vector(direction)
         return self.size[0] * Abs(d[0]) + self.size[1] * Abs(d[1])
 
+    # TODO DELETE replace with or forward call to get_perfect_support_distance
     def get_size_in_direction_3d(self, direction: Direction3D) -> Numeric:
         """
         Get the size of the timber measured along an arbitrary 3D direction in global space.

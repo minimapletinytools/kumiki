@@ -16,8 +16,10 @@ from kumiki.footprint import Footprint, FootprintLocation
 from kumiki.ticket import TimberTicket
 from kumiki.joints.workshop.shavings import SimplePegParameters
 from kumiki.joints.workshop.butt_joints import (
-    cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_dropin_housed_butt_joint_on_face_aligned_timbers
+)
+from kumiki.joints.workshop.mortise_and_tenon_joints import (
+    cut_mortise_and_tenon_joint_on_face_aligned_timbers,
 )
 from kumiki.timber import Timber, TimberLongEdge, TimberLongFace, SomeTimberFace
 

@@ -9,7 +9,7 @@ representations are converted to floating point values in CAD systems.
 from sympy import pi, Matrix, cos, sin
 from kumiki.timber import Frame, TimberFace, TimberEnd, create_v3, create_timber
 from kumiki.construction import ButtJointTimberArrangement
-from kumiki.joints.workshop.butt_joints import cut_mortise_and_tenon_joint
+from kumiki.joints.workshop.mortise_and_tenon_joints import cut_mortise_and_tenon_joint
 from kumiki.patternbook import Pattern
 from kumiki.rule import scalar
 

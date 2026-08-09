@@ -11,8 +11,10 @@ from dataclasses import replace
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.butt_joints import (
-    cut_mortise_and_tenon_joint,
     convert_mortise_shoulder_inset_to_centerline_distance,
+)
+from kumiki.joints.workshop.mortise_and_tenon_joints import (
+    cut_mortise_and_tenon_joint,
 )
 from kumiki.patternbook import Pattern, make_pattern_from_joint
 
