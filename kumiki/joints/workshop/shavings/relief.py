@@ -592,6 +592,7 @@ def chop_shoulder_notch_aligned_with_timber(
 
 
 # TODO make internal _chop_shoulder_notch_on_timber_face 
+# TODO you can probably delete this as we'll switch over to use lofted profile geometery for this
 def chop_shoulder_notch_on_timber_face(
     timber: TimberLike,
     # TODO TimberLongFace
@@ -740,15 +741,15 @@ def chop_shoulder_notch_on_timber_face(
     return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
 
 
-def chop_butt_joint_shoulder_notch_on_plane_aligned_timbers_2sided(
+def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     arrangement: ButtJointTimberArrangement,
     notch_angle: Optional[Numeric] = None
 ):
     """
-    almost identical to chop_shoulder_notch_on_timber_face except assumes plane aligned
-    
 
-    replaces both chop_shoulder_notch_* functions
+    the notch extends the entire dimension of the receiving timber in the joint normal axis
+
+
     """
     assert "Not Implemented"
 
@@ -758,15 +759,29 @@ def chop_butt_joint_shoulder_notch_on_plane_aligned_timbers_2sided(
     #assert given notch angle is <= 1/2*approach angle or set it to 1/2*approach angle
 
 
-def chop_butt_joint_shoulder_4sided(
-    arrangement: ButtJointTimberArrangement,
-    notch_wall_relief_cut_angle: Optional[Numeric] = None
+def chop_butt_joint_shoulder_notch_relief_4sided(
+    arrangement: ButtJointTimberArrangement
 ):
     """
-
-
-    replaces both chop_shoulder_notch_* functions
     """
+
+    # determine the joint shoulder plane
+    # determine the angle of the butt timber to the joint shoulder plane. (butt_timber_angle)
+    # determine the butt timber perfect timber within quadrilateral cross section shape in the joint shoulder plane
+    # now construct the possibly skew frustum shape at notch_wall_relief_cut_angle
+    # first determine the "length" of the frustrum so that it clears the entire imperfect parts of both timbers, this should be something like max: 
+    #   get_perfect_support_distance_from_centerline(receiving_timber,shoulder_plane_normal)/sin(butt_timber_angle)
+    #   max(butt_timber.rough_size[0],butt_timber.rough_size[1])/cos(butt_timber_angle)
+    # the first profile in the loft is the qualdrlateral cross section shape
+    # for each edge of the quad:
+    #   compute the angle between the adjacant long face on the butt timber to that edge and the shoulder plane
+    #   extend that line out by length/cos(that angle)
+    #   this will cerate the 4 edges froming the second profile in the loft
+    # create a loft CSG from the 2 profiles
+    #   substract the butt timber perfect CSG from the loft to get the negative relief CSG for the receiving timber
+    #   take the rough timber CSG of the butt timber, substract the shoulder plane (half space) and the loft to get the negative relief CSG for the butt timber
+    #
+
     assert "Not Implemented"
 
 
