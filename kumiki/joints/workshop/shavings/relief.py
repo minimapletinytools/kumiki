@@ -10,10 +10,11 @@ import warnings
 from dataclasses import dataclass, replace
 from typing import Optional, Union
 
-from sympy import Abs, Max, Min, acos
+from sympy import Abs, Max, Min, acos, sqrt
 
 from kumiki.construction import ButtJointTimberArrangement, ArrangementNames
 from kumiki.cutcsg import (
+    ConvexPolygonSimpleLoft,
     CutCSG,
     Difference,
     HalfSpace,
@@ -104,6 +105,18 @@ class ButtJointScribeReliefConfig:
         return ButtJointScribeReliefConfig(
             timber_to_be_scribed=ArrangementNames.receiving_timber,
         )
+
+
+@dataclass(frozen=True)
+class ButtJointNotchReliefConfig:
+    """
+    Configuration for butt joint relief via chop_butt_joint_shoulder_notch_relief_4sided.
+
+    Unlike ButtJointScribeReliefConfig (which scribes one timber's whole imperfect body
+    onto the other), this relieves only the material near the inset shoulder using the
+    4-sided frustum notch -- see chop_butt_joint_shoulder_notch_relief_4sided.
+    """
+    pass
 
 
 @dataclass(frozen=True)
@@ -764,30 +777,232 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     # prcoeed with CSG cutting logic from the frustum CSG same as chop_butt_joint_shoulder_notch_relief_4sided
 
 
+def _intersect_line_with_plane(line_point: V3, line_direction: Direction3D, plane: Plane) -> V3:
+    """Intersection of the line {line_point + t*line_direction} with plane."""
+    denom = safe_dot_product(line_direction, plane.normal)
+    assert not zero_test(denom), "line is parallel to the plane"
+    t = safe_dot_product(plane.point - line_point, plane.normal) / denom
+    return line_point + line_direction * t
+
+
+def _intersect_2d_lines(p1: V2, d1: V2, p2: V2, d2: V2) -> V2:
+    """Intersection of 2D lines {p1 + s*d1} and {p2 + t*d2}."""
+    denom = d1[0] * d2[1] - d1[1] * d2[0]
+    assert not zero_test(denom), "2D lines are parallel"
+    diff = p2 - p1
+    s = (diff[0] * d2[1] - diff[1] * d2[0]) / denom
+    return p1 + d1 * s
+
+
 def chop_butt_joint_shoulder_notch_relief_4sided(
-    arrangement: ButtJointTimberArrangement
-):
+    arrangement: ButtJointTimberArrangement,
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
+) -> ShoulderReliefCSGGeometry | None:
     """
-    """
+    Compute the shoulder notch on the receiving timber AND the matching relief cut on the
+    butting timber, for arrangements where the butt timber may approach the shoulder at a
+    compound angle (not necessarily plane-aligned with the receiving timber).
 
-    # determine the joint shoulder plane
-    # determine the angle of the butt timber to the joint shoulder plane. (butt_timber_angle)
-    # determine the butt timber perfect timber within quadrilateral cross section shape in the joint shoulder plane
-    # now construct the possibly skew frustum shape at notch_wall_relief_cut_angle
-    # first determine the "length" of the frustrum so that it clears the entire imperfect parts of both timbers, this should be something like max: 
-    #   get_perfect_support_distance_from_centerline(receiving_timber,shoulder_plane_normal)/sin(butt_timber_angle)
-    #   max(butt_timber.rough_size[0],butt_timber.rough_size[1])/cos(butt_timber_angle)
-    # the first profile in the loft is the qualdrlateral cross section shape
-    # for each edge of the quad:
-    #   compute the angle between the adjacant long face on the butt timber to that edge and the shoulder plane
-    #   extend that line out by length/cos(angle/2)
-    #   this will cerate the 4 edges froming the second profile in the loft
-    # create a loft CSG from the 2 profiles
-    #   substract the butt timber perfect CSG from the loft to get the negative relief CSG for the receiving timber
-    #   take the rough timber CSG of the butt timber, substract the shoulder plane (half space) and the loft to get the negative relief CSG for the butt timber
+    Unlike ``chop_relief_for_butt_joint_arrangement``, the notch is a single 4-sided frustum
+    (a ``ConvexPolygonSimpleLoft``) rather than a union of a straight prism plus 2 tilted
+    relief prisms, so all 4 walls can relieve independently based on how each of the butt
+    timber's 4 long faces actually meets the shoulder plane.
+
+    Geometry, in outline:
+    - quad-1 is the butt timber's PERFECT cross-section sliced by the shoulder plane (an
+      oblique quadrilateral in general, since the butt timber's length axis need not be
+      perpendicular to the shoulder plane).
+    - Each of quad-1's 4 edges lies exactly on the line where one of the butt timber's long
+      face planes crosses the shoulder plane (by construction: both of that edge's corners
+      sit on that face). For each edge, the relieved wall direction bisects the dihedral
+      angle between that face and the shoulder plane -- this stays on the safe (non-colliding)
+      side of the face for any distance travelled along it, so a wall can safely be extended
+      further than its own bisector's "natural" depth without becoming unsafe.
+    - Each edge's own bisector reaches a different depth for the same in-plane reach (since
+      the 4 dihedral angles generally differ), which would make quad-2 non-planar. Instead we
+      take the deepest of the 4 (the "maximal loft distance") as a common depth, and rescale
+      each edge's in-plane offset to match -- still safely on that edge's own bisector, just
+      further out -- so quad-2 stays flat and parallel to quad-1 and every wall gets at least
+      as much depth-clearance as it individually needs.
+
+    Returns ``None`` when no notch is required (shoulder sits at or past the receiving
+    timber's rough entry face) -- see ``does_shoulder_plane_need_notching``.
+    """
+    if not does_shoulder_plane_need_notching(
+        arrangement,
+        mortise_shoulder_distance_from_centerline_or_centerplane,
+    ):
+        return None
+
+    receiving_timber = arrangement.receiving_timber
+    butt_timber = arrangement.butt_timber
+
+    # Shoulder plane, with normal pointing TOWARD the tenon (i.e. the direction the
+    # notch/frustum extends into the receiving timber -- the material between the inset
+    # shoulder and the receiving timber's own entry face). The located helper already
+    # uses this convention directly.
+    from kumiki.joints.workshop.shavings.build_a_butt import (
+        locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+    )
+    shoulder_plane_towards_tenon = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+        arrangement, mortise_shoulder_distance_from_centerline_or_centerplane,
+    )
+    n_depth = safe_normalize_vector(shoulder_plane_towards_tenon.normal)
+    shoulder_plane = Plane(normal=n_depth, point=shoulder_plane_towards_tenon.point)
+
+    butt_length_dir = safe_normalize_vector(butt_timber.get_length_direction_global())
+
+    # ------------------------------------------------------------------
+    # "length": how far, in-plane, the frustum needs to reach to clear the imperfect
+    # (beyond-perfect) material of both timbers, given how obliquely the butt timber
+    # approaches the shoulder plane.
+    # ------------------------------------------------------------------
+    sin_butt_angle = Min(Abs(safe_dot_product(butt_length_dir, n_depth)), scalar(1))
+    assert not zero_test(sin_butt_angle), "butt timber's length axis lies within the shoulder plane"
+    cos_butt_angle = sqrt(scalar(1) - sin_butt_angle ** 2)
+
+    shoulder_normal_in_receiving_local = safe_transform_vector(receiving_timber.orientation.matrix.T, n_depth)
+    perfect_support_distance = get_perfect_support_distance_from_centerline(
+        receiving_timber,
+        create_v2(shoulder_normal_in_receiving_local[0], shoulder_normal_in_receiving_local[1]),
+    )
+    butt_rough_size = butt_timber.get_rough_size()
+    # cos_butt_angle is 0 for a straight (non-raking) approach -- the common case, not a
+    # degenerate one -- in which case the rough-size term doesn't apply; only the receiving
+    # timber's own perfect-support term governs.
+    rough_size_term = (
+        scalar(0) if zero_test(cos_butt_angle)
+        else Max(butt_rough_size[0], butt_rough_size[1]) / cos_butt_angle
+    )
+    imperfect_clearance_length = Max(perfect_support_distance / sin_butt_angle, rough_size_term)
+
+    # ------------------------------------------------------------------
+    # quad-1: the butt timber's perfect cross-section, sliced by the shoulder plane.
+    # Each corner is tagged with its (sign_x, sign_y) in the butt timber's own local
+    # frame so the adjacent long face for each edge can be recovered after quad-1 is
+    # (possibly) re-wound below -- independent of corner order.
+    # ------------------------------------------------------------------
+    half_w = butt_timber.size[0] / scalar(2)
+    half_h = butt_timber.size[1] / scalar(2)
+    corner_signs = [(1, 1), (-1, 1), (-1, -1), (1, -1)]  # RIGHT_FRONT, FRONT_LEFT, LEFT_BACK, BACK_RIGHT
+
+    butt_width_dir = butt_timber.get_width_direction_global()
+    if safe_compare(Abs(safe_dot_product(n_depth, butt_width_dir)) - scalar(9, 10), 0, Comparison.LT):
+        x_ref_reference = butt_width_dir
+    else:
+        x_ref_reference = butt_timber.get_height_direction_global()
+    x_ref = safe_normalize_vector(x_ref_reference - n_depth * safe_dot_product(x_ref_reference, n_depth))
+
+    joint_center_global = _intersect_line_with_plane(butt_timber.get_bottom_position_global(), butt_length_dir, shoulder_plane)
+    loft_transform = Transform(position=joint_center_global, orientation=Orientation.from_z_and_x(n_depth, x_ref))
+
+    corner_data = []  # (local_2d_point, sign_x, sign_y)
+    for sign_x, sign_y in corner_signs:
+        base_global = butt_timber.transform.local_to_global(create_v3(sign_x * half_w, sign_y * half_h, scalar(0)))
+        corner_global = _intersect_line_with_plane(base_global, butt_length_dir, shoulder_plane)
+        corner_local_3d = loft_transform.global_to_local(corner_global)
+        corner_data.append((create_v2(corner_local_3d[0], corner_local_3d[1]), sign_x, sign_y))
+
+    signed_area = sum(
+        corner_data[i][0][0] * corner_data[(i + 1) % 4][0][1] - corner_data[(i + 1) % 4][0][0] * corner_data[i][0][1]
+        for i in range(4)
+    )
+    if safe_compare(signed_area, 0, Comparison.LT):
+        corner_data.reverse()
+
+    bottom_points = [c[0] for c in corner_data]
+
+    def adjacent_face(i: int) -> TimberFace:
+        _, sign_x_a, sign_y_a = corner_data[i]
+        _, sign_x_b, sign_y_b = corner_data[(i + 1) % 4]
+        if sign_x_a == sign_x_b:
+            return TimberFace.RIGHT if sign_x_a > 0 else TimberFace.LEFT
+        return TimberFace.FRONT if sign_y_a > 0 else TimberFace.BACK
+
+    # ------------------------------------------------------------------
+    # Per-edge bisector: for edge i, tan(dihedral_i / 2) relates in-plane reach (T) to
+    # depth (N) along that edge's own bisector between its adjacent long face and the
+    # shoulder plane. loft_depth is the deepest of the 4 natural depths; every edge's
+    # in-plane reach is then rescaled to that common depth, staying on its own (safe)
+    # bisector ray.
+    # ------------------------------------------------------------------
+    tan_half_dihedrals = []
+    for i in range(4):
+        face_normal = butt_timber.get_face_direction_global(adjacent_face(i))
+        cos_dihedral = Min(Abs(safe_dot_product(face_normal, n_depth)), scalar(1))
+        sin_dihedral = sqrt(scalar(1) - cos_dihedral ** 2)
+        tan_half = sin_dihedral / (scalar(1) + cos_dihedral)
+        assert not zero_test(tan_half), f"{adjacent_face(i)} face of butt timber is parallel to the shoulder plane"
+        tan_half_dihedrals.append(tan_half)
+
+    loft_depth = Max(*[imperfect_clearance_length * t for t in tan_half_dihedrals])
+    edge_reaches = [loft_depth / t for t in tan_half_dihedrals]
+
+    centroid = sum(bottom_points, Matrix([scalar(0), scalar(0)])) / scalar(4)
+    offset_lines = []
+    for i in range(4):
+        p, q = bottom_points[i], bottom_points[(i + 1) % 4]
+        edge_dir = safe_normalize_vector(q - p)
+        outward_normal = create_v2(edge_dir[1], -edge_dir[0])
+        midpoint = (p + q) / scalar(2)
+        if safe_compare(safe_dot_product(outward_normal, midpoint - centroid), 0, Comparison.LT):
+            outward_normal = -outward_normal
+        offset_point = p + outward_normal * edge_reaches[i]
+        offset_lines.append((offset_point, edge_dir))
+
+    top_points = [
+        _intersect_2d_lines(*offset_lines[(i - 1) % 4], *offset_lines[i])
+        for i in range(4)
+    ]
+
+    loft_global = ConvexPolygonSimpleLoft(
+        bottom_points=bottom_points,
+        top_points=top_points,
+        start_distance=scalar(0),
+        end_distance=loft_depth,
+        transform=loft_transform,
+    )
+    
+    receiving_timber_notch_negative_csg_local = adopt_csg(
+        None, receiving_timber.transform, loft_global
+    )
+
+    # ------------------------------------------------------------------
+    # Butting timber: relieve rough (beyond-perfect) material that's WITHIN the frustum's
+    # own depth range (from the shoulder to shoulder+loft_depth, in the +n_depth/
+    # toward-entry-face direction -- the same span the loft itself occupies) AND outside
+    # the frustum's own clearance envelope -- i.e. material that would collide with the
+    # receiving timber's un-notched wood. Material outside that depth range must NOT be
+    # touched: behind the shoulder is the tenon's own collar/tongue area (handled by the
+    # dedicated shoulder cut elsewhere, not here), and beyond the frustum's far end is
+    # just the timber's own untouched bulk running back to its far end.
     #
-
-    assert "Not Implemented"
+    # near/far are plain (unbounded, cross-section-agnostic) half-spaces, so this CSG is
+    # unbounded in the directions perpendicular to n_depth -- meshing it standalone (e.g.
+    # triangulate_cutcsg called directly on this piece) renders as a huge box, since there's
+    # nothing here to bound its footprint. That's expected: like any negative_csg, it's only
+    # meaningful once intersected with the butt timber's own actual solid body, which happens
+    # implicitly wherever this gets applied as a Cutting.
+    # ------------------------------------------------------------------
+    near_plane_global = HalfSpace(
+        normal=n_depth,
+        offset=safe_dot_product(n_depth, shoulder_plane.point),
+    )
+    far_plane_point_global = shoulder_plane.point + n_depth * loft_depth
+    far_plane_global = HalfSpace(
+        normal=n_depth,
+        offset=safe_dot_product(n_depth, far_plane_point_global),
+    )
+    loft_in_butt_local = adopt_csg(None, butt_timber.transform, loft_global)
+    butting_timber_relief_negative_csg_local = Difference(
+        base=adopt_csg(None, butt_timber.transform, near_plane_global),
+        subtract=[loft_in_butt_local, adopt_csg(None, butt_timber.transform, far_plane_global)],
+    )
+    
+    return ShoulderReliefCSGGeometry(
+        receiving_timber_notch_negative_CSG=receiving_timber_notch_negative_csg_local,
+        butting_timber_relief_negative_CSG=butting_timber_relief_negative_csg_local,
+    )
 
 
 @dataclass(frozen=True)

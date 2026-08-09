@@ -226,6 +226,72 @@ class TestMortiseAndTenonGeometry:
 
 
 
+class TestMortiseAndTenonJointNotchReliefConfig:
+    """Tests for relief=ButtJointNotchReliefConfig() in cut_mortise_and_tenon_joint."""
+
+    def test_notch_relief_actually_relieves_the_butt_timber(self, symbolic_mode, simple_T_configuration):
+        """
+        Regression guard: relief=ButtJointNotchReliefConfig() must actually change the
+        tenon (butt timber)'s cut geometry for an imperfect (oversized) tenon, not just the
+        mortise (receiving timber)'s notch. A previous bug wired the relief CSG as something
+        to subtract FROM shoulder_half_space_local (the standard behind-the-shoulder collar
+        cut) -- but the relief CSG occupies its OWN, DISJOINT depth range (from the shoulder
+        outward, toward the receiving timber's entry face), so subtracting it there had NO
+        effect at all (a silent no-op): the tenon received zero relief regardless of how
+        oversized it was, even though the mortise's own notch was computed and applied
+        correctly. The fix unions the relief CSG in as an ADDITIONAL region to remove,
+        rather than subtracting it from a base it never overlaps.
+        """
+        from dataclasses import replace
+
+        tenon_timber, mortise_timber = simple_T_configuration
+        imperfect_tenon = replace(
+            tenon_timber,
+            rough_half_sizes=(create_v2(scalar(3), scalar(3)), create_v2(scalar(3), scalar(3))),
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=imperfect_tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        joint_no_relief = cut_mortise_and_tenon_joint(
+            arrangement=arrangement,
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_distance_from_centerline_or_centerplane=scalar(2),
+            relief=None,
+        )
+        joint_with_relief = cut_mortise_and_tenon_joint(
+            arrangement=arrangement,
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_distance_from_centerline_or_centerplane=scalar(2),
+            relief=ButtJointNotchReliefConfig(),
+        )
+
+        tenon_csg_no_relief = joint_no_relief.cuttings["tenon_timber"].negative_csg
+        tenon_csg_with_relief = joint_with_relief.cuttings["tenon_timber"].negative_csg
+        assert tenon_csg_no_relief is not None
+        assert tenon_csg_with_relief is not None
+
+        # A point where rough (beyond-perfect) material pokes past the tight flare just
+        # past the shoulder: must be removed WITH relief, but NOT removed without it.
+        poke_point = create_v3(scalar(28, 10), scalar(0), scalar(21, 10))
+        assert not tenon_csg_no_relief.contains_point(poke_point)
+        assert tenon_csg_with_relief.contains_point(poke_point)
+
+        # Far bulk of the tenon, well away from the joint: untouched in both cases.
+        far_point = create_v3(scalar(0), scalar(0), scalar(90))
+        assert not tenon_csg_no_relief.contains_point(far_point)
+        assert not tenon_csg_with_relief.contains_point(far_point)
+
+        # The tongue's own core survives in both cases (relief must not eat the tongue).
+        core_point = create_v3(scalar(0), scalar(0), scalar(1, 2))
+        assert not tenon_csg_no_relief.contains_point(core_point)
+        assert not tenon_csg_with_relief.contains_point(core_point)
+
+
 class TestMortiseAndTenonRelativeTenonSizing:
 
     def test_relative_sizing_matches_equivalent_tenon_size(self, simple_T_configuration):

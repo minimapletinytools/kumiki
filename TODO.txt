@@ -168,8 +168,8 @@ DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
 
 -new notching plan
   DONE/IGNORE-update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
+  DONE-add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
   -add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber, you can modify make chop_shoulder_notch_on_timber_face into an internal function and then call it from teh new one.
-  -add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
   -FAT/PAT mortise and tenon joints now allow notched style and do it themselves rather than pass arg to parent
 
 

@@ -4,22 +4,26 @@ Tests for the shoulder-notch and relief-cut helpers in kumiki.joints.workshop.re
 
 from dataclasses import replace
 
-from kumiki.cutcsg import Difference, Intersection
+from kumiki.cutcsg import ConvexPolygonSimpleLoft, Difference, Intersection
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.shavings.relief import (
     BraceJointScribeReliefConfig,
+    ButtJointNotchReliefConfig,
     CrossCapJointScribeReliefConfig,
     DoubleButtJointScribeReliefConfig,
     QuadrupleButtJointScribeReliefConfig,
     ShoulderReliefCSGGeometry,
     TripleButtJointScribeReliefConfig,
+    chop_butt_joint_shoulder_notch_relief_4sided,
     chop_relief_for_butt_joint_arrangement,
     chop_scribe_relief,
     chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
 )
+from kumiki.joints.workshop.mortise_and_tenon_joints import cut_mortise_and_tenon_joint
 from kumiki.rule import (
+    Matrix,
     Orientation,
     Transform,
     create_v2,
@@ -34,6 +38,7 @@ from kumiki.timber import (
     create_v3,
     create_timber,
     Cutting,
+    CutTimber,
 )
 from kumiki.timber_shavings import are_timbers_plane_aligned
 from tests.testing_shavings import (
@@ -166,6 +171,231 @@ class TestChopReliefForButtJointArrangement:
             chop_relief_for_butt_joint_arrangement(arrangement, face_half_size)
             is None
         )
+
+
+class TestChopButtJointShoulderNotchRelief4Sided:
+    """Tests for chop_butt_joint_shoulder_notch_relief_4sided."""
+
+    def test_returns_none_for_flush_shoulder(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+        )
+        # Mortise is 6x6, so a shoulder at the rough half-size (3) is flush -- no notch needed.
+        assert chop_butt_joint_shoulder_notch_relief_4sided(arrangement, scalar(3)) is None
+
+    def test_notch_extends_toward_tenon_not_backward_into_solid_mortise(self, simple_T_configuration):
+        """
+        Anchors the notch's location in GLOBAL/absolute terms using coordinates derived
+        independently of the loft's own transform (unlike the local-frame test below, whose
+        query points are generated FROM loft.transform -- self-referential, so it stays
+        "self-consistent" and passes even if the whole loft is built pointing backward; it
+        would NOT have caught this bug). Points here are computed directly from the known
+        timber geometry instead.
+
+        Setup: mortise is 6x6 (half-size 3 in Z, its height axis), centered at the origin in
+        cross-section; tenon (4x4, half-width 2) rises from Z=0 along the shared centerline.
+        Shoulder is inset 2 from the mortise centerline -> shoulder plane at Z=2, entry face
+        at Z=3 (toward the tenon). At depth loft_depth/2=1.5 past the shoulder (Z=3.5), the
+        interpolated flare half-width is 3.5 (from 2 at the shoulder to 5 at full depth), so
+        X=3 sits safely inside it. The point's mirror image reflected across the shoulder
+        plane (Z=0.5, same X) lies backward, deep in the mortise's own remaining solid
+        interior -- exactly where the bug misplaced the frustum -- and must never be touched.
+        """
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        geom = chop_butt_joint_shoulder_notch_relief_4sided(arrangement, scalar(2))
+        assert geom is not None
+        from kumiki.cutcsg import adopt_csg
+        notch_global = adopt_csg(mortise_timber.transform, Transform.identity(), geom.receiving_timber_notch_negative_CSG)
+
+        forward_point = Matrix([scalar(3), scalar(0), scalar(7, 2)])   # X=3, Z=3.5: toward tenon, inside the flare
+        backward_point = Matrix([scalar(3), scalar(0), scalar(1, 2)])  # X=3, Z=0.5: mirrored, into solid mortise
+
+        assert notch_global.contains_point(forward_point)
+        assert not notch_global.contains_point(backward_point)
+
+    def test_perpendicular_notch_flares_symmetrically_around_the_tenon(self, simple_T_configuration):
+        """
+        For a straight (non-raking) T, all 4 of the tenon's long faces meet the shoulder
+        plane at 90 degrees, so the loft flares outward by the same amount on every side:
+        the notch (the raw frustum loft -- its straight core is also removed, redundantly
+        but harmlessly, by the separately-unioned mortise hole prism) should contain points
+        just past the tenon's perfect corner, contain its own straight core, and exclude
+        points entirely outside the loft.
+        """
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber,
+            butt_timber=tenon_timber,
+            butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        geom = chop_butt_joint_shoulder_notch_relief_4sided(arrangement, scalar(2))
+        assert geom is not None
+        assert isinstance(geom, ShoulderReliefCSGGeometry)
+
+        notch = geom.receiving_timber_notch_negative_CSG
+        assert isinstance(notch, ConvexPolygonSimpleLoft)
+        loft = notch
+
+        # Tenon is 4x4 (half-width 2); the loft flares uniformly since every face meets
+        # the shoulder plane perpendicular, so all 4 corners sit at the same radius.
+        for point in loft.bottom_points:
+            assert abs(float(point[0])) == pytest.approx(2.0)
+            assert abs(float(point[1])) == pytest.approx(2.0)
+
+        # Just past the tenon's own corner, mid-depth into the flare: inside the notch.
+        flare_point = loft.transform.local_to_global(Matrix([scalar(3), scalar(3), loft.end_distance / scalar(2)]))
+        assert notch.contains_point(flare_point)
+
+        # Dead center of the tenon's own straight core: contained too (the notch is now the
+        # raw loft, covering its whole cross-section from centerline outward, not just the
+        # beyond-perfect shell -- the actual mortise hole is a separate, unioned prism).
+        core_point = loft.transform.local_to_global(Matrix([scalar(0), scalar(0), loft.end_distance / scalar(2)]))
+        assert notch.contains_point(core_point)
+
+        # Well outside the loft entirely.
+        outside_point = loft.transform.local_to_global(Matrix([scalar(20), scalar(20), loft.end_distance / scalar(2)]))
+        assert not notch.contains_point(outside_point)
+
+    def test_raking_joint_relieves_faces_independently(self):
+        """
+        A tenon raking along the mortise's own run (not just tilting sideways) meets its
+        RIGHT/LEFT faces square-on (90 degrees) but its FRONT/BACK faces at an angle --
+        the resulting loft should flare more in one axis than the other (not a uniform
+        scale-up), unlike the perpendicular case above.
+        """
+        mortise = create_timber(
+            length=scalar(100), size=create_v2(scalar(6), scalar(6)),
+            bottom_position=create_v3(-scalar(50), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            ticket="mortise",
+        )
+        raking_length_dir = normalize_vector(create_v3(scalar(2), -scalar(3), scalar(0)))
+        tenon = create_timber(
+            length=scalar(50), size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(scalar(20), scalar(30), scalar(0)),
+            length_direction=raking_length_dir,
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            ticket="raking_tenon",
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise, butt_timber=tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        geom = chop_butt_joint_shoulder_notch_relief_4sided(arrangement, scalar(1))
+        assert geom is not None
+        notch = geom.receiving_timber_notch_negative_CSG
+        assert isinstance(notch, ConvexPolygonSimpleLoft)
+        loft = notch
+
+        bottom_half_width = float(loft.bottom_points[0][0])
+        bottom_half_height = float(loft.bottom_points[0][1])
+        top_half_width = float(loft.top_points[0][0])
+        top_half_height = float(loft.top_points[0][1])
+
+        # Bottom (at the shoulder) is the tenon's own perfect cross-section, unaffected by
+        # the rake in one axis (width, perpendicular to the rake) but stretched in the other
+        # (height, the oblique slice direction) -- matching the RIGHT/LEFT vs FRONT/BACK
+        # dihedral-angle split computed for this configuration.
+        assert bottom_half_width == pytest.approx(2.0)
+        assert bottom_half_height > 2.0
+
+        # The aspect ratio changes from bottom to top -- a uniform (non-raking) flare would
+        # keep width/height in the same proportion; this one stretches height much more.
+        bottom_ratio = bottom_half_height / bottom_half_width
+        top_ratio = top_half_height / top_half_width
+        assert top_ratio > bottom_ratio * 1.2
+
+    def test_raking_joint_produces_watertight_notch_and_correct_relief_containment(self):
+        """
+        Sanity-check the receiving timber's notch mesh, and the butting timber's relief
+        CSG's exact containment logic, on an imperfect, raking tenon.
+
+        The butting-timber relief CSG is built from plain (unbounded, cross-section-agnostic)
+        half-spaces, so meshing IT ALONE would render as a huge box (nothing here bounds its
+        footprint -- see the comment in chop_butt_joint_shoulder_notch_relief_4sided). It's
+        only meaningful once intersected with the butt timber's own real solid body, which
+        happens naturally wherever it's applied as a Cutting -- checked below via
+        contains_point on the raw relief CSG (exact, symbolic, no meshing involved), AND via
+        meshing the FULLY APPLIED cut (butt timber's actual body with the cut applied),
+        which is properly bounded and should be watertight.
+        """
+        from dataclasses import replace as dataclasses_replace
+
+        from kumiki.triangles import triangulate_cutcsg
+
+        mortise = create_timber(
+            length=scalar(100), size=create_v2(scalar(6), scalar(6)),
+            bottom_position=create_v3(-scalar(50), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            ticket="mortise",
+        )
+        raking_length_dir = normalize_vector(create_v3(scalar(2), -scalar(3), scalar(0)))
+        tenon = create_timber(
+            length=scalar(50), size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(scalar(20), scalar(30), scalar(0)),
+            length_direction=raking_length_dir,
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            ticket="raking_tenon",
+        )
+        imperfect_tenon = dataclasses_replace(
+            tenon, rough_half_sizes=(create_v2(scalar(3), scalar(3)), create_v2(scalar(3), scalar(3)))
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise, butt_timber=imperfect_tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        geom = chop_butt_joint_shoulder_notch_relief_4sided(arrangement, scalar(1))
+        assert geom is not None
+        relief_csg = geom.butting_timber_relief_negative_CSG
+        assert relief_csg is not None
+
+        notch_mesh = triangulate_cutcsg(geom.receiving_timber_notch_negative_CSG).mesh
+        assert notch_mesh.is_watertight
+        assert notch_mesh.volume > 0
+
+        # Genuinely past the loft's own far end (shoulder ~= 37.26, loft depth ~= 10.82,
+        # so the loft's far cap sits at ~= 48.07 in tenon-local Z; tenon length is 50),
+        # deep in the tenon's own bulk: never touched.
+        far_point_local = Matrix([scalar(0), scalar(0), scalar(49)])
+        assert not relief_csg.contains_point(far_point_local)
+
+        # Near the shoulder collar (behind the shoulder, where the dedicated tongue cut
+        # lives): also not this function's concern.
+        collar_point_local = Matrix([scalar(0), scalar(0), scalar(1, 2)])
+        assert not relief_csg.contains_point(collar_point_local)
+
+        # The FULLY APPLIED cut (imperfect_tenon's actual body with this relief unioned into
+        # its shoulder cut, via cut_mortise_and_tenon_joint) must be properly bounded and
+        # watertight -- confirming the unbounded standalone relief CSG above resolves
+        # correctly once combined with the real timber body.
+        joint = cut_mortise_and_tenon_joint(
+            arrangement=arrangement,
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_distance_from_centerline_or_centerplane=scalar(1),
+            relief=ButtJointNotchReliefConfig(),
+        )
+        tenon_cutting = joint.cuttings["raking_tenon"]
+        cut_timber = CutTimber(timber=imperfect_tenon, cuts=[tenon_cutting])
+        applied_mesh = triangulate_cutcsg(cut_timber.render_timber_with_cuts_csg_local()).mesh
+        assert applied_mesh.is_watertight
+        assert applied_mesh.volume > 0
+        # Bounded to the timber's own real extent (length 50, rough half-size 3) -- not the
+        # ~10000-unit fake-infinite half-space box the standalone relief CSG would show.
+        assert applied_mesh.bounds[1][2] <= 51  # max Z comfortably within timber length
 
 
 class TestChopShoulderNotchAlignedWithTimber:
