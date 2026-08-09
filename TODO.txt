@@ -166,6 +166,21 @@ DONE-update mortise and tenon joint to use relative position tenon parameters (s
   DONE-update all patterns to use the new relative paraemteres
 DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
 
+-rename/reorg all mortise and tenon joints
+
+  -mortise_and_tenon_join/...
+  -delete 45 degree relative tenon size, basic, 
+  -face_aligned
+  -plane_aligned
+  -through_tenon
+  -face_aligned_inset_shoulder
+  -plane_aligned_notch_relief
+  -plane_aligned_scribe_relief
+  -double_angled_notch_relief
+  -double_angled_scribe_relief
+  
+  
+
 -new notching plan
   DONE/IGNORE-update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
   DONE-add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
