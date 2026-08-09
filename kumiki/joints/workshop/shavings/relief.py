@@ -393,7 +393,7 @@ def does_shoulder_plane_need_notching(
         and not zero_test(face_half_size - mortise_shoulder_distance_from_centerline_or_centerplane)
     )
 
-
+# TODO DEPRECATE ME
 def chop_shoulder_notch_aligned_with_timber(
     notch_timber: TimberLike,
     butting_timber: TimberLike,
@@ -591,8 +591,7 @@ def chop_shoulder_notch_aligned_with_timber(
     return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
 
 
-# TODO make internal _chop_shoulder_notch_on_timber_face 
-# TODO you can probably delete this as we'll switch over to use lofted profile geometery for this
+# TODO DEPRECATE ME mostly replaced by chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided
 def chop_shoulder_notch_on_timber_face(
     timber: TimberLike,
     # TODO TimberLongFace
@@ -806,6 +805,7 @@ class ShoulderReliefCSGGeometry:
     butting_timber_relief_negative_CSG: CutCSG | None
 
 
+# TODO DEPRECATE replce with chop_butt_joint_shoulder_notch_relief_*
 def chop_relief_for_butt_joint_arrangement(
     arrangement: ButtJointTimberArrangement,
     mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
