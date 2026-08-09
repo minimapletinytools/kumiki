@@ -756,7 +756,13 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     error = arrangement.check_plane_aligned()
     assert error is None, error
 
-    #assert given notch angle is <= 1/2*approach angle or set it to 1/2*approach angle
+    # follow the same algorithm in chop_butt_joint_shoulder_notch_relief_4sided except to determine the edges of the frustum perpendicular to the receiving timber
+    # note some logic may be simpler because we can assume plane aligned
+    # for the 2 edges of the frustum parallel to the receiving timber
+    # first find the maximal distance of the rough face planes parallel to the joint plane to determine the extend of the last 2sides of our frustum
+    #   using get_half_rough_size_in_face_normal_axis for both directions of the joint plane normal on both timbers 
+    # construct the 2 polygons for the frustum using the info above, (intersect the perpendicular edges to the parallel max rough face planes to complete the polygon)
+    # prcoeed with CSG cutting logic from the frustum CSG same as chop_butt_joint_shoulder_notch_relief_4sided
 
 
 def chop_butt_joint_shoulder_notch_relief_4sided(
@@ -775,7 +781,7 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     # the first profile in the loft is the qualdrlateral cross section shape
     # for each edge of the quad:
     #   compute the angle between the adjacant long face on the butt timber to that edge and the shoulder plane
-    #   extend that line out by length/cos(that angle)
+    #   extend that line out by length/cos(angle/2)
     #   this will cerate the 4 edges froming the second profile in the loft
     # create a loft CSG from the 2 profiles
     #   substract the butt timber perfect CSG from the loft to get the negative relief CSG for the receiving timber
