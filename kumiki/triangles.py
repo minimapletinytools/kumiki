@@ -18,6 +18,7 @@ from sympy import Expr
 
 from .cutcsg import (
     ConvexPolygonExtrusion,
+    ConvexPolygonSimpleLoft,
     CutCSG,
     Cylinder,
     EmptyCSG,
@@ -140,6 +141,9 @@ def _triangulate_with_label(csg: CutCSG, label: str) -> TriangleMesh:
         return TriangleMesh(mesh=mesh, face_sources=tuple(label for _ in range(len(mesh.faces))))
     if isinstance(csg, ConvexPolygonExtrusion):
         mesh = _mesh_convex_polygon_extrusion(csg)
+        return TriangleMesh(mesh=mesh, face_sources=tuple(label for _ in range(len(mesh.faces))))
+    if isinstance(csg, ConvexPolygonSimpleLoft):
+        mesh = _mesh_convex_polygon_loft(csg)
         return TriangleMesh(mesh=mesh, face_sources=tuple(label for _ in range(len(mesh.faces))))
     if isinstance(csg, HalfSpace):
         mesh = _mesh_half_space(csg)
@@ -389,6 +393,40 @@ def _mesh_convex_polygon_extrusion(extrusion: ConvexPolygonExtrusion) -> trimesh
     return _finalize_mesh(mesh)
 
 
+def _mesh_convex_polygon_loft(loft: ConvexPolygonSimpleLoft) -> trimesh.Trimesh:
+    if not loft.is_valid():
+        raise ValueError("ConvexPolygonSimpleLoft must be valid before triangulation")
+
+    bottom_points, top_points = _polygon_point_pairs_ccw(loft.bottom_points, loft.top_points)
+    point_count = len(bottom_points)
+    bottom_z = _numeric_to_float(loft.start_distance)
+    top_z = _numeric_to_float(loft.end_distance)
+
+    vertices: list[list[float]] = []
+    for point in bottom_points:
+        vertices.append([_numeric_to_float(point[0]), _numeric_to_float(point[1]), bottom_z])
+    for point in top_points:
+        vertices.append([_numeric_to_float(point[0]), _numeric_to_float(point[1]), top_z])
+
+    faces: list[list[int]] = []
+    for index in range(1, point_count - 1):
+        faces.append([0, index + 1, index])
+        faces.append([point_count, point_count + index, point_count + index + 1])
+
+    for index in range(point_count):
+        next_index = (index + 1) % point_count
+        bottom_a = index
+        bottom_b = next_index
+        top_a = point_count + index
+        top_b = point_count + next_index
+        faces.append([bottom_a, bottom_b, top_b])
+        faces.append([bottom_a, top_b, top_a])
+
+    mesh = trimesh.Trimesh(vertices=np.asarray(vertices), faces=np.asarray(faces), process=False)
+    mesh.apply_transform(_transform_to_numpy(loft.transform))
+    return _finalize_mesh(mesh)
+
+
 def _finite_extent_pair(
     start_distance: Optional[Numeric], end_distance: Optional[Numeric]
 ) -> Tuple[float, float]:
@@ -460,6 +498,23 @@ def _polygon_points_ccw(points: Iterable[V2]) -> list[V2]:
     if signed_area < 0:
         ordered.reverse()
     return ordered
+
+
+def _polygon_point_pairs_ccw(bottom: Iterable[V2], top: Iterable[V2]) -> Tuple[list[V2], list[V2]]:
+    """Like _polygon_points_ccw, but reorders two index-matched point rings
+    together (based on the winding of ``bottom``) so the vertex correspondence
+    between them is preserved."""
+    bottom_ordered = list(bottom)
+    top_ordered = list(top)
+    signed_area = 0.0
+    for index, point in enumerate(bottom_ordered):
+        next_point = bottom_ordered[(index + 1) % len(bottom_ordered)]
+        signed_area += _numeric_to_float(point[0]) * _numeric_to_float(next_point[1])
+        signed_area -= _numeric_to_float(next_point[0]) * _numeric_to_float(point[1])
+    if signed_area < 0:
+        bottom_ordered.reverse()
+        top_ordered.reverse()
+    return bottom_ordered, top_ordered
 
 
 def _remove_nonmanifold_faces(mesh: trimesh.Trimesh) -> trimesh.Trimesh:

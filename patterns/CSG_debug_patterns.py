@@ -202,8 +202,51 @@ def example_hexagon_extrusion():
         end_distance=1,    # End at Z=1 (1 meter tall)
         transform=Transform.identity()
     )
-    
+
     return hexagon
+
+
+def example_asymmetric_frustum_loft():
+    """
+    Asymmetric frustum: a 1m x 0.6m rectangle at the bottom tapering to a
+    0.4m x 0.4m square at the top, with the top ALSO offset sideways instead
+    of staying centered over the bottom.
+
+    Demonstrates ConvexPolygonSimpleLoft lofting between two convex polygons that
+    differ in size, aspect ratio, AND position -- not just a symmetric
+    shrink-in-place taper (which RectangularPrism/ConvexPolygonExtrusion
+    can't represent at all, and which you'd otherwise need several chained
+    HalfSpace intersections to approximate).
+
+    Bottom (Z=0): 1m x 0.6m rectangle centered at origin
+    Top (Z=1.5): 0.4m x 0.4m square centered at (0.3, 0.2)
+
+    Returns:
+        ConvexPolygonSimpleLoft CSG object
+    """
+    bottom_points = [
+        Matrix([scalar(1, 2), scalar(3, 10)]),
+        Matrix([scalar(-1, 2), scalar(3, 10)]),
+        Matrix([scalar(-1, 2), scalar(-3, 10)]),
+        Matrix([scalar(1, 2), scalar(-3, 10)]),
+    ]
+
+    top_center = Matrix([scalar(3, 10), scalar(1, 5)])
+    top_half_size = scalar(1, 5)
+    top_points = [
+        top_center + Matrix([top_half_size, top_half_size]),
+        top_center + Matrix([-top_half_size, top_half_size]),
+        top_center + Matrix([-top_half_size, -top_half_size]),
+        top_center + Matrix([top_half_size, -top_half_size]),
+    ]
+
+    return ConvexPolygonSimpleLoft(
+        bottom_points=bottom_points,
+        top_points=top_points,
+        start_distance=scalar(0),
+        end_distance=scalar(3, 2),
+        transform=Transform.identity(),
+    )
 
 
 def example_lap_cut_on_timber():
@@ -636,6 +679,11 @@ EXAMPLES = {
         'description': 'Regular hexagon (0.5m radius) extruded to 1m height',
         'function': example_hexagon_extrusion
     },
+    'asymmetric_frustum_loft': {
+        'name': 'Asymmetric Frustum (ConvexPolygonSimpleLoft)',
+        'description': '1m x 0.6m rectangle at bottom tapering to an offset 0.4m x 0.4m square at top',
+        'function': example_asymmetric_frustum_loft
+    },
     'lap_cut_timber': {
         'name': 'Lap Cut on Timber',
         'description': '4"x4"x4\' timber with 4" lap cut on top end (tests chop_lap_on_timber_end)',
@@ -709,6 +757,7 @@ patterns = [
     Pattern(path="csg_debug/positioned_cube", lambda_=make_pattern_from_csg(example_cube_at_position), pattern_type='csg', tags=['poop']),
     Pattern(path="csg_debug/union_cubes", lambda_=make_pattern_from_csg(example_union_of_cubes), pattern_type='csg', tags=['poop']),
     Pattern(path="csg_debug/hexagon_extrusion", lambda_=make_pattern_from_csg(example_hexagon_extrusion), pattern_type='csg', tags=['poop']),
+    Pattern(path="csg_debug/asymmetric_frustum_loft", lambda_=make_pattern_from_csg(example_asymmetric_frustum_loft), pattern_type='csg', tags=['poop']),
     Pattern(path="csg_debug/lap_cut_timber", lambda_=make_pattern_from_csg(example_lap_cut_on_timber), pattern_type='csg', tags=['poop']),
     Pattern(path="csg_debug/gooseneck_profile_cut", lambda_=make_pattern_from_csg(example_gooseneck_profile_cut), pattern_type='csg', tags=['poop']),
     Pattern(path="csg_debug/shoulder_notch_on_timber", lambda_=make_pattern_from_csg(example_shoulder_notch_on_timber), pattern_type='csg', tags=['poop']),

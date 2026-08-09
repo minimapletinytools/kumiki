@@ -16,6 +16,7 @@ from typing import Any, List, Optional, Union, cast
 
 from .cutcsg import (
     ConvexPolygonExtrusion,
+    ConvexPolygonSimpleLoft,
     CutCSG,
     Cylinder,
     Difference,
@@ -45,6 +46,7 @@ BRepBuilderAPI_MakeWire = cast(Any, None)
 BRepBuilderAPI_MakeFace = cast(Any, None)
 BRepBuilderAPI_Transform = cast(Any, None)
 BRepPrimAPI_MakePrism = cast(Any, None)
+BRepOffsetAPI_ThruSections = cast(Any, None)
 gp_Pnt = cast(Any, None)
 gp_Vec = cast(Any, None)
 gp_Dir = cast(Any, None)
@@ -69,6 +71,7 @@ try:
     _BRepPrimAPI = importlib.import_module("OCP.BRepPrimAPI")
     _BRepAlgoAPI = importlib.import_module("OCP.BRepAlgoAPI")
     _BRepBuilderAPI = importlib.import_module("OCP.BRepBuilderAPI")
+    _BRepOffsetAPI = importlib.import_module("OCP.BRepOffsetAPI")
     _gp = importlib.import_module("OCP.gp")
     _TopoDS = importlib.import_module("OCP.TopoDS")
     _BRep = importlib.import_module("OCP.BRep")
@@ -92,6 +95,7 @@ try:
     BRepBuilderAPI_MakeWire = getattr(_BRepBuilderAPI, "BRepBuilderAPI_MakeWire")
     BRepBuilderAPI_MakeFace = getattr(_BRepBuilderAPI, "BRepBuilderAPI_MakeFace")
     BRepBuilderAPI_Transform = getattr(_BRepBuilderAPI, "BRepBuilderAPI_Transform")
+    BRepOffsetAPI_ThruSections = getattr(_BRepOffsetAPI, "BRepOffsetAPI_ThruSections")
 
     gp_Pnt = getattr(_gp, "gp_Pnt")
     gp_Vec = getattr(_gp, "gp_Vec")
@@ -379,6 +383,8 @@ def _csg_to_ocp(csg: CutCSG) -> "TopoDS_Shape":
             return _cylinder_to_ocp(csg)
         if isinstance(csg, ConvexPolygonExtrusion):
             return _extrusion_to_ocp(csg)
+        if isinstance(csg, ConvexPolygonSimpleLoft):
+            return _loft_to_ocp(csg)
         if isinstance(csg, HalfSpace):
             return _halfspace_to_ocp(csg)
         if isinstance(csg, SolidUnion):
@@ -391,7 +397,7 @@ def _csg_to_ocp(csg: CutCSG) -> "TopoDS_Shape":
             f"[blueprint] STEP error in {type(csg).__name__}: {exc}",
             file=sys.stderr, flush=True,
         )
-        if isinstance(csg, (RectangularPrism, ConvexPolygonExtrusion)):
+        if isinstance(csg, (RectangularPrism, ConvexPolygonExtrusion, ConvexPolygonSimpleLoft)):
             m = csg.transform.orientation.matrix
             p = csg.transform.position
             print(
@@ -540,6 +546,37 @@ def _extrusion_to_ocp(ext: ConvexPolygonExtrusion) -> "TopoDS_Shape":
     shape = BRepPrimAPI_MakePrism(face, gp_Vec(0, 0, length)).Shape()
 
     return _transform_shape(shape, ext.transform)
+
+
+def _loft_to_ocp(loft: ConvexPolygonSimpleLoft) -> "TopoDS_Shape":
+    start = _to_mm(loft.start_distance)
+    end = _to_mm(loft.end_distance)
+
+    def _make_wire(points: list, z: float) -> "TopoDS_Shape":
+        pts = [(_to_mm(p[0]), _to_mm(p[1])) for p in points]
+        wire_builder = BRepBuilderAPI_MakeWire()
+        for i in range(len(pts)):
+            p1 = pts[i]
+            p2 = pts[(i + 1) % len(pts)]
+            edge = BRepBuilderAPI_MakeEdge(
+                gp_Pnt(p1[0], p1[1], z),
+                gp_Pnt(p2[0], p2[1], z),
+            ).Edge()
+            wire_builder.Add(edge)
+        return wire_builder.Wire()
+
+    bottom_wire = _make_wire(loft.bottom_points, start)
+    top_wire = _make_wire(loft.top_points, end)
+
+    # ruled=True gives straight-line lofting between corresponding wire vertices,
+    # matching ConvexPolygonSimpleLoft's own index-to-index vertex correspondence.
+    loft_builder = BRepOffsetAPI_ThruSections(True, True)
+    loft_builder.AddWire(bottom_wire)
+    loft_builder.AddWire(top_wire)
+    loft_builder.Build()
+    shape = loft_builder.Shape()
+
+    return _transform_shape(shape, loft.transform)
 
 
 def _halfspace_to_ocp(hs: HalfSpace) -> "TopoDS_Shape":

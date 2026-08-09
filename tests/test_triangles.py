@@ -3,6 +3,7 @@ import pytest
 from kumiki import (
     scalar,
     ConvexPolygonExtrusion,
+    ConvexPolygonSimpleLoft,
     Cylinder,
     Difference,
     EmptyCSG,
@@ -94,6 +95,77 @@ class TestTriangles:
         assert pytest.approx(bounds[1][0], abs=1e-6) == 2.0
         assert pytest.approx(bounds[0][2], abs=1e-6) == 1.0
         assert pytest.approx(bounds[1][2], abs=1e-6) == 4.0
+
+    def test_triangulate_convex_polygon_loft_matches_frustum_volume(self):
+        """A square-to-square loft (frustum) has a closed-form volume:
+        (h/3)*(A_bottom + A_top + sqrt(A_bottom*A_top))."""
+        bottom = [
+            create_v2(scalar(1), scalar(1)),
+            create_v2(scalar(-1), scalar(1)),
+            create_v2(scalar(-1), scalar(-1)),
+            create_v2(scalar(1), scalar(-1)),
+        ]
+        top = [
+            create_v2(scalar(1, 2), scalar(1, 2)),
+            create_v2(scalar(-1, 2), scalar(1, 2)),
+            create_v2(scalar(-1, 2), scalar(-1, 2)),
+            create_v2(scalar(1, 2), scalar(-1, 2)),
+        ]
+        loft = ConvexPolygonSimpleLoft(
+            bottom_points=bottom,
+            top_points=top,
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(2),
+        )
+
+        mesh = triangulate_cutcsg(loft).mesh
+        assert mesh.is_watertight
+
+        h, a_bottom, a_top = 2.0, 4.0, 1.0
+        expected_volume = (h / 3.0) * (a_bottom + a_top + (a_bottom * a_top) ** 0.5)
+        assert mesh.volume == pytest.approx(expected_volume)
+
+    def test_triangulate_convex_polygon_loft_asymmetric_offset(self):
+        """Bottom and top profiles need not share a center or size -- volume
+        should still match the exact prismatoid (Simpson's rule) formula,
+        which holds for any straight-line loft regardless of offset."""
+        bottom = [
+            create_v2(scalar(1), scalar(1)),
+            create_v2(scalar(-1), scalar(1)),
+            create_v2(scalar(-1), scalar(-1)),
+            create_v2(scalar(1), scalar(-1)),
+        ]
+        top = [p + create_v2(scalar(3), scalar(0)) for p in [
+            create_v2(scalar(1, 5), scalar(1, 5)),
+            create_v2(scalar(-1, 5), scalar(1, 5)),
+            create_v2(scalar(-1, 5), scalar(-1, 5)),
+            create_v2(scalar(1, 5), scalar(-1, 5)),
+        ]]
+        loft = ConvexPolygonSimpleLoft(
+            bottom_points=bottom,
+            top_points=top,
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(4),
+        )
+
+        mesh = triangulate_cutcsg(loft).mesh
+        assert mesh.is_watertight
+
+        # Simpson's rule over height is exact here because cross-sectional area
+        # is quadratic in height for any straight-line vertex loft.
+        a_bottom = 4.0
+        a_top = 0.16
+        mid_points = [(b + t) / 2 for b, t in zip(bottom, top)]
+        # shoelace formula for the (rectangular) midpoint cross-section
+        xs = [float(p[0]) for p in mid_points]
+        ys = [float(p[1]) for p in mid_points]
+        a_mid = 0.5 * abs(sum(xs[i] * ys[(i + 1) % 4] - xs[(i + 1) % 4] * ys[i] for i in range(4)))
+
+        h = 4.0
+        expected_volume = (h / 6.0) * (a_bottom + 4 * a_mid + a_top)
+        assert mesh.volume == pytest.approx(expected_volume)
 
     def test_triangulate_difference_reduces_volume(self):
         base = RectangularPrism(

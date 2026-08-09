@@ -15,6 +15,7 @@ from kumiki.cutcsg import (
     Intersection,
     Difference,
     ConvexPolygonExtrusion,
+    ConvexPolygonSimpleLoft,
     BoundingBox,
     EmptyCSG,
     PrismFace,
@@ -1513,6 +1514,221 @@ class TestConvexPolygonExtrusion:
         assert "ConvexPolygonExtrusion" in repr_str
         assert "3 points" in repr_str
         assert "5" in repr_str
+
+
+class TestConvexPolygonSimpleLoft:
+    """Test ConvexPolygonSimpleLoft class."""
+
+    def _square(self, half_size):
+        return [
+            Matrix([half_size, half_size]),
+            Matrix([-half_size, half_size]),
+            Matrix([-half_size, -half_size]),
+            Matrix([half_size, -half_size]),
+        ]
+
+    def test_constructor(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(10),
+                                  transform=Transform.identity())
+
+        assert loft.bottom_points == bottom
+        assert loft.top_points == top
+        assert loft.start_distance == scalar(0)
+        assert loft.end_distance == scalar(10)
+
+    def test_is_valid_requires_matching_point_count(self):
+        bottom = self._square(scalar(2))
+        top = [Matrix([0, 0]), Matrix([1, 0]), Matrix([0, 1])]  # triangle: different count
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(10))
+        assert loft.is_valid() == False
+
+    def test_is_valid_requires_end_after_start(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+
+        loft_zero = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                       start_distance=scalar(5), end_distance=scalar(5))
+        assert loft_zero.is_valid() == False
+
+        loft_negative = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                           start_distance=scalar(5), end_distance=scalar(0))
+        assert loft_negative.is_valid() == False
+
+    def test_is_valid_requires_both_profiles_convex(self):
+        bottom = self._square(scalar(2))
+        # Concave "arrow" profile, same shape used in the extrusion convexity test
+        top_concave = [Matrix([0, 2]), Matrix([2, 0]), Matrix([0, -2]), Matrix([1, 0])]
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top_concave,
+                                  start_distance=scalar(0), end_distance=scalar(10))
+        assert loft.is_valid() == False
+
+    def test_is_valid_requires_matching_winding(self):
+        bottom_ccw = self._square(scalar(2))
+        top_cw = [Matrix([1, 1]), Matrix([1, -1]), Matrix([-1, -1]), Matrix([-1, 1])]
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom_ccw, top_points=top_cw,
+                                  start_distance=scalar(0), end_distance=scalar(10))
+        assert loft.is_valid() == False
+
+    def test_is_valid_matching_convex_profiles_passes(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(10))
+        assert loft.is_valid() == True
+
+    def test_contains_point_caps(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4))
+
+        assert loft.contains_point(Matrix([scalar(0), scalar(0), scalar(0)])) == True
+        assert loft.contains_point(Matrix([scalar(0), scalar(0), scalar(4)])) == True
+        assert loft.contains_point(Matrix([scalar(0), scalar(0), scalar(-1)])) == False
+        assert loft.contains_point(Matrix([scalar(0), scalar(0), scalar(5)])) == False
+
+    def test_contains_point_tapered_cross_section(self):
+        """Core new behavior vs. ConvexPolygonExtrusion: the cross-section
+        shrinks with height instead of staying constant."""
+        bottom = self._square(scalar(2))  # half-width 2 at z=0
+        top = self._square(scalar(1))     # half-width 1 at z=4
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4))
+
+        # At z=2 (halfway), half-width should be 1.5
+        assert loft.contains_point(Matrix([scalar(7, 5), scalar(0), scalar(2)])) == True
+        assert loft.contains_point(Matrix([scalar(8, 5), scalar(0), scalar(2)])) == False
+
+    def test_contains_point_asymmetric_offset_taper(self):
+        """Bottom and top need not share a center -- a 'leaning' loft."""
+        bottom = self._square(scalar(1))
+        top = [p + Matrix([scalar(5), scalar(0)]) for p in self._square(scalar(1))]
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(10))
+
+        assert loft.contains_point(Matrix([scalar(0), scalar(0), scalar(0)])) == True
+        assert loft.contains_point(Matrix([scalar(5), scalar(0), scalar(10)])) == True
+        assert loft.contains_point(Matrix([scalar(5), scalar(0), scalar(0)])) == False
+        assert loft.contains_point(Matrix([scalar(0), scalar(0), scalar(10)])) == False
+        # Halfway up, the cross-section center should have moved to (2.5, 0)
+        assert loft.contains_point(Matrix([scalar(5, 2), scalar(0), scalar(5)])) == True
+
+    def test_is_point_on_boundary_caps(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4))
+
+        assert loft.is_point_on_boundary(Matrix([scalar(0), scalar(0), scalar(0)])) == True
+        assert loft.is_point_on_boundary(Matrix([scalar(0), scalar(0), scalar(4)])) == True
+
+    def test_is_point_on_boundary_tapered_side_face(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4))
+
+        # Halfway up, the +x face sits at x=1.5, not x=2
+        assert loft.is_point_on_boundary(Matrix([scalar(3, 2), scalar(0), scalar(2)])) == True
+        assert loft.is_point_on_boundary(Matrix([scalar(2), scalar(0), scalar(2)])) == False
+
+    def test_is_point_on_boundary_interior_false(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4))
+
+        assert loft.is_point_on_boundary(Matrix([scalar(0), scalar(0), scalar(2)])) == False
+
+    def test_get_outward_normal_caps(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4))
+
+        assert loft.get_outward_normal(Matrix([scalar(0), scalar(0), scalar(0)])) == Matrix([0, 0, -1])
+        assert loft.get_outward_normal(Matrix([scalar(0), scalar(0), scalar(4)])) == Matrix([0, 0, 1])
+
+    def test_get_outward_normal_tapered_side_face(self):
+        """A face that narrows going up should have an outward normal tilting
+        away from vertical, matching the closed-form gradient of the tapering
+        plane: half-width(z) = 2 - z/4, so the (unnormalized) normal is
+        (1, 0, 1/4) -> normalized (4, 0, 1)/sqrt(17)."""
+        import math
+
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4))
+
+        normal = loft.get_outward_normal(Matrix([scalar(3, 2), scalar(0), scalar(2)]))
+        assert normal is not None
+        nx, ny, nz = float(normal[0]), float(normal[1]), float(normal[2])
+
+        assert nx ** 2 + ny ** 2 + nz ** 2 == pytest.approx(1.0)
+        assert nx == pytest.approx(4 / math.sqrt(17))
+        assert ny == pytest.approx(0.0, abs=1e-9)
+        assert nz == pytest.approx(1 / math.sqrt(17))
+
+    def test_get_aabb(self, symbolic_mode):
+        bottom = self._square(scalar(3))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(5),
+                                  transform=Transform.identity())
+
+        bbox = loft.get_aabb()
+        assert bbox.min_x == scalar(-3)
+        assert bbox.max_x == scalar(3)
+        assert bbox.min_y == scalar(-3)
+        assert bbox.max_y == scalar(3)
+        assert bbox.min_z == scalar(0)
+        assert bbox.max_z == scalar(5)
+
+    def test_repr(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(5))
+
+        repr_str = repr(loft)
+        assert "ConvexPolygonSimpleLoft" in repr_str
+        assert "4->4 points" in repr_str
+
+    def test_translate_csg(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                  start_distance=scalar(0), end_distance=scalar(4),
+                                  transform=Transform.identity())
+
+        translated = translate_csg(loft, Matrix([scalar(10), scalar(0), scalar(0)]))
+        assert isinstance(translated, ConvexPolygonSimpleLoft)
+        assert translated.contains_point(Matrix([scalar(10), scalar(0), scalar(0)])) == True
+        assert translated.contains_point(Matrix([scalar(0), scalar(0), scalar(0)])) == False
+
+    def test_adopt_csg(self):
+        bottom = self._square(scalar(2))
+        top = self._square(scalar(1))
+        local_loft = ConvexPolygonSimpleLoft(bottom_points=bottom, top_points=top,
+                                        start_distance=scalar(0), end_distance=scalar(4),
+                                        transform=Transform.identity())
+        orig_transform = Transform(
+            position=Matrix([scalar(3), scalar(4), scalar(5)]),
+            orientation=Orientation.rotate_left(),
+        )
+
+        adopted = adopt_csg(orig_transform, None, local_loft)
+
+        assert isinstance(adopted, ConvexPolygonSimpleLoft)
+        for axis in range(3):
+            assert adopted.transform.position[axis].equals(orig_transform.position[axis])
+        assert adopted.bottom_points == bottom
+        assert adopted.top_points == top
 
 
 class TestBoundaryDetectionComprehensive:

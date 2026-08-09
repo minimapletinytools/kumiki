@@ -1564,6 +1564,298 @@ class ConvexPolygonExtrusion(CutCSG):
         )
 
 
+@dataclass(frozen=True)
+class ConvexPolygonSimpleLoft(CutCSG):
+    """
+    A solid formed by straight-line lofting between two convex polygons in parallel
+    planes, connected index-to-index (vertex i of bottom_points connects by a
+    straight line to vertex i of top_points). Generalizes ConvexPolygonExtrusion
+    to the case where the cross-section changes shape/size/offset along the length
+    instead of staying constant -- ConvexPolygonExtrusion is the degenerate case
+    where bottom_points == top_points.
+
+    bottom_points and top_points must each independently be a valid convex polygon
+    (same rules as ConvexPolygonExtrusion.is_valid()) with the SAME number of points
+    wound in the SAME direction. Intermediate (lofted) cross-sections are NOT
+    checked for convexity or simplicity -- if the correspondence between the two
+    profiles is "twisted" enough (e.g. a profile rotated relative to the other),
+    an intermediate cross-section can become non-convex or self-intersecting, which
+    is undefined behavior for this primitive. This is safe for tapers/relief pockets
+    where each vertex moves along a roughly-monotonic path (the common case for
+    joinery), but this is NOT a general-purpose polygon morph.
+
+    Side faces are ruled surfaces and are only planar in the special case where the
+    taper is a pure independent per-axis scale from one profile to the other (e.g.
+    a rectangle-to-rectangle taper on the same axes); get_outward_normal accounts
+    for this and is not necessarily constant across a side face.
+
+    The polygons live in the local XY plane, with bottom_points at start_distance
+    and top_points at end_distance along the local Z-axis, matching the
+    position/orientation conventions of RectangularPrism and ConvexPolygonExtrusion.
+    Unlike those two, start_distance/end_distance must both be finite -- an
+    infinite loft has no meaningful cross-section to loft towards.
+
+    Args:
+        bottom_points: convex polygon at start_distance (local XY plane)
+        top_points: convex polygon at end_distance (local XY plane), same point
+            count and winding direction as bottom_points
+        start_distance: distance from position along Z-axis to bottom_points
+        end_distance: distance from position along Z-axis to top_points
+        transform: Transform (position and orientation) in global coordinates (default: identity)
+    """
+    bottom_points: Profile
+    top_points: Profile
+    start_distance: Numeric
+    end_distance: Numeric
+    transform: Transform = field(default_factory=Transform.identity)
+
+    def get_bottom_position(self) -> V3:
+        """Get the position of the bottom of the loft (at start_distance)."""
+        return self.transform.position - safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.start_distance]))
+
+    def get_top_position(self) -> V3:
+        """Get the position of the top of the loft (at end_distance)."""
+        return self.transform.position + safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.end_distance]))
+
+    def __repr__(self) -> str:
+        return (f"ConvexPolygonSimpleLoft({len(self.bottom_points)}->{len(self.top_points)} points, "
+                f"transform={self.transform}, start={self.start_distance}, end={self.end_distance})")
+
+    def is_valid(self) -> bool:
+        """
+        Check if the ConvexPolygonSimpleLoft is valid.
+
+        Checks:
+        1. bottom_points and top_points each have at least 3 points
+        2. bottom_points and top_points have the same number of points
+        3. end_distance > start_distance
+        4. bottom_points and top_points are each individually convex
+
+        Does NOT check that intermediate (lofted) cross-sections stay convex or
+        simple -- see class docstring.
+        """
+        if len(self.bottom_points) < 3 or len(self.top_points) < 3:
+            return False
+        if len(self.bottom_points) != len(self.top_points):
+            return False
+        if safe_compare(self.end_distance, self.start_distance, Comparison.LE):
+            return False
+
+        def winding_sign(points: Profile) -> Optional[int]:
+            """+1 for CCW-convex, -1 for CW-convex, None if not convex."""
+            n = len(points)
+
+            def cross_product_2d(i):
+                p0, p1, p2 = points[i], points[(i + 1) % n], points[(i + 2) % n]
+                edge1, edge2 = p1 - p0, p2 - p1
+                return edge1[0] * edge2[1] - edge1[1] * edge2[0]
+
+            cross_products = [cross_product_2d(i) for i in range(n)]
+            non_zero_crosses = [cp for cp in cross_products if not safe_zero_test(cp)]
+            if not non_zero_crosses:
+                return None
+            if all(safe_compare(cp, 0, Comparison.GT) for cp in non_zero_crosses):
+                return 1
+            if all(safe_compare(cp, 0, Comparison.LT) for cp in non_zero_crosses):
+                return -1
+            return None
+
+        bottom_winding = winding_sign(self.bottom_points)
+        top_winding = winding_sign(self.top_points)
+        # Both must be individually convex AND wound the same direction -- the
+        # index-to-index correspondence between bottom_points and top_points only
+        # means what it's documented to mean (a straight-line loft) if they agree.
+        return bottom_winding is not None and bottom_winding == top_winding
+
+    def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
+        """Project a global point onto this loft's local (x, y, z) axes."""
+        local_point = point - self.transform.position
+        local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
+        return local_coords[0], local_coords[1], local_coords[2]
+
+    def _height_fraction(self, z_coord: Numeric) -> Numeric:
+        """Fraction along the loft (0 at start_distance, 1 at end_distance) for a local Z coordinate."""
+        return cast(Numeric, (z_coord - self.start_distance) / (self.end_distance - self.start_distance))
+
+    def _cross_section_at(self, t: Numeric) -> Profile:
+        """The (index-matched, linearly interpolated) polygon at height-fraction t."""
+        return [bottom + (top - bottom) * t for bottom, top in zip(self.bottom_points, self.top_points)]
+
+    def contains_point(self, point: V3) -> bool:
+        """
+        Check if a point is contained within the loft.
+
+        Args:
+            point: Point to test (3x1 Matrix)
+
+        Returns:
+            True if the point is inside or on the boundary, False otherwise
+        """
+        x_coord, y_coord, z_coord = self._local_coords(point)
+
+        if safe_compare(z_coord - self.start_distance, 0, Comparison.LT):
+            return False
+        if safe_compare(z_coord - self.end_distance, 0, Comparison.GT):
+            return False
+
+        cross_section = self._cross_section_at(self._height_fraction(z_coord))
+        point_2d = Matrix([x_coord, y_coord])
+
+        for i in range(len(cross_section)):
+            p1 = cross_section[i]
+            p2 = cross_section[(i + 1) % len(cross_section)]
+            edge = p2 - p1
+            to_point = point_2d - p1
+            cross = edge[0] * to_point[1] - edge[1] * to_point[0]
+            if safe_compare(cross, 0, Comparison.LT):
+                return False
+
+        return True
+
+    def is_point_on_boundary(self, point: V3) -> bool:
+        """
+        Check if a point is on the boundary of the loft.
+
+        Args:
+            point: Point to test (3x1 Matrix)
+
+        Returns:
+            True if the point is on the boundary, False otherwise
+        """
+        if not self.contains_point(point):
+            return False
+
+        x_coord, y_coord, z_coord = self._local_coords(point)
+
+        if zero_test(z_coord - self.start_distance):
+            return True
+        if zero_test(z_coord - self.end_distance):
+            return True
+
+        cross_section = self._cross_section_at(self._height_fraction(z_coord))
+        point_2d = Matrix([x_coord, y_coord])
+
+        # On a lofted vertex (the straight line connecting a bottom vertex to its
+        # matching top vertex, evaluated at this height)
+        for vertex_2d in cross_section:
+            distance_sq = (point_2d[0] - vertex_2d[0]) ** 2 + (point_2d[1] - vertex_2d[1]) ** 2
+            if zero_test(distance_sq):
+                return True
+
+        # On a side face at this height
+        for i in range(len(cross_section)):
+            p1 = cross_section[i]
+            p2 = cross_section[(i + 1) % len(cross_section)]
+            edge = p2 - p1
+            to_point = point_2d - p1
+
+            edge_length_sq = edge[0] ** 2 + edge[1] ** 2
+            if zero_test(edge_length_sq):
+                continue
+
+            u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
+            u_in_range = safe_compare(u, 0, Comparison.GE) and safe_compare(u - scalar(1), 0, Comparison.LE)
+
+            if u_in_range:
+                closest_point = p1 + edge * u
+                distance_sq = (point_2d[0] - closest_point[0]) ** 2 + (point_2d[1] - closest_point[1]) ** 2
+                if zero_test(distance_sq):
+                    return True
+
+        return False
+
+    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+        """
+        Get the outward normal vector at a boundary point.
+
+        For the top/bottom caps this is the (constant) local ±Z axis. For a side
+        face, the face is in general a ruled (non-planar) surface, so the normal
+        is computed from the face's parametric partial derivatives at this point
+        rather than being constant across the face.
+
+        Args:
+            point: A point on the boundary
+
+        Returns:
+            The outward normal vector at the point, or None if cannot be determined
+        """
+        x_coord, y_coord, z_coord = self._local_coords(point)
+
+        if zero_test(z_coord - self.end_distance):
+            local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
+            return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+
+        if zero_test(z_coord - self.start_distance):
+            local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
+            return safe_transform_vector(self.transform.orientation.matrix, local_normal)
+
+        t_height = self._height_fraction(z_coord)
+        cross_section = self._cross_section_at(t_height)
+        point_2d = Matrix([x_coord, y_coord])
+        n = len(cross_section)
+
+        for i in range(n):
+            p1 = cross_section[i]
+            p2 = cross_section[(i + 1) % n]
+            edge = p2 - p1
+            to_point = point_2d - p1
+
+            edge_length_sq = edge[0] ** 2 + edge[1] ** 2
+            if safe_zero_test(edge_length_sq):
+                continue
+
+            u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
+            if not (safe_compare(u, 0, Comparison.GE) and safe_compare(u, 1, Comparison.LE)):
+                continue
+
+            closest_point = p1 + edge * u
+            distance_sq = (point_2d[0] - closest_point[0]) ** 2 + (point_2d[1] - closest_point[1]) ** 2
+            if not safe_zero_test(distance_sq):
+                continue
+
+            # Point is on the side face spanning edge i. Parametrize the face by
+            # (u, t): P(u, t) = lerp(bottom_i + u*(bottom_{i+1}-bottom_i),
+            #                        top_i + u*(top_{i+1}-top_i), t)
+            # and take dP/du x dP/dt as the (unnormalized, not-yet-oriented) normal.
+            bottom_i, bottom_i1 = self.bottom_points[i], self.bottom_points[(i + 1) % n]
+            top_i, top_i1 = self.top_points[i], self.top_points[(i + 1) % n]
+            length = self.end_distance - self.start_distance
+
+            d_edge = (scalar(1) - t_height) * (bottom_i1 - bottom_i) + t_height * (top_i1 - top_i)
+            d_height_xy = (top_i - bottom_i) + u * ((top_i1 - top_i) - (bottom_i1 - bottom_i))
+
+            d_edge_3d = Matrix([d_edge[0], d_edge[1], scalar(0)])
+            d_height_3d = Matrix([d_height_xy[0], d_height_xy[1], length])
+            local_normal = cross_product(d_edge_3d, d_height_3d)
+
+            # Orient outward: flip if it doesn't point away from this height's
+            # cross-section centroid (mirrors ConvexPolygonExtrusion's approach).
+            center_x = sum(p[0] for p in cross_section) / n
+            center_y = sum(p[1] for p in cross_section) / n
+            to_edge = closest_point - Matrix([center_x, center_y])
+            outward_dot = local_normal[0] * to_edge[0] + local_normal[1] * to_edge[1]
+            if safe_compare(outward_dot, 0, Comparison.LT):
+                local_normal = -local_normal
+
+            return safe_normalize_vector(safe_transform_vector(self.transform.orientation.matrix, local_normal))
+
+        return None
+
+    def get_aabb(self) -> BoundingBox:
+        corners_global = (
+            [self.transform.local_to_global(Matrix([pt[0], pt[1], self.start_distance])) for pt in self.bottom_points] +
+            [self.transform.local_to_global(Matrix([pt[0], pt[1], self.end_distance])) for pt in self.top_points]
+        )
+
+        xs = [p[0] for p in corners_global]
+        ys = [p[1] for p in corners_global]
+        zs = [p[2] for p in corners_global]
+        return BoundingBox(
+            _numeric_min(*xs), _numeric_min(*ys), _numeric_min(*zs),
+            _numeric_max(*xs), _numeric_max(*ys), _numeric_max(*zs),
+        )
+
+
 # ============================================================================
 # Polygon decomposition utility
 # ============================================================================
@@ -1763,6 +2055,10 @@ def translate_csg(csg: CutCSG, translation: V3) -> CutCSG:
         new_transform = replace(csg.transform, position=new_position)
         return replace(csg, transform=new_transform)
     if isinstance(csg, ConvexPolygonExtrusion):
+        new_position = csg.transform.position + translation
+        new_transform = replace(csg.transform, position=new_position)
+        return replace(csg, transform=new_transform)
+    if isinstance(csg, ConvexPolygonSimpleLoft):
         new_position = csg.transform.position + translation
         new_transform = replace(csg.transform, position=new_position)
         return replace(csg, transform=new_transform)
