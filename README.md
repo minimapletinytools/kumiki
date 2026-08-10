@@ -1,12 +1,14 @@
 # Kumiki
 
-Kumiki is a Code assisted Design (CoAD) library for programmatically designing timber framed structures and woodworking in general.
+Kumiki is a Code Assisted Design (CoAD) library for programmatically designing timber framed structures and woodworking in general.
 
 As Kumiki is a CoAD library, it is well suited for usage with AI agents.
 
 Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki designs!
 
 Kumiki is in BETA, try it out! There are many more features to come and expect frequent breaking changes accompanied by a minor version bump. The AI agent should be able to easily address any breaking API changes based on the changelog.
+
+![](oscarshed.png)
 
 ## setup
 
@@ -51,6 +53,12 @@ To generate drawings, your best bet right now is to export as STEP or STL files 
 1. ability to measure features relative to each other in Kigumi
 2. ability to generate and export drawings inside kigumi
 
+
+# Contributing
+
+If you'd like to contribute new joints, you can always create a new file in kumiki/joints/community and add yourself as a CODEOWNER for that file. These joints may eventually be promoted to the main joint folder. 
+
+If you'd like to contribute it's best to first contact me. There are plenty of joints and new features to work on :).
 
 ## Developing Kumiki
 
