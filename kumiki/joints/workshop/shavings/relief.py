@@ -920,23 +920,38 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
         return TimberFace.FRONT if sign_y_a > 0 else TimberFace.BACK
 
     # ------------------------------------------------------------------
-    # Per-edge bisector: for edge i, tan(dihedral_i / 2) relates in-plane reach (T) to
-    # depth (N) along that edge's own bisector between its adjacent long face and the
-    # shoulder plane. loft_depth is the deepest of the 4 natural depths; every edge's
-    # in-plane reach is then rescaled to that common depth, staying on its own (safe)
-    # bisector ray.
+    # Per-edge bisector: for edge i, the bisector between its adjacent long face's own
+    # OUTWARD normal and n_depth is normalize(face_normal + n_depth). Decomposing a move
+    # of arc-length T along that bisector into its n_depth component (depth) and its
+    # in-plane component (reach) gives depth = T*cos(dihedral/2), reach = T*sin(dihedral/2)
+    # -- so reach = depth * tan(dihedral/2), i.e. depth = reach / tan(dihedral/2). The
+    # dihedral used here is the SIGNED angle between face_normal and n_depth (no Abs): the
+    # bisector direction depends on which way face_normal actually points relative to
+    # n_depth, not just how far off-parallel it is. Concretely, opposite faces of the
+    # timber (e.g. RIGHT vs LEFT) have negated face_normal, so their SIGNED dihedral is
+    # generally supplementary (e.g. 45 vs 135 degrees), not equal -- folding that through
+    # Abs() bisects the wrong one of the two wedges the two planes form for whichever face
+    # has a negative dot product, sending that wall's bisector back toward the timber's own
+    # material instead of away from it.
+    #
+    # loft_depth is the deepest of the 4 natural depths (reach=imperfect_clearance_length
+    # for each wall, taken along its own bisector); every edge's in-plane reach is then
+    # rescaled to that common depth, staying on its own (safe) bisector ray.
     # ------------------------------------------------------------------
     tan_half_dihedrals = []
     for i in range(4):
         face_normal = butt_timber.get_face_direction_global(adjacent_face(i))
-        cos_dihedral = Min(Abs(safe_dot_product(face_normal, n_depth)), scalar(1))
+        cos_dihedral = Max(Min(safe_dot_product(face_normal, n_depth), scalar(1)), scalar(-1))
+        assert not zero_test(scalar(1) + cos_dihedral), (
+            f"{adjacent_face(i)} face of butt timber directly faces back through the shoulder plane"
+        )
         sin_dihedral = sqrt(scalar(1) - cos_dihedral ** 2)
         tan_half = sin_dihedral / (scalar(1) + cos_dihedral)
         assert not zero_test(tan_half), f"{adjacent_face(i)} face of butt timber is parallel to the shoulder plane"
         tan_half_dihedrals.append(tan_half)
 
-    loft_depth = Max(*[imperfect_clearance_length * t for t in tan_half_dihedrals])
-    edge_reaches = [loft_depth / t for t in tan_half_dihedrals]
+    loft_depth = Max(*[imperfect_clearance_length / t for t in tan_half_dihedrals])
+    edge_reaches = [loft_depth * t for t in tan_half_dihedrals]
 
     centroid = sum(bottom_points, Matrix([scalar(0), scalar(0)])) / scalar(4)
     offset_lines = []

@@ -269,9 +269,11 @@ class TestChopButtJointShoulderNotchRelief4Sided:
     def test_raking_joint_relieves_faces_independently(self):
         """
         A tenon raking along the mortise's own run (not just tilting sideways) meets its
-        RIGHT/LEFT faces square-on (90 degrees) but its FRONT/BACK faces at an angle --
-        the resulting loft should flare more in one axis than the other (not a uniform
-        scale-up), unlike the perpendicular case above.
+        RIGHT/LEFT faces square-on (90 degrees, negated width_dir dotted with n_depth is 0
+        either way -- unaffected by sign) but its FRONT/BACK faces at genuinely different
+        SIGNED angles to the shoulder plane (negated height_dir generally gives a
+        supplementary, not equal, signed dihedral) -- so unlike RIGHT/LEFT, which flare out
+        identically on both sides, FRONT and BACK must flare out by DIFFERENT amounts.
         """
         mortise = create_timber(
             length=scalar(100), size=create_v2(scalar(6), scalar(6)),
@@ -300,21 +302,29 @@ class TestChopButtJointShoulderNotchRelief4Sided:
 
         bottom_half_width = float(loft.bottom_points[0][0])
         bottom_half_height = float(loft.bottom_points[0][1])
-        top_half_width = float(loft.top_points[0][0])
-        top_half_height = float(loft.top_points[0][1])
 
         # Bottom (at the shoulder) is the tenon's own perfect cross-section, unaffected by
         # the rake in one axis (width, perpendicular to the rake) but stretched in the other
-        # (height, the oblique slice direction) -- matching the RIGHT/LEFT vs FRONT/BACK
-        # dihedral-angle split computed for this configuration.
+        # (height, the oblique slice direction).
         assert bottom_half_width == pytest.approx(2.0)
         assert bottom_half_height > 2.0
 
-        # The aspect ratio changes from bottom to top -- a uniform (non-raking) flare would
-        # keep width/height in the same proportion; this one stretches height much more.
-        bottom_ratio = bottom_half_height / bottom_half_width
-        top_ratio = top_half_height / top_half_width
-        assert top_ratio > bottom_ratio * 1.2
+        # RIGHT/LEFT (width axis, points 0/1 vs 2/3) flare out identically on both sides --
+        # width_dir is exactly perpendicular to n_depth here, so the sign flip between the
+        # two faces' normals doesn't change their (already zero) dot product with n_depth.
+        top_half_width_right = float(loft.top_points[0][0])
+        top_half_width_left = -float(loft.top_points[1][0])
+        assert top_half_width_right == pytest.approx(top_half_width_left)
+        assert top_half_width_right > bottom_half_width
+
+        # FRONT/BACK (height axis) flare out by DIFFERENT amounts -- the whole point of
+        # computing each wall's own SIGNED dihedral independently instead of a single
+        # Abs-based value shared by both.
+        top_half_height_front = float(loft.top_points[0][1])
+        top_half_height_back = -float(loft.top_points[2][1])
+        assert top_half_height_front > bottom_half_height
+        assert top_half_height_back > bottom_half_height
+        assert top_half_height_front != pytest.approx(top_half_height_back, rel=0.05)
 
     def test_raking_joint_produces_watertight_notch_and_correct_relief_containment(self):
         """
