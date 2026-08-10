@@ -106,6 +106,47 @@ def make_tongue_and_fork_butt_joint_angled_inset_example(position: V3, use_round
     return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
 
 
+def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
+    """
+    Create a tongue-and-fork butt joint at 138 degrees, shoulder flush with the receiving
+    (fork) timber's entry face (no inset). Same arrangement as
+    make_tongue_and_fork_butt_joint_angled_inset_example, isolating the angled
+    furthest-tip end-cut behavior from the separate shoulder-inset housing behavior.
+    """
+    from sympy import sin, cos, Integer
+    angle = degrees(138)
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+
+    receiving_bottom = position + create_v3(-TIMBER_LENGTH / scalar(2), scalar(0), scalar(0))
+    receiving_timber = _maybe_round_timber(create_timber(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=receiving_bottom,
+        length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="receiving_timber",
+    ), use_round_timbers)
+
+    butt_length_direction = create_v3(sin(angle), cos(angle), scalar(0))
+    butt_timber = _maybe_round_timber(create_timber(
+        length=TIMBER_LENGTH,
+        size=TIMBER_SIZE_2D,
+        bottom_position=position,
+        length_direction=butt_length_direction,
+        width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+        ticket="butt_timber",
+    ), use_round_timbers)
+
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=butt_timber,
+        receiving_timber=receiving_timber,
+        butt_timber_end=TimberEnd.BOTTOM,
+    )
+    joint = cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(arrangement)
+    return [CutTimber(cutting.timber, cuts=[cutting]) for cutting in joint.cuttings.values()]
+
+
 def make_butt_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
     """
     Create a butt joint where one timber butts into another.
@@ -283,14 +324,16 @@ def create_all_butt_joint_patterns(use_round_timbers=False) -> Frame:
     all_timbers = []
     all_timbers += make_tongue_and_fork_butt_joint_90_example(origin, use_round_timbers)
     all_timbers += make_tongue_and_fork_butt_joint_angled_inset_example(origin + create_v3(step, scalar(0), scalar(0)), use_round_timbers)
-    all_timbers += make_butt_joint_example(origin + create_v3(step * 2, scalar(0), scalar(0)), use_round_timbers)
-    all_timbers += make_butt_joint_3d_angles_example(origin + create_v3(step * 3, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_tongue_and_fork_butt_joint_angled_example(origin + create_v3(step * 2, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_butt_joint_example(origin + create_v3(step * 3, scalar(0), scalar(0)), use_round_timbers)
+    all_timbers += make_butt_joint_3d_angles_example(origin + create_v3(step * 4, scalar(0), scalar(0)), use_round_timbers)
     return Frame(cut_timbers=all_timbers, name="Butt Joint Patterns")
 
 
 patterns = [
     Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_90", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_90_example, "Tongue and Fork Butt Joint 90°"), pattern_type='frame', tags=['main']),
-    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_angled_inset_example, "Tongue and Fork Butt Joint (Angled + Inset)"), pattern_type='frame'),
+    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_angled_example, "Tongue and Fork Butt Joint (Angled)"), pattern_type='frame'),
+    Pattern(path="butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled_inset", lambda_=_make_frame_pattern(make_tongue_and_fork_butt_joint_angled_inset_example, "Tongue and Fork Butt Joint (Angled + Inset)"), pattern_type='frame'),
     Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint", lambda_=_make_frame_pattern(make_butt_joint_example, "Plain Butt Joint"), pattern_type='frame'),
     Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint_3d", lambda_=_make_frame_pattern(make_butt_joint_3d_angles_example, "Plain Butt Joint (3D)"), pattern_type='frame'),
     Pattern(path="butt_joints/cut_dropin_dovetail_butt_joint_on_face_aligned_timbers", lambda_=make_pattern_from_frame(create_dovetail_butt_joint_example), pattern_type='frame'),
