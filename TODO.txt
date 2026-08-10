@@ -1,3 +1,24 @@
+:: 8/7/2026 short shed script
+
+
+
+"I'm maple, and this is how I used kumiki and AI to create this 16x12 shed design (text overlay: it's the one from the learn to timber frame book)
+
+First, I ask the agent to establish the footprint of the building creating the sills and joists using mortise and tenon joinery for the corners and drop in joints for the joists.
+
+On each corner and side I have the agent place larger posts, capping each longer side with a beefy top plate (maybe show a cute cow graphic here)
+The shorter sides are joined together with a wedged half dovetail joint.
+
+Next we'll need girts to support the posts, and lets not forgot to add room for a door. (uhm, this was really quite a few prompts to get here, maybe show a sequence of shots as the girts and doors get added, or just show the final show after everything is added , I tihnk that's fine too.)
+
+I got a little eager here and prompted the agent too much at once so the braces are a mess, (show the clip with the bad braces) but it was easy enough to fix with a few clarifications.
+
+Lastly, I ask the agent add rafters aligning the second to last ones flush with the outside face of the structure.
+
+Amazing that's all it took. If you like to see more content like this please like, subscribe and stay tuned :O
+
+
+
 :: 8/8/2026 table script
 
 A while back I made this cute little coffee table, lets model it today in kumiki.
@@ -167,9 +188,8 @@ DONE-update mortise and tenon joint to use relative position tenon parameters (s
 DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
 
 -rename/reorg all mortise and tenon joints
-
-  -mortise_and_tenon_join/...
-  -delete 45 degree relative tenon size, basic, 
+  DONE-mortise_and_tenon_join/...
+  DONE-delete 45 degree relative tenon size, basic, 
   -face_aligned
   -plane_aligned
   -through_tenon
@@ -181,11 +201,11 @@ DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
   
   
 
--new notching plan
+DONE-new notching plan
   DONE/IGNORE-update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
   DONE-add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
-  -add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber, you can modify make chop_shoulder_notch_on_timber_face into an internal function and then call it from teh new one.
-  -FAT/PAT mortise and tenon joints now allow notched style and do it themselves rather than pass arg to parent
+  DONE-add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber, you can modify make chop_shoulder_notch_on_timber_face into an internal function and then call it from teh new one.
+  DONE-FAT/PAT mortise and tenon joints now allow notched style and do it themselves rather than pass arg to parent
 
 
 -consider doing the big 1 joint per file reorg
@@ -193,23 +213,6 @@ DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
   -maybe get ird of folder + example support, examples are always leaf nodes?
 -do joint rename to match what's in your new book
   -add shouder to cross lap joint
-
-
-
-"I'm maple, and this is how I used kumiki and AI to create this 16x12 shed design (text overlay: it's the one from the learn to timber frame book)
-
-First, I ask the agent to establish the footprint of the building creating the sills and joists using mortise and tenon joinery for the corners and drop in joints for the joists.
-
-On each corner and side I have the agent place larger posts, capping each longer side with a beefy top plate (maybe show a cute cow graphic here)
-The shorter sides are joined together with a wedged half dovetail joint.
-
-Next we'll need girts to support the posts, and lets not forgot to add room for a door. (uhm, this was really quite a few prompts to get here, maybe show a sequence of shots as the girts and doors get added, or just show the final show after everything is added , I tihnk that's fine too.)
-
-I got a little eager here and prompted the agent too much at once so the braces are a mess, (show the clip with the bad braces) but it was easy enough to fix with a few clarifications.
-
-Lastly, I ask the agent add rafters aligning the second to last ones flush with the outside face of the structure.
-
-Amazing that's all it took. If you like to see more content like this please like, subscribe and stay tuned :O
 
 
 
