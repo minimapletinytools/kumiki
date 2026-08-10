@@ -8,6 +8,38 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-08-10
+
+### kumiki
+
+#### Added
+
+- Added a corner (right-angle) mortise-and-tenon joint: `cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers`. `tenon_distance_from_end` positions the tenon along the joint-plane axis from the mortise timber's end face (0 = flush/exposed, i.e. equivalent to a tongue-and-fork corner joint); `tenon_lateral_offset` offsets it perpendicular to the joint plane. Each timber's stock is automatically end-cut flush with the other's outer face at the corner.
+- Added `ButtJointNotchReliefConfig` (an alternative to `ButtJointScribeReliefConfig`) for `cut_mortise_and_tenon_joint` / `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` / `cut_mortise_and_tenon_joint_on_face_aligned_timbers`: relieves only the material near an inset shoulder via a lofted frustum notch (4-sided in the general case, a cheaper 2-sided flat/flared form when the arrangement is plane-aligned) instead of scribing each timber's whole imperfect body onto the other.
+- Added `ConvexPolygonSimpleLoft` CSG primitive (`kumiki/cutcsg.py`): a straight-line loft between two arbitrary index-matched convex polygons, with mesh and OCP export support -- the basis for the new notch-relief geometry above.
+- `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` / `cut_mortise_and_tenon_joint_on_face_aligned_timbers` gained `tenon_width_relative_to_joint` / `tenon_height_relative_to_joint`, sizing the tenon relative to the shared joint plane (width = parallel to it, height = perpendicular) instead of the tenon timber's raw local X/Y axes. Provide these two together, or `tenon_size` (now optional), not both.
+- `cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers` / `cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers` gained `shoulder_inset`, and the tongue timber now gets a proper housing/shoulder cut when the shoulder is inset from its entry face (previously only the two cheek cuts were made, with no shoulder housing at all).
+
+#### Changed
+
+- **Breaking:** In `cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers` / `cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers`, `arrangement.butt_timber` and `arrangement.receiving_timber` swapped roles: `butt_timber` is now the fork (was the tongue) and `receiving_timber` is now the tongue (was the fork), matching how every other butt joint in this library assigns roles. The fork timber's end cut and slot depth were also fixed to correctly extend to the furthest tip for angled (non-perpendicular) joints, rather than just the centerline intersection.
+  **Migrate:** swap which timber you pass as `butt_timber` vs. `receiving_timber` at call sites.
+- **Breaking:** `tenon_size` is now optional and moved after `tenon_length` in `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` / `cut_mortise_and_tenon_joint_on_face_aligned_timbers`'s parameter order (to make room for the new relative-sizing pair above).
+  **Migrate:** pass `tenon_size` by keyword, or reorder positional args.
+- `mortise_and_tenon_joints.py` split out of `butt_joints.py` into its own module. All functions are still re-exported from the top-level `kumiki` package, so `import kumiki; kumiki.cut_mortise_and_tenon_joint(...)` is unaffected -- only direct submodule imports (`from kumiki.joints.workshop.butt_joints import cut_mortise_and_tenon_joint`) need updating to `kumiki.joints.workshop.mortise_and_tenon_joints`.
+- Cleaned up example pattern paths under `butt_joints/mortise_and_tenon/`, dropping a redundantly repeated `mortise_and_tenon_` prefix from leaf names (e.g. `mortise_and_tenon/mortise_and_tenon_double_angled` -> `mortise_and_tenon/double_angled`); removed the superseded `example_basic_mortise_and_tenon` and `example_mortise_and_tenon_45_degree_relative_tenon_size` patterns.
+
+#### Fixed
+
+- Fixed `chop_butt_joint_shoulder_notch_relief_4sided`'s dihedral-angle bisector: it used `Abs()` on the signed face-to-shoulder angle (making any two opposite faces always report an identical relief angle, even under a compound-angle approach where they genuinely differ) and had the reach/depth relationship along the bisector inverted. Both are fixed together (signed angle, `reach = depth * tan(dihedral / 2)`), verified by checking the actual tenon geometry stays fully cleared at every depth.
+- Fixed `chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided` with the same signed-angle/reach-depth fix (computed per side instead of from one shared value), and:
+  - quad-1's flared-axis extent now accounts for the oblique stretch where the tenon's perfect cross-section actually crosses the shoulder plane (previously used the un-stretched raw half-size, understating it for any raking approach).
+  - the flat-axis boundary now reaches the FURTHER of both timbers' own rough edges (previously the receiving timber's perfect edge only), guaranteeing the relief is a full transverse cut across the receiving timber's entire width rather than a pocket that could stop partway across it.
+
+#### Deprecated
+
+- `chop_shoulder_notch_aligned_with_timber`, `chop_shoulder_notch_on_timber_face`, and `chop_relief_for_butt_joint_arrangement` (in `kumiki.joints.workshop.shavings.relief`) are marked for future removal, superseded by `chop_butt_joint_shoulder_notch_relief_4sided` / `chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided`. No deprecation warning emitted yet -- these still work as before.
+
 ## [0.4.7] - 2026-08-04
 
 ### kumiki
