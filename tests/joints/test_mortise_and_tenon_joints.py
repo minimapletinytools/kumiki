@@ -292,6 +292,177 @@ class TestMortiseAndTenonJointNotchReliefConfig:
         assert not tenon_csg_with_relief.contains_point(core_point)
 
 
+class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
+    """
+    Tests for relief=ButtJointNotchReliefConfig() in
+    cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
+    cut_mortise_and_tenon_joint_on_face_aligned_timbers.
+
+    These wrappers know the arrangement is plane-aligned, so they should use
+    chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided (2 flat walls,
+    2 flared walls) themselves -- applying it directly and passing
+    relief=DisableInsetShoulderNotchingReliefConfig() (NOT None -- see that config's own
+    docstring) down to cut_mortise_and_tenon_joint, so its default SCRIBE-based
+    inset-shoulder housing cut is skipped entirely rather than redundantly unioned on top.
+
+    Probe points below are given in intuitive GLOBAL terms and converted to the mortise
+    timber's own LOCAL frame (what Cutting.negative_csg.contains_point actually expects --
+    see the Cutting docstring) via _mortise_local, using this fixture's specific layout:
+    mortise runs along global +X centered at the origin (bottom_position=(-50,0,0), local
+    Z=length=global X, local X=width=global Y, local Y=height=global Z), so
+    local(a,b,c) = global(c-50, a, b).
+    """
+
+    @staticmethod
+    def _mortise_local(gx, gy, gz):
+        return create_v3(scalar(gy), scalar(gz), gx + scalar(50))
+
+    def test_notch_relief_actually_applied_via_face_aligned_wrapper(self, symbolic_mode, simple_T_configuration):
+        """Regression guard mirroring TestMortiseAndTenonJointNotchReliefConfig's own:
+        relief must have a real effect through this wrapper too, not be silently dropped."""
+        tenon_timber, mortise_timber = simple_T_configuration
+
+        joint_no_relief = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+            ),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_inset=scalar(1),
+            relief=None,
+        )
+        joint_with_relief = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+            ),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_inset=scalar(1),
+            relief=ButtJointNotchReliefConfig(),
+        )
+
+        mortise_csg_no_relief = joint_no_relief.cuttings["mortise_timber"].negative_csg
+        mortise_csg_with_relief = joint_with_relief.cuttings["mortise_timber"].negative_csg
+        assert mortise_csg_no_relief is not None
+        assert mortise_csg_with_relief is not None
+
+        # Mortise is 6x6, shoulder inset 1 from the entry face -> shoulder at global Z=2. A
+        # point at the mortise's own Y-edge (P-axis, flat at the full rough half-size 3),
+        # just past the shoulder, must be relieved WITH the notch config but not without it.
+        p_axis_edge_point = self._mortise_local(0, 3, scalar(21, 10))
+        assert not mortise_csg_no_relief.contains_point(p_axis_edge_point)
+        assert mortise_csg_with_relief.contains_point(p_axis_edge_point)
+
+    def test_uses_2sided_not_4sided_notch(self, symbolic_mode, simple_T_configuration):
+        """
+        Distinguishing behavior vs the 4-sided notch (used when calling
+        cut_mortise_and_tenon_joint directly): the P-axis (Y here) must stay FLAT at the
+        mortise's own rough edge (3) even at a depth where the 4-sided version would have
+        already flared past it. Uses a deep-inset shoulder (large clearance requirement) so
+        the two versions diverge clearly within the notch's own depth range.
+        """
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_inset=scalar(1),
+            relief=ButtJointNotchReliefConfig(),
+        )
+        mortise_csg = joint.cuttings["mortise_timber"].negative_csg
+        assert mortise_csg is not None
+
+        # Just past the P-axis (Y) edge at 3: never touched, at any depth within the notch.
+        just_beyond_p_edge = self._mortise_local(0, scalar(31, 10), scalar(21, 10))
+        assert not mortise_csg.contains_point(just_beyond_p_edge)
+
+        # Just inside the P-axis edge, deep into the notch: relieved.
+        just_inside_p_edge = self._mortise_local(0, scalar(29, 10), 4)
+        assert mortise_csg.contains_point(just_inside_p_edge)
+
+    def test_does_not_also_apply_the_redundant_default_scribe_housing_cut(self, symbolic_mode, simple_T_configuration):
+        """
+        Regression guard: previously, relief=ButtJointNotchReliefConfig() through this
+        wrapper passed relief=None down to cut_mortise_and_tenon_joint, which (since None
+        isn't a ButtJointNotchReliefConfig) fell through to that inner call's OWN default
+        SCRIBE-based inset-shoulder housing cut -- unioned in ON TOP OF the 2-sided relief
+        this wrapper already applies. Unlike the 2-sided notch's own Q-axis flare (which
+        starts tight at the tenon's PERFECT Q half-size and only grows gradually with
+        depth), the SCRIBE cut scribes the tenon's full ROUGH cross-section immediately past
+        the shoulder, regardless of depth. Oversizing the tenon's rough WIDTH (Q axis) makes
+        this visible: a point just past the shoulder, beyond the correct notch's own
+        (barely-flared-yet) Q reach at that shallow depth but still within the tenon's
+        oversized rough width, would have been caught by the redundant scribe cut even
+        though the correct construction must not relieve it yet at that depth.
+        """
+        from dataclasses import replace
+
+        tenon_timber, mortise_timber = simple_T_configuration
+        imperfect_tenon = replace(
+            tenon_timber,
+            rough_half_sizes=(create_v2(scalar(5), scalar(5)), create_v2(scalar(2), scalar(2))),
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=imperfect_tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_inset=scalar(1),
+            relief=ButtJointNotchReliefConfig(),
+        )
+        mortise_csg = joint.cuttings["mortise_timber"].negative_csg
+        assert mortise_csg is not None
+
+        # Shoulder at global Z=2; Q axis here is global X (the mortise's own length axis --
+        # see class docstring). Just past the shoulder (Z=2.1) and 3 units along Q (within
+        # the tenon's oversized rough width of 5, but beyond the correct notch's own Q reach
+        # at this shallow a depth, which is barely past its unflared base of 2): the
+        # redundant scribe cut (using the tenon's full rough width regardless of depth)
+        # would have relieved this; the correct construction must not, yet.
+        just_beyond_q_reach_near_shoulder = self._mortise_local(3, 0, scalar(21, 10))
+        assert not mortise_csg.contains_point(just_beyond_q_reach_near_shoulder)
+
+    def test_forwards_through_face_aligned_to_plane_aligned_wrapper(self, symbolic_mode, simple_T_configuration):
+        """cut_mortise_and_tenon_joint_on_face_aligned_timbers and
+        cut_mortise_and_tenon_joint_on_plane_aligned_timbers must produce identical results
+        for an arrangement that's valid for both (face-aligned implies plane-aligned)."""
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+        joint_face = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement, tenon_size=Matrix([scalar(2), scalar(2)]), tenon_length=scalar(3),
+            mortise_depth=scalar(2), mortise_shoulder_inset=scalar(1), relief=ButtJointNotchReliefConfig(),
+        )
+        joint_plane = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+            arrangement=arrangement, tenon_size=Matrix([scalar(2), scalar(2)]), tenon_length=scalar(3),
+            mortise_depth=scalar(2), mortise_shoulder_inset=scalar(1), relief=ButtJointNotchReliefConfig(),
+        )
+
+        probe_points = [
+            self._mortise_local(0, scalar(29, 10), 4),
+            self._mortise_local(0, 0, scalar(21, 10)),
+            self._mortise_local(0, 0, 90),
+        ]
+        mortise_face = joint_face.cuttings["mortise_timber"].negative_csg
+        mortise_plane = joint_plane.cuttings["mortise_timber"].negative_csg
+        assert mortise_face is not None and mortise_plane is not None
+        for point in probe_points:
+            assert mortise_face.contains_point(point) == mortise_plane.contains_point(point)
+
+
 class TestMortiseAndTenonRelativeTenonSizing:
 
     def test_relative_sizing_matches_equivalent_tenon_size(self, simple_T_configuration):

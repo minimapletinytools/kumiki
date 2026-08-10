@@ -402,6 +402,77 @@ def example_mortise_and_tenon_45_degree_relative_tenon_size(position=None, use_r
     )
 
 
+def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None):
+    """
+    Mortise and tenon on plane-aligned timbers, tenon approaching at 45 degrees (in the
+    XY plane) -- same arrangement as example_mortise_and_tenon_45_degree_relative_tenon_size
+    -- but both timbers are Timber (not the PerfectTimberWithin base) with ROUGH sizes 1"
+    larger than their perfect-timber-within size (0.5" extra on each side, symmetric), and
+    relief=ButtJointNotchReliefConfig() to demonstrate
+    chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided: since the
+    arrangement is plane-aligned, cut_mortise_and_tenon_joint_on_plane_aligned_timbers uses
+    the 2-sided notch (2 flat walls at the timbers' own rough edges, 2 flared walls) instead
+    of the fully-general 4-sided one, relieving the extra rough material on both timbers.
+    """
+    from sympy import sin, cos, pi
+
+    if position is None:
+        position = create_v3(scalar(0), scalar(0), scalar(0))
+
+    ptw_size = create_v2(inches(4), inches(5))
+    timber_length = inches(48)
+    # Rough half-size = PTW half-size + 0.5" on each side -> rough size = PTW size + 1" total.
+    rough_half_sizes = (
+        create_v2(ptw_size[0] / scalar(2) + inches(1, 2), ptw_size[0] / scalar(2) + inches(1, 2)),
+        create_v2(ptw_size[1] / scalar(2) + inches(1, 2), ptw_size[1] / scalar(2) + inches(1, 2)),
+    )
+
+    # Receiving (mortise) timber: runs along +X, centered at position
+    mortise_timber = Timber(
+        length=timber_length,
+        size=ptw_size,
+        transform=Transform(
+            position=position + create_v3(-timber_length / scalar(2), scalar(0), scalar(0)),
+            orientation=compute_timber_orientation(create_v3(scalar(1), scalar(0), scalar(0)), create_v3(scalar(0), scalar(0), scalar(1))),
+        ),
+        ticket=TimberTicket("mortise"),
+        rough_half_sizes=rough_half_sizes,
+    )
+
+    # Tenon timber: approaches from below at 45 degrees from the Y axis in the XY plane.
+    angle = pi / scalar(4)  # 45 degrees
+    tenon_dir = normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
+    tenon_width_dir = normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
+    tenon_bottom = position - tenon_dir * timber_length
+    tenon_timber = Timber(
+        length=timber_length,
+        size=ptw_size,
+        transform=Transform(
+            position=tenon_bottom,
+            orientation=compute_timber_orientation(tenon_dir, tenon_width_dir),
+        ),
+        ticket=TimberTicket("tenon"),
+        rough_half_sizes=rough_half_sizes,
+    )
+
+    arrangement = ButtJointTimberArrangement(
+        butt_timber=tenon_timber,
+        receiving_timber=mortise_timber,
+        butt_timber_end=TimberEnd.TOP,
+        front_face_on_butt_timber=TimberLongFace.FRONT,
+    )
+
+    return cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
+        arrangement=arrangement,
+        tenon_width_relative_to_joint=inches(3),
+        tenon_height_relative_to_joint=inches(1),
+        tenon_length=inches(3),
+        mortise_depth=inches(4),
+        mortise_shoulder_inset=inches(1),
+        relief=ButtJointNotchReliefConfig(),
+    )
+
+
 def example_brace_joint(position=None, use_round_timbers=False):
     """
     Create a brace joint with mortise and tenon connections.
@@ -1000,6 +1071,7 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_double_angled", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_double_angled_with_notch_relief", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon_with_notch_relief), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_45_degree_relative_tenon_size", lambda_=make_pattern_from_joint(example_mortise_and_tenon_45_degree_relative_tenon_size), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_joint_plane_aligned_notched_2sided", lambda_=make_pattern_from_joint(example_mortise_and_tenon_joint_plane_aligned_notched_2sided), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),
     Pattern(path="corner_joints/mortise_and_tenon/mortise_and_tenon_corner_joint", lambda_=make_pattern_from_joint(example_mortise_and_tenon_corner_joint), pattern_type='frame'),

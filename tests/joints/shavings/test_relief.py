@@ -16,6 +16,7 @@ from kumiki.joints.workshop.shavings.relief import (
     ShoulderReliefCSGGeometry,
     TripleButtJointScribeReliefConfig,
     chop_butt_joint_shoulder_notch_relief_4sided,
+    chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided,
     chop_relief_for_butt_joint_arrangement,
     chop_scribe_relief,
     chop_shoulder_notch_aligned_with_timber,
@@ -406,6 +407,236 @@ class TestChopButtJointShoulderNotchRelief4Sided:
         # Bounded to the timber's own real extent (length 50, rough half-size 3) -- not the
         # ~10000-unit fake-infinite half-space box the standalone relief CSG would show.
         assert applied_mesh.bounds[1][2] <= 51  # max Z comfortably within timber length
+
+
+class TestChopButtJointShoulderNotchReliefOnPlaneAlignedTimbers2Sided:
+    """
+    Tests for chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided.
+
+    Setup mirrors the 4-sided tests: mortise is 6x6 running along global X (its own
+    cross-section spans Y and Z, centered at the origin); tenon (4x4, perfect) rises along
+    global Z from the origin. This arrangement is plane-aligned (tenon's FRONT/BACK faces,
+    normal +-Y, are parallel to the mortise's RIGHT/LEFT faces, also normal +-Y) with joint
+    normal axis P = (0,-1,0) (Y) and flared axis Q = tenon's width axis (X).
+    """
+
+    def test_returns_none_for_flush_shoulder(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        assert chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(3)) is None
+
+    def test_raises_for_non_plane_aligned_arrangement(self):
+        non_plane_mortise = create_timber(
+            length=scalar(100), size=create_v2(scalar(6), scalar(6)),
+            bottom_position=create_v3(-scalar(50), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            ticket="non_plane_mortise",
+        )
+        non_plane_tenon = create_timber(
+            length=scalar(100), size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+            width_direction=normalize_vector(create_v3(scalar(1), scalar(0), scalar(1))),
+            ticket="non_plane_tenon",
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=non_plane_mortise, butt_timber=non_plane_tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        with pytest.raises(AssertionError):
+            chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(1))
+
+    def test_p_axis_is_flat_across_full_depth_at_receiving_timbers_own_edge(self, simple_T_configuration):
+        """
+        The P-axis (joint normal axis, Y here) walls must be FLAT (constant extent) across
+        the notch's ENTIRE depth, sitting at the receiving timber's own rough half-size (3,
+        for the 6x6 mortise) -- not flared/tapered like the 4-sided version's walls, and not
+        confined to the (smaller) 4x4 tenon's own footprint.
+        """
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
+        assert geom is not None
+        loft = geom.receiving_timber_notch_negative_CSG
+        assert isinstance(loft, ConvexPolygonSimpleLoft)
+
+        for points in (loft.bottom_points, loft.top_points):
+            for point in points:
+                assert abs(float(point[0])) == pytest.approx(3.0)
+
+    def test_q_axis_flares_like_4sided_from_perfect_tenon_size(self, simple_T_configuration):
+        """The Q-axis (flared) walls behave like the 4-sided version: quad-1 sits at the
+        butt timber's own PERFECT half-size, quad-2 flares outward."""
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
+        assert geom is not None
+        loft = geom.receiving_timber_notch_negative_CSG
+        assert isinstance(loft, ConvexPolygonSimpleLoft)
+
+        for point in loft.bottom_points:
+            assert abs(float(point[1])) == pytest.approx(2.0)  # tenon's own perfect half-width
+        for point in loft.top_points:
+            assert abs(float(point[1])) > 2.0
+
+    def test_q_axis_quad1_uses_ptw_at_shoulder_not_raw_half_size_for_raking_tenon(self):
+        """
+        For a raking (but still plane-aligned) tenon -- e.g. a 45-degree brace -- quad-1's
+        Q-extent must be the tenon's PTW cross-section footprint where it actually crosses
+        the shoulder plane, not the tenon's raw (un-stretched) half-size. Mirrors the
+        4-sided version's equivalent per-corner shoulder-plane intersection.
+        """
+        mortise_timber = create_timber(
+            length=scalar(100), size=create_v2(scalar(6), scalar(6)),
+            bottom_position=create_v3(-scalar(50), scalar(0), scalar(0)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+            ticket="mortise_timber",
+        )
+        raking_dir = normalize_vector(create_v3(scalar(1), scalar(0), scalar(1)))
+        tenon_timber = create_timber(
+            length=scalar(40), size=create_v2(scalar(4), scalar(4)),
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length_direction=raking_dir,
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+            ticket="tenon_timber",
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(1))
+        assert geom is not None
+        loft = geom.receiving_timber_notch_negative_CSG
+        assert isinstance(loft, ConvexPolygonSimpleLoft)
+
+        # Tenon's raw PTW half-size (perpendicular to the rake) is 2; raking 45 degrees in
+        # the (Q, n_depth) plane stretches the shoulder-plane footprint by 1/cos(45) = sqrt(2).
+        for point in loft.bottom_points:
+            assert abs(float(point[1])) == pytest.approx(2.0 * (2 ** 0.5))
+
+    def test_notch_extends_toward_tenon_not_backward_into_solid_mortise(self, simple_T_configuration):
+        """Same direction regression guard as the 4-sided version's equivalent test."""
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
+        assert geom is not None
+        from kumiki.cutcsg import adopt_csg
+        notch_global = adopt_csg(mortise_timber.transform, Transform.identity(), geom.receiving_timber_notch_negative_CSG)
+
+        # Shoulder at global Z=2 (toward tenon), entry face at Z=3.
+        forward_point = Matrix([scalar(0), scalar(0), scalar(35, 10)])   # Z=3.5: toward tenon
+        backward_point = Matrix([scalar(0), scalar(0), scalar(5, 10)])   # Z=0.5: mirrored, into solid mortise
+        assert notch_global.contains_point(forward_point)
+        assert not notch_global.contains_point(backward_point)
+
+    def test_p_boundary_is_the_further_of_either_timbers_rough_size_per_side(self, simple_T_configuration):
+        """
+        The flat P-axis walls must reach out to whichever is FURTHER, independently per
+        side, between the RECEIVING timber's own rough edge and the BUTT timber's own rough
+        edge on that axis -- guaranteeing a full transverse relief across the receiving
+        timber's entire width, not a pocket sized to only one of the two timbers. Uses
+        asymmetric rough sizes on both timbers, arranged so each side of the notch is won by
+        a DIFFERENT timber, to confirm both are actually compared (not just one hard-coded).
+        """
+        tenon_timber, mortise_timber = simple_T_configuration
+        # P axis here is the tenon's HEIGHT axis / the mortise's WIDTH axis (see class
+        # docstring), with the timbers' respective +axis directions pointing OPPOSITE ways
+        # along global Y (mortise +width = LEFT = -Y-ish; tenon +height = FRONT = +Y-ish) --
+        # verified directly against the resulting loft below rather than assumed.
+        imperfect_mortise = replace(
+            mortise_timber,
+            rough_half_sizes=(create_v2(scalar(5), scalar(2)), create_v2(scalar(3), scalar(3))),
+        )
+        imperfect_tenon = replace(
+            tenon_timber,
+            rough_half_sizes=(create_v2(scalar(2), scalar(2)), create_v2(scalar(3), scalar(6))),
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=imperfect_mortise, butt_timber=imperfect_tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
+        assert geom is not None
+        loft = geom.receiving_timber_notch_negative_CSG
+        assert isinstance(loft, ConvexPolygonSimpleLoft)
+
+        # One side: mortise's rough edge (5) beats the tenon's (3) -> boundary = 5.
+        # Other side: tenon's rough edge (6) beats the mortise's (2) -> boundary = 6.
+        p_values = sorted({round(abs(float(point[0])), 6) for point in loft.bottom_points})
+        assert p_values == [5.0, 6.0]
+        p_values_top = sorted({round(abs(float(point[0])), 6) for point in loft.top_points})
+        assert p_values_top == [5.0, 6.0]  # flat: identical at the far end too
+
+    def test_notch_angle_floors_depth_without_changing_reach(self, simple_T_configuration):
+        """A larger notch_angle floors the wall's own relief angle away from its natural
+        (shallowest-possible) bisector -- since reach = depth * tan(angle/2) is fixed at the
+        target clearance, a steeper floored angle needs LESS depth to reach that same
+        clearance, never more. tan(angle/2) only ever increases from its natural minimum
+        (never decreases), so depth only ever decreases (or stays the same, once the floor
+        is below the natural angle)."""
+        tenon_timber, mortise_timber = simple_T_configuration
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        from sympy import pi as _pi
+
+        geom_default = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
+        geom_angled = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
+            arrangement, scalar(2), notch_angle=degrees(60),
+        )
+        geom_tiny_angle = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
+            arrangement, scalar(2), notch_angle=degrees(1),
+        )
+        assert geom_default is not None and geom_angled is not None and geom_tiny_angle is not None
+        loft_default = geom_default.receiving_timber_notch_negative_CSG
+        loft_angled = geom_angled.receiving_timber_notch_negative_CSG
+        loft_tiny_angle = geom_tiny_angle.receiving_timber_notch_negative_CSG
+        assert isinstance(loft_default, ConvexPolygonSimpleLoft)
+        assert isinstance(loft_angled, ConvexPolygonSimpleLoft)
+        assert isinstance(loft_tiny_angle, ConvexPolygonSimpleLoft)
+
+        default_depth = float(loft_default.end_distance)
+        angled_depth = float(loft_angled.end_distance)
+        tiny_angle_depth = float(loft_tiny_angle.end_distance)
+
+        assert angled_depth < default_depth
+        assert tiny_angle_depth == pytest.approx(default_depth)  # floor (below natural), not override
+
+        # Reach (top_points) must be unaffected by the angle either way.
+        assert loft_default.top_points == loft_angled.top_points
+
+    def test_produces_watertight_geometry_for_imperfect_tenon(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        imperfect_tenon = replace(
+            tenon_timber,
+            rough_half_sizes=(create_v2(scalar(3), scalar(3)), create_v2(scalar(3), scalar(3))),
+        )
+        arrangement = ButtJointTimberArrangement(
+            receiving_timber=mortise_timber, butt_timber=imperfect_tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+        geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
+        assert geom is not None
+
+        from kumiki.cutcsg import adopt_csg
+        from kumiki.triangles import triangulate_cutcsg
+        notch_global = adopt_csg(mortise_timber.transform, Transform.identity(), geom.receiving_timber_notch_negative_CSG)
+        notch_mesh = triangulate_cutcsg(notch_global).mesh
+        assert notch_mesh.is_watertight
+        assert notch_mesh.volume > 0
+
+        relief_csg = geom.butting_timber_relief_negative_CSG
+        assert relief_csg is not None
+        far_point_local = Matrix([scalar(0), scalar(0), scalar(90)])
+        assert not relief_csg.contains_point(far_point_local)
+        collar_point_local = Matrix([scalar(0), scalar(0), scalar(1)])
+        assert not relief_csg.contains_point(collar_point_local)
 
 
 class TestChopShoulderNotchAlignedWithTimber:

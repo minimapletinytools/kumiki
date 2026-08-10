@@ -19,6 +19,7 @@ from kumiki.cutcsg import (
     Difference,
     HalfSpace,
     Intersection,
+    Profile,
     RectangularPrism,
     SolidUnion,
     adopt_csg,
@@ -115,6 +116,29 @@ class ButtJointNotchReliefConfig:
     Unlike ButtJointScribeReliefConfig (which scribes one timber's whole imperfect body
     onto the other), this relieves only the material near the inset shoulder using the
     4-sided frustum notch -- see chop_butt_joint_shoulder_notch_relief_4sided.
+    """
+    pass
+
+
+@dataclass(frozen=True)
+class DisableInsetShoulderNotchingReliefConfig:
+    """
+    INTERNAL ONLY -- not meant to be passed by callers of cut_mortise_and_tenon_joint
+    directly. Disables the "shoulder notch on mortise timber and matching relief on tenon
+    timber (when shoulder is inset from the mortise entry face)" step entirely (the SCRIBE-
+    based housing cut that runs whenever relief is None or a ButtJointScribeReliefConfig),
+    without enabling any other relief in its place.
+
+    Exists for cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
+    cut_mortise_and_tenon_joint_on_face_aligned_timbers: when the caller passes
+    ButtJointNotchReliefConfig, those wrappers compute
+    chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided themselves and
+    union it in after calling cut_mortise_and_tenon_joint. Passing relief=None down to that
+    inner call would (incorrectly) also trigger its own default SCRIBE-based inset-shoulder
+    notch -- redundant with, not a replacement for, the 2-sided relief the wrapper is about
+    to union in on top of it. Passing this config instead skips that inner step cleanly,
+    same as ButtJointNotchReliefConfig does for the fully-general 4-sided case, without
+    engaging any of ButtJointNotchReliefConfig's OWN (4-sided) relief logic.
     """
     pass
 
@@ -755,26 +779,297 @@ def chop_shoulder_notch_on_timber_face(
 
 def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     arrangement: ButtJointTimberArrangement,
-    notch_angle: Optional[Numeric] = None
-):
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
+    notch_angle: Optional[Numeric] = None,
+) -> ShoulderReliefCSGGeometry | None:
     """
+    Like ``chop_butt_joint_shoulder_notch_relief_4sided``, but restricted to PLANE-ALIGNED
+    arrangements, where it produces a simpler notch: only 2 of the 4 walls flare via the
+    dihedral-bisector construction; the other 2 don't flare at all -- they're pushed straight
+    out, for the notch's ENTIRE depth, to whichever is FURTHER along the "joint normal axis"
+    -- the shared normal of the two timbers' aligned long faces
+    (``arrangement.compute_normalized_timber_cross_product()``) -- between the RECEIVING
+    timber's own ROUGH edge and the BUTT timber's own ROUGH edge. This guarantees a full
+    TRANSVERSE relief spanning the receiving timber's entire width on this axis (never a
+    pocket that stops partway across it), and is safe specifically because plane-alignment
+    guarantees the butt timber's faces in that axis are exactly PARALLEL to the receiving
+    timber's own faces there -- there's no dihedral angle to bisect, so a straight-walled
+    channel is the natural choice, unlike the 4-sided version's fully general per-wall flare.
 
-    the notch extends the entire dimension of the receiving timber in the joint normal axis
+    Geometry, in outline (P = joint normal axis, Q = the butt timber's other cross-sectional
+    axis, both perpendicular to n_depth = the shoulder plane's normal):
+    - Along P: both the shoulder-plane cross-section (quad-1) and the far cross-section
+      (quad-2) span the SAME fixed extent -- per side, the FURTHER of the receiving timber's
+      own ROUGH half-size and the butt timber's own ROUGH half-size on that axis
+      (plane-alignment guarantees P is EXACTLY -- not just approximately -- one of EACH
+      timber's own width/height axes, the same shared axis ``are_timbers_plane_aligned``
+      identifies, so there's no oblique stretching to account for). Flat, unflared walls in
+      this axis, for the notch's whole depth.
+    - Along Q: quad-1 uses the butt timber's PERFECT cross-section as it actually crosses
+      the shoulder plane (same as the 4-sided version's quad-1 corners) -- NOT simply the
+      tenon's raw PTW half-size, which understates the footprint whenever the tenon's length
+      axis isn't perpendicular to the shoulder plane within the (Q, n_depth) plane (e.g. any
+      raking brace-style joint); quad-2 flares outward via the SAME per-wall dihedral-bisector
+      construction as the 4-sided version, using the SIGNED dihedral angle between each of
+      the butt timber's two Q-normal faces and the shoulder plane independently -- negated
+      normals generally give supplementary (not equal) signed angles, so the two flared
+      walls generally reach out by different amounts, same as any two non-opposite walls in
+      the 4-sided version would.
+    - The two flared (Q-direction) walls reach a common depth exactly as in the 4-sided
+      case (the deeper of their two natural depths); the two flat (P-direction) walls are,
+      by construction, already at a fixed extent for that whole depth, so no rescaling is
+      needed for them.
 
+    Args:
+        arrangement: butt joint arrangement; must be plane-aligned (raises via
+            ``arrangement.check_plane_aligned()`` otherwise).
+        mortise_shoulder_distance_from_centerline_or_centerplane: same as the 4-sided
+            version -- signed distance from the receiving timber's centerline to the
+            shoulder plane, toward the butt timber.
+        notch_angle: optional MINIMUM wall-relief angle (radians) for the 2 flared (Q-axis)
+            walls, floored independently against each wall's own natural dihedral-bisector
+            angle -- same "floor, not override" convention as
+            ``notch_wall_min_relief_cut_angle`` elsewhere in this file. None (default) uses
+            each wall's natural bisector angle only (the tightest safe notch). Has no effect
+            on the 2 flat (P-axis) walls, which never flare.
 
+    Returns ``None`` when no notch is required -- see ``does_shoulder_plane_need_notching``.
     """
-    assert "Not Implemented"
-
     error = arrangement.check_plane_aligned()
     assert error is None, error
 
-    # follow the same algorithm in chop_butt_joint_shoulder_notch_relief_4sided except to determine the edges of the frustum perpendicular to the receiving timber
-    # note some logic may be simpler because we can assume plane aligned
-    # for the 2 edges of the frustum parallel to the receiving timber
-    # first find the maximal distance of the rough face planes parallel to the joint plane to determine the extend of the last 2sides of our frustum
-    #   using get_half_rough_size_in_face_normal_axis for both directions of the joint plane normal on both timbers 
-    # construct the 2 polygons for the frustum using the info above, (intersect the perpendicular edges to the parallel max rough face planes to complete the polygon)
-    # prcoeed with CSG cutting logic from the frustum CSG same as chop_butt_joint_shoulder_notch_relief_4sided
+    if not does_shoulder_plane_need_notching(
+        arrangement,
+        mortise_shoulder_distance_from_centerline_or_centerplane,
+    ):
+        return None
+
+    receiving_timber = arrangement.receiving_timber
+    butt_timber = arrangement.butt_timber
+
+    from kumiki.joints.workshop.shavings.build_a_butt import (
+        locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+    )
+    shoulder_plane_towards_tenon = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+        arrangement, mortise_shoulder_distance_from_centerline_or_centerplane,
+    )
+    n_depth = safe_normalize_vector(shoulder_plane_towards_tenon.normal)
+    shoulder_plane = Plane(normal=n_depth, point=shoulder_plane_towards_tenon.point)
+
+    butt_length_dir = safe_normalize_vector(butt_timber.get_length_direction_global())
+    joint_center_global = _intersect_line_with_plane(butt_timber.get_bottom_position_global(), butt_length_dir, shoulder_plane)
+
+    # "Joint normal axis" P: the shared normal of the two timbers' aligned long faces (the
+    # plane-alignment plane). By construction this is perpendicular to n_depth -- project
+    # for numerical robustness rather than assuming exact orthogonality.
+    joint_normal_axis_raw = safe_normalize_vector(arrangement.compute_normalized_timber_cross_product())
+    joint_normal_axis = safe_normalize_vector(
+        joint_normal_axis_raw - n_depth * safe_dot_product(joint_normal_axis_raw, n_depth)
+    )
+
+    # ------------------------------------------------------------------
+    # "length": identical to chop_butt_joint_shoulder_notch_relief_4sided -- how far, in
+    # the Q (flared) direction, the frustum needs to reach to clear the imperfect
+    # (beyond-perfect) material of both timbers, given how obliquely the butt timber
+    # approaches the shoulder plane.
+    # ------------------------------------------------------------------
+    sin_butt_angle = Min(Abs(safe_dot_product(butt_length_dir, n_depth)), scalar(1))
+    assert not zero_test(sin_butt_angle), "butt timber's length axis lies within the shoulder plane"
+    cos_butt_angle = sqrt(scalar(1) - sin_butt_angle ** 2)
+
+    shoulder_normal_in_receiving_local = safe_transform_vector(receiving_timber.orientation.matrix.T, n_depth)
+    perfect_support_distance = get_perfect_support_distance_from_centerline(
+        receiving_timber,
+        create_v2(shoulder_normal_in_receiving_local[0], shoulder_normal_in_receiving_local[1]),
+    )
+    butt_rough_size = butt_timber.get_rough_size()
+    rough_size_term = (
+        scalar(0) if zero_test(cos_butt_angle)
+        else Max(butt_rough_size[0], butt_rough_size[1]) / cos_butt_angle
+    )
+    imperfect_clearance_length = Max(perfect_support_distance / sin_butt_angle, rough_size_term)
+
+    # ------------------------------------------------------------------
+    # Which of the butt timber's own cross-sectional axes (width or height) IS the joint
+    # normal axis P (plane-alignment guarantees exactly one is). The OTHER axis is Q, the
+    # one that flares.
+    # ------------------------------------------------------------------
+    butt_width_dir = butt_timber.get_width_direction_global()
+    butt_height_dir = butt_timber.get_height_direction_global()
+    width_is_joint_normal_axis = safe_compare(
+        Abs(safe_dot_product(joint_normal_axis, butt_width_dir)), scalar(1, 2), Comparison.GT
+    )
+
+    if width_is_joint_normal_axis:
+        q_half_size = butt_timber.size[1] / scalar(2)
+        q_face_normal = butt_height_dir
+    else:
+        q_half_size = butt_timber.size[0] / scalar(2)
+        q_face_normal = butt_width_dir
+
+    # Q's two faces have negated normals (+q_face_normal / -q_face_normal), so -- per the
+    # note in chop_butt_joint_shoulder_notch_relief_4sided's per-edge bisector -- their
+    # SIGNED dihedral angles to the shoulder plane are generally supplementary, not equal:
+    # unlike an earlier version of this function, the two flared walls are computed (and, in
+    # general, reach out) independently, not from one shared value.
+    def _tan_half(face_normal: V3) -> Numeric:
+        cos_dihedral = Max(Min(safe_dot_product(face_normal, n_depth), scalar(1)), scalar(-1))
+        assert not zero_test(scalar(1) + cos_dihedral), (
+            "butt timber's Q-axis face directly faces back through the shoulder plane"
+        )
+        sin_dihedral = sqrt(scalar(1) - cos_dihedral ** 2)
+        tan_half = sin_dihedral / (scalar(1) + cos_dihedral)
+        assert not zero_test(tan_half), "butt timber's Q-axis face is parallel to the shoulder plane"
+        if notch_angle is not None:
+            from sympy import tan
+            tan_half = Max(tan_half, tan(notch_angle))
+        return tan_half
+
+    # Which physical side of the loft's own +Q/-Q axis q_face_normal actually points toward:
+    # q_face_normal generally has some component along n_depth (that's what makes it flare),
+    # so it isn't simply +-y_ref_q -- project out the n_depth component before comparing.
+    y_ref_q = safe_normalize_vector(cross_product(n_depth, joint_normal_axis))
+    q_face_normal_inplane = q_face_normal - n_depth * safe_dot_product(q_face_normal, n_depth)
+    q_face_normal_is_pos_side = safe_compare(
+        safe_dot_product(q_face_normal_inplane, y_ref_q), 0, Comparison.GT
+    )
+
+    tan_half_at_q_face_normal = _tan_half(q_face_normal)
+    tan_half_at_negated_q_face_normal = _tan_half(-q_face_normal)
+    tan_half_pos, tan_half_neg = (
+        (tan_half_at_q_face_normal, tan_half_at_negated_q_face_normal)
+        if q_face_normal_is_pos_side
+        else (tan_half_at_negated_q_face_normal, tan_half_at_q_face_normal)
+    )
+
+    # reach = depth * tan_half along each wall's own bisector (see the 4-sided version's
+    # per-edge bisector note); loft_depth is the deeper of the two natural depths (reach ==
+    # imperfect_clearance_length), so each flared wall gets AT LEAST that much reach --
+    # exactly that much for whichever wall defines loft_depth, more for the other.
+    loft_depth = Max(imperfect_clearance_length / tan_half_pos, imperfect_clearance_length / tan_half_neg)
+    q_reach_pos = loft_depth * tan_half_pos
+    q_reach_neg = loft_depth * tan_half_neg
+
+    # ------------------------------------------------------------------
+    # Q-axis quad-1 half-extent: NOT simply q_half_size (the tenon's raw PTW half-size) --
+    # like the 4-sided version's quad-1 corners, this must be the PTW's actual footprint
+    # where its edge (running along the tenon's own length axis, offset by q_half_size in Q)
+    # crosses the shoulder plane, which is stretched away from the raw half-size whenever the
+    # tenon's length axis isn't perpendicular to the shoulder plane within the (Q, n_depth)
+    # plane -- e.g. any raking (not just tilting-sideways) brace-style joint. Using the raw
+    # half-size here draws quad-1 from where the tenon's CENTERLINE-ish cross-section sits,
+    # not from where its PTW boundary actually meets the shoulder plane.
+    # ------------------------------------------------------------------
+    q_local_axis_index = 1 if width_is_joint_normal_axis else 0
+
+    def _q_stretch_at_shoulder(q_local_value: Numeric) -> Numeric:
+        coords = [scalar(0), scalar(0)]
+        coords[q_local_axis_index] = q_local_value
+        base_global = butt_timber.transform.local_to_global(create_v3(coords[0], coords[1], scalar(0)))
+        shoulder_point_global = _intersect_line_with_plane(base_global, butt_length_dir, shoulder_plane)
+        return Abs(safe_dot_product(shoulder_point_global - joint_center_global, y_ref_q))
+
+    q_bottom_extent_at_q_face_normal = _q_stretch_at_shoulder(q_half_size)
+    q_bottom_extent_at_negated_q_face_normal = _q_stretch_at_shoulder(-q_half_size)
+    q_bottom_extent_pos, q_bottom_extent_neg = (
+        (q_bottom_extent_at_q_face_normal, q_bottom_extent_at_negated_q_face_normal)
+        if q_face_normal_is_pos_side
+        else (q_bottom_extent_at_negated_q_face_normal, q_bottom_extent_at_q_face_normal)
+    )
+
+    # ------------------------------------------------------------------
+    # P-direction boundaries: NOT a tight pocket sized to either timber's PERFECT extent --
+    # the flat walls are pushed all the way out to whichever is FURTHER, per side, between
+    # the RECEIVING timber's own ROUGH edge and the BUTT timber's own ROUGH edge (both
+    # measured from joint_center_global, along P). This guarantees the notch is a full
+    # TRANSVERSE relief spanning the receiving timber's entire width on this axis (and, if
+    # the butt timber's rough stock happens to poke out even further, that too) -- never a
+    # shorter pocket that stops partway across. Plane-alignment guarantees P is exactly (not
+    # just approximately) one of EACH timber's own width/height axes (the same shared axis
+    # identified by are_timbers_plane_aligned -- see the module-level proof in this
+    # function's docstring), so there's no oblique stretching to account for on this axis.
+    # ------------------------------------------------------------------
+
+    def p_local(point: V3) -> Numeric:
+        return safe_dot_product(joint_normal_axis, point - joint_center_global)
+
+    def _rough_p_extent(timber: TimberLike, direction: Direction3D) -> Numeric:
+        face = timber.get_closest_oriented_long_face_from_global_direction(direction).to.face()
+        return timber.get_half_rough_size_in_face_normal_axis(face)
+
+    receiving_centerline_p = p_local(receiving_timber.transform.position)
+    butt_centerline_p = p_local(butt_timber.transform.position)
+
+    p_boundary_pos = Max(
+        receiving_centerline_p + _rough_p_extent(receiving_timber, joint_normal_axis),
+        butt_centerline_p + _rough_p_extent(butt_timber, joint_normal_axis),
+    )
+    p_boundary_neg = Max(
+        -receiving_centerline_p + _rough_p_extent(receiving_timber, -joint_normal_axis),
+        -butt_centerline_p + _rough_p_extent(butt_timber, -joint_normal_axis),
+    )
+
+    # ------------------------------------------------------------------
+    # Both cross-sections: flat (unflared) at the P boundaries for their entire depth;
+    # flared in Q, from the tenon's PTW-at-the-shoulder extent (quad-1) out to
+    # q_bottom_extent + q_reach (quad-2).
+    # ------------------------------------------------------------------
+    loft_transform = Transform(position=joint_center_global, orientation=Orientation.from_z_and_x(n_depth, joint_normal_axis))
+
+    def make_quad(q_extent_pos: Numeric, q_extent_neg: Numeric) -> Profile:
+        return [
+            create_v2(p_boundary_pos, q_extent_pos),
+            create_v2(-p_boundary_neg, q_extent_pos),
+            create_v2(-p_boundary_neg, -q_extent_neg),
+            create_v2(p_boundary_pos, -q_extent_neg),
+        ]
+
+    bottom_points = make_quad(q_bottom_extent_pos, q_bottom_extent_neg)
+    top_points = make_quad(q_bottom_extent_pos + q_reach_pos, q_bottom_extent_neg + q_reach_neg)
+
+    signed_area = sum(
+        bottom_points[i][0] * bottom_points[(i + 1) % 4][1] - bottom_points[(i + 1) % 4][0] * bottom_points[i][1]
+        for i in range(4)
+    )
+    if safe_compare(signed_area, 0, Comparison.LT):
+        bottom_points = list(reversed(bottom_points))
+        top_points = list(reversed(top_points))
+
+    loft_global = ConvexPolygonSimpleLoft(
+        bottom_points=bottom_points,
+        top_points=top_points,
+        start_distance=scalar(0),
+        end_distance=loft_depth,
+        transform=loft_transform,
+    )
+
+    receiving_timber_notch_negative_csg_local = adopt_csg(
+        None, receiving_timber.transform, loft_global
+    )
+
+    # ------------------------------------------------------------------
+    # Butting timber relief: identical construction to
+    # chop_butt_joint_shoulder_notch_relief_4sided -- see the KNOWN comment there.
+    # ------------------------------------------------------------------
+    near_plane_global = HalfSpace(
+        normal=n_depth,
+        offset=safe_dot_product(n_depth, shoulder_plane.point),
+    )
+    far_plane_point_global = shoulder_plane.point + n_depth * loft_depth
+    far_plane_global = HalfSpace(
+        normal=n_depth,
+        offset=safe_dot_product(n_depth, far_plane_point_global),
+    )
+    loft_in_butt_local = adopt_csg(None, butt_timber.transform, loft_global)
+    butting_timber_relief_negative_csg_local = Difference(
+        base=adopt_csg(None, butt_timber.transform, near_plane_global),
+        subtract=[loft_in_butt_local, adopt_csg(None, butt_timber.transform, far_plane_global)],
+    )
+
+    return ShoulderReliefCSGGeometry(
+        receiving_timber_notch_negative_CSG=receiving_timber_notch_negative_csg_local,
+        butting_timber_relief_negative_CSG=butting_timber_relief_negative_csg_local,
+    )
 
 
 def _intersect_line_with_plane(line_point: V3, line_direction: Direction3D, plane: Plane) -> V3:
