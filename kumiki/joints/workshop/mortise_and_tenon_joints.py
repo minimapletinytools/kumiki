@@ -14,7 +14,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, chop_butt_joint_shoulder_notch_relief_4sided, chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig, DisableInsetShoulderNotchingReliefConfig, chop_scribe_relief_and_apply_for_butt_joint_arrangement
+from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, chop_butt_joint_shoulder_notch_relief_4sided, chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig, chop_scribe_relief_and_apply_for_butt_joint_arrangement
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -79,6 +79,29 @@ class WedgeParameters:
     width_axis: Direction3D
     positions: List[Numeric]
     expand_mortise: Numeric = scalar(0)
+
+
+@dataclass(frozen=True)
+class DisableInsetShoulderNotchingReliefConfig:
+    """
+    INTERNAL ONLY -- not meant to be passed by callers of cut_mortise_and_tenon_joint
+    directly. Disables the "shoulder notch on mortise timber and matching relief on tenon
+    timber (when shoulder is inset from the mortise entry face)" step entirely (the SCRIBE-
+    based housing cut that runs whenever relief is None or a ButtJointScribeReliefConfig),
+    without enabling any other relief in its place.
+
+    Exists for cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
+    cut_mortise_and_tenon_joint_on_face_aligned_timbers: when the caller passes
+    ButtJointNotchReliefConfig, those wrappers compute
+    chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided themselves and
+    union it in after calling cut_mortise_and_tenon_joint. Passing relief=None down to that
+    inner call would (incorrectly) also trigger its own default SCRIBE-based inset-shoulder
+    notch -- redundant with, not a replacement for, the 2-sided relief the wrapper is about
+    to union in on top of it. Passing this config instead skips that inner step cleanly,
+    same as ButtJointNotchReliefConfig does for the fully-general 4-sided case, without
+    engaging any of ButtJointNotchReliefConfig's OWN (4-sided) relief logic.
+    """
+    pass
 
 
 # ============================================================================
