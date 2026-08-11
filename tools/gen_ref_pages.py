@@ -14,13 +14,15 @@ kumiki/__init__.py and must not get a public reference page. Because the
 module list is derived from kumiki/__init__.py's own imports, this script
 stays in sync automatically as that file changes.
 
-The generated nav is split into two groups -- "Core" (the modules users
-actually author designs against day to day) listed first, and "Supporting
-Reference" (lower-level/internal-ish modules, looked up far less often)
-pushed below -- rather than one flat alphabetical list. Modules not
-explicitly classified below fall back into Supporting Reference automatically
-(with a Title Case guess at a display name) so a newly-added top-level import
-in kumiki/__init__.py still gets a page instead of being silently dropped.
+The generated nav is split into three groups, in this order: "Core" (the
+non-joint modules users actually author designs against day to day), "Joints"
+(all joint-cutting modules, broken out as their own top-level group since
+there are so many of them), and "Supporting Reference" (lower-level/
+internal-ish modules, looked up far less often) -- rather than one flat
+alphabetical list. Modules not explicitly classified below fall back into
+Supporting Reference automatically (with a Title Case guess at a display
+name) so a newly-added top-level import in kumiki/__init__.py still gets a
+page instead of being silently dropped.
 """
 
 from __future__ import annotations
@@ -42,13 +44,14 @@ NOTE_TEMPLATE = (
     "path shown in the heading above.\n"
 )
 
-# Modules users actually author designs against day to day -- listed first, under "Core".
-# Ordered deliberately (not alphabetically): the rough order a design gets built in.
+# Non-joint modules users actually author designs against day to day -- listed first, under
+# "Core". Ordered deliberately (not alphabetically): the rough order a design gets built in.
 CORE_ORDER = ["footprint", "timber", "construction", "measuring", "rule"]
 
-# joints.workshop.* are always Core, grouped under their own "Joints" sub-heading, with the
-# "workshop" path segment (an implementation detail -- see kumiki/joints/workshop/) dropped
-# from the nav. Ordered with the most commonly reached-for joints first.
+# joints.workshop.* always get their own top-level "Joints" group (right after Core, before
+# Supporting Reference), with the "workshop" path segment (an implementation detail -- see
+# kumiki/joints/workshop/) dropped from the nav. Ordered with the most commonly reached-for
+# joints first.
 JOINTS_ORDER = [
     "basic_joints",
     "mortise_and_tenon_joints",
@@ -162,14 +165,14 @@ for joints_leaf in JOINTS_ORDER:
         continue
     dotted = joints_modules.pop(joints_leaf)
     link = _write_page(dotted, imports_by_module[dotted])
-    nav["Core", "Joints", _display_name(joints_leaf)] = link
+    nav["Joints", _display_name(joints_leaf)] = link
 
 # Any joints.workshop.* module not explicitly ordered above (a new joint type added since
 # this script was last updated) still gets a page, appended rather than dropped.
 for joints_leaf in sorted(joints_modules):
     dotted = joints_modules[joints_leaf]
     link = _write_page(dotted, imports_by_module[dotted])
-    nav["Core", "Joints", _display_name(joints_leaf)] = link
+    nav["Joints", _display_name(joints_leaf)] = link
 
 for module_leaf in SUPPORTING_ORDER:
     if module_leaf not in imports_by_module:
