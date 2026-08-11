@@ -491,8 +491,10 @@ def _dovetail_trapezoid_points(
 #    dovetail_small_width
 def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJointBoardArrangement, dovetail_depth: Numeric, dovetail_small_width: Numeric, dovetail_angle: Numeric, lateral_offset: Numeric = scalar(0), dovetail_length: Optional[Numeric] = None, shorten_dovetail_by: Numeric = scalar(0), extend_front_dovetail_housing_by: Union[None, Numeric] = scalar(0), taper_angle: Numeric = scalar(0)) -> Joint:
     """
-        cuts a sliding dovetail joint, the dovetail slides in from the front_face_on_butt_timber direction
+    cuts a sliding dovetail joint, the dovetail slides in from the front_face_on_butt_timber direction
 
+    Args:
+        arrangement:
         dovetail_depth: the depth of the dovetail, see diagram
         dovetail_small_width: the width of the smaller part of the dovetail, see diagram
         dovetail_angle: the angle the dovetail expands by from the smaller part of the dovetail
@@ -501,6 +503,8 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         shorten_dovetail_by: shortens the dovetail from front_face_on_butt_timber by this amount
         extend_front_dovetail_housing_by: extend the front side of the dovetail housing from the end of the shortened dovetail by this amount. If `None` extends all the way through. Note that the back side is always extended to the end of the receiving timber so that the joint can be assembled.
         taper_angle: the narrower side is always pointing towards front_face_on_butt_timber
+
+    Returns:
     """
     butt_timber = arrangement.butt_timber
     receiving_timber = arrangement.receiving_timber

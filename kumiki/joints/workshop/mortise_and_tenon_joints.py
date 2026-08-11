@@ -1075,6 +1075,7 @@ def cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
     relief: Union[None, ButtJointScribeReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
 ) -> Joint:
     """
+    Args:
         arrangement: timber1 is the tenon timber, timber2 is the mortise timber, front_face_on_timber1 is the peg entry face
         tenon_width_relative_to_joint: the "width" of the tenon which is in the axis that's parallel to the joint plane
         tenon_height_relative_to_joint: the "height" of the tenon which is in the axis that's perpendicular to the joint plane
@@ -1089,6 +1090,8 @@ def cut_practice_mortise_and_tenon_corner_joint_on_plane_aligned_timbers(
         mortise_shoulder_inset: see cut_mortise_and_tenon_joint
         peg_parameters: see cut_mortise_and_tenon_joint
         relief: see cut_mortise_and_tenon_joint
+
+    Returns:
 
     Raises:
         KumikiArrangementError: If the arrangement is not plane-aligned.

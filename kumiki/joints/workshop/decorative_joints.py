@@ -174,6 +174,15 @@ def cut_practice_rafter_tail_scallop_decoration(
     exactly ON the end_side plane), and simply passes through the point
     scallop_length in from the end along cut_side (so there is a slight kink
     there, where the curve meets the flat run of cut_side).
+
+    Args:
+        timber:
+        end_side:
+        cut_side:
+        scallop_height:
+        scallop_length:
+
+    Returns:
     """
     assert safe_compare(scallop_length, 0, Comparison.GT), "scallop_length must be positive"
     assert safe_compare(scallop_height, 0, Comparison.GT), "scallop_height must be positive"
