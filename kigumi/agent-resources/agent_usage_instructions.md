@@ -2,7 +2,7 @@
 
 ## Background
 
-When starting work in a workspace, if in dout, run the **`init-kumiki-project`** skill (`docs/skills/init-kumiki-project/SKILL.md`).
+When starting work in a workspace, if in dout, run the **`init-kumiki-project`** skill (`skills/init-kumiki-project/SKILL.md`, alongside this file).
 
 ## General Usage Pattern *START HERE*
 

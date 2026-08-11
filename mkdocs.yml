@@ -8,8 +8,6 @@ docs_dir: docs
 
 exclude_docs: |
   plans/
-  skills/
-  agent_usage_instructions.md
 
 theme:
   name: material

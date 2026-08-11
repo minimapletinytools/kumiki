@@ -203,7 +203,7 @@ subsections (omit whichever project wasn't part of this release).
 Before committing, always regenerate the bundled usage instructions:
 
 ```bash
-cat docs/agent_usage_instructions.md > kigumi/.generated/bundled-usage-instructions.md
+cat kigumi/agent-resources/agent_usage_instructions.md > kigumi/.generated/bundled-usage-instructions.md
 ```
 
 ## Commit and tag

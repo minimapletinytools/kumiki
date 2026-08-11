@@ -205,7 +205,7 @@ Patterns are simple examples demonstrating joints or other deconstruted concepts
 - each joint should have at least one pattern
 - if a joint has multiple patterns, they should all be in a subfolder named after the joint
 
-Kumiki also ships with a few example Frames that demonstrate how to put everything together. In general, follow agent_usage_instructions.md for authoring patterns and example frames.
+Kumiki also ships with a few example Frames that demonstrate how to put everything together. In general, follow `kigumi/agent-resources/agent_usage_instructions.md` for authoring patterns and example frames.
 
 ### How patterns and frames get discovered
 
