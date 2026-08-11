@@ -14,23 +14,6 @@ from .shavings.relief import warn_if_arrangement_timbers_imperfect
 from kumiki.measuring import locate_top_center_position, locate_bottom_center_position, mark_distance_from_end_along_centerline, mark_distance_from_face_in_normal_direction
 
 
-_raw_safe_dot_product = safe_dot_product
-_raw_safe_norm = safe_norm
-_raw_safe_transform_vector = safe_transform_vector
-
-
-def safe_dot_product(*args, **kwargs):
-    return prune(_raw_safe_dot_product(*args, **kwargs))
-
-
-def safe_norm(*args, **kwargs):
-    return prune(_raw_safe_norm(*args, **kwargs))
-
-
-def safe_transform_vector(*args, **kwargs):
-    return prune(_raw_safe_transform_vector(*args, **kwargs))
-
-
 # Aliases for backwards compatibility
 CSGUnion = SolidUnion
 

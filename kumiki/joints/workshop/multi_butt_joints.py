@@ -19,23 +19,6 @@ from .shavings.relief import (
 )
 
 
-_raw_safe_dot_product = safe_dot_product
-_raw_safe_norm = safe_norm
-_raw_safe_transform_vector = safe_transform_vector
-
-
-def safe_dot_product(*args, **kwargs):
-    return prune(_raw_safe_dot_product(*args, **kwargs))
-
-
-def safe_norm(*args, **kwargs):
-    return prune(_raw_safe_norm(*args, **kwargs))
-
-
-def safe_transform_vector(*args, **kwargs):
-    return prune(_raw_safe_transform_vector(*args, **kwargs))
-
-
 def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: DoubleButtJointTimberArrangement,
                                            # thickness is in the axis perpendicular to the joint plane
                                            slot_thickness: Numeric,

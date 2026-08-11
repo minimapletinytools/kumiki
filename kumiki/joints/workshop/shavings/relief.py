@@ -40,23 +40,6 @@ IMPERFECT_TIMBER_WARNING = (
 )
 
 
-_raw_safe_dot_product = safe_dot_product
-_raw_safe_norm = safe_norm
-_raw_safe_transform_vector = safe_transform_vector
-
-
-def safe_dot_product(*args, **kwargs):
-    return prune(_raw_safe_dot_product(*args, **kwargs))
-
-
-def safe_norm(*args, **kwargs):
-    return prune(_raw_safe_norm(*args, **kwargs))
-
-
-def safe_transform_vector(*args, **kwargs):
-    return prune(_raw_safe_transform_vector(*args, **kwargs))
-
-
 def warn_if_arrangement_timbers_imperfect(arrangement) -> None:
     """Warn when a joint arrangement uses any timber that is not perfect."""
     check_perfection = getattr(arrangement, "check_perfection", None)

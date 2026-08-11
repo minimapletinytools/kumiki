@@ -196,7 +196,7 @@ DONE-new notching plan
 -add notching mode to FAT/PAT joints
   -NotchFromInsetShoulder (current behavior)
   -NotchFromPerefctTimberWithin (keeps scribe shoulder notching in cut_mortise_and_tenon_joint call, and then does the notching from PTW face rather than join shoulder)
-  
+
 -rename/reorg all mortise and tenon joints
   DONE-mortise_and_tenon_join/...
   DONE-delete 45 degree relative tenon size, basic, 
@@ -211,6 +211,8 @@ DONE-new notching plan
 
 -move agent usage instructions and docs/skills out of docs folder
 -delet plans in docs folder
+-remove calls to normalize_vector and zero_test switch to safe version
+
   
 
 
