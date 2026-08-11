@@ -43,7 +43,7 @@ render-matplotlib = ["matplotlib>=3.5.0"]
 [project.urls]
 Homepage = "https://github.com/minimapletinytools/kumiki"
 Repository = "https://github.com/minimapletinytools/kumiki"
-Documentation = "https://github.com/minimapletinytools/kumiki/tree/main/docs"
+Documentation = "https://kumiki.build/docs/"
 
 [build-system]
 requires = ["hatchling"]
@@ -83,6 +83,14 @@ dev = [
     "pytest-cov>=4.0.0",
     "pytest-mock>=3.10.0",
 ]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.7.7",
+    "mkdocstrings[python]>=1.0.6",
+    "mkdocs-gen-files>=0.6.1",
+    "mkdocs-literate-nav>=0.6.3",
+    "mkdocs-section-index>=0.3.12",
+]
 
 [tool.ty.src]
-exclude = ["oldcrap", "fusion360/libs", "kigumi", "fusion360", "freecad", "patterns"]
+exclude = ["oldcrap", "fusion360/libs", "kigumi", "fusion360", "freecad", "patterns", "tools/gen_ref_pages.py"]

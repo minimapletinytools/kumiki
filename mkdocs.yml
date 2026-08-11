@@ -1,2 +1,92 @@
+site_name: Kumiki
+site_description: A library for programmatic timber frame CAD design
+site_url: https://kumiki.build/docs/
+repo_url: https://github.com/minimapletinytools/kumiki
+repo_name: minimapletinytools/kumiki
+
+docs_dir: docs
+
+exclude_docs: |
+  plans/
+  skills/
+  agent_usage_instructions.md
+
+theme:
+  name: material
+  favicon: assets/favicon.png
+  logo: assets/favicon.png
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.top
+    - navigation.indexes
+    - content.code.copy
+    - search.suggest
+    - search.highlight
+
+extra_css:
+  - stylesheets/extra.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+
+plugins:
+  - search
+  - gen-files:
+      scripts:
+        - tools/gen_ref_pages.py
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - section-index
+  - mkdocstrings:
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            docstring_section_style: table
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: true
+            show_object_full_path: false
+            merge_init_into_class: true
+            separate_signature: true
+            show_signature_annotations: true
+            signature_crossrefs: true
+            members_order: source
+            show_if_no_docstring: true
+            filters: ["!^_"]
+            heading_level: 2
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+
 nav:
-  - index.md
+  - Home: index.md
+  - Concepts: concepts.md
+  - Pattern Book: patternbook.md
+  - API Reference: reference/

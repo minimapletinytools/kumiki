@@ -5,6 +5,11 @@ on:
     branches: [main]
     paths:
       - 'website/**'
+      - 'docs/**'
+      - 'kumiki/**'
+      - 'mkdocs.yml'
+      - 'tools/gen_ref_pages.py'
+      - 'pyproject.toml'
       - '.github/workflows/deploy-website.yml'
   workflow_dispatch:
 
@@ -20,18 +25,41 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: website
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install dependencies
+
+      - name: Install website dependencies
+        working-directory: website
         run: npm install
-      - name: Build site
+
+      - name: Build website
+        working-directory: website
         run: npm run build
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Cache uv artifacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/uv
+            .venv
+          key: uv-${{ runner.os }}-py3.12-docs-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+          restore-keys: |
+            uv-${{ runner.os }}-py3.12-docs-
+
+      - name: Build documentation site
+        run: make docs SITE_DIR=website/dist/docs
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:

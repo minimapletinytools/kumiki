@@ -1,4 +1,8 @@
-.PHONY: help setup test test-verbose test-cov typecheck typecheck-watch clean profile stepout pattern-index
+.PHONY: help setup test test-verbose test-cov typecheck typecheck-watch clean profile stepout pattern-index docs docs-serve
+
+# Local build output directory for `make docs`; CI overrides this to land the
+# build inside the Astro site's output dir, e.g. `make docs SITE_DIR=website/dist/docs`.
+SITE_DIR ?= site
 
 help:
 	@echo "🦒 Kumiki Development Commands"
@@ -13,6 +17,8 @@ help:
 	@echo "  make clean           - Remove build artifacts and cache files"
 	@echo "  make profile         - Profile all patterns (or PATTERNS='oscarshed kumiki')"
 	@echo "  make stepout         - Export STEP files (or PATTERN=kumiki)"
+	@echo "  make docs            - Build the documentation site (mkdocs) into site/ (override with SITE_DIR=...)"
+	@echo "  make docs-serve      - Serve the documentation site locally with live-reload"
 	@echo ""
 
 setup:
@@ -47,6 +53,14 @@ stepout:
 pattern-index:
 	uv run python tools/build_pattern_index.py
 	@echo "✅ kumiki/_pattern_index.json regenerated"
+
+docs:
+	uv run --only-group docs mkdocs build --site-dir $(SITE_DIR)
+	@echo ""
+	@echo "✅ Documentation built in $(SITE_DIR)/"
+
+docs-serve:
+	uv run --only-group docs mkdocs serve
 
 clean:
 	find . -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
