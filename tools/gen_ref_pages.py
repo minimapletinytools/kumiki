@@ -13,6 +13,14 @@ joints/workshop/shavings/router_table.py, ...) that are not re-exported by
 kumiki/__init__.py and must not get a public reference page. Because the
 module list is derived from kumiki/__init__.py's own imports, this script
 stays in sync automatically as that file changes.
+
+The generated nav is split into two groups -- "Core" (the modules users
+actually author designs against day to day) listed first, and "Supporting
+Reference" (lower-level/internal-ish modules, looked up far less often)
+pushed below -- rather than one flat alphabetical list. Modules not
+explicitly classified below fall back into Supporting Reference automatically
+(with a Title Case guess at a display name) so a newly-added top-level import
+in kumiki/__init__.py still gets a page instead of being silently dropped.
 """
 
 from __future__ import annotations
@@ -33,6 +41,46 @@ NOTE_TEMPLATE = (
     "as `kumiki.{example}` -- you do not need to import from the submodule "
     "path shown in the heading above.\n"
 )
+
+# Modules users actually author designs against day to day -- listed first, under "Core".
+# Ordered deliberately (not alphabetically): the rough order a design gets built in.
+CORE_ORDER = ["footprint", "timber", "construction", "measuring", "rule"]
+
+# joints.workshop.* are always Core, grouped under their own "Joints" sub-heading, with the
+# "workshop" path segment (an implementation detail -- see kumiki/joints/workshop/) dropped
+# from the nav. Ordered with the most commonly reached-for joints first.
+JOINTS_ORDER = [
+    "basic_joints",
+    "mortise_and_tenon_joints",
+    "butt_joints",
+    "corner_joints",
+    "cross_joints",
+    "splice_joints",
+    "board_joints",
+    "multi_butt_joints",
+    "compound_joints",
+    "free_joints",
+    "decorative_joints",
+    "shavings",
+]
+
+# Lower-level or rarely-looked-up-directly modules -- listed after Core, under "Supporting
+# Reference". Anything from kumiki/__init__.py not mentioned here or above still gets a page
+# (appended here automatically), just with a guessed display name.
+SUPPORTING_ORDER = ["cutcsg", "patternbook", "librarian", "triangles", "blueprint"]
+
+DISPLAY_NAMES = {
+    "cutcsg": "CutCSG",
+    # "Pattern Book" (no suffix) is docs/patternbook.md's own top-level nav entry -- this is
+    # the patternbook.py *module*'s API reference page, kept distinguishable from that.
+    "patternbook": "Pattern Book (API)",
+    "mortise_and_tenon_joints": "Mortise and Tenon Joints",
+    "multi_butt_joints": "Multi-Butt Joints",
+}
+
+
+def _display_name(module_leaf: str) -> str:
+    return DISPLAY_NAMES.get(module_leaf, module_leaf.replace("_", " ").title())
 
 
 def _first_public_symbol(dotted_module: str) -> str | None:
@@ -70,12 +118,11 @@ def _iter_public_imports():
                 yield node.module, names
 
 
-nav = mkdocs_gen_files.Nav()
-
-for dotted_module, only_members in sorted(_iter_public_imports(), key=lambda t: t[0]):
+def _write_page(dotted_module: str, only_members: list[str] | None) -> str:
+    """Write the mkdocstrings stub page for one module; return its doc path
+    (relative to REFERENCE_ROOT, posix-style) for use as the nav link target."""
     parts = tuple(dotted_module.split("."))
     doc_path = REFERENCE_ROOT / Path(*parts).with_suffix(".md")
-    nav[parts] = doc_path.relative_to(REFERENCE_ROOT).as_posix()
 
     full_ident = f"kumiki.{dotted_module}"
     example_name = only_members[0] if only_members else (_first_public_symbol(dotted_module) or parts[-1])
@@ -89,6 +136,52 @@ for dotted_module, only_members in sorted(_iter_public_imports(), key=lambda t: 
             fd.write("      members:\n")
             for name in only_members:
                 fd.write(f"        - {name}\n")
+
+    return doc_path.relative_to(REFERENCE_ROOT).as_posix()
+
+
+imports_by_module = dict(_iter_public_imports())
+joints_prefix = "joints.workshop."
+joints_modules = {
+    dotted[len(joints_prefix):]: dotted for dotted in imports_by_module if dotted.startswith(joints_prefix)
+}
+remaining = {
+    dotted for dotted in imports_by_module if not dotted.startswith(joints_prefix)
+} - set(CORE_ORDER) - set(SUPPORTING_ORDER)
+
+nav = mkdocs_gen_files.Nav()
+
+for module_leaf in CORE_ORDER:
+    if module_leaf not in imports_by_module:
+        continue  # kumiki/__init__.py no longer imports this -- skip rather than error
+    link = _write_page(module_leaf, imports_by_module[module_leaf])
+    nav["Core", _display_name(module_leaf)] = link
+
+for joints_leaf in JOINTS_ORDER:
+    if joints_leaf not in joints_modules:
+        continue
+    dotted = joints_modules.pop(joints_leaf)
+    link = _write_page(dotted, imports_by_module[dotted])
+    nav["Core", "Joints", _display_name(joints_leaf)] = link
+
+# Any joints.workshop.* module not explicitly ordered above (a new joint type added since
+# this script was last updated) still gets a page, appended rather than dropped.
+for joints_leaf in sorted(joints_modules):
+    dotted = joints_modules[joints_leaf]
+    link = _write_page(dotted, imports_by_module[dotted])
+    nav["Core", "Joints", _display_name(joints_leaf)] = link
+
+for module_leaf in SUPPORTING_ORDER:
+    if module_leaf not in imports_by_module:
+        continue
+    link = _write_page(module_leaf, imports_by_module[module_leaf])
+    nav["Supporting Reference", _display_name(module_leaf)] = link
+
+# Anything from kumiki/__init__.py not explicitly classified above (e.g. a brand-new
+# top-level import) -- still gets a page, filed under Supporting Reference by default.
+for dotted in sorted(remaining):
+    link = _write_page(dotted, imports_by_module[dotted])
+    nav["Supporting Reference", _display_name(dotted.split(".")[-1])] = link
 
 with mkdocs_gen_files.open(REFERENCE_ROOT / "SUMMARY.md", "w") as nav_file:
     nav_file.writelines(nav.build_literate_nav())
