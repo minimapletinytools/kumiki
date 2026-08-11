@@ -145,7 +145,7 @@ def create_axis_aligned_timber(bottom_position: V3, length: Numeric, size: V2,
     Creates an axis-aligned timber using TimberFace to reference directions
     in the world coordinate system.
 
-    AGENT NOTE: AVOID this function if possible, prefer methods like join_timber, attach_face/plane_aligned_timber, create_*_timber_on_footprint, or even create_axis_aligned_timber, which are more robust and easier to use.
+    AGENT NOTE: Prefer methods like join_timber, attach_face/plane_aligned_timber, create_*_timber_on_footprint, which are more robust and easier to use.
     
     Args:
         bottom_position: Position of the bottom point of the timber
@@ -1120,6 +1120,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     return create_timber(length=timber_length, size=size, bottom_position=bottom_pos, length_direction=length_direction, width_direction=width_direction, ticket=ticket)
 
 
+@deprecated("attach_plane_aligned_timber is easier to understand")
 def join_plane_aligned_on_plane_aligned_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
                                                 location_on_timber1: Numeric, location_on_timber2: Numeric,
                                                 stickout: Stickout,
@@ -1128,10 +1129,39 @@ def join_plane_aligned_on_plane_aligned_timbers(timber1: PerfectTimberWithin, ti
                                                 lateral_offset_from_timber1: Numeric = scalar(0),
                                                 feature_to_mark_on_joining_timber: Optional[TimberFeature] = None,
                                                 # if None, set to some arbitrary face of timber1 on the parallel face plane
-                                                orientation_long_face_on_timber1: Optional[TimberLongFace] = None, 
+                                                orientation_long_face_on_timber1: Optional[TimberLongFace] = None,
                                                 # this face on the created timber will align with orientation_long_face_on_timber1
                                                 orientation_long_face_on_timber2: Optional[TimberLongFace] = TimberLongFace.RIGHT,
                                                 ticket: Optional[Union[TimberTicket, str]] = None) -> Timber:
+    """
+    Joins two plane-aligned timbers with a connecting timber that lies in their shared plane.
+
+    Deprecated: This function's own signature is the main reason for the deprecation --
+    the lateral-offset/feature-marking/orientation-long-face parameters are hard to reason
+    about together. `attach_plane_aligned_timber` covers the same cases with a signature
+    that, while still not simple, is a bit easier to follow. Prefer it for new code.
+
+    Args:
+        timber1: First timber to join
+        timber2: Second timber to join (plane-aligned with timber1)
+        location_on_timber1: Position along timber1's length where the joining timber attaches
+        location_on_timber2: Position along timber2's length where the joining timber attaches
+        stickout: How much the joining timber extends beyond each connection point
+        size: Cross-sectional size (width, height) of the joining timber
+        lateral_offset_from_timber1: Lateral offset, in the axis perpendicular to the shared
+                        plane, from feature_to_mark_on_joining_timber. Defaults to scalar(0).
+        feature_to_mark_on_joining_timber: Optional feature on the created timber to use as the reference for the lateral offset.
+                                           It is intended for you to use the locate_face or locate_long_edge functions to create a plane or line on a timber.
+                                           If not provided, uses the centerline. If a plane is provided, the "origin" of the plane is used for longitudinal positioning (i.e. location_on_timber1). In the case of locate_face, the origin aligns with the center of the created timber.
+        orientation_long_face_on_timber1: Optional long face of timber1, on the shared plane, to orient against.
+                                          If None, an arbitrary face of timber1 on the shared plane is used.
+        orientation_long_face_on_timber2: The long face on the created timber that will align with
+                                          orientation_long_face_on_timber1. Defaults to TimberLongFace.RIGHT.
+        ticket: Optional ticket for this timber (can be Ticket object or string name, used for rendering/debugging)
+
+    Returns:
+        New timber that joins timber1 and timber2, lying in their shared plane
+    """
     require_check(None if are_timbers_plane_aligned(timber1, timber2) else "Timbers must be plane-aligned")
     plane_normal = normalize_vector(cross_product(timber1.get_length_direction_global(), timber2.get_length_direction_global()))
 
@@ -1191,7 +1221,12 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
                                                 ticket: Optional[Union[TimberTicket, str]] = None) -> Timber:
     """
     Joins two face-aligned timbers with a perpendicular timber.
-    
+
+    Deprecated: This function's own signature is the main reason for the deprecation --
+    the lateral-offset/feature-marking/orientation-face parameters are hard to reason
+    about together. `attach_face_aligned_timber` covers the same cases with a signature
+    that, while still not simple, is a bit easier to follow. Prefer it for new code.
+
     Args:
         timber1: First timber to join
         timber2: Second timber to join (face-aligned with timber1)

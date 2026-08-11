@@ -178,6 +178,9 @@ class DoubleButtJointScribeReliefConfig:
         first_timber_to_be_scribed: ArrangementNames,
         second_timber_to_be_scribed: ArrangementNames,
     ):
+        """
+        Create a DoubleButtJointScribeReliefConfig from the order of which timbers to be scribed
+        """
         return DoubleButtJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
@@ -202,6 +205,9 @@ class TripleButtJointScribeReliefConfig:
         second_timber_to_be_scribed: ArrangementNames,
         third_timber_to_be_scribed: ArrangementNames,
     ):
+        """
+        Create a TripleButtJointScribeReliefConfig from the order of which timbers to be scribed
+        """
         return TripleButtJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
@@ -230,6 +236,9 @@ class QuadrupleButtJointScribeReliefConfig:
         third_timber_to_be_scribed: ArrangementNames,
         fourth_timber_to_be_scribed: ArrangementNames,
     ):
+        """
+        Create a QuadrupleButtJointScribeReliefConfig from the order of which timbers to be scribed
+        """
         return QuadrupleButtJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
@@ -254,6 +263,9 @@ class CrossCapJointScribeReliefConfig:
         first_timber_to_be_scribed: ArrangementNames,
         second_timber_to_be_scribed: ArrangementNames,
     ):
+        """
+        Create a CrossCapJointScribeReliefConfig from the order of which timbers to be scribed
+        """
         return CrossCapJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
@@ -275,6 +287,9 @@ class BraceJointScribeReliefConfig:
         first_timber_to_be_scribed: ArrangementNames,
         second_timber_to_be_scribed: ArrangementNames,
     ):
+        """
+        Create a BraceJointScribeReliefConfig from the order of which timbers to be scribed
+        """
         return BraceJointScribeReliefConfig(
             first_timber_to_be_scribed=first_timber_to_be_scribed,
             second_timber_to_be_scribed=second_timber_to_be_scribed,
