@@ -606,6 +606,12 @@ class PerfectTimberWithin(ABC):
     def get_size_index_in_long_face_normal_axis(self, face: TimberLongFace) -> int:
         """
         Get the index of the size in the direction normal to the specified face.
+
+        Args:
+            face: The long face to get the size index for (RIGHT/LEFT or FRONT/BACK)
+
+        Returns:
+            Index into self.size: 0 (width) for RIGHT/LEFT, 1 (height) for FRONT/BACK
         """
         assert isinstance(face, TimberLongFace), f"expected TimberLongFace, got {type(face).__name__}"
         if face == TimberLongFace.RIGHT or face == TimberLongFace.LEFT:
@@ -618,9 +624,13 @@ class PerfectTimberWithin(ABC):
     def get_size_in_face_normal_axis(self, face: SomeTimberFace) -> Numeric:
         """
         Get the size of the timber in the direction normal to the specified face.
-        
+
         Args:
             face: The face to get the size for (can be TimberFace, TimberEnd, or TimberLongFace)
+
+        Returns:
+            The timber's extent along the axis normal to the given face: self.length for
+            TOP/BOTTOM, self.size[0] (width) for RIGHT/LEFT, self.size[1] (height) for FRONT/BACK
         """
         # Convert to TimberFace
         face = face.to.face()

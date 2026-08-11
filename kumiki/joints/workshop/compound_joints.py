@@ -55,6 +55,12 @@ def cut_multi_cross_lap_joint_on_plane_aligned_timbers(timbers : List[TimberLike
       cut_distance_ratios: Strictly increasing global position ratios in (0, 1) for the
           first len(cut_distance_ratios) boundaries; any remaining boundaries are filled
           in uniformly up to the finish face.
+
+  Returns:
+      Joint combining the N-1 pairwise cross-lap joints between adjacent timbers, plus any
+      extra "fill" cuts needed so non-adjacent timbers in the stack don't collide outside
+      their pairwise cut boundary. The whole assembly is treated as rigid (no single-timber
+      escape freedom).
   """
   assert len(timbers) >= 2, "cut_multi_cross_lap_joint_on_plane_aligned_timbers requires at least 2 timbers"
   assert starting_face_on_first_timber in _LONG_FACES, \

@@ -542,6 +542,17 @@ def locate_top_center_position(timber: PerfectTimberWithin) -> Point:
 def locate_into_face(distance: Numeric, face: SomeTimberFace, timber: PerfectTimberWithin) -> UnsignedPlane:
     """
     Measure a distance from a face on a timber.
+
+    Args:
+        distance: How far into the timber, along the face's inward normal, to place the plane
+        face: The face to measure from (can be TimberFace, TimberEnd, or TimberLongFace)
+        timber: The timber to measure on
+
+    Returns:
+        UnsignedPlane parallel to the face, offset `distance` into the timber along the face's
+        normal. This is the inverse of mark_distance_from_face_in_normal_direction: if
+        feature = locate_into_face(d, face, timber), then
+        mark_distance_from_face_in_normal_direction(feature, timber, face).distance == d
     """
 
     # First pick any point on the face

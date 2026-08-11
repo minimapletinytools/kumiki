@@ -23,6 +23,11 @@ def cut_free_house_joint(
     Args:
         housing_timber: Timber that will be cut to house the housed timbers
         housed_timbers: Timbers that will be housed
+
+    Returns:
+        Joint with the cut housing timber keyed "housing_timber", and each housed timber
+        unmodified, keyed "housed_timber_1", "housed_timber_2", ... in input order. No
+        assembly freedoms are set (the connections are treated as rigid).
     """
     assert len(housed_timbers) > 0, "housed_timbers must contain at least one timber"
 
