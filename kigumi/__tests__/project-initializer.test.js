@@ -10,10 +10,14 @@ jest.mock('child_process', () => ({
 const { spawn } = require('child_process');
 const { initializeWorkspaceProject } = require('../project-initializer');
 
-const AGENT_RESOURCES_SOURCE_PATH = path.resolve(__dirname, '..', 'agent-resources');
+const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '.kigumi', 'docs');
+const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', '..', 'docs');
 
 function getUsageInstructionsSourcePath() {
-  return path.join(AGENT_RESOURCES_SOURCE_PATH, 'agent_usage_instructions.md');
+  if (fs.existsSync(BUNDLED_DOCS_SOURCE_PATH)) {
+    return path.join(BUNDLED_DOCS_SOURCE_PATH, 'agent_usage_instructions.md');
+  }
+  return path.join(CANONICAL_DOCS_SOURCE_PATH, 'agent_usage_instructions.md');
 }
 
 function createMockChildProcess({ stdoutText = '', stderrText = '', exitCode = 0 } = {}) {

@@ -26,7 +26,7 @@ statement is recognized as a **frame** entry if either of these holds:
 * **Name-based fallback** (unconditional, ignores types entirely): a target
   or function literally named ``example`` or ``build_frame`` is *always*
   treated as a frame entry, whether or not it's annotated ``-> Frame``. This
-  is why ``kigumi/agent-resources/agent_usage_instructions.md`` can say "just call it
+  is why ``docs/agent_usage_instructions.md`` can say "just call it
   ``example``" as the simple convention, while the type-based rule is what
   actually backs it.
 

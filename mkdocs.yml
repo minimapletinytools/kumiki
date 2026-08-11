@@ -6,6 +6,9 @@ repo_name: minimapletinytools/kumiki
 
 docs_dir: docs
 
+exclude_docs: |
+  agent_usage_instructions.md
+
 theme:
   name: material
   favicon: assets/favicon.png

@@ -17,11 +17,11 @@ const {
 
 const BUNDLED_DOCS_SOURCE_PATH = path.resolve(__dirname, '.kigumi', 'docs');
 const CANONICAL_DOCS_SOURCE_PATH = path.resolve(__dirname, '..', 'docs');
-// Kigumi-specific agent resources (usage instructions, skills) live directly under the
-// extension's own source tree, unlike the general docs above -- no dev/packaged-extension
-// path split needed here, since __dirname already resolves correctly in both cases (vsce
-// packages this directory as-is) and there's no separate staging step to fall back from.
-const AGENT_RESOURCES_SOURCE_PATH = path.resolve(__dirname, 'agent-resources');
+// Kigumi-only skills (e.g. init-kumiki-project) live directly under the extension's own
+// source tree, unlike the general docs above -- no dev/packaged-extension path split
+// needed here, since __dirname already resolves correctly in both cases (vsce packages
+// this directory as-is) and there's no separate staging step to fall back from.
+const SKILLS_SOURCE_PATH = path.resolve(__dirname, 'skills');
 
 function stripLeadingYamlFrontmatter(content) {
     if (!content.startsWith('---')) {
@@ -80,8 +80,13 @@ function ensureAgentsInstructionsFile(agentsPath) {
         '- docs/agent_usage_instructions.md',
         '',
         'Note: the `docs/` folder was copied from the bundled Kigumi docs at project initialization',
-        'time and may be out of date. Run the "Kigumi: Update Kumiki" command (or reinitialize the',
-        'project) to refresh it to the latest version.',
+        'time and may be out of date. The kumiki library installed in `.venv` ships its own docs.',
+        'To check for a more recent version, resolve the library path:',
+        '',
+        '  .venv/bin/python3 -c "import kumiki, pathlib; print(pathlib.Path(kumiki.__file__).resolve().parent)"',
+        '  (Windows: .venv\\Scripts\\python.exe)',
+        '',
+        'Then read `<that_path>/docs/agent_usage_instructions.md` for the most up-to-date instructions.',
         '',
     ].join('\n');
     fs.mkdirSync(path.dirname(agentsPath), { recursive: true });
@@ -124,16 +129,15 @@ function copyBundledDocsIntoWorkspace(workspaceRoot) {
         fs.cpSync(sourcePath, targetPath, { recursive: true, force: true });
     }
 
-    // agent_usage_instructions.md and the skills/ folder live separately, under this
-    // extension's own agent-resources/ (see AGENT_RESOURCES_SOURCE_PATH above), not in the
-    // general docs source -- merge them into the same workspace docs/ target so
-    // docs/agent_usage_instructions.md keeps resolving where AGENTS.md points readers to.
-    const copiedAgentResources = fs.existsSync(AGENT_RESOURCES_SOURCE_PATH);
-    if (copiedAgentResources) {
-        fs.cpSync(AGENT_RESOURCES_SOURCE_PATH, targetPath, { recursive: true, force: true });
+    // Kigumi-only skills (see SKILLS_SOURCE_PATH above) live separately from the general
+    // docs source -- merge them into the same workspace docs/skills/ target so
+    // docs/skills/init-kumiki-project/SKILL.md (referenced from agent_usage_instructions.md)
+    // keeps resolving.
+    if (fs.existsSync(SKILLS_SOURCE_PATH)) {
+        fs.cpSync(SKILLS_SOURCE_PATH, path.join(targetPath, 'skills'), { recursive: true, force: true });
     }
 
-    return copiedAgentResources;
+    return sourcePath !== null;
 }
 
 function ensureAgentInstructionFiles(workspaceRoot, options = {}) {
