@@ -198,7 +198,9 @@ DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
   -plane_aligned_scribe_relief
   -double_angled_notch_relief
   -double_angled_scribe_relief
-  
+
+-move agent usage instructions and docs/skills out of docs folder
+-delet plans in docs folder
   
 
 DONE-new notching plan
