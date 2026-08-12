@@ -1,0 +1,67 @@
+---
+import Layout from '../layouts/Layout.astro';
+const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+<Layout title="About · kumiki" description="Why kumiki exists, and who's behind it.">
+  <section class="about">
+    <h1>About</h1>
+
+    <div class="prose">
+      <p>
+        Like many others, I went headfirst into Japanese carpentry during COVID. I've also been
+        designing games and software with some intensity for decades. Kumiki is the combined
+        inspiration of my hobbies.
+      </p>
+      <p>
+        Commercial CAD software carries a hefty price tag and leaves plenty to be desired for
+        woodworking. Clunky interfaces with limited parametric features aren't ideal for
+        representing repeating patterns of joints that follow systematic geometric rules.
+      </p>
+      <p>
+        When I originally created kumiki, I figured few people would be willing to write
+        <strong>CODE</strong> to make their <strong>DESIGNS</strong>, even with kumiki designed
+        to be as simple and accessible as it is. By the time I released it, though, the agentic
+        coding ship had sailed. I won't say much about that, except that it has, as a matter of
+        fact, made kumiki more &mdash; not less &mdash; accessible as a CAD program.
+      </p>
+      <p>
+        I hope you enjoy using it as much as I enjoy making it. Kumiki is free and open source!
+      </p>
+    </div>
+
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">
+        View on GitHub
+      </a>
+      <a class="btn btn-secondary" href={`${base}/`}>
+        Back to home
+      </a>
+    </div>
+  </section>
+</Layout>
+
+<style>
+  .about {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 2.2rem 0 2rem;
+  }
+  .about h1 {
+    font-size: 2.2rem;
+    margin: 0 0 1.6rem;
+  }
+  .prose p {
+    color: var(--ink-soft);
+    font-size: 1.05rem;
+    margin: 0 0 1.2rem;
+  }
+  .prose strong {
+    color: var(--ink);
+  }
+  .cta-row {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-top: 2rem;
+  }
+</style>
