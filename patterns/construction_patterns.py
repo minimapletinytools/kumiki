@@ -146,7 +146,7 @@ def make_attach_face_aligned_timber_stickout_example(reference: StickoutReferenc
         bottom_position=create_v3(span, 0, 0),
         length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
         # rotated 45 degrees about its own axis
-        width_direction=normalize_vector(create_v3(scalar(1), scalar(1), scalar(0))),
+        width_direction=safe_normalize_vector(create_v3(scalar(1), scalar(1), scalar(0))),
         ticket="Target_Post",
     )
 
@@ -196,7 +196,7 @@ def make_attach_face_aligned_timber_target_projection_example():
         bottom_position=create_v3(span, inches(8), 0),
         length_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Vertical
         # rotated 45 degrees about its own axis
-        width_direction=normalize_vector(create_v3(scalar(1), scalar(1), scalar(0))),
+        width_direction=safe_normalize_vector(create_v3(scalar(1), scalar(1), scalar(0))),
         ticket="Target_Post",
     )
 

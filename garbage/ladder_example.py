@@ -48,8 +48,8 @@ def _create_side_rails(origin: V3, x_offset: Numeric, side_label: str) -> tuple[
     front_bottom_global = origin + create_v3(x_offset, -side_stringer_base_depth / 2, 0)
     back_bottom_global = origin + create_v3(x_offset, side_stringer_base_depth / 2, 0)
 
-    front_length_direction = normalize_vector(apex_global - front_bottom_global)
-    back_length_direction = normalize_vector(apex_global - back_bottom_global)
+    front_length_direction = safe_normalize_vector(apex_global - front_bottom_global)
+    back_length_direction = safe_normalize_vector(apex_global - back_bottom_global)
 
     # Width points out of the side-frame plane (X), keeping members plane-aligned in YZ.
     width_direction = create_v3(1, 0, 0)

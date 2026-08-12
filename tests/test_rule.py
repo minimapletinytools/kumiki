@@ -19,14 +19,12 @@ from kumiki.rule import (
     INCH_TO_METER, FOOT_TO_METER, SHAKU_TO_METER,
     create_v3,
     safe_normalize_vector,
-    normalize_vector,
     radians,
     is_complex_expr,
     safe_det,
     safe_simplify,
     safe_compare,
     Comparison,
-    equality_test,
     safe_equality_test,
     safe_zero_test,
     degrees,
@@ -1035,7 +1033,7 @@ class TestTransformRotateAroundAxis:
         # dist = ||(P - Q) - ((P - Q) · D̂)D̂||
         
         def distance_to_axis(point, axis_pos, axis_dir):
-            axis_normalized = normalize_vector(axis_dir)
+            axis_normalized = safe_normalize_vector(axis_dir)
             point_to_axis_pos = point - axis_pos
             projection_length = sum(point_to_axis_pos[i] * axis_normalized[i] for i in range(3))
             projection = axis_normalized * projection_length
@@ -1356,7 +1354,7 @@ class TestSafeEqualityTest:
 
 class TestEqualityTest:
     def test_equal_rationals(self):
-        assert equality_test(scalar(1, 2), scalar(1, 2)) == True
+        assert safe_equality_test(scalar(1, 2), scalar(1, 2)) == True
 
 
 class TestDegrees:

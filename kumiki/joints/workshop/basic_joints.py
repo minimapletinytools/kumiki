@@ -281,7 +281,7 @@ def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     if arrangement.front_face_on_butt_timber_1 is None:
         butt_1_len = arrangement.butt_timber_1.get_length_direction_global()
         receiving_len = arrangement.receiving_timber.get_length_direction_global()
-        joint_plane_normal = normalize_vector(cross_product(butt_1_len, receiving_len))
+        joint_plane_normal = safe_normalize_vector(cross_product(butt_1_len, receiving_len))
         peg_face = arrangement.butt_timber_1.get_closest_oriented_long_face_from_global_direction(
             joint_plane_normal
         )
@@ -304,7 +304,7 @@ def cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
     slot_direction_global = receiving_timber.get_face_direction_global(
         slot_facing_end_on_receiving_timber
     )
-    joint_plane_normal_global = normalize_vector(
+    joint_plane_normal_global = safe_normalize_vector(
         cross_product(butt_length_direction_global, receiving_length_direction_global)
     )
 

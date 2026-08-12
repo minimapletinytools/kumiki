@@ -30,7 +30,7 @@ from kumiki.rule import (
     create_v2,
     degrees,
     inches,
-    safe_normalize_vector as normalize_vector,
+    safe_normalize_vector as safe_normalize_vector,
     scalar,
 )
 from kumiki.timber import (
@@ -110,7 +110,7 @@ class TestShoulderNotchingDecision:
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
             length_direction=create_v3(scalar(0), scalar(1), scalar(0)),
-            width_direction=normalize_vector(create_v3(scalar(1), scalar(0), scalar(1))),
+            width_direction=safe_normalize_vector(create_v3(scalar(1), scalar(0), scalar(1))),
             ticket="non_plane_tenon",
         )
         non_plane_arrangement = ButtJointTimberArrangement(
@@ -283,7 +283,7 @@ class TestChopButtJointShoulderNotchRelief4Sided:
             width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             ticket="mortise",
         )
-        raking_length_dir = normalize_vector(create_v3(scalar(2), -scalar(3), scalar(0)))
+        raking_length_dir = safe_normalize_vector(create_v3(scalar(2), -scalar(3), scalar(0)))
         tenon = create_timber(
             length=scalar(50), size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(20), scalar(30), scalar(0)),
@@ -352,7 +352,7 @@ class TestChopButtJointShoulderNotchRelief4Sided:
             width_direction=create_v3(scalar(0), scalar(0), scalar(1)),
             ticket="mortise",
         )
-        raking_length_dir = normalize_vector(create_v3(scalar(2), -scalar(3), scalar(0)))
+        raking_length_dir = safe_normalize_vector(create_v3(scalar(2), -scalar(3), scalar(0)))
         tenon = create_timber(
             length=scalar(50), size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(20), scalar(30), scalar(0)),
@@ -439,7 +439,7 @@ class TestChopButtJointShoulderNotchReliefOnPlaneAlignedTimbers2Sided:
             length=scalar(100), size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
             length_direction=create_v3(scalar(0), scalar(1), scalar(0)),
-            width_direction=normalize_vector(create_v3(scalar(1), scalar(0), scalar(1))),
+            width_direction=safe_normalize_vector(create_v3(scalar(1), scalar(0), scalar(1))),
             ticket="non_plane_tenon",
         )
         arrangement = ButtJointTimberArrangement(
@@ -499,7 +499,7 @@ class TestChopButtJointShoulderNotchReliefOnPlaneAlignedTimbers2Sided:
             width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
             ticket="mortise_timber",
         )
-        raking_dir = normalize_vector(create_v3(scalar(1), scalar(0), scalar(1)))
+        raking_dir = safe_normalize_vector(create_v3(scalar(1), scalar(0), scalar(1)))
         tenon_timber = create_timber(
             length=scalar(40), size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),

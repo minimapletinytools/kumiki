@@ -209,9 +209,9 @@ DONE-new notching plan
   -double_angled_notch_relief
   -double_angled_scribe_relief
 
--move agent usage instructions and docs/skills out of docs folder
--delet plans in docs folder
--remove calls to normalize_vector and zero_test switch to safe version
+DONE-move agent usage instructions and docs/skills out of docs folder
+DONE-delet plans in docs folder
+DONE-remove calls to normalize_vector and zero_test switch to safe version
 
   
 

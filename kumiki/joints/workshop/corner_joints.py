@@ -110,7 +110,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     e = safe_dot_product(directionB, w0)
 
     denom = prune(a * c - b * b)
-    if zero_test(denom):
+    if safe_zero_test(denom):
         # Parallel timbers: lines don't converge; bisect between the two end positions
         intersection_point = prune((endA_position + endB_position) / 2)
     else:
@@ -127,13 +127,13 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
 
     # Create the miter plane normal
     # Normalize the directions first
-    normA = normalize_vector(directionA)
-    normB = normalize_vector(directionB)
+    normA = safe_normalize_vector(directionA)
+    normB = safe_normalize_vector(directionB)
 
     # The bisecting direction is the normalized sum of the two directions
     # This points "into" the joint (towards the acute angle)
     # IMPORTANT: The bisector lives IN the miter plane (it's the line you draw on the wood)
-    bisector = normalize_vector(normA + normB)
+    bisector = safe_normalize_vector(normA + normB)
 
     # The plane formed by the two timber directions has normal:
     plane_normal = cross_product(normA, normB)
@@ -145,10 +145,10 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # and the plane_normal. This is the cross product: bisector × plane_normal
     # For parallel timbers plane_normal is zero, so fall back to a perpendicular end cut.
     plane_normal_sq = safe_dot_product(plane_normal, plane_normal)
-    if zero_test(plane_normal_sq):
+    if safe_zero_test(plane_normal_sq):
         miter_normal = normA
     else:
-        miter_normal = normalize_vector(cross_product(bisector, plane_normal))
+        miter_normal = safe_normalize_vector(cross_product(bisector, plane_normal))
 
     # The miter plane passes through the intersection point
     # Both timbers will be cut by this same plane, but each timber needs its half-plane
@@ -223,7 +223,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # Offset the miter plane along the bisector (which is in the miter plane)
     # For a timber with outer corner distance d and joint half-angle α:
     # offset ≈ d / sin(α) if sin(α) > 0, else use a large value
-    if not zero_test(sin_half_angle):
+    if not safe_zero_test(sin_half_angle):
         offset_dist_A = outer_corner_dist_A / sin_half_angle
         offset_dist_B = outer_corner_dist_B / sin_half_angle
     else:
@@ -417,8 +417,8 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     marking_origin_global = shoulder_point_global + tongue_normal_direction * tongue_position
 
     tongue_orientation_global = Orientation.from_z_and_y(
-        z_direction=normalize_vector(tongue_end_direction),
-        y_direction=normalize_vector(tongue_normal_direction),
+        z_direction=safe_normalize_vector(tongue_end_direction),
+        y_direction=safe_normalize_vector(tongue_normal_direction),
     )
     marking_space_transform = Transform(position=marking_origin_global, orientation=tongue_orientation_global)
     marking_space = Space(transform=marking_space_transform)
@@ -460,7 +460,7 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     # Slot depth = distance from shoulder to fork far face along tongue direction
     fork_slot_depth = safe_dot_product(
         fork_far_face_point_global - shoulder_point_global,
-        normalize_vector(tongue_end_direction),
+        safe_normalize_vector(tongue_end_direction),
     )
     assert safe_compare(fork_slot_depth, 0, Comparison.GT), \
         "Fork slot depth must be > 0; check timber arrangement and end selections"
@@ -805,7 +805,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
 
     # Calculate angle between timbers using dot product
     # angle = acos(directionA · directionB)
-    dot_product = safe_dot_product(normalize_vector(directionA), normalize_vector(directionB))
+    dot_product = safe_dot_product(safe_normalize_vector(directionA), safe_normalize_vector(directionB))
 
     # Clamp to [-1, 1] to avoid numerical issues with acos
     from sympy import Max, Min
@@ -899,7 +899,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
 
     # Calculate the diagonal direction (bisector between timberA and timberB)
     # This is the average of the two end directions
-    diagonal_direction = normalize_vector(directionA + directionB)
+    diagonal_direction = safe_normalize_vector(directionA + directionB)
 
     # Find inner faces by looking for the closest oriented face to the negative diagonal direction
     # The negative diagonal points toward the inside of the corner
@@ -914,12 +914,12 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     # The inner shoulder axis is the intersection line of the two inner face planes
     # Direction of intersection line = cross product of the two normals
     inner_shoulder_direction = cross_product(timberA_inner_face_normal, timberB_inner_face_normal)
-    inner_shoulder_direction = normalize_vector(inner_shoulder_direction)
+    inner_shoulder_direction = safe_normalize_vector(inner_shoulder_direction)
 
     # validate that the timber size in the inner_face axis direction is the same on both timbers
     timberA_inner_face_size = timberA.get_size_in_face_normal_axis(timberA_inner_face_enum)
     timberB_inner_face_size = timberB.get_size_in_face_normal_axis(timberB_inner_face_enum)
-    if not zero_test(timberA_inner_face_size - timberB_inner_face_size):
+    if not safe_zero_test(timberA_inner_face_size - timberB_inner_face_size):
         raise ValueError(
             f"Timber widths in the miter plane are not the same. "
             f"TimberA size: {float(timberA_inner_face_size):.3f}, "
@@ -971,11 +971,11 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     # Ensure correct orientation (might need to flip based on handedness)
     # Y-axis from cross product
     marking_y = cross_product(marking_z, marking_x)
-    marking_y = normalize_vector(marking_y)
+    marking_y = safe_normalize_vector(marking_y)
 
     # Re-orthogonalize X to be perpendicular to Z
     marking_x = cross_product(marking_y, marking_z)
-    marking_x = normalize_vector(marking_x)
+    marking_x = safe_normalize_vector(marking_x)
 
     # ========================================================================
     # Step 7: Generate finger prisms
@@ -1019,7 +1019,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
 
         # Y-axis: perpendicular to both (computed via cross product)
         finger_y = cross_product(finger_z, finger_x)
-        finger_y = normalize_vector(finger_y)
+        finger_y = safe_normalize_vector(finger_y)
 
         finger_orientation = Orientation(Matrix([
             [finger_x[0], finger_y[0], finger_z[0]],
@@ -1224,11 +1224,11 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     intersection_point = marking_position
 
     # Create miter plane normal
-    normA = normalize_vector(directionA)
-    normB = normalize_vector(directionB)
-    bisector = normalize_vector(normA + normB)
+    normA = safe_normalize_vector(directionA)
+    normB = safe_normalize_vector(directionB)
+    bisector = safe_normalize_vector(normA + normB)
     plane_normal = cross_product(normA, normB)
-    miter_normal = normalize_vector(cross_product(bisector, plane_normal))
+    miter_normal = safe_normalize_vector(cross_product(bisector, plane_normal))
 
     # Create HalfSpace cuts for miter planes
     dot_A = safe_dot_product(normA, miter_normal)

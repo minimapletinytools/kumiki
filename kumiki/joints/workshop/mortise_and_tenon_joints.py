@@ -276,7 +276,7 @@ def cut_mortise_and_tenon_joint(
     # Step 4: Define marking_space (global Space at shoulder, toward tenon end)
     # -------------------------------------------------------------------------
     tenon_orientation = compute_timber_orientation(
-        normalize_vector(tenon_end_direction), tenon_timber.get_width_direction_global()
+        safe_normalize_vector(tenon_end_direction), tenon_timber.get_width_direction_global()
     )
     tenon_base_transform = Transform(position=marking_origin_global, orientation=tenon_orientation)
     marking_space: Space = Space(transform=tenon_base_transform)
@@ -286,7 +286,7 @@ def cut_mortise_and_tenon_joint(
     # -------------------------------------------------------------------------
     mortise_face_normal = shoulder_plane.normal
     cos_angle = safe_dot_product(
-        normalize_vector(mortise_face_normal), normalize_vector(tenon_end_direction)
+        safe_normalize_vector(mortise_face_normal), safe_normalize_vector(tenon_end_direction)
     )
 
     # -------------------------------------------------------------------------
@@ -304,7 +304,7 @@ def cut_mortise_and_tenon_joint(
     if use_round_tenon:
         # Round tenon: use cylinder with diameter = tenon_size[0]
         tenon_radius = tenon_size[0] / scalar(2)
-        axis_direction_global = normalize_vector(tenon_end_direction)
+        axis_direction_global = safe_normalize_vector(tenon_end_direction)
         tenon_prism_global = Cylinder(
             axis_direction=axis_direction_global,
             radius=tenon_radius,
@@ -330,8 +330,8 @@ def cut_mortise_and_tenon_joint(
         )
 
     tenon_prism_cropping_csgs: Optional[List[CutCSG]] = None
-    # why did the agent do zero_test(scalar(1) - cos_angle * cos_angle)...
-    do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not zero_test(scalar(1) - cos_angle * cos_angle)
+    # why did the agent do safe_zero_test(scalar(1) - cos_angle * cos_angle)...
+    do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not safe_zero_test(scalar(1) - cos_angle * cos_angle)
     if do_lengthwise_cropping:
         # TODO you could support this on non plane-aligned timbers as well but you need to choose a different plane to do the cropping
         # Compute mortise_face locally — cropping is only used for plane-aligned timbers
@@ -389,7 +389,7 @@ def cut_mortise_and_tenon_joint(
         if use_round_tenon:
             # Round mortise hole at an angle: use cylinder
             mortise_radius = tenon_size[0] / scalar(2)
-            axis_direction_global = normalize_vector(tenon_end_direction)
+            axis_direction_global = safe_normalize_vector(tenon_end_direction)
             mortise_hole_prism_global = Cylinder(
                 axis_direction=axis_direction_global,
                 radius=mortise_radius,
@@ -425,7 +425,7 @@ def cut_mortise_and_tenon_joint(
         if use_round_tenon:
             # Round mortise hole: use cylinder with same diameter as tenon
             mortise_radius = tenon_size[0] / scalar(2)
-            axis_direction_global = normalize_vector(tenon_end_direction)
+            axis_direction_global = safe_normalize_vector(tenon_end_direction)
             mortise_hole_prism_global = Cylinder(
                 axis_direction=axis_direction_global,
                 radius=mortise_radius,

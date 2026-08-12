@@ -105,17 +105,17 @@ class RectangularPrismFeature(CSGFeature):
         hw = self.owner.size[0] / 2
         hh = self.owner.size[1] / 2
         if self.face == PrismFace.RIGHT:
-            return equality_test(x, hw)
+            return safe_equality_test(x, hw)
         elif self.face == PrismFace.LEFT:
-            return equality_test(x, -hw)
+            return safe_equality_test(x, -hw)
         elif self.face == PrismFace.FRONT:
-            return equality_test(y, hh)
+            return safe_equality_test(y, hh)
         elif self.face == PrismFace.BACK:
-            return equality_test(y, -hh)
+            return safe_equality_test(y, -hh)
         elif self.face == PrismFace.TOP:
-            return self.owner.end_distance is not None and equality_test(z, self.owner.end_distance)
+            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance)
         elif self.face == PrismFace.BOTTOM:
-            return self.owner.start_distance is not None and equality_test(z, self.owner.start_distance)
+            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance)
         return False
 
 
@@ -279,8 +279,8 @@ class HalfSpace(CutCSG):
         """
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
-        # Use zero_test to handle Float vs Integer comparison with tolerance
-        return zero_test(dot_product - self.offset)
+        # Use safe_zero_test to handle Float vs Integer comparison with tolerance
+        return safe_zero_test(dot_product - self.offset)
     
     def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
         """
@@ -487,17 +487,17 @@ class RectangularPrism(CutCSG):
         half_height = self.size[1] / 2
 
         # On width faces
-        if equality_test(Abs(x_coord), half_width):
+        if safe_equality_test(Abs(x_coord), half_width):
             return True
 
         # On height faces
-        if equality_test(Abs(y_coord), half_height):
+        if safe_equality_test(Abs(y_coord), half_height):
             return True
 
         # On length faces (if finite)
-        if self.start_distance is not None and equality_test(z_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance):
             return True
-        if self.end_distance is not None and equality_test(z_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance):
             return True
 
         return False
@@ -529,20 +529,20 @@ class RectangularPrism(CutCSG):
         # TODO you should check if point is on edges and return averages instead
 
         # On length faces (top/bottom) - check these first
-        if self.start_distance is not None and equality_test(z_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance):
             return -length_dir  # Bottom face, normal points in -length direction (outward)
-        if self.end_distance is not None and equality_test(z_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance):
             return length_dir  # Top face, normal points in +length direction (outward)
 
         # On width faces (right/left)
-        if equality_test(Abs(x_coord), half_width):
+        if safe_equality_test(Abs(x_coord), half_width):
             if safe_compare(x_coord, 0, Comparison.GT):
                 return width_dir  # Right face, normal points in +width direction
             else:
                 return -width_dir  # Left face, normal points in -width direction
 
         # On height faces (front/back)
-        if equality_test(Abs(y_coord), half_height):
+        if safe_equality_test(Abs(y_coord), half_height):
             if safe_compare(y_coord, 0, Comparison.GT):
                 return height_dir  # Front face, normal points in +height direction
             else:
@@ -558,12 +558,12 @@ class RectangularPrism(CutCSG):
         hw = self.size[0] / 2
         hh = self.size[1] / 2
         face_checks = {
-            PrismFace.RIGHT: lambda: equality_test(x, hw),
-            PrismFace.LEFT: lambda: equality_test(x, -hw),
-            PrismFace.FRONT: lambda: equality_test(y, hh),
-            PrismFace.BACK: lambda: equality_test(y, -hh),
-            PrismFace.TOP: lambda: self.end_distance is not None and equality_test(z, self.end_distance),
-            PrismFace.BOTTOM: lambda: self.start_distance is not None and equality_test(z, self.start_distance),
+            PrismFace.RIGHT: lambda: safe_equality_test(x, hw),
+            PrismFace.LEFT: lambda: safe_equality_test(x, -hw),
+            PrismFace.FRONT: lambda: safe_equality_test(y, hh),
+            PrismFace.BACK: lambda: safe_equality_test(y, -hh),
+            PrismFace.TOP: lambda: self.end_distance is not None and safe_equality_test(z, self.end_distance),
+            PrismFace.BOTTOM: lambda: self.start_distance is not None and safe_equality_test(z, self.start_distance),
         }
         features: List[CSGFeature] = []
         for name, face in self.named_features:
@@ -742,13 +742,13 @@ class Cylinder(CutCSG):
         radial_distance = safe_norm(radial_vector)
 
         # On cylindrical surface
-        if equality_test(radial_distance, self.radius):
+        if safe_equality_test(radial_distance, self.radius):
             return True
 
         # On end caps (if finite and at the end)
-        if self.start_distance is not None and equality_test(axial_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(axial_coord, self.start_distance):
             return True
-        if self.end_distance is not None and equality_test(axial_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(axial_coord, self.end_distance):
             return True
 
         return False
@@ -780,7 +780,7 @@ class Cylinder(CutCSG):
         radial_distance = safe_norm(radial_vector)
 
         # Check if on cylindrical surface first (most common case)
-        if equality_test(radial_distance, self.radius):
+        if safe_equality_test(radial_distance, self.radius):
             # Normal is the radial direction (normalized)
             if safe_zero_test(radial_distance):
                 # Point is on the axis, which shouldn't happen for the cylindrical surface
@@ -790,10 +790,10 @@ class Cylinder(CutCSG):
                 return radial_vector / radial_distance
 
         # Check if on end caps
-        if self.start_distance is not None and equality_test(axial_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(axial_coord, self.start_distance):
             # Bottom cap, normal points in -axis direction (outward)
             return -axis
-        if self.end_distance is not None and equality_test(axial_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(axial_coord, self.end_distance):
             # Top cap, normal points in +axis direction (outward)
             return axis
 
@@ -1102,7 +1102,7 @@ class Difference(CutCSG):
                         
                         # If dot product == 1, surfaces overlap, exclude the point
                         # TODO what were really wanting to chec khere is that the surfaces are the same locally which may not be the case if the normal was on an edge with this condition. To fix this you should introduce an is_on_edge function HOWEVER this also won't work in the case of stuff like cylinders, so to fix that you probably really need a surface_derivative (curvature) function...
-                        if equality_test(dot_product, 1):
+                        if safe_equality_test(dot_product, 1):
                             return False
                     else:
                         # Cannot determine normals, use conservative approach: exclude
@@ -1418,16 +1418,16 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check if on top or bottom face (if finite)
-        if self.start_distance is not None and zero_test(z_coord - self.start_distance):
+        if self.start_distance is not None and safe_zero_test(z_coord - self.start_distance):
             return True
-        if self.end_distance is not None and zero_test(z_coord - self.end_distance):
+        if self.end_distance is not None and safe_zero_test(z_coord - self.end_distance):
             return True
         
         # Check if on a vertical edge (point is at a vertex XY coordinate)
         point_2d = Matrix([x_coord, y_coord])
         for vertex_2d in self.points:
             distance_sq = (point_2d[0] - vertex_2d[0])**2 + (point_2d[1] - vertex_2d[1])**2
-            if zero_test(distance_sq):
+            if safe_zero_test(distance_sq):
                 return True  # Point is on a vertical edge
         
         # Check if on any horizontal edge of the polygon (side face at this z)
@@ -1442,7 +1442,7 @@ class ConvexPolygonExtrusion(CutCSG):
             
             # If edge is zero-length, skip it
             edge_length_sq = edge[0]**2 + edge[1]**2
-            if zero_test(edge_length_sq):
+            if safe_zero_test(edge_length_sq):
                 continue
             
             # Project to_point onto edge
@@ -1454,7 +1454,7 @@ class ConvexPolygonExtrusion(CutCSG):
             if t_in_range:
                 closest_point = p1 + edge * t
                 distance_sq = (point_2d[0] - closest_point[0])**2 + (point_2d[1] - closest_point[1])**2
-                if zero_test(distance_sq):
+                if safe_zero_test(distance_sq):
                     return True
         
         return False
@@ -1480,13 +1480,13 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check if on top face
-        if self.end_distance is not None and equality_test(z_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance):
             # Top face, normal points in +Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         # Check if on bottom face
-        if self.start_distance is not None and equality_test(z_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance):
             # Bottom face, normal points in -Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
@@ -1727,9 +1727,9 @@ class ConvexPolygonSimpleLoft(CutCSG):
 
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if zero_test(z_coord - self.start_distance):
+        if safe_zero_test(z_coord - self.start_distance):
             return True
-        if zero_test(z_coord - self.end_distance):
+        if safe_zero_test(z_coord - self.end_distance):
             return True
 
         cross_section = self._cross_section_at(self._height_fraction(z_coord))
@@ -1739,7 +1739,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
         # matching top vertex, evaluated at this height)
         for vertex_2d in cross_section:
             distance_sq = (point_2d[0] - vertex_2d[0]) ** 2 + (point_2d[1] - vertex_2d[1]) ** 2
-            if zero_test(distance_sq):
+            if safe_zero_test(distance_sq):
                 return True
 
         # On a side face at this height
@@ -1750,7 +1750,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-            if zero_test(edge_length_sq):
+            if safe_zero_test(edge_length_sq):
                 continue
 
             u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
@@ -1759,7 +1759,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
             if u_in_range:
                 closest_point = p1 + edge * u
                 distance_sq = (point_2d[0] - closest_point[0]) ** 2 + (point_2d[1] - closest_point[1]) ** 2
-                if zero_test(distance_sq):
+                if safe_zero_test(distance_sq):
                     return True
 
         return False
@@ -1781,11 +1781,11 @@ class ConvexPolygonSimpleLoft(CutCSG):
         """
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if zero_test(z_coord - self.end_distance):
+        if safe_zero_test(z_coord - self.end_distance):
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
-        if zero_test(z_coord - self.start_distance):
+        if safe_zero_test(z_coord - self.start_distance):
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 

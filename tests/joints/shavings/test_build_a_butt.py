@@ -4,7 +4,7 @@ Tests for build-a-butt-joint shoulder helpers
 
 import pytest
 from sympy import cos, sin, pi
-from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, zero_test, safe_dot_product, safe_normalize_vector as normalize_vector, safe_compare, Comparison, scalar
+from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, safe_zero_test, safe_dot_product, safe_normalize_vector as safe_normalize_vector, safe_compare, Comparison, scalar
 from kumiki.timber import (
     TimberEnd,
     create_timber, create_v3
@@ -91,7 +91,7 @@ class TestMeasureMortiseShoulderPlane:
         # The plane normal should be in the mortise cross-section, pointing
         # toward the tenon (which is offset at +Z=3").
         mortise_length_dir = mortise_timber.get_length_direction_global()
-        assert zero_test(safe_dot_product(plane.normal, mortise_length_dir)), \
+        assert safe_zero_test(safe_dot_product(plane.normal, mortise_length_dir)), \
             "Plane normal should be perpendicular to the mortise length direction"
         dot_z = safe_dot_product(plane.normal, create_v3(scalar(0), scalar(0), scalar(1)))
         assert safe_compare(dot_z, 0, Comparison.GE), \

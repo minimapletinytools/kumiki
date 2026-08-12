@@ -293,7 +293,7 @@ class Footprint:
         # Normalize the direction
         from sympy import sqrt
         length = sqrt(dx * dx + dy * dy)
-        if zero_test(length):
+        if safe_zero_test(length):
             raise ValueError(f"Side {side_index} has zero length")
         
         dx = dx / length

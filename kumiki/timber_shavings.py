@@ -95,7 +95,7 @@ def _support_distance_local(
     z_max: Numeric,
 ) -> Numeric:
     """Distance from position_local to the furthest support plane normal to direction_local."""
-    d = normalize_vector(direction_local)
+    d = safe_normalize_vector(direction_local)
     support_value = _support_value_local(
         direction_local=d,
         x_pos=x_pos,
@@ -368,7 +368,7 @@ def are_timbers_parallel(timber1: PerfectTimberWithin, timber2: PerfectTimberWit
     dot_product = Abs(numeric_dot_product(timber1.get_length_direction_global(), timber2.get_length_direction_global()))
     
     if tolerance is None:
-        return equality_test(dot_product, 1)
+        return safe_equality_test(dot_product, 1)
     else:
         return Abs(dot_product - 1) < tolerance
 
@@ -388,7 +388,7 @@ def are_timbers_orthogonal(timber1: PerfectTimberWithin, timber2: PerfectTimberW
     dot_product = numeric_dot_product(timber1.get_length_direction_global(), timber2.get_length_direction_global())
     
     if tolerance is None:
-        return zero_test(dot_product)
+        return safe_zero_test(dot_product)
     else:
         return Abs(dot_product) < tolerance
 
@@ -423,7 +423,7 @@ def are_timbers_face_aligned(timber1: PerfectTimberWithin, timber2: PerfectTimbe
             dot_product = Abs(numeric_dot_product(dir1, dir2))
             
             if tolerance is None:
-                if equality_test(dot_product, 1):
+                if safe_equality_test(dot_product, 1):
                     return True
             else:
                 if Abs(dot_product - 1) < tolerance:
@@ -457,7 +457,7 @@ def are_timbers_plane_aligned(timber1: PerfectTimberWithin, timber2: PerfectTimb
             dot_product = Abs(numeric_dot_product(normal1, normal2))
             
             if tolerance is None:
-                if equality_test(dot_product, 1):
+                if safe_equality_test(dot_product, 1):
                     return True
             else:
                 if Abs(dot_product - 1) < tolerance:

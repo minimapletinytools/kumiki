@@ -386,8 +386,8 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     marking_origin_global = shoulder_point_global + tongue_normal_direction * tongue_position
 
     fork_orientation_global = Orientation.from_z_and_y(
-        z_direction=normalize_vector(fork_end_direction),
-        y_direction=normalize_vector(tongue_normal_direction),
+        z_direction=safe_normalize_vector(fork_end_direction),
+        y_direction=safe_normalize_vector(tongue_normal_direction),
     )
     marking_space_transform = Transform(position=marking_origin_global, orientation=fork_orientation_global)
     marking_space = Space(transform=marking_space_transform)
@@ -405,7 +405,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
 
     fork_slot_depth = safe_dot_product(
         fork_far_face_point_global - shoulder_point_global,
-        normalize_vector(fork_end_direction),
+        safe_normalize_vector(fork_end_direction),
     )
     assert safe_compare(fork_slot_depth, 0, Comparison.GT), \
         "Fork slot depth must be > 0; check timber arrangement and end selections"
@@ -452,7 +452,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     nx, ny, nz = fork_end_cut.normal[0], fork_end_cut.normal[1], fork_end_cut.normal[2]
     
     z_corners = []
-    if not zero_test(nz):
+    if not safe_zero_test(nz):
         for cx, cy in corners:
             cz = (fork_end_cut.offset - nx * cx - ny * cy) / nz
             z_corners.append(cz)

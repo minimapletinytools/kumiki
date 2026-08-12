@@ -19,7 +19,7 @@ from kumiki.rule import (
     safe_compare,
     safe_dot_product,
     safe_normalize_vector,
-    equality_test,
+    safe_equality_test,
 )
 from kumiki.cutcsg import (
     RectangularPrism,
@@ -82,7 +82,7 @@ def cut_tongue_and_groove_joint(
     # --- Same orientation between boards (element-wise on the rotation matrix) ---
     for r in range(3):
         for c in range(3):
-            assert equality_test(
+            assert safe_equality_test(
                 tongue_board.transform.orientation.matrix[r, c],
                 groove_board.transform.orientation.matrix[r, c],
             ), "tongue board and groove board must have the same orientation"

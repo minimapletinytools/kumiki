@@ -42,10 +42,10 @@ class TestVectorHelpers:
     def test_normalize_vector(self, symbolic_mode):
         """Test vector normalization."""
         v = create_v3(3, 4, 0)  # Use integers for exact computation
-        normalized = normalize_vector(v)
+        normalized = safe_normalize_vector(v)
         
         # Should have magnitude 1
-        magnitude = vector_magnitude(normalized)
+        magnitude = safe_magnitude(normalized)
         assert magnitude == 1
         
         # Should preserve direction ratios exactly
@@ -56,7 +56,7 @@ class TestVectorHelpers:
     def test_normalize_zero_vector(self):
         """Test normalization of zero vector."""
         v = create_v3(scalar(0), scalar(0), scalar(0))  # Use exact integers
-        normalized = normalize_vector(v)
+        normalized = safe_normalize_vector(v)
         assert normalized == v  # Should return original zero vector
     
     def test_cross_product(self):
@@ -73,7 +73,7 @@ class TestVectorHelpers:
     def test_vector_magnitude(self, symbolic_mode):
         """Test vector magnitude calculation."""
         v = create_v3(3, 4, 0)  # Use integers for exact computation
-        magnitude = vector_magnitude(v)
+        magnitude = safe_magnitude(v)
         assert magnitude == 5
 
 

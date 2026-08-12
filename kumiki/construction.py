@@ -397,7 +397,7 @@ def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: in
     start_point = footprint.corners[corner_index]
     end_point = footprint.corners[(corner_index + 1) % len(footprint.corners)]
         
-    length_direction = normalize_vector(Matrix([end_point[0] - start_point[0], end_point[1] - start_point[1], 0]))
+    length_direction = safe_normalize_vector(Matrix([end_point[0] - start_point[0], end_point[1] - start_point[1], 0]))
 
     # Calculate length from boundary side if not provided
     if length is None:
@@ -583,7 +583,7 @@ def attach_timber(
 
     # point_dir is the direction the attached timber points; length_dir is its +length (bottom->top),
     # which flips when the TOP end is the one sitting against the original timber.
-    point_dir = normalize_vector(attached_timber_direction)
+    point_dir = safe_normalize_vector(attached_timber_direction)
     if attached_timber_end_that_points_towards_original_timber == TimberEnd.BOTTOM:
         length_dir = point_dir
     else:
@@ -600,7 +600,7 @@ def attach_timber(
         original_length_dir = original_timber.get_length_direction_global()
         assert not are_vectors_parallel(length_dir, original_length_dir), \
             "lateral_offset requires the attached timber to not be parallel to the original timber's length"
-        lateral_dir = normalize_vector(cross_product(original_length_dir, length_dir))
+        lateral_dir = safe_normalize_vector(cross_product(original_length_dir, length_dir))
         reference = reference + lateral_dir * lateral_offset
 
     # ---- extend along the pointing direction and build the timber ----
@@ -758,7 +758,7 @@ def attach_plane_aligned_timber(
         width_axis_along_p = True
 
     width_dir = p if width_axis_along_p else t
-    height_dir = normalize_vector(cross_product(length_dir, width_dir))
+    height_dir = safe_normalize_vector(cross_product(length_dir, width_dir))
 
     def _attached_long_face_normal_and_half(face: TimberLongFace) -> Tuple[Direction3D, Numeric]:
         """Outward global normal and center-to-face half size for a long face of the attached timber."""
@@ -789,7 +789,7 @@ def attach_plane_aligned_timber(
 
     # ---- lateral-position-axis coordinate (along t) ----
     if isinstance(original_timber_face_to_measure_from_for_lateral_position, TimberFace):
-        orig_lat_normal = normalize_vector(original_timber.get_face_direction_global(original_timber_face_to_measure_from_for_lateral_position))
+        orig_lat_normal = safe_normalize_vector(original_timber.get_face_direction_global(original_timber_face_to_measure_from_for_lateral_position))
         assert are_vectors_parallel(orig_lat_normal, t), (
             "original_timber_face_to_measure_from_for_lateral_position must be a lateral face of the original timber "
             "(perpendicular to original_timber_long_face_that_attached_timber_points_to and to the length)"
@@ -850,7 +850,7 @@ def attach_plane_aligned_timber(
             # point_dir (the perpendicular foot is where the centerline crosses that plane)
             m = point_dir
         else:
-            m = normalize_vector(cross_product(target_length_dir, t))
+            m = safe_normalize_vector(cross_product(target_length_dir, t))
         crossing_rate = point_dir.dot(m)
         d = target_timber.get_bottom_position_global().dot(m)
         if attached_timber_stickout.stickoutReference2 != StickoutReference.CENTER_LINE:
@@ -1053,7 +1053,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     
     # Calculate length direction (from timber1 to timber2)
     length_direction = pos2 - pos1
-    length_direction = normalize_vector(length_direction)
+    length_direction = safe_normalize_vector(length_direction)
     
     # Calculate face direction (width direction for the created timber)
     if orientation_width_vector is not None:
@@ -1076,7 +1076,7 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
     # Formula: v_perp = v - (v·n)n
     dot_product = reference_direction.dot(length_direction)
     width_direction = reference_direction - dot_product * length_direction
-    width_direction = normalize_vector(width_direction)
+    width_direction = safe_normalize_vector(width_direction)
     
     # TODO TEST THIS IT'S PROBABLY WRONG
     # Determine size if not provided
@@ -1101,13 +1101,13 @@ def join_timbers(timber1: PerfectTimberWithin, timber2: PerfectTimberWithin,
         "join_timbers only supports CENTER_LINE stickout reference. Use join_face_aligned_on_face_aligned_timbers for INSIDE/OUTSIDE references."
     
     # Calculate timber length with stickout (always from centerline in join_timbers)
-    centerline_distance = vector_magnitude(pos2 - pos1)
+    centerline_distance = safe_magnitude(pos2 - pos1)
     timber_length = centerline_distance + stickout.stickout1 + stickout.stickout2
     
     # Apply lateral offset
     if lateral_offset != scalar(0):
         # Calculate offset direction (cross product of length vectors)
-        offset_dir = normalize_vector(cross_product(timber1.get_length_direction_global(), length_direction))
+        offset_dir = safe_normalize_vector(cross_product(timber1.get_length_direction_global(), length_direction))
     
     # Calculate the bottom position (start of timber)
     # Start from pos1 and move backward by stickout1 (always centerline)
@@ -1163,7 +1163,7 @@ def join_plane_aligned_on_plane_aligned_timbers(timber1: PerfectTimberWithin, ti
         New timber that joins timber1 and timber2, lying in their shared plane
     """
     require_check(None if are_timbers_plane_aligned(timber1, timber2) else "Timbers must be plane-aligned")
-    plane_normal = normalize_vector(cross_product(timber1.get_length_direction_global(), timber2.get_length_direction_global()))
+    plane_normal = safe_normalize_vector(cross_product(timber1.get_length_direction_global(), timber2.get_length_direction_global()))
 
     if orientation_long_face_on_timber1 is None:
         orientation_long_face_on_timber1 = timber1.get_closest_oriented_long_face_from_global_direction(plane_normal)
@@ -1181,8 +1181,8 @@ def join_plane_aligned_on_plane_aligned_timbers(timber1: PerfectTimberWithin, ti
 
     point1 = locate_position_on_centerline_from_bottom(timber1, location_on_timber1).position
     point2 = locate_position_on_centerline_from_bottom(timber2, location_on_timber2).position
-    joining_direction = normalize_vector(point2 - point1)
-    lateral_offset_direction = normalize_vector(cross_product(timber1.get_length_direction_global(), joining_direction))
+    joining_direction = safe_normalize_vector(point2 - point1)
+    lateral_offset_direction = safe_normalize_vector(cross_product(timber1.get_length_direction_global(), joining_direction))
     lateral_offset = lateral_offset_from_timber1
     if safe_compare(lateral_offset_direction.dot(plane_normal), 0, Comparison.LT):
         lateral_offset = -lateral_offset
@@ -1204,7 +1204,7 @@ def join_plane_aligned_on_plane_aligned_timbers(timber1: PerfectTimberWithin, ti
         lateral_offset=lateral_offset,
         stickout=stickout,
         size=size,
-        orientation_width_vector=normalize_vector(orientation_width_vector),
+        orientation_width_vector=safe_normalize_vector(orientation_width_vector),
         ticket=ticket,
     )
 
@@ -1272,7 +1272,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
     
     # Calculate position on timber2 to determine joining direction
     pos2 = locate_position_on_centerline_from_bottom(timber2, location_on_timber2).position
-    joining_direction = normalize_vector(pos2 - pos1)
+    joining_direction = safe_normalize_vector(pos2 - pos1)
     
     # Convert TimberFace to a direction vector for orientation (if provided)
     orientation_width_vector = orientation_face_on_timber1.get_direction() if orientation_face_on_timber1 is not None else None
@@ -1292,10 +1292,10 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
     # Project reference direction onto the plane perpendicular to the joining direction
     dot_product = reference_direction.dot(joining_direction)
     width_direction = reference_direction - dot_product * joining_direction
-    width_direction = normalize_vector(width_direction)
+    width_direction = safe_normalize_vector(width_direction)
     
     # Calculate height direction (perpendicular to both length and width)
-    height_direction = normalize_vector(cross_product(joining_direction, width_direction))
+    height_direction = safe_normalize_vector(cross_product(joining_direction, width_direction))
     
     # Now convert feature-relative measurements to centerline-relative measurements
     longitudinal_offset = scalar(0)
@@ -1347,7 +1347,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
         # Determine which face this plane represents by comparing normals using dot product
         
         # Normalize the plane normal for comparison
-        plane_normal = normalize_vector(feature_geometry.normal)
+        plane_normal = safe_normalize_vector(feature_geometry.normal)
         
         # Check dot products to determine which direction the normal points
         # dot product ≈ +1 means same direction, ≈ -1 means opposite direction
@@ -1393,7 +1393,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
         # The lateral offset is the distance in the lateral direction (perpendicular to joining direction)
         # For a joining timber, the lateral direction is typically the cross product of
         # timber1's length direction and the joining direction
-        lateral_direction = normalize_vector(cross_product(timber1.get_length_direction_global(), joining_direction))
+        lateral_direction = safe_normalize_vector(cross_product(timber1.get_length_direction_global(), joining_direction))
         
         # Calculate total lateral offset from the edge position
         # The edge has offsets in both width and height directions
@@ -1419,7 +1419,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
     # Intentionally do not clamp the projected location. Keep this consistent
     # with the initial projection above.
     pos2 = locate_position_on_centerline_from_bottom(timber2, location_on_timber2).position
-    joining_direction = normalize_vector(pos2 - pos1)
+    joining_direction = safe_normalize_vector(pos2 - pos1)
     
     # Determine which dimension of the created timber is perpendicular to the joining direction
     # The created timber will have:
@@ -1438,7 +1438,7 @@ def join_face_aligned_on_face_aligned_timbers(timber1: PerfectTimberWithin, timb
         if orientation_width_vector is not None:
             # The width (size[0]) is along the width_direction
             # The height (size[1]) is along the height_direction (perpendicular to both)
-            height_direction = normalize_vector(cross_product(joining_direction, orientation_width_vector))
+            height_direction = safe_normalize_vector(cross_product(joining_direction, orientation_width_vector))
             
             # Check which dimension is more perpendicular to timber1's length direction
             # This determines which face is "inside" (facing timber1)
@@ -1549,7 +1549,7 @@ class ButtJointTimberArrangement:
         if self._memo.get(key) is not None:
             return self._memo[key]
 
-        result = normalize_vector(cross_product(self.butt_timber.get_face_direction_global(self.butt_timber_end), self.receiving_timber.get_length_direction_global()))
+        result = safe_normalize_vector(cross_product(self.butt_timber.get_face_direction_global(self.butt_timber_end), self.receiving_timber.get_length_direction_global()))
         self._memo[key] = result
         return result
 
@@ -1668,7 +1668,7 @@ class DoubleButtJointTimberArrangement:
             return "butt_timber_2 length direction must be orthogonal to receiving_timber length direction"
 
         if self.front_face_on_butt_timber_1 is not None:
-            joint_plane_normal = normalize_vector(cross_product(dir1, recv_len))
+            joint_plane_normal = safe_normalize_vector(cross_product(dir1, recv_len))
             butt_1_face_normal = self.butt_timber_1.get_face_direction_global(
                 self.front_face_on_butt_timber_1
             )
@@ -1686,7 +1686,7 @@ class DoubleButtJointTimberArrangement:
         approach_dir2 = -dir2 if self.butt_timber_2_end == TimberEnd.TOP else dir2
         
         # Pair must approach from opposite directions (antiparallel)
-        if not equality_test(approach_dir1.dot(approach_dir2), -1):
+        if not safe_equality_test(approach_dir1.dot(approach_dir2), -1):
             return "butt_timber_1 and butt_timber_2 must approach from opposite directions (antiparallel)"
         return None
 
@@ -1762,10 +1762,10 @@ class TripleButtJointTimberArrangement:
         pairs = [(butt_dirs[i][0], butt_dirs[i][1], butt_dirs[j][0], butt_dirs[j][1])
                  for i in range(len(butt_dirs)) for j in range(i + 1, len(butt_dirs))]
         for name_i, dir_i, name_j, dir_j in pairs:
-            if equality_test(dir_i.dot(dir_j), 1):
+            if safe_equality_test(dir_i.dot(dir_j), 1):
                 return f"{name_i} and {name_j} must point in different cardinal directions"
         # Main pair must be antiparallel (pointing towards each other)
-        if not equality_test(dir_main1.dot(dir_main2), -1):
+        if not safe_equality_test(dir_main1.dot(dir_main2), -1):
             return "main_butt_timber_1 and main_butt_timber_2 must be antiparallel (pointing towards each other)"
         return None
 
@@ -1839,13 +1839,13 @@ class QuadrupleButtJointTimberArrangement:
         pairs = [(butt_dirs[i][0], butt_dirs[i][1], butt_dirs[j][0], butt_dirs[j][1])
                  for i in range(len(butt_dirs)) for j in range(i + 1, len(butt_dirs))]
         for name_i, dir_i, name_j, dir_j in pairs:
-            if equality_test(dir_i.dot(dir_j), 1):
+            if safe_equality_test(dir_i.dot(dir_j), 1):
                 return f"{name_i} and {name_j} must point in different cardinal directions"
         # Main pair must be antiparallel
-        if not equality_test(dir_main1.dot(dir_main2), -1):
+        if not safe_equality_test(dir_main1.dot(dir_main2), -1):
             return "main_butt_timber_1 and main_butt_timber_2 must be antiparallel (pointing towards each other)"
         # Awk pair must be antiparallel
-        if not equality_test(dir_awk1.dot(dir_awk2), -1):
+        if not safe_equality_test(dir_awk1.dot(dir_awk2), -1):
             return "awk_1 and awk_2 must be antiparallel (pointing towards each other)"
         return None
 
@@ -1932,7 +1932,7 @@ class CornerJointTimberArrangement:
 
     def compute_normalized_timber_cross_product(self) -> Direction3D:
         """Compute the normalized cross product of timber1 and timber2 length directions."""
-        return normalize_vector(cross_product(self.timber1.get_face_direction_global(self.timber1_end), self.timber2.get_face_direction_global(self.timber2_end)))
+        return safe_normalize_vector(cross_product(self.timber1.get_face_direction_global(self.timber1_end), self.timber2.get_face_direction_global(self.timber2_end)))
 
     def is_timber2_left_of_timber1(self) -> bool:
         """returns true if timber2 is to the left of timber1 when looking down the length of timber1 and standing on the front face of timber1"""
@@ -1976,7 +1976,7 @@ class CrossJointTimberArrangement:
 
     def compute_normalized_timber_cross_product(self) -> Direction3D:
         """Compute the normalized cross product of timber1 and timber2 length directions."""
-        return normalize_vector(cross_product(self.timber1.get_length_direction_global(), self.timber2.get_length_direction_global()))
+        return safe_normalize_vector(cross_product(self.timber1.get_length_direction_global(), self.timber2.get_length_direction_global()))
 
     def check_plane_aligned(self) -> Optional[str]:
         """Return None if timbers are plane-aligned and front face is in plane, else an error message."""
@@ -2051,7 +2051,7 @@ class ButtJointBoardArrangement:
             self.receiving_timber.get_height_direction_global(),
         ]
         for axis_direction in receiving_axis_directions:
-            if equality_test(Abs(numeric_dot_product(butt_face_direction, axis_direction)), 1):
+            if safe_equality_test(Abs(numeric_dot_product(butt_face_direction, axis_direction)), 1):
                 return None
         return "butt_timber_face must be parallel to some face on receiving_timber"
 
@@ -2088,7 +2088,7 @@ class PanelBoardArrangement:
         for i, b in enumerate(self.boards[1:], start=1):
             for r in range(3):
                 for c in range(3):
-                    if not equality_test(
+                    if not safe_equality_test(
                         b.transform.orientation.matrix[r, c],
                         ref.transform.orientation.matrix[r, c],
                     ):
@@ -2096,13 +2096,13 @@ class PanelBoardArrangement:
                             f"all boards must have the same orientation "
                             f"(board {i} differs from board 0 at [{r},{c}])"
                         )
-            if not equality_test(b.size[1], board_thickness):
+            if not safe_equality_test(b.size[1], board_thickness):
                 return (
                     f"all boards must have the same thickness "
                     f"(board {i} has {b.size[1]}, board 0 has {board_thickness})"
                 )
             pos_in_ref_local = ref.transform.global_to_local(b.transform.position)
-            if not equality_test(pos_in_ref_local[1], scalar(0)):
+            if not safe_equality_test(pos_in_ref_local[1], scalar(0)):
                 return (
                     f"board {i} is not coplanar with board 0 "
                     f"(Y offset = {pos_in_ref_local[1]} in ref local frame)"
@@ -2175,18 +2175,18 @@ class ExtendedTimberArrangement:
 
             offset = t.get_bottom_position_global() - ref_position
             perpendicular_offset = offset - ref_length_dir * safe_dot_product(offset, ref_length_dir)
-            if not zero_test(safe_dot_product(perpendicular_offset, perpendicular_offset)):
+            if not safe_zero_test(safe_dot_product(perpendicular_offset, perpendicular_offset)):
                 return f"all timbers must be coaxial (timber {i}'s centerline does not lie on timber 0's centerline)"
 
             if not are_timbers_face_aligned(ref, t):
                 return f"all timbers must be face-aligned (timber {i} is not face-aligned with timber 0)"
 
-            if not equality_test(t.get_size_in_direction_3d(ref_width_dir), ref.size[0]):
+            if not safe_equality_test(t.get_size_in_direction_3d(ref_width_dir), ref.size[0]):
                 return (
                     f"all timbers must have the same cross-sectional size "
                     f"(timber {i}'s size does not match timber 0 along timber 0's width direction)"
                 )
-            if not equality_test(t.get_size_in_direction_3d(ref_height_dir), ref.size[1]):
+            if not safe_equality_test(t.get_size_in_direction_3d(ref_height_dir), ref.size[1]):
                 return (
                     f"all timbers must have the same cross-sectional size "
                     f"(timber {i}'s size does not match timber 0 along timber 0's height direction)"
@@ -2216,7 +2216,7 @@ def _are_directions_perpendicular(direction1: Direction3D, direction2: Direction
     
     if tolerance is None:
         # Use automatic comparison (SymPy .equals() for symbolic, epsilon for floats)
-        return zero_test(dot_product)
+        return safe_zero_test(dot_product)
     else:
         # Use provided tolerance for approximate comparison
         return Abs(dot_product) < tolerance
@@ -2239,7 +2239,7 @@ def _are_directions_parallel(direction1: Direction3D, direction2: Direction3D, t
     
     if tolerance is None:
         # Use automatic comparison (SymPy .equals() for symbolic, epsilon for floats)
-        return equality_test(dot_mag, 1)
+        return safe_equality_test(dot_mag, 1)
     else:
         # Use provided tolerance for approximate comparison
         return Abs(dot_mag - 1) < tolerance

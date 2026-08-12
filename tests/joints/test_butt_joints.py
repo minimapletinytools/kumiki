@@ -15,7 +15,7 @@ from tests.testing_shavings import (
 def _render_cutting(cutting: Cutting):
     return CutTimber(cutting.timber, cuts=[cutting]).render_timber_with_cuts_csg_local()
 
-from kumiki.rule import inches, degrees, are_vectors_parallel, safe_dot_product, normalize_vector
+from kumiki.rule import inches, degrees, are_vectors_parallel, safe_dot_product, safe_normalize_vector
 from kumiki.ticket import TimberTicket
 from kumiki.cutcsg import Difference, SolidUnion, ConvexPolygonExtrusion
 from kumiki.example_shavings import (

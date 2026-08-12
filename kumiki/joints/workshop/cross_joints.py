@@ -140,7 +140,7 @@ def cut_plain_cross_lap_joint(
     # Choose the face on that axis on timberA that's closest to timberB
     # Then pick the opposite face on timberB
     if timberA_cut_face is None:
-        from kumiki.rule import safe_normalize_vector as normalize_vector
+        from kumiki.rule import safe_normalize_vector as safe_normalize_vector
 
         # Get length directions of both timbers
         d1 = timberA.get_length_direction_global()
@@ -148,7 +148,7 @@ def cut_plain_cross_lap_joint(
 
         # Find axis perpendicular to both length directions (cross product)
         perpendicular_axis = cross_product(d1, d2)
-        perpendicular_axis = normalize_vector(perpendicular_axis)
+        perpendicular_axis = safe_normalize_vector(perpendicular_axis)
 
         # Get center positions of both timbers
         centerA = timberA.get_bottom_position_global() + timberA.get_length_direction_global() * (timberA.length / scalar(2))

@@ -705,7 +705,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
     from sympy import Matrix
-    from kumiki.rule import safe_normalize_vector as normalize_vector
+    from kumiki.rule import safe_normalize_vector as safe_normalize_vector
 
     # Check if we have a single profile or multiple profiles
     # If the first element is a list, we have multiple profiles
@@ -788,7 +788,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
     # Profile Y-axis: perpendicular to X and Z, using right-hand rule
     # X = Y × Z (so that X, Y, Z form a right-handed system)
     profile_x_axis = cross_product(profile_y_axis, profile_z_axis)
-    profile_x_axis = normalize_vector(profile_x_axis)
+    profile_x_axis = safe_normalize_vector(profile_x_axis)
     
     # Create the orientation matrix for the profile
     # Columns are: X-axis, Y-axis, Z-axis

@@ -8,7 +8,7 @@ from kumiki.joints.workshop.board_joints import (
     cut_tongue_and_groove_joint,
 )
 from kumiki.ticket import BoardTicket, TimberTicket
-from kumiki.rule import equality_test, scalar
+from kumiki.rule import safe_equality_test, scalar
 from kumiki.timber import Board, Orientation, Timber, Transform, create_v3
 from kumiki.cutcsg import RectangularPrism, SolidUnion
 from kumiki.construction import ExtendedTimberArrangement, PanelBoardArrangement
@@ -308,7 +308,7 @@ class TestBoardInGroovedRectangularFrameJoint:
 
         left_prism = joint.cuttings["left"].negative_csg
         assert isinstance(left_prism, RectangularPrism)
-        assert equality_test(left_prism.size[1], board_thickness)
+        assert safe_equality_test(left_prism.size[1], board_thickness)
 
     def test_groove_width_spans_full_panel(self):
         """Groove X-size equals total panel width (n_boards × board_width)."""
@@ -318,4 +318,4 @@ class TestBoardInGroovedRectangularFrameJoint:
 
         left_prism = joint.cuttings["left"].negative_csg
         assert isinstance(left_prism, RectangularPrism)
-        assert equality_test(left_prism.size[0], bw * scalar(n))
+        assert safe_equality_test(left_prism.size[0], bw * scalar(n))

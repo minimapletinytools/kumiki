@@ -779,13 +779,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
 
         target_plate_point = create_v3(x, plate_y, rafter_plate_z)
         target_ridge_point = create_v3(x, ridge_y, rafter_ridge_z)
-        target_direction = normalize_vector(target_ridge_point - target_plate_point)
+        target_direction = safe_normalize_vector(target_ridge_point - target_plate_point)
         target_bottom = target_plate_point - target_direction * extra_rafter_length
 
         plate_centerline_point = locate_position_on_centerline_from_bottom(plate, plate_location).position
         ridge_centerline_point = locate_position_on_centerline_from_bottom(ridge, ridge_location).position
-        join_direction = normalize_vector(ridge_centerline_point - plate_centerline_point)
-        offset_direction = normalize_vector(cross_product(plate.get_length_direction_global(), join_direction))
+        join_direction = safe_normalize_vector(ridge_centerline_point - plate_centerline_point)
+        offset_direction = safe_normalize_vector(cross_product(plate.get_length_direction_global(), join_direction))
         base_bottom = plate_centerline_point - join_direction * extra_rafter_length
         lateral_offset = safe_dot_product(target_bottom - base_bottom, offset_direction)*1.5
 
@@ -881,7 +881,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     add_milestone('cutting joints')
 
     def _is_horizontal_timber(timber: PerfectTimberWithin) -> bool:
-        return zero_test(
+        return safe_zero_test(
             safe_dot_product(
                 timber.get_length_direction_global(),
                 create_v3(scalar(0), scalar(0), scalar(1)),

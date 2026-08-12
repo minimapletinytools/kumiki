@@ -651,7 +651,7 @@ def mark_distance_from_corner_along_edge_by_intersecting_plane(plane: Union[Unsi
     numerator = safe_dot_product(plane.normal, (plane.point - end_position))
     denominator = safe_dot_product(plane.normal, into_timber_direction)
 
-    if zero_test(denominator):
+    if safe_zero_test(denominator):
         raise ValueError(f"Edge is parallel to plane - no intersection exists")
 
     resolved_edge: EdgeOrCenterline = TimberEdge(edge.value) if isinstance(edge, TimberLongEdge) else edge
@@ -705,7 +705,7 @@ def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: 
     
     denominator = a * c - b * b
     
-    if zero_test(denominator):
+    if safe_zero_test(denominator):
         t = scalar(0)
     else:
         t = (a * e - b * d) / denominator

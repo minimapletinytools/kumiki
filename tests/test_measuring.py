@@ -617,9 +617,9 @@ class TestMeasureCenterLine:
     def test_locate_centerline_diagonal(self):
         """Test measuring the center line of a diagonally oriented timber"""
         # Timber pointing in diagonal direction
-        from kumiki.rule import safe_normalize_vector as normalize_vector
+        from kumiki.rule import safe_normalize_vector as safe_normalize_vector
         
-        direction = normalize_vector(create_v3(1, 1, 1))  # Diagonal
+        direction = safe_normalize_vector(create_v3(1, 1, 1))  # Diagonal
         timber = create_timber(
             length=scalar(60),
             size=create_v2(4, 4),
@@ -833,28 +833,28 @@ class TestMarkPlaneFromEdgeInDirection:
 
     def test_round_trip_diagonal_timber_and_direction(self):
         """Round-trip on a diagonal timber with a non-axis-aligned direction."""
-        from kumiki.rule import safe_normalize_vector as normalize_vector, zero_test
+        from kumiki.rule import safe_normalize_vector as safe_normalize_vector, safe_zero_test
         from sympy import simplify
 
         timber = create_timber(
             length=scalar(60),
             size=create_v2(4, 6),
             bottom_position=create_v3(10, 20, 5),
-            length_direction=normalize_vector(create_v3(1, 1, 0)),
-            width_direction=normalize_vector(create_v3(-1, 1, 0)),
+            length_direction=safe_normalize_vector(create_v3(1, 1, 0)),
+            width_direction=safe_normalize_vector(create_v3(-1, 1, 0)),
             ticket="diag_timber"
         )
-        direction = normalize_vector(create_v3(2, -1, 3))
+        direction = safe_normalize_vector(create_v3(2, -1, 3))
         distance = scalar(11, 3)
         plane = locate_plane_from_edge_in_direction(
             timber, TimberEdge.RIGHT_FRONT, direction, distance
         )
         result = mark_plane_from_edge_in_direction(plane, timber, TimberEdge.RIGHT_FRONT)
         assert result.direction.equals(direction)
-        assert zero_test(simplify(result.distance - distance))
+        assert safe_zero_test(simplify(result.distance - distance))
         round_trip_plane = result.locate()
         for i in range(3):
-            assert zero_test(simplify(round_trip_plane.point[i] - plane.point[i]))
+            assert safe_zero_test(simplify(round_trip_plane.point[i] - plane.point[i]))
 
 
 class TestPointFromCornerInFaceDirection:

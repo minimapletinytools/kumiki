@@ -1255,13 +1255,13 @@ class TestHelperFunctions:
         
                 # Test with diagonal direction that's closer to +Z than +X
         # This should align with TOP face (Z-direction)
-        target_diagonal_z = normalize_vector(create_v3(scalar("0.3"), 0, 1))  # Mostly +Z, little bit +X
+        target_diagonal_z = safe_normalize_vector(create_v3(scalar("0.3"), 0, 1))  # Mostly +Z, little bit +X
         aligned_face = timber.get_closest_oriented_face_from_global_direction(target_diagonal_z)
         assert aligned_face == TimberFace.TOP
 
         # Test with diagonal direction that's closer to +X than +Z
         # This should align with RIGHT face (X-direction)
-        target_diagonal_x = normalize_vector(create_v3(1, 0, scalar("0.3")))  # Mostly +X, little bit +Z
+        target_diagonal_x = safe_normalize_vector(create_v3(1, 0, scalar("0.3")))  # Mostly +X, little bit +Z
         aligned_face = timber.get_closest_oriented_face_from_global_direction(target_diagonal_x)
         assert aligned_face == TimberFace.RIGHT
     
@@ -1571,8 +1571,8 @@ class TestTimberFootprintOrientation:
             length=scalar("11.31"),  # ~8*sqrt(2)
             size=create_v2(scalar("0.2"), scalar("0.3")),
             bottom_position=create_v3(1, 1, 0),
-            length_direction=normalize_vector(create_v3(1, 1, 0)),  # Diagonal
-            width_direction=normalize_vector(create_v3(-1, 1, 0))   # Perpendicular to length, pointing "inward-ish"
+            length_direction=safe_normalize_vector(create_v3(1, 1, 0)),  # Diagonal
+            width_direction=safe_normalize_vector(create_v3(-1, 1, 0))   # Perpendicular to length, pointing "inward-ish"
         )
         
         inside_face = timber.get_inside_face_from_footprint(footprint)
@@ -1644,14 +1644,14 @@ class TestSplitTimber:
     def test_split_timber_diagonal(self, symbolic_mode):
         """Test splitting a diagonal timber"""
         # Create a diagonal timber at 45 degrees
-        length_dir = normalize_vector(create_v3(scalar(1), scalar(1), scalar(0)))
+        length_dir = safe_normalize_vector(create_v3(scalar(1), scalar(1), scalar(0)))
         
         timber = create_timber(
             length=scalar(10),
             size=create_v2(scalar(4), scalar(4)),
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
             length_direction=length_dir,
-            width_direction=normalize_vector(create_v3(scalar(-1), scalar(1), scalar(0)))
+            width_direction=safe_normalize_vector(create_v3(scalar(-1), scalar(1), scalar(0)))
         )
         
         # Split at 4 units from bottom
@@ -1737,8 +1737,8 @@ class TestSplitTimber:
             length=scalar(15),
             size=create_v2(scalar(6), scalar(8)),
             bottom_position=create_v3(scalar(1), scalar(2), scalar(3)),
-            length_direction=normalize_vector(create_v3(scalar(0), scalar(1), scalar(1))),
-            width_direction=normalize_vector(create_v3(scalar(1), scalar(0), scalar(0)))
+            length_direction=safe_normalize_vector(create_v3(scalar(0), scalar(1), scalar(1))),
+            width_direction=safe_normalize_vector(create_v3(scalar(1), scalar(0), scalar(0)))
         )
         
         bottom_timber, top_timber = split_timber(timber, scalar(5))
@@ -2034,7 +2034,7 @@ class TestAttachFaceAlignedTimber:
             size=create_v2(scalar(2), scalar(2)),
             bottom_position=create_v3(10, 0, 0),
             length_direction=create_v3(0, 0, 1),
-            width_direction=normalize_vector(create_v3(1, 1, 0)),
+            width_direction=safe_normalize_vector(create_v3(1, 1, 0)),
             ticket="RotatedPost",
         )
         for ref2, end_x in [

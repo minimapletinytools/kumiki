@@ -391,17 +391,17 @@ def compute_timber_orientation(length_direction: Direction3D, width_direction: D
         Orientation object representing the timber's orientation in 3D space
     """
     # Normalize the length direction first (this will be our primary axis)
-    length_norm = normalize_vector(length_direction)
+    length_norm = safe_normalize_vector(length_direction)
     
     # Orthogonalize face direction relative to length direction using Gram-Schmidt
-    face_input = normalize_vector(width_direction)
+    face_input = safe_normalize_vector(width_direction)
     
     # Project face_input onto length_norm and subtract to get orthogonal component
     projection = length_norm * (face_input.dot(length_norm))
     face_orthogonal = face_input - projection
     
     # Check if face_orthogonal is too small (vectors were nearly parallel)
-    if zero_test(safe_norm(face_orthogonal)):
+    if safe_zero_test(safe_norm(face_orthogonal)):
         # Choose an arbitrary orthogonal direction
         # Find a vector that's not parallel to length_norm
         if Abs(length_norm[0]) < scalar(9, 10):  # Threshold comparison
@@ -414,11 +414,11 @@ def compute_timber_orientation(length_direction: Direction3D, width_direction: D
         face_orthogonal = temp_vector - projection
     
     # Normalize the orthogonalized face direction
-    face_norm = normalize_vector(face_orthogonal)
+    face_norm = safe_normalize_vector(face_orthogonal)
     
     # Cross product to get the third axis (guaranteed to be orthogonal)
     cross_result = cross_product(length_norm, face_norm)
-    height_norm = normalize_vector(cross_result)
+    height_norm = safe_normalize_vector(cross_result)
     
     # Create rotation matrix [face_norm, height_norm, length_norm]
     rotation_matrix = Matrix([
@@ -510,7 +510,7 @@ class PerfectTimberWithin(ABC):
                 f"(expected one of {sorted(valid_names)})"
             )
             rough_half, ptw_half = _face_to_rough_and_ptw[face_name]
-            assert equality_test(rough_half, ptw_half), (
+            assert safe_equality_test(rough_half, ptw_half), (
                 f"Reference face {face_name} on timber '{self.ticket.path}' is not coincident: "
                 f"rough half-size ({rough_half}) != PTW half-size ({ptw_half})"
             )
@@ -714,7 +714,7 @@ class PerfectTimberWithin(ABC):
         Returns:
             The size of the cross-section measured along the given direction.
         """
-        d = normalize_vector(direction)
+        d = safe_normalize_vector(direction)
         return self.size[0] * Abs(d[0]) + self.size[1] * Abs(d[1])
 
     # TODO DELETE replace with or forward call to get_perfect_support_distance
@@ -734,7 +734,7 @@ class PerfectTimberWithin(ABC):
         Returns:
             The size of the timber measured along the given direction.
         """
-        d_global = normalize_vector(direction)
+        d_global = safe_normalize_vector(direction)
         # Rotate to local frame (transpose of rotation matrix, no translation for directions)
         d_local = safe_transform_vector(self.orientation.matrix.T, d_global)
         return self.size[0] * Abs(d_local[0]) + self.size[1] * Abs(d_local[1]) + self.length * Abs(d_local[2])
@@ -1017,13 +1017,13 @@ class PerfectTimberWithin(ABC):
         if face == TimberFace.TOP or face == TimberFace.BOTTOM:
             return True  # Length is always perfect
         elif face == TimberFace.RIGHT:
-            return equality_test(width_halves[0], w_half)
+            return safe_equality_test(width_halves[0], w_half)
         elif face == TimberFace.LEFT:
-            return equality_test(width_halves[1], w_half)
+            return safe_equality_test(width_halves[1], w_half)
         elif face == TimberFace.FRONT:
-            return equality_test(height_halves[0], h_half)
+            return safe_equality_test(height_halves[0], h_half)
         elif face == TimberFace.BACK:
-            return equality_test(height_halves[1], h_half)
+            return safe_equality_test(height_halves[1], h_half)
         else:
             raise ValueError(f"Face {face} is not a long face; only RIGHT, LEFT, FRONT, BACK are valid for this check.")
     
@@ -1040,10 +1040,10 @@ class PerfectTimberWithin(ABC):
         width_halves, height_halves = self.get_rough_half_sizes()
         w_half = self.size[0] / scalar(2)
         h_half = self.size[1] / scalar(2)
-        return (equality_test(width_halves[0], w_half) and
-                equality_test(width_halves[1], w_half) and
-                equality_test(height_halves[0], h_half) and
-                equality_test(height_halves[1], h_half))
+        return (safe_equality_test(width_halves[0], w_half) and
+                safe_equality_test(width_halves[1], w_half) and
+                safe_equality_test(height_halves[0], h_half) and
+                safe_equality_test(height_halves[1], h_half))
 
     def get_imperfect_fringe_csg_local(self) -> CutCSG:
         """
@@ -1515,7 +1515,7 @@ class Cutting:
             if isinstance(component, HalfSpace):
                 for existing in csg_components:
                     if isinstance(existing, HalfSpace):
-                        if existing.normal.equals(component.normal) and equality_test(existing.offset, component.offset):
+                        if existing.normal.equals(component.normal) and safe_equality_test(existing.offset, component.offset):
                             return
             csg_components.append(component)
 
@@ -1808,7 +1808,7 @@ class CutTimber:
                 intersections = []
                 for corner_x, corner_y in corner_positions:
                     # Check if normal[2] is not zero (otherwise plane is perpendicular to length)
-                    if not equality_test(end_cut.normal[2], 0):
+                    if not safe_equality_test(end_cut.normal[2], 0):
                         z_intersect = (end_cut.offset - end_cut.normal[0]*corner_x - end_cut.normal[1]*corner_y) / end_cut.normal[2]
                         intersections.append(z_intersect)
                 
@@ -1822,7 +1822,7 @@ class CutTimber:
                 # Same logic as above
                 intersections = []
                 for corner_x, corner_y in corner_positions:
-                    if not equality_test(end_cut.normal[2], 0):
+                    if not safe_equality_test(end_cut.normal[2], 0):
                         z_intersect = (end_cut.offset - end_cut.normal[0]*corner_x - end_cut.normal[1]*corner_y) / end_cut.normal[2]
                         intersections.append(z_intersect)
                 
@@ -1876,7 +1876,7 @@ class CutTimber:
                 half_space = csg
                 dot_product = safe_dot_product(half_space.normal, length_direction_local)
                 
-                if equality_test(Abs(dot_product), 1):
+                if safe_equality_test(Abs(dot_product), 1):
                     # HalfSpace aligned with length direction
                     # HalfSpace contains points where (p · normal) >= offset
                     # When subtracted, remaining points are where (p · normal) < offset

@@ -11,7 +11,7 @@ from tests.testing_shavings import (
     create_standard_horizontal_timber,
     create_centered_horizontal_timber
 )
-from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, zero_test, safe_compare, Comparison, safe_dot_product, safe_normalize_vector as normalize_vector
+from kumiki.rule import Orientation, create_v2, inches, radians, are_vectors_parallel, safe_zero_test, safe_compare, Comparison, safe_dot_product, safe_normalize_vector as safe_normalize_vector
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace,
     V2, V3, Numeric, PegShape, WedgeShape, Peg, Cutting, CutTimber,

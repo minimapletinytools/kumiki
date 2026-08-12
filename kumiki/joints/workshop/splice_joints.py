@@ -69,7 +69,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         directionB = -timberB.get_length_direction_global()
 
     # Normalize length direction for later use
-    length_dir_norm = normalize_vector(timberA.get_length_direction_global())
+    length_dir_norm = safe_normalize_vector(timberA.get_length_direction_global())
 
     # Calculate or validate the splice point
     if splice_point is None:
@@ -85,15 +85,15 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         projected_point = timberA.get_bottom_position_global() + length_dir_norm * distance_along_centerline
 
         # Check if the point needed projection (warn if not on centerline)
-        distance_from_centerline = vector_magnitude(splice_point - projected_point)
-        if not zero_test(distance_from_centerline):
+        distance_from_centerline = safe_magnitude(splice_point - projected_point)
+        if not safe_zero_test(distance_from_centerline):
             warnings.warn(f"Splice point was not on timberA's centerline (distance: {float(distance_from_centerline)}). Projecting onto centerline.")
             splice_point = projected_point
 
     # Check if timber cross sections overlap (approximate check using bounding boxes)
     # Project both timber cross-sections onto a plane perpendicular to the length direction
     # For simplicity, we'll warn if the centerlines are far apart
-    centerline_distance = vector_magnitude(
+    centerline_distance = safe_magnitude(
         (splice_point - timberA.get_bottom_position_global()) -
         length_dir_norm * safe_dot_product(splice_point - timberA.get_bottom_position_global(), length_dir_norm) -
         ((splice_point - timberB.get_bottom_position_global()) -

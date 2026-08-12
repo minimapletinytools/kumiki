@@ -93,12 +93,12 @@ def _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_
     proj = prune(tenon_dir - mortise_length_dir * safe_dot_product(tenon_dir, mortise_length_dir))
     proj_len_sq = safe_dot_product(proj, proj)
     if not safe_zero_test(proj_len_sq):
-        direction_in_plane = normalize_vector(proj)
+        direction_in_plane = safe_normalize_vector(proj)
     else:
         MP = P - M
         mp_len_sq = safe_dot_product(MP, MP)
         if not safe_zero_test(mp_len_sq):
-            direction_in_plane = normalize_vector(MP)
+            direction_in_plane = safe_normalize_vector(MP)
         else:
             direction_in_plane = mortise_timber.get_width_direction_global()
 
@@ -489,7 +489,7 @@ def dovetail_tenon_geometry(
     # receiving timber's cross-section.
     receiving_length_dir = arrangement.receiving_timber.get_length_direction_global()
     top_dot_receiving_length = safe_dot_product(top_face_dir, receiving_length_dir)
-    if not (zero_test(top_dot_receiving_length - scalar(1)) or zero_test(top_dot_receiving_length + scalar(1))):
+    if not (safe_zero_test(top_dot_receiving_length - scalar(1)) or safe_zero_test(top_dot_receiving_length + scalar(1))):
         raise AssertionError(
             f"dovetail_top_side_on_butt_timber ({dovetail_top_side_on_butt_timber}) must point "
             f"along the receiving timber's length axis (dot product was {top_dot_receiving_length}, "
@@ -497,7 +497,7 @@ def dovetail_tenon_geometry(
         )
 
     # Lateral direction (across the joint width), perpendicular to both length and top-bottom.
-    lateral_dir = normalize_vector(cross_product(into_mortise_dir, top_face_dir))
+    lateral_dir = safe_normalize_vector(cross_product(into_mortise_dir, top_face_dir))
 
     # tenon_size[0] aligns with the butt timber's width axis (RIGHT direction);
     # tenon_size[1] aligns with the butt timber's height axis (TOP direction).
@@ -1034,7 +1034,7 @@ def compute_peg_positions(
             mortise_len_dir = -mortise_len_dir
         peg_y_base = mortise_len_dir
 
-    if zero_test(ccw_rotation_angle):
+    if safe_zero_test(ccw_rotation_angle):
         peg_orientation_global = Orientation.from_z_and_y(
             z_direction=peg_drill_direction,
             y_direction=peg_y_base,
@@ -1116,7 +1116,7 @@ def compute_peg_positions(
         t_exit_vals = []
         for axis in range(3):
             d = ray_dir_local[axis]
-            if zero_test(d):
+            if safe_zero_test(d):
                 assert box_mins[axis] <= ray_origin_local[axis] <= box_maxs[axis], (
                     f"Peg ray is parallel to mortise timber axis {axis} but peg position is "
                     f"outside the mortise timber bounds on that axis"

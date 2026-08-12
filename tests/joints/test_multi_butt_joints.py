@@ -53,7 +53,7 @@ class TestSplinedOpposingDoubleButtJoint:
         )
 
         slot_direction_global = arrangement.receiving_timber.get_face_direction_global(TimberEnd.TOP)
-        joint_plane_normal_global = normalize_vector(
+        joint_plane_normal_global = safe_normalize_vector(
             cross_product(
                 arrangement.butt_timber_1.get_length_direction_global(),
                 arrangement.receiving_timber.get_length_direction_global(),
@@ -114,7 +114,7 @@ class TestSplinedOpposingDoubleButtJoint:
 
         assert butt_1_flush_end_cut is not None
         assert butt_1_inset_end_cut is not None
-        assert zero_test((butt_1_inset_end_cut.offset - butt_1_flush_end_cut.offset) - inches(1)), (
+        assert safe_zero_test((butt_1_inset_end_cut.offset - butt_1_flush_end_cut.offset) - inches(1)), (
             "Top-end shoulder cut offset should increase by the shoulder inset (butt protrudes further)"
         )
 
@@ -200,7 +200,7 @@ class TestSplinedOpposingDoubleButtJoint:
 
         receiving_len = arrangement.receiving_timber.get_length_direction_global()
         butt_1_len = arrangement.butt_timber_1.get_length_direction_global()
-        joint_plane_normal = normalize_vector(cross_product(butt_1_len, receiving_len))
+        joint_plane_normal = safe_normalize_vector(cross_product(butt_1_len, receiving_len))
 
         peg_key = next(key for key in joint.jointAccessories if key.startswith("peg_butt_1_"))
         peg = joint.jointAccessories[peg_key]
@@ -305,5 +305,5 @@ class TestSplinedOpposingDoubleButtJoint:
         spline_lateral_position = safe_dot_product(non_extra_spline_center_global, lateral_axis)
         actual_spline_lateral_position = safe_dot_product(spline.transform.position, lateral_axis)
 
-        assert zero_test(peg_lateral_position - spline_lateral_position)
-        assert zero_test(Abs(actual_spline_lateral_position - spline_lateral_position) - spline_extra_depth / scalar(2))
+        assert safe_zero_test(peg_lateral_position - spline_lateral_position)
+        assert safe_zero_test(Abs(actual_spline_lateral_position - spline_lateral_position) - spline_extra_depth / scalar(2))

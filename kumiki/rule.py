@@ -764,22 +764,13 @@ def create_v3(x: Numeric, y: Numeric, z: Numeric) -> V3:
     """Create a 3D vector"""
     return Matrix([x, y, z])
 
-def normalize_vector(vec: Matrix) -> Matrix:
-    """Deprecated: use safe_normalize_vector instead."""
-    return safe_normalize_vector(vec)
-
 def cross_product(v1: V3, v2: V3) -> V3:
     """Calculate cross product of two 3D vectors"""
     return Matrix([
         v1[1]*v2[2] - v1[2]*v2[1],
-        v1[2]*v2[0] - v1[0]*v2[2], 
+        v1[2]*v2[0] - v1[0]*v2[2],
         v1[0]*v2[1] - v1[1]*v2[0]
     ])
-
-def vector_magnitude(vec: Matrix):
-    """Deprecated: use safe_magnitude instead."""
-    return safe_magnitude(vec)
-
 
 # ============================================================================
 # Angle Conversion Functions
@@ -1012,16 +1003,6 @@ def safe_zero_test(value) -> bool:
 def safe_equality_test(value, expected) -> bool:
     """Test if two values are approximately equal."""
     return safe_compare(value, expected, Comparison.EQ)
-
-
-# Deprecated aliases — use safe_zero_test / safe_equality_test
-def zero_test(value) -> bool:
-    """Deprecated: use safe_zero_test instead."""
-    return safe_zero_test(value)
-
-def equality_test(value, expected) -> bool:
-    """Deprecated: use safe_equality_test instead."""
-    return safe_equality_test(value, expected)
 
 
 # ============================================================================

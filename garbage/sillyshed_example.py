@@ -149,15 +149,15 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
         front_vec = ridge_point - front_plate_point
         back_vec = ridge_point - back_plate_point
 
-        front_bottom = front_plate_point - normalize_vector(front_vec) * rafter_overhang
-        back_bottom = back_plate_point - normalize_vector(back_vec) * rafter_overhang
+        front_bottom = front_plate_point - safe_normalize_vector(front_vec) * rafter_overhang
+        back_bottom = back_plate_point - safe_normalize_vector(back_vec) * rafter_overhang
 
         rafters.append(
             create_timber(
                 length=safe_norm(front_vec) + rafter_overhang,
                 size=rafter_size,
                 bottom_position=front_bottom,
-                length_direction=normalize_vector(front_vec),
+                length_direction=safe_normalize_vector(front_vec),
                 width_direction=create_v3(1, 0, 0),
                 ticket=f"SillyShed Front Rafter {x_label}",
             )
@@ -168,7 +168,7 @@ def _create_roof_rafters(origin: V3) -> list[Timber]:
                 length=safe_norm(back_vec) + rafter_overhang,
                 size=rafter_size,
                 bottom_position=back_bottom,
-                length_direction=normalize_vector(back_vec),
+                length_direction=safe_normalize_vector(back_vec),
                 width_direction=create_v3(1, 0, 0),
                 ticket=f"SillyShed Back Rafter {x_label}",
             )
@@ -212,7 +212,7 @@ def _build_joints(
         timber1_end: TimberEnd,
         timber2_end: TimberEnd,
     ) -> CornerJointTimberArrangement:
-        corner_plane_normal = normalize_vector(
+        corner_plane_normal = safe_normalize_vector(
             cross_product(
                 timber1.get_length_direction_global(),
                 timber2.get_length_direction_global(),

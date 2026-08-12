@@ -362,9 +362,9 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         roof_front_rafters.append(
             create_timber(
                 bottom_position=_offset_position(rafter_x, zero, roof_ridge_z, center),
-                length=vector_magnitude(front_vec),
+                length=safe_magnitude(front_vec),
                 size=beam_size,
-                length_direction=normalize_vector(front_vec),
+                length_direction=safe_normalize_vector(front_vec),
                 width_direction=create_v3(1, 0, 0),
                 ticket=f"Roof Front Rafter {rafter_index}",
             )
@@ -372,9 +372,9 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         roof_back_rafters.append(
             create_timber(
                 bottom_position=_offset_position(rafter_x, zero, roof_ridge_z, center),
-                length=vector_magnitude(back_vec),
+                length=safe_magnitude(back_vec),
                 size=beam_size,
-                length_direction=normalize_vector(back_vec),
+                length_direction=safe_normalize_vector(back_vec),
                 width_direction=create_v3(1, 0, 0),
                 ticket=f"Roof Back Rafter {rafter_index}",
             )
@@ -394,9 +394,9 @@ def create_gateway(center: Optional[V3] = None) -> Frame:
         roof_braces.append(
             create_timber(
                 bottom_position=_offset_position(brace_x, zero, brace_start_z, center),
-                length=vector_magnitude(brace_vec),
+                length=safe_magnitude(brace_vec),
                 size=Matrix([cm(8), cm(8)]),
-                length_direction=normalize_vector(brace_vec),
+                length_direction=safe_normalize_vector(brace_vec),
                 width_direction=create_v3(1, 0, 0),
                 ticket=brace_name,
             )

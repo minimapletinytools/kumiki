@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace,
-    Board, create_timber, compute_timber_orientation, normalize_vector,
+    Board, create_timber, compute_timber_orientation, safe_normalize_vector,
     RoundTimber, MeshTimber, RegularPolygonTimber,
 )
 from kumiki.rule import (
@@ -432,7 +432,7 @@ def create_canonical_example_brace_joint_timbers(
     # Calculate brace direction (from timber1 midpoint to timber2 midpoint)
     brace_direction_vector = timber2_midpoint - timber1_midpoint
     # Normalize the direction
-    brace_length_direction = normalize_vector(brace_direction_vector)
+    brace_length_direction = safe_normalize_vector(brace_direction_vector)
     
     # Calculate the length of the brace (distance between midpoints)
     # Distance = sqrt((length/2)^2 + (length/2)^2) = length / sqrt(2)

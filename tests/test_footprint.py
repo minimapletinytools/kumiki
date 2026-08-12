@@ -164,27 +164,27 @@ class TestFootprint:
         # Test bottom edge (should point up/inward: y+)
         # Returns Direction3D (V3)
         normal = footprint.get_inward_normal(0)
-        assert zero_test(normal[0])
+        assert safe_zero_test(normal[0])
         assert normal[1] == scalar(1)
-        assert zero_test(normal[2])
+        assert safe_zero_test(normal[2])
         
         # Test right edge (should point left/inward: x-)
         normal = footprint.get_inward_normal(1)
         assert normal[0] == scalar(-1)
-        assert zero_test(normal[1])
-        assert zero_test(normal[2])
+        assert safe_zero_test(normal[1])
+        assert safe_zero_test(normal[2])
         
         # Test top edge (should point down/inward: y-)
         normal = footprint.get_inward_normal(2)
-        assert zero_test(normal[0])
+        assert safe_zero_test(normal[0])
         assert normal[1] == scalar(-1)
-        assert zero_test(normal[2])
+        assert safe_zero_test(normal[2])
         
         # Test left edge (should point right/inward: x+)
         normal = footprint.get_inward_normal(3)
         assert normal[0] == scalar(1)
-        assert zero_test(normal[1])
-        assert zero_test(normal[2])
+        assert safe_zero_test(normal[1])
+        assert safe_zero_test(normal[2])
     
     def test_segment_to_segment_distance_parallel(self):
         """Test _segment_to_segment_distance with parallel segments."""
@@ -225,7 +225,7 @@ class TestFootprint:
         line2_end = create_v2(2, 0)
         
         distance = _segment_to_segment_distance(line1_start, line1_end, line2_start, line2_end)
-        assert zero_test(distance)
+        assert safe_zero_test(distance)
     
     def test_segment_to_segment_distance_perpendicular(self):
         """Test _segment_to_segment_distance with perpendicular segments."""
@@ -327,5 +327,5 @@ class TestFootprint:
         idx, side, dist = footprint.nearest_boundary_from_line(line_start, line_end)
         
         # Should have distance 0 since it intersects
-        assert zero_test(dist)
+        assert safe_zero_test(dist)
 

@@ -323,9 +323,9 @@ def _perfect_cross_section_slice_span_along_plane_direction(
     b = timber.get_length_direction_global()
     n = slice_plane_normal_global
     d = measure_direction_global
-    assert zero_test(safe_dot_product(d, n)), "measure_direction_global must lie in the slice plane"
+    assert safe_zero_test(safe_dot_product(d, n)), "measure_direction_global must lie in the slice plane"
     b_dot_n = safe_dot_product(b, n)
-    assert not zero_test(b_dot_n), "Timber length axis is parallel to the slice plane"
+    assert not safe_zero_test(b_dot_n), "Timber length axis is parallel to the slice plane"
 
     e_global = d - n * (safe_dot_product(b, d) / b_dot_n)
     e_local = safe_transform_vector(timber.orientation.matrix.T, e_global)
@@ -402,7 +402,7 @@ def does_shoulder_plane_need_notching(
         face_half_size = mortise_timber.get_size_in_face_normal_axis(mortise_face) / scalar(2)
     return (
         mortise_shoulder_distance_from_centerline_or_centerplane < face_half_size
-        and not zero_test(face_half_size - mortise_shoulder_distance_from_centerline_or_centerplane)
+        and not safe_zero_test(face_half_size - mortise_shoulder_distance_from_centerline_or_centerplane)
     )
 
 # TODO DEPRECATE ME
@@ -451,7 +451,7 @@ def chop_shoulder_notch_aligned_with_timber(
     )
 
     # the approach direction projected onto the plane perpendicular to the notch timber's length axis
-    perpendicular_approach_direction_global = normalize_vector(projected)
+    perpendicular_approach_direction_global = safe_normalize_vector(projected)
 
     arrangement = ButtJointTimberArrangement(
         butt_timber=butting_timber,
@@ -480,7 +480,7 @@ def chop_shoulder_notch_aligned_with_timber(
     shoulder_plane_normal = shoulder_plane.normal
     butting_centerline = locate_centerline(butting_timber)
     denom = safe_dot_product(shoulder_plane.normal, butting_centerline.direction)
-    assert not zero_test(denom), "Butting timber centerline is parallel to the shoulder plane"
+    assert not safe_zero_test(denom), "Butting timber centerline is parallel to the shoulder plane"
     t = safe_dot_product(
         shoulder_plane.normal,
         shoulder_plane.point - butting_centerline.point,
@@ -533,8 +533,8 @@ def chop_shoulder_notch_aligned_with_timber(
     n_global = shoulder_plane.normal
     b_in_plane = b_global - n_global * safe_dot_product(b_global, n_global)
     b_in_plane_len_sq = safe_dot_product(b_in_plane, b_in_plane)
-    if not zero_test(b_in_plane_len_sq):
-        notch_width_axis_global = normalize_vector(b_in_plane)
+    if not safe_zero_test(b_in_plane_len_sq):
+        notch_width_axis_global = safe_normalize_vector(b_in_plane)
     else:
         notch_width_axis_global = notch_length_dir_global
 
@@ -548,7 +548,7 @@ def chop_shoulder_notch_aligned_with_timber(
         notch_timber.orientation.matrix.T,
         shoulder_plane_normal,
     )
-    notch_width_axis_local = normalize_vector(
+    notch_width_axis_local = safe_normalize_vector(
         safe_transform_vector(notch_timber.orientation.matrix.T, notch_width_axis_global)
     )
 
@@ -571,12 +571,12 @@ def chop_shoulder_notch_aligned_with_timber(
     butt_rake_from_shoulder_normal_radians = acos(Min(cos_butt_from_shoulder_normal, scalar(1)))
     wall_relief_angle_radians = Max(notch_wall_relief_cut_angle_radians, butt_rake_from_shoulder_normal_radians)
 
-    if zero_test(wall_relief_angle_radians):
+    if safe_zero_test(wall_relief_angle_radians):
         return notch_prism
 
     angle_rad = wall_relief_angle_radians
     span_direction_local = cross_product(approach_direction_local, notch_width_axis_local)
-    span_direction_local = normalize_vector(span_direction_local)
+    span_direction_local = safe_normalize_vector(span_direction_local)
 
     corner_point_1 = prism_position_local + notch_width_axis_local * (notch_width / scalar(2))
     corner_point_2 = prism_position_local - notch_width_axis_local * (notch_width / scalar(2))
@@ -849,7 +849,7 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     # approaches the shoulder plane.
     # ------------------------------------------------------------------
     sin_butt_angle = Min(Abs(safe_dot_product(butt_length_dir, n_depth)), scalar(1))
-    assert not zero_test(sin_butt_angle), "butt timber's length axis lies within the shoulder plane"
+    assert not safe_zero_test(sin_butt_angle), "butt timber's length axis lies within the shoulder plane"
     cos_butt_angle = sqrt(scalar(1) - sin_butt_angle ** 2)
 
     shoulder_normal_in_receiving_local = safe_transform_vector(receiving_timber.orientation.matrix.T, n_depth)
@@ -859,7 +859,7 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     )
     butt_rough_size = butt_timber.get_rough_size()
     rough_size_term = (
-        scalar(0) if zero_test(cos_butt_angle)
+        scalar(0) if safe_zero_test(cos_butt_angle)
         else Max(butt_rough_size[0], butt_rough_size[1]) / cos_butt_angle
     )
     imperfect_clearance_length = Max(perfect_support_distance / sin_butt_angle, rough_size_term)
@@ -889,12 +889,12 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     # general, reach out) independently, not from one shared value.
     def _tan_half(face_normal: V3) -> Numeric:
         cos_dihedral = Max(Min(safe_dot_product(face_normal, n_depth), scalar(1)), scalar(-1))
-        assert not zero_test(scalar(1) + cos_dihedral), (
+        assert not safe_zero_test(scalar(1) + cos_dihedral), (
             "butt timber's Q-axis face directly faces back through the shoulder plane"
         )
         sin_dihedral = sqrt(scalar(1) - cos_dihedral ** 2)
         tan_half = sin_dihedral / (scalar(1) + cos_dihedral)
-        assert not zero_test(tan_half), "butt timber's Q-axis face is parallel to the shoulder plane"
+        assert not safe_zero_test(tan_half), "butt timber's Q-axis face is parallel to the shoulder plane"
         if notch_angle is not None:
             from sympy import tan
             tan_half = Max(tan_half, tan(notch_angle))
@@ -1050,7 +1050,7 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
 def _intersect_line_with_plane(line_point: V3, line_direction: Direction3D, plane: Plane) -> V3:
     """Intersection of the line {line_point + t*line_direction} with plane."""
     denom = safe_dot_product(line_direction, plane.normal)
-    assert not zero_test(denom), "line is parallel to the plane"
+    assert not safe_zero_test(denom), "line is parallel to the plane"
     t = safe_dot_product(plane.point - line_point, plane.normal) / denom
     return line_point + line_direction * t
 
@@ -1058,7 +1058,7 @@ def _intersect_line_with_plane(line_point: V3, line_direction: Direction3D, plan
 def _intersect_2d_lines(p1: V2, d1: V2, p2: V2, d2: V2) -> V2:
     """Intersection of 2D lines {p1 + s*d1} and {p2 + t*d2}."""
     denom = d1[0] * d2[1] - d1[1] * d2[0]
-    assert not zero_test(denom), "2D lines are parallel"
+    assert not safe_zero_test(denom), "2D lines are parallel"
     diff = p2 - p1
     s = (diff[0] * d2[1] - diff[1] * d2[0]) / denom
     return p1 + d1 * s
@@ -1128,7 +1128,7 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     # approaches the shoulder plane.
     # ------------------------------------------------------------------
     sin_butt_angle = Min(Abs(safe_dot_product(butt_length_dir, n_depth)), scalar(1))
-    assert not zero_test(sin_butt_angle), "butt timber's length axis lies within the shoulder plane"
+    assert not safe_zero_test(sin_butt_angle), "butt timber's length axis lies within the shoulder plane"
     cos_butt_angle = sqrt(scalar(1) - sin_butt_angle ** 2)
 
     shoulder_normal_in_receiving_local = safe_transform_vector(receiving_timber.orientation.matrix.T, n_depth)
@@ -1141,7 +1141,7 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     # degenerate one -- in which case the rough-size term doesn't apply; only the receiving
     # timber's own perfect-support term governs.
     rough_size_term = (
-        scalar(0) if zero_test(cos_butt_angle)
+        scalar(0) if safe_zero_test(cos_butt_angle)
         else Max(butt_rough_size[0], butt_rough_size[1]) / cos_butt_angle
     )
     imperfect_clearance_length = Max(perfect_support_distance / sin_butt_angle, rough_size_term)
@@ -1212,12 +1212,12 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     for i in range(4):
         face_normal = butt_timber.get_face_direction_global(adjacent_face(i))
         cos_dihedral = Max(Min(safe_dot_product(face_normal, n_depth), scalar(1)), scalar(-1))
-        assert not zero_test(scalar(1) + cos_dihedral), (
+        assert not safe_zero_test(scalar(1) + cos_dihedral), (
             f"{adjacent_face(i)} face of butt timber directly faces back through the shoulder plane"
         )
         sin_dihedral = sqrt(scalar(1) - cos_dihedral ** 2)
         tan_half = sin_dihedral / (scalar(1) + cos_dihedral)
-        assert not zero_test(tan_half), f"{adjacent_face(i)} face of butt timber is parallel to the shoulder plane"
+        assert not safe_zero_test(tan_half), f"{adjacent_face(i)} face of butt timber is parallel to the shoulder plane"
         tan_half_dihedrals.append(tan_half)
 
     loft_depth = Max(*[imperfect_clearance_length / t for t in tan_half_dihedrals])
@@ -1347,7 +1347,7 @@ def chop_relief_for_butt_joint_arrangement(
     projected = butt_end_direction_global - receiving_length_dir * safe_dot_product(
         butt_end_direction_global, receiving_length_dir
     )
-    approach_into_receiving = normalize_vector(projected)
+    approach_into_receiving = safe_normalize_vector(projected)
 
     # Angle the butt timber makes with the shoulder-plane normal (0 when perpendicular).
     cos_butt_dev = safe_dot_product(butt_end_direction_global, approach_into_receiving)
@@ -1379,7 +1379,7 @@ def chop_relief_for_butt_joint_arrangement(
     shoulder_plane = Plane(normal=-shoulder_plane.normal, point=shoulder_plane.point)
     butt_centerline = locate_centerline(butt_timber)
     denom = safe_dot_product(shoulder_plane.normal, butt_centerline.direction)
-    assert not zero_test(denom), "Butt centerline is parallel to the shoulder plane"
+    assert not safe_zero_test(denom), "Butt centerline is parallel to the shoulder plane"
     t = safe_dot_product(
         shoulder_plane.normal, shoulder_plane.point - butt_centerline.point
     ) / denom
@@ -1435,7 +1435,7 @@ def chop_relief_for_butt_joint_arrangement(
     # 3. Prism matching the butt timber's perfect cross-section, extending
     #    along the butt centerline from past the shoulder plane to past the
     #    far face of the receiving timber.
-    if zero_test(cos_butt_dev):
+    if safe_zero_test(cos_butt_dev):
         butt_extent_along_centerline = receiving_extent_in_approach
     else:
         butt_extent_along_centerline = receiving_extent_in_approach / Abs(cos_butt_dev)
