@@ -350,8 +350,8 @@ def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None):
 
     # Tenon timber: approaches from below at 45 degrees from the Y axis in the XY plane.
     angle = pi / scalar(4)  # 45 degrees
-    tenon_dir = normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
-    tenon_width_dir = normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
+    tenon_dir = safe_normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
+    tenon_width_dir = safe_normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
     tenon_bottom = position - tenon_dir * timber_length
     tenon_timber = Timber(
         length=timber_length,
@@ -431,7 +431,7 @@ def example_brace_joint(position=None, use_round_timbers=False):
     tenon_width_relative_to_joint = inches(3)  # 3" wide (parallel to the joint plane)
     tenon_height_relative_to_joint = inches(1)  # 1" tall (perpendicular to the joint plane)
     tenon_length = inches(5)
-    mortise_depth = inches(2) 
+    mortise_depth = inches(3) 
 
         
     # Define peg parameters
@@ -825,8 +825,8 @@ def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
     # Direction: (sin30, cos30, 0) = (0.5, sqrt(3)/2, 0)
     from sympy import sin, cos, pi, Rational
     angle = pi / scalar(6)  # 30 degrees
-    tenon_dir = normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
-    tenon_width_dir = normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
+    tenon_dir = safe_normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
+    tenon_width_dir = safe_normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
 
     # Place bottom of tenon timber centered so its top meets the mortise
     tenon_bottom = position - tenon_dir * timber_length
@@ -898,13 +898,13 @@ def example_inset_shoulder_scribe_angled(position=None, use_round_timbers=False)
     angle_xy = pi / scalar(6)   # 30 deg in XY
     angle_z  = pi / scalar(9)   # 20 deg toward Z
     # length direction: rotate (0,1,0) by angle_xy around Z, then tilt by angle_z toward Z
-    tenon_dir = normalize_vector(create_v3(
+    tenon_dir = safe_normalize_vector(create_v3(
         sin(angle_xy) * cos(angle_z),
         cos(angle_xy) * cos(angle_z),
         sin(angle_z),
     ))
     # width direction: perpendicular to tenon_dir, mostly in XY plane
-    tenon_width_dir = normalize_vector(create_v3(cos(angle_xy), -sin(angle_xy), scalar(0)))
+    tenon_width_dir = safe_normalize_vector(create_v3(cos(angle_xy), -sin(angle_xy), scalar(0)))
 
     # Place bottom of tenon timber centered so its top meets the mortise
     tenon_bottom = position - tenon_dir * timber_length
