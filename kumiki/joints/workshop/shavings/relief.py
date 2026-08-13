@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, replace
-from typing import Optional, Union
+from typing import List, Optional, Union
 
 from sympy import Abs, Max, Min, acos, sqrt
 
@@ -26,7 +26,7 @@ from kumiki.cutcsg import (
     make_finite_rectangular_prism_from_half_space,
     EmptyCSG,
 )
-from kumiki.measuring import Plane, locate_centerline, locate_plane_from_edge_in_direction
+from kumiki.measuring import Plane, get_center_point_on_face_global, locate_centerline, locate_plane_from_edge_in_direction
 from kumiki.rule import *
 from kumiki.timber import Cutting, TimberCenterline, TimberFace, TimberLike, TimberEnd, TimberLongFace
 from kumiki.timber_shavings import (
@@ -91,6 +91,12 @@ class ButtJointScribeReliefConfig:
         )
 
 
+class NotchFrom(Enum):
+    """Which reference plane a ButtJointNotchReliefConfig notch is anchored to."""
+    Face = 0
+    Shoulder = 1
+
+
 @dataclass(frozen=True)
 class ButtJointNotchReliefConfig:
     """
@@ -99,8 +105,19 @@ class ButtJointNotchReliefConfig:
     Unlike ButtJointScribeReliefConfig (which scribes one timber's whole imperfect body
     onto the other), this relieves only the material near the inset shoulder using the
     4-sided frustum notch -- see chop_butt_joint_shoulder_notch_relief_4sided.
+
+    Attributes:
+        notch_from: Which plane the notch is measured from.
+            - Shoulder (default): the notch is anchored to the actual (possibly inset)
+              shoulder plane. The only value cut_mortise_and_tenon_joint itself supports.
+            - Face: only supported by cut_mortise_and_tenon_joint_on_plane_aligned_timbers
+              / _on_face_aligned_timbers. The joint is still fit at the real (inset)
+              shoulder (via the default scribe-based housing cut), but the notch relief
+              itself is anchored to the mortise entry face -- as if mortise_shoulder_inset
+              were 0 -- so it reads as starting at the timber's outer face regardless of
+              how deep the shoulder is actually inset.
     """
-    pass
+    notch_from: NotchFrom = NotchFrom.Shoulder
 
 
 @dataclass(frozen=True)
@@ -1045,6 +1062,117 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
         receiving_timber_notch_negative_CSG=receiving_timber_notch_negative_csg_local,
         butting_timber_relief_negative_CSG=butting_timber_relief_negative_csg_local,
     )
+
+
+def chop_rough_relief_on_long_faces_beyond_shoulder_plane(
+    arrangement: ButtJointTimberArrangement,
+    long_faces: List[TimberLongFace],
+    mortise_shoulder_distance_from_centerline_or_centerplane: Numeric,
+) -> CutCSG:
+    """
+    Self-trims the butt (tenon) timber's own ROUGH (as-sawn) material that lies beyond its
+    PERFECT (finished) envelope, restricted to the given long_faces only, and further
+    restricted to the side of the shoulder plane where the tenon timber's full body (not
+    just the tenon peg) must be housed within the receiving (mortise) timber -- the same
+    side chop_butt_joint_shoulder_notch_relief_4sided /
+    _on_plane_aligned_timbers_2sided's own scribe/notch geometry occupies.
+
+    Use this alongside a ShoulderReliefStyle.PerfectOnly housing scribe (see
+    cut_mortise_and_tenon_joint): that scribe cuts a TIGHT pocket into the mortise, sized to
+    the tenon's PERFECT footprint only, so for the joint to actually fit, the tenon's own
+    rough excess in that same region must be trimmed off the tenon instead -- not relieved
+    by enlarging the mortise pocket, which would defeat the point of PerfectOnly.
+
+    Formula, per requested face: Intersection(Difference(rough, PTW), half-space beyond
+    that face's own PTW boundary) -- isolates just that face's own imperfect sliver of the
+    rough-minus-perfect shell -- unioned across long_faces, then Difference'd against the
+    shoulder plane's housing-side half-space (mirroring
+    cut_mortise_and_tenon_joint's own shoulder_half_space_global construction).
+
+    Pass only the faces that actually need this. For example, combined with a
+    chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided notch, only the 2
+    long faces NOT parallel to the joint plane need it: that notch's 2 flat P-axis walls
+    (the faces PARALLEL to the joint plane) already give those faces full rough coverage,
+    for the notch's whole depth; its 2 flared Q-axis walls (the faces NOT parallel to the
+    joint plane) only cover the tenon's PERFECT footprint, so THOSE faces are left with a
+    rough-clearance gap that this function fills in.
+
+    Args:
+        arrangement: butt joint arrangement (receiving_timber = mortise, butt_timber = tenon).
+        long_faces: which of the tenon timber's long faces (RIGHT/LEFT/FRONT/BACK) to
+            compute rough relief for. Faces not listed are left untouched by this function.
+        mortise_shoulder_distance_from_centerline_or_centerplane: same meaning as elsewhere
+            in this module -- signed distance from the mortise centerline to the shoulder
+            plane, toward the tenon.
+
+    Returns:
+        CSG already adopted into the butt (tenon) timber's own LOCAL space -- ready to
+        union directly onto that timber's cutting. Empty (EmptyCSG) if long_faces is empty.
+    """
+    if not long_faces:
+        return EmptyCSG()
+
+    tenon_timber = arrangement.butt_timber
+    mortise_timber = arrangement.receiving_timber
+    tenon_end = arrangement.butt_timber_end
+
+    from kumiki.joints.workshop.shavings.build_a_butt import (
+        locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
+    )
+    shoulder_plane = locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber(
+        arrangement, mortise_shoulder_distance_from_centerline_or_centerplane,
+    )
+
+    extend_bot = tenon_end == TimberEnd.BOTTOM
+    extend_top = tenon_end == TimberEnd.TOP
+    rough_extended_local = tenon_timber.get_extended_actual_csg_local(extend_bot=extend_bot, extend_top=extend_top)
+    perfect_extended_local = tenon_timber.get_extended_perfect_csg_local(extend_bot=extend_bot, extend_top=extend_top)
+    imperfect_shell_local = Difference(base=rough_extended_local, subtract=[perfect_extended_local])
+
+    face_pieces_local = []
+    for face in long_faces:
+        face_dir_local = face.to.face().get_direction()
+        perfect_half_local = tenon_timber.get_size_in_face_normal_axis(face) / scalar(2)
+        face_half_space_local = HalfSpace(normal=face_dir_local, offset=perfect_half_local)
+        face_pieces_local.append(Intersection(left=imperfect_shell_local, right=face_half_space_local))
+
+    faces_imperfect_local = SolidUnion(children=face_pieces_local)
+    faces_imperfect_global = adopt_csg(tenon_timber.transform, None, faces_imperfect_local)
+
+    # Mirrors cut_mortise_and_tenon_joint's own shoulder_half_space_global exactly: keeps
+    # only the portion of faces_imperfect_global on the housing side of the shoulder plane
+    # (the side the tenon timber's full body -- not just the tenon peg -- occupies).
+    shoulder_half_space_global = HalfSpace(
+        normal=-shoulder_plane.normal,
+        offset=safe_dot_product(-shoulder_plane.normal, shoulder_plane.point),
+    )
+
+    # The housing region only exists BETWEEN the shoulder and the mortise's own entry face
+    # -- shoulder_half_space_global alone bounds the near (joint/peg) side, but nothing
+    # bounds the far side, so without this the cut would extend unboundedly back along the
+    # tenon's own shank (its own rough/perfect extension is infinite there by construction,
+    # extend_bot/extend_top). That's harmless when this result is scribed onto the MORTISE
+    # (the mortise timber's own finite body naturally crops it), but this result is applied
+    # to the TENON itself (self-trim), which genuinely occupies that whole "infinite"
+    # direction -- so the far side must be bounded explicitly here, at the mortise's entry
+    # face: past that face the tenon continues as its ordinary, unhoused shank and must not
+    # be trimmed.
+    tenon_end_direction = tenon_timber.get_face_direction_global(tenon_end)
+    mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
+        -tenon_end_direction
+    ).to.face()
+    mortise_face_direction = mortise_timber.get_face_direction_global(mortise_face)
+    beyond_mortise_face_half_space_global = HalfSpace(
+        normal=mortise_face_direction,
+        offset=safe_dot_product(mortise_face_direction, get_center_point_on_face_global(mortise_face, mortise_timber)),
+    )
+
+    beyond_shoulder_global = Difference(
+        base=faces_imperfect_global,
+        subtract=[shoulder_half_space_global, beyond_mortise_face_half_space_global],
+    )
+
+    return adopt_csg(None, tenon_timber.transform, beyond_shoulder_global)
 
 
 def _intersect_line_with_plane(line_point: V3, line_direction: Direction3D, plane: Plane) -> V3:

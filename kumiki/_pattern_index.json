@@ -14,6 +14,7 @@
           "positioned_cube",
           "union_cubes",
           "hexagon_extrusion",
+          "asymmetric_frustum_loft",
           "lap_cut_timber",
           "gooseneck_profile_cut",
           "shoulder_notch_on_timber",
@@ -54,6 +55,13 @@
           },
           {
             "path": "csg_debug/hexagon_extrusion",
+            "pattern_type": "csg",
+            "tags": [
+              "poop"
+            ]
+          },
+          {
+            "path": "csg_debug/asymmetric_frustum_loft",
             "pattern_type": "csg",
             "tags": [
               "poop"
@@ -111,7 +119,7 @@
         ]
       },
       "relative_path": "CSG_debug_patterns.py",
-      "sha256": "abdda0d9c1a15995feadfea114479321d78aa1ceba4eaaa08428cb520a944281",
+      "sha256": "e3c1bb781c6ee0aeb8e2b1c849d5e6e51b7e34b317b7009051f6924f0a1deed7",
       "warnings": []
     },
     "patterns/basic_joints_patterns.py": {
@@ -138,7 +146,8 @@
           "basic_dropin_dovetail_butt_joint",
           "basic_dropin_housed_butt_joint",
           "basic_mitered_and_keyed_lap_joint",
-          "basic_wedged_half_dovetail_mortise_and_tenon"
+          "basic_wedged_half_dovetail_mortise_and_tenon",
+          "basic_tusked_mortise_and_tenon"
         ],
         "patterns": [
           {
@@ -226,11 +235,16 @@
             "tags": [
               "main"
             ]
+          },
+          {
+            "path": "basic_joints/basic_tusked_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": []
           }
         ]
       },
       "relative_path": "basic_joints_patterns.py",
-      "sha256": "ac4327bb50cb72e6e0c4409e73f06d0d27e58663fc822cfb2809ea8fa093afef",
+      "sha256": "07751b19bb9d359554f7a31332084e94e4065080b583f78f4e1755bb7c874f91",
       "warnings": []
     },
     "patterns/board_joints_patterns.py": {
@@ -291,7 +305,7 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 946,
+          "lineno": 321,
           "name": "create_all_butt_joint_patterns"
         }
       ],
@@ -302,23 +316,11 @@
         "pattern_names": [
           "tongue_and_fork_butt_joint_90",
           "tongue_and_fork_butt_joint_angled",
+          "tongue_and_fork_butt_joint_angled_inset",
           "plain_butt_joint",
           "plain_butt_joint_3d",
-          "mortise_and_tenon_basic",
-          "mortise_and_tenon_basic_face_aligned",
-          "mortise_and_tenon_round_face_aligned",
-          "mortise_and_tenon_basic_face_aligned_round_timbers",
-          "mortise_and_tenon_through_tenon",
-          "mortise_and_tenon_inset_shoulder",
-          "mortise_and_tenon_double_angled",
-          "mortise_and_tenon_compound_offset_parallel_shoulder",
-          "brace_joint_mortise_and_tenon",
-          "wedged_half_dovetail_mortise_and_tenon",
-          "half_dovetail_mortise_and_tenon_no_wedge",
           "cut_dropin_dovetail_butt_joint_on_face_aligned_timbers",
-          "cut_dropin_housed_butt_joint_on_face_aligned_timbers",
-          "mortise_and_tenon_inset_shoulder_notch_angled",
-          "mortise_and_tenon_inset_shoulder_scribe_angled"
+          "cut_dropin_housed_butt_joint_on_face_aligned_timbers"
         ],
         "patterns": [
           {
@@ -334,67 +336,17 @@
             "tags": []
           },
           {
+            "path": "butt_joints/tongue_and_fork/tongue_and_fork_butt_joint_angled_inset",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
             "path": "butt_joints/plain_butt_joint/plain_butt_joint",
             "pattern_type": "frame",
             "tags": []
           },
           {
             "path": "butt_joints/plain_butt_joint/plain_butt_joint_3d",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_basic",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_basic_face_aligned",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_round_face_aligned",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_basic_face_aligned_round_timbers",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_through_tenon",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_double_angled",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_compound_offset_parallel_shoulder",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/wedged_half_dovetail_mortise_and_tenon",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/half_dovetail_mortise_and_tenon_no_wedge",
             "pattern_type": "frame",
             "tags": []
           },
@@ -407,21 +359,11 @@
             "path": "butt_joints/cut_dropin_housed_butt_joint_on_face_aligned_timbers",
             "pattern_type": "frame",
             "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_notch_angled",
-            "pattern_type": "frame",
-            "tags": []
-          },
-          {
-            "path": "butt_joints/mortise_and_tenon/mortise_and_tenon_inset_shoulder_scribe_angled",
-            "pattern_type": "frame",
-            "tags": []
           }
         ]
       },
       "relative_path": "butt_joints_patterns.py",
-      "sha256": "b647b729567ecdce97e11efca79912a6dd65a49217357c75a4e21cebc7f24ddd",
+      "sha256": "b4faceea4bb1be36517cd6da27c8be024b54b64bfae16c29211ffe1d2f340893",
       "warnings": []
     },
     "patterns/compound_joints_patterns.py": {
@@ -546,7 +488,7 @@
         ]
       },
       "relative_path": "construction_patterns.py",
-      "sha256": "78db1ef6c9751bcc8894488e34ec4fb15c9ba12c58651f77ee4a5f973202eb4f",
+      "sha256": "60e65747459c396526adf7fb14a33cef9c000b3c9329f391d077dd078af7797d",
       "warnings": []
     },
     "patterns/corner_joints_patterns.py": {
@@ -741,7 +683,144 @@
         ]
       },
       "relative_path": "irrational_angles_patterns.py",
-      "sha256": "9d86c68ccf2a6b753a3b304d5467d0aa31282bda1343e1952ea19493a252444e",
+      "sha256": "66257a11949767708e2a05a375e97639a18acd62e87f723906f1b4ef6d86a7dc",
+      "warnings": []
+    },
+    "patterns/mortise_and_tenon_joints_patterns.py": {
+      "chosen_frame_kind": null,
+      "chosen_frame_name": null,
+      "frames": [],
+      "load_error": null,
+      "module_name": "giraffe_librarian_dynamic_mortise_and_tenon_joints_patterns",
+      "multiple_frames": false,
+      "patternbook": {
+        "pattern_names": [
+          "basic_face_aligned",
+          "round_face_aligned",
+          "basic_face_aligned_round_timbers",
+          "through_tenon",
+          "face_aligned_inset_shoulder",
+          "double_angled",
+          "double_angled_with_notch_relief",
+          "joint_plane_aligned_notched_2sided",
+          "joint_plane_aligned_notched_2sided_from_face",
+          "compound_offset_parallel_shoulder",
+          "brace_joint_mortise_and_tenon",
+          "mortise_and_tenon_corner_joint",
+          "wedged_half_dovetail_mortise_and_tenon",
+          "inset_shoulder_notch_angled",
+          "inset_shoulder_scribe_angled",
+          "tusked_mortise_and_tenon",
+          "tusked_mortise_and_tenon_entry_from_top",
+          "tusked_mortise_and_tenon_opposite_shoulder_inset_from_top",
+          "tusked_mortise_and_tenon_opposite_shoulder_from_perfect",
+          "tusked_mortise_and_tenon_opposite_shoulder_from_rough"
+        ],
+        "patterns": [
+          {
+            "path": "butt_joints/mortise_and_tenon/basic_face_aligned",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/round_face_aligned",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/basic_face_aligned_round_timbers",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/through_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/face_aligned_inset_shoulder",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/double_angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/double_angled_with_notch_relief",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/joint_plane_aligned_notched_2sided",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/joint_plane_aligned_notched_2sided_from_face",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/compound_offset_parallel_shoulder",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "corner_joints/mortise_and_tenon/mortise_and_tenon_corner_joint",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/wedged_half_dovetail_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/inset_shoulder_notch_angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/mortise_and_tenon/inset_shoulder_scribe_angled",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/tusked_mortise_and_tenon",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_entry_from_top",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_inset_from_top",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_perfect",
+            "pattern_type": "frame",
+            "tags": []
+          },
+          {
+            "path": "butt_joints/tusked_mortise_and_tenon/tusked_mortise_and_tenon_opposite_shoulder_from_rough",
+            "pattern_type": "frame",
+            "tags": []
+          }
+        ]
+      },
+      "relative_path": "mortise_and_tenon_joints_patterns.py",
+      "sha256": "c1d319663743d3e3464336516fef035c68f78f6e495566937df1f33bcb7362c8",
       "warnings": []
     },
     "patterns/multi_butt_joints_patterns.py": {
@@ -868,7 +947,7 @@
         ]
       },
       "relative_path": "onlypoop/relief_example_patterns.py",
-      "sha256": "f60119e292c72ef554611c6719e9ed01355eeb21be1949853795256bba9cb508",
+      "sha256": "d38b1648283f1326f1adc0b627a746877d214b81a302193fc852c49b468ce8b4",
       "warnings": []
     },
     "patterns/onlypoop/simple_simultaneous_assembly.py": {
@@ -1126,12 +1205,12 @@
       "frames": [
         {
           "kind": "function",
-          "lineno": 128,
+          "lineno": 130,
           "name": "build_shed_frame"
         },
         {
           "kind": "var",
-          "lineno": 1413,
+          "lineno": 1415,
           "name": "example"
         }
       ],
@@ -1140,7 +1219,7 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/learn_to_timber_frame_shed.py",
-      "sha256": "ea70325da893f1c39640864a95b6089de45397a4facb7893d3348d314ec7c788",
+      "sha256": "f0ba64ce3956f1d0b187599e01a838e2f5e0a606969d88feee5067b6e9346011",
       "warnings": []
     },
     "patterns/structures/multi_cross_lap_post.py": {
@@ -1227,11 +1306,11 @@
       "multiple_frames": true,
       "patternbook": null,
       "relative_path": "structures/tinyhouse120.py",
-      "sha256": "c7d4a18dceaed0fce3b1a29f560780ef69cca1c5c050c1280cd975199b091d0e",
+      "sha256": "282f27f9b99db43d46266d9402e00fe3fe38230814cf9dd5c811521defb9235a",
       "warnings": []
     }
   },
-  "generated_at": "2026-08-04T02:44:19.164061+00:00",
+  "generated_at": "2026-08-13T00:42:56.552269+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

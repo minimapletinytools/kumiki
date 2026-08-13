@@ -186,14 +186,18 @@ DONE-cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers
 DONE-update mortise and tenon joint to use relative position tenon parameters (see notes in file)
   DONE-update all patterns to use the new relative paraemteres
 DONE-add cut_mortise_and_tenon_corner_oint (see notes in file)
-
 DONE-new notching plan
   DONE/IGNORE-update all inset shoulder computatinos to use scribe style (make a helper function for this maybe, like scribe up to shoulder plane or something)
   DONE-add butt joint notching that cuts the chamfered shape (maybe then you don't need the one above anymore)
   DONE-add spceila notching just for plane aligned/face aligned stuff, this one notches the whole width of the receiving timber, you can modify make chop_shoulder_notch_on_timber_face into an internal function and then call it from teh new one.
   DONE-FAT/PAT mortise and tenon joints now allow notched style and do it themselves rather than pass arg to parent
-
--add notching mode to FAT/PAT joints
+DONE-move agent usage instructions and docs/skills out of docs folder
+DONE-delet plans in docs folder
+DONE-remove calls to normalize_vector and zero_test switch to safe version
+DONE-someway to mke footprint show up more clearly in footprint examples? (probably just render on top of everything?)
+DONE-would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
+DONE- no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
+DONE-add notching mode to FAT/PAT joints
   -NotchFromInsetShoulder (current behavior)
   -NotchFromPerefctTimberWithin (keeps scribe shoulder notching in cut_mortise_and_tenon_joint call, and then does the notching from PTW face rather than join shoulder)
 
@@ -209,10 +213,6 @@ DONE-new notching plan
   -double_angled_notch_relief
   -double_angled_scribe_relief
 
-DONE-move agent usage instructions and docs/skills out of docs folder
-DONE-delet plans in docs folder
-DONE-remove calls to normalize_vector and zero_test switch to safe version
-
   
 
 
@@ -220,9 +220,7 @@ DONE-remove calls to normalize_vector and zero_test switch to safe version
   -decide how to reorg examples too...
   -maybe get ird of folder + example support, examples are always leaf nodes?
 -do joint rename to match what's in your new book
-  -add shouder to cross lap joint
-
-
+-add shouder to cross lap joint
 
 
 -furniture joints
@@ -270,9 +268,7 @@ DONE-remove calls to normalize_vector and zero_test switch to safe version
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
-DONE-someway to mke footprint show up more clearly in footprint examples? (probably just render on top of everything?)
-DONE-would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
-DONE- no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
+
 - probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
 -should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
 -consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
@@ -322,7 +318,7 @@ DONE- no ctors for noud timber, add a change timber function or something allowi
     -leave a TODO to add notching for non perfect timbers
   DONE-kanawa tsugi joint
   -add screw joint
-  -I guessy ou probably want to do tusked mortise and tenon joint too
+  DONE-I guessy ou probably want to do tusked mortise and tenon joint too
   -do the castle joint 3 way joint thingy that should be easy?
     -may as well do the oscar hsed 3 way joint hingy as well
   -do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
@@ -333,7 +329,7 @@ DONE- no ctors for noud timber, add a change timber function or something allowi
   -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap
     -# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
   -lincoln log joints?
-  -difference joint 
+  DONE-difference joint 
     -where 1 CutTimber is just substracted from another timber, useful for making modifications not readily supported... 
     -may as well do a union joint then? (these would really be decorative joints...)
     -or would it be better just to have folsk make custom joints

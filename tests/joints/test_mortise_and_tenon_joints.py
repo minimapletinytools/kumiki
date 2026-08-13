@@ -301,9 +301,9 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
     These wrappers know the arrangement is plane-aligned, so they should use
     chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided (2 flat walls,
     2 flared walls) themselves -- applying it directly and passing
-    relief=DisableInsetShoulderNotchingReliefConfig() (NOT None -- see that config's own
-    docstring) down to cut_mortise_and_tenon_joint, so its default SCRIBE-based
-    inset-shoulder housing cut is skipped entirely rather than redundantly unioned on top.
+    shoulder_relief_style=None (NOT the ShoulderReliefStyle.Rough default) down to
+    cut_mortise_and_tenon_joint, so its default SCRIBE-based inset-shoulder housing cut is
+    skipped entirely rather than redundantly unioned on top.
 
     Probe points below are given in intuitive GLOBAL terms and converted to the mortise
     timber's own LOCAL frame (what Cutting.negative_csg.contains_point actually expects --

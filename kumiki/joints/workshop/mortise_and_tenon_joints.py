@@ -14,7 +14,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, chop_butt_joint_shoulder_notch_relief_4sided, chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig, chop_scribe_relief_and_apply_for_butt_joint_arrangement
+from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, chop_butt_joint_shoulder_notch_relief_4sided, chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided, chop_rough_relief_on_long_faces_beyond_shoulder_plane, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig, NotchFrom, chop_scribe_relief_and_apply_for_butt_joint_arrangement
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -81,27 +81,22 @@ class WedgeParameters:
     expand_mortise: Numeric = scalar(0)
 
 
-@dataclass(frozen=True)
-class DisableInsetShoulderNotchingReliefConfig:
+class ShoulderReliefStyle(Enum):
     """
-    INTERNAL ONLY -- not meant to be passed by callers of cut_mortise_and_tenon_joint
-    directly. Disables the "shoulder notch on mortise timber and matching relief on tenon
-    timber (when shoulder is inset from the mortise entry face)" step entirely (the SCRIBE-
-    based housing cut that runs whenever relief is None or a ButtJointScribeReliefConfig),
-    without enabling any other relief in its place.
+    Which CSG of the butt (tenon) timber the shoulder notch/relief step in
+    cut_mortise_and_tenon_joint scribes onto the mortise (receiving) timber, when the
+    shoulder is inset from the mortise entry face.
 
-    Exists for cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
-    cut_mortise_and_tenon_joint_on_face_aligned_timbers: when the caller passes
-    ButtJointNotchReliefConfig, those wrappers compute
-    chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided themselves and
-    union it in after calling cut_mortise_and_tenon_joint. Passing relief=None down to that
-    inner call would (incorrectly) also trigger its own default SCRIBE-based inset-shoulder
-    notch -- redundant with, not a replacement for, the 2-sided relief the wrapper is about
-    to union in on top of it. Passing this config instead skips that inner step cleanly,
-    same as ButtJointNotchReliefConfig does for the fully-general 4-sided case, without
-    engaging any of ButtJointNotchReliefConfig's OWN (4-sided) relief logic.
+    Rough: uses the tenon timber's ROUGH (actual, as-sawn) cross-section -- the current/
+        default behavior. Gives the housing extra clearance for oversized rough stock.
+    PerfectOnly: uses the tenon timber's PERFECT (finished-dimension) cross-section only,
+        ignoring any rough/oversize margin. Use this when a separate relief step (e.g. a
+        ButtJointNotchReliefConfig(notch_from=NotchFrom.Face) notch) already handles the
+        rough-stock clearance elsewhere, so the housing scribe itself should stay tight to
+        the tenon's finished size instead of also carrying the rough margin.
     """
-    pass
+    Rough = 0
+    PerfectOnly = 1
 
 
 # ============================================================================
@@ -121,7 +116,8 @@ def cut_mortise_and_tenon_joint(
     peg_parameters: Optional[SimplePegParameters] = None,
     bore_mortise_perpendicular_to_face: bool = False,
     use_round_tenon: bool = False,
-    relief: Union[None, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig, DisableInsetShoulderNotchingReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
+    relief: Union[None, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig] = ButtJointScribeReliefConfig.butt_timber(),
+    shoulder_relief_style: Optional[ShoulderReliefStyle] = ShoulderReliefStyle.Rough,
 ) -> Joint:
     """
     Creates a mortise and tenon joint with full control over all parameters.
@@ -163,21 +159,39 @@ def cut_mortise_and_tenon_joint(
               scribes one timber's imperfect (beyond-perfect-within) material onto the other
               and cuts it away. Defaults to scribing the tenon (butt) timber onto the mortise
               (receiving) timber. This is separate from — and applied on top of — the shoulder
-              notch/relief that mortise_shoulder_distance_from_centerline_or_centerplane may
-              require.
+              notch/relief that shoulder_relief_style/mortise_shoulder_distance_from_centerline_or_centerplane
+              may require.
             - ButtJointNotchReliefConfig: replaces BOTH the default shoulder notch/relief
-              (the scribe-based housing cut for an inset shoulder) AND scribe relief with a
-              single call to `chop_butt_joint_shoulder_notch_relief_4sided`, which relieves
-              only the material near the inset shoulder via a 4-sided frustum notch instead
-              of scribing each timber's whole imperfect body onto the other. Prefer this for
-              compound-angle (non-plane-aligned) joints with an inset shoulder.
-            - DisableInsetShoulderNotchingReliefConfig: INTERNAL ONLY (used by
+              (the scribe-based housing cut for an inset shoulder, controlled by
+              shoulder_relief_style) AND scribe relief with a single call to
+              `chop_butt_joint_shoulder_notch_relief_4sided`, which relieves only the
+              material near the inset shoulder via a 4-sided frustum notch instead of
+              scribing each timber's whole imperfect body onto the other. Prefer this for
+              compound-angle (non-plane-aligned) joints with an inset shoulder. Must have
+              notch_from=NotchFrom.Shoulder (the default) -- this function has no
+              face-anchored notch logic; use
               cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
-              _on_face_aligned_timbers). Skips the default shoulder notch/relief step
-              entirely without engaging any other relief in its place -- unlike passing
-              None, which still runs the SCRIBE-based inset-shoulder housing cut.
-            Pass None to skip scribe/notch relief but still apply the default SCRIBE-based
-            inset-shoulder housing cut when the shoulder is inset.
+              _on_face_aligned_timbers for notch_from=NotchFrom.Face.
+            Pass None to skip scribe/notch relief but still apply the default shoulder
+            notch/relief step (per shoulder_relief_style) when the shoulder is inset.
+        shoulder_relief_style: Controls the shoulder notch/relief step -- the SCRIBE-based
+            housing cut applied when the shoulder is inset from the mortise entry face
+            (independent of the relief argument above). Either:
+            - ShoulderReliefStyle.Rough (default): scribes the tenon timber's ROUGH
+              (as-sawn) cross-section onto the mortise timber, giving the housing extra
+              clearance for oversized rough stock.
+            - ShoulderReliefStyle.PerfectOnly: scribes only the tenon timber's PERFECT
+              (finished-dimension) cross-section, ignoring any rough margin. Use this when
+              a separate relief step already handles the rough-stock clearance elsewhere
+              (e.g. cut_mortise_and_tenon_joint_on_plane_aligned_timbers passes this for
+              ButtJointNotchReliefConfig(notch_from=NotchFrom.Face), whose own 2-sided
+              notch already covers the rough margin at the face).
+            - None: skips the shoulder notch/relief step entirely, without engaging any
+              other relief in its place. Used internally by
+              cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
+              _on_face_aligned_timbers when they compute their own shoulder relief
+              (chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided) and
+              union it in after calling this function, to avoid redundantly applying both.
 
     Returns:
         Joint object containing the two CutTimbers and any accessories, all in global space.
@@ -448,21 +462,29 @@ def cut_mortise_and_tenon_joint(
     # (when shoulder is inset from the mortise entry face)
     # -------------------------------------------------------------------------
 
-    if isinstance(relief, DisableInsetShoulderNotchingReliefConfig):
-        # INTERNAL ONLY: the caller (cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
+    if isinstance(relief, ButtJointNotchReliefConfig):
+        assert relief.notch_from == NotchFrom.Shoulder, (
+            "cut_mortise_and_tenon_joint only supports "
+            "ButtJointNotchReliefConfig(notch_from=NotchFrom.Shoulder) -- "
+            "notch_from=NotchFrom.Face is only supported by "
+            "cut_mortise_and_tenon_joint_on_plane_aligned_timbers / "
+            "_on_face_aligned_timbers, which compute their own face-anchored relief "
+            "on top of this function's default shoulder scribe."
+        )
+        # The 4-sided notch relief IS the inset-shoulder relief (built directly from the
+        # shoulder line), so the scribe-based housing cut below would be redundant --
+        # skip straight to it instead.
+        shoulder_notch_relief_geom: ShoulderReliefCSGGeometry | None = chop_butt_joint_shoulder_notch_relief_4sided(
+            arrangement,
+            mortise_shoulder_distance_from_centerline_or_centerplane,
+        )
+    elif shoulder_relief_style is None:
+        # INTERNAL: the caller (cut_mortise_and_tenon_joint_on_plane_aligned_timbers /
         # _on_face_aligned_timbers) has already computed its own inset-shoulder relief
         # (chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided) and will
         # union it in itself -- running the scribe-based housing cut below too would be
         # redundant with it, not a replacement for it, so skip this step entirely.
-        shoulder_notch_relief_geom: ShoulderReliefCSGGeometry | None = None
-    elif isinstance(relief, ButtJointNotchReliefConfig):
-        # The 4-sided notch relief IS the inset-shoulder relief (built directly from the
-        # shoulder line), so the scribe-based housing cut below would be redundant --
-        # skip straight to it instead.
-        shoulder_notch_relief_geom = chop_butt_joint_shoulder_notch_relief_4sided(
-            arrangement,
-            mortise_shoulder_distance_from_centerline_or_centerplane,
-        )
+        shoulder_notch_relief_geom = None
     # The region to remove from the mortise timber is the intersection of the tenon timber's
     # perfect representation with the mortise-side of the shoulder plane.
     #
@@ -476,13 +498,21 @@ def cut_mortise_and_tenon_joint(
         check_against_rough_size=True,
         set_mortise_shoulder_parallel_to_face=set_mortise_shoulder_parallel_to_face,
     ):
-        tenon_timber_csg_global = adopt_csg(
-            tenon_timber.transform,
-            None,
+        tenon_timber_scribe_csg_local = (
             tenon_timber.get_extended_actual_csg_local(
                 extend_bot=(tenon_end == TimberEnd.BOTTOM),
                 extend_top=(tenon_end == TimberEnd.TOP),
-            ),
+            )
+            if shoulder_relief_style == ShoulderReliefStyle.Rough
+            else tenon_timber.get_extended_perfect_csg_local(
+                extend_bot=(tenon_end == TimberEnd.BOTTOM),
+                extend_top=(tenon_end == TimberEnd.TOP),
+            )
+        )
+        tenon_timber_csg_global = adopt_csg(
+            tenon_timber.transform,
+            None,
+            tenon_timber_scribe_csg_local,
         )
         scribe_csg_global = Difference(
             base=tenon_timber_csg_global,
@@ -817,9 +847,23 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
               removed) chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided
               instead of the fully-general 4-sided notch cut_mortise_and_tenon_joint itself
               would apply. Computed and applied here (unioned onto the mortise notch and
-              tenon relief cuts), with relief=None passed to the inner
-              cut_mortise_and_tenon_joint call so it doesn't ALSO apply its own (4-sided,
-              more conservative) relief on top.
+              tenon relief cuts). Its notch_from field controls where that notch is
+              anchored:
+                - NotchFrom.Shoulder (default): anchored to the real (possibly inset)
+                  shoulder plane. shoulder_relief_style=None is passed to the inner
+                  cut_mortise_and_tenon_joint call so it doesn't ALSO apply its own
+                  (4-sided, more conservative) shoulder relief on top.
+                - NotchFrom.Face: the joint is still fit at the real shoulder --
+                  shoulder_relief_style=ShoulderReliefStyle.PerfectOnly is passed to the
+                  inner cut_mortise_and_tenon_joint call instead, so its default
+                  scribe-based housing cut still runs (fitting the joint at the real
+                  shoulder) but scribes only the tenon's PERFECT cross-section, not its
+                  rough one -- the rough-stock margin is instead covered by the notch
+                  relief itself, which is anchored to the mortise entry face
+                  (mortise_shoulder_inset treated as 0), so it reads as starting at the
+                  timber's outer face.
+            Either way, relief=None is passed to the inner cut_mortise_and_tenon_joint call
+            (this wrapper applies the notch relief itself, afterward).
             Pass None to skip relief entirely.
 
     Returns:
@@ -856,6 +900,14 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         receiving_timber=arrangement.receiving_timber,
     )
 
+    # notch_from=Face still fits the joint at the real (inset) shoulder via the default
+    # scribe-based housing cut below (relief=None, shoulder_relief_style=PerfectOnly) --
+    # only the notch relief geometry itself (computed further down) is anchored to the
+    # face instead of the real shoulder. PerfectOnly (not Rough) because the 2-sided notch
+    # unioned in below already covers the rough-stock margin at the face; scribing the
+    # housing cut with the tenon's ROUGH cross-section too would double up on that margin.
+    notch_from_face = isinstance(relief, ButtJointNotchReliefConfig) and relief.notch_from == NotchFrom.Face
+
     joint = cut_mortise_and_tenon_joint(
         arrangement=arrangement,
         tenon_size=tenon_size,
@@ -867,12 +919,33 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
         peg_parameters=peg_parameters,
         bore_mortise_perpendicular_to_face=bore_mortise_perpendicular_to_face,
         use_round_tenon=use_round_tenon,
-        relief=DisableInsetShoulderNotchingReliefConfig() if isinstance(relief, ButtJointNotchReliefConfig) else relief,
+        # relief=None whenever ButtJointNotchReliefConfig is passed (both notch_from styles):
+        # this wrapper computes its own shoulder relief below and unions it in itself, so the
+        # inner call's whole-body scribe relief step must stay off either way.
+        relief=None if isinstance(relief, ButtJointNotchReliefConfig) else relief,
+        shoulder_relief_style=(
+            ShoulderReliefStyle.PerfectOnly if notch_from_face
+            # notch_from=Shoulder: this wrapper's own 2-sided relief (below) IS the shoulder
+            # relief, so skip the inner call's default shoulder scribe entirely.
+            else None if isinstance(relief, ButtJointNotchReliefConfig)
+            else ShoulderReliefStyle.Rough
+        ),
     )
 
     if isinstance(relief, ButtJointNotchReliefConfig):
+        # notch_from=Face anchors the notch relief itself to the mortise entry face --
+        # i.e. as if mortise_shoulder_inset were 0 -- regardless of the real inset used above.
+        notch_mortise_shoulder_distance_from_centerline_or_centerplane = (
+            convert_mortise_shoulder_inset_to_centerline_distance(
+                mortise_shoulder_inset=scalar(0),
+                mortise_face=mortise_face,
+                receiving_timber=arrangement.receiving_timber,
+            )
+            if notch_from_face
+            else mortise_shoulder_distance_from_centerline_or_centerplane
+        )
         geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
-            arrangement, mortise_shoulder_distance_from_centerline_or_centerplane,
+            arrangement, notch_mortise_shoulder_distance_from_centerline_or_centerplane,
         )
         if geom is not None:
             tenon_key = arrangement.butt_timber.ticket.path
@@ -892,6 +965,43 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
                     negative_csg=CSGUnion([tenon_cutting.negative_csg, geom.butting_timber_relief_negative_CSG]),
                 )
             joint = replace(joint, cuttings=updated_cuttings)
+
+            if notch_from_face:
+                # shoulder_relief_style=PerfectOnly above cut a TIGHT pocket into the
+                # mortise (sized to the tenon's PERFECT footprint only); the 2-sided
+                # notch's flared Q-axis walls (see
+                # chop_rough_relief_on_long_faces_beyond_shoulder_plane's docstring) only
+                # cover the tenon's PERFECT footprint too. So on the 2 long faces NOT
+                # parallel to the joint plane, the tenon's own ROUGH-beyond-PERFECT
+                # material near the REAL (inset) shoulder is still uncleared -- since the
+                # mortise pocket there is deliberately tight (not relieved), this excess
+                # must be trimmed off the TENON itself instead. Uses the REAL shoulder
+                # (not the face-anchored one the notch itself uses), matching where the
+                # tenon timber's body actually needs to fit within that pocket.
+                joint_normal_axis = arrangement.compute_normalized_timber_cross_product()
+                p_face = arrangement.butt_timber.get_closest_oriented_long_face_from_global_direction(
+                    joint_normal_axis
+                )
+                q_faces = (
+                    [TimberLongFace.FRONT, TimberLongFace.BACK]
+                    if p_face in (TimberLongFace.RIGHT, TimberLongFace.LEFT)
+                    else [TimberLongFace.RIGHT, TimberLongFace.LEFT]
+                )
+                rough_relief_tenon_local = chop_rough_relief_on_long_faces_beyond_shoulder_plane(
+                    arrangement, q_faces, mortise_shoulder_distance_from_centerline_or_centerplane,
+                )
+                tenon_cutting = joint.cuttings[tenon_key]
+                assert tenon_cutting.negative_csg is not None
+                joint = replace(
+                    joint,
+                    cuttings={
+                        **joint.cuttings,
+                        tenon_key: replace(
+                            tenon_cutting,
+                            negative_csg=CSGUnion([tenon_cutting.negative_csg, rough_relief_tenon_local]),
+                        ),
+                    },
+                )
 
     return joint
 
