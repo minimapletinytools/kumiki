@@ -135,17 +135,31 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 
-def _cut_timber_to_trimesh(cut_timber: CutTimber) -> "trimesh.Trimesh":
-    """Return a trimesh in global coordinates for a single CutTimber."""
+def _cut_timber_to_trimesh(cut_timber: CutTimber, local: bool = False) -> "trimesh.Trimesh":
+    """Return a trimesh for a single CutTimber.
+
+    Args:
+        cut_timber: The timber to convert.
+        local: If True, return the mesh in the timber's own local coordinates
+            (bottom of timber at the origin). If False, return it in global
+            coordinates (its actual assembled position and orientation).
+    """
     from .triangles import triangulate_cutcsg
 
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
-    global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
-    return triangulate_cutcsg(global_csg).mesh
+    csg = local_csg if local else adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
+    return triangulate_cutcsg(csg).mesh
 
 
-def _joint_accessory_to_trimesh(accessory: Accessory) -> "trimesh.Trimesh":
-    """Return a trimesh in global coordinates for a single Accessory."""
+def _joint_accessory_to_trimesh(accessory: Accessory, local: bool = False) -> "trimesh.Trimesh":
+    """Return a trimesh for a single Accessory.
+
+    Args:
+        accessory: The accessory to convert.
+        local: If True, return the mesh in the accessory's own local coordinates.
+            If False, return it in global coordinates (its actual assembled
+            position and orientation).
+    """
     from .triangles import triangulate_cutcsg
 
     local_csg = accessory.get_csg_local()
@@ -154,20 +168,23 @@ def _joint_accessory_to_trimesh(accessory: Accessory) -> "trimesh.Trimesh":
         raise ValueError(
             f"Accessory '{accessory.ticket.path}' does not define a global transform"
         )
-    global_csg = adopt_csg(transform, Transform.identity(), local_csg)
-    return triangulate_cutcsg(global_csg).mesh
+    csg = local_csg if local else adopt_csg(transform, Transform.identity(), local_csg)
+    return triangulate_cutcsg(csg).mesh
 
 
-def export_cut_timber_stl(cut_timber: CutTimber, filepath: Union[str, Path]) -> None:
-    """Export a single CutTimber to an STL file (global coordinates, metres).
+def export_cut_timber_stl(cut_timber: CutTimber, filepath: Union[str, Path], *, local: bool = True) -> None:
+    """Export a single CutTimber to an STL file (metres).
 
     Args:
         cut_timber: The timber (with cuts applied) to export.
         filepath: Destination path. Parent directories are created if needed.
+        local: If True (default), export in the timber's own local coordinates
+            (bottom of timber at the origin). If False, export in global
+            coordinates (its actual assembled position and orientation).
     """
     filepath = Path(filepath)
     filepath.parent.mkdir(parents=True, exist_ok=True)
-    mesh = _cut_timber_to_trimesh(cut_timber)
+    mesh = _cut_timber_to_trimesh(cut_timber, local=local)
     mesh.export(str(filepath), file_type="stl")
 
 
@@ -175,6 +192,7 @@ def export_frame_stl(
     frame: Frame,
     output_dir: Union[str, Path],
     *,
+    local: bool = True,
     combined: bool = False,
     include_accessories: bool = True,
 ) -> List[Path]:
@@ -183,6 +201,12 @@ def export_frame_stl(
     Args:
         frame: The frame to export.
         output_dir: Directory for the STL files.
+        local: If True (default), each individual file is exported in that
+            part's own local coordinates (bottom at the origin). If False,
+            individual files are exported in global coordinates (their actual
+            assembled position and orientation). The optional combined file is
+            always in global coordinates regardless of this flag, since a
+            merged mesh is only meaningful with parts in their real positions.
         combined: If True, also write a single ``_combined.stl`` with all
             timbers and accessories merged into one mesh.
         include_accessories: If True, export accessory meshes. If False,
@@ -205,14 +229,15 @@ def export_frame_stl(
         used_names.add(candidate)
         return candidate
 
-    meshes: list[trimesh.Trimesh] = []
+    combined_meshes: list[trimesh.Trimesh] = []
     for i, ct in enumerate(frame.cut_timbers):
         name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
-        mesh = _cut_timber_to_trimesh(ct)
-        meshes.append(mesh)
+        mesh = _cut_timber_to_trimesh(ct, local=local)
         dest = output_dir / f"{name}.stl"
         mesh.export(str(dest), file_type="stl")
         written.append(dest)
+        if combined:
+            combined_meshes.append(mesh if not local else _cut_timber_to_trimesh(ct, local=False))
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
@@ -222,14 +247,15 @@ def export_frame_stl(
             else:
                 base_name = f"accessory_{i}"
             name = _next_available_name(base_name)
-            mesh = _joint_accessory_to_trimesh(accessory)
-            meshes.append(mesh)
+            mesh = _joint_accessory_to_trimesh(accessory, local=local)
             dest = output_dir / f"{name}.stl"
             mesh.export(str(dest), file_type="stl")
             written.append(dest)
+            if combined:
+                combined_meshes.append(mesh if not local else _joint_accessory_to_trimesh(accessory, local=False))
 
-    if combined and meshes:
-        merged = trimesh.util.concatenate(meshes)
+    if combined and combined_meshes:
+        merged = trimesh.util.concatenate(combined_meshes)
         dest = output_dir / "_combined.stl"
         merged.export(str(dest), file_type="stl")
         written.append(dest)
@@ -241,10 +267,17 @@ def export_frame_obj(
     frame: Frame,
     output_dir: Union[str, Path],
     *,
+    local: bool = True,
     combined: bool = False,
     include_accessories: bool = True,
 ) -> List[Path]:
-    """Export every timber and accessory in a Frame to OBJ files."""
+    """Export every timber and accessory in a Frame to OBJ files.
+
+    local: If True (default), each individual file is exported in that part's
+        own local coordinates (bottom at the origin). If False, individual
+        files are exported in global coordinates. The combined file (if
+        requested) is always in global coordinates regardless of this flag.
+    """
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
@@ -259,14 +292,15 @@ def export_frame_obj(
         used_names.add(candidate)
         return candidate
 
-    meshes: list[trimesh.Trimesh] = []
+    combined_meshes: list[trimesh.Trimesh] = []
     for i, ct in enumerate(frame.cut_timbers):
         name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
-        mesh = _cut_timber_to_trimesh(ct)
-        meshes.append(mesh)
+        mesh = _cut_timber_to_trimesh(ct, local=local)
         dest = output_dir / f"{name}.obj"
         mesh.export(str(dest), file_type="obj")
         written.append(dest)
+        if combined:
+            combined_meshes.append(mesh if not local else _cut_timber_to_trimesh(ct, local=False))
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
@@ -276,14 +310,15 @@ def export_frame_obj(
             else:
                 base_name = f"accessory_{i}"
             name = _next_available_name(base_name)
-            mesh = _joint_accessory_to_trimesh(accessory)
-            meshes.append(mesh)
+            mesh = _joint_accessory_to_trimesh(accessory, local=local)
             dest = output_dir / f"{name}.obj"
             mesh.export(str(dest), file_type="obj")
             written.append(dest)
+            if combined:
+                combined_meshes.append(mesh if not local else _joint_accessory_to_trimesh(accessory, local=False))
 
-    if combined and meshes:
-        merged = trimesh.util.concatenate(meshes)
+    if combined and combined_meshes:
+        merged = trimesh.util.concatenate(combined_meshes)
         dest = output_dir / "_combined.obj"
         merged.export(str(dest), file_type="obj")
         written.append(dest)
@@ -302,10 +337,17 @@ def export_frame_3mf(
     frame: Frame,
     output_dir: Union[str, Path],
     *,
+    local: bool = True,
     combined: bool = False,
     include_accessories: bool = True,
 ) -> List[Path]:
-    """Export individual STL members plus an optional combined 3MF scene."""
+    """Export individual STL members plus an optional combined 3MF scene.
+
+    local: If True (default), each individual STL member is exported in its
+        own local coordinates (bottom at the origin). If False, in global
+        coordinates. The combined 3MF scene (if requested) is always in
+        global coordinates regardless of this flag.
+    """
     if not _THREEMF_AVAILABLE:
         raise ImportError(
             "3MF export requires trimesh soft dependencies 'lxml' and 'networkx'. "
@@ -329,11 +371,13 @@ def export_frame_3mf(
 
     for i, ct in enumerate(frame.cut_timbers):
         name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
-        mesh = _cut_timber_to_trimesh(ct)
+        mesh = _cut_timber_to_trimesh(ct, local=local)
         dest = output_dir / f"{name}.stl"
         mesh.export(str(dest), file_type="stl")
         written.append(dest)
-        scene.add_geometry(_mesh_to_millimeters(mesh), geom_name=name, node_name=name)
+        if combined:
+            scene_mesh = mesh if not local else _cut_timber_to_trimesh(ct, local=False)
+            scene.add_geometry(_mesh_to_millimeters(scene_mesh), geom_name=name, node_name=name)
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
@@ -343,11 +387,13 @@ def export_frame_3mf(
             else:
                 base_name = f"accessory_{i}"
             name = _next_available_name(base_name)
-            mesh = _joint_accessory_to_trimesh(accessory)
+            mesh = _joint_accessory_to_trimesh(accessory, local=local)
             dest = output_dir / f"{name}.stl"
             mesh.export(str(dest), file_type="stl")
             written.append(dest)
-            scene.add_geometry(_mesh_to_millimeters(mesh), geom_name=name, node_name=name)
+            if combined:
+                scene_mesh = mesh if not local else _joint_accessory_to_trimesh(accessory, local=False)
+                scene.add_geometry(_mesh_to_millimeters(scene_mesh), geom_name=name, node_name=name)
 
     if combined and len(scene.geometry) > 0:
         dest = output_dir / "_combined.3mf"
@@ -708,14 +754,17 @@ def _write_step_named(
 # ---------------------------------------------------------------------------
 
 
-def export_cut_timber_step(cut_timber: CutTimber, filepath: Union[str, Path]) -> None:
-    """Export a single CutTimber to a STEP file (global coordinates, millimetres).
+def export_cut_timber_step(cut_timber: CutTimber, filepath: Union[str, Path], *, local: bool = True) -> None:
+    """Export a single CutTimber to a STEP file (millimetres).
 
     Requires OCP (cadquery-ocp). Install with: ``pip install cadquery-ocp``
 
     Args:
         cut_timber: The timber (with cuts applied) to export.
         filepath: Destination path. Parent directories are created if needed.
+        local: If True (default), export in the timber's own local coordinates
+            (bottom of timber at the origin). If False, export in global
+            coordinates (its actual assembled position and orientation).
     """
     if not _OCP_AVAILABLE:
         raise ImportError(
@@ -726,8 +775,8 @@ def export_cut_timber_step(cut_timber: CutTimber, filepath: Union[str, Path]) ->
     filepath.parent.mkdir(parents=True, exist_ok=True)
 
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
-    global_csg = adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
-    shape = _csg_to_ocp(global_csg)
+    export_csg = local_csg if local else adopt_csg(cut_timber.timber.transform, Transform.identity(), local_csg)
+    shape = _csg_to_ocp(export_csg)
     body_name = cut_timber.timber.ticket.path or filepath.stem
     _write_step(shape, str(filepath), name=body_name)
 
@@ -736,6 +785,7 @@ def export_frame_step(
     frame: Frame,
     output_dir: Union[str, Path],
     *,
+    local: bool = True,
     combined: bool = False,
     include_accessories: bool = True,
 ) -> List[Path]:
@@ -748,6 +798,13 @@ def export_frame_step(
     Args:
         frame: The frame to export.
         output_dir: Directory for the STEP files.
+        local: If True (default), each individual file is exported in that
+            part's own local coordinates (bottom at the origin). If False,
+            individual files are exported in global coordinates (their actual
+            assembled position and orientation). The optional combined file is
+            always in global coordinates regardless of this flag, since a
+            merged compound is only meaningful with parts in their real
+            positions.
         combined: If True, also write a single ``_combined.step`` containing
             all timbers as a compound shape.
         include_accessories: If True, export accessory solids. If False,
@@ -765,8 +822,7 @@ def export_frame_step(
     output_dir.mkdir(parents=True, exist_ok=True)
     written: List[Path] = []
 
-    shapes: list[TopoDS_Shape] = []
-    named_shapes: list[tuple] = []
+    named_combined_shapes: list[tuple] = []
     used_names: set[str] = set()
 
     def _next_available_name(base_name: str) -> str:
@@ -781,13 +837,17 @@ def export_frame_step(
     for i, ct in enumerate(frame.cut_timbers):
         name = _next_available_name(ct.timber.ticket.path or f"timber_{i}")
         local_csg = ct.render_timber_with_cuts_csg_local()
-        global_csg = adopt_csg(ct.timber.transform, Transform.identity(), local_csg)
-        shape = _csg_to_ocp(global_csg)
-        shapes.append(shape)
-        named_shapes.append((name, shape))
+        global_csg = (
+            adopt_csg(ct.timber.transform, Transform.identity(), local_csg)
+            if (combined or not local) else None
+        )
+        shape = _csg_to_ocp(local_csg if local else global_csg)
         dest = output_dir / f"{name}.step"
         _write_step(shape, str(dest), name=name)
         written.append(dest)
+        if combined:
+            combined_shape = shape if not local else _csg_to_ocp(global_csg)
+            named_combined_shapes.append((name, combined_shape))
 
     if include_accessories:
         for i, accessory in enumerate(frame.accessories):
@@ -803,17 +863,21 @@ def export_frame_step(
                     f"Accessory '{accessory.ticket.path}' does not define a global transform"
                 )
             local_csg = accessory.get_csg_local()
-            global_csg = adopt_csg(transform, Transform.identity(), local_csg)
-            shape = _csg_to_ocp(global_csg)
-            shapes.append(shape)
-            named_shapes.append((name, shape))
+            global_csg = (
+                adopt_csg(transform, Transform.identity(), local_csg)
+                if (combined or not local) else None
+            )
+            shape = _csg_to_ocp(local_csg if local else global_csg)
             dest = output_dir / f"{name}.step"
             _write_step(shape, str(dest), name=name)
             written.append(dest)
+            if combined:
+                combined_shape = shape if not local else _csg_to_ocp(global_csg)
+                named_combined_shapes.append((name, combined_shape))
 
-    if combined and named_shapes:
+    if combined and named_combined_shapes:
         dest = output_dir / "_combined.step"
-        _write_step_named(named_shapes, str(dest))
+        _write_step_named(named_combined_shapes, str(dest))
         written.append(dest)
 
     return written

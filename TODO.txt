@@ -214,7 +214,16 @@ DONE-add notching mode to FAT/PAT joints
   -double_angled_scribe_relief
 
   
+-do more derocative joints 
+  -polyline profile
+  -maybe support arc to?
+  -one for just removing random circles
+  -one for rounding over outside edges on boards (for butt crack table)
 
+-add right click export STL support
+-add STL mesh support shouldn't be hard :O
+  -make a cabriole leg table example 
+    -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
 
 -consider doing the big 1 joint per file reorg
   -decide how to reorg examples too...
