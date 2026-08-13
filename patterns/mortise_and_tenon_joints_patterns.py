@@ -312,7 +312,7 @@ def example_double_angled_mortise_and_tenon_with_notch_relief(position=None, use
     )
 
 
-def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None):
+def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None, notch_from=NotchFrom.Shoulder):
     """
     Mortise and tenon on plane-aligned timbers, tenon approaching at 45 degrees (in the
     XY plane), with both timbers being Timber (not the PerfectTimberWithin base) with ROUGH
@@ -322,6 +322,13 @@ def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None):
     arrangement is plane-aligned, cut_mortise_and_tenon_joint_on_plane_aligned_timbers uses
     the 2-sided notch (2 flat walls at the timbers' own rough edges, 2 flared walls) instead
     of the fully-general 4-sided one, relieving the extra rough material on both timbers.
+
+    Uses mortise_shoulder_inset=1" (a real inset), so the two notch_from styles are visibly
+    different:
+    - NotchFrom.Shoulder (default): the notch is anchored to the real, inset shoulder.
+    - NotchFrom.Face: the joint still fits at the real, inset shoulder (via the default
+      scribe-based housing cut), but the notch itself is anchored to the mortise entry
+      face instead, so it reads as starting at the timber's outer face.
     """
     from sympy import sin, cos, pi
 
@@ -378,8 +385,19 @@ def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None):
         tenon_length=inches(3),
         mortise_depth=inches(4),
         mortise_shoulder_inset=inches(1),
-        relief=ButtJointNotchReliefConfig(),
+        relief=ButtJointNotchReliefConfig(notch_from=notch_from),
     )
+
+
+def example_mortise_and_tenon_joint_plane_aligned_notched_2sided_from_face(position=None):
+    """
+    Same arrangement as example_mortise_and_tenon_joint_plane_aligned_notched_2sided, but
+    with relief=ButtJointNotchReliefConfig(notch_from=NotchFrom.Face): the joint still fits
+    at the real, inset shoulder (via the default scribe-based housing cut), but the 2-sided
+    notch relief itself is anchored to the mortise entry face instead of the real shoulder --
+    compare against the Shoulder-anchored version to see the difference.
+    """
+    return example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=position, notch_from=NotchFrom.Face)
 
 
 def example_brace_joint(position=None, use_round_timbers=False):
@@ -978,6 +996,7 @@ patterns = [
     Pattern(path="butt_joints/mortise_and_tenon/double_angled", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/double_angled_with_notch_relief", lambda_=make_pattern_from_joint(example_double_angled_mortise_and_tenon_with_notch_relief), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/joint_plane_aligned_notched_2sided", lambda_=make_pattern_from_joint(example_mortise_and_tenon_joint_plane_aligned_notched_2sided), pattern_type='frame'),
+    Pattern(path="butt_joints/mortise_and_tenon/joint_plane_aligned_notched_2sided_from_face", lambda_=make_pattern_from_joint(example_mortise_and_tenon_joint_plane_aligned_notched_2sided_from_face), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/compound_offset_parallel_shoulder", lambda_=make_pattern_from_joint(example_compound_angle_offset_parallel_shoulder), pattern_type='frame'),
     Pattern(path="butt_joints/mortise_and_tenon/brace_joint_mortise_and_tenon", lambda_=make_pattern_from_frame(example_brace_joint), pattern_type='frame'),
     Pattern(path="corner_joints/mortise_and_tenon/mortise_and_tenon_corner_joint", lambda_=make_pattern_from_joint(example_mortise_and_tenon_corner_joint), pattern_type='frame'),

@@ -91,6 +91,12 @@ class ButtJointScribeReliefConfig:
         )
 
 
+class NotchFrom(Enum):
+    """Which reference plane a ButtJointNotchReliefConfig notch is anchored to."""
+    Face = 0
+    Shoulder = 1
+
+
 @dataclass(frozen=True)
 class ButtJointNotchReliefConfig:
     """
@@ -99,8 +105,19 @@ class ButtJointNotchReliefConfig:
     Unlike ButtJointScribeReliefConfig (which scribes one timber's whole imperfect body
     onto the other), this relieves only the material near the inset shoulder using the
     4-sided frustum notch -- see chop_butt_joint_shoulder_notch_relief_4sided.
+
+    Attributes:
+        notch_from: Which plane the notch is measured from.
+            - Shoulder (default): the notch is anchored to the actual (possibly inset)
+              shoulder plane. The only value cut_mortise_and_tenon_joint itself supports.
+            - Face: only supported by cut_mortise_and_tenon_joint_on_plane_aligned_timbers
+              / _on_face_aligned_timbers. The joint is still fit at the real (inset)
+              shoulder (via the default scribe-based housing cut), but the notch relief
+              itself is anchored to the mortise entry face -- as if mortise_shoulder_inset
+              were 0 -- so it reads as starting at the timber's outer face regardless of
+              how deep the shoulder is actually inset.
     """
-    pass
+    notch_from: NotchFrom = NotchFrom.Shoulder
 
 
 @dataclass(frozen=True)

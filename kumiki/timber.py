@@ -1003,6 +1003,30 @@ class PerfectTimberWithin(ABC):
             extend_top=extend_top
         )
 
+    @final
+    def get_extended_perfect_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
+        """
+        Returns the PERFECT (finished-dimension) CSG geometry extended to infinity at
+        specified ends -- always self.get_perfect_size(), regardless of any rough/actual
+        sizing a subclass's get_extended_actual_csg_local may use instead. Unlike
+        get_extended_actual_csg_local, this is not overridden per-subclass: every timber
+        type's perfect timber within is a rectangular prism (see
+        get_perfect_timber_within_csg_local), so one implementation suffices for all of them.
+
+        Args:
+            extend_bot: If True, extend to -infinity at bottom (z=0)
+            extend_top: If True, extend to +infinity at top (z=length)
+
+        Returns:
+            CutCSG representing the extended geometry in local coordinates
+        """
+        return _create_extended_rectangular_prism(
+            size=self.get_perfect_size(),
+            length=self.length,
+            extend_bot=extend_bot,
+            extend_top=extend_top
+        )
+
     def is_face_perfect(self, face: TimberFace) -> bool:
         """
         Check if the specified face of the timber is perfect (matches the perfect timber within).
