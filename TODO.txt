@@ -197,9 +197,7 @@ DONE-remove calls to normalize_vector and zero_test switch to safe version
 DONE-someway to mke footprint show up more clearly in footprint examples? (probably just render on top of everything?)
 DONE-would be nice if you could open a pattern .py file  in kigumi viewer and have it render all the patterns...
 DONE- no ctors for noud timber, add a change timber function or something allowing you to change the timber type os you can keep using exsiting timber construction functions
-
-
--add notching mode to FAT/PAT joints
+DONE-add notching mode to FAT/PAT joints
   -NotchFromInsetShoulder (current behavior)
   -NotchFromPerefctTimberWithin (keeps scribe shoulder notching in cut_mortise_and_tenon_joint call, and then does the notching from PTW face rather than join shoulder)
 
