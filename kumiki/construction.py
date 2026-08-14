@@ -689,6 +689,13 @@ def attach_plane_aligned_timber(
 
     All measurements are taken from the perfect timber within of the original and attached timber.
 
+    ``original_timber_long_face_that_attached_timber_points_to`` chosen on the wrong side (e.g. the
+    target actually lies opposite the face's outward normal) would otherwise solve for a
+    non-positive attached timber length. Rather than failing in that case, this automatically
+    retries with the opposite long face (RIGHT<->LEFT or FRONT<->BACK) and, if that succeeds,
+    emits a warning and uses it instead. Only fails if BOTH the requested face and its opposite
+    produce a non-positive length.
+
     Returns:
         The new attached timber, plane-aligned with and positioned relative to the original timber.
     """
@@ -712,212 +719,237 @@ def attach_plane_aligned_timber(
     assert isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, (TimberLongFace, TimberCenterline)), \
         f"attached_timber_long_face_to_measure_to_for_lateral_position must be TimberLongFace or TimberCenterline, got {type(attached_timber_long_face_to_measure_to_for_lateral_position).__name__}"
 
-    # ---- orthonormal basis from the original timber's perfect-timber-within ----
-    # a = attach direction (out of the chosen long face), l = original length axis, t = lateral axis.
-    # The attached timber lives in the a-l plane; t is the shared (plane-aligned) lateral normal.
-    a = original_timber.get_face_direction_global(original_timber_long_face_that_attached_timber_points_to)
-    l = original_timber.get_length_direction_global()
-    t = cross_product(a, l)
+    def _build(points_to_face: TimberLongFace) -> Optional[Timber]:
+        """Full geometry solve for one choice of points_to_face; returns None (instead of
+        asserting) when it would produce a non-positive attached timber length, so the
+        caller can retry with the opposite face -- see the retry loop below."""
+        # ---- orthonormal basis from the original timber's perfect-timber-within ----
+        # a = attach direction (out of the chosen long face), l = original length axis, t = lateral axis.
+        # The attached timber lives in the a-l plane; t is the shared (plane-aligned) lateral normal.
+        a = original_timber.get_face_direction_global(points_to_face)
+        l = original_timber.get_length_direction_global()
+        t = cross_product(a, l)
 
-    # ---- attached timber length axis (tilted within the a-l plane) ----
-    # point_dir points out of the chosen face at attached_timber_angle from the original length; it
-    # is the direction the attached timber extends, independent of which end faces the original.
-    point_dir = cos(attached_timber_angle) * l + sin(attached_timber_angle) * a
-    if attached_timber_end_that_points_towards_original_timber == TimberEnd.BOTTOM:
-        length_dir = point_dir
-    else:  # the TOP end sits on the original-timber side, so +length points back toward it
-        length_dir = -point_dir
-    # in-plane cross-section axis: perpendicular to length_dir within the a-l plane.
-    # (reduces to +l when attached_timber_angle == pi/2, matching attach_face_aligned_timber)
-    p = sin(attached_timber_angle) * l - cos(attached_timber_angle) * a
+        # ---- attached timber length axis (tilted within the a-l plane) ----
+        # point_dir points out of the chosen face at attached_timber_angle from the original length; it
+        # is the direction the attached timber extends, independent of which end faces the original.
+        point_dir = cos(attached_timber_angle) * l + sin(attached_timber_angle) * a
+        if attached_timber_end_that_points_towards_original_timber == TimberEnd.BOTTOM:
+            length_dir = point_dir
+        else:  # the TOP end sits on the original-timber side, so +length points back toward it
+            length_dir = -point_dir
+        # in-plane cross-section axis: perpendicular to length_dir within the a-l plane.
+        # (reduces to +l when attached_timber_angle == pi/2, matching attach_face_aligned_timber)
+        p = sin(attached_timber_angle) * l - cos(attached_timber_angle) * a
 
-    # ---- derive the cross-section orientation from the named measure-to faces ----
-    # The attached timber's two cross-section axes are p (in the a-l plane) and t (lateral):
-    #   - the length-position face has its normal along p (its position is read along the length l)
-    #   - the lateral-position face has its normal along t (parallel to the original's lateral faces)
-    # A long face on RIGHT/LEFT lies on the width (X) axis; FRONT/BACK lies on the height (Y) axis,
-    # so the only decision is whether the width axis runs along p or along t.
-    def _is_width_axis(face: TimberLongFace) -> bool:
-        return face in (TimberLongFace.RIGHT, TimberLongFace.LEFT)
+        # ---- derive the cross-section orientation from the named measure-to faces ----
+        # The attached timber's two cross-section axes are p (in the a-l plane) and t (lateral):
+        #   - the length-position face has its normal along p (its position is read along the length l)
+        #   - the lateral-position face has its normal along t (parallel to the original's lateral faces)
+        # A long face on RIGHT/LEFT lies on the width (X) axis; FRONT/BACK lies on the height (Y) axis,
+        # so the only decision is whether the width axis runs along p or along t.
+        def _is_width_axis(face: TimberLongFace) -> bool:
+            return face in (TimberLongFace.RIGHT, TimberLongFace.LEFT)
 
-    width_axis_along_p: Optional[bool] = None
-    if isinstance(attached_timber_long_face_to_measure_to_for_length_position, TimberLongFace):
-        width_axis_along_p = _is_width_axis(attached_timber_long_face_to_measure_to_for_length_position)
-    if isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, TimberLongFace):
-        lateral_wants_width_along_p = not _is_width_axis(attached_timber_long_face_to_measure_to_for_lateral_position)
-        if width_axis_along_p is None:
-            width_axis_along_p = lateral_wants_width_along_p
-        else:
-            assert width_axis_along_p == lateral_wants_width_along_p, (
-                "attached_timber_long_face_to_measure_to_for_length_position and "
-                "attached_timber_long_face_to_measure_to_for_lateral_position imply conflicting cross-section "
-                "orientations (they must reference perpendicular faces of the attached timber)"
-            )
-    if width_axis_along_p is None:
-        # neither face named (both CENTERLINE): default the width axis to the in-plane (p) axis
-        width_axis_along_p = True
-
-    width_dir = p if width_axis_along_p else t
-    height_dir = safe_normalize_vector(cross_product(length_dir, width_dir))
-
-    def _attached_long_face_normal_and_half(face: TimberLongFace) -> Tuple[Direction3D, Numeric]:
-        """Outward global normal and center-to-face half size for a long face of the attached timber."""
-        if face == TimberLongFace.RIGHT:
-            return width_dir, size[0] / scalar(2)
-        elif face == TimberLongFace.LEFT:
-            return -width_dir, size[0] / scalar(2)
-        elif face == TimberLongFace.FRONT:
-            return height_dir, size[1] / scalar(2)
-        else:  # BACK
-            return -height_dir, size[1] / scalar(2)
-
-    O = original_timber.get_bottom_position_global()
-
-    # ---- length-position-axis coordinate (along l) ----
-    # Measure from the chosen end of the original timber, going into the timber.
-    end_face = original_timber_end_to_measure_from_for_length_position
-    end_l = get_center_point_on_face_global(end_face, original_timber).dot(l)
-    if end_face == TimberEnd.TOP:
-        target_l = end_l - length_position_measurement  # into the timber from the top is -l
-    else:  # BOTTOM
-        target_l = end_l + length_position_measurement  # into the timber from the bottom is +l
-    if isinstance(attached_timber_long_face_to_measure_to_for_length_position, TimberLongFace):
-        len_normal, len_half = _attached_long_face_normal_and_half(attached_timber_long_face_to_measure_to_for_length_position)
-        center_l = target_l - len_normal.dot(l) * len_half
-    else:  # CENTERLINE
-        center_l = target_l
-
-    # ---- lateral-position-axis coordinate (along t) ----
-    if isinstance(original_timber_face_to_measure_from_for_lateral_position, TimberFace):
-        orig_lat_normal = safe_normalize_vector(original_timber.get_face_direction_global(original_timber_face_to_measure_from_for_lateral_position))
-        assert are_vectors_parallel(orig_lat_normal, t), (
-            "original_timber_face_to_measure_from_for_lateral_position must be a lateral face of the original timber "
-            "(perpendicular to original_timber_long_face_that_attached_timber_points_to and to the length)"
-        )
-        from_t = get_center_point_on_face_global(original_timber_face_to_measure_from_for_lateral_position, original_timber).dot(t)
-        into_sign_t = -orig_lat_normal.dot(t)  # positive measurement goes into the original timber
-    else:  # CENTERLINE
-        from_t = O.dot(t)
-        into_sign_t = scalar(1)
-    target_t = from_t + lateral_position_measurement * into_sign_t
-    if isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, TimberLongFace):
-        lat_normal, lat_half = _attached_long_face_normal_and_half(attached_timber_long_face_to_measure_to_for_lateral_position)
-        assert are_vectors_parallel(lat_normal, t), (
-            "attached_timber_long_face_to_measure_to_for_lateral_position must be a lateral face (perpendicular to "
-            "original_timber_long_face_that_attached_timber_points_to)"
-        )
-        center_t = target_t - lat_normal.dot(t) * lat_half
-    else:  # CENTERLINE
-        center_t = target_t
-
-    # ---- resolve the timber's extent along its centerline ----
-    # Parametrize the attached centerline by s (in units of point_dir), with s = 0 where it
-    # crosses the plane through the original timber's centerline with normal a. The start end
-    # (the end that attaches to the original timber) sits at s = -opposite_length and the target
-    # end at s = attached_timber_length.
-
-    # start end: where the centerline touches the stickoutReference1 feature of the original
-    # timber, extended by stickout1 beyond it (in -point_dir).
-    if attached_timber_stickout.stickoutReference1 == StickoutReference.CENTER_LINE:
-        start_reference_s = scalar(0)
-    else:
-        sin_attach = point_dir.dot(a)  # sin(attached_timber_angle)
-        assert safe_compare(sin_attach, scalar(0), Comparison.GT), \
-            "INSIDE/OUTSIDE stickoutReference1 requires attached_timber_angle strictly between 0 and pi (the attached timber must point out of the original timber's face)"
-        # center-to-face depth of the original timber along the attach direction
-        half_depth_along_a = get_center_point_on_face_global(
-            original_timber_long_face_that_attached_timber_points_to, original_timber).dot(a) - O.dot(a)
-        if attached_timber_stickout.stickoutReference1 == StickoutReference.INSIDE:
-            start_reference_s = half_depth_along_a / sin_attach
-        else:  # OUTSIDE: the face opposite the one the attached timber points out of
-            start_reference_s = -half_depth_along_a / sin_attach
-    opposite_length = attached_timber_stickout.stickout1 - start_reference_s
-
-
-    if isinstance(attached_timber_length_or_target, PerfectTimberWithin):
-        # target end: where the centerline touches the stickoutReference2 feature of the target
-        # timber, extended by stickout2 beyond it (in +point_dir). The feature is the target's
-        # centerline -- or the near (INSIDE) / far (OUTSIDE) boundary of its silhouette --
-        # projected onto the a-l plane. Projected along t, each feature is a plane {x . m = d}
-        # with m . t == 0, so intersecting the attached centerline with the plane equals
-        # intersecting it with the projected feature.
-        target_timber = attached_timber_length_or_target
-        target_length_dir = target_timber.get_length_direction_global()
-        if are_vectors_parallel(target_length_dir, t):
-            # the target's centerline is parallel to the lateral axis, so it projects to a single
-            # *point* on the a-l plane: drop that point perpendicularly onto the attached timber's
-            # length axis, i.e. touch the plane through the target's centerline with normal
-            # point_dir (the perpendicular foot is where the centerline crosses that plane)
-            m = point_dir
-        else:
-            m = safe_normalize_vector(cross_product(target_length_dir, t))
-        crossing_rate = point_dir.dot(m)
-        d = target_timber.get_bottom_position_global().dot(m)
-        if attached_timber_stickout.stickoutReference2 != StickoutReference.CENTER_LINE:
-            assert safe_compare(crossing_rate, scalar(0), Comparison.NE), \
-                "attached timber runs parallel to the target timber's projection, so INSIDE/OUTSIDE stickoutReference2 cannot be resolved"
-            # near/far silhouette boundary: the projected centerline offset by the largest
-            # cross-section corner offset along m. For a target plane-aligned with the a-l plane
-            # this reduces to its long face planes; for a rotated target it is the projected
-            # corner-edge boundary.
-            silhouette_half_extent = (
-                target_timber.size[0] / scalar(2) * Abs(target_timber.get_width_direction_global().dot(m))
-                + target_timber.size[1] / scalar(2) * Abs(target_timber.get_height_direction_global().dot(m))
-            )
-            # INSIDE is the boundary the attached timber reaches first travelling along +point_dir
-            approaching_along_m = safe_compare(crossing_rate, scalar(0), Comparison.GT)
-            if (attached_timber_stickout.stickoutReference2 == StickoutReference.INSIDE) == approaching_along_m:
-                d = d - silhouette_half_extent
+        width_axis_along_p: Optional[bool] = None
+        if isinstance(attached_timber_long_face_to_measure_to_for_length_position, TimberLongFace):
+            width_axis_along_p = _is_width_axis(attached_timber_long_face_to_measure_to_for_length_position)
+        if isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, TimberLongFace):
+            lateral_wants_width_along_p = not _is_width_axis(attached_timber_long_face_to_measure_to_for_lateral_position)
+            if width_axis_along_p is None:
+                width_axis_along_p = lateral_wants_width_along_p
             else:
-                d = d + silhouette_half_extent
+                assert width_axis_along_p == lateral_wants_width_along_p, (
+                    "attached_timber_long_face_to_measure_to_for_length_position and "
+                    "attached_timber_long_face_to_measure_to_for_lateral_position imply conflicting cross-section "
+                    "orientations (they must reference perpendicular faces of the attached timber)"
+                )
+        if width_axis_along_p is None:
+            # neither face named (both CENTERLINE): default the width axis to the in-plane (p) axis
+            width_axis_along_p = True
 
-        # The length-position measurement pins the attached timber's *center* at (center_l,
-        # center_t), and the center sits at s = (length - opposite_length)/2, so for non-
-        # perpendicular angles the centerline's position itself depends on the length being
-        # solved for. Substituting the s = 0 point
-        #   P0 = (O.a, center_l - (length - opposite_length)/2 * cos_attach, center_t)
-        # into the touch condition (d - P0.m) / (point_dir.m) + stickout2 = length and solving
-        # the (linear) equation for length gives the closed form below.
-        cos_attach = point_dir.dot(l)
-        m_l = m.dot(l)
-        # P0.m evaluated as if length == opposite_length; the length dependence is folded into
-        # the denominator.
-        centerline_anchor_dot_m = O.dot(a) * m.dot(a) + center_l * m_l + center_t * m.dot(t)
-        denominator = crossing_rate - cos_attach * m_l / scalar(2)
-        assert safe_compare(denominator, scalar(0), Comparison.NE), \
-            "attached timber's centerline (as positioned by the length-position measurement) never crosses the target feature"
-        attached_timber_length = (
-            attached_timber_stickout.stickout2 * crossing_rate
-            + (d - centerline_anchor_dot_m)
-            - opposite_length / scalar(2) * cos_attach * m_l
-        ) / denominator
-    else:
-        attached_timber_length = attached_timber_length_or_target
-        if attached_timber_stickout.stickout2 != scalar(0) or attached_timber_stickout.stickoutReference2 != StickoutReference.CENTER_LINE:
-            warnings.warn("attached_timber_stickout.stickout2 is ignored when attached_timber_length_or_target is a numeric length; pass a target timber to use it")
+        width_dir = p if width_axis_along_p else t
+        height_dir = safe_normalize_vector(cross_product(length_dir, width_dir))
 
-    attached_total_length = attached_timber_length + opposite_length
-    assert safe_compare(attached_total_length, scalar(0), Comparison.GT), \
-        "attached timber total length (attached_timber_length + opposite length from stickout1) must be positive"
+        def _attached_long_face_normal_and_half(face: TimberLongFace) -> Tuple[Direction3D, Numeric]:
+            """Outward global normal and center-to-face half size for a long face of the attached timber."""
+            if face == TimberLongFace.RIGHT:
+                return width_dir, size[0] / scalar(2)
+            elif face == TimberLongFace.LEFT:
+                return -width_dir, size[0] / scalar(2)
+            elif face == TimberLongFace.FRONT:
+                return height_dir, size[1] / scalar(2)
+            else:  # BACK
+                return -height_dir, size[1] / scalar(2)
 
-    # ---- attach-axis coordinate of the attached timber's center ----
-    # The timber extends from s = -opposite_length to s = attached_timber_length along point_dir,
-    # so the center's a-coordinate shifts by (length - opposite)/2 times the a-component of point_dir.
-    center_a = O.dot(a) + (attached_timber_length - opposite_length) / scalar(2) * point_dir.dot(a)
+        O = original_timber.get_bottom_position_global()
 
-    # ---- reconstruct the center in global coordinates and build the timber ----
-    # (a, l, t) is an orthonormal basis, so a global point equals the sum of its coords times the axes.
-    center = center_a * a + center_l * l + center_t * t
-    bottom_position = center - length_dir * (attached_total_length / scalar(2))
+        # ---- length-position-axis coordinate (along l) ----
+        # Measure from the chosen end of the original timber, going into the timber.
+        end_face = original_timber_end_to_measure_from_for_length_position
+        end_l = get_center_point_on_face_global(end_face, original_timber).dot(l)
+        if end_face == TimberEnd.TOP:
+            target_l = end_l - length_position_measurement  # into the timber from the top is -l
+        else:  # BOTTOM
+            target_l = end_l + length_position_measurement  # into the timber from the bottom is +l
+        if isinstance(attached_timber_long_face_to_measure_to_for_length_position, TimberLongFace):
+            len_normal, len_half = _attached_long_face_normal_and_half(attached_timber_long_face_to_measure_to_for_length_position)
+            center_l = target_l - len_normal.dot(l) * len_half
+        else:  # CENTERLINE
+            center_l = target_l
 
-    return create_timber(
-        bottom_position=bottom_position,
-        length=attached_total_length,
-        size=size,
-        length_direction=length_dir,
-        width_direction=width_dir,
-        ticket=ticket,
+        # ---- lateral-position-axis coordinate (along t) ----
+        if isinstance(original_timber_face_to_measure_from_for_lateral_position, TimberFace):
+            orig_lat_normal = safe_normalize_vector(original_timber.get_face_direction_global(original_timber_face_to_measure_from_for_lateral_position))
+            assert are_vectors_parallel(orig_lat_normal, t), (
+                "original_timber_face_to_measure_from_for_lateral_position must be a lateral face of the original timber "
+                "(perpendicular to original_timber_long_face_that_attached_timber_points_to and to the length)"
+            )
+            from_t = get_center_point_on_face_global(original_timber_face_to_measure_from_for_lateral_position, original_timber).dot(t)
+            into_sign_t = -orig_lat_normal.dot(t)  # positive measurement goes into the original timber
+        else:  # CENTERLINE
+            from_t = O.dot(t)
+            into_sign_t = scalar(1)
+        target_t = from_t + lateral_position_measurement * into_sign_t
+        if isinstance(attached_timber_long_face_to_measure_to_for_lateral_position, TimberLongFace):
+            lat_normal, lat_half = _attached_long_face_normal_and_half(attached_timber_long_face_to_measure_to_for_lateral_position)
+            assert are_vectors_parallel(lat_normal, t), (
+                "attached_timber_long_face_to_measure_to_for_lateral_position must be a lateral face (perpendicular to "
+                "original_timber_long_face_that_attached_timber_points_to)"
+            )
+            center_t = target_t - lat_normal.dot(t) * lat_half
+        else:  # CENTERLINE
+            center_t = target_t
+
+        # ---- resolve the timber's extent along its centerline ----
+        # Parametrize the attached centerline by s (in units of point_dir), with s = 0 where it
+        # crosses the plane through the original timber's centerline with normal a. The start end
+        # (the end that attaches to the original timber) sits at s = -opposite_length and the target
+        # end at s = attached_timber_length.
+
+        # start end: where the centerline touches the stickoutReference1 feature of the original
+        # timber, extended by stickout1 beyond it (in -point_dir).
+        if attached_timber_stickout.stickoutReference1 == StickoutReference.CENTER_LINE:
+            start_reference_s = scalar(0)
+        else:
+            sin_attach = point_dir.dot(a)  # sin(attached_timber_angle)
+            assert safe_compare(sin_attach, scalar(0), Comparison.GT), \
+                "INSIDE/OUTSIDE stickoutReference1 requires attached_timber_angle strictly between 0 and pi (the attached timber must point out of the original timber's face)"
+            # center-to-face depth of the original timber along the attach direction
+            half_depth_along_a = get_center_point_on_face_global(
+                points_to_face, original_timber).dot(a) - O.dot(a)
+            if attached_timber_stickout.stickoutReference1 == StickoutReference.INSIDE:
+                start_reference_s = half_depth_along_a / sin_attach
+            else:  # OUTSIDE: the face opposite the one the attached timber points out of
+                start_reference_s = -half_depth_along_a / sin_attach
+        opposite_length = attached_timber_stickout.stickout1 - start_reference_s
+
+
+        if isinstance(attached_timber_length_or_target, PerfectTimberWithin):
+            # target end: where the centerline touches the stickoutReference2 feature of the target
+            # timber, extended by stickout2 beyond it (in +point_dir). The feature is the target's
+            # centerline -- or the near (INSIDE) / far (OUTSIDE) boundary of its silhouette --
+            # projected onto the a-l plane. Projected along t, each feature is a plane {x . m = d}
+            # with m . t == 0, so intersecting the attached centerline with the plane equals
+            # intersecting it with the projected feature.
+            target_timber = attached_timber_length_or_target
+            target_length_dir = target_timber.get_length_direction_global()
+            if are_vectors_parallel(target_length_dir, t):
+                # the target's centerline is parallel to the lateral axis, so it projects to a single
+                # *point* on the a-l plane: drop that point perpendicularly onto the attached timber's
+                # length axis, i.e. touch the plane through the target's centerline with normal
+                # point_dir (the perpendicular foot is where the centerline crosses that plane)
+                m = point_dir
+            else:
+                m = safe_normalize_vector(cross_product(target_length_dir, t))
+            crossing_rate = point_dir.dot(m)
+            d = target_timber.get_bottom_position_global().dot(m)
+            if attached_timber_stickout.stickoutReference2 != StickoutReference.CENTER_LINE:
+                assert safe_compare(crossing_rate, scalar(0), Comparison.NE), \
+                    "attached timber runs parallel to the target timber's projection, so INSIDE/OUTSIDE stickoutReference2 cannot be resolved"
+                # near/far silhouette boundary: the projected centerline offset by the largest
+                # cross-section corner offset along m. For a target plane-aligned with the a-l plane
+                # this reduces to its long face planes; for a rotated target it is the projected
+                # corner-edge boundary.
+                silhouette_half_extent = (
+                    target_timber.size[0] / scalar(2) * Abs(target_timber.get_width_direction_global().dot(m))
+                    + target_timber.size[1] / scalar(2) * Abs(target_timber.get_height_direction_global().dot(m))
+                )
+                # INSIDE is the boundary the attached timber reaches first travelling along +point_dir
+                approaching_along_m = safe_compare(crossing_rate, scalar(0), Comparison.GT)
+                if (attached_timber_stickout.stickoutReference2 == StickoutReference.INSIDE) == approaching_along_m:
+                    d = d - silhouette_half_extent
+                else:
+                    d = d + silhouette_half_extent
+
+            # The length-position measurement pins the attached timber's *center* at (center_l,
+            # center_t), and the center sits at s = (length - opposite_length)/2, so for non-
+            # perpendicular angles the centerline's position itself depends on the length being
+            # solved for. Substituting the s = 0 point
+            #   P0 = (O.a, center_l - (length - opposite_length)/2 * cos_attach, center_t)
+            # into the touch condition (d - P0.m) / (point_dir.m) + stickout2 = length and solving
+            # the (linear) equation for length gives the closed form below.
+            cos_attach = point_dir.dot(l)
+            m_l = m.dot(l)
+            # P0.m evaluated as if length == opposite_length; the length dependence is folded into
+            # the denominator.
+            centerline_anchor_dot_m = O.dot(a) * m.dot(a) + center_l * m_l + center_t * m.dot(t)
+            denominator = crossing_rate - cos_attach * m_l / scalar(2)
+            assert safe_compare(denominator, scalar(0), Comparison.NE), \
+                "attached timber's centerline (as positioned by the length-position measurement) never crosses the target feature"
+            attached_timber_length = (
+                attached_timber_stickout.stickout2 * crossing_rate
+                + (d - centerline_anchor_dot_m)
+                - opposite_length / scalar(2) * cos_attach * m_l
+            ) / denominator
+        else:
+            attached_timber_length = attached_timber_length_or_target
+            if attached_timber_stickout.stickout2 != scalar(0) or attached_timber_stickout.stickoutReference2 != StickoutReference.CENTER_LINE:
+                warnings.warn("attached_timber_stickout.stickout2 is ignored when attached_timber_length_or_target is a numeric length; pass a target timber to use it")
+
+        attached_total_length = attached_timber_length + opposite_length
+        if not safe_compare(attached_total_length, scalar(0), Comparison.GT):
+            return None
+
+        # ---- attach-axis coordinate of the attached timber's center ----
+        # The timber extends from s = -opposite_length to s = attached_timber_length along point_dir,
+        # so the center's a-coordinate shifts by (length - opposite)/2 times the a-component of point_dir.
+        center_a = O.dot(a) + (attached_timber_length - opposite_length) / scalar(2) * point_dir.dot(a)
+
+        # ---- reconstruct the center in global coordinates and build the timber ----
+        # (a, l, t) is an orthonormal basis, so a global point equals the sum of its coords times the axes.
+        center = center_a * a + center_l * l + center_t * t
+        bottom_position = center - length_dir * (attached_total_length / scalar(2))
+
+        return create_timber(
+            bottom_position=bottom_position,
+            length=attached_total_length,
+            size=size,
+            length_direction=length_dir,
+            width_direction=width_dir,
+            ticket=ticket,
+        )
+
+    # ---- try the requested face; if it would produce a non-positive length (the target lies
+    # on the opposite side of the original timber from the requested face), silently retry with
+    # the opposite long face instead of failing -- see _build's docstring. ----
+    result = _build(original_timber_long_face_that_attached_timber_points_to)
+    if result is None:
+        opposite_face = original_timber_long_face_that_attached_timber_points_to.to.face().get_opposite_face().to.long_face()
+        result = _build(opposite_face)
+        if result is not None:
+            warnings.warn(
+                "attach_plane_aligned_timber: original_timber_long_face_that_attached_timber_points_to="
+                f"{original_timber_long_face_that_attached_timber_points_to.name} would have produced a "
+                "non-positive attached timber length (the target lies on the opposite side of the original "
+                f"timber); used {opposite_face.name} instead.",
+                stacklevel=2,
+            )
+    assert result is not None, (
+        "attached timber total length (attached_timber_length + opposite length from stickout1) must be "
+        "positive for original_timber_long_face_that_attached_timber_points_to or its opposite face"
     )
+    return result
 
 def attach_face_aligned_timber(
     original_timber: TimberLike,
@@ -948,7 +980,9 @@ def attach_face_aligned_timber(
     The attached timber's length axis runs along the normal of
     ``original_timber_long_face_that_attached_timber_points_to`` (the face it "points to" / sticks
     out of). ``attached_timber_end_that_points_towards_original_timber`` chooses which end
-    (TOP/BOTTOM) of the attached timber sits on the original-timber side;
+    (TOP/BOTTOM) of the attached timber sits on the original-timber side. If the chosen face turns
+    out to be on the wrong side of the target, this automatically retries with its opposite long
+    face instead of failing -- see :func:`attach_plane_aligned_timber`.
 
     The attached timber's height and width axis orientation are determined by:
     - attached_timber_long_face_to_measure_to_for_lateral_position
