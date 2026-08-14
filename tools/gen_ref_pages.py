@@ -86,18 +86,40 @@ def _display_name(module_leaf: str) -> str:
     return DISPLAY_NAMES.get(module_leaf, module_leaf.replace("_", " ").title())
 
 
-def _first_public_symbol(dotted_module: str) -> str | None:
-    """Name of the first top-level, non-underscore class/function defined in
-    a module -- used only to give the "flat import path" note a real,
-    correct example instead of (incorrectly) the module's own filename."""
+def _locally_defined_public_names(dotted_module: str) -> list[str]:
+    """Names of top-level classes, functions, and constant assignments actually DEFINED in
+    this module's own source -- as opposed to merely imported into it (e.g. via
+    `from .x import *`) and thereby re-exported through its flat namespace.
+
+    Needed because griffe's `Object.is_public` doesn't (yet -- see its own docstring/TODO)
+    treat wildcard-imported names as non-public, so without an explicit `members:` list,
+    mkdocstrings would also render everything each module's own `from .x import *`
+    statements pull in onto ITS reference page (e.g. kumiki/timber.py's page would also
+    list every name kumiki/rule.py's `from .rule import *` brings into scope there).
+    Explicit `from .x import a, b` imports are already correctly excluded by mkdocstrings'
+    `filters: public` option; this only needs to handle the wildcard case.
+
+    Returns [] if the module file can't be found (mkdocstrings then falls back to its own
+    default member selection).
+    """
     module_path = (REPO_ROOT / "kumiki" / Path(*dotted_module.split("."))).with_suffix(".py")
     if not module_path.exists():
-        return None
+        return []
     tree = ast.parse(module_path.read_text(), filename=str(module_path))
+    names: list[str] = []
     for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and not node.name.startswith("_"):
-            return node.name
-    return None
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            if not node.name.startswith("_"):
+                names.append(node.name)
+        elif isinstance(node, ast.Assign):
+            names.extend(
+                target.id for target in node.targets
+                if isinstance(target, ast.Name) and not target.id.startswith("_")
+            )
+        elif isinstance(node, ast.AnnAssign) and isinstance(node.target, ast.Name):
+            if not node.target.id.startswith("_"):
+                names.append(node.target.id)
+    return names
 
 
 def _iter_public_imports():
@@ -128,16 +150,17 @@ def _write_page(dotted_module: str, only_members: list[str] | None) -> str:
     doc_path = REFERENCE_ROOT / Path(*parts).with_suffix(".md")
 
     full_ident = f"kumiki.{dotted_module}"
-    example_name = only_members[0] if only_members else (_first_public_symbol(dotted_module) or parts[-1])
+    members = only_members if only_members is not None else _locally_defined_public_names(dotted_module)
+    example_name = members[0] if members else parts[-1]
 
     with mkdocs_gen_files.open(doc_path, "w") as fd:
         fd.write(f"# `{full_ident}`\n\n")
         fd.write(NOTE_TEMPLATE.format(example=example_name) + "\n")
         fd.write(f"::: {full_ident}\n")
-        if only_members:
+        if members:
             fd.write("    options:\n")
             fd.write("      members:\n")
-            for name in only_members:
+            for name in members:
                 fd.write(f"        - {name}\n")
 
     return doc_path.relative_to(REFERENCE_ROOT).as_posix()
