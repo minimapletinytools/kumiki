@@ -294,11 +294,13 @@ def prism_to_mesh(prism: Any) -> Dict[str, Any]:
     ]
 
     # 12 triangles with outward-facing CCW normals (verified via cross-product)
+    # Face naming matches kumiki.timber.TimberFace: RIGHT=+X, FRONT=+Y, LEFT=-X, BACK=-Y
+    # (see RectangularPrismFeature.test_point in kumiki/cutcsg.py).
     indices = [
         0, 2, 1,   0, 3, 2,  # bottom (-Z face)
         4, 5, 6,   4, 6, 7,  # top    (+Z face)
-        0, 1, 5,   0, 5, 4,  # front  (-Y face)
-        3, 7, 6,   3, 6, 2,  # back   (+Y face)
+        0, 1, 5,   0, 5, 4,  # back   (-Y face)
+        3, 7, 6,   3, 6, 2,  # front  (+Y face)
         3, 0, 4,   3, 4, 7,  # left   (-X face)
         1, 2, 6,   1, 6, 5,  # right  (+X face)
     ]
@@ -1664,8 +1666,8 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
         candidates: List[Tuple[str, float]] = []
         candidates.append(("left", abs(lp[0] + hw)))
         candidates.append(("right", abs(lp[0] - hw)))
-        candidates.append(("front", abs(lp[1] + hh)))
-        candidates.append(("back", abs(lp[1] - hh)))
+        candidates.append(("front", abs(lp[1] - hh)))
+        candidates.append(("back", abs(lp[1] + hh)))
         if z0 is not None:
             candidates.append(("bottom", abs(lp[2] - z0)))
         if z1 is not None:
