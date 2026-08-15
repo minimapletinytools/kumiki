@@ -596,62 +596,6 @@ def _create_dovetail_debug_arrangement() -> ButtJointTimberArrangement:
         front_face_on_butt_timber=TimberLongFace.RIGHT,
     )
 
-
-def example_dovetail_shoulder_geometry_raw():
-    """Raw global CSG output of build_dovetail_shoulder_geometery."""
-    arrangement = _create_dovetail_debug_arrangement()
-    shoulder_result = compute_butt_joint_shoulder(
-        arrangement=arrangement,
-        distance_from_centerline=inches(1),
-        up_direction=arrangement.butt_timber.get_height_direction_global(),
-    )
-    return build_dovetail_shoulder_geometery(
-        arrangement=arrangement,
-        shoulder_result=shoulder_result,
-        dovetail_depth=inches(3),
-    )
-
-
-def example_dovetail_tenon_geometry_raw():
-    """Raw CSG output of dovetail_tenon_geometry (tenon + mortise shapes)."""
-    arrangement = _create_dovetail_debug_arrangement()
-    shoulder_result = compute_butt_joint_shoulder(
-        arrangement=arrangement,
-        distance_from_centerline=inches(1),
-        up_direction=arrangement.butt_timber.get_height_direction_global(),
-    )
-    geo = dovetail_tenon_geometry(
-        arrangement=arrangement,
-        shoulder_result=shoulder_result,
-        dovetail_top_side_on_butt_timber=TimberLongFace.RIGHT,
-        tenon_size=Matrix([inches(2), inches(2)]),
-        tenon_depth=inches(5),
-        dovetail_depth=inches(1),
-        tenon_lateral_offset=scalar(0),
-        receiving_timber_mortise_extra_depth=inches(1, 2),
-        wedge_accessory_parameters = DovetailTenonWedgeAccessoryParameters(
-            #wedge_from_receiving_timber_side: bool = False
-            #wedge_angle: Numeric = degrees(10)
-            #wedge_small_height: Optional[Numeric] = None
-            # the wedge length without stickout is just tenon_depth
-            # this one can actually be negative which you'll want to do if the tenon is not a through tenon
-            #wedge_tip_stickout: Numeric = 0
-            #wedge_back_extra_length: Numeric = 0
-        )
-    )
-
-    # Render both shapes side-by-side for easier visual inspection.
-    tenon_offset = Transform(position=Matrix([0, 0, 0]), orientation=Orientation.identity())
-    mortise_offset = Transform(position=Matrix([inches(8), 0, 0]), orientation=Orientation.identity())
-    wedge_offset = Transform(position=Matrix([inches(16), 0, 0]), orientation=Orientation.identity())
-
-    tenon_shifted = adopt_csg(None, tenon_offset, geo.tenon_negative_csg)
-    mortise_shifted = adopt_csg(None, mortise_offset, geo.mortise_negative_csg)
-    wedge_shifted = adopt_csg(None, wedge_offset, geo.wedge_accessory_csg)
-    #return SolidUnion(children=[tenon_shifted, mortise_shifted])
-    return SolidUnion(children=[mortise_shifted])
-
-
 # Dictionary for easy example selection
 EXAMPLES = {
     'cube_cutout': {
@@ -708,16 +652,6 @@ EXAMPLES = {
         'name': 'Raw Shoulder Notch CSG (45° walls)',
         'description': 'Direct CSG output from chop_shoulder_notch_on_timber_face with 45° angled walls',
         'function': example_chop_shoulder_notch_on_timber_face_raw
-    },
-    'dovetail_shoulder_geometry_raw': {
-        'name': 'Raw Dovetail Shoulder Geometry CSG',
-        'description': 'Direct CSG output from build_dovetail_shoulder_geometery',
-        'function': example_dovetail_shoulder_geometry_raw
-    },
-    'dovetail_tenon_geometry_raw': {
-        'name': 'Raw Dovetail Tenon Geometry CSG',
-        'description': 'Direct CSG output from dovetail_tenon_geometry (tenon + mortise, offset side-by-side)',
-        'function': example_dovetail_tenon_geometry_raw
     }
 }
 
