@@ -1058,6 +1058,7 @@ class KigumiViewerApp extends LitElement {
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
         this.isOrthographic = false;
+        this.contextMenuState = null; // { memberKey, x, y } | null
         this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
         this.assemblyData = null;
@@ -1150,6 +1151,8 @@ class KigumiViewerApp extends LitElement {
         this.onWindowKeyDown = this.onWindowKeyDown.bind(this);
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
         this.onLayerStateSync = this.onLayerStateSync.bind(this);
+        this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
+        this.onWindowContextMenuDismiss = this.onWindowContextMenuDismiss.bind(this);
     }
 
     createRenderRoot() {
@@ -1206,6 +1209,7 @@ class KigumiViewerApp extends LitElement {
                 <div id="debug"></div>
                 <div id="hint">${navigationHint}</div>
                 ${this.renderAssemblyTimeline()}
+                ${this.renderMemberContextMenu()}
             </div>
             <div id="top-controls">
                 ${this.settingsPanel.render()}
@@ -1307,6 +1311,7 @@ class KigumiViewerApp extends LitElement {
         if (this._layersView) {
             this._layersView.addEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.addEventListener('layer-state-sync', this.onLayerStateSync);
+            this._layersView.addEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
         }
         // Layers tree (and any background assembly solve) data arrives
         // unprompted, pushed by the extension host once it's actually ready
@@ -1322,6 +1327,7 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('scroll', this.onWindowScroll);
         window.removeEventListener('mouseup', this.onWindowMouseUp);
         window.removeEventListener('mousemove', this.onWindowMouseMove);
+        window.removeEventListener('mousedown', this.onWindowContextMenuDismiss);
         window.removeEventListener('resize', this.onWindowResize);
         window.removeEventListener('keydown', this.onWindowKeyDown);
         window.removeEventListener('pointermove', this.onGizmoPointerMove);
@@ -1335,6 +1341,7 @@ class KigumiViewerApp extends LitElement {
         if (this._layersView) {
             this._layersView.removeEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.removeEventListener('layer-state-sync', this.onLayerStateSync);
+            this._layersView.removeEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
         }
         if (this.gizmoRenderer) {
             this.gizmoRenderer.dispose();
@@ -1539,6 +1546,7 @@ class KigumiViewerApp extends LitElement {
         window.addEventListener('scroll', this.onWindowScroll);
         window.addEventListener('mouseup', this.onWindowMouseUp);
         window.addEventListener('mousemove', this.onWindowMouseMove);
+        window.addEventListener('mousedown', this.onWindowContextMenuDismiss);
         window.addEventListener('pointermove', this.onGizmoPointerMove);
         window.addEventListener('pointerup', this.onGizmoPointerUp);
         window.addEventListener('pointermove', this.onLightDialPointerMove);
@@ -2336,6 +2344,22 @@ class KigumiViewerApp extends LitElement {
             && !mouseActionMoved
         ) {
             this.handleCanvasClick(event);
+            return;
+        }
+        // Right button released without dragging (mousedown always starts an 'orbit'
+        // drag for button 2 -- see the canvas mousedown handler -- so this is the only
+        // way to tell a right-click from a right-drag-to-orbit): open the context menu
+        // for whatever member is under the cursor, if any.
+        if (
+            activeMouseAction === 'orbit'
+            && mouseDownButton === 2
+            && mouseDownTarget === canvas
+            && !mouseActionMoved
+        ) {
+            const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
+            if (found) {
+                this.showMemberContextMenu(found.memberKey, event.clientX, event.clientY);
+            }
         }
     }
 
@@ -2368,7 +2392,9 @@ class KigumiViewerApp extends LitElement {
         }
         if (event.key === 'Escape') {
             event.preventDefault();
-            if (this.selectionManager.csgSelection) {
+            if (this.contextMenuState) {
+                this.closeMemberContextMenu();
+            } else if (this.selectionManager.csgSelection) {
                 this.selectionManager.clearCSGSelection();
                 this.removeCSGHighlight();
             } else {
@@ -2406,21 +2432,24 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    handleCanvasClick(event) {
+    // Raycasts from a client (screen) point into the scene and returns the closest
+    // visible, unlocked member hit, or null. Shared by left-click selection and the
+    // right-click context menu so both use identical hit-testing.
+    _findMemberAtClientPoint(clientX, clientY) {
         const canvas = this.renderRoot.querySelector('#c');
-        if (!canvas || !event) {
-            return;
+        if (!canvas) {
+            return null;
         }
         const rect = canvas.getBoundingClientRect();
         if (
-            event.clientX < rect.left || event.clientX > rect.right ||
-            event.clientY < rect.top || event.clientY > rect.bottom
+            clientX < rect.left || clientX > rect.right ||
+            clientY < rect.top || clientY > rect.bottom
         ) {
-            return;
+            return null;
         }
 
-        const normalizedX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        const normalizedY = -(((event.clientY - rect.top) / rect.height) * 2 - 1);
+        const normalizedX = ((clientX - rect.left) / rect.width) * 2 - 1;
+        const normalizedY = -(((clientY - rect.top) / rect.height) * 2 - 1);
 
         this.navigationPointer.set(normalizedX, normalizedY);
         this.navigationRaycaster.setFromCamera(this.navigationPointer, this.camera);
@@ -2433,8 +2462,25 @@ class KigumiViewerApp extends LitElement {
             targetMeshes.push(bundle.mesh);
         }
         const intersects = this.navigationRaycaster.intersectObjects(targetMeshes, false);
-
         if (intersects.length === 0) {
+            return null;
+        }
+
+        const hit = intersects[0];
+        const memberKey = this.meshKeyMap.get(hit.object);
+        if (!memberKey) {
+            return null;
+        }
+        return { memberKey, hit };
+    }
+
+    handleCanvasClick(event) {
+        if (!event) {
+            return;
+        }
+        const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
+
+        if (!found) {
             this.selectionManager.clearLayerSelection();
             this.selectionManager.clearCSGSelection();
             this.removeCSGHighlight();
@@ -2442,16 +2488,8 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        // When a single timber is selected, find its hit among all intersects
-        // (it may be behind unselected timbers). Otherwise use the closest hit.
-        let hit = intersects[0];
-        let memberKey = this.meshKeyMap.get(hit.object);
-
+        const { memberKey, hit } = found;
         this.selectionManager.clearLayerSelection();
-
-        if (!memberKey) {
-            return;
-        }
 
         if (event.shiftKey) {
             this.selectionManager.clearCSGSelection();
@@ -2480,6 +2518,55 @@ class KigumiViewerApp extends LitElement {
         this.emitViewerLog('selection-changed', {
             selectedTimbers: this.selectionManager.getSelectedTimbers(),
         });
+    }
+
+    // ------------------------------------------------------------------
+    // Member context menu (right-click on a timber, in 3D space or the timber list)
+    // ------------------------------------------------------------------
+
+    onMemberContextMenuRequest(event) {
+        const detail = event && event.detail;
+        if (!detail || typeof detail.memberKey !== 'string') {
+            return;
+        }
+        this.showMemberContextMenu(detail.memberKey, detail.clientX, detail.clientY);
+    }
+
+    showMemberContextMenu(memberKey, clientX, clientY) {
+        if (!memberKey) {
+            return;
+        }
+        this.contextMenuState = { memberKey, x: clientX, y: clientY };
+        this.requestUpdate();
+    }
+
+    closeMemberContextMenu() {
+        if (!this.contextMenuState) {
+            return;
+        }
+        this.contextMenuState = null;
+        this.requestUpdate();
+    }
+
+    onWindowContextMenuDismiss(event) {
+        if (!this.contextMenuState) {
+            return;
+        }
+        const menuEl = this.renderRoot.querySelector('#member-context-menu');
+        if (menuEl && event.target && menuEl.contains(event.target)) {
+            return;
+        }
+        this.closeMemberContextMenu();
+    }
+
+    exportMember(memberKey, format) {
+        this.closeMemberContextMenu();
+        if (!memberKey || (format !== 'stl' && format !== 'step')) {
+            return;
+        }
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({ type: 'requestExportMember', memberKey, format });
+        }
     }
 
     handleCSGSelectionResult(message) {
@@ -3198,6 +3285,50 @@ class KigumiViewerApp extends LitElement {
         this.querySelectorAll('.assembly-timeline-mark[data-left]').forEach((mark) => {
             mark.style.left = `${mark.dataset.left}%`;
         });
+        // Positioned via JS rather than a lit `style="..."` attribute binding: the webview's
+        // CSP (style-src, no 'unsafe-inline') silently drops inline style attributes, but
+        // script-driven element.style assignment is unaffected -- same reason the assembly
+        // timeline marks above are positioned this way instead.
+        const menu = this.querySelector('#member-context-menu');
+        if (menu) {
+            const x = Number(menu.dataset.x);
+            const y = Number(menu.dataset.y);
+            const maxLeft = Math.max(0, window.innerWidth - menu.offsetWidth - 4);
+            const maxTop = Math.max(0, window.innerHeight - menu.offsetHeight - 4);
+            menu.style.left = `${Math.min(Math.max(0, x), maxLeft)}px`;
+            menu.style.top = `${Math.min(Math.max(0, y), maxTop)}px`;
+        }
+    }
+
+    renderMemberContextMenu() {
+        const state = this.contextMenuState;
+        if (!state) {
+            return '';
+        }
+        const meta = this.memberMetadataByKey.get(state.memberKey);
+        const displayName = (meta && meta.name) || state.memberKey;
+        return html`
+            <div
+                id="member-context-menu"
+                class="context-menu"
+                data-x=${state.x}
+                data-y=${state.y}
+                @mousedown=${(event) => event.stopPropagation()}
+                @contextmenu=${(event) => event.preventDefault()}
+            >
+                <div class="context-menu-title">${displayName}</div>
+                <button
+                    type="button"
+                    class="context-menu-item"
+                    @click=${() => this.exportMember(state.memberKey, 'stl')}
+                >${t('viewer.contextMenu.exportStl')}</button>
+                <button
+                    type="button"
+                    class="context-menu-item"
+                    @click=${() => this.exportMember(state.memberKey, 'step')}
+                >${t('viewer.contextMenu.exportStep')}</button>
+            </div>
+        `;
     }
 
     renderAssemblyTimeline() {

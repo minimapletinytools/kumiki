@@ -204,6 +204,18 @@
             row.dataset.nodeId = nodeId;
             if (memberKey) row.dataset.memberKey = memberKey;
 
+            if (memberKey && rowType === 'timber') {
+                row.addEventListener('contextmenu', (event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    row.dispatchEvent(new CustomEvent('kigumi-member-contextmenu', {
+                        detail: { memberKey, clientX: event.clientX, clientY: event.clientY },
+                        bubbles: true,
+                        composed: true,
+                    }));
+                });
+            }
+
             // Chevron / expand control
             const chev = document.createElement('span');
             chev.className = 'lp-chev' + (hasChildren ? ' lp-has-children' : ' lp-leaf');

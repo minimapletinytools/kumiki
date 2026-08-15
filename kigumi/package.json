@@ -1,7 +1,7 @@
 {
   "name": "kigumi",
   "displayName": "Kigumi",
-  "description": "Kiguim is a viewer tool for Kumiki designs",
+  "description": "Kigumi is a viewer tool for kumiki designs",
   "version": "0.4.6",
   "publisher": "minimaple",
   "license": "MPL-2.0",
@@ -48,7 +48,7 @@
       "kigumi": [
         {
           "id": "kigumi.explorer",
-          "name": "Kigumi Explorer 🦊",
+          "name": "Kigumi Explorer 🦝",
           "icon": "templogo.png"
         }
       ]

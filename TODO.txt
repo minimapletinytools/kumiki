@@ -204,8 +204,18 @@ DONE-add notching mode to FAT/PAT joints
 DONE-attach timber bugs
   DONE-lengt bug
   DONE-# TODO BUG alignig BACK face rather than FRONT???
-  
 
+DONE-add right click export STL support
+
+
+
+
+-consider making sidebar refresh for new files automatic
+
+-rough/perfect timber within bounding box rendering
+  -rename actual to rough (actualy geometry)
+  -perfect box
+  -rough box
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 
 
@@ -228,7 +238,7 @@ DONE-attach timber bugs
   -one for just removing random circles
   -one for rounding over outside edges on boards (for butt crack table)
 
--add right click export STL support
+
 -add STL mesh support shouldn't be hard :O
   -make a cabriole leg table example 
     -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)

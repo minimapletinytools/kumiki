@@ -347,6 +347,12 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'requestExportMember') {
+                this._handleExportMemberRequest(message).catch((err) => {
+                    this.log(`[export] requestExportMember error: ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestInstallCadqueryOcp') {
                 this._handleInstallCadqueryOcp().catch((err) => {
                     this.log(`[export] requestInstallCadqueryOcp error: ${err.message || err}`);
@@ -1110,6 +1116,57 @@ class FrameViewSession {
             void vscode.window.showWarningMessage(`${summary}. Failed: ${failedFormats.join(', ')}`);
         } else {
             void vscode.window.showInformationMessage(summary);
+        }
+    }
+
+    async _handleExportMemberRequest(message) {
+        const memberKey = (message && typeof message.memberKey === 'string') ? message.memberKey : '';
+        const format = (message && typeof message.format === 'string') ? message.format.toLowerCase() : '';
+
+        // memberKey/format always come from the context-menu UI (hardcoded 'stl'/'step'
+        // buttons plus whichever member was right-clicked), so a malformed message here
+        // indicates a webview bug, not a user mistake -- log rather than prompt.
+        if (!memberKey || (format !== 'stl' && format !== 'step')) {
+            this.log(`[export] requestExportMember ignored malformed message: ${JSON.stringify(message)}`);
+            return;
+        }
+
+        if (!this.runnerSession) {
+            return;
+        }
+        await this.ensureRunnerSession();
+
+        const outputDir = this.getExportDirectory();
+        fs.mkdirSync(outputDir, { recursive: true });
+
+        const formatLabel = format.toUpperCase();
+        try {
+            const result = await this.runnerSession.slotRequest('export_member', this.slotName, {
+                memberKey,
+                format,
+                outputDir,
+            });
+            const writtenFiles = Array.isArray(result && result.files) ? result.files : [];
+            const summary = `Kigumi exported ${formatLabel} for '${memberKey}' to ${writtenFiles[0] || outputDir}`;
+            this.log(`[export] ${summary}`);
+            void vscode.window.showInformationMessage(summary);
+            return { format, memberKey, writtenFiles, outputDir };
+        } catch (error) {
+            const details = this.extractRunnerErrorDetails(error);
+            this.log(`[export] ${formatLabel} export of '${memberKey}' failed: ${details.message}`);
+
+            const openOutputAction = t('message.action.openKigumiOutput');
+            const installHint = format === 'step' && details.message.includes('cadquery-ocp')
+                ? ' Install STEP support with: pip install cadquery-ocp'
+                : '';
+            const choice = await vscode.window.showErrorMessage(
+                `Kigumi ${formatLabel} export of '${memberKey}' failed: ${details.message}${installHint}`,
+                openOutputAction
+            );
+            if (choice === openOutputAction) {
+                this.channel.show(true);
+            }
+            throw error;
         }
     }
 

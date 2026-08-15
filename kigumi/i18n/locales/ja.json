@@ -81,6 +81,8 @@
   "viewer.chrome.gizmo.projectionMode.perspective": "透視投影",
   "viewer.chrome.gizmo.projectionMode.orthographic": "平行投影",
   "viewer.chrome.gizmo.light": "ライト",
+  "viewer.contextMenu.exportStl": "STLとしてエクスポート",
+  "viewer.contextMenu.exportStep": "STEPとしてエクスポート",
   "viewer.chrome.navHint.leftClick": "左/右ドラッグで回転 • 中ドラッグでパン • スクロールでズーム • Fでフォーカス",
   "viewer.chrome.navHint.rightClick": "右ドラッグで回転 • 中ドラッグでパン • スクロールでズーム • Fでフォーカス",
 

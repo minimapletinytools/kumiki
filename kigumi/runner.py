@@ -2479,6 +2479,49 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         log_stderr(f"[slot] Raised pattern '{pattern_name}' in slot '{slot_name}'")
         return state, make_success_response(request_id, command, result), False
 
+    if command == "export_member":
+        ss = _resolve_slot(state, payload)
+        member_key = payload.get("memberKey")
+        export_format = str(payload.get("format", "stl")).lower()
+        output_dir_raw = payload.get("outputDir")
+
+        if export_format not in {"stl", "step"}:
+            raise ValueError("export_member requires payload.format to be 'stl' or 'step'")
+        if not isinstance(member_key, str) or not member_key:
+            raise ValueError("export_member requires payload.memberKey")
+        if not isinstance(output_dir_raw, str) or not output_dir_raw:
+            raise ValueError("export_member requires payload.outputDir")
+
+        output_dir = Path(output_dir_raw).resolve()
+        if _project_root is not None:
+            allowed_root = (_project_root / "kigumi_exports").resolve()
+            try:
+                output_dir.relative_to(allowed_root)
+            except ValueError as exc:
+                raise ValueError("export_member outputDir must be inside project kigumi_exports/") from exc
+
+        timber_entries, _accessory_entries = _assign_member_keys(ss.frame)
+        entry = next((e for e in timber_entries if e["memberKey"] == member_key), None)
+        if entry is None:
+            raise ValueError(f"Unknown memberKey: {member_key}")
+
+        from kumiki.blueprint import export_cut_timber_stl, export_cut_timber_step
+
+        output_dir.mkdir(parents=True, exist_ok=True)
+        base_name = entry["timber"].ticket.path or entry["displayName"]
+        dest = output_dir / f"{base_name}.{export_format}"
+        if export_format == "stl":
+            export_cut_timber_stl(entry["cutTimber"], dest, local=True)
+        else:
+            export_cut_timber_step(entry["cutTimber"], dest, local=True)
+
+        return state, make_success_response(request_id, command, {
+            "format": export_format,
+            "memberKey": member_key,
+            "outputDir": str(output_dir),
+            "files": [str(dest)],
+        }), False
+
     if command == "export_frame":
         ss = _resolve_slot(state, payload)
         export_format = str(payload.get("format", "stl")).lower()

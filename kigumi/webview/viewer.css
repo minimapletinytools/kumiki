@@ -207,6 +207,57 @@ canvas { display: block; width: 100%; height: 100%; }
 #camera-mode-btn:hover {
     background: var(--hv-control-bg-solid-hover);
 }
+#projection-mode-btn {
+    width: 108px;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    background: var(--hv-control-bg-strong);
+    color: var(--hv-title);
+    font: 12px 'Segoe UI', sans-serif;
+    padding: 6px 10px;
+    cursor: pointer;
+    text-transform: lowercase;
+}
+#projection-mode-btn:hover {
+    background: var(--hv-control-bg-solid-hover);
+}
+.context-menu {
+    position: fixed;
+    z-index: 200;
+    min-width: 170px;
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    padding: 4px;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
+}
+.context-menu-title {
+    color: var(--hv-dim);
+    font: 11px 'Segoe UI', sans-serif;
+    padding: 4px 8px 6px;
+    border-bottom: 1px solid var(--hv-panel-border);
+    margin-bottom: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.context-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--hv-title);
+    font: 12px 'Segoe UI', sans-serif;
+    text-transform: lowercase;
+    padding: 6px 8px;
+    cursor: pointer;
+}
+.context-menu-item:hover {
+    background: var(--hv-control-bg-hover);
+}
 #top-controls {
     width: 100%;
     max-width: none;

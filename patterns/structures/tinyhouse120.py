@@ -1465,7 +1465,7 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
     ]
 
     add_milestone('assembling frame')
-    return Frame.from_joints(
+    frame = Frame.from_joints(
         joints=(
             wall_stud_joints
             + intermediate_post_joints
@@ -1484,6 +1484,8 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         additional_unjointed_timbers=unjointed_timbers,
         name="Tiny House 120"
     )
+    frame = replace(frame, footprints=[footprint])
+    return frame
 
 
 example = create_tinyhouse120
