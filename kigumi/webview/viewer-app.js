@@ -1057,6 +1057,7 @@ class KigumiViewerApp extends LitElement {
         this.footprintObjects = [];
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
+        this.isOrthographic = false;
         this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
         this.assemblyData = null;
@@ -1192,6 +1193,11 @@ class KigumiViewerApp extends LitElement {
                         type="button"
                         title=${t('viewer.chrome.gizmo.cameraMode.title')}
                     >📷 ${cameraMode === 'standard' ? t('viewer.chrome.gizmo.cameraMode.standard') : t('viewer.chrome.gizmo.cameraMode.free')}</button>
+                    <button
+                        id="projection-mode-btn"
+                        type="button"
+                        title=${t('viewer.chrome.gizmo.projectionMode.title')}
+                    >${this.isOrthographic ? '⬛' : '📐'} ${this.isOrthographic ? t('viewer.chrome.gizmo.projectionMode.orthographic') : t('viewer.chrome.gizmo.projectionMode.perspective')}</button>
                     <div class="gizmo-block">
                         <div class="gizmo-title">${t('viewer.chrome.gizmo.light')}</div>
                         <canvas id="light-dial-c"></canvas>
@@ -1409,6 +1415,7 @@ class KigumiViewerApp extends LitElement {
         const gizmoCanvas = this.renderRoot.querySelector('#gizmo-cube-c');
         const focusButton = this.renderRoot.querySelector('#focus-btn');
         const cameraModeButton = this.renderRoot.querySelector('#camera-mode-btn');
+        const projectionModeButton = this.renderRoot.querySelector('#projection-mode-btn');
         const lightDialCanvas = this.renderRoot.querySelector('#light-dial-c');
 
         toV3d.addEventListener('click', () => {
@@ -1465,6 +1472,10 @@ class KigumiViewerApp extends LitElement {
         cameraModeButton.addEventListener('click', () => {
             const nextMode = this.cameraController.getCameraMode() === 'standard' ? 'free' : 'standard';
             this.setCameraMode(nextMode);
+        });
+
+        projectionModeButton.addEventListener('click', () => {
+            this.setProjectionMode(!this.isOrthographic);
         });
 
         const outputBtn = this.renderRoot.querySelector('#output-btn');
@@ -1555,8 +1566,14 @@ class KigumiViewerApp extends LitElement {
         this.scene = new THREE.Scene();
         this.setTheme(this.activeTheme);
 
-        this.camera = new THREE.PerspectiveCamera(45, viewport.offsetWidth / viewport.offsetHeight, 0.01, 10000);
-        this.camera.up.set(0, 0, 1);
+        this.perspectiveCamera = new THREE.PerspectiveCamera(45, viewport.offsetWidth / viewport.offsetHeight, 0.01, 10000);
+        this.perspectiveCamera.up.set(0, 0, 1);
+        // Frustum bounds are placeholders here; updateOrthographicFrustum() (called from
+        // updateCamera()) sizes them from the current orbitDist before every use, so the
+        // two projections stay visually consistent (same apparent framing) when toggled.
+        this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
+        this.orthographicCamera.up.set(0, 0, 1);
+        this.camera = this.isOrthographic ? this.orthographicCamera : this.perspectiveCamera;
 
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.61));
         this.sun = new THREE.DirectionalLight(0xffffff, 0.62);
@@ -2374,8 +2391,7 @@ class KigumiViewerApp extends LitElement {
         const viewport = this.renderRoot.querySelector('#viewport');
         const width = viewport.offsetWidth;
         const height = viewport.offsetHeight;
-        this.camera.aspect = width / height;
-        this.camera.updateProjectionMatrix();
+        this.syncCameraProjection();
         this.renderer.setSize(width, height, false);
         this.resizeGizmoRenderer();
         this.drawLightDial();
@@ -2949,7 +2965,10 @@ class KigumiViewerApp extends LitElement {
         const dy = bounds.maxY - bounds.minY;
         const dz = bounds.maxZ - bounds.minZ;
         const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) / 2 || 5;
-        const fovRad = this.camera.fov * Math.PI / 180;
+        // Always use the perspective camera's FOV, even in orthographic mode: orbitDist
+        // drives the orthographic frustum size too (see updateOrthographicFrustum), so this
+        // keeps "fit to bounds" framing consistent across both projections.
+        const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
         const targetDist = radius / Math.sin(fovRad / 2) * 1.3;
         this.animateCameraTo(
             { x: 0, y: -1, z: 0 },
@@ -4436,7 +4455,7 @@ class KigumiViewerApp extends LitElement {
         const dy = bounds.maxY - bounds.minY;
         const dz = bounds.maxZ - bounds.minZ;
         const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) / 2 || 5;
-        const fovRad = this.camera.fov * Math.PI / 180;
+        const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
         if (!hadExistingScene) {
             this.cx = this.focusedCx;
             this.cy = this.focusedCy;
@@ -4444,9 +4463,7 @@ class KigumiViewerApp extends LitElement {
             this.orbitDist = radius / Math.sin(fovRad / 2) * 1.3;
         }
         this.lightDistance = Math.max(12, radius * 4);
-        this.camera.near = Math.max(0.1, radius * 0.03);
-        this.camera.far = Math.max(200, radius * 20);
-        this.camera.updateProjectionMatrix();
+        this.setCameraNearFar(Math.max(0.1, radius * 0.03), Math.max(200, radius * 20));
         this.updateCamera();
         this.updateLightFromAngles();
         this.drawLightDial();
@@ -4460,8 +4477,76 @@ class KigumiViewerApp extends LitElement {
         if (!this.camera) {
             return;
         }
+        if (this.isOrthographic) {
+            this.updateOrthographicFrustum();
+        }
         this.cameraController.applyToCamera(this.camera);
         this.updateOrbitCenterGizmo();
+    }
+
+    // Sizes the orthographic frustum from the current orbitDist and the perspective
+    // camera's FOV, so switching projections (or zooming while orthographic) keeps the
+    // same apparent framing a perspective camera would show at that distance -- called
+    // from updateCamera() before every use rather than only on resize/toggle, since
+    // orbitDist changes continuously during zoom/animation.
+    updateOrthographicFrustum() {
+        if (!this.orthographicCamera || !this.perspectiveCamera) {
+            return;
+        }
+        const viewport = this.renderRoot.querySelector('#viewport');
+        const aspect = (viewport && viewport.offsetHeight)
+            ? viewport.offsetWidth / viewport.offsetHeight
+            : 1;
+        const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
+        const halfHeight = Math.max(0.001, this.orbitDist) * Math.tan(fovRad / 2);
+        const halfWidth = halfHeight * aspect;
+        this.orthographicCamera.left = -halfWidth;
+        this.orthographicCamera.right = halfWidth;
+        this.orthographicCamera.top = halfHeight;
+        this.orthographicCamera.bottom = -halfHeight;
+        this.orthographicCamera.updateProjectionMatrix();
+    }
+
+    // Keeps both cameras' aspect/frustum in sync with the current viewport size --
+    // called on resize and when toggling projection mode (the camera that just became
+    // inactive should still be correctly sized if the viewport changes while it's idle).
+    syncCameraProjection() {
+        const viewport = this.renderRoot.querySelector('#viewport');
+        if (!viewport || !viewport.offsetHeight) {
+            return;
+        }
+        if (this.perspectiveCamera) {
+            this.perspectiveCamera.aspect = viewport.offsetWidth / viewport.offsetHeight;
+            this.perspectiveCamera.updateProjectionMatrix();
+        }
+        this.updateOrthographicFrustum();
+    }
+
+    // Applies near/far to both cameras (not just the active one) so the inactive
+    // projection is still correctly configured if the user toggles to it later.
+    setCameraNearFar(near, far) {
+        if (this.perspectiveCamera) {
+            this.perspectiveCamera.near = near;
+            this.perspectiveCamera.far = far;
+            this.perspectiveCamera.updateProjectionMatrix();
+        }
+        if (this.orthographicCamera) {
+            this.orthographicCamera.near = near;
+            this.orthographicCamera.far = far;
+            this.orthographicCamera.updateProjectionMatrix();
+        }
+    }
+
+    setProjectionMode(isOrthographic) {
+        const next = Boolean(isOrthographic);
+        if (this.isOrthographic === next) {
+            return;
+        }
+        this.isOrthographic = next;
+        this.camera = next ? this.orthographicCamera : this.perspectiveCamera;
+        this.syncCameraProjection();
+        this.updateCamera();
+        this.requestUpdate();
     }
 }
 

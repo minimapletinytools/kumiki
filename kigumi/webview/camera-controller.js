@@ -3,7 +3,9 @@
     // computation, drag rotation, animation, zoom scaling, and (de)serialization.
     // It deliberately knows nothing about the DOM, the THREE scene graph, or the
     // viewer-app — the host is responsible for passing pointer deltas in and for
-    // calling applyToCamera() to write the result onto a THREE.PerspectiveCamera.
+    // calling applyToCamera() to write the result onto a THREE.PerspectiveCamera or
+    // THREE.OrthographicCamera -- applyToCamera only touches position/up/lookAt, which both
+    // camera types support, so it works for either without changes.
 
     const DEFAULT_INITIAL_THETA = -Math.PI / 5;
     const DEFAULT_INITIAL_PHI = Math.PI / 3;
