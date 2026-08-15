@@ -4,6 +4,7 @@ const vscode = require('vscode');
 const { FrameViewSession } = require('./frame-view-session');
 const { PythonRunnerSession } = require('./runner-session');
 const { KigumiSidebarProvider } = require('./sidebar-provider');
+const { NewPythonFileWatcher } = require('./new-python-file-watcher');
 const { normalizeRetentionDays, pruneOldLogFiles } = require('./log-retention');
 const {
     getInitializationStatus,
@@ -26,6 +27,8 @@ let sidebarProvider = null;
 let openInSplitView = false;
 let autoRefreshOnFileChange = false;
 let logRetentionDays = 15;
+let autoRefreshSidebarOnNewFile = true;
+let newPythonFileWatcher = null;
 const BUILD_MARKER = '🧪 KIGUMI_BUILD_2026-05-17T02:45Z';
 const ENABLE_TEST_COMMANDS = process.env.KIGUMI_ENABLE_TEST_COMMANDS === '1';
 
@@ -101,6 +104,7 @@ function activate(context) {
     openInSplitView = vscode.workspace.getConfiguration('kigumi').get('viewer.openInSplitView', false);
     autoRefreshOnFileChange = vscode.workspace.getConfiguration('kigumi').get('viewer.autoRefreshOnFileChange', false);
     logRetentionDays = normalizeRetentionDays(vscode.workspace.getConfiguration('kigumi').get('viewer.logRetentionDays', 15));
+    autoRefreshSidebarOnNewFile = vscode.workspace.getConfiguration('kigumi').get('sidebar.autoRefreshOnNewFile', true);
     pruneWorkspaceLogs(outputChannel, logRetentionDays);
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration((event) => {
         if (event.affectsConfiguration('kigumi.viewer.openInSplitView')) {
@@ -121,6 +125,13 @@ function activate(context) {
             logRetentionDays = normalizeRetentionDays(vscode.workspace.getConfiguration('kigumi').get('viewer.logRetentionDays', 15));
             pruneWorkspaceLogs(outputChannel, logRetentionDays);
             outputChannel.appendLine(`[kigumi] Log retention days: ${logRetentionDays}`);
+        }
+        if (event.affectsConfiguration('kigumi.sidebar.autoRefreshOnNewFile')) {
+            autoRefreshSidebarOnNewFile = vscode.workspace.getConfiguration('kigumi').get('sidebar.autoRefreshOnNewFile', true);
+            if (newPythonFileWatcher) {
+                newPythonFileWatcher.setEnabled(autoRefreshSidebarOnNewFile);
+            }
+            outputChannel.appendLine(`[kigumi] Auto refresh sidebar on new file: ${autoRefreshSidebarOnNewFile ? 'enabled' : 'disabled'}`);
         }
     }));
 
@@ -193,6 +204,19 @@ function activate(context) {
         sidebarProvider.setSelectedElementData(selected);
     }));
     context.subscriptions.push(sidebarProvider, explorerTreeView);
+
+    newPythonFileWatcher = new NewPythonFileWatcher(
+        getWorkspaceRoot(),
+        () => {
+            if (sidebarProvider) {
+                void sidebarProvider.refresh(true);
+            }
+        },
+        (message) => outputChannel.appendLine(`[kigumi] [sidebar-watch] ${message}`),
+    );
+    newPythonFileWatcher.setEnabled(autoRefreshSidebarOnNewFile);
+    newPythonFileWatcher.start();
+    context.subscriptions.push(newPythonFileWatcher);
 
     register(context, 'kigumi.render', async function () {
         try {

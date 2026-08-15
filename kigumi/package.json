@@ -233,6 +233,11 @@
           "default": 15,
           "minimum": 0,
           "description": "%config.logRetentionDays.description%"
+        },
+        "kigumi.sidebar.autoRefreshOnNewFile": {
+          "type": "boolean",
+          "default": true,
+          "description": "%config.autoRefreshSidebarOnNewFile.description%"
         }
       }
     }

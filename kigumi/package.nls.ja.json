@@ -22,5 +22,6 @@
   "config.autoRefreshOnFileChange.description": "監視対象のファイルが変更されたときに、開いているKigumiビューアーを自動的に更新します。",
   "config.showPoopTaggedJoints.description": "パターンブックでpoopタグ付きの仕口を表示します。",
   "config.assemblyPreview.description": "フレームビューアーに組み立て(分解)プレビュータイムラインを表示します。実験的機能です。ビューアーを(再)起動すると反映されます。",
-  "config.logRetentionDays.description": "拡張機能の起動時、または設定変更時に、.kigumi/logs内の指定日数より古いKigumiログファイルを削除します。"
+  "config.logRetentionDays.description": "拡張機能の起動時、または設定変更時に、.kigumi/logs内の指定日数より古いKigumiログファイルを削除します。",
+  "config.autoRefreshSidebarOnNewFile.description": "ワークスペースに新しい.pyファイルが作成されたときに、Kigumiサイドバーを自動的に更新します。"
 }

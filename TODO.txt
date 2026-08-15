@@ -206,11 +206,7 @@ DONE-attach timber bugs
   DONE-# TODO BUG alignig BACK face rather than FRONT???
 
 DONE-add right click export STL support
-
-
-
-
--consider making sidebar refresh for new files automatic
+DONE-consider making sidebar refresh for new files automatic
 
 -rough/perfect timber within bounding box rendering
   -rename actual to rough (actualy geometry)
