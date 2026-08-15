@@ -147,6 +147,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const assemblyTimelineJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'assembly-timeline.js'))).toString();
     const featureFlagsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'feature-flags.js'))).toString();
     const cameraControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'camera-controller.js'))).toString();
+    const geometryModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'geometry-mode.js'))).toString();
     const stylesCssUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer.css'))).toString();
     const threeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'three.min.js'))).toString();
     const reflectorJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'Reflector.js'))).toString();
@@ -185,6 +186,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__ASSEMBLY_TIMELINE_JS_URI__', assemblyTimelineJsUri)
         .replace('__FEATURE_FLAGS_JS_URI__', featureFlagsJsUri)
         .replace('__CAMERA_CONTROLLER_JS_URI__', cameraControllerJsUri)
+        .replace('__GEOMETRY_MODE_JS_URI__', geometryModeJsUri)
         .replace('__APP_JS_URI__', appJsUri)
         .replace('__STYLES_CSS_URI__', stylesCssUri)
         .replace('__THREE_JS_URI__', threeJsUri)

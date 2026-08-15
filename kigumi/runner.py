@@ -473,6 +473,31 @@ def _cut_timber_to_triangle_mesh_payload(
     else:
         payload["hasActualGeometryDifferentFromPerfect"] = False
 
+    # No-joints box geometry: plain rectangular boxes with no CSG cuts applied at
+    # all (no joint cuts, no mortise holes), cropped in length only by this
+    # timber's aggregated end-cut trims. Built unconditionally (not gated behind
+    # has_non_rectangular_actual) since a joint cut changes what a no-joints box
+    # looks like for every timber shape, not just non-rectangular ones.
+    try:
+        perfect_box_mesh = prism_to_mesh(cut_timber.get_perfect_timber_within_bounding_box_prism())
+        payload["perfectBoxNoJointsVertices"] = perfect_box_mesh["vertices"]
+        payload["perfectBoxNoJointsIndices"] = perfect_box_mesh["indices"]
+    except Exception as exc:  # noqa: BLE001 — best-effort optional payload
+        log_stderr(
+            f"Warning: failed to build perfect-box-no-joints mesh for "
+            f"{get_timber_display_name(timber)}: {exc}"
+        )
+
+    try:
+        rough_box_mesh = prism_to_mesh(cut_timber.get_rough_bounding_box_prism())
+        payload["roughBoxNoJointsVertices"] = rough_box_mesh["vertices"]
+        payload["roughBoxNoJointsIndices"] = rough_box_mesh["indices"]
+    except Exception as exc:  # noqa: BLE001 — best-effort optional payload
+        log_stderr(
+            f"Warning: failed to build rough-box-no-joints mesh for "
+            f"{get_timber_display_name(timber)}: {exc}"
+        )
+
     return payload
 
 

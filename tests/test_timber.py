@@ -5,6 +5,7 @@ Tests for Kumiki timber framing system
 import pytest
 from sympy import Matrix, sqrt, simplify, Abs
 from kumiki.rule import Orientation
+from kumiki.timber import _get_rough_size_and_offset
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -1359,6 +1360,189 @@ class TestFrameBoundingBox:
         assert "empty frame" in str(exc_info.value).lower()
 
 
+class TestCutTimberBoundingBoxPrisms:
+    """Tests for CutTimber.get_perfect_timber_within_bounding_box_prism and
+    get_rough_bounding_box_prism (and the shared _bounding_box_prism_for_cross_section
+    helper they're both built on)."""
+
+    def test_uncut_matches_timber_exactly(self, symbolic_mode):
+        """With no cuts, the PTW bounding box prism matches the timber's own bounds."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(10), scalar(20), scalar(5)),
+            length=scalar(96),
+            size=create_v2(scalar(4), scalar(6)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+        )
+        cut_timber = CutTimber(timber, cuts=[])
+        prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
+
+        assert prism.size == timber.size
+        assert prism.start_distance == scalar(0)
+        assert prism.end_distance == timber.length
+        assert prism.transform.position == timber.get_bottom_position_global()
+
+    def test_single_end_cut_crops(self, symbolic_mode):
+        """A single top end cut crops end_distance; start_distance stays at 0."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+        )
+        cut = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))
+        cut_timber = CutTimber(timber, cuts=[cut])
+        prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
+
+        assert prism.start_distance == scalar(0)
+        assert prism.end_distance == scalar(80)
+
+    def test_multiple_cuts_tightest_crop_wins(self, symbolic_mode):
+        """The most restrictive end cut wins independently at each end, across every
+        Cutting on the timber -- this is the "minimal end cuts across the frame's
+        cuttings" behavior the no-joints box feature is built on."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(48),
+            size=create_v2(scalar(4), scalar(6)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+        )
+        cut_a = Cutting(
+            timber=timber,
+            maybe_top_end_cut_distance_from_bottom=scalar(40),
+            maybe_bottom_end_cut_distance_from_bottom=scalar(5),
+        )
+        cut_b = Cutting(
+            timber=timber,
+            maybe_top_end_cut_distance_from_bottom=scalar(35),
+            maybe_bottom_end_cut_distance_from_bottom=scalar(2),
+        )
+        cut_timber = CutTimber(timber, cuts=[cut_a, cut_b])
+        prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
+
+        # Bottom: max(5, 2) = 5 (tighter cut wins)
+        assert prism.start_distance == scalar(5)
+        # Top: min(40, 35) = 35 (tighter cut wins)
+        assert prism.end_distance == scalar(35)
+
+    def test_deprecated_aliases_still_delegate(self, symbolic_mode):
+        """get_bounding_box_prism and DEPRECATED_approximate_bounding_prism still
+        delegate to get_perfect_timber_within_bounding_box_prism post-refactor."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+        )
+        cut = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))
+        cut_timber = CutTimber(timber, cuts=[cut])
+
+        expected = cut_timber.get_perfect_timber_within_bounding_box_prism()
+        for actual in (cut_timber.get_bounding_box_prism(), cut_timber.DEPRECATED_approximate_bounding_prism()):
+            assert actual.size == expected.size
+            assert actual.start_distance == expected.start_distance
+            assert actual.end_distance == expected.end_distance
+            assert actual.transform.position == expected.transform.position
+
+    def test_rough_box_symmetric_matches_ptw_box(self, symbolic_mode):
+        """With symmetric (default) rough half-sizes, the rough box matches the PTW box."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+        )
+        cut = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(80))
+        cut_timber = CutTimber(timber, cuts=[cut])
+
+        ptw_prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
+        rough_prism = cut_timber.get_rough_bounding_box_prism()
+
+        assert rough_prism.size == ptw_prism.size
+        assert rough_prism.start_distance == ptw_prism.start_distance
+        assert rough_prism.end_distance == ptw_prism.end_distance
+        assert rough_prism.transform.position == ptw_prism.transform.position
+
+    def test_rough_box_asymmetric_size_and_offset(self, symbolic_mode):
+        """Rough box with asymmetric rough_half_sizes has the correct total size and
+        is offset from the centerline (reuses the fixture from test_csg_asymmetric_offset)."""
+        t = Timber(
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
+            transform=Transform.identity(),
+            rough_half_sizes=(
+                create_v2(scalar(3), scalar(1)),   # right=3, left=1 -> total=4, offset_x=+1
+                create_v2(scalar(4), scalar(2)),   # front=4, back=2 -> total=6, offset_y=+1
+            ),
+        )
+        cut_timber = CutTimber(t, cuts=[])
+        prism = cut_timber.get_rough_bounding_box_prism()
+
+        assert prism.size == create_v2(scalar(4), scalar(6))
+        assert prism.transform.position == create_v3(scalar(1), scalar(1), scalar(0))
+        assert prism.start_distance == scalar(0)
+        assert prism.end_distance == scalar(100)
+
+    def test_rough_box_offset_on_rotated_timber(self, symbolic_mode):
+        """The local (offset_x, offset_y) -> global transform.position conversion uses
+        the timber's own (non-axis-aligned) width/height direction vectors, not raw
+        global XY -- this is the key regression guard for rotated timbers."""
+        base = create_timber(
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
+            bottom_position=create_v3(scalar(10), scalar(20), scalar(5)),
+            length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            width_direction=create_v3(scalar(1), scalar(1), scalar(0)),  # 45 degrees in XY
+        )
+        t = Timber(
+            length=base.length,
+            size=base.size,
+            transform=base.transform,
+            ticket=base.ticket,
+            rough_half_sizes=(
+                create_v2(scalar(3), scalar(1)),
+                create_v2(scalar(4), scalar(2)),
+            ),
+        )
+        # Sanity check that this timber really is rotated off-axis (guards against the
+        # test silently degrading to the axis-aligned case above).
+        width_dir = t.get_width_direction_global()
+        assert simplify(width_dir[0] - width_dir[1]) == 0
+        assert width_dir[2] == 0
+
+        cut_timber = CutTimber(t, cuts=[])
+        prism = cut_timber.get_rough_bounding_box_prism()
+
+        _, offset = _get_rough_size_and_offset(t)
+        expected_position = (
+            t.get_bottom_position_global()
+            + t.get_width_direction_global() * offset[0]
+            + t.get_height_direction_global() * offset[1]
+        )
+        assert simplify(prism.transform.position - expected_position).norm() == 0
+
+    def test_rough_box_polymorphic_on_round_timber(self, symbolic_mode):
+        """get_rough_bounding_box_prism works on a non-Timber PerfectTimberWithin
+        subclass (RoundTimber), whose rough half-sizes are always symmetric."""
+        rt = RoundTimber(
+            length=scalar(100),
+            size=create_v2(scalar(12), scalar(12)),
+            transform=Transform.identity(),
+            diameter=scalar(12),
+        )
+        cut_timber = CutTimber(rt, cuts=[])
+        prism = cut_timber.get_rough_bounding_box_prism()
+
+        assert prism.size == create_v2(scalar(12), scalar(12))
+        assert prism.transform.position == rt.get_bottom_position_global()
+        assert prism.start_distance == scalar(0)
+        assert prism.end_distance == scalar(100)
+
+
 class TestGetSizeInDirection:
     """Tests for get_size_in_direction_2d and get_size_in_direction_3d."""
 
@@ -1645,6 +1829,53 @@ class TestGetRoughHalfSizes:
         assert not csg.contains_point(create_v3(scalar(1), scalar(-3), scalar(50)))
 
 
+class TestGetRoughSizeAndOffset:
+    """Tests for the internal kumiki.timber._get_rough_size_and_offset helper."""
+
+    def test_symmetric_timber_zero_offset(self):
+        """Symmetric (default) Timber returns size == self.size and offset (0, 0)."""
+        t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
+        size, offset = _get_rough_size_and_offset(t)
+        assert size == create_v2(scalar(4), scalar(6))
+        assert offset == create_v3(scalar(0), scalar(0), scalar(0))
+
+    def test_asymmetric_timber_size_and_offset(self):
+        """Asymmetric rough_half_sizes produce the summed size and the correct offset."""
+        t = Timber(
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(6)),
+            transform=Transform.identity(),
+            rough_half_sizes=(
+                create_v2(scalar(3), scalar(1)),   # right=3, left=1 -> total=4, offset_x=+1
+                create_v2(scalar(4), scalar(2)),   # front=4, back=2 -> total=6, offset_y=+1
+            ),
+        )
+        size, offset = _get_rough_size_and_offset(t)
+        assert size == create_v2(scalar(4), scalar(6))
+        assert offset == create_v3(scalar(1), scalar(1), scalar(0))
+
+    def test_round_timber_zero_offset(self):
+        """RoundTimber (always symmetric) returns offset (0, 0)."""
+        rt = RoundTimber(
+            length=scalar(100),
+            size=create_v2(scalar(12), scalar(12)),
+            transform=Transform.identity(),
+            diameter=scalar(12),
+        )
+        size, offset = _get_rough_size_and_offset(rt)
+        assert size == create_v2(scalar(12), scalar(12))
+        assert offset == create_v3(scalar(0), scalar(0), scalar(0))
+
+    def test_board_zero_offset(self):
+        """Board (always symmetric) returns size == self.size and offset (0, 0)."""
+        b = Board(
+            length=scalar(2),
+            size=create_v2(scalar(10), scalar(8)),
+            transform=Transform.identity(),
+        )
+        size, offset = _get_rough_size_and_offset(b)
+        assert size == create_v2(scalar(10), scalar(8))
+        assert offset == create_v3(scalar(0), scalar(0), scalar(0))
 
 
 class TestJointAssembly:

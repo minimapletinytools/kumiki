@@ -200,18 +200,20 @@ DONE- no ctors for noud timber, add a change timber function or something allowi
 DONE-add notching mode to FAT/PAT joints
   -NotchFromInsetShoulder (current behavior)
   -NotchFromPerefctTimberWithin (keeps scribe shoulder notching in cut_mortise_and_tenon_joint call, and then does the notching from PTW face rather than join shoulder)
-
 DONE-attach timber bugs
   DONE-lengt bug
   DONE-# TODO BUG alignig BACK face rather than FRONT???
-
 DONE-add right click export STL support
 DONE-consider making sidebar refresh for new files automatic
 
--rough/perfect timber within bounding box rendering
+DONE-rough/perfect timber within bounding box rendering
   -rename actual to rough (actualy geometry)
   -perfect box
   -rough box
+
+-create helper method for building cut timber from list of joints
+-house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
+
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 
 

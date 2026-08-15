@@ -1129,17 +1129,6 @@ class Timber(PerfectTimberWithin):
         h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
 
-    def _rough_csg_size_and_offset(self) -> Tuple[V2, V3]:
-        """Compute the total rough cross-section size and the local offset from the centerline."""
-        width_halves, height_halves = self.get_rough_half_sizes()
-        total_w = width_halves[0] + width_halves[1]
-        total_h = height_halves[0] + height_halves[1]
-        # Offset: positive means shift toward RIGHT / FRONT
-        offset_x = (width_halves[0] - width_halves[1]) / scalar(2)
-        offset_y = (height_halves[0] - height_halves[1]) / scalar(2)
-        return (create_v2(total_w, total_h),
-                create_v3(offset_x, offset_y, scalar(0)))
-
     def get_actual_csg_local(self) -> CutCSG:
         """
         Returns the actual CSG geometry for this timber.
@@ -1150,7 +1139,7 @@ class Timber(PerfectTimberWithin):
         Returns:
             RectangularPrism representing the actual geometry in local coordinates
         """
-        rough_size, offset = self._rough_csg_size_and_offset()
+        rough_size, offset = _get_rough_size_and_offset(self)
         return RectangularPrism(
             size=rough_size,
             transform=Transform(position=offset, orientation=Orientation.identity()),
@@ -1173,7 +1162,7 @@ class Timber(PerfectTimberWithin):
         Returns:
             CutCSG representing the extended geometry in local coordinates
         """
-        rough_size, offset = self._rough_csg_size_and_offset()
+        rough_size, offset = _get_rough_size_and_offset(self)
         return RectangularPrism(
             size=rough_size,
             transform=Transform(position=offset, orientation=Orientation.identity()),
@@ -1597,6 +1586,29 @@ class Cutting:
         return distance_from_end_to_cut
 
 
+def _get_rough_size_and_offset(timber: PerfectTimberWithin) -> Tuple[V2, V3]:
+    """
+    Returns the total rough cross-sectional size and the local (x, y) offset
+    from the centerline to the center of the rough bounding box.
+
+    Positive offset_x shifts the rough box center toward the RIGHT face;
+    positive offset_y shifts it toward the FRONT face. The offset is (0, 0)
+    whenever the rough half-sizes are symmetric (the default for every
+    built-in timber type unless given explicit asymmetric rough_half_sizes,
+    e.g. for square-rule layout).
+
+    Internal helper (not part of the public PerfectTimberWithin API) shared by
+    Timber's actual-CSG methods and CutTimber.get_rough_bounding_box_prism.
+    """
+    width_halves, height_halves = timber.get_rough_half_sizes()
+    total_w = width_halves[0] + width_halves[1]
+    total_h = height_halves[0] + height_halves[1]
+    offset_x = (width_halves[0] - width_halves[1]) / scalar(2)
+    offset_y = (height_halves[0] - height_halves[1]) / scalar(2)
+    return (create_v2(total_w, total_h),
+            create_v3(offset_x, offset_y, scalar(0)))
+
+
 def _timber_face_tags() -> List[Tuple[str, PrismFace]]:
     """Standard named feature tags for the 6 faces of a timber RectangularPrism."""
     return [
@@ -1783,38 +1795,43 @@ class CutTimber:
         return Difference(starting_csg, negative_csgs)
 
     
-    def get_perfect_timber_within_bounding_box_prism(self) -> RectangularPrism:
+    def _bounding_box_prism_for_cross_section(
+        self,
+        size: V2,
+        offset_x: Numeric = scalar(0),
+        offset_y: Numeric = scalar(0),
+    ) -> RectangularPrism:
         """
-        Get the bounding box prism for this timber cropped based on its end cuts if any, otherwise the original perfet timber within box is produced.
-        The bounding box is aligned with the timber's orientation.
-        
-        Uses PerfectTimberWithin size to determine the cross-sectional size of the bounding box.
-        Uses the end cuts (maybe_top_end_cut and maybe_bottom_end_cut) to determine
-        the extent of the timber along its length. For skewed end cuts, finds where
-        the plane intersects the four long edges of the timber and takes the max/min.
-        
+        Shared helper: build a RectangularPrism of a given cross-sectional `size`,
+        whose center may be offset from the timber's centerline by (offset_x,
+        offset_y) in the timber's LOCAL (centerline-origin) frame -- e.g. for an
+        asymmetric rough/as-sawn cross-section (see get_rough_bounding_box_prism).
+
+        Cropped in length by the most restrictive top/bottom end cut across every
+        Cutting on this timber (the frame's aggregated outer length trims -- not
+        each joint's own internal cut geometry). For skewed end cuts, finds where
+        the plane intersects the four long edges of the (possibly offset) cross-
+        section and takes the max/min, narrowing progressively across all cuts.
+
         Returns:
             RectangularPrism: The bounding box for the cut timber in global coordinates
         """
-        
         # Start with the timber's original bounds (in local coordinates)
         min_z = scalar(0)
         max_z = self.timber.length
-        
-        # Get timber half-sizes for the four corner edges
-        half_width = self.timber.size[0] / scalar(2)
-        half_height = self.timber.size[1] / scalar(2)
-        
+
+        half_width = size[0] / scalar(2)
+        half_height = size[1] / scalar(2)
+
         # The four corner edges in local coordinates are at:
-        # (-half_width, -half_height, z), (half_width, -half_height, z),
-        # (-half_width, half_height, z), (half_width, half_height, z)
+        # (offset_x -+ half_width, offset_y -+ half_height, z)
         corner_positions = [
-            (half_width, half_height),
-            (half_width, -half_height),
-            (-half_width, half_height),
-            (-half_width, -half_height)
+            (offset_x + half_width, offset_y + half_height),
+            (offset_x + half_width, offset_y - half_height),
+            (offset_x - half_width, offset_y + half_height),
+            (offset_x - half_width, offset_y - half_height)
         ]
-        
+
         # Check all cuts for end cuts
         for cut in self.cuts:
             top_end_cut = cut.get_maybe_top_end_cut()
@@ -1828,18 +1845,18 @@ class CutTimber:
                 # Point on edge: (corner_x, corner_y, z)
                 # Solve for z: normal[0]*corner_x + normal[1]*corner_y + normal[2]*z = offset
                 # z = (offset - normal[0]*corner_x - normal[1]*corner_y) / normal[2]
-                
+
                 intersections = []
                 for corner_x, corner_y in corner_positions:
                     # Check if normal[2] is not zero (otherwise plane is perpendicular to length)
                     if not safe_equality_test(end_cut.normal[2], 0):
                         z_intersect = (end_cut.offset - end_cut.normal[0]*corner_x - end_cut.normal[1]*corner_y) / end_cut.normal[2]
                         intersections.append(z_intersect)
-                
+
                 # For top end cut, clamp the top bound down to the cut plane extent.
                 if intersections:
                     max_z = Min(max_z, *intersections)
-            
+
             # Handle bottom end cut
             if bottom_end_cut is not None:
                 end_cut = bottom_end_cut
@@ -1849,20 +1866,58 @@ class CutTimber:
                     if not safe_equality_test(end_cut.normal[2], 0):
                         z_intersect = (end_cut.offset - end_cut.normal[0]*corner_x - end_cut.normal[1]*corner_y) / end_cut.normal[2]
                         intersections.append(z_intersect)
-                
+
                 # For bottom end cut, clamp the bottom bound up to the cut plane extent.
                 if intersections:
                     min_z = Max(min_z, *intersections)
-        
+
+        global_offset = (
+            self.timber.get_width_direction_global() * offset_x
+            + self.timber.get_height_direction_global() * offset_y
+        )
+
         return RectangularPrism(
-            size=self.timber.size,
+            size=size,
             transform=Transform(
-                position=self.timber.get_bottom_position_global(),
+                position=self.timber.get_bottom_position_global() + global_offset,
                 orientation=self.timber.orientation
             ),
             start_distance=min_z,
             end_distance=max_z
         )
+
+    def get_perfect_timber_within_bounding_box_prism(self) -> RectangularPrism:
+        """
+        Get the bounding box prism for this timber cropped based on its end cuts if any, otherwise the original perfet timber within box is produced.
+        The bounding box is aligned with the timber's orientation.
+
+        Uses PerfectTimberWithin size to determine the cross-sectional size of the bounding box.
+        Uses the end cuts (maybe_top_end_cut and maybe_bottom_end_cut) to determine
+        the extent of the timber along its length. For skewed end cuts, finds where
+        the plane intersects the four long edges of the timber and takes the max/min.
+
+        Returns:
+            RectangularPrism: The bounding box for the cut timber in global coordinates
+        """
+        return self._bounding_box_prism_for_cross_section(self.timber.size)
+
+    def get_rough_bounding_box_prism(self) -> RectangularPrism:
+        """
+        Get the bounding box prism for this timber's ROUGH (as-sawn) cross-section,
+        cropped in length the same way as get_perfect_timber_within_bounding_box_prism
+        (the most restrictive end cut across every Cutting on this timber -- the
+        frame's aggregated outer length trims, not each joint's own internal cut
+        geometry).
+
+        Unlike the perfect-timber-within box, the rough box may be off-center from
+        the timber's centerline (see get_rough_half_sizes -- e.g. for square-rule
+        layout) and is generally larger than the perfect/finished size.
+
+        Returns:
+            RectangularPrism: The rough bounding box for the cut timber, in global coordinates
+        """
+        rough_size, offset = _get_rough_size_and_offset(self.timber)
+        return self._bounding_box_prism_for_cross_section(rough_size, offset[0], offset[1])
     
     @deprecated("use get_perfect_timber_within_bounding_box_prism instead")
     def get_bounding_box_prism(self) -> RectangularPrism:

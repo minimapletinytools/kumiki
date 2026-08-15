@@ -8,8 +8,6 @@ const ViewerPhase = Object.freeze({
     ERROR: 'error',
 });
 
-const VALID_GEOMETRY_MODES = new Set(['actual', 'perfectTimberWithin']);
-
 // 'none': edge lines hidden entirely.
 // 'overlay': edge lines drawn on top of solid faces (default) -- always
 //   rendered on top regardless of what's in front (depthTest off), matching
@@ -101,7 +99,7 @@ function cloneRenderParameterValue(parameter, value) {
 
 function normalizeViewerOptions(viewerOptions) {
     const opts = (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
-    const geometryMode = VALID_GEOMETRY_MODES.has(opts.geometryMode) ? opts.geometryMode : 'actual';
+    const geometryMode = GeometryMode.VALID_MODES.has(opts.geometryMode) ? opts.geometryMode : GeometryMode.DEFAULT_MODE;
     return { geometryMode };
 }
 
@@ -130,6 +128,7 @@ const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : nul
 const VIEWER_APP_VERSION = '2026.03.17.4';
 const SelectionStore = window.SelectionStore;
 const CameraController = window.CameraController;
+const GeometryMode = window.GeometryMode;
 const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
@@ -369,6 +368,9 @@ if (!SelectionStore) {
 if (!CameraController) {
     throw new Error('CameraController is not loaded. Ensure camera-controller.js is included before viewer-app.js.');
 }
+if (!GeometryMode) {
+    throw new Error('GeometryMode is not loaded. Ensure geometry-mode.js is included before viewer-app.js.');
+}
 const AssemblyTimeline = window.AssemblyTimeline;
 if (!AssemblyTimeline) {
     throw new Error('AssemblyTimeline is not loaded. Ensure assembly-timeline.js is included before viewer-app.js.');
@@ -606,6 +608,8 @@ class ViewerSettingsPanel {
                     <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
                         <option value="actual">${t('viewer.options.geometry.actual')}</option>
                         <option value="perfectTimberWithin">${t('viewer.options.geometry.perfectTimberWithin')}</option>
+                        <option value="perfectBoxNoJoints">${t('viewer.options.geometry.perfectBoxNoJoints')}</option>
+                        <option value="roughBoxNoJoints">${t('viewer.options.geometry.roughBoxNoJoints')}</option>
                     </select>
                 </label>
                 <label>
@@ -2855,22 +2859,25 @@ class KigumiViewerApp extends LitElement {
     }
 
     setGeometryMode(mode) {
-        const next = VALID_GEOMETRY_MODES.has(mode) ? mode : 'actual';
-        const prev = (this.viewerOptions && this.viewerOptions.geometryMode) || 'actual';
+        const next = GeometryMode.VALID_MODES.has(mode) ? mode : GeometryMode.DEFAULT_MODE;
+        const prev = (this.viewerOptions && this.viewerOptions.geometryMode) || GeometryMode.DEFAULT_MODE;
         if (next === prev) {
             return;
         }
         this.viewerOptions = { ...this.viewerOptions, geometryMode: next };
 
         // Identify timbers whose displayed mesh will actually swap when the mode
-        // changes. Only non-perfect timbers carry both meshes; perfect timbers
-        // (and accessories) render the same geometry in either mode.
+        // changes (by reference -- see GeometryMode.selectMeshBuffers). Accessories
+        // and timbers whose alternate-mode arrays are absent render the same
+        // geometry in either mode and are excluded.
         const lastMeshes = (this._lastGeometryData && this._lastGeometryData.meshes) || [];
         const swappedKeys = new Set();
         for (const mesh of lastMeshes) {
-            if (mesh && mesh.memberType === 'timber'
-                && mesh.hasActualGeometryDifferentFromPerfect
-                && Array.isArray(mesh.perfectTimberWithinVertices)) {
+            if (!mesh) {
+                continue;
+            }
+            const memberType = mesh.memberType === 'accessory' ? 'accessory' : 'timber';
+            if (GeometryMode.meshBuffersDifferBetweenModes(mesh, memberType, prev, next)) {
                 const key = mesh.memberKey || mesh.timberKey;
                 if (key) {
                     swappedKeys.add(key);
@@ -4294,18 +4301,10 @@ class KigumiViewerApp extends LitElement {
             }
 
             const meshT0 = performance.now();
-            // Choose vertex/index arrays based on geometryMode. Non-perfect timbers
-            // include perfectTimberWithinVertices/perfectTimberWithinIndices; perfect timbers and
-            // accessories always use the actual vertices/indices regardless of mode.
-            const usePerfectTimberWithin = (
-                geometryMode === 'perfectTimberWithin'
-                && memberType === 'timber'
-                && mesh.hasActualGeometryDifferentFromPerfect
-                && Array.isArray(mesh.perfectTimberWithinVertices)
-                && Array.isArray(mesh.perfectTimberWithinIndices)
-            );
-            const vertexSource = usePerfectTimberWithin ? mesh.perfectTimberWithinVertices : (mesh.vertices || []);
-            const indexSource = usePerfectTimberWithin ? mesh.perfectTimberWithinIndices : (mesh.indices || []);
+            // Choose vertex/index arrays based on geometryMode. Accessories and
+            // perfect timbers (which lack the alternate-mode payload fields) fall
+            // back to the actual vertices/indices regardless of mode.
+            const { vertices: vertexSource, indices: indexSource } = GeometryMode.selectMeshBuffers(mesh, memberType, geometryMode);
             const positions = new Float32Array(vertexSource);
             const indexedGeometry = new THREE.BufferGeometry();
             indexedGeometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
