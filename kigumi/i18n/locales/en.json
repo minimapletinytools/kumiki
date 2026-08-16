@@ -53,6 +53,9 @@
   "viewer.themes.forestMist": "Forest Mist",
   "viewer.themes.warmWhite": "Warm White",
   "viewer.themes.linen": "Linen",
+  "viewer.themes.bloom": "Bloom",
+  "viewer.themes.tide": "Tide",
+  "viewer.themes.sunbeam": "Sunbeam",
   "viewer.themes.slateNight": "Slate Night",
 
   "viewer.frameParams.ariaLabel": "Frame parameters",

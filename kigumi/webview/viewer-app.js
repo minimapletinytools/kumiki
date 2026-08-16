@@ -255,6 +255,16 @@ const DEFAULT_THEME_UI = Object.freeze({
     chipBg: 'rgba(255, 255, 255, 0.8)',
 });
 
+// Fades an 'rgba(r, g, b, a)' color to fully transparent at the same r/g/b,
+// for the outer edge of a radial-gradient blob (see 'blobs' pattern below).
+function radialFadeColor(color) {
+    const match = /rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)/.exec(color);
+    if (!match) {
+        return color;
+    }
+    return `rgba(${match[1]}, ${match[2]}, ${match[3]}, 0)`;
+}
+
 function createTheme(theme) {
     return Object.freeze({
         ...theme,
@@ -306,6 +316,51 @@ const THEMES = Object.freeze({
         pattern: 'linen',
         timberProfileId: 'timber-warm',
         accessoryProfileId: 'accessory-brass',
+    }),
+    'bloom': createTheme({
+        label: 'Bloom',
+        labelKey: 'viewer.themes.bloom',
+        gradientTop: '#fdeaea',
+        gradientBottom: '#f7e4f0',
+        pattern: 'blobs',
+        blobColors: [
+            { x: 0.15, y: 0.2, color: 'rgba(255, 182, 193, 0.55)' },
+            { x: 0.85, y: 0.15, color: 'rgba(200, 162, 255, 0.5)' },
+            { x: 0.75, y: 0.85, color: 'rgba(255, 200, 150, 0.45)' },
+            { x: 0.2, y: 0.85, color: 'rgba(255, 150, 200, 0.4)' },
+        ],
+        timberProfileId: 'timber-warm',
+        accessoryProfileId: 'accessory-cute',
+    }),
+    'tide': createTheme({
+        label: 'Tide',
+        labelKey: 'viewer.themes.tide',
+        gradientTop: '#e3f6f5',
+        gradientBottom: '#eaf7ec',
+        pattern: 'blobs',
+        blobColors: [
+            { x: 0.2, y: 0.25, color: 'rgba(100, 200, 220, 0.5)' },
+            { x: 0.8, y: 0.2, color: 'rgba(120, 220, 160, 0.45)' },
+            { x: 0.75, y: 0.8, color: 'rgba(90, 160, 230, 0.45)' },
+            { x: 0.15, y: 0.85, color: 'rgba(140, 230, 200, 0.4)' },
+        ],
+        timberProfileId: 'timber-warm',
+        accessoryProfileId: 'accessory-cute',
+    }),
+    'sunbeam': createTheme({
+        label: 'Sunbeam',
+        labelKey: 'viewer.themes.sunbeam',
+        gradientTop: '#fff6e0',
+        gradientBottom: '#ffeef0',
+        pattern: 'blobs',
+        blobColors: [
+            { x: 0.2, y: 0.2, color: 'rgba(255, 210, 120, 0.55)' },
+            { x: 0.8, y: 0.25, color: 'rgba(255, 160, 130, 0.5)' },
+            { x: 0.75, y: 0.85, color: 'rgba(255, 180, 210, 0.45)' },
+            { x: 0.2, y: 0.85, color: 'rgba(255, 230, 150, 0.4)' },
+        ],
+        timberProfileId: 'timber-warm',
+        accessoryProfileId: 'accessory-cute',
     }),
     'slate': createTheme({
         label: 'Slate Night',
@@ -3033,6 +3088,17 @@ class KigumiViewerApp extends LitElement {
             for (let y = 0; y < h; y += sp) {
                 ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
             }
+        } else if (preset.pattern === 'blobs' && Array.isArray(preset.blobColors)) {
+            const radius = Math.max(w, h) * 0.55;
+            for (const blob of preset.blobColors) {
+                const cx = blob.x * w;
+                const cy = blob.y * h;
+                const blobGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, radius);
+                blobGradient.addColorStop(0, blob.color);
+                blobGradient.addColorStop(1, radialFadeColor(blob.color));
+                ctx.fillStyle = blobGradient;
+                ctx.fillRect(0, 0, w, h);
+            }
         }
         const tex = new THREE.CanvasTexture(canvas);
         tex.needsUpdate = true;
@@ -3045,6 +3111,12 @@ class KigumiViewerApp extends LitElement {
         }
         if (preset.pattern === 'grid') {
             return `linear-gradient(rgba(80,140,220,0.12) 0 1px, transparent 1px 24px) 0 0 / 24px 24px repeat, linear-gradient(90deg, rgba(80,140,220,0.12) 0 1px, transparent 1px 24px) 0 0 / 24px 24px repeat, linear-gradient(180deg, ${preset.gradientTop} 0%, ${preset.gradientBottom} 100%)`;
+        }
+        if (preset.pattern === 'blobs' && Array.isArray(preset.blobColors)) {
+            const blobLayers = preset.blobColors
+                .map((blob) => `radial-gradient(circle at ${Math.round(blob.x * 100)}% ${Math.round(blob.y * 100)}%, ${blob.color} 0%, ${radialFadeColor(blob.color)} 60%)`)
+                .join(', ');
+            return `${blobLayers}, linear-gradient(180deg, ${preset.gradientTop} 0%, ${preset.gradientBottom} 100%)`;
         }
         return `linear-gradient(180deg, ${preset.gradientTop} 0%, ${preset.gradientBottom} 100%)`;
     }
