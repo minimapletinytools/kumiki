@@ -124,6 +124,81 @@ class TestFreeHouseJoint:
         assert housing_rendered.contains_point(housing_local_lower), \
             "Z=9.5 should still be inside the housing (relief does not reach the removed region)"
 
+    # 🐪
+    def test_free_house_joint_extends_cut_timber_for_skewed_end_cut(self, symbolic_mode):
+        """
+        A housed CutTimber's un-extended local Z origin sits exactly at the housing's
+        centerline, but a SKEWED end cut (e.g. a miter) means the piece's true, as-cut
+        tip reaches past that origin at one corner of the cross-section. The housing
+        relief must reach that far too -- if the housing carve-out were computed from
+        the un-extended body instead of the extended one, the sharp corner of the miter
+        would get chopped off flat instead of leaving room for the full pointed tip.
+        """
+        # 3x3 vertical housing timber, base at origin, height 20.
+        housing_timber = create_standard_vertical_timber(
+            height=20, size=(3, 3), position=(0, 0, 0), ticket="housing"
+        )
+
+        # 2x2 horizontal +X timber; local x = global Y, local y = global Z, local z = global X.
+        # Bottom (local z=0) sits at global X=0 -- the housing's centerline -- so any material
+        # at global X<0 only exists because the bottom end was extended past local z=0.
+        housed_timber_base = create_timber(
+            length=scalar(20),
+            size=Matrix([scalar(2), scalar(2)]),
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(10)),
+            length_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            width_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+            ticket="housed_base",
+        )
+
+        # Skewed 45-degree miter-style cut in the local x/z plane. Kept (remaining) region
+        # is local_x + local_z > 0. At local_x=0.5 the kept region reaches to local_z=-0.3 --
+        # past the timber's own un-extended bottom (local_z=0) -- while at local_x=-0.5 it's
+        # trimmed back to local_z=0.3.
+        #
+        # maybe_bottom_end_cut_distance_from_bottom is separate axis-aligned bookkeeping
+        # (used for length/bounding-box purposes elsewhere -- see get_maybe_bottom_end_cut)
+        # that gets unioned into the real cut alongside negative_csg. Real miter joints
+        # (cut_plain_miter_joint) always set it to the *outermost* corner of the skewed
+        # plane, so it never removes more than the skewed cut already does. Mirror that
+        # here with a very permissive value so this synthetic cut isn't inadvertently
+        # double-cut by its own bookkeeping distance.
+        skew_normal = safe_normalize_vector(Matrix([scalar(1), scalar(0), scalar(1)]))
+        miter_cut = Cutting(
+            timber=housed_timber_base,
+            maybe_bottom_end_cut_distance_from_bottom=scalar(-100),
+            negative_csg=HalfSpace(normal=-skew_normal, offset=scalar(0)),
+        )
+        housed_cut_timber = CutTimber(housed_timber_base, cuts=[miter_cut])
+        housed_body = housed_cut_timber.render_timber_with_cuts_csg_local()
+
+        joint = cut_free_house_joint(housing_timber, [housed_cut_timber])
+        housing_rendered = _render_cutting(joint.cuttings["housing_timber"])
+
+        # --- Sharp tip (global X=-0.3, Y=0.5, Z=10): past the un-extended bottom (X=0) ---
+        # Kept in the housed body (local_x + local_z = 0.5 + (-0.3) > 0); the housing must
+        # be relieved here even though it lies beyond the timber's own un-extended origin.
+        tip_global = create_v3(scalar(-3, 10), scalar(1, 2), scalar(10))
+        housing_local_tip = housing_timber.transform.global_to_local(tip_global)
+        housed_local_tip = housed_timber_base.transform.global_to_local(tip_global)
+
+        assert housed_body.contains_point(housed_local_tip), \
+            "tip should be kept in the housed body (past the miter's skewed cut point)"
+        assert not housing_rendered.contains_point(housing_local_tip), \
+            "housing must be relieved at the tip -- this only happens if the housed " \
+            "timber's body was extended past its un-extended bottom before cutting"
+
+        # --- Trimmed-back corner (global X=0.3, Y=-0.5, Z=10): removed from the housed body ---
+        # The housing must NOT be relieved here.
+        trimmed_global = create_v3(scalar(3, 10), scalar(-1, 2), scalar(10))
+        housing_local_trimmed = housing_timber.transform.global_to_local(trimmed_global)
+        housed_local_trimmed = housed_timber_base.transform.global_to_local(trimmed_global)
+
+        assert not housed_body.contains_point(housed_local_trimmed), \
+            "trimmed-back corner should have been cut away from the housed body"
+        assert housing_rendered.contains_point(housing_local_trimmed), \
+            "housing must remain solid where the housed body was trimmed away"
+
     def test_free_house_joint_multiple_housed_timbers_relief_union(self, symbolic_mode):
         """
         Two housed timbers should produce one housing relief that removes both occupied regions.

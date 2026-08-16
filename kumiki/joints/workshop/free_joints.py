@@ -48,11 +48,19 @@ def cut_free_house_joint(
             #   housed_prism - (cuts on the housed_timber that intersect the housing_timber)
             # This correctly models the relief cut matching the housed piece including any mortises in it.
 
-            # Housed timber's actual prism in housing_timber's local space
+            # Housed timber's actual prism in housing_timber's local space. Uses the
+            # EXTENDED (semi-infinite at any end with a cut) body, not the raw
+            # un-extended actual CSG: the housed timber's own un-extended box may fall
+            # short of the housing (e.g. a miter cut trims material back from an end
+            # that was never drawn out to meet its neighbor), so cutting the raw box
+            # by the miter/end-cut half-space would chop the tip off short instead of
+            # producing the full pointed corner. Extending first and then subtracting
+            # the cut (below) matches how CutTimber.render_timber_with_cuts_csg_local
+            # already renders this same timber for display.
             housed_prism_in_housing = adopt_csg(
                 housed_timber.timber.transform,
                 housing_timber.transform,
-                housed_timber.timber.get_actual_csg_local(),
+                housed_timber._extended_timber_without_cuts_csg_local(),
             )
 
             # AABB of the housed_timber's prism in housing_timber's local space (used for pruning below)
