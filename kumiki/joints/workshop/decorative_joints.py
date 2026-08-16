@@ -2,9 +2,10 @@
 Kumiki - Decorative joint construction functions
 """
 
+import warnings
 from typing import Dict, List, Tuple
 
-from sympy import Matrix
+from sympy import Abs, Matrix
 
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, Cutting, Joint, JointTicket
 from kumiki.rule import Numeric, Comparison, safe_compare, scalar, Transform, Orientation
@@ -158,8 +159,97 @@ def cut_practice_rounded_end_decoration(
     distance_from_end: Numeric,
     lateral_offset: Numeric = 0
 ) -> Joint:
-    #warn if distance_from_end is less than radius
-    assert "not implemneted"
+    """
+    Rounds off `rounded_end` of `timber` with a single large-radius arc spanning
+    the full width perpendicular to both `rounded_face` and `rounded_end` -- a
+    gentle bowed/bullnose end profile, visible as a curved outline when looking
+    straight at `rounded_face` (the arc's plane is perpendicular to
+    `rounded_face`'s normal, i.e. that normal is the cylinder's own axis).
+
+    The cylinder (of `radius`) is centered `distance_from_end` in from the
+    timber's actual `rounded_end` face, offset laterally by `lateral_offset`
+    (positive is toward `rounded_end.rotate_about(rounded_face)`). Only the
+    material outside that cylinder is removed.
+
+    If `distance_from_end` is less than `radius`, the cylinder's surface passes
+    beyond the actual end at the lateral center, so a flat band survives there
+    and only the corners get rounded off (a filleted-corner rectangle) rather
+    than a single continuous arc spanning the whole width -- a warning is
+    raised in that case since it may not be the intended look.
+    """
+    if safe_compare(distance_from_end, radius, Comparison.LT):
+        warnings.warn(
+            f"cut_practice_rounded_end_decoration: distance_from_end ({distance_from_end}) is less than "
+            f"radius ({radius}) on {timber.ticket.path}'s {rounded_end.name} -- the lateral center will "
+            f"stay flat/unrounded and only the corners will be filleted, rather than a single continuous "
+            f"arc across the whole width.",
+            stacklevel=2,
+        )
+
+    # The face perpendicular to both given faces -- the axis the arc spans
+    # across (e.g. the board's width, for rounded_face=FRONT/rounded_end=TOP).
+    span_face = rounded_end.rotate_about(rounded_face)
+
+    axis_dir = timber.get_face_direction_global(rounded_face)
+    end_dir = timber.get_face_direction_global(rounded_end)
+    span_dir = timber.get_face_direction_global(span_face)
+
+    half_span_reach = _available_extent_in_face_normal_axis(timber, span_face)
+    assert safe_compare(radius - (half_span_reach + Abs(lateral_offset)), 0, Comparison.GE), (
+        f"radius {radius} is too small to span {rounded_end.name}'s full width from a lateral offset of "
+        f"{lateral_offset} (needs at least {half_span_reach + Abs(lateral_offset)})"
+    )
+
+    # Point on the actual end face, at the given lateral offset -- the local
+    # origin (start_distance=0 equivalent) for both the prism and the cylinder.
+    end_reference = get_center_point_on_face_global(rounded_end, timber) + span_dir * lateral_offset
+    cylinder_center = end_reference - end_dir * distance_from_end
+
+    cylinder = Cylinder(
+        axis_direction=axis_dir,
+        radius=radius,
+        position=cylinder_center,
+        start_distance=-timber.get_half_rough_size_in_face_normal_axis(rounded_face.get_opposite_face()),
+        end_distance=timber.get_half_rough_size_in_face_normal_axis(rounded_face),
+    )
+
+    # A generously-oversized prism covering the corner region -- from exactly
+    # the cylinder's center distance back to the actual end (tight, since that
+    # fully brackets where the cylinder's surface can be, given the assertion
+    # above), and comfortably wider than the cross-section in every other
+    # direction (harmless -- nothing exists there to over-cut).
+    prism_orientation = Orientation(Matrix([
+        [span_dir[0], axis_dir[0], end_dir[0]],
+        [span_dir[1], axis_dir[1], end_dir[1]],
+        [span_dir[2], axis_dir[2], end_dir[2]],
+    ]))
+    prism_span_size = scalar(2) * (half_span_reach + Abs(lateral_offset) + radius)
+    prism_axis_size = (
+        timber.get_half_rough_size_in_face_normal_axis(rounded_face)
+        + timber.get_half_rough_size_in_face_normal_axis(rounded_face.get_opposite_face())
+    )
+    prism = RectangularPrism(
+        size=Matrix([prism_span_size, prism_axis_size]),
+        transform=Transform(position=end_reference, orientation=prism_orientation),
+        start_distance=-distance_from_end,
+        end_distance=radius,
+    )
+
+    negative_csg = adopt_csg(
+        None,
+        timber.transform,
+        Difference(base=prism, subtract=[cylinder], label="rounded_end_decoration"),
+    )
+    cutting = Cutting(
+        timber=timber,
+        negative_csg=negative_csg,
+        label="rounded_end_decoration",
+    )
+    return Joint(
+        cuttings={timber.ticket.path: cutting},
+        ticket=JointTicket(joint_type="rounded_end_decoration"),
+    )
+
 #_______________
 #               |
 #______________◜  ←scallop_height

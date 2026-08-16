@@ -1,6 +1,7 @@
 """Tests for decorative joints."""
 
 import math
+import warnings
 
 import pytest
 from sympy import Matrix
@@ -8,10 +9,11 @@ from sympy import Matrix
 from kumiki.joints.workshop.decorative_joints import (
     cut_practice_roundover_decoration,
     cut_practice_rafter_tail_scallop_decoration,
+    cut_practice_rounded_end_decoration,
 )
 from kumiki.ticket import TimberTicket
 from kumiki.rule import scalar, Transform
-from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberLongFace
+from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberFace, TimberLongFace
 from kumiki.cutcsg import Difference, Cylinder
 from kumiki.triangles import triangulate_cutcsg
 
@@ -181,3 +183,108 @@ class TestRafterTailScallopDecoration:
         assert not cutting.negative_csg.contains_point(far_flat_region)
         front_half_at_end = Matrix([0.0, 2.0, float(LENGTH)])
         assert not cutting.negative_csg.contains_point(front_half_at_end)
+
+
+class TestRoundedEndDecoration:
+    """Tests for cut_practice_rounded_end_decoration.
+
+    Uses rounded_face=RIGHT, rounded_end=TOP throughout: the cylinder axis runs
+    along X (WIDTH), so it doesn't matter which X the test points use, and the
+    arc spans Y (HEIGHT, half-extent 3) at the TOP end (Z=LENGTH=12).
+    """
+
+    def _result(self, radius, distance_from_end, lateral_offset=scalar(0)):
+        timber = _make_timber()
+        joint = cut_practice_rounded_end_decoration(
+            timber,
+            rounded_face=TimberFace.RIGHT,
+            rounded_end=TimberFace.TOP,
+            radius=radius,
+            distance_from_end=distance_from_end,
+            lateral_offset=lateral_offset,
+        )
+        cutting = joint.cuttings["timber"]
+        full_prism = timber.get_perfect_timber_within_csg_local()
+        result_csg = Difference(base=full_prism, subtract=[cutting.negative_csg])
+        return joint, cutting, result_csg
+
+    def test_joint_structure(self):
+        joint, cutting, _ = self._result(radius=scalar(5), distance_from_end=scalar(5))
+
+        assert joint.ticket.joint_type == "rounded_end_decoration"
+        assert joint.is_decorative()
+        assert set(joint.cuttings.keys()) == {"timber"}
+        assert cutting.label == "rounded_end_decoration"
+        assert cutting.negative_csg is not None
+
+    def test_watertight(self):
+        _, _, result_csg = self._result(radius=scalar(5), distance_from_end=scalar(5))
+        mesh = triangulate_cutcsg(result_csg).mesh
+        assert mesh.is_watertight
+
+    def test_tangent_at_center_recedes_toward_corners(self):
+        # distance_from_end == radius: the arc is tangent to the original
+        # boundary exactly at the lateral center (Y=0) and recedes by the
+        # sagitta -- radius - sqrt(radius**2 - half_extent**2) = 5 - 4 = 1 --
+        # at the full corner (Y=half_extent=3), i.e. the corner's new boundary
+        # is at Z=11.
+        _, _, result_csg = self._result(radius=scalar(5), distance_from_end=scalar(5))
+
+        center_near_end = Matrix([0.0, 0.0, float(LENGTH) - 0.01])
+        assert result_csg.contains_point(center_near_end)
+
+        corner_at_original_end = Matrix([0.0, 3.0, float(LENGTH)])
+        assert not result_csg.contains_point(corner_at_original_end)
+
+        corner_within_recession = Matrix([0.0, 3.0, float(LENGTH) - 0.1])  # Z=11.9 > 11 -> removed
+        assert not result_csg.contains_point(corner_within_recession)
+
+        corner_past_recession = Matrix([0.0, 3.0, float(LENGTH) - 1.5])  # Z=10.5 < 11 -> kept
+        assert result_csg.contains_point(corner_past_recession)
+
+        far_from_end = Matrix([0.0, 0.0, 5.0])
+        assert result_csg.contains_point(far_from_end)
+
+    def test_flat_center_when_distance_from_end_less_than_radius(self):
+        # distance_from_end=2 < radius=5: the flat band half-width
+        # sqrt(radius**2 - distance_from_end**2) = sqrt(21) ~= 4.58 exceeds
+        # the timber's own half-extent (3), so nothing is removed anywhere
+        # across the whole width -- not even the corners.
+        with pytest.warns(UserWarning, match="distance_from_end"):
+            _, _, result_csg = self._result(radius=scalar(5), distance_from_end=scalar(2))
+
+        center_at_end = Matrix([0.0, 0.0, float(LENGTH)])
+        assert result_csg.contains_point(center_at_end)
+        corner_at_end = Matrix([0.0, 3.0, float(LENGTH)])
+        assert result_csg.contains_point(corner_at_end)
+
+    def test_distance_from_end_equal_to_radius_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            self._result(radius=scalar(5), distance_from_end=scalar(5))
+
+    def test_lateral_offset_shifts_the_bulge(self):
+        # rounded_end.rotate_about(rounded_face) = TOP.rotate_about(RIGHT) = BACK,
+        # whose direction is -Y, so positive lateral_offset shifts the arc's
+        # center toward -Y. That makes the -Y corner recede less (it's now
+        # closer to the shifted center): its new boundary moves from Z=11
+        # (centered) to Z=12-(5-sqrt(25-4))~=11.58. At Z=11.3 (between those
+        # two boundaries), the -Y corner point flips from removed (centered)
+        # to kept (offset).
+        _, _, centered = self._result(radius=scalar(5), distance_from_end=scalar(5))
+        _, _, offset = self._result(radius=scalar(5), distance_from_end=scalar(5), lateral_offset=scalar(1))
+
+        probe = Matrix([0.0, -3.0, 11.3])
+        assert not centered.contains_point(probe)
+        assert offset.contains_point(probe)
+
+    def test_radius_too_small_for_width_raises(self):
+        timber = _make_timber()
+        with pytest.raises(AssertionError, match="too small"):
+            cut_practice_rounded_end_decoration(
+                timber,
+                rounded_face=TimberFace.RIGHT,
+                rounded_end=TimberFace.TOP,
+                radius=scalar(1),  # half-extent along Y is 3 > radius
+                distance_from_end=scalar(1),
+            )
