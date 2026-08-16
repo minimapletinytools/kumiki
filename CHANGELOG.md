@@ -8,6 +8,42 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-08-15
+
+### kumiki
+
+#### Added
+
+- Added `CutTimber.from_joints(timber, joints)`: builds a `CutTimber` by collecting every `Cutting` across a list of `Joint`s whose `.timber` is that exact timber (matched by identity, the same rule `Frame.from_joints` uses). Lets joint functions that need "this timber's actual body so far" (e.g. `cut_free_house_joint`'s `housed_timbers`) do so without hand-picking a `Joint.cuttings["timberA"/"timberB"]` key, which is easy to pair with the wrong timber.
+- Added a rounded-end decorative cut: `cut_practice_rounded_end_decoration(timber, rounded_face, rounded_end, radius, distance_from_end, lateral_offset=0)`. Carves a single large-radius arc across the full width perpendicular to `rounded_face`/`rounded_end` -- a gentle bowed/bullnose end profile. `distance_from_end == radius` is tangent at the lateral center and recedes toward the corners (a continuous corner-to-corner bulge); less than `radius` leaves the center flat with only the corners filleted (a warning is raised in that case).
+- Added `notch_from` (`NotchFrom.Shoulder | NotchFrom.Face`) to `ButtJointNotchReliefConfig`: `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` / `_on_face_aligned_timbers` can now anchor the 2-sided notch relief to the mortise's entry face instead of the real (possibly inset) shoulder. Replaces the internal-only `DisableInsetShoulderNotchingReliefConfig` with a general `shoulder_relief_style` param (`None | Rough | PerfectOnly`) on `cut_mortise_and_tenon_joint`. Added `chop_rough_relief_on_long_faces_beyond_shoulder_plane` (`relief.py`) to trim the tenon's own rough-stock excess near the shoulder, which a tight `PerfectOnly` pocket no longer covers.
+- Added a "coffee table" structure example (`patterns/structures/coffee_table.py`).
+- `attach_plane_aligned_timber` / `attach_face_aligned_timber` now auto-flip `original_timber_long_face_that_attached_timber_points_to` to the opposite long face (with a warning) if the requested orientation would produce a non-positive attached-timber length, only raising the original assertion if both directions fail.
+
+#### Changed
+
+- **Breaking:** `export_cut_timber_stl` / `export_cut_timber_step` / `export_frame_stl` / `export_frame_obj` / `export_frame_3mf` (and the STEP frame export) gained a keyword-only `local: bool = True` parameter. Per-part files are now exported in each part's own local coordinates (bottom at the origin) by default, rather than always in global (assembled) coordinates; a `combined` merged file, when requested, is still always global.
+  **Migrate:** pass `local=False` at call sites that relied on the old always-global behavior for individual part files.
+- Removed the deprecated `normalize_vector` / `zero_test` (and `vector_magnitude` / `equality_test`) aliases from `rule.py`; all call sites across `kumiki/`, `patterns/`, and `tests/` now use `safe_normalize_vector` / `safe_zero_test` directly.
+- Removed the broken `CSG_debug_patterns.py` example patterns.
+
+#### Fixed
+
+- Fixed `cut_free_house_joint`: the housed timber's body was built from its raw, un-extended box, so an end cut whose plane is skewed (e.g. a miter) -- where one corner of the cross-section reaches past the timber's own un-extended origin -- had that corner chopped off flat in the housing relief instead of leaving room for the full pointed tip. Now built from the same extended-then-cut body `CutTimber.render_timber_with_cuts_csg_local` already uses for rendering.
+
+### kigumi
+
+#### Added
+
+- Added two new geometry render modes to the viewer's geometry dropdown: "perfect box (no joints)" and "rough box (no joints)" -- a plain rectangular box (no CSG joint cuts at all) sized to the timber's perfect or rough cross-section, cropped in length by the frame's aggregated end-cut trims. The existing "actual" mode is relabeled "rough (actual geometry)" for clarity against the new rough/perfect distinction.
+- Added a right-click context menu on a timber (in 3D space or the timber list) with "export as stl" / "export as step", exporting just that one member.
+- Added an orthographic/perspective camera projection toggle to the viewer.
+- Added a folder watcher that automatically refreshes the Kigumi sidebar when new `.py` files are created in the workspace, gated by the `kigumi.sidebar.autoRefreshOnNewFile` setting (default on).
+
+#### Fixed
+
+- Fixed the right-click face picker reporting the wrong face name for the FRONT/BACK faces (a swapped-label bug in `_detect_face_label`).
+
 ## [0.4.8] - 2026-08-10
 
 ### kumiki
