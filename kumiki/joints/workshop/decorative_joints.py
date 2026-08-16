@@ -148,7 +148,18 @@ def cut_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]
 
 
 
-
+def cut_practice_rounded_end_decoration(
+    timber: BlockLike,
+    # so the round shape is visible on this face
+    rounded_face: TimberFace,
+    # and the round shape is cut towards this face
+    rounded_end: TimberFace,
+    radius: Numeric,
+    distance_from_end: Numeric,
+    lateral_offset: Numeric = 0
+) -> Joint:
+    #warn if distance_from_end is less than radius
+    assert "not implemneted"
 #_______________
 #               |
 #______________◜  ←scallop_height
