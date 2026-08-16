@@ -933,6 +933,74 @@ class TestCutTimber:
         assert isinstance(csg.subtract[0], HalfSpace)
 
 
+class TestCutTimberFromJoints:
+    """Test CutTimber.from_joints."""
+
+    def test_collects_cuttings_for_timber_across_joints(self):
+        """Cuttings for `timber` from every joint are collected, in joint order."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket="Timber A"
+        )
+        cut1 = Cutting(timber=timber, maybe_bottom_end_cut_distance_from_bottom=scalar(5))
+        cut2 = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=scalar(90))
+        joint1 = Joint(cuttings={"timberA": cut1}, ticket=JointTicket(joint_type="j1"), jointAccessories={})
+        joint2 = Joint(cuttings={"timberA": cut2}, ticket=JointTicket(joint_type="j2"), jointAccessories={})
+
+        cut_timber = CutTimber.from_joints(timber, [joint1, joint2])
+
+        assert cut_timber.timber is timber
+        assert cut_timber.cuts == [cut1, cut2]
+
+    def test_ignores_cuttings_for_other_timbers(self):
+        """Cuttings whose .timber is a different (even if structurally identical) timber are excluded."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket="Timber A"
+        )
+        other_timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket="Timber B"
+        )
+        cut_for_timber = Cutting(timber=timber)
+        cut_for_other = Cutting(timber=other_timber)
+        joint = Joint(
+            cuttings={"timberA": cut_for_timber, "timberB": cut_for_other},
+            ticket=JointTicket(joint_type="j"),
+            jointAccessories={},
+        )
+
+        cut_timber = CutTimber.from_joints(timber, [joint])
+
+        assert cut_timber.cuts == [cut_for_timber]
+
+    def test_empty_when_no_joints_reference_timber(self):
+        """A timber not referenced by any joint gets an empty (uncut) CutTimber."""
+        timber = create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket="Lonely Timber"
+        )
+        cut_timber = CutTimber.from_joints(timber, [])
+        assert cut_timber.timber is timber
+        assert cut_timber.cuts == []
+
+
 class TestFrameFromJoints:
     """Test Frame.from_joints constructor."""
     

@@ -1756,6 +1756,37 @@ class CutTimber:
         """Get the name from the underlying timber's ticket."""
         return self.timber.ticket.path
 
+    @classmethod
+    def from_joints(cls, timber: PerfectTimberWithin, joints: List['Joint']) -> 'CutTimber':
+        """
+        Build a CutTimber for `timber` by collecting every Cutting across `joints`
+        whose Cutting.timber is this exact timber (matched by identity -- the same
+        matching Frame.from_joints uses to merge cuttings for a timber across the
+        whole frame).
+
+        Useful when a joint function needs "this timber's actual body so far" (e.g.
+        cut_free_house_joint's housed_timbers) but the timber has cuts from more than
+        one joint (e.g. a corner miter plus a roundover decoration): rather than
+        manually picking which Joint.cuttings key belongs to which timber (easy to
+        mix up -- see cuttings["timberA"] vs cuttings["timberB"]), this collects
+        every relevant cutting automatically, in the order `joints` are given.
+
+        Args:
+            timber: The timber to build a CutTimber for
+            joints: Joints to search for cuttings on `timber`. Joints that don't
+                involve `timber` at all contribute nothing.
+
+        Returns:
+            CutTimber wrapping `timber` with all matching cuts, in joint order.
+        """
+        cuts = [
+            cutting
+            for joint in joints
+            for cutting in joint.cuttings.values()
+            if cutting.timber is timber
+        ]
+        return cls(timber, cuts=cuts)
+
     # this one returns the timber without cuts where ends with joints are infinite in length
     def _extended_timber_without_cuts_csg_local(self) -> CutCSG:
         """
