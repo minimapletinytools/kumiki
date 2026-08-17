@@ -1672,6 +1672,47 @@ def _is_point_on_csg_boundary_float(csg: Any, pt: List[float], eps: float = 1e-4
     return False
 
 
+# Prism-local generic label -> (axis index into a rotation matrix's columns, sign).
+# Column `axis_index` of a prism's forward rotation matrix is that prism-local
+# axis expressed in the outer (timber-local) space -- see _build_inv_transform_float.
+_GENERIC_LABEL_AXIS = {
+    "right": (0, 1.0), "left": (0, -1.0),
+    "front": (1, 1.0), "back": (1, -1.0),
+    "top": (2, 1.0), "bottom": (2, -1.0),
+}
+_TIMBER_LOCAL_FACE_NORMALS = (
+    ("right", (1.0, 0.0, 0.0)), ("left", (-1.0, 0.0, 0.0)),
+    ("front", (0.0, 1.0, 0.0)), ("back", (0.0, -1.0, 0.0)),
+    ("top", (0.0, 0.0, 1.0)), ("bottom", (0.0, 0.0, -1.0)),
+)
+
+
+def _generic_label_in_timber_local_space(rot: List[List[float]], prism_local_label: str) -> str:
+    """Re-express a prism-local generic face label in the outer timber's own
+    six canonical face directions.
+
+    Some RectangularPrisms are built in their own local space, independent of
+    (and sometimes flipped relative to) the timber's own top/bottom/etc.
+    convention -- e.g. a tenon's marking_space, whose local Z points along
+    whichever direction the tenon protrudes, not the timber's own length axis.
+    A user browsing a timber's faces only ever wants an answer relative to
+    THAT timber, never relative to some CSG primitive's own incidental local
+    frame, so re-project the matched face's outward normal into timber-local
+    space and report whichever of the timber's six directions it best matches.
+    """
+    axis_index, sign = _GENERIC_LABEL_AXIS[prism_local_label]
+    normal = [sign * rot[0][axis_index], sign * rot[1][axis_index], sign * rot[2][axis_index]]
+
+    best_label = prism_local_label
+    best_dot = -2.0
+    for label, direction in _TIMBER_LOCAL_FACE_NORMALS:
+        dot = normal[0]*direction[0] + normal[1]*direction[1] + normal[2]*direction[2]
+        if dot > best_dot:
+            best_dot = dot
+            best_label = label
+    return best_label
+
+
 def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
     """Determine which face of a primitive CSG node *pt* lies on."""
     from kumiki.cutcsg import HalfSpace, RectangularPrism, Cylinder, PrismFace
@@ -1727,7 +1768,7 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
                     if face == target_face:
                         return name
 
-            return generic_label
+            return _generic_label_in_timber_local_space(rot, generic_label)
         return "face"
 
     if isinstance(csg, Cylinder):
