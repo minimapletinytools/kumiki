@@ -1674,7 +1674,7 @@ def _is_point_on_csg_boundary_float(csg: Any, pt: List[float], eps: float = 1e-4
 
 def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
     """Determine which face of a primitive CSG node *pt* lies on."""
-    from kumiki.cutcsg import HalfSpace, RectangularPrism, Cylinder
+    from kumiki.cutcsg import HalfSpace, RectangularPrism, Cylinder, PrismFace
 
     if isinstance(csg, HalfSpace):
         return getattr(csg, "named_feature", None) or "cut_plane"
@@ -1701,7 +1701,33 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
         within_eps = [(label, d) for label, d in candidates if d < eps]
         if within_eps:
             within_eps.sort(key=lambda c: c[1])
-            return within_eps[0][0]
+            generic_label = within_eps[0][0]
+
+            # Some RectangularPrisms are built in their OWN local space, unrelated
+            # to the outer timber's own length axis (e.g. a tenon's marking_space,
+            # whose local Z points along whichever direction the tenon protrudes --
+            # not the timber's own top/bottom). For those, generic_label's
+            # "top"/"bottom" is only meaningful within that sub-prism's own frame
+            # and can be actively misleading (e.g. a BOTTOM-end tenon's outward tip
+            # sits at that sub-prism's own end_distance, i.e. generic "top"). Prefer
+            # the prism's own named_features, if it declares one for this face, over
+            # the geometry-only guess.
+            named_features = getattr(csg, "named_features", None)
+            if named_features:
+                face_by_label = {
+                    "top": PrismFace.TOP,
+                    "bottom": PrismFace.BOTTOM,
+                    "right": PrismFace.RIGHT,
+                    "left": PrismFace.LEFT,
+                    "front": PrismFace.FRONT,
+                    "back": PrismFace.BACK,
+                }
+                target_face = face_by_label.get(generic_label)
+                for name, face in named_features:
+                    if face == target_face:
+                        return name
+
+            return generic_label
         return "face"
 
     if isinstance(csg, Cylinder):

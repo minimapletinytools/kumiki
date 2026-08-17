@@ -210,6 +210,9 @@ DONE-rough/perfect timber within bounding box rendering
   -perfect box
   -rough box
 
+-fix tusk failing from other direction bug
+DONE-fix top end being backwards bug
+-add N/S/E/W labels to the cube
 -create helper method for building cut timber from list of joints
 -house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
 
