@@ -95,7 +95,31 @@ def make_timber_imperfect_opposite_edge(
 # - East side (X = 12') has length 16'
 # - West side (X = 0) has length 16'
 base_width = feet(12)   # East-West width (12 feet)
-base_length = feet(16)  # North-South length (16 feet)
+length_feet = 16
+base_length = feet(length_feet)  # North-South length (16 feet)
+
+# Number of floor joists spanning between the East and West mudsills.
+# Evenly spaced along the mudsill length (base_length / (num_joists + 1) per gap),
+# leaving one spacing gap between the first/last joist and each mudsill end so the
+# joists clear the corner-post mortises there.
+# The middle 1 joist (if num_joists is odd) or 2 joists (if even) use a pegged
+# mortise-and-tenon joint; the rest use a drop-in housed butt joint.
+num_joists = length_feet // 3
+
+# Number of rafter pairs (each pair = one West + one East rafter meeting at the ridge).
+# The outer 2 rafter pairs on each side keep their existing alignment:
+#   - the outermost pair stays flush with the top-plate overhang end
+#   - the 2nd pair stays aligned with the mudsill end (where the corner post /
+#     collar tie sits, the "gable bent")
+# The remaining pairs are evenly spaced between the two gable-bent pairs.
+# Must be >= 4 (2 aligned pairs on each side).
+num_rafter_pairs = length_feet // 2 + 1
+
+# Number of mid-wall posts on the East and West walls (in addition to the 4 corner
+# posts), evenly spaced between the corner posts. Each mid post gets its own tie beam
+# to its opposite-wall counterpart, and knee braces leaning into both of its
+# neighboring bays. 0 removes mid posts entirely (a single long bay per wall).
+num_ew_mid_posts = length_feet // 9
 
 # Mudsill size: 8" vertical height, 7" horizontal width
 # Note: size[0] is the vertical Z-dimension, size[1] is the horizontal depth perpendicular to the footprint boundary
@@ -108,9 +132,6 @@ mudsill_size = create_v2(mudsill_height, mudsill_width)
 joist_height = inches(7)
 joist_width = inches(5)
 joist_size = create_v2(joist_height, joist_width)
-
-# Spacing: 2'8" (which is 8/3 feet) center-to-center
-joist_spacing = feet(8, 3)
 
 # Post size: 7"x7" cross-section
 # Height = mudsill top (8") + 9'4" = 8" + 112" = 120" = 10'. Posts sit at Z=0, tops at Z=10'.
@@ -268,9 +289,10 @@ def build_shed_frame() -> Frame:
     # The joists extend 3" into the mudsills for support (attached_timber_stickout).
 
     joists = []
-    # We want 5 joists spaced 2'8" apart:
-    # 2'8", 5'4", 8'0", 10'8", 13'4"
-    for i in range(1, 6):
+    # Evenly space num_joists joists along the mudsill length, leaving one spacing
+    # gap between the first/last joist and each mudsill end.
+    joist_spacing = base_length / scalar(num_joists + 1)
+    for i in range(1, num_joists + 1):
         loc = joist_spacing * scalar(i)
         joist = attach_face_aligned_timber(
             original_timber=east_mudsill,
@@ -294,81 +316,80 @@ def build_shed_frame() -> Frame:
 
     # 5. Join the joists to the sills
     joist_joints = []
-    
-    # Middle joist (Joist 3, index 2) is joined with a mortise and tenon joint
-    # - Tenon: 1.5" thick (vertical/local X), 5" wide (horizontal/local Y)
+
+    # Middle joist(s) (1 if num_joists is odd, 2 if even) are joined with a mortise
+    # and tenon joint; every other joist uses a drop-in housed butt joint.
+    # - M&T Tenon: 1.5" thick (vertical/local X), 5" wide (horizontal/local Y)
     # - Position: bottom of the tenon is 4.5" below the top of the sill.
     #   Since top face is LEFT (local -X at -3.5"), the bottom of the tenon is at local X = +1.0"
     #   (which is 4.5" below -3.5").
     #   Tenon thickness is 1.5", so the tenon spans from local X = -0.5" to +1.0".
     #   Center of the tenon is at local X = +0.25" (+1/4" offset).
-    joist3_tenon_size = create_v2(inches(1.5), inches(5))
-    joist3_tenon_length = inches(3)
-    joist3_mortise_depth = inches(13, 4) # 3.25"
-    joist3_tenon_position = create_v2(inches(1, 4), scalar(0)) # +0.25" local X (depth to bottom is 4.5")
+    # - Butt joint: joist extends 3" into sills, so housing_length = 3", housing_width = 5"
+    #   (width of joist), housing_depth = 4.5" (pocket depth; remaining 2.5" of the 7" joist is cut away).
+    joist_tenon_size = create_v2(inches(1.5), inches(5))
+    joist_tenon_length = inches(3)
+    joist_mortise_depth = inches(13, 4) # 3.25"
+    joist_tenon_position = create_v2(inches(1, 4), scalar(0)) # +0.25" local X (depth to bottom is 4.5")
 
-    # East end of Floor Joist 3
-    joint_joist3_east = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=east_mudsill,
-            butt_timber=joists[2],
-            butt_timber_end=TimberEnd.BOTTOM,
-            front_face_on_butt_timber=TimberLongFace.LEFT,
-        ),
-        tenon_size=joist3_tenon_size,
-        tenon_length=joist3_tenon_length,
-        mortise_depth=joist3_mortise_depth,
-        tenon_position=joist3_tenon_position,
-        peg_parameters=peg_params, # Added peg!
-    )
-    # West end of Floor Joist 3
-    joint_joist3_west = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=west_mudsill,
-            butt_timber=joists[2],
-            butt_timber_end=TimberEnd.TOP,
-            front_face_on_butt_timber=TimberLongFace.LEFT,
-        ),
-        tenon_size=joist3_tenon_size,
-        tenon_length=joist3_tenon_length,
-        mortise_depth=joist3_mortise_depth,
-        tenon_position=joist3_tenon_position,
-        peg_parameters=peg_params, # Added peg!
-    )
-    joist_joints.extend([joint_joist3_east, joint_joist3_west])
+    if num_joists % 2 == 1:
+        mortise_and_tenon_joist_indices = {num_joists // 2}
+    else:
+        mortise_and_tenon_joist_indices = {num_joists // 2 - 1, num_joists // 2}
 
-    # Other joists (Joists 1, 2, 4, 5) are joined with the drop-in housed butt joint
-    # - Joist extends 3" into sills, so housing_length = 3"
-    # - Housing width = 5" (width of joist)
-    # - Housing depth = 4.5" (so the pocket is 4.5" deep, and the remaining 2.5" bottom section of the 7" joist is cut away)
-    for idx in [0, 1, 3, 4]:
-        joist = joists[idx]
-        # East end
-        joint_east = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
-            arrangement=ButtJointTimberArrangement(
-                receiving_timber=east_mudsill,
-                butt_timber=joist,
-                butt_timber_end=TimberEnd.BOTTOM,
-                front_face_on_butt_timber=TimberLongFace.LEFT,
-            ),
-            receiving_timber_shoulder_inset=scalar(0),
-            housing_length=inches(3),
-            housing_width=inches(5),
-            housing_depth=inches(9, 2), # 4.5" depth
-        )
-        # West end
-        joint_west = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
-            arrangement=ButtJointTimberArrangement(
-                receiving_timber=west_mudsill,
-                butt_timber=joist,
-                butt_timber_end=TimberEnd.TOP,
-                front_face_on_butt_timber=TimberLongFace.LEFT,
-            ),
-            receiving_timber_shoulder_inset=scalar(0),
-            housing_length=inches(3),
-            housing_width=inches(5),
-            housing_depth=inches(9, 2), # 4.5" depth
-        )
+    for idx, joist in enumerate(joists):
+        if idx in mortise_and_tenon_joist_indices:
+            joint_east = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=ButtJointTimberArrangement(
+                    receiving_timber=east_mudsill,
+                    butt_timber=joist,
+                    butt_timber_end=TimberEnd.BOTTOM,
+                    front_face_on_butt_timber=TimberLongFace.LEFT,
+                ),
+                tenon_size=joist_tenon_size,
+                tenon_length=joist_tenon_length,
+                mortise_depth=joist_mortise_depth,
+                tenon_position=joist_tenon_position,
+                peg_parameters=peg_params,
+            )
+            joint_west = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+                arrangement=ButtJointTimberArrangement(
+                    receiving_timber=west_mudsill,
+                    butt_timber=joist,
+                    butt_timber_end=TimberEnd.TOP,
+                    front_face_on_butt_timber=TimberLongFace.LEFT,
+                ),
+                tenon_size=joist_tenon_size,
+                tenon_length=joist_tenon_length,
+                mortise_depth=joist_mortise_depth,
+                tenon_position=joist_tenon_position,
+                peg_parameters=peg_params,
+            )
+        else:
+            joint_east = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
+                arrangement=ButtJointTimberArrangement(
+                    receiving_timber=east_mudsill,
+                    butt_timber=joist,
+                    butt_timber_end=TimberEnd.BOTTOM,
+                    front_face_on_butt_timber=TimberLongFace.LEFT,
+                ),
+                receiving_timber_shoulder_inset=scalar(0),
+                housing_length=inches(3),
+                housing_width=inches(5),
+                housing_depth=inches(9, 2), # 4.5" depth
+            )
+            joint_west = cut_dropin_housed_butt_joint_on_face_aligned_timbers(
+                arrangement=ButtJointTimberArrangement(
+                    receiving_timber=west_mudsill,
+                    butt_timber=joist,
+                    butt_timber_end=TimberEnd.TOP,
+                    front_face_on_butt_timber=TimberLongFace.LEFT,
+                ),
+                receiving_timber_shoulder_inset=scalar(0),
+                housing_length=inches(3),
+                housing_width=inches(5),
+                housing_depth=inches(9, 2), # 4.5" depth
+            )
         joist_joints.extend([joint_east, joint_west])
 
     # 6. Place 6 posts (7"x7") on the inside of the footprint and join to mudsills.
@@ -425,28 +446,40 @@ def build_shed_frame() -> Frame:
         ticket=TimberTicket(path="northwest-corner-post", tags=("post",))
     )
 
-    # --- Mid-side posts: East and West sides at 8' midpoint ---
-    mid_side_distance = base_length / scalar(2)  # 8' along 16' side
+    # --- Mid-wall posts: East and West sides, evenly spaced between the corner posts ---
+    # num_ew_mid_posts posts per wall divide it into (num_ew_mid_posts + 1) equal bays.
+    # Posts are paired south-to-north by index (west_mid_posts[i] <-> east_mid_posts[i]),
+    # e.g. with 1 mid post per wall (the original design) each sits at the 8' midpoint of
+    # the 16' wall.
+    # create_vertical_timber_on_footprint_side measures distance_along_side from the side's
+    # start corner: the East mudsill's side (index 1) runs South->North (corner 1 -> corner 2),
+    # but the West mudsill's side (index 3) runs North->South (corner 3 -> corner 0) -- so the
+    # same south-relative Y position requires *reversed* distance_along_side on the West side.
+    def _build_mid_wall_posts(footprint_side_index, ticket_prefix, measure_from_south):
+        posts = []
+        for i in range(1, num_ew_mid_posts + 1):
+            y_from_south = base_length * scalar(i) / scalar(num_ew_mid_posts + 1)
+            distance_along_side = y_from_south if measure_from_south else (base_length - y_from_south)
+            posts.append(create_vertical_timber_on_footprint_side(
+                footprint, footprint_side_index, distance_along_side, post_height, FootprintLocation.INSIDE, post_size,
+                ticket=TimberTicket(path=f"{ticket_prefix}-mid-post-{i}", tags=("post",))
+            ))
+        return posts
 
-    post_east_center = create_vertical_timber_on_footprint_side(
-        footprint, 1, mid_side_distance, post_height, FootprintLocation.INSIDE, post_size,
-        ticket=TimberTicket(path="east-center-post", tags=("post",))
-    )
-    post_west_center = create_vertical_timber_on_footprint_side(
-        footprint, 3, mid_side_distance, post_height, FootprintLocation.INSIDE, post_size,
-        ticket=TimberTicket(path="west-center-post", tags=("post",))
-    )
+    east_mid_posts = _build_mid_wall_posts(1, "east", measure_from_south=True)
+    west_mid_posts = _build_mid_wall_posts(3, "west", measure_from_south=False)
 
     # Enlarge posts by 1/2" on the faces opposite to their reference edges:
     # - Corner posts reference edge: outside corner (LEFT_BACK)
-    # - West center post reference edge: north outside corner (LEFT_BACK)
-    # - East center post reference edge: north outside corner (BACK_RIGHT)
+    # - West mid posts reference edge: north outside corner (LEFT_BACK)
+    # - East mid posts reference edge: north outside corner (BACK_RIGHT)
+    # (These are constant per post-construction method/side, independent of position along the wall.)
     post_sw = make_timber_imperfect_opposite_edge(post_sw, TimberLongEdge.LEFT_BACK)
     post_se = make_timber_imperfect_opposite_edge(post_se, TimberLongEdge.LEFT_BACK)
     post_ne = make_timber_imperfect_opposite_edge(post_ne, TimberLongEdge.LEFT_BACK)
     post_nw = make_timber_imperfect_opposite_edge(post_nw, TimberLongEdge.LEFT_BACK)
-    post_west_center = make_timber_imperfect_opposite_edge(post_west_center, TimberLongEdge.LEFT_BACK)
-    post_east_center = make_timber_imperfect_opposite_edge(post_east_center, TimberLongEdge.BACK_RIGHT)
+    west_mid_posts = [make_timber_imperfect_opposite_edge(p, TimberLongEdge.LEFT_BACK) for p in west_mid_posts]
+    east_mid_posts = [make_timber_imperfect_opposite_edge(p, TimberLongEdge.BACK_RIGHT) for p in east_mid_posts]
 
     # --- Post-to-mudsill mortise and tenon joints ---
     # Each post (butt_timber, BOTTOM end) joints into the top face of its adjacent mudsill
@@ -512,38 +545,39 @@ def build_shed_frame() -> Frame:
         tenon_position=post_tenon_position,
     )
 
-    # East center post → east mudsill
-    joint_post_east_center = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=east_mudsill,
-            butt_timber=post_east_center,
-            butt_timber_end=TimberEnd.BOTTOM,
-            front_face_on_butt_timber=None,
-        ),
-        tenon_size=post_tenon_size,
-        tenon_length=post_tenon_length,
-        mortise_depth=post_mortise_depth,
-        tenon_position=post_tenon_position,
-    )
-
-    # West center post → west mudsill
-    joint_post_west_center = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=west_mudsill,
-            butt_timber=post_west_center,
-            butt_timber_end=TimberEnd.BOTTOM,
-            front_face_on_butt_timber=None,
-        ),
-        tenon_size=post_tenon_size,
-        tenon_length=post_tenon_length,
-        mortise_depth=post_mortise_depth,
-        tenon_position=post_tenon_position,
-    )
+    # Mid-wall posts → their own wall's mudsill (same tenon spec as the SE/NW corner posts,
+    # regardless of position along the wall).
+    mid_post_joints = []
+    for post in east_mid_posts:
+        mid_post_joints.append(cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=east_mudsill,
+                butt_timber=post,
+                butt_timber_end=TimberEnd.BOTTOM,
+                front_face_on_butt_timber=None,
+            ),
+            tenon_size=post_tenon_size,
+            tenon_length=post_tenon_length,
+            mortise_depth=post_mortise_depth,
+            tenon_position=post_tenon_position,
+        ))
+    for post in west_mid_posts:
+        mid_post_joints.append(cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=west_mudsill,
+                butt_timber=post,
+                butt_timber_end=TimberEnd.BOTTOM,
+                front_face_on_butt_timber=None,
+            ),
+            tenon_size=post_tenon_size,
+            tenon_length=post_tenon_length,
+            mortise_depth=post_mortise_depth,
+            tenon_position=post_tenon_position,
+        ))
 
     post_joints = [
         joint_post_sw, joint_post_se, joint_post_ne, joint_post_nw,
-        joint_post_east_center, joint_post_west_center,
-    ]
+    ] + mid_post_joints
 
     # 7. Top plates connecting the 3 posts on each wall.
     #
@@ -652,18 +686,23 @@ def build_shed_frame() -> Frame:
         peg_parameters=top_peg_params,
     )
 
-    joint_top_west_center = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=plate_west,
-            butt_timber=post_west_center,
-            butt_timber_end=TimberEnd.TOP,
-            front_face_on_butt_timber=TimberLongFace.BACK,   # −localY = −X_global
-        ),
-        tenon_size=top_tenon_size_B,
-        tenon_length=top_plate_tenon_length,
-        mortise_depth=top_plate_mortise_depth,
-        peg_parameters=top_peg_params,
-    )
+    # West mid posts share the NW post's local-axis convention (BACK = −X_global),
+    # regardless of position along the wall.
+    west_mid_top_plate_joints = [
+        cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=plate_west,
+                butt_timber=post,
+                butt_timber_end=TimberEnd.TOP,
+                front_face_on_butt_timber=TimberLongFace.BACK,   # −localY = −X_global
+            ),
+            tenon_size=top_tenon_size_B,
+            tenon_length=top_plate_tenon_length,
+            mortise_depth=top_plate_mortise_depth,
+            peg_parameters=top_peg_params,
+        )
+        for post in west_mid_posts
+    ]
 
     joint_top_nw = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
@@ -692,18 +731,23 @@ def build_shed_frame() -> Frame:
         peg_parameters=top_peg_params,
     )
 
-    joint_top_east_center = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-        arrangement=ButtJointTimberArrangement(
-            receiving_timber=plate_east,
-            butt_timber=post_east_center,
-            butt_timber_end=TimberEnd.TOP,
-            front_face_on_butt_timber=TimberLongFace.FRONT,  # +localY = −X_global
-        ),
-        tenon_size=top_tenon_size_B,
-        tenon_length=top_plate_tenon_length,
-        mortise_depth=top_plate_mortise_depth,
-        peg_parameters=top_peg_params,
-    )
+    # East mid posts share the SE post's local-axis convention (FRONT = −X_global),
+    # regardless of position along the wall.
+    east_mid_top_plate_joints = [
+        cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=plate_east,
+                butt_timber=post,
+                butt_timber_end=TimberEnd.TOP,
+                front_face_on_butt_timber=TimberLongFace.FRONT,  # +localY = −X_global
+            ),
+            tenon_size=top_tenon_size_B,
+            tenon_length=top_plate_tenon_length,
+            mortise_depth=top_plate_mortise_depth,
+            peg_parameters=top_peg_params,
+        )
+        for post in east_mid_posts
+    ]
 
     joint_top_ne = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=ButtJointTimberArrangement(
@@ -718,10 +762,10 @@ def build_shed_frame() -> Frame:
         peg_parameters=top_peg_params,
     )
 
-    top_plate_joints = [
-        joint_top_sw, joint_top_west_center, joint_top_nw,
-        joint_top_se, joint_top_east_center, joint_top_ne,
-    ]
+    top_plate_joints = (
+        [joint_top_sw] + west_mid_top_plate_joints + [joint_top_nw]
+        + [joint_top_se] + east_mid_top_plate_joints + [joint_top_ne]
+    )
 
     # 8. Tie beams connecting each post pair from East to West.
     #
@@ -745,11 +789,14 @@ def build_shed_frame() -> Frame:
         wedge_extra_height=scalar(0),
     )
 
-    tie_beam_pairs = [
-        (post_sw, post_se, "South Tie Beam"),
-        (post_west_center, post_east_center, "Center Tie Beam"),
-        (post_nw, post_ne, "North Tie Beam"),
-    ]
+    tie_beam_pairs = (
+        [(post_sw, post_se, "South Tie Beam")]
+        + [
+            (west_mid_posts[i], east_mid_posts[i], f"Mid Tie Beam {i + 1}")
+            for i in range(num_ew_mid_posts)
+        ]
+        + [(post_nw, post_ne, "North Tie Beam")]
+    )
 
     tie_beam_joints = []
     south_tie_beam = None
@@ -816,65 +863,45 @@ def build_shed_frame() -> Frame:
 
     girt_size = create_v2(girt_height, girt_width)
 
-    # West South Girt (sw_post -> w_center_post)
-    w_s_girt = attach_face_aligned_timber(
-        original_timber=post_sw,
-        size=girt_size,
-        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.FRONT,
-        attached_timber_length_or_target=post_west_center,
-        attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
-        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
-        length_position_measurement=girt_centerline_z,
-        original_timber_face_to_measure_from_for_lateral_position=TimberFace.LEFT,
-        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.BACK,
-        lateral_position_measurement=scalar(0),
-        ticket=TimberTicket(path="West South Girt", tags=("beam", "girt"))
-    )
+    # West/East wall girts: walk [south corner post, mid posts..., north corner post] and
+    # place one girt per gap. The girt's local-axis convention depends only on whether its
+    # origin post is the south corner post or a mid post (constant regardless of position
+    # along the wall) -- confirmed by the original 1-mid-post design, where the "South Girt"
+    # (origin = corner post) and "North Girt" (origin = mid post) used different conventions.
+    west_girt_origin_conv = {
+        "corner": dict(long_face=TimberLongFace.FRONT, lat_from=TimberFace.LEFT, lat_to=TimberLongFace.BACK),
+        "mid": dict(long_face=TimberLongFace.LEFT, lat_from=TimberFace.BACK, lat_to=TimberLongFace.BACK),
+    }
+    east_girt_origin_conv = {
+        "corner": dict(long_face=TimberLongFace.RIGHT, lat_from=TimberFace.BACK, lat_to=TimberLongFace.FRONT),
+        "mid": dict(long_face=TimberLongFace.RIGHT, lat_from=TimberFace.BACK, lat_to=TimberLongFace.FRONT),
+    }
 
-    # West North Girt (w_center_post -> nw_post)
-    w_n_girt = attach_face_aligned_timber(
-        original_timber=post_west_center,
-        size=girt_size,
-        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.LEFT,
-        attached_timber_length_or_target=post_nw,
-        attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
-        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
-        length_position_measurement=girt_centerline_z,
-        original_timber_face_to_measure_from_for_lateral_position=TimberFace.BACK,
-        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.BACK,
-        lateral_position_measurement=scalar(0),
-        ticket=TimberTicket(path="West North Girt", tags=("beam", "girt"))
-    )
+    def _build_wall_girts(south_post, mid_posts, north_post, origin_conv, name_prefix):
+        posts_in_order = [south_post] + list(mid_posts) + [north_post]
+        girts = []
+        for i in range(len(posts_in_order) - 1):
+            origin_post = posts_in_order[i]
+            target_post = posts_in_order[i + 1]
+            conv = origin_conv["corner"] if i == 0 else origin_conv["mid"]
+            girt = attach_face_aligned_timber(
+                original_timber=origin_post,
+                size=girt_size,
+                original_timber_long_face_that_attached_timber_points_to=conv["long_face"],
+                attached_timber_length_or_target=target_post,
+                attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
+                original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
+                length_position_measurement=girt_centerline_z,
+                original_timber_face_to_measure_from_for_lateral_position=conv["lat_from"],
+                attached_timber_long_face_to_measure_to_for_lateral_position=conv["lat_to"],
+                lateral_position_measurement=scalar(0),
+                ticket=TimberTicket(path=f"{name_prefix} Girt {i + 1}", tags=("beam", "girt"))
+            )
+            girts.append((girt, origin_post, target_post))
+        return girts
 
-    # East South Girt (se_post -> e_center_post)
-    e_s_girt = attach_face_aligned_timber(
-        original_timber=post_se,
-        size=girt_size,
-        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-        attached_timber_length_or_target=post_east_center,
-        attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
-        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
-        length_position_measurement=girt_centerline_z,
-        original_timber_face_to_measure_from_for_lateral_position=TimberFace.BACK,
-        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.FRONT,
-        lateral_position_measurement=scalar(0),
-        ticket=TimberTicket(path="East South Girt", tags=("beam", "girt"))
-    )
-
-    # East North Girt (e_center_post -> ne_post)
-    e_n_girt = attach_face_aligned_timber(
-        original_timber=post_east_center,
-        size=girt_size,
-        original_timber_long_face_that_attached_timber_points_to=TimberLongFace.RIGHT,
-        attached_timber_length_or_target=post_ne,
-        attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
-        original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
-        length_position_measurement=girt_centerline_z,
-        original_timber_face_to_measure_from_for_lateral_position=TimberFace.BACK,
-        attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.FRONT,
-        lateral_position_measurement=scalar(0),
-        ticket=TimberTicket(path="East North Girt", tags=("beam", "girt"))
-    )
+    west_girts = _build_wall_girts(post_sw, west_mid_posts, post_nw, west_girt_origin_conv, "West")
+    east_girts = _build_wall_girts(post_se, east_mid_posts, post_ne, east_girt_origin_conv, "East")
 
     # North Girt (nw_post -> ne_post, top of girt at 3' above mudsill top)
     north_girt_top_z = mudsill_top + feet(3)  # 36" above mudsill top = 44" Z total
@@ -898,10 +925,14 @@ def build_shed_frame() -> Frame:
     # - West girts reference edge: upper outside edge (BACK_RIGHT)
     # - East girts reference edge: upper outside edge (RIGHT_FRONT)
     # - North girt reference edge: upper outside edge (BACK_RIGHT)
-    w_s_girt = make_timber_imperfect_opposite_edge(w_s_girt, TimberLongEdge.BACK_RIGHT)
-    w_n_girt = make_timber_imperfect_opposite_edge(w_n_girt, TimberLongEdge.BACK_RIGHT)
-    e_s_girt = make_timber_imperfect_opposite_edge(e_s_girt, TimberLongEdge.RIGHT_FRONT)
-    e_n_girt = make_timber_imperfect_opposite_edge(e_n_girt, TimberLongEdge.RIGHT_FRONT)
+    west_girts = [
+        (make_timber_imperfect_opposite_edge(g, TimberLongEdge.BACK_RIGHT), origin, target)
+        for g, origin, target in west_girts
+    ]
+    east_girts = [
+        (make_timber_imperfect_opposite_edge(g, TimberLongEdge.RIGHT_FRONT), origin, target)
+        for g, origin, target in east_girts
+    ]
     n_girt = make_timber_imperfect_opposite_edge(n_girt, TimberLongEdge.BACK_RIGHT)
 
     # --- Barefaced Mortise & Tenon Joints with Round Pegs for Wall Girts ---
@@ -925,18 +956,17 @@ def build_shed_frame() -> Frame:
         stickout_length=scalar(0)
     )
 
-    girt_joint_specs = [
-        (w_s_girt, post_sw, TimberEnd.BOTTOM, west_girt_tenon_pos),
-        (w_s_girt, post_west_center, TimberEnd.TOP, west_girt_tenon_pos),
-        (w_n_girt, post_west_center, TimberEnd.BOTTOM, west_girt_tenon_pos),
-        (w_n_girt, post_nw, TimberEnd.TOP, west_girt_tenon_pos),
-        (e_s_girt, post_se, TimberEnd.BOTTOM, east_girt_tenon_pos),
-        (e_s_girt, post_east_center, TimberEnd.TOP, east_girt_tenon_pos),
-        (e_n_girt, post_east_center, TimberEnd.BOTTOM, east_girt_tenon_pos),
-        (e_n_girt, post_ne, TimberEnd.TOP, east_girt_tenon_pos),
+    girt_joint_specs = []
+    for girt, origin_post, target_post in west_girts:
+        girt_joint_specs.append((girt, origin_post, TimberEnd.BOTTOM, west_girt_tenon_pos))
+        girt_joint_specs.append((girt, target_post, TimberEnd.TOP, west_girt_tenon_pos))
+    for girt, origin_post, target_post in east_girts:
+        girt_joint_specs.append((girt, origin_post, TimberEnd.BOTTOM, east_girt_tenon_pos))
+        girt_joint_specs.append((girt, target_post, TimberEnd.TOP, east_girt_tenon_pos))
+    girt_joint_specs.extend([
         (n_girt, post_nw, TimberEnd.BOTTOM, north_girt_tenon_pos),
         (n_girt, post_ne, TimberEnd.TOP, north_girt_tenon_pos),
-    ]
+    ])
 
     girt_joints = []
     for girt, post, end, pos in girt_joint_specs:
@@ -959,11 +989,15 @@ def build_shed_frame() -> Frame:
     #
     #  Door post spec: 4" deep (Y axis) × 5" wide (X axis).
     #  Alignment: flush with the outside face of the South wall (Y = 0 to Y = 4").
-    #  Symmetry: centered around X = 6' (72") with a 3' 6" (42") door opening gap.
-    #    - West Door Post: X = 46" to 51" (centerline X = 48.5")
-    #    - East Door Post: X = 93" to 98" (centerline X = 95.5")
+    #  Symmetry: centered around X = base_width / 2 with a 3' 6" (42") door opening gap.
 
     door_post_size = create_v2(inches(5), inches(4))
+    door_opening_width = inches(42)  # 3'6" clear opening between door posts
+    # Centerline offset from the footprint centerline to each door post's centerline:
+    # half the opening plus half the post's own width (door_post_size[0]).
+    door_post_centerline_offset = door_opening_width / scalar(2) + door_post_size[0] / scalar(2)
+    west_door_post_x = base_width / scalar(2) - door_post_centerline_offset
+    east_door_post_x = base_width / scalar(2) + door_post_centerline_offset
 
     west_door_post = attach_face_aligned_timber(
         original_timber=south_mudsill,
@@ -972,7 +1006,7 @@ def build_shed_frame() -> Frame:
         attached_timber_length_or_target=south_tie_beam,
         attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
         original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
-        length_position_measurement=inches(97, 2),  # 48.5" centerline in X
+        length_position_measurement=west_door_post_x,
         original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,  # Y=0 outside face
         attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.FRONT,
         lateral_position_measurement=inches(4),  # offset to sit from Y=0 to Y=4"
@@ -986,7 +1020,7 @@ def build_shed_frame() -> Frame:
         attached_timber_length_or_target=south_tie_beam,
         attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
         original_timber_end_to_measure_from_for_length_position=TimberEnd.BOTTOM,
-        length_position_measurement=inches(191, 2),  # 95.5" centerline in X
+        length_position_measurement=east_door_post_x,
         original_timber_face_to_measure_from_for_lateral_position=TimberFace.FRONT,  # Y=0 outside face
         attached_timber_long_face_to_measure_to_for_lateral_position=TimberLongFace.FRONT,
         lateral_position_measurement=inches(4),  # offset to sit from Y=0 to Y=4"
@@ -1148,19 +1182,53 @@ def build_shed_frame() -> Frame:
     pos_pos = create_v2(scalar(0), inches(3, 4))   # +0.75" offset when FRONT is inside face
     pos_neg = create_v2(scalar(0), -inches(3, 4))  # -0.75" offset when BACK is inside face
 
-    brace_specs = [
-        # West Wall (outside face at X=0)
-        (post_sw, TimberLongFace.FRONT, plate_west, plate_brace_length_pos, TimberFace.LEFT, TimberLongFace.BACK, "West SW Brace", TimberLongFace.FRONT, pos_pos),
-        (post_west_center, TimberLongFace.RIGHT, plate_west, plate_brace_length_pos, TimberFace.BACK, TimberLongFace.FRONT, "West Center South Brace", TimberLongFace.FRONT, pos_neg),
-        (post_west_center, TimberLongFace.LEFT, plate_west, plate_brace_length_pos, TimberFace.BACK, TimberLongFace.BACK, "West Center North Brace", TimberLongFace.FRONT, pos_pos),
-        (post_nw, TimberLongFace.RIGHT, plate_west, plate_brace_length_pos, TimberFace.BACK, TimberLongFace.FRONT, "West NW Brace", TimberLongFace.FRONT, pos_neg),
+    # West/East wall knee braces: the south corner post and north corner post each get a
+    # single brace leaning into their one adjacent bay; every mid post gets 2 braces (one
+    # leaning into each of its neighboring bays). Which of these 4 roles a post plays
+    # determines its brace's facing/lateral/peg conventions -- constant regardless of how
+    # many mid posts there are or which one a given post is.
+    west_south_corner_conv = dict(facing_face=TimberLongFace.FRONT, orig_lat=TimberFace.LEFT, att_lat=TimberLongFace.BACK, peg_face=TimberLongFace.FRONT, tenon_pos=pos_pos)
+    west_mid_south_conv    = dict(facing_face=TimberLongFace.RIGHT, orig_lat=TimberFace.BACK, att_lat=TimberLongFace.FRONT, peg_face=TimberLongFace.FRONT, tenon_pos=pos_neg)
+    west_mid_north_conv    = dict(facing_face=TimberLongFace.LEFT, orig_lat=TimberFace.BACK, att_lat=TimberLongFace.BACK, peg_face=TimberLongFace.FRONT, tenon_pos=pos_pos)
+    west_north_corner_conv = dict(facing_face=TimberLongFace.RIGHT, orig_lat=TimberFace.BACK, att_lat=TimberLongFace.FRONT, peg_face=TimberLongFace.FRONT, tenon_pos=pos_neg)
 
-        # East Wall (outside face at X=12')
-        (post_se, TimberLongFace.RIGHT, plate_east, plate_brace_length_pos, TimberFace.BACK, TimberLongFace.FRONT, "East SE Brace", TimberLongFace.BACK, pos_neg),
-        (post_east_center, TimberLongFace.LEFT, plate_east, plate_brace_length_pos, TimberFace.BACK, TimberLongFace.BACK, "East Center South Brace", TimberLongFace.BACK, pos_pos),
-        (post_east_center, TimberLongFace.RIGHT, plate_east, plate_brace_length_pos, TimberFace.BACK, TimberLongFace.FRONT, "East Center North Brace", TimberLongFace.BACK, pos_neg),
-        (post_ne, TimberLongFace.FRONT, plate_east, plate_brace_length_pos, TimberFace.LEFT, TimberLongFace.BACK, "East NE Brace", TimberLongFace.BACK, pos_pos),
+    east_south_corner_conv = dict(facing_face=TimberLongFace.RIGHT, orig_lat=TimberFace.BACK, att_lat=TimberLongFace.FRONT, peg_face=TimberLongFace.BACK, tenon_pos=pos_neg)
+    east_mid_south_conv    = dict(facing_face=TimberLongFace.LEFT, orig_lat=TimberFace.BACK, att_lat=TimberLongFace.BACK, peg_face=TimberLongFace.BACK, tenon_pos=pos_pos)
+    east_mid_north_conv    = dict(facing_face=TimberLongFace.RIGHT, orig_lat=TimberFace.BACK, att_lat=TimberLongFace.FRONT, peg_face=TimberLongFace.BACK, tenon_pos=pos_neg)
+    east_north_corner_conv = dict(facing_face=TimberLongFace.FRONT, orig_lat=TimberFace.LEFT, att_lat=TimberLongFace.BACK, peg_face=TimberLongFace.BACK, tenon_pos=pos_pos)
 
+    def _wall_brace_specs(south_post, mid_posts, north_post, plate,
+                           south_conv, mid_south_conv, mid_north_conv, north_conv,
+                           wall_label, south_name, north_name):
+        specs = [
+            (south_post, south_conv["facing_face"], plate, plate_brace_length_pos,
+             south_conv["orig_lat"], south_conv["att_lat"], south_name,
+             south_conv["peg_face"], south_conv["tenon_pos"]),
+        ]
+        for i, post in enumerate(mid_posts, start=1):
+            specs.append((post, mid_south_conv["facing_face"], plate, plate_brace_length_pos,
+                          mid_south_conv["orig_lat"], mid_south_conv["att_lat"], f"{wall_label} Mid {i} South Brace",
+                          mid_south_conv["peg_face"], mid_south_conv["tenon_pos"]))
+            specs.append((post, mid_north_conv["facing_face"], plate, plate_brace_length_pos,
+                          mid_north_conv["orig_lat"], mid_north_conv["att_lat"], f"{wall_label} Mid {i} North Brace",
+                          mid_north_conv["peg_face"], mid_north_conv["tenon_pos"]))
+        specs.append((north_post, north_conv["facing_face"], plate, plate_brace_length_pos,
+                      north_conv["orig_lat"], north_conv["att_lat"], north_name,
+                      north_conv["peg_face"], north_conv["tenon_pos"]))
+        return specs
+
+    west_brace_specs = _wall_brace_specs(
+        post_sw, west_mid_posts, post_nw, plate_west,
+        west_south_corner_conv, west_mid_south_conv, west_mid_north_conv, west_north_corner_conv,
+        "West", "West SW Brace", "West NW Brace",
+    )
+    east_brace_specs = _wall_brace_specs(
+        post_se, east_mid_posts, post_ne, plate_east,
+        east_south_corner_conv, east_mid_south_conv, east_mid_north_conv, east_north_corner_conv,
+        "East", "East SE Brace", "East NE Brace",
+    )
+
+    brace_specs = west_brace_specs + east_brace_specs + [
         # South Wall (outside face at Y=0)
         (post_sw, TimberLongFace.RIGHT, south_tie_beam, tie_brace_length_pos, TimberFace.BACK, TimberLongFace.FRONT, "South SW Brace", TimberLongFace.FRONT, pos_neg),
         (post_se, TimberLongFace.FRONT, south_tie_beam, tie_brace_length_pos, TimberFace.LEFT, TimberLongFace.BACK, "South SE Brace", TimberLongFace.FRONT, pos_pos),
@@ -1177,6 +1245,7 @@ def build_shed_frame() -> Frame:
             size=brace_size,
             original_timber_long_face_that_attached_timber_points_to=facing_face,
             attached_timber_angle=pi / 4,
+            # TODO update this to use target timber
             attached_timber_length_or_target=b_length,
             attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
             original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
@@ -1207,17 +1276,21 @@ def build_shed_frame() -> Frame:
         )
         brace_joints.extend([j_post, j_beam])
 
-    # 13. 9 Pairs of 5x5 Rafters (Pitch: 45°, Overhang: 18", 5"x5" section).
+    # 13. num_rafter_pairs Pairs of 5x5 Rafters (Pitch: 45°, Overhang: 18", 5"x5" section).
     #
     #  Geometry:
-    #  - Rafter bottom face intersects West/East Top Plate outside face (X=0 / X=144") 3.5" below plate top (Z=116.5").
-    #  - 45° slope (rise = 1, run = 1). Rafters meet at roof peak X = 72" (Z = 188.5").
-    #  - Rafters extend 18" beyond plate outside face (to X = -18" / X = 162"). Total horizontal span = 90" (7.5').
-    #  - 3D length = 90" × √2 = 127.279" (10.606 ft).
+    #  - Rafter bottom face intersects West/East Top Plate outside face (X=0 / X=base_width) 3.5" below plate top (Z=116.5").
+    #  - 45° slope (rise = 1, run = 1). Rafters meet at roof peak X = base_width / 2 (Z = 188.5").
+    #  - Rafters extend 18" beyond plate outside face. Total horizontal span = base_width/2 + 18" per side.
+    #
+    #  Y-spacing (along base_length): the outer 2 pairs on each side keep their existing alignment —
+    #  the outermost pair flush with the top-plate overhang end, the 2nd pair aligned with the mudsill
+    #  end (the "gable bent", where the corner post / collar tie sits). The remaining pairs are evenly
+    #  spaced between the two gable-bent pairs.
     #
     #  Joints:
     #  - Peak Joint: Tongue and fork corner joint between West Rafter and East Rafter at top ends.
-    #  - Plate Housing Joint: Generic housing cut on West/East Top Plates receiving the 9 crossing rafters.
+    #  - Plate Housing Joint: Generic housing cut on West/East Top Plates receiving the crossing rafters.
 
     from kumiki.rule import Orientation
     from kumiki.joints.workshop.corner_joints import (
@@ -1226,21 +1299,24 @@ def build_shed_frame() -> Frame:
     )
     from kumiki.joints.workshop.free_joints import cut_free_house_joint
 
-    rafter_size = create_v2(inches(5), inches(5))
-    rafter_length = inches(90) * sqrt(2)
+    if num_rafter_pairs < 4:
+        raise ValueError("num_rafter_pairs must be >= 4 (2 aligned rafter pairs on each side)")
 
-    spacing = (inches(189.5) - inches(2.5)) / scalar(6)  # 31.1667"
-    y_centerlines = [
-        -inches(12) + inches(5) / scalar(2),
-        inches(2.5),
-        inches(2.5) + spacing,
-        inches(2.5) + scalar(2) * spacing,
-        inches(2.5) + scalar(3) * spacing,
-        inches(2.5) + scalar(4) * spacing,
-        inches(2.5) + scalar(5) * spacing,
-        inches(189.5),
-        inches(204) - inches(5) / scalar(2),
-    ]
+    rafter_size = create_v2(inches(5), inches(5))
+    rafter_horizontal_half_span = base_width / scalar(2) + inches(18)
+    rafter_length = rafter_horizontal_half_span * sqrt(2)
+
+    rafter_half_width = rafter_size[1] / scalar(2)  # 2.5", half the rafter's Y-thickness
+    plate_y_north_end = plate_y_south_end + plate_length
+    gable_south_y = rafter_half_width               # aligned with south mudsill end
+    gable_north_y = base_length - rafter_half_width  # aligned with north mudsill end
+    num_middle_aligned = num_rafter_pairs - 2        # the 2 gable-bent pairs + interior pairs
+    interior_spacing = (gable_north_y - gable_south_y) / scalar(num_middle_aligned - 1)
+    y_centerlines = (
+        [plate_y_south_end + rafter_half_width]
+        + [gable_south_y + scalar(k) * interior_spacing for k in range(num_middle_aligned)]
+        + [plate_y_north_end - rafter_half_width]
+    )
 
     u_west = Matrix([sqrt(2) / scalar(2), scalar(0), sqrt(2) / scalar(2)])
     u_east = Matrix([-sqrt(2) / scalar(2), scalar(0), sqrt(2) / scalar(2)])
@@ -1252,7 +1328,7 @@ def build_shed_frame() -> Frame:
     start_x_west = -inches(18)
     start_z_west = inches(233, 2) + (inches(5) / scalar(2)) / sqrt(2) - inches(18)
 
-    start_x_east = feet(12) + inches(18)
+    start_x_east = base_width + inches(18)
     start_z_east = start_z_west
 
     west_rafters = []
@@ -1301,7 +1377,7 @@ def build_shed_frame() -> Frame:
     )
     rafter_housing_joints = [j_west_housing, j_east_housing]
 
-    # 14. 3x5 Collar Ties on Rafter Pair 2 (South) and Rafter Pair 8 (North).
+    # 14. 3x5 Collar Ties on Rafter Pair 2 (South gable bent) and the 2nd-to-last Rafter Pair (North gable bent).
     #
     #  Spec: 3" thick (in Y) × 5" high (in Z).
     #  Placement: Attached 3' (36") down from the rafter peak along the 45° rafter axis.
@@ -1315,10 +1391,10 @@ def build_shed_frame() -> Frame:
     collar_size = create_v2(inches(5), inches(3))  # 5" high in Z, 3" thick in Y
     collar_length = feet(3) * sqrt(2)  # Exact horizontal span (50.912")
 
-    rw2 = west_rafters[1]   # Rafter Pair 2 (South gable bent)
+    rw2 = west_rafters[1]                     # Rafter Pair 2 (South gable bent)
     re2 = east_rafters[1]
-    rw8 = west_rafters[7]   # Rafter Pair 8 (North gable bent)
-    re8 = east_rafters[7]
+    rw8 = west_rafters[num_rafter_pairs - 2]  # 2nd-to-last Rafter Pair (North gable bent)
+    re8 = east_rafters[num_rafter_pairs - 2]
 
     collar_south = attach_plane_aligned_timber(
         original_timber=rw2, size=collar_size,
