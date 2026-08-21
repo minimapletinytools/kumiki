@@ -13,7 +13,7 @@ from kumiki.joints.workshop.decorative_joints import (
 )
 from kumiki.ticket import TimberTicket
 from kumiki.rule import scalar, Transform
-from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberFace, TimberLongFace
+from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge
 from kumiki.cutcsg import Difference, Cylinder
 from kumiki.triangles import triangulate_cutcsg
 
@@ -134,8 +134,7 @@ class TestRafterTailScallopDecoration:
         timber = _make_timber()
         joint = cut_practice_rafter_tail_scallop_decoration(
             timber,
-            end_side=TimberEnd.TOP,
-            cut_side=TimberLongFace.BACK,
+            short_edge=TimberShortEdge.TOP_BACK,
             scallop_height=scallop_height,
             scallop_length=scallop_length,
         )
@@ -183,6 +182,16 @@ class TestRafterTailScallopDecoration:
         assert not cutting.negative_csg.contains_point(far_flat_region)
         front_half_at_end = Matrix([0.0, 2.0, float(LENGTH)])
         assert not cutting.negative_csg.contains_point(front_half_at_end)
+
+    def test_scallop_cut_accepts_timber_edge(self):
+        timber = _make_timber()
+        joint = cut_practice_rafter_tail_scallop_decoration(
+            timber,
+            short_edge=TimberEdge.TOP_BACK,
+            scallop_height=scalar(2),
+            scallop_length=scalar(4),
+        )
+        assert joint.ticket.joint_type == "rafter_tail_scallop_decoration"
 
 
 class TestRoundedEndDecoration:

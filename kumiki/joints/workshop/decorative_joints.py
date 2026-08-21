@@ -3,11 +3,11 @@ Kumiki - Decorative joint construction functions
 """
 
 import warnings
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Union
 
 from sympy import Abs, Matrix
 
-from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, Cutting, Joint, JointTicket
+from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
 from kumiki.rule import Numeric, Comparison, safe_compare, scalar, Transform, Orientation
 from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg
 from kumiki.measuring import get_center_point_on_face_global
@@ -259,8 +259,7 @@ def cut_practice_rounded_end_decoration(
 
 def cut_practice_rafter_tail_scallop_decoration(
     timber: BlockLike,
-    end_side: TimberEnd,
-    cut_side: TimberLongFace,
+    short_edge: Union[TimberShortEdge, TimberEdge],
     scallop_height: Numeric,
     scallop_length: Numeric,
 ) -> Joint:
@@ -277,16 +276,23 @@ def cut_practice_rafter_tail_scallop_decoration(
     there, where the curve meets the flat run of cut_side).
 
     Args:
-        timber:
-        end_side:
-        cut_side:
-        scallop_height:
-        scallop_length:
+        timber: Timber to cut decoration on
+        short_edge: The short edge defining the end face and cut face
+        scallop_height: Height of scallop measured from cut_side on end_side
+        scallop_length: Length of scallop measured inwards from end on cut_side
 
     Returns:
+        Joint containing decorative cutting
     """
+    if isinstance(short_edge, TimberEdge):
+        short_edge = short_edge.short_edge()
+    assert isinstance(short_edge, TimberShortEdge), f"expected TimberShortEdge, got {type(short_edge).__name__}"
+
     assert safe_compare(scallop_length, 0, Comparison.GT), "scallop_length must be positive"
     assert safe_compare(scallop_height, 0, Comparison.GT), "scallop_height must be positive"
+
+    end_side = short_edge.end
+    cut_side = short_edge.long_face
 
     end_face = end_side.to.face()
     cut_face = cut_side.to.face()
@@ -333,3 +339,26 @@ def cut_practice_rafter_tail_scallop_decoration(
         cuttings={timber.ticket.path: cutting},
         ticket=JointTicket(joint_type="rafter_tail_scallop_decoration"),
     )
+
+
+# path coordinates is based on cut_corner
+#
+# +y
+# |
+# |________
+# |________|__ +x
+# ^
+# cut_corner
+#
+# generally speaking, path coordiantes is a line representing what you want to cut drown from the left end of the timber to the bottom face of the timber (based on the picture above)
+#
+# specifically to form the cut out:
+# - the 0'th path coordinate is extended to the end of the timber (x = 0)
+# - that point is extended vertically to the rough face in the -y direction (relative to the diagram above) 
+# - then that point is extended to horizontally to the x coordinate of the last path coordinate
+# - finally it is connected to the last path coordinate
+# the 0'th path coordinate
+def cut_path_extrusion_end_decoration(
+    cut_corner: TimberShortEdge,
+):
+    pass

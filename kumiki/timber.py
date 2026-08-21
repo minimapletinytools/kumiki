@@ -383,6 +383,29 @@ class TimberShortEdge(Enum):
         """Convert to TimberFeature for further conversions."""
         return TimberFeature(self.value)
 
+    @property
+    def end(self) -> TimberEnd:
+        """Get the TimberEnd associated with this short edge."""
+        if self.value in (12, 13, 14, 15):
+            return TimberEnd.BOTTOM
+        else:
+            return TimberEnd.TOP
+
+    @property
+    def long_face(self) -> TimberLongFace:
+        """Get the TimberLongFace associated with this short edge."""
+        _map = {
+            12: TimberLongFace.RIGHT,
+            16: TimberLongFace.RIGHT,
+            13: TimberLongFace.FRONT,
+            17: TimberLongFace.FRONT,
+            14: TimberLongFace.LEFT,
+            18: TimberLongFace.LEFT,
+            15: TimberLongFace.BACK,
+            19: TimberLongFace.BACK,
+        }
+        return _map[self.value]
+
 
 # ============================================================================
 # Type Aliases

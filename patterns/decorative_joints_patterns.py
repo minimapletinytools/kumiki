@@ -57,8 +57,7 @@ def example_rafter_tail_scallop_decoration() -> Joint:
     )
     return cut_practice_rafter_tail_scallop_decoration(
         timber=timber,
-        end_side=TimberEnd.TOP,
-        cut_side=TimberLongFace.BACK,
+        short_edge=TimberShortEdge.TOP_BACK,
         scallop_height=inches(2),
         scallop_length=inches(4),
     )
