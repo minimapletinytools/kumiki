@@ -475,6 +475,11 @@ def locate_long_edge(timber: PerfectTimberWithin, edge: TimberLongEdge) -> Line:
     return locate_edge(timber, TimberEdge(edge.value))
 
 
+def locate_short_edge(timber: PerfectTimberWithin, edge: TimberShortEdge) -> Line:
+    """Measure a short edge on a timber. Thin wrapper around locate_edge."""
+    return locate_edge(timber, TimberEdge(edge.value))
+
+
 def locate_centerline(timber: PerfectTimberWithin) -> Line:
     """Measure the centerline of a timber. Thin wrapper around locate_edge."""
     return locate_edge(timber, TimberCenterline.CENTERLINE)
@@ -621,14 +626,14 @@ def mark_distance_from_face_in_normal_direction(feature: Union[UnsignedPlane, Pl
     return DistanceFromFace(distance=distance, timber=timber, face=face)
 
 
-def mark_distance_from_corner_along_edge_by_intersecting_plane(plane: Union[UnsignedPlane, Plane], timber: PerfectTimberWithin, edge: Union[TimberLongEdge, EdgeOrCenterline], end: TimberEnd) -> DistanceFromCornerAlongEdge:
+def mark_distance_from_corner_along_edge_by_intersecting_plane(plane: Union[UnsignedPlane, Plane], timber: PerfectTimberWithin, edge: Union[TimberLongEdge, TimberShortEdge, EdgeOrCenterline], end: TimberEnd) -> DistanceFromCornerAlongEdge:
     """
     Mark onto an edge by intersecting a plane, returning a DistanceFromCornerAlongEdge.
 
     Args:
         plane: the plane to intersect with
         timber: the timber whose edge we're intersecting
-        edge: the edge to intersect with (TimberLongEdge, TimberEdge, or TimberCenterline)
+        edge: the edge to intersect with (TimberLongEdge, TimberShortEdge, TimberEdge, or TimberCenterline)
         end: the end of the timber to mark from
 
     Returns:
@@ -636,7 +641,7 @@ def mark_distance_from_corner_along_edge_by_intersecting_plane(plane: Union[Unsi
         intersection. Positive means into the timber from the end.
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
-    if isinstance(edge, TimberLongEdge):
+    if isinstance(edge, (TimberLongEdge, TimberShortEdge)):
         edge_line = locate_edge(timber, TimberEdge(edge.value))
     else:
         edge_line = locate_edge(timber, edge)
@@ -654,7 +659,7 @@ def mark_distance_from_corner_along_edge_by_intersecting_plane(plane: Union[Unsi
     if safe_zero_test(denominator):
         raise ValueError(f"Edge is parallel to plane - no intersection exists")
 
-    resolved_edge: EdgeOrCenterline = TimberEdge(edge.value) if isinstance(edge, TimberLongEdge) else edge
+    resolved_edge: EdgeOrCenterline = TimberEdge(edge.value) if isinstance(edge, (TimberLongEdge, TimberShortEdge)) else edge
     return DistanceFromCornerAlongEdge(
         distance=numerator / denominator,
         timber=timber,
@@ -663,21 +668,21 @@ def mark_distance_from_corner_along_edge_by_intersecting_plane(plane: Union[Unsi
     )
 
 
-def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: Line, timber: PerfectTimberWithin, edge: Union[TimberLongEdge, EdgeOrCenterline], end: TimberEnd) -> DistanceFromCornerAlongEdge:
+def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: Line, timber: PerfectTimberWithin, edge: Union[TimberLongEdge, TimberShortEdge, EdgeOrCenterline], end: TimberEnd) -> DistanceFromCornerAlongEdge:
     """
     Mark onto an edge by finding the closest point to a line, returning a DistanceFromCornerAlongEdge.
 
     Args:
         line: The line feature to mark from
         timber: The timber whose edge we're marking to
-        edge: The edge to mark to (TimberLongEdge, TimberEdge, or TimberCenterline)
+        edge: The edge to mark to (TimberLongEdge, TimberShortEdge, TimberEdge, or TimberCenterline)
         end: Which end of the timber to mark from
 
     Returns:
         DistanceFromCornerAlongEdge with the signed distance from the end to the closest point.
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
-    if isinstance(edge, TimberLongEdge):
+    if isinstance(edge, (TimberLongEdge, TimberShortEdge)):
         edge_line = locate_edge(timber, TimberEdge(edge.value))
     else:
         edge_line = locate_edge(timber, edge)
@@ -710,7 +715,7 @@ def mark_distance_from_corner_along_edge_by_finding_closest_point_on_line(line: 
     else:
         t = (a * e - b * d) / denominator
 
-    resolved_edge: EdgeOrCenterline = TimberEdge(edge.value) if isinstance(edge, TimberLongEdge) else edge
+    resolved_edge: EdgeOrCenterline = TimberEdge(edge.value) if isinstance(edge, (TimberLongEdge, TimberShortEdge)) else edge
     return DistanceFromCornerAlongEdge(
         distance=t,
         timber=timber,

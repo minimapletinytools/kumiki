@@ -121,6 +121,12 @@ class TimberFeature(Enum):
             raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberLongEdge. Only values 8-11 are valid long edges.")
         return TimberLongEdge(self.value)
 
+    def short_edge(self) -> 'TimberShortEdge':
+        """Convert to TimberShortEdge. Values 12-19 map to short edges."""
+        if self.value not in range(12, 20):
+            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberShortEdge. Only values 12-19 are valid short edges.")
+        return TimberShortEdge(self.value)
+
     def corner(self) -> 'TimberCorner':
         """Convert to TimberCorner. Values 20-27 map to corners."""
         if self.value not in range(20, 28):
@@ -337,12 +343,40 @@ class TimberEdge(Enum):
         }
         return _map[self]
 
-    
+    def long_edge(self) -> 'TimberLongEdge':
+        """Convert to TimberLongEdge. Values 8-11 map to long edges."""
+        if self.value not in range(8, 12):
+            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberLongEdge. Only values 8-11 are valid long edges.")
+        return TimberLongEdge(self.value)
+
+    def short_edge(self) -> 'TimberShortEdge':
+        """Convert to TimberShortEdge. Values 12-19 map to short edges."""
+        if self.value not in range(12, 20):
+            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberShortEdge. Only values 12-19 are valid short edges.")
+        return TimberShortEdge(self.value)
+
+
 class TimberLongEdge(Enum):
     RIGHT_FRONT = 8
     FRONT_LEFT = 9
     LEFT_BACK = 10
     BACK_RIGHT = 11
+    
+    @property
+    def to(self) -> TimberFeature:
+        """Convert to TimberFeature for further conversions."""
+        return TimberFeature(self.value)
+
+
+class TimberShortEdge(Enum):
+    BOTTOM_RIGHT = 12
+    BOTTOM_FRONT = 13
+    BOTTOM_LEFT = 14
+    BOTTOM_BACK = 15
+    TOP_RIGHT = 16
+    TOP_FRONT = 17
+    TOP_LEFT = 18
+    TOP_BACK = 19
     
     @property
     def to(self) -> TimberFeature:

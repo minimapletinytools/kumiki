@@ -208,6 +208,43 @@ class TestTimberEnumConversions:
         with pytest.raises(ValueError, match="Cannot convert.*to TimberLongEdge"):
             TimberFeature.TOP_BACK_EDGE.long_edge()
 
+    def test_timber_short_edge_to_feature(self):
+        """Test TimberShortEdge to TimberFeature conversion."""
+        assert TimberShortEdge.BOTTOM_RIGHT.to == TimberFeature.BOTTOM_RIGHT_EDGE
+        assert TimberShortEdge.BOTTOM_FRONT.to == TimberFeature.BOTTOM_FRONT_EDGE
+        assert TimberShortEdge.BOTTOM_LEFT.to == TimberFeature.BOTTOM_LEFT_EDGE
+        assert TimberShortEdge.BOTTOM_BACK.to == TimberFeature.BOTTOM_BACK_EDGE
+        assert TimberShortEdge.TOP_RIGHT.to == TimberFeature.TOP_RIGHT_EDGE
+        assert TimberShortEdge.TOP_FRONT.to == TimberFeature.TOP_FRONT_EDGE
+        assert TimberShortEdge.TOP_LEFT.to == TimberFeature.TOP_LEFT_EDGE
+        assert TimberShortEdge.TOP_BACK.to == TimberFeature.TOP_BACK_EDGE
+
+    def test_timber_feature_to_short_edge(self):
+        """Test TimberFeature to TimberShortEdge conversion."""
+        assert TimberFeature.BOTTOM_RIGHT_EDGE.short_edge() == TimberShortEdge.BOTTOM_RIGHT
+        assert TimberFeature.BOTTOM_FRONT_EDGE.short_edge() == TimberShortEdge.BOTTOM_FRONT
+        assert TimberFeature.BOTTOM_LEFT_EDGE.short_edge() == TimberShortEdge.BOTTOM_LEFT
+        assert TimberFeature.BOTTOM_BACK_EDGE.short_edge() == TimberShortEdge.BOTTOM_BACK
+        assert TimberFeature.TOP_RIGHT_EDGE.short_edge() == TimberShortEdge.TOP_RIGHT
+        assert TimberFeature.TOP_FRONT_EDGE.short_edge() == TimberShortEdge.TOP_FRONT
+        assert TimberFeature.TOP_LEFT_EDGE.short_edge() == TimberShortEdge.TOP_LEFT
+        assert TimberFeature.TOP_BACK_EDGE.short_edge() == TimberShortEdge.TOP_BACK
+
+    def test_timber_edge_to_short_edge(self):
+        """Test TimberEdge to TimberShortEdge and TimberLongEdge conversion."""
+        assert TimberEdge.BOTTOM_RIGHT.short_edge() == TimberShortEdge.BOTTOM_RIGHT
+        assert TimberEdge.TOP_FRONT.short_edge() == TimberShortEdge.TOP_FRONT
+        assert TimberEdge.RIGHT_FRONT.long_edge() == TimberLongEdge.RIGHT_FRONT
+
+    def test_timber_feature_short_edge_conversion_invalid(self):
+        """Test that converting non-short-edge features to short edge raises error."""
+        with pytest.raises(ValueError, match="Cannot convert.*to TimberShortEdge"):
+            TimberFeature.TOP_FACE.short_edge()
+        with pytest.raises(ValueError, match="Cannot convert.*to TimberShortEdge"):
+            TimberFeature.CENTERLINE.short_edge()
+        with pytest.raises(ValueError, match="Cannot convert.*to TimberShortEdge"):
+            TimberFeature.RIGHT_FRONT_EDGE.short_edge()
+
 
 
 class TestTimber:
