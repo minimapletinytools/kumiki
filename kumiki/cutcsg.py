@@ -66,6 +66,22 @@ class PrismFace(Enum):
     BACK = 6
 
 
+class ExtrusionCap(Enum):
+    """Which flat end of an extrusion-like primitive a feature is on."""
+    TOP = 1
+    BOTTOM = 2
+
+
+# Key identifying one named feature on an extrusion-like primitive
+# (ConvexPolygonExtrusion, pathcsg.PathExtrusion): an int n means the side face
+# running from vertex n to vertex n+1 -- from points[n] to
+# points[(n+1) % len(points)] for ConvexPolygonExtrusion, or from
+# path.segments[n].start to path.segments[n].end for PathExtrusion. Same
+# "n to n+1" meaning in both, so referencing side n means the same thing
+# regardless of which of the two primitives it is.
+ExtrusionFeatureKey = Union[int, ExtrusionCap]
+
+
 @dataclass(frozen=True)
 class CSGFeature(ABC):
     """
@@ -117,6 +133,24 @@ class RectangularPrismFeature(CSGFeature):
         elif self.face == PrismFace.BOTTOM:
             return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance)
         return False
+
+
+@dataclass(frozen=True)
+class ConvexPolygonExtrusionFeature(CSGFeature):
+    """Feature representing one side face (points[key] -> points[key+1 mod n])
+    or an end cap (ExtrusionCap.TOP/BOTTOM) of a ConvexPolygonExtrusion."""
+    owner: 'ConvexPolygonExtrusion'
+    key: ExtrusionFeatureKey
+
+    def test_point(self, point: V3) -> bool:
+        if not self.owner.is_point_on_boundary(point):
+            return False
+        x, y, z = self.owner._local_coords(point)
+        if self.key == ExtrusionCap.TOP:
+            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance)
+        if self.key == ExtrusionCap.BOTTOM:
+            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance)
+        return self.owner._point_on_side(self.key, x, y)
 
 
 @dataclass(frozen=True)
@@ -1263,6 +1297,7 @@ class ConvexPolygonExtrusion(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None  # starting distance in the direction of the -Z axis. None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # ending distance in the direction of the +Z axis. None means infinite in positive direction
+    named_features: Optional[List[Tuple[str, ExtrusionFeatureKey]]] = None
 
     def get_bottom_position(self) -> V3:
         """
@@ -1539,6 +1574,44 @@ class ConvexPolygonExtrusion(CutCSG):
                     return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         return None
+
+    def _local_coords(self, point: V3) -> Tuple[Numeric, Numeric, Numeric]:
+        local_point = point - self.transform.position
+        local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
+        return local_coords[0], local_coords[1], local_coords[2]
+
+    def _point_on_side(self, index: int, x: Numeric, y: Numeric) -> bool:
+        """Whether local (x, y) lies on the side face running from points[index]
+        to points[(index+1) % len(points)]."""
+        p1 = self.points[index]
+        p2 = self.points[(index + 1) % len(self.points)]
+        edge = p2 - p1
+        to_point = Matrix([x, y]) - p1
+        edge_length_sq = edge[0] ** 2 + edge[1] ** 2
+        if safe_zero_test(edge_length_sq):
+            return False
+        t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
+        if not (safe_compare(t, 0, Comparison.GE) and safe_compare(t, 1, Comparison.LE)):
+            return False
+        closest_point = p1 + edge * t
+        distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
+        return safe_zero_test(distance_sq)
+
+    def get_all_features(self, point: V3) -> List[CSGFeature]:
+        if self.named_features is None or not self.is_point_on_boundary(point):
+            return []
+        x, y, z = self._local_coords(point)
+        features: List[CSGFeature] = []
+        for name, key in self.named_features:
+            if key == ExtrusionCap.TOP:
+                if self.end_distance is not None and safe_equality_test(z, self.end_distance):
+                    features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
+            elif key == ExtrusionCap.BOTTOM:
+                if self.start_distance is not None and safe_equality_test(z, self.start_distance):
+                    features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
+            elif self._point_on_side(key, x, y):
+                features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
+        return features
 
     def get_aabb(self) -> BoundingBox:
         if self.start_distance is None or self.end_distance is None:
@@ -1865,6 +1938,15 @@ def decompose_simple_polygon_into_convex_pieces(points: Profile) -> List[Profile
     Decompose a simple (non-self-intersecting) polygon, given as an ordered
     list of (u, v) points, into convex quads/triangles whose union equals the
     polygon — via horizontal (constant-v) trapezoidal decomposition.
+
+    See pathcsg.decompose_path_into_convex_pieces for the same algorithm
+    generalized to a Path (lines + arcs): it sweeps directly over a Path's
+    segments instead of a pre-tessellated point list, so the expensive
+    exact-arithmetic part runs over the (small) segment count rather than
+    however many points arc tessellation would otherwise produce. Not wired
+    together with this function (would need pathcsg -> cutcsg -> pathcsg,
+    which is circular) — kept as two independent implementations of the same
+    sweep for now.
 
     Splits the polygon at every vertex's v-coordinate, and within each
     resulting v-band, finds every edge active there, sorts their u-crossings

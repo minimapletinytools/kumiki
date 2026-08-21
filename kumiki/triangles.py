@@ -28,6 +28,7 @@ from .cutcsg import (
     RectangularPrism,
     SolidUnion,
 )
+from .pathcsg import PathExtrusion, decompose_path_into_convex_pieces
 from .rule import Matrix, Numeric, Transform, V2, V3
 
 
@@ -38,6 +39,9 @@ TRIANGLES_CYLINDER_SECTIONS = 32
 TRIANGLES_RAY_EPSILON = 1e-8
 TRIANGLES_TINY_COMPONENT_VOLUME_RATIO = 1e-4
 TRIANGLES_TINY_COMPONENT_MIN_ABS_VOLUME = 1e-10
+# Chord-sagitta tolerance (meters) used to tessellate PathExtrusion arcs into
+# straight mesh segments -- see pathcsg.Path.tessellate.
+TRIANGLES_PATH_TESSELLATION_TOLERANCE = 0.0005
 
 
 Float3 = Tuple[float, float, float]
@@ -141,6 +145,9 @@ def _triangulate_with_label(csg: CutCSG, label: str) -> TriangleMesh:
         return TriangleMesh(mesh=mesh, face_sources=tuple(label for _ in range(len(mesh.faces))))
     if isinstance(csg, ConvexPolygonExtrusion):
         mesh = _mesh_convex_polygon_extrusion(csg)
+        return TriangleMesh(mesh=mesh, face_sources=tuple(label for _ in range(len(mesh.faces))))
+    if isinstance(csg, PathExtrusion):
+        mesh = _mesh_path_extrusion(csg)
         return TriangleMesh(mesh=mesh, face_sources=tuple(label for _ in range(len(mesh.faces))))
     if isinstance(csg, ConvexPolygonSimpleLoft):
         mesh = _mesh_convex_polygon_loft(csg)
@@ -387,6 +394,59 @@ def _mesh_convex_polygon_extrusion(extrusion: ConvexPolygonExtrusion) -> trimesh
         top_b = point_count + next_index
         faces.append([bottom_a, bottom_b, top_b])
         faces.append([bottom_a, top_b, top_a])
+
+    mesh = trimesh.Trimesh(vertices=np.asarray(vertices), faces=np.asarray(faces), process=False)
+    mesh.apply_transform(_transform_to_numpy(extrusion.transform))
+    return _finalize_mesh(mesh)
+
+
+def _mesh_path_extrusion(extrusion: PathExtrusion) -> trimesh.Trimesh:
+    start_distance, end_distance = _finite_extent_pair(extrusion.start_distance, extrusion.end_distance)
+    if end_distance <= start_distance:
+        raise ValueError("PathExtrusion must have positive height after finite conversion")
+
+    tolerance = TRIANGLES_PATH_TESSELLATION_TOLERANCE
+    perimeter = _polygon_points_ccw(extrusion.path.tessellate_for_mesh(tolerance))
+    point_count = len(perimeter)
+
+    vertices: list[list[float]] = []
+    for point in perimeter:
+        vertices.append([_numeric_to_float(point[0]), _numeric_to_float(point[1]), start_distance])
+    for point in perimeter:
+        vertices.append([_numeric_to_float(point[0]), _numeric_to_float(point[1]), end_distance])
+
+    faces: list[list[int]] = []
+    for index in range(point_count):
+        next_index = (index + 1) % point_count
+        bottom_a = index
+        bottom_b = next_index
+        top_a = point_count + index
+        top_b = point_count + next_index
+        faces.append([bottom_a, bottom_b, top_b])
+        faces.append([bottom_a, top_b, top_a])
+
+    # Caps: decompose the Path (over its own segments, not the tessellated
+    # perimeter above -- see decompose_path_into_convex_pieces) into convex
+    # pieces and fan-triangulate each one independently. Cap vertices are
+    # NOT index-shared with the wall ring built above (a curved band-edge's
+    # extra sample points generally aren't wall vertices at all) -- they're
+    # geometrically coincident at the shared boundary instead, and
+    # _finalize_mesh's merge_vertices() stitches the two into one manifold
+    # mesh, same as how separately-triangulated CSG operands get welded.
+    for piece in decompose_path_into_convex_pieces(extrusion.path, tolerance):
+        piece_ccw = _polygon_points_ccw(piece)
+        piece_count = len(piece_ccw)
+        if piece_count < 3:
+            continue
+        bottom_base = len(vertices)
+        for point in piece_ccw:
+            vertices.append([_numeric_to_float(point[0]), _numeric_to_float(point[1]), start_distance])
+        top_base = len(vertices)
+        for point in piece_ccw:
+            vertices.append([_numeric_to_float(point[0]), _numeric_to_float(point[1]), end_distance])
+        for index in range(1, piece_count - 1):
+            faces.append([bottom_base, bottom_base + index + 1, bottom_base + index])
+            faces.append([top_base, top_base + index, top_base + index + 1])
 
     mesh = trimesh.Trimesh(vertices=np.asarray(vertices), faces=np.asarray(faces), process=False)
     mesh.apply_transform(_transform_to_numpy(extrusion.transform))
