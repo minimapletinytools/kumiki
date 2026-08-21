@@ -209,7 +209,28 @@ DONE-rough/perfect timber within bounding box rendering
   -rename actual to rough (actualy geometry)
   -perfect box
   -rough box
+-update examples to use tenon_width_relative_to_joint and tenon_height_relative_to_joint
+-make no overlay the default
+-BUG th egeomoetery fro the center hole in kanawa tsugi is twrong
+  -the A part draws the line to the far corner of the center hole and the B parts are draws the line to the close corner
+  -you alos need to slightly tilt the vertical lines so the hole remains square
+  -and you need to slightly tilt the peg as well
 
+-DRAWING TIME
+  -review feature referencing in kumiki
+		-create feature enum point/edge/face and support them
+		-CSGfeature class should return more info about the feature
+			-face features need to beintersectable with another face for edges
+			-edges can be intersected with face for point,s but we don't actually need this
+		-we need some special face treatment
+			-figure out when faces intersect via union/interseciton/difference
+			-if 2 named face features intersect thisp roduces a named edge feature,
+				-careful that you don't end up with too many of these if you have several such CSG operations
+					-I think in most cases you'd rather a prism define its own edge feature then rely on intersecting
+				-in general the one place we really need this is where the shoulder plane intersect the PTW faces of the timber, so PTW timber faces are kinda special in this sense
+	-review reference face/edge in kumiki
+
+-make parameters human readable
 -fix tusk failing from other direction bug
 DONE-fix top end being backwards bug
 -add N/S/E/W labels to the cube
