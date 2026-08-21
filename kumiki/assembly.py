@@ -714,6 +714,14 @@ _SIMULTANEOUS_PARALLEL_TOLERANCE = 1e-5
 _SIMULTANEOUS_SPEED_EPSILON = 1e-6
 # Cap on ray-choice combinations for edges with multiple non-collinear rays.
 _SIMULTANEOUS_COMBO_CAP = 64
+# Cap on the number of per-scheduled-coordinate seeds tried by the heuristic
+# alternating-projection search in _sign_feasible_null_vector, in addition to
+# the all-ones seed. Each seed runs a fixed 300-iteration projection loop, so
+# this is O(seeds) expensive; on components with many scheduled coordinates
+# (dozens+) the heuristic can end up costing far more than the exact LP
+# backstop it falls back to anyway. Capping it bounds the worst case while
+# still giving the heuristic a real chance to win the common, cheap cases.
+_MAX_HEURISTIC_SEEDS = 8
 
 
 def _orthonormalize(vectors: List[List[float]]) -> List[List[float]]:
@@ -768,14 +776,20 @@ def _sign_feasible_null_vector(
     null_basis: List[List[float]],
     half_line: Set[int],
     scheduled: Set[int],
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> Optional[List[float]]:
     """A vector in span(null_basis), normalized to max |x| = 1, with x_e >= 0
     on half-line coordinates and |x_e| > 0 on some scheduled coordinate.
 
     Tries the basis vectors and their sum directly (which covers symmetric
     structures, whose solution IS the symmetric nullspace direction), then
-    alternating projection between the nullspace and the sign orthant. The
-    result is approximate; the caller re-validates reconstructed velocities.
+    alternating projection between the nullspace and the sign orthant (capped
+    to _MAX_HEURISTIC_SEEDS extra seeds -- each seed is a fixed 300-iteration
+    loop, so this is the expensive part on components with many scheduled
+    coordinates). Falls back to the exact LP backstop, which is cheap and
+    reliable at the sizes it's gated to, so a capped/failed heuristic search
+    never costs correctness -- only a shot at an early, cheaper answer.
+    The result is approximate; the caller re-validates reconstructed velocities.
     """
     if not null_basis:
         return None
@@ -812,11 +826,13 @@ def _sign_feasible_null_vector(
             return result
 
     seeds = [[1.0] * dimension]
-    for index in sorted(scheduled):
+    for index in sorted(scheduled)[:_MAX_HEURISTIC_SEEDS]:
         seed = [0.0] * dimension
         seed[index] = 1.0
         seeds.append(seed)
     for seed in seeds:
+        if should_cancel is not None and should_cancel():
+            return None
         x = seed
         for _ in range(300):
             x = project(x)
@@ -826,6 +842,8 @@ def _sign_feasible_null_vector(
         if result is not None:
             return result
 
+    if should_cancel is not None and should_cancel():
+        return None
     return _lp_sign_feasible_null_vector(null_basis, half_line, scheduled)
 
 
@@ -896,6 +914,7 @@ def _lp_sign_feasible_null_vector(
 def _attempt_simultaneous_step(
     ordering: Ordering,
     pairs: List[_Pair],
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> Optional[Dict[int, _Float3]]:
     """Phase 1b: a simultaneous multi-velocity motion when no rigid group
     works (interlocked rings, splayed radial structures).
@@ -979,6 +998,8 @@ def _attempt_simultaneous_step(
 
     seen_clusters: Set[int] = set()
     for start in sorted(adjacency.keys()):
+        if should_cancel is not None and should_cancel():
+            return None
         if start in seen_clusters:
             continue
         component: Set[int] = {start}
@@ -1008,6 +1029,7 @@ def _attempt_simultaneous_step(
             cluster_members=cluster_members,
             find=find,
             pairs=pairs,
+            should_cancel=should_cancel,
         )
         if result is not None:
             return result
@@ -1024,6 +1046,7 @@ def _solve_simultaneous_component(
     cluster_members: Dict[int, List[int]],
     find,
     pairs: List[_Pair],
+    should_cancel: Optional[Callable[[], bool]] = None,
 ) -> Optional[Dict[int, _Float3]]:
     local_of_edge = {edge_index: k for k, edge_index in enumerate(component_edges)}
     edge_count = len(component_edges)
@@ -1068,6 +1091,8 @@ def _solve_simultaneous_component(
                 return
 
     for combo in option_combos():
+        if should_cancel is not None and should_cancel():
+            return None
         axes: List[_Float3] = []
         half_line: Set[int] = set()
         for edge_index in component_edges:
@@ -1097,7 +1122,7 @@ def _solve_simultaneous_component(
             if ordering in edge_pairs[index].scheduled_orderings
         }
         null_basis = _nullspace_basis(rows, edge_count)  # already orthonormal
-        x = _sign_feasible_null_vector(null_basis, half_line, scheduled_locals)
+        x = _sign_feasible_null_vector(null_basis, half_line, scheduled_locals, should_cancel=should_cancel)
         if x is None:
             continue
 
@@ -1343,6 +1368,8 @@ def solve_assembly(
                 candidate_inputs.values(),
                 key=lambda item: (member_by_key[item[0]].name, item[0], _axis_key(item[1])),
             ):
+                if should_cancel is not None and should_cancel():
+                    return None
                 candidate = _evaluate_candidate(
                     target, direction, ordering, pairs_by_member, member_by_key,
                     member_min_ordering, positions, active_members, plane_normal,
@@ -1353,7 +1380,7 @@ def solve_assembly(
                     best = candidate
 
             if best is None:
-                ring = _attempt_simultaneous_step(ordering, pairs)
+                ring = _attempt_simultaneous_step(ordering, pairs, should_cancel=should_cancel)
                 if ring is not None:
                     sequence += 1
                     primaries: Set[int] = set()
@@ -1375,6 +1402,15 @@ def solve_assembly(
                     warn_dragged(set(ring), primaries, ordering)
                     emit_micro(ring, primaries & set(ring), mergeable=False)
                     continue
+
+                # ring is None here either because no valid extraction exists,
+                # or because should_cancel fired partway through the search
+                # (which _attempt_simultaneous_step reports the same way, as
+                # None). Only the former is a genuine failure -- a cancelled
+                # search must propagate as an abort, not a fabricated
+                # AssemblyFailure with an incomplete diagnostic.
+                if should_cancel is not None and should_cancel():
+                    return None
 
                 diagnostics: List[str] = []
                 for pair in scheduled_pairs[:8]:
