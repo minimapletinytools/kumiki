@@ -3,7 +3,7 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, pi
+from sympy import Matrix, sqrt, simplify, Abs, pi, atan2, sin, cos
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -376,7 +376,17 @@ class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
         u_dir = -timber1.get_face_direction_global(arrangement.timber1_end)
         v_face = front_face_on_timber1.rotate_right()
         v_dir = timber1.get_face_direction_global(v_face)
-        expected_direction = safe_normalize_vector(u_dir * (-(SL + SSD) / scalar(2)) + v_dir * (-SSD / scalar(2)))
+        # corner->p4 is NOT the naive (-(SL+SSD)/2, -SSD/2) chord -- the joint
+        # computes p4 via the actual scarf angle (atan2(SSD/2, sqrt((SL/2)^2 -
+        # (SSD/2)^2))), which only reduces to that straight-line approximation
+        # in the limit SSD << SL. Recompute it the same way the joint does
+        # (stepped_shoulder_length defaults to SSD here, as in the call above).
+        some_var_x = sqrt((SL / scalar(2)) ** 2 - (SSD / scalar(2)) ** 2)
+        scarf_hypotneuse = some_var_x + SSD / scalar(2)
+        scarf_angle = atan2(SSD / scalar(2), some_var_x)
+        corner_to_p4_u = -cos(scarf_angle) * scarf_hypotneuse
+        corner_to_p4_v = -sin(scarf_angle) * scarf_hypotneuse
+        expected_direction = safe_normalize_vector(u_dir * corner_to_p4_u + v_dir * corner_to_p4_v)
 
         freedom1 = cut1.assembly_freedom
         freedom2 = cut2.assembly_freedom

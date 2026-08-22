@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
-from sympy import cos, sin, sqrt as sym_sqrt
+from sympy import cos, sin, sqrt as sym_sqrt, Float
 
 from .rule import *
 from .cutcsg import (
@@ -109,7 +109,7 @@ class PathSegment(ABC):
         """This segment's term in the shoelace-with-arcs sum, for Path.signed_area()."""
 
     @abstractmethod
-    def tessellate(self, tolerance: Numeric) -> List[V2]:
+    def tessellate(self, tolerance: float) -> List[V2]:
         """
         Points approximating this segment for MESHING ONLY -- never used by
         the analytic methods above. Excludes `start` (shared with the
@@ -117,7 +117,7 @@ class PathSegment(ABC):
         """
 
     @abstractmethod
-    def tessellate_with_extra_breaks(self, other_breaks: List[Numeric], tolerance: Numeric) -> List[V2]:
+    def tessellate_with_extra_breaks(self, other_breaks: List[Numeric], tolerance: float) -> List[V2]:
         """
         Like tessellate(), but also forces a vertex at every y-value in
         `other_breaks` that falls strictly inside this segment's own y-range
@@ -137,7 +137,7 @@ class PathSegment(ABC):
         """
 
     @abstractmethod
-    def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: Numeric) -> List[V2]:
+    def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: float) -> List[V2]:
         """
         Points approximating this segment strictly BETWEEN point_lo and
         point_hi (both assumed to already lie on this segment), excluding
@@ -249,10 +249,10 @@ class LineSegment(PathSegment):
         x1, y1 = self.line_end[0], self.line_end[1]
         return (x0 * y1 - x1 * y0) / scalar(2)
 
-    def tessellate(self, tolerance: Numeric) -> List[V2]:
+    def tessellate(self, tolerance: float) -> List[V2]:
         return [self.line_end]
 
-    def tessellate_with_extra_breaks(self, other_breaks: List[Numeric], tolerance: Numeric) -> List[V2]:
+    def tessellate_with_extra_breaks(self, other_breaks: List[Numeric], tolerance: float) -> List[V2]:
         y0, y1 = self.line_start[1], self.line_end[1]
         if safe_zero_test(y1 - y0):
             return [self.line_end]  # horizontal: no y ever falls strictly inside its range
@@ -267,7 +267,7 @@ class LineSegment(PathSegment):
         inserts.sort(key=lambda item: giraffe_evalf(item[0]))
         return [pt for _, pt in inserts] + [self.line_end]
 
-    def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: Numeric) -> List[V2]:
+    def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: float) -> List[V2]:
         return []
 
     def reverse(self) -> 'LineSegment':
@@ -415,9 +415,7 @@ class ArcSegment(PathSegment):
         angle = self._angle_for_point(point)
         lo, hi = self._angle_extent_float()
         if lo - 1e-9 <= angle <= hi + 1e-9:
-            radius = float(self.radius)
-            cx, cy = float(self.center[0]), float(self.center[1])
-            return create_v2(cx + radius * math.cos(angle), cy + radius * math.sin(angle))
+            return self._point_at_angle(angle)
         # off the arc's own span -- nearer endpoint wins
         start_pt, end_pt = self.start, self.end
         d_start = (point[0] - start_pt[0]) ** 2 + (point[1] - start_pt[1]) ** 2
@@ -466,7 +464,7 @@ class ArcSegment(PathSegment):
         arc_term = (self.radius ** 2) * (self.sweep_angle - sin(self.sweep_angle)) / scalar(2)
         return chord_term + arc_term
 
-    def _angle_grid(self, tolerance: Numeric) -> List[float]:
+    def _angle_grid(self, tolerance: float) -> List[float]:
         """
         Interior sample angles (strictly between start_angle and end_angle),
         anchored at start_angle and spaced by a fixed step derived from
@@ -496,14 +494,14 @@ class ArcSegment(PathSegment):
     def _point_at_angle(self, angle: float) -> V2:
         cx, cy = float(self.center[0]), float(self.center[1])
         radius = float(self.radius)
-        return create_v2(cx + radius * math.cos(angle), cy + radius * math.sin(angle))
+        return create_v2(Float(cx + radius * math.cos(angle)), Float(cy + radius * math.sin(angle)))
 
-    def tessellate(self, tolerance: Numeric) -> List[V2]:
+    def tessellate(self, tolerance: float) -> List[V2]:
         points = [self._point_at_angle(a) for a in self._angle_grid(tolerance)]
         points.append(self.end)
         return points
 
-    def tessellate_with_extra_breaks(self, other_breaks: List[Numeric], tolerance: Numeric) -> List[V2]:
+    def tessellate_with_extra_breaks(self, other_breaks: List[Numeric], tolerance: float) -> List[V2]:
         angles = list(self._angle_grid(tolerance))
         for y in other_breaks:
             for x in self.ray_crossings(y, inclusive=True):
@@ -521,7 +519,7 @@ class ArcSegment(PathSegment):
         points.append(self.end)
         return points
 
-    def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: Numeric) -> List[V2]:
+    def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: float) -> List[V2]:
         angle_lo = self._angle_for_point(point_lo)
         angle_hi = self._angle_for_point(point_hi)
         reverse = angle_lo > angle_hi
@@ -633,7 +631,7 @@ class FancyPath:
                     count += 1
         return count % 2 == 1
 
-    def tessellate(self, tolerance: Numeric) -> Profile:
+    def tessellate(self, tolerance: float) -> Profile:
         """
         Path -> plain point list (Profile), for meshing only.
 
@@ -649,7 +647,7 @@ class FancyPath:
             points.extend(seg.tessellate(tolerance))
         return points
 
-    def tessellate_for_mesh(self, tolerance: Numeric) -> Profile:
+    def tessellate_for_mesh(self, tolerance: float) -> Profile:
         """
         Like tessellate(), but forces a vertex at every band-seam
         decompose_path_into_convex_pieces will introduce -- including on a
@@ -694,7 +692,7 @@ def _path_breakpoints(path: FancyPath) -> List[Numeric]:
 # decompose_path_into_convex_pieces
 # ============================================================================
 
-def decompose_path_into_convex_pieces(path: FancyPath, tolerance: Numeric) -> List[Profile]:
+def decompose_path_into_convex_pieces(path: FancyPath, tolerance: float) -> List[Profile]:
     """
     Like cutcsg.decompose_simple_polygon_into_convex_pieces, but sweeps
     directly over a FancyPath's small number of segments instead of a

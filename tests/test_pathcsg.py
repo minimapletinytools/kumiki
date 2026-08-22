@@ -44,6 +44,7 @@ class TestPathCSG:
         on_boundary = create_v3(radius, scalar(0), height / 2)
         assert extrusion.is_point_on_boundary(on_boundary)
         normal = extrusion.get_outward_normal(on_boundary)
+        assert normal is not None
         assert [float(n) for n in normal] == pytest.approx([1.0, 0.0, 0.0])
 
         mesh = mesh_cutcsg(extrusion).mesh
