@@ -64,7 +64,11 @@ def cut_free_house_joint(
             )
 
             # AABB of the housed_timber's prism in housing_timber's local space (used for pruning below)
-            housed_aabb = housed_prism_in_housing.get_aabb()
+            # TODO this is rather pointless, the AABB is almost always infinite as we use the extended timber
+            # if you want to do this properly, get the RectangularPrism instead.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                housed_aabb = housed_prism_in_housing.get_aabb()
 
             # Housing_timber cross-section half-extents (in its own local space).
             half_w = housing_timber.size[0] / scalar(2)
@@ -84,7 +88,9 @@ def cut_free_house_joint(
                 # INTERSECTED with the housed_timbers actual AABB is entirely contained in the external side of the plane
                 # if this is the case, that means that CSG feature does not actually affect the housed timber
                 # and can be removed from the tree
-                aabb = csg_in_housing_local.get_aabb()
+                with warnings.catch_warnings():
+                    warnings.simplefilter("ignore", UserWarning)
+                    aabb = csg_in_housing_local.get_aabb()
                 # Empty (e.g. EmptyCSG) -> trivially doesn't affect anything, safe to prune
                 if aabb.is_empty:
                     return True

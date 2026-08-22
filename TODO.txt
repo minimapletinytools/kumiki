@@ -216,8 +216,10 @@ DONE-BUG th egeomoetery fro the center hole in kanawa tsugi is twrong
   -the A part draws the line to the far corner of the center hole and the B parts are draws the line to the close corner
   -you alos need to slightly tilt the vertical lines so the hole remains square
   -and you need to slightly tilt the peg as well
+DONE-research removing sympy entirely...
 
--research removing sympy entirely...
+
+
 -DRAWING TIME
   -review feature referencing in kumiki
 		-create feature enum point/edge/face and support them
