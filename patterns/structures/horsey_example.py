@@ -142,7 +142,8 @@ def create_sawhorse() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
-        tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in beam's Y direction)
+        tenon_width_relative_to_joint=tenon_width,
+        tenon_height_relative_to_joint=tenon_thickness,
         tenon_length=tenon_length,
         mortise_depth=None,  # Through mortise
         peg_parameters=peg_params_post_beam,
@@ -155,7 +156,8 @@ def create_sawhorse() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
-        tenon_size=Matrix([tenon_thickness, tenon_width]),  # 1" x 3" (3" in beam's Y direction)
+        tenon_width_relative_to_joint=tenon_width,
+        tenon_height_relative_to_joint=tenon_thickness,
         tenon_length=tenon_length,
         mortise_depth=None,  # Through mortise
         peg_parameters=peg_params_post_beam,
@@ -217,7 +219,8 @@ def create_sawhorse() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        tenon_size=Matrix([tenon_width, tenon_thickness]),  # 3" x 1" (3" in plate's X direction)
+        tenon_width_relative_to_joint=tenon_width,
+        tenon_height_relative_to_joint=tenon_thickness,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         peg_parameters=peg_params_post_plate,
@@ -230,7 +233,8 @@ def create_sawhorse() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        tenon_size=Matrix([tenon_width, tenon_thickness]),  # 3" x 1" (3" in plate's X direction)
+        tenon_width_relative_to_joint=tenon_width,
+        tenon_height_relative_to_joint=tenon_thickness,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         peg_parameters=peg_params_post_plate,

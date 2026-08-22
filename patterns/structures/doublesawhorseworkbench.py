@@ -34,9 +34,10 @@ post_gap = inches(3)       # clear gap between the two posts on each foot
 top_beam_size = Matrix([inches(15, 2), inches(7, 2)])  # true 4x8: 7.5" in Y, 3.5" in Z
 top_beam_overhang = inches(11)  # beyond the outside face of the posts, each side
 
-# Post-to-foot mortise and tenon: tenon is 4/3" in X (about a third of the
-# foot's 3.5" width) and 5" in Y, just under the post's 5.5" depth.
-post_tenon_size = Matrix([inches(4, 3), inches(5)])
+# Post-to-foot mortise and tenon: tenon is 5" wide (along the foot/post joint
+# plane in Y) and 4/3" tall (perpendicular to the joint plane in X).
+post_tenon_width_relative_to_joint = inches(5)
+post_tenon_height_relative_to_joint = inches(4, 3)
 post_tenon_length = inches(5)
 
 # Square draw-bore pegs on the post-to-foot joints: 1" square, centered on the
@@ -51,9 +52,10 @@ post_peg_parameters = SimplePegParameters(
 )
 
 # Post-to-beam mortise and tenon: stopped mortise (tenon must not protrude
-# through the 3.5" beam). Tenon is deliberately rotated from the usual
-# convention: 1.5" in the beam's length axis (X), 4" in the perpendicular (Y).
-beam_tenon_size = Matrix([inches(3, 2), inches(4)])
+# through the 3.5" beam). Tenon is 1.5" wide (along the beam's length axis X)
+# and 4" tall (perpendicular to the joint plane in Y).
+beam_tenon_width_relative_to_joint = inches(3, 2)
+beam_tenon_height_relative_to_joint = inches(4)
 beam_tenon_length = inches(3)
 beam_mortise_depth = beam_tenon_length + inches(1, 4)  # stops 1/4" below the top
 
@@ -171,7 +173,8 @@ def build_double_sawhorse_workbench() -> Frame:
                 butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=peg_face_on_post,
             ),
-            tenon_size=post_tenon_size,
+            tenon_width_relative_to_joint=post_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=post_tenon_height_relative_to_joint,
             tenon_length=post_tenon_length,
             mortise_depth=None,  # through mortise
             peg_parameters=post_peg_parameters,
@@ -194,7 +197,8 @@ def build_double_sawhorse_workbench() -> Frame:
                 butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=beam_tenon_size,
+            tenon_width_relative_to_joint=beam_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=beam_tenon_height_relative_to_joint,
             tenon_length=beam_tenon_length,
             mortise_depth=beam_mortise_depth,
         )

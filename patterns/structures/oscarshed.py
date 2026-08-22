@@ -254,7 +254,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Tenon length: 2 inches
     # Mortise depth: 3 inches (through mortise since mudsill is 4" deep)
     
-    tenon_size = Matrix([inches(2), inches(1)])  # 2" along X (mudsill direction), 1" along Y
+    tenon_width_relative_to_joint = inches(2)
+    tenon_height_relative_to_joint = inches(1)
     tenon_length = inches(3)
     mortise_depth = inches(3.5)
     
@@ -267,7 +268,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_offset_left,
@@ -282,7 +284,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_offset_right,
@@ -296,7 +299,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_offset_left,
@@ -310,7 +314,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_offset_right,
@@ -325,7 +330,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Mortise depth: 3.5 inches
     # No peg (peg_parameters=None)
     
-    middle_post_tenon_size = Matrix([inches(2), inches(1)])  # 2" along X (mudsill direction), 1" along Y
+    middle_post_tenon_width_relative_to_joint = inches(2)
+    middle_post_tenon_height_relative_to_joint = inches(1)
     middle_post_tenon_length = inches(3)
     middle_post_mortise_depth = inches(3.5)
     
@@ -337,7 +343,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=middle_post_tenon_size,
+        tenon_width_relative_to_joint=middle_post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=middle_post_tenon_height_relative_to_joint,
         tenon_length=middle_post_tenon_length,
         mortise_depth=middle_post_mortise_depth,
     )
@@ -350,7 +357,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=middle_post_tenon_size,
+        tenon_width_relative_to_joint=middle_post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=middle_post_tenon_height_relative_to_joint,
         tenon_length=middle_post_tenon_length,
         mortise_depth=middle_post_mortise_depth,
     )
@@ -400,7 +408,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Mortise depth: 4.5 inches
     # No peg
     
-    side_girt_back_tenon_size = Matrix([inches(scalar(3, 2)), inches(3)])  # 1.5" x 3"
+    side_girt_back_tenon_width_relative_to_joint = inches(3)
+    side_girt_back_tenon_height_relative_to_joint = inches(scalar(3, 2))
     side_girt_back_tenon_length = inches(scalar(9, 2))  # 4.5 inches
     side_girt_back_mortise_depth = inches(scalar(9, 2))  # 4.5 inches (through mortise)
     
@@ -412,7 +421,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=side_girt_back_tenon_size,
+        tenon_width_relative_to_joint=side_girt_back_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=side_girt_back_tenon_height_relative_to_joint,
         tenon_length=side_girt_back_tenon_length,
         mortise_depth=side_girt_back_mortise_depth,
     )
@@ -425,7 +435,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=side_girt_back_tenon_size,
+        tenon_width_relative_to_joint=side_girt_back_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=side_girt_back_tenon_height_relative_to_joint,
         tenon_length=side_girt_back_tenon_length,
         mortise_depth=side_girt_back_mortise_depth,
     )
@@ -439,7 +450,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Mortise depth: 3 inches
     # Peg: 5/8" square peg, 1 inch from shoulder, centered
     
-    side_girt_tenon_size = Matrix([inches(2), inches(1)])  # 1" horizontal, 2" vertical
+    side_girt_tenon_width_relative_to_joint = inches(2)
+    side_girt_tenon_height_relative_to_joint = inches(1)
     side_girt_tenon_length = inches(3)
     side_girt_mortise_depth = inches(3.5)
     
@@ -462,7 +474,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        tenon_size=side_girt_tenon_size,
+        tenon_width_relative_to_joint=side_girt_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=side_girt_tenon_height_relative_to_joint,
         tenon_length=side_girt_tenon_length,
         mortise_depth=side_girt_mortise_depth,
         peg_parameters=side_girt_peg_params_left,
@@ -476,7 +489,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size=side_girt_tenon_size,
+        tenon_width_relative_to_joint=side_girt_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=side_girt_tenon_height_relative_to_joint,
         tenon_length=side_girt_tenon_length,
         mortise_depth=side_girt_mortise_depth,
         peg_parameters=side_girt_peg_params_right,
@@ -599,7 +613,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Mortise depth: 3 inches
     # Peg: 5/8" square peg, 1 inch from shoulder, centered
     
-    front_girt_tenon_size = Matrix([inches(2), inches(1)])
+    front_girt_tenon_width_relative_to_joint = inches(2)
+    front_girt_tenon_height_relative_to_joint = inches(1)
     front_girt_tenon_length = inches(3)
     front_girt_mortise_depth = inches(3.5)
     
@@ -620,7 +635,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        tenon_size=front_girt_tenon_size,
+        tenon_width_relative_to_joint=front_girt_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=front_girt_tenon_height_relative_to_joint,
         tenon_length=front_girt_tenon_length,
         mortise_depth=front_girt_mortise_depth,
         peg_parameters=front_girt_peg_params,
@@ -634,7 +650,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        tenon_size=front_girt_tenon_size,
+        tenon_width_relative_to_joint=front_girt_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=front_girt_tenon_height_relative_to_joint,
         tenon_length=front_girt_tenon_length,
         mortise_depth=front_girt_mortise_depth,
         peg_parameters=front_girt_peg_params,
@@ -727,7 +744,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=middle_post_tenon_size,
+        tenon_width_relative_to_joint=middle_post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=middle_post_tenon_height_relative_to_joint,
         tenon_length=middle_post_tenon_length,
         mortise_depth=middle_post_mortise_depth,
     )
@@ -740,7 +758,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=middle_post_tenon_size,
+        tenon_width_relative_to_joint=middle_post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=middle_post_tenon_height_relative_to_joint,
         tenon_length=middle_post_tenon_length,
         mortise_depth=middle_post_mortise_depth,
     )
@@ -759,7 +778,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=middle_post_tenon_size,
+        tenon_width_relative_to_joint=middle_post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=middle_post_tenon_height_relative_to_joint,
         tenon_length=middle_post_tenon_length,
         mortise_depth=middle_post_mortise_depth,
     )
@@ -772,7 +792,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=middle_post_tenon_size,
+        tenon_width_relative_to_joint=middle_post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=middle_post_tenon_height_relative_to_joint,
         tenon_length=middle_post_tenon_length,
         mortise_depth=middle_post_mortise_depth,
     )
@@ -800,7 +821,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
     # Mortise depth: 2.5 inches
     # No peg
     
-    corner_post_to_beam_tenon_size = Matrix([inches(scalar(3, 2)), inches(1)])  # 1" front to back, 1.5" side to side
+    corner_post_to_beam_tenon_width_relative_to_joint = inches(scalar(3, 2))
+    corner_post_to_beam_tenon_height_relative_to_joint = inches(1)
     corner_post_to_beam_tenon_length = inches(scalar(5, 2))  # 2.5 inches
     corner_post_to_beam_mortise_depth = inches(scalar(5, 2))  # 2.5 inches
     
@@ -812,7 +834,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=corner_post_to_beam_tenon_size,
+        tenon_width_relative_to_joint=corner_post_to_beam_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=corner_post_to_beam_tenon_height_relative_to_joint,
         tenon_length=corner_post_to_beam_tenon_length,
         mortise_depth=corner_post_to_beam_mortise_depth,
     )
@@ -825,7 +848,8 @@ def create_oscarshed(center: Optional[V3] = None) -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=corner_post_to_beam_tenon_size,
+        tenon_width_relative_to_joint=corner_post_to_beam_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=corner_post_to_beam_tenon_height_relative_to_joint,
         tenon_length=corner_post_to_beam_tenon_length,
         mortise_depth=corner_post_to_beam_mortise_depth,
     )
