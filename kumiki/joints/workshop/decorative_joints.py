@@ -340,7 +340,7 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
     )
 
 
-def cut_path_extrusion_corner_end_decoration(
+def cut_practice_path_extrusion_corner_end_decoration(
     cut_corner: TimberShortEdge,
     cut_path: List[PathSegment],
 ) -> Joint:
