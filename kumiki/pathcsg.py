@@ -154,6 +154,13 @@ class PathSegment(ABC):
         points, which is a T-junction merge_vertices() can't repair.
         """
 
+    @abstractmethod
+    def reverse(self) -> 'PathSegment':
+        """This same segment, geometrically identical, but traversed from
+        `end` to `start` instead of `start` to `end`. Used by FancyPath.reversed()
+        to flip a whole loop's winding direction (e.g. to satisfy is_valid()'s
+        CCW requirement when a loop was naturally built CW by construction)."""
+
 
 def _right_perpendicular(v: V2) -> V2:
     """Rotate a 2D vector -90 degrees (clockwise): (dx,dy) -> (dy,-dx).
@@ -262,6 +269,9 @@ class LineSegment(PathSegment):
 
     def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: Numeric) -> List[V2]:
         return []
+
+    def reverse(self) -> 'LineSegment':
+        return LineSegment(self.line_end, self.line_start)
 
 
 # ============================================================================
@@ -526,6 +536,13 @@ class ArcSegment(PathSegment):
             interior.reverse()
         return [self._point_at_angle(a) for a in interior]
 
+    def reverse(self) -> 'ArcSegment':
+        # Same circle, same points, traversed the other way: starting where
+        # this one ended, sweeping by the same magnitude in the opposite
+        # (CCW<->CW) direction.
+        return ArcSegment(center=self.center, radius=self.radius,
+                           start_angle=self.end_angle, sweep_angle=-self.sweep_angle)
+
 
 # ============================================================================
 # FancyPath
@@ -569,6 +586,14 @@ class FancyPath:
         for seg in self.segments:
             total += seg.signed_area_contribution()
         return total
+
+    def reversed(self) -> 'FancyPath':
+        """This same closed loop, traversed in the opposite direction --
+        flips CW<->CCW (negates signed_area()). Handy for a loop that's
+        naturally built in a fixed geometric order that comes out CW (e.g.
+        one auto-generated end of it is dictated by construction rather than
+        free to choose) but needs to satisfy is_valid()'s CCW requirement."""
+        return FancyPath([seg.reverse() for seg in reversed(self.segments)])
 
     def bounds(self) -> Tuple[V2, V2]:
         mins, maxs = self.segments[0].bounds()

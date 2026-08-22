@@ -3,14 +3,14 @@ Kumiki - Decorative joint construction functions
 """
 
 import warnings
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 from sympy import Abs, Matrix
 
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
-from kumiki.rule import Numeric, Comparison, safe_compare, scalar, Transform, Orientation
+from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation
 from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg
-from kumiki.pathcsg import PathSegment
+from kumiki.pathcsg import PathSegment, LineSegment, Path, PathExtrusion
 from kumiki.measuring import get_center_point_on_face_global
 
 
@@ -340,7 +340,14 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
     )
 
 
+def _line_if_nondegenerate(a: Matrix, b: Matrix) -> Optional[LineSegment]:
+    if safe_zero_test(a[0] - b[0]) and safe_zero_test(a[1] - b[1]):
+        return None
+    return LineSegment(a, b)
+
+
 def cut_practice_path_extrusion_corner_end_decoration(
+    timber: BlockLike,
     cut_corner: TimberShortEdge,
     cut_path: List[PathSegment],
 ) -> Joint:
@@ -358,13 +365,103 @@ def cut_practice_path_extrusion_corner_end_decoration(
 
     specifically to form the cut out:
     - the 0'th path coordinate is extended to the end of the timber (x = 0)
-    - that point is extended vertically to the rough face in the -y direction (relative to the diagram above) 
+    - that point is extended vertically to the rough face in the -y direction (relative to the diagram above)
     - then that point is extended to horizontally to the x coordinate of the last path coordinate
-    - finally it is connected to the last path coordinate
-    the 0'th path coordinate
+    - finally it is connected to the last path coordinate, and from there back to
+      the 0'th path coordinate, closing the loop
+
+    The enclosed region (cut_path on the inside, the end/rough-face corner on
+    the outside) is extruded across the timber's full actual (rough) width
+    perpendicular to both cut_corner's end face and long face, and removed --
+    the same "extrude a 2D cut profile across the full perpendicular width"
+    idea as cut_practice_rafter_tail_scallop_corner_end_decoration, just with
+    an arbitrary line/arc path instead of a single circular arc.
 
     Arguments:
+        timber: Timber to cut the decoration on
         cut_corner: the corner that is to be cut out, which determines the coordinates of the  path based on the diagram above
-        cut_path: the path, which must be drawn from the left edge to the bottom edge based on the diagram above. 
+        cut_path: the path, which must be drawn from the left edge to the bottom edge based on the diagram above.
     """
-    assert "Not Implemented"
+    assert len(cut_path) > 0, "cut_path must have at least one segment"
+
+    end_side = cut_corner.end
+    cut_side = cut_corner.long_face
+    end_face = end_side.to.face()
+    cut_face = cut_side.to.face()
+
+    # Marking space: origin is where the relevant centerplane meets both
+    # cut_side and end_side (the midpoint of the edge they share) -- same
+    # frame cut_practice_rafter_tail_scallop_corner_end_decoration uses.
+    # Local +x points from the end INTO the timber (so x=0, per the diagram,
+    # is the end face itself); local +y points from cut_side INTO the timber
+    # (so -y, per the diagram, is outward past cut_side's perfect face --
+    # where any rough-stock excess lives).
+    end_direction = timber.get_face_direction_global(end_face)
+    cut_direction = timber.get_face_direction_global(cut_face)
+    origin = (
+        get_center_point_on_face_global(end_face, timber)
+        + cut_direction * (timber.get_size_in_face_normal_axis(cut_face) / scalar(2))
+    )
+    local_x_dir = -end_direction
+    local_y_dir = -cut_direction
+
+    # The axis perpendicular to both end_side and cut_side -- the extrusion
+    # runs along this, across the timber's full rough width, same as the
+    # scallop's cylinder axis.
+    perp_face = cut_face.rotate_about(end_face)
+    perp_face_opposite = perp_face.get_opposite_face()
+    extrusion_dir = timber.get_face_direction_global(perp_face)
+
+    orientation = Orientation(Matrix([
+        [local_x_dir[0], local_y_dir[0], extrusion_dir[0]],
+        [local_x_dir[1], local_y_dir[1], extrusion_dir[1]],
+        [local_x_dir[2], local_y_dir[2], extrusion_dir[2]],
+    ]))
+
+    path_start = cut_path[0].start
+    path_end = cut_path[-1].end
+    y_rough = -_rough_excess_in_face_normal_axis(timber, cut_face)
+
+    loop_start = create_v2(scalar(0), path_start[1])
+    rough_near_end = create_v2(scalar(0), y_rough)
+    rough_near_path_end = create_v2(path_end[0], y_rough)
+
+    segments: List[PathSegment] = []
+    start_connector = _line_if_nondegenerate(loop_start, path_start)
+    if start_connector is not None:
+        segments.append(start_connector)
+    segments.extend(cut_path)
+    for a, b in ((path_end, rough_near_path_end), (rough_near_path_end, rough_near_end), (rough_near_end, loop_start)):
+        closing_segment = _line_if_nondegenerate(a, b)
+        if closing_segment is not None:
+            segments.append(closing_segment)
+
+    loop = Path(segments)
+    # cut_path is drawn "downhill" (end toward the end face, bottom toward
+    # cut_side) per the diagram, which makes the loop as constructed above
+    # come out clockwise -- flip it so is_valid()'s CCW requirement (needed
+    # for correct outward normals) is satisfied regardless.
+    if safe_compare(loop.signed_area(), 0, Comparison.LT):
+        loop = loop.reversed()
+    assert loop.is_valid(), (
+        f"cut_practice_path_extrusion_corner_end_decoration: constructed cut path for "
+        f"{cut_corner.name} is not a valid simple loop -- check cut_path connectivity"
+    )
+
+    extrusion = PathExtrusion(
+        path=loop,
+        transform=Transform(position=origin, orientation=orientation),
+        start_distance=-timber.get_half_rough_size_in_face_normal_axis(perp_face_opposite),
+        end_distance=timber.get_half_rough_size_in_face_normal_axis(perp_face),
+    )
+
+    negative_csg = adopt_csg(None, timber.transform, extrusion)
+    cutting = Cutting(
+        timber=timber,
+        negative_csg=negative_csg,
+        label="path_extrusion_corner_end_decoration",
+    )
+    return Joint(
+        cuttings={timber.ticket.path: cutting},
+        ticket=JointTicket(joint_type="path_extrusion_corner_end_decoration"),
+    )

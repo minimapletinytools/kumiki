@@ -2,7 +2,10 @@
 Decorative Joints Patterns
 """
 
+from sympy import pi
+
 from kumiki import *
+from kumiki.pathcsg import LineSegment, ArcSegment
 from kumiki.patternbook import Pattern, make_pattern_from_joint
 
 
@@ -63,6 +66,43 @@ def example_rafter_tail_scallop_decoration() -> Joint:
     )
 
 
+def example_path_extrusion_corner_end_decoration() -> Joint:
+    """
+    A carved corner scoop at the bottom-right end of a timber, drawn as a
+    path with both a convex bulge, a concave tuck, and a straight run --
+    demonstrating that cut_practice_path_extrusion_corner_end_decoration's
+    cut_path can freely mix curve directions and straight lines, not just a
+    single arc like cut_practice_rafter_tail_scallop_corner_end_decoration.
+
+    Path coordinates are local to cut_corner (x: distance from the end face
+    into the timber, y: distance from the cut_side face into the timber):
+      - a convex quarter-circle bulge from (0", 3") to (1", 2")
+      - a concave quarter-circle tuck from (1", 2") to (2", 3")
+      - a straight run from (2", 3") down to (4", 0"), reaching the bottom edge
+    """
+    timber = Timber(
+        length=feet(4),
+        size=Matrix([inches(6), inches(8)]),
+        transform=Transform.identity(),
+        ticket=TimberTicket(path="timber"),
+    )
+    bulge = ArcSegment(
+        center=create_v2(inches(1), inches(3)), radius=inches(1),
+        start_angle=pi, sweep_angle=pi / 2,
+    )
+    tuck = ArcSegment(
+        center=create_v2(inches(2), inches(2)), radius=inches(1),
+        start_angle=pi, sweep_angle=-pi / 2,
+    )
+    run = LineSegment(tuck.end, create_v2(inches(4), scalar(0)))
+
+    return cut_practice_path_extrusion_corner_end_decoration(
+        timber=timber,
+        cut_corner=TimberShortEdge.BOTTOM_RIGHT,
+        cut_path=[bulge, tuck, run],
+    )
+
+
 patterns = [
     Pattern(
         path="decorative_joints/roundover",
@@ -79,6 +119,12 @@ patterns = [
     Pattern(
         path="decorative_joints/rafter_tail_scallop",
         lambda_=make_pattern_from_joint(example_rafter_tail_scallop_decoration),
+        pattern_type='frame',
+        tags=['main'],
+    ),
+    Pattern(
+        path="decorative_joints/path_extrusion_corner_end",
+        lambda_=make_pattern_from_joint(example_path_extrusion_corner_end_decoration),
         pattern_type='frame',
         tags=['main'],
     ),
