@@ -13,6 +13,7 @@ from .cutcsg import *
 from .timber import *
 from .footprint import *
 from .construction import *
+from .pathcsg import *
 from .joints.workshop.shavings import *
 from .joints.workshop.corner_joints import *
 from .joints.workshop.splice_joints import *

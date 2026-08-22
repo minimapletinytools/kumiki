@@ -8,7 +8,7 @@ from sympy import pi
 
 from kumiki.rule import create_v2, create_v3, Transform, scalar, Rational
 from kumiki.cutcsg import ExtrusionCap
-from kumiki.pathcsg import ArcSegment, LineSegment, Path, PathExtrusion
+from kumiki.pathcsg import ArcSegment, LineSegment, FancyPath, Path, PathExtrusion
 from kumiki.triangles import mesh_cutcsg
 
 
@@ -26,7 +26,7 @@ class TestPathCSG:
         radius = Rational(1, 20)
         height = Rational(1, 10)
         center = create_v2(scalar(0), scalar(0))
-        path = Path(segments=[
+        path = FancyPath(segments=[
             ArcSegment(center=center, radius=radius, start_angle=scalar(0), sweep_angle=pi),
             ArcSegment(center=center, radius=radius, start_angle=pi, sweep_angle=pi),
         ])
@@ -52,6 +52,9 @@ class TestPathCSG:
         expected_volume = math.pi * float(radius) ** 2 * float(height)
         assert mesh.volume == pytest.approx(expected_volume, rel=0.02)
 
+    def test_path_alias(self):
+        assert Path is FancyPath
+
     # ------------------------------------------------------------------
     # A square with a concave semicircular bite taken out of the top edge.
     # This is the shape the whole curved-extrusion effort is for (a
@@ -71,7 +74,7 @@ class TestPathCSG:
         p_tl = create_v2(scalar(0), Rational(1, 10))
         notch_arc = ArcSegment(center=notch_center, radius=r, start_angle=scalar(0), sweep_angle=-pi)
 
-        path = Path([
+        path = FancyPath([
             LineSegment(p_bl, p_br),
             LineSegment(p_br, p_tr),
             LineSegment(p_tr, notch_start),
@@ -104,7 +107,7 @@ class TestPathCSG:
     # This is the shape decompose_path_into_convex_pieces exists for --
     # a single convex-only piece could never represent it.
     # ------------------------------------------------------------------
-    def _leg_profile_path(self) -> Path:
+    def _leg_profile_path(self) -> FancyPath:
         p0 = create_v2(scalar(0), scalar(0))
         p1 = create_v2(Rational(3, 100), scalar(0))
         line_foot = LineSegment(p0, p1)
@@ -122,7 +125,7 @@ class TestPathCSG:
         line_top = LineSegment(p5, p6)
         line_back = LineSegment(p6, p0)
 
-        return Path([line_foot, knee, ankle, foot_bulge, line_shin, line_top, line_back])
+        return FancyPath([line_foot, knee, ankle, foot_bulge, line_shin, line_top, line_back])
 
     def test_leg_profile_is_valid_and_non_convex(self):
         path = self._leg_profile_path()

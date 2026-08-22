@@ -528,11 +528,11 @@ class ArcSegment(PathSegment):
 
 
 # ============================================================================
-# Path
+# FancyPath
 # ============================================================================
 
 @dataclass(frozen=True)
-class Path:
+class FancyPath:
     """
     A closed loop: segments[i].end must equal segments[i+1].start, and
     segments[-1].end must equal segments[0].start. NOT validated at
@@ -644,10 +644,14 @@ class Path:
         return points
 
 
-def _path_breakpoints(path: Path) -> List[Numeric]:
+# Alias for backwards compatibility
+Path = FancyPath
+
+
+def _path_breakpoints(path: FancyPath) -> List[Numeric]:
     """Sorted, deduped y-values decompose_path_into_convex_pieces sweeps
     between: every segment's own start y, plus every segment's v_extrema.
-    Shared with Path.tessellate_for_mesh so the wall ring and the cap pieces
+    Shared with FancyPath.tessellate_for_mesh so the wall ring and the cap pieces
     agree on where every seam falls."""
     breakpoints: List[Numeric] = []
     for seg in path.segments:
@@ -665,10 +669,10 @@ def _path_breakpoints(path: Path) -> List[Numeric]:
 # decompose_path_into_convex_pieces
 # ============================================================================
 
-def decompose_path_into_convex_pieces(path: Path, tolerance: Numeric) -> List[Profile]:
+def decompose_path_into_convex_pieces(path: FancyPath, tolerance: Numeric) -> List[Profile]:
     """
     Like cutcsg.decompose_simple_polygon_into_convex_pieces, but sweeps
-    directly over a Path's small number of segments instead of a
+    directly over a FancyPath's small number of segments instead of a
     pre-tessellated point list -- the expensive exact-arithmetic part (which
     v-bands exist, which segments are active in each, pairing crossings) runs
     over O(segment count), not O(tessellated point count). A leg profile with
@@ -725,7 +729,7 @@ def decompose_path_into_convex_pieces(path: Path, tolerance: Numeric) -> List[Pr
             hi_hits = sorted(seg.ray_crossings(v_hi, inclusive=True), key=giraffe_evalf)
             if len(lo_hits) != len(mid_hits) or len(hi_hits) != len(mid_hits):
                 raise ValueError(
-                    "Path is not simple: a segment's crossing count changed within a "
+                    "FancyPath is not simple: a segment's crossing count changed within a "
                     "single decomposition band (band boundaries should prevent this)"
                 )
             for k in range(len(mid_hits)):
@@ -733,7 +737,7 @@ def decompose_path_into_convex_pieces(path: Path, tolerance: Numeric) -> List[Pr
         crossings.sort(key=lambda c: giraffe_evalf(c[0]))
 
         if len(crossings) % 2 != 0:
-            raise ValueError("Path is not simple: odd number of boundary crossings in a v-band")
+            raise ValueError("FancyPath is not simple: odd number of boundary crossings in a v-band")
 
         for j in range(0, len(crossings) - 1, 2):
             _, u_left_lo, u_left_hi, seg_left = crossings[j]
@@ -814,16 +818,16 @@ class PathExtrusionFeature(CSGFeature):
 @dataclass(frozen=True)
 class PathExtrusion(CutCSG):
     """
-    Generalizes ConvexPolygonExtrusion to an arbitrary closed Path (lines and
+    Generalizes ConvexPolygonExtrusion to an arbitrary closed FancyPath (lines and
     arcs today, more segment types later) -- convexity is NOT required.
     Trades ConvexPolygonExtrusion's cheap half-plane containment test for
-    Path's general ray-casting one.
+    FancyPath's general ray-casting one.
 
     The path lives in the local XY plane at `transform`'s position, extruded
     out in -z by start_distance and +z by end_distance, matching
     ConvexPolygonExtrusion's conventions exactly.
     """
-    path: Path
+    path: FancyPath
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None
     end_distance: Optional[Numeric] = None
