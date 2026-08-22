@@ -134,7 +134,8 @@ class TestMortiseAndTenonGeometry:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=tenon_length,
             mortise_depth=mortise_depth,
         )
@@ -188,7 +189,8 @@ class TestMortiseAndTenonGeometry:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(5),
         )
@@ -325,7 +327,8 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
             ),
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(3),
             mortise_depth=scalar(2),
             mortise_shoulder_inset=scalar(1),
@@ -335,7 +338,8 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
             arrangement=ButtJointTimberArrangement(
                 receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
             ),
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(3),
             mortise_depth=scalar(2),
             mortise_shoulder_inset=scalar(1),
@@ -369,7 +373,8 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
 
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(3),
             mortise_depth=scalar(2),
             mortise_shoulder_inset=scalar(1),
@@ -414,7 +419,8 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
 
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(3),
             mortise_depth=scalar(2),
             mortise_shoulder_inset=scalar(1),
@@ -442,12 +448,22 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
         )
 
         joint_face = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-            arrangement=arrangement, tenon_size=Matrix([scalar(2), scalar(2)]), tenon_length=scalar(3),
-            mortise_depth=scalar(2), mortise_shoulder_inset=scalar(1), relief=ButtJointNotchReliefConfig(),
+            arrangement=arrangement,
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_inset=scalar(1),
+            relief=ButtJointNotchReliefConfig(),
         )
         joint_plane = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
-            arrangement=arrangement, tenon_size=Matrix([scalar(2), scalar(2)]), tenon_length=scalar(3),
-            mortise_depth=scalar(2), mortise_shoulder_inset=scalar(1), relief=ButtJointNotchReliefConfig(),
+            arrangement=arrangement,
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_inset=scalar(1),
+            relief=ButtJointNotchReliefConfig(),
         )
 
         probe_points = [
@@ -562,7 +578,8 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(4),
             peg_parameters=peg_params,
@@ -622,7 +639,8 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(4),
             peg_parameters=peg_params,
@@ -653,7 +671,8 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(4),
             peg_parameters=peg_params,
@@ -736,7 +755,8 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(4),
             peg_parameters=peg_params,
@@ -786,7 +806,8 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(4),
             peg_parameters=peg_params,
@@ -825,7 +846,8 @@ class TestPegStuff:
         )
         joint_with_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(4),
             peg_parameters=peg_params_with_offset,
@@ -842,7 +864,8 @@ class TestPegStuff:
         
         joint_no_offset = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(4),
             peg_parameters=peg_params_no_offset,
@@ -885,7 +908,8 @@ class TestPegStuff:
         )
         joint = cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([inches(2), inches(2)]),
+            tenon_width_relative_to_joint=inches(2),
+            tenon_height_relative_to_joint=inches(2),
             tenon_length=inches(4),
             mortise_depth=inches(3),
             peg_parameters=peg_params,
@@ -925,7 +949,8 @@ class TestMortiseAndTenonCSGHierarchy:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(5),
         )
@@ -966,7 +991,8 @@ class TestMortiseAndTenonCSGHierarchy:
         )
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
-            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(2),
             tenon_length=scalar(4),
             mortise_depth=scalar(5),
         )
