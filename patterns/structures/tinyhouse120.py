@@ -947,6 +947,19 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                 if _is_horizontal_timber(butt_timber)
                 else None
             )
+
+            arr_for_rel = ButtJointTimberArrangement(
+                butt_timber=butt_timber,
+                receiving_timber=receiving_timber,
+                butt_timber_end=butt_timber_end,
+            )
+            rel_normal = arr_for_rel.compute_normalized_timber_cross_product()
+            rel_h_face = butt_timber.get_closest_oriented_long_face_from_global_direction(rel_normal)
+            rel_h_idx = butt_timber.get_size_index_in_long_face_normal_axis(rel_h_face)
+            rel_w_idx = 1 - rel_h_idx
+            actual_tenon_width = actual_tenon_size[rel_w_idx]
+            actual_tenon_height = actual_tenon_size[rel_h_idx]
+
             return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
                 arrangement=ButtJointTimberArrangement(
                     butt_timber=butt_timber,
@@ -958,7 +971,8 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                         else None
                     ),
                 ),
-                tenon_size=actual_tenon_size,
+                tenon_width_relative_to_joint=actual_tenon_width,
+                tenon_height_relative_to_joint=actual_tenon_height,
                 tenon_length=stud_tenon_depth,
                 mortise_depth=stud_tenon_depth,
                 mortise_shoulder_inset=inches(scalar(1, 64)),
@@ -1151,11 +1165,13 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
             _fat_joint_aligned_to_receiver(window_member, post_FM2, TimberEnd.TOP, label="window_member_to_post")
         )
 
-    corner_post_to_side_plate_tenon_size = create_v2(inches(scalar(3, 2)), inches(3))
+    corner_post_to_side_plate_tenon_width_relative_to_joint = inches(3)
+    corner_post_to_side_plate_tenon_height_relative_to_joint = inches(scalar(3, 2))
     corner_post_to_side_plate_tenon_length = inches(scalar(9, 2))
     corner_post_to_side_plate_mortise_depth = inches(scalar(9, 2))
 
-    corner_post_to_cross_plate_tenon_size = create_v2(inches(scalar(3, 2)), inches(1))
+    corner_post_to_cross_plate_tenon_width_relative_to_joint = inches(scalar(3, 2))
+    corner_post_to_cross_plate_tenon_height_relative_to_joint = inches(1)
     corner_post_to_cross_plate_tenon_length = inches(scalar(5, 2))
     corner_post_to_cross_plate_mortise_depth = inches(scalar(5, 2))
 
@@ -1175,7 +1191,8 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                     butt_timber_end=TimberEnd.TOP,
                     front_face_on_butt_timber=None,
                 ),
-                tenon_size=corner_post_to_side_plate_tenon_size,
+                tenon_width_relative_to_joint=corner_post_to_side_plate_tenon_width_relative_to_joint,
+                tenon_height_relative_to_joint=corner_post_to_side_plate_tenon_height_relative_to_joint,
                 tenon_length=corner_post_to_side_plate_tenon_length,
                 mortise_depth=corner_post_to_side_plate_mortise_depth,
             )
@@ -1195,7 +1212,8 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
                     butt_timber_end=TimberEnd.TOP,
                     front_face_on_butt_timber=None,
                 ),
-                tenon_size=corner_post_to_cross_plate_tenon_size,
+                tenon_width_relative_to_joint=corner_post_to_cross_plate_tenon_width_relative_to_joint,
+                tenon_height_relative_to_joint=corner_post_to_cross_plate_tenon_height_relative_to_joint,
                 tenon_length=corner_post_to_cross_plate_tenon_length,
                 mortise_depth=corner_post_to_cross_plate_mortise_depth,
             )
@@ -1223,13 +1241,23 @@ def create_tinyhouse120(center: Optional[V3] = None) -> Frame:
         long_axis_global: V3,
     ) -> Joint:
         try:
+            ts = _tenon_size_with_long_axis(stud, long_axis_global)
+            king_arr = ButtJointTimberArrangement(
+                butt_timber=stud,
+                receiving_timber=beam,
+                butt_timber_end=stud_end,
+            )
+            king_normal = king_arr.compute_normalized_timber_cross_product()
+            king_h_face = stud.get_closest_oriented_long_face_from_global_direction(king_normal)
+            king_h_idx = stud.get_size_index_in_long_face_normal_axis(king_h_face)
+            king_w_idx = 1 - king_h_idx
+            king_tenon_width = ts[king_w_idx]
+            king_tenon_height = ts[king_h_idx]
+
             return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
-                arrangement=ButtJointTimberArrangement(
-                    butt_timber=stud,
-                    receiving_timber=beam,
-                    butt_timber_end=stud_end,
-                ),
-                tenon_size=_tenon_size_with_long_axis(stud, long_axis_global),
+                arrangement=king_arr,
+                tenon_width_relative_to_joint=king_tenon_width,
+                tenon_height_relative_to_joint=king_tenon_height,
                 tenon_length=stud_tenon_depth,
                 mortise_depth=stud_tenon_depth,
                 mortise_shoulder_inset=inches(scalar(1, 64)),
