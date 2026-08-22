@@ -253,12 +253,14 @@ def cut_practice_rounded_end_decoration(
 #_______________
 #               |
 #______________◜  ←scallop_height
-#      ↑       ↑
-#      |       scallop_width
-#    cut_side
+#              ↑
+#              scallop_width
+#    
 
+# TODO rename to cut_practice_rafter_tail_scallop_corner_end_decoration
 def cut_practice_rafter_tail_scallop_decoration(
     timber: BlockLike,
+    # TODO rename to corner, do not allow TimberEdge in the type must be ShortEdge
     short_edge: Union[TimberShortEdge, TimberEdge],
     scallop_height: Numeric,
     scallop_length: Numeric,
@@ -341,24 +343,31 @@ def cut_practice_rafter_tail_scallop_decoration(
     )
 
 
-# path coordinates is based on cut_corner
-#
-# +y
-# |
-# |________
-# |________|__ +x
-# ^
-# cut_corner
-#
-# generally speaking, path coordiantes is a line representing what you want to cut drown from the left end of the timber to the bottom face of the timber (based on the picture above)
-#
-# specifically to form the cut out:
-# - the 0'th path coordinate is extended to the end of the timber (x = 0)
-# - that point is extended vertically to the rough face in the -y direction (relative to the diagram above) 
-# - then that point is extended to horizontally to the x coordinate of the last path coordinate
-# - finally it is connected to the last path coordinate
-# the 0'th path coordinate
-def cut_path_extrusion_end_decoration(
+def cut_path_extrusion_corner_end_decoration(
     cut_corner: TimberShortEdge,
-):
-    pass
+    cut_path: List[PathSegment],
+) -> Joint:
+    """
+    path coordinates is based on cut_corner
+
+    +y
+    |
+    |________
+    |________|__ +x
+    ^
+    cut_corner
+
+    generally speaking, path coordiantes is a line representing what you want to cut drown from the left end of the timber to the bottom face of the timber (based on the picture above)
+
+    specifically to form the cut out:
+    - the 0'th path coordinate is extended to the end of the timber (x = 0)
+    - that point is extended vertically to the rough face in the -y direction (relative to the diagram above) 
+    - then that point is extended to horizontally to the x coordinate of the last path coordinate
+    - finally it is connected to the last path coordinate
+    the 0'th path coordinate
+
+    Arguments:
+        cut_corner: the corner that is to be cut out, which determines the coordinates of the  path based on the diagram above
+        cut_path: the path, which must be drawn from the left edge to the bottom edge based on the diagram above. 
+    """
+    assert "Not Implemented"
