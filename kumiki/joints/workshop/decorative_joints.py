@@ -10,6 +10,7 @@ from sympy import Abs, Matrix
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
 from kumiki.rule import Numeric, Comparison, safe_compare, scalar, Transform, Orientation
 from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg
+from kumiki.pathcsg import PathSegment
 from kumiki.measuring import get_center_point_on_face_global
 
 
@@ -252,8 +253,7 @@ def cut_practice_rounded_end_decoration(
 
 def cut_practice_rafter_tail_scallop_corner_end_decoration(
     timber: BlockLike,
-    # TODO rename to corner, do not allow TimberEdge in the type must be ShortEdge
-    short_edge: Union[TimberShortEdge, TimberEdge],
+    short_edge: Union[TimberShortEdge],
     scallop_height: Numeric,
     scallop_length: Numeric,
 ) -> Joint:
@@ -286,9 +286,6 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
     Returns:
         Joint containing decorative cutting
     """
-    if isinstance(short_edge, TimberEdge):
-        short_edge = short_edge.short_edge()
-    assert isinstance(short_edge, TimberShortEdge), f"expected TimberShortEdge, got {type(short_edge).__name__}"
 
     assert safe_compare(scallop_length, 0, Comparison.GT), "scallop_length must be positive"
     assert safe_compare(scallop_height, 0, Comparison.GT), "scallop_height must be positive"

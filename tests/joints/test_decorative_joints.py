@@ -183,16 +183,6 @@ class TestRafterTailScallopDecoration:
         front_half_at_end = Matrix([0.0, 2.0, float(LENGTH)])
         assert not cutting.negative_csg.contains_point(front_half_at_end)
 
-    def test_scallop_cut_accepts_timber_edge(self):
-        timber = _make_timber()
-        joint = cut_practice_rafter_tail_scallop_corner_end_decoration(
-            timber,
-            short_edge=TimberEdge.TOP_BACK,
-            scallop_height=scalar(2),
-            scallop_length=scalar(4),
-        )
-        assert joint.ticket.joint_type == "rafter_tail_scallop_decoration"
-
 
 class TestRoundedEndDecoration:
     """Tests for cut_practice_rounded_end_decoration.
