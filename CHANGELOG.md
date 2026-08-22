@@ -8,6 +8,42 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.4.10] - 2026-08-22
+
+### kumiki
+
+#### Added
+
+- Added a general path/arc extrusion CSG system in `kumiki/pathcsg.py`: `FancyPath` (a closed loop of `LineSegment`/`ArcSegment` pieces; `Path` is kept as an alias) and `PathExtrusion`, which extrudes an arbitrary, not-necessarily-convex 2D path along Z, with mesh (`decompose_path_into_convex_pieces`) and OCP export support. Now re-exported from the top-level `kumiki` package (`import kumiki; kumiki.FancyPath(...)`), previously only reachable via `kumiki.pathcsg`.
+- Added `TimberShortEdge` (the 8 end-corner short edges, e.g. `TOP_BACK`), with `TimberFeature.short_edge()` / `TimberEdge.short_edge()` / `TimberEdge.long_edge()` conversions and a new `locate_short_edge` measuring helper. `mark_distance_from_corner_along_edge_by_intersecting_plane` / `_by_finding_closest_point_on_line` now also accept a `TimberShortEdge`.
+- Implemented `cut_practice_path_extrusion_corner_end_decoration(timber, cut_corner, cut_path)`: cuts an arbitrary line/arc profile out of a timber's end corner (generalizing the rafter-tail scallop's single circular arc to any path), extruded across the timber's full rough width and subtracted.
+
+#### Changed
+
+- **Breaking:** Scalar values (`scalar()`, `inches()`, `feet()`, `mm()`, `cm()`, `m()`, `shaku()`, `sun()`, `bu()`, `degrees()`, `radians()`, and any arithmetic derived from them) are now plain Python `float` instead of sympy `Rational`/`Expr`. This removes sympy's exact-rational arithmetic entirely -- along with the substantial per-operation overhead of sympy's expression-construction pipeline it required -- in favor of ordinary double-precision floats. `Matrix` is no longer `sympy.Matrix`: it's a new, lightweight numpy-backed class supporting the same construction/indexing/multiplication semantics (`*` is matrix-multiply, not elementwise), but it is now immutable (`some_matrix[i, j] = x` raises `TypeError`) and no longer has a `.copy()` method (unnecessary once immutable). `Rational` is no longer importable from `kumiki.rule`.
+  **Migrate:** Replace `isinstance(x, Rational)` checks with `isinstance(x, float)`. Replace any in-place `Matrix`/vector mutation with constructing a new one (e.g. `create_v3(...)`, `Matrix([...])`). Any code comparing computed values for exact equality (`a == b`) should switch to `safe_equality_test`/`safe_zero_test`, since float arithmetic can differ from the mathematically exact result by machine epsilon where exact rational arithmetic previously could not.
+- **Breaking:** `cut_practice_rafter_tail_scallop_decoration` is renamed to `cut_practice_rafter_tail_scallop_corner_end_decoration`, and its `end_side: TimberEnd` / `cut_side: TimberLongFace` parameters are replaced by a single `short_edge: TimberShortEdge` parameter.
+  **Migrate:** rename the call, and combine the old two args into the corresponding `TimberShortEdge` (e.g. `end_side=TimberEnd.TOP, cut_side=TimberLongFace.BACK` becomes `short_edge=TimberShortEdge.TOP_BACK`); a plain `TimberEdge` is also accepted and auto-converted.
+
+#### Fixed
+
+- Fixed `cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers` (Kanawa Tsugi joint): the center peg-hole geometry was wrong -- one side of the joint drew its vertical line to the hole's far corner while the other drew to the near corner, leaving a non-square hole. The vertical lines are now both tilted correctly to keep the hole square, and the Kusabi peg accessory is now tilted to match the scarf angle (previously left un-rotated, no longer matching the actual cut).
+- Fixed `solve_assembly`'s simultaneous-step search (used for interlocked/radial disassembly sequences) to check cancellation throughout its heuristic seed search rather than only between top-level candidates, so a cancelled solve aborts immediately instead of running to completion first. Also capped the heuristic seeds tried per component -- the search's cost scaled with the number of scheduled coordinates and could dominate solve time on complex components.
+
+### kigumi
+
+#### Added
+
+- Added three new viewer background themes ("Bloom", "Tide", "Sunbeam") using a new soft radial-gradient "blobs" background pattern, localized in English and Japanese.
+
+#### Changed
+
+- The viewer's default edge display mode changed from "overlay" to "no overlay".
+
+#### Fixed
+
+- Fixed the right-click face picker mislabeling faces on any CSG sub-feature built in its own local coordinate frame -- e.g. a tusked mortise-and-tenon's tenon tip at a BOTTOM-end joint reported "top" instead of "tenon_bot". The picker now prefers the feature's own declared name when one exists, and otherwise re-projects the matched face's normal into the timber's own six canonical directions instead of reusing the sub-feature's incidental local-frame label.
+
 ## [0.4.9] - 2026-08-15
 
 ### kumiki
