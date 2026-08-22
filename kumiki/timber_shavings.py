@@ -407,8 +407,7 @@ def are_timbers_face_aligned(timber1: PerfectTimberWithin, timber2: PerfectTimbe
         timber1: First timber
         timber2: Second timber  
         tolerance: Optional numerical tolerance for parallel check. If None, uses exact
-                   equality (recommended when using SymPy Rational types). If provided,
-                   uses approximate floating-point comparison.
+                   equality. If provided, uses approximate floating-point comparison.
         
     Returns:
         True if timbers are face-aligned, False otherwise
@@ -439,8 +438,7 @@ def are_timbers_plane_aligned(timber1: PerfectTimberWithin, timber2: PerfectTimb
         timber1: First timber
         timber2: Second timber  
         tolerance: Optional numerical tolerance for parallel check. If None, uses exact
-                   equality (recommended when using SymPy Rational types). If provided,
-                   uses approximate floating-point comparison.
+                   equality. If provided, uses approximate floating-point comparison.
         
     Returns:
         True if timbers have at least one pair of parallel long faces, False otherwise
@@ -523,7 +521,6 @@ def do_xy_cross_section_on_parallel_timbers_overlap(timberA: PerfectTimberWithin
     corner4 = timberB_center_local_xy - offset_width_local - offset_height_local
     
     # Find axis-aligned bounding box of timberB in timberA's local space
-    from sympy import Min, Max
     timberB_x_min = Min(corner1[0], corner2[0], corner3[0], corner4[0])
     timberB_x_max = Max(corner1[0], corner2[0], corner3[0], corner4[0])
     timberB_y_min = Min(corner1[1], corner2[1], corner3[1], corner4[1])

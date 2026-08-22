@@ -3,7 +3,6 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs
 from kumiki.rule import Orientation
 from kumiki.timber import _get_rough_size_and_offset
 from kumiki import *
@@ -40,7 +39,7 @@ class TestVectorHelpers:
         assert v[1] == 2
         assert v[2] == 3
     
-    def test_normalize_vector(self, symbolic_mode):
+    def test_normalize_vector(self):
         """Test vector normalization."""
         v = create_v3(3, 4, 0)  # Use integers for exact computation
         normalized = safe_normalize_vector(v)
@@ -71,7 +70,7 @@ class TestVectorHelpers:
         assert cross[1] == 0
         assert cross[2] == 1
     
-    def test_vector_magnitude(self, symbolic_mode):
+    def test_vector_magnitude(self):
         """Test vector magnitude calculation."""
         v = create_v3(3, 4, 0)  # Use integers for exact computation
         magnitude = safe_magnitude(v)
@@ -290,7 +289,7 @@ class TestTimber:
         assert transform[2, 3] == 3
         assert transform[3, 3] == 1
     
-    def test_orientation_computed_from_directions(self, symbolic_mode):
+    def test_orientation_computed_from_directions(self):
         """Test that orientation is correctly computed from input face and length directions."""
         # Test with standard vertical timber facing east
         input_length_dir = create_v3(scalar(0), scalar(0), scalar(1))  # Up - exact integers
@@ -323,7 +322,7 @@ class TestTimber:
         assert height_dir[1] == 1  # Exact integer from calculation
         assert height_dir[2] == 0
     
-    def test_orientation_with_horizontal_timber(self, symbolic_mode):
+    def test_orientation_with_horizontal_timber(self):
         """Test orientation computation with a horizontal timber."""
         # Horizontal timber running north, facing up
         input_length_dir = create_v3(scalar(0), scalar(1), scalar(0))  # North - exact integers
@@ -380,7 +379,7 @@ class TestTimber:
         assert_vectors_perpendicular(length_dir, height_dir)
         assert_vectors_perpendicular(width_dir, height_dir)
     
-    def test_orientation_handles_non_normalized_inputs(self, symbolic_mode):
+    def test_orientation_handles_non_normalized_inputs(self):
         """Test that orientation computation works with non-normalized input vectors."""
         # Use vectors that aren't unit length
         input_length_dir = create_v3(scalar(0), scalar(0), scalar(5))  # Up, but length 5
@@ -407,7 +406,7 @@ class TestTimber:
         assert width_dir[1] == 0
         assert width_dir[2] == 0
     
-    def test_get_position_on_centerline_from_bottom_global(self, symbolic_mode):
+    def test_get_position_on_centerline_from_bottom_global(self):
         """Test the get_centerline_position_from_bottom method."""
         timber = create_timber(
             length=scalar(5),
@@ -441,7 +440,7 @@ class TestTimber:
         assert pos_neg[1] == 1  # 2.0 + (-1.0) * 1.0
         assert pos_neg[2] == 3
     
-    def test_get_position_on_centerline_from_bottom_global(self, symbolic_mode):
+    def test_get_position_on_centerline_from_bottom_global(self):
         """Test get_centerline_position_from_bottom method."""
         timber = create_timber(
             length=scalar(10),
@@ -469,7 +468,7 @@ class TestTimber:
         assert pos_top[1] == 2
         assert pos_top[2] == 13  # 3.0 + 10.0
     
-    def test_get_position_on_centerline_from_top_global(self, symbolic_mode):
+    def test_get_position_on_centerline_from_top_global(self):
         """Test get_centerline_position_from_top method."""
         timber = create_timber(
             length=scalar(10),
@@ -732,7 +731,7 @@ class TestEnumsAndDataStructures:
 class TestGetCornerPositionGlobal:
     """Test PerfectTimberWithin.get_corner_position_global."""
 
-    def test_bot_right_front_vertical_timber(self, symbolic_mode):
+    def test_bot_right_front_vertical_timber(self):
         """BOT_RIGHT_FRONT corner of a 10x20x100 vertical timber at origin = (5, 10, 0)."""
         timber = create_timber(
             length=scalar(100),
@@ -782,7 +781,7 @@ class TestCutTimber:
         # In LOCAL coordinates, the prism is always axis-aligned (identity orientation)
         # The timber's orientation transforms from local to global coordinates
         from kumiki.rule import Orientation
-        assert simplify(csg.transform.orientation.matrix - Orientation.identity().matrix).norm() == 0
+        assert safe_zero_test((csg.transform.orientation.matrix - Orientation.identity().matrix).norm())
     
     def test_extended_timber_without_cuts_positioned(self):
         """Test that CSG works correctly for timber at different position."""
@@ -1337,7 +1336,7 @@ class TestFrameFromJoints:
 class TestFrameBoundingBox:
     """Test Frame bounding box calculations."""
     
-    def test_single_timber_bounding_box_matches_timber_prism(self, symbolic_mode):
+    def test_single_timber_bounding_box_matches_timber_prism(self):
         """Test that a frame with a single timber has a bounding box matching the timber's prism."""
         # Create a simple vertical timber
         timber = create_axis_aligned_timber(
@@ -1470,7 +1469,7 @@ class TestCutTimberBoundingBoxPrisms:
     get_rough_bounding_box_prism (and the shared _bounding_box_prism_for_cross_section
     helper they're both built on)."""
 
-    def test_uncut_matches_timber_exactly(self, symbolic_mode):
+    def test_uncut_matches_timber_exactly(self):
         """With no cuts, the PTW bounding box prism matches the timber's own bounds."""
         timber = create_axis_aligned_timber(
             bottom_position=create_v3(scalar(10), scalar(20), scalar(5)),
@@ -1487,7 +1486,7 @@ class TestCutTimberBoundingBoxPrisms:
         assert prism.end_distance == timber.length
         assert prism.transform.position == timber.get_bottom_position_global()
 
-    def test_single_end_cut_crops(self, symbolic_mode):
+    def test_single_end_cut_crops(self):
         """A single top end cut crops end_distance; start_distance stays at 0."""
         timber = create_axis_aligned_timber(
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -1503,7 +1502,7 @@ class TestCutTimberBoundingBoxPrisms:
         assert prism.start_distance == scalar(0)
         assert prism.end_distance == scalar(80)
 
-    def test_multiple_cuts_tightest_crop_wins(self, symbolic_mode):
+    def test_multiple_cuts_tightest_crop_wins(self):
         """The most restrictive end cut wins independently at each end, across every
         Cutting on the timber -- this is the "minimal end cuts across the frame's
         cuttings" behavior the no-joints box feature is built on."""
@@ -1532,7 +1531,7 @@ class TestCutTimberBoundingBoxPrisms:
         # Top: min(40, 35) = 35 (tighter cut wins)
         assert prism.end_distance == scalar(35)
 
-    def test_deprecated_aliases_still_delegate(self, symbolic_mode):
+    def test_deprecated_aliases_still_delegate(self):
         """get_bounding_box_prism and DEPRECATED_approximate_bounding_prism still
         delegate to get_perfect_timber_within_bounding_box_prism post-refactor."""
         timber = create_axis_aligned_timber(
@@ -1552,7 +1551,7 @@ class TestCutTimberBoundingBoxPrisms:
             assert actual.end_distance == expected.end_distance
             assert actual.transform.position == expected.transform.position
 
-    def test_rough_box_symmetric_matches_ptw_box(self, symbolic_mode):
+    def test_rough_box_symmetric_matches_ptw_box(self):
         """With symmetric (default) rough half-sizes, the rough box matches the PTW box."""
         timber = create_axis_aligned_timber(
             bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
@@ -1572,7 +1571,7 @@ class TestCutTimberBoundingBoxPrisms:
         assert rough_prism.end_distance == ptw_prism.end_distance
         assert rough_prism.transform.position == ptw_prism.transform.position
 
-    def test_rough_box_asymmetric_size_and_offset(self, symbolic_mode):
+    def test_rough_box_asymmetric_size_and_offset(self):
         """Rough box with asymmetric rough_half_sizes has the correct total size and
         is offset from the centerline (reuses the fixture from test_csg_asymmetric_offset)."""
         t = Timber(
@@ -1592,7 +1591,7 @@ class TestCutTimberBoundingBoxPrisms:
         assert prism.start_distance == scalar(0)
         assert prism.end_distance == scalar(100)
 
-    def test_rough_box_offset_on_rotated_timber(self, symbolic_mode):
+    def test_rough_box_offset_on_rotated_timber(self):
         """The local (offset_x, offset_y) -> global transform.position conversion uses
         the timber's own (non-axis-aligned) width/height direction vectors, not raw
         global XY -- this is the key regression guard for rotated timbers."""
@@ -1616,7 +1615,7 @@ class TestCutTimberBoundingBoxPrisms:
         # Sanity check that this timber really is rotated off-axis (guards against the
         # test silently degrading to the axis-aligned case above).
         width_dir = t.get_width_direction_global()
-        assert simplify(width_dir[0] - width_dir[1]) == 0
+        assert safe_zero_test(width_dir[0] - width_dir[1])
         assert width_dir[2] == 0
 
         cut_timber = CutTimber(t, cuts=[])
@@ -1628,9 +1627,9 @@ class TestCutTimberBoundingBoxPrisms:
             + t.get_width_direction_global() * offset[0]
             + t.get_height_direction_global() * offset[1]
         )
-        assert simplify(prism.transform.position - expected_position).norm() == 0
+        assert safe_zero_test((prism.transform.position - expected_position).norm())
 
-    def test_rough_box_polymorphic_on_round_timber(self, symbolic_mode):
+    def test_rough_box_polymorphic_on_round_timber(self):
         """get_rough_bounding_box_prism works on a non-Timber PerfectTimberWithin
         subclass (RoundTimber), whose rough half-sizes are always symmetric."""
         rt = RoundTimber(
@@ -1651,69 +1650,69 @@ class TestCutTimberBoundingBoxPrisms:
 class TestGetSizeInDirection:
     """Tests for get_size_in_direction_2d and get_size_in_direction_3d."""
 
-    def test_2d_matches_face_normal_width(self, symbolic_mode):
+    def test_2d_matches_face_normal_width(self):
         """2D +x direction should match get_size_in_face_normal_axis for RIGHT."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_2d(create_v2(1, 0)) == t.get_size_in_face_normal_axis(TimberFace.RIGHT)
 
-    def test_2d_matches_face_normal_height(self, symbolic_mode):
+    def test_2d_matches_face_normal_height(self):
         """2D +y direction should match get_size_in_face_normal_axis for FRONT."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_2d(create_v2(0, 1)) == t.get_size_in_face_normal_axis(TimberFace.FRONT)
 
-    def test_2d_negative_axes(self, symbolic_mode):
+    def test_2d_negative_axes(self):
         """Negative axis directions should give the same result as positive."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_2d(create_v2(-1, 0)) == t.get_size_in_face_normal_axis(TimberFace.LEFT)
         assert t.get_size_in_direction_2d(create_v2(0, -1)) == t.get_size_in_face_normal_axis(TimberFace.BACK)
 
-    def test_2d_diagonal_of_cross_section(self, symbolic_mode):
+    def test_2d_diagonal_of_cross_section(self):
         """Direction along the cross-section diagonal of a 4x6 timber."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         # Diagonal direction is (4, 6), normalized = (4, 6) / sqrt(52)
         # Size = 4 * |4/sqrt(52)| + 6 * |6/sqrt(52)| = (16 + 36) / sqrt(52) = 52 / sqrt(52) = sqrt(52)
         result = t.get_size_in_direction_2d(create_v2(4, 6))
         expected = sqrt(52)
-        assert simplify(result - expected) == 0
+        assert safe_zero_test(result - expected)
 
-    def test_2d_arbitrary_direction(self, symbolic_mode):
+    def test_2d_arbitrary_direction(self):
         """Non-orthogonal direction at 45 degrees for a square cross-section."""
         t = create_standard_vertical_timber(size=(scalar(3), scalar(3)))
         # Direction (1, 1), normalized = (1/sqrt(2), 1/sqrt(2))
         # Size = 3 * 1/sqrt(2) + 3 * 1/sqrt(2) = 6/sqrt(2) = 3*sqrt(2)
         result = t.get_size_in_direction_2d(create_v2(1, 1))
         expected = 3 * sqrt(2)
-        assert simplify(result - expected) == 0
+        assert safe_zero_test(result - expected)
 
-    def test_2d_unnormalized_input(self, symbolic_mode):
+    def test_2d_unnormalized_input(self):
         """Should handle unnormalized direction vectors correctly."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         # (10, 0) should give same result as (1, 0)
         assert t.get_size_in_direction_2d(create_v2(10, 0)) == scalar(4)
 
-    def test_3d_matches_face_normal_width(self, symbolic_mode):
+    def test_3d_matches_face_normal_width(self):
         """3D global +x direction should match get_size_in_face_normal_axis for RIGHT on a vertical timber."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_3d(create_v3(1, 0, 0)) == t.get_size_in_face_normal_axis(TimberFace.RIGHT)
 
-    def test_3d_matches_face_normal_height(self, symbolic_mode):
+    def test_3d_matches_face_normal_height(self):
         """3D global +y direction should match get_size_in_face_normal_axis for FRONT on a vertical timber."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_3d(create_v3(0, 1, 0)) == t.get_size_in_face_normal_axis(TimberFace.FRONT)
 
-    def test_3d_matches_face_normal_length(self, symbolic_mode):
+    def test_3d_matches_face_normal_length(self):
         """3D global +z direction should match get_size_in_face_normal_axis for TOP on a vertical timber."""
         t = create_standard_vertical_timber(height=100, size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_3d(create_v3(0, 0, 1)) == t.get_size_in_face_normal_axis(TimberFace.TOP)
 
-    def test_3d_negative_axes(self, symbolic_mode):
+    def test_3d_negative_axes(self):
         """Negative axis directions should give same result as positive."""
         t = create_standard_vertical_timber(height=100, size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_3d(create_v3(-1, 0, 0)) == t.get_size_in_face_normal_axis(TimberFace.LEFT)
         assert t.get_size_in_direction_3d(create_v3(0, -1, 0)) == t.get_size_in_face_normal_axis(TimberFace.BACK)
         assert t.get_size_in_direction_3d(create_v3(0, 0, -1)) == t.get_size_in_face_normal_axis(TimberFace.BOTTOM)
 
-    def test_3d_diagonal_of_two_long_faces(self, symbolic_mode):
+    def test_3d_diagonal_of_two_long_faces(self):
         """Direction along the diagonal of the two long faces (width and height, no length component)."""
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         # Global (1, 1, 0) on a vertical timber maps to local (1, 1, 0) (width and height directions)
@@ -1721,9 +1720,9 @@ class TestGetSizeInDirection:
         # Size = 4 * 1/sqrt(2) + 6 * 1/sqrt(2) = 10/sqrt(2) = 5*sqrt(2)
         result = t.get_size_in_direction_3d(create_v3(1, 1, 0))
         expected = 5 * sqrt(2)
-        assert simplify(result - expected) == 0
+        assert safe_zero_test(result - expected)
 
-    def test_3d_arbitrary_direction(self, symbolic_mode):
+    def test_3d_arbitrary_direction(self):
         """Arbitrary non-orthogonal 3D direction."""
         t = create_standard_vertical_timber(height=100, size=(scalar(4), scalar(6)))
         # Direction (1, 0, 1) on a vertical timber maps to local (1, 0, 1) (width and length)
@@ -1731,9 +1730,9 @@ class TestGetSizeInDirection:
         # Size = 4 * 1/sqrt(2) + 6 * 0 + 100 * 1/sqrt(2) = 104/sqrt(2) = 52*sqrt(2)
         result = t.get_size_in_direction_3d(create_v3(1, 0, 1))
         expected = 52 * sqrt(2)
-        assert simplify(result - expected) == 0
+        assert safe_zero_test(result - expected)
 
-    def test_3d_horizontal_timber_axes(self, symbolic_mode):
+    def test_3d_horizontal_timber_axes(self):
         """3D method should respect timber orientation for a horizontal timber."""
         t = create_standard_horizontal_timber(direction='x', length=100, size=(scalar(4), scalar(6)))
         # Horizontal timber in +x direction: length along x, width along y(?), let's check via face normals
@@ -1742,7 +1741,7 @@ class TestGetSizeInDirection:
         # Global +x = length direction → should give length = 100
         assert t.get_size_in_direction_3d(create_v3(1, 0, 0)) == t.get_size_in_face_normal_axis(TimberFace.TOP)
 
-    def test_3d_unnormalized_input(self, symbolic_mode):
+    def test_3d_unnormalized_input(self):
         """Should handle unnormalized direction vectors correctly."""
         t = create_standard_vertical_timber(height=100, size=(scalar(4), scalar(6)))
         assert t.get_size_in_direction_3d(create_v3(5, 0, 0)) == scalar(4)
@@ -2033,7 +2032,7 @@ class TestJointAssembly:
         )
         return timber_a, timber_b, joint
 
-    def test_with_order_uniform_preserves_suborders(self, float_mode):
+    def test_with_order_uniform_preserves_suborders(self):
         _, _, joint = self.build_joint(suborders=True)
 
         ordered = joint.with_order(2)
@@ -2045,7 +2044,7 @@ class TestJointAssembly:
         assert joint.cuttings["a"].assembly_ordering == Ordering(0, 1)
         assert ordered.cuttings["a"].timber is joint.cuttings["a"].timber
 
-    def test_with_order_mapping_by_key_and_object(self, float_mode):
+    def test_with_order_mapping_by_key_and_object(self):
         timber_a, timber_b, joint = self.build_joint()
         peg = joint.jointAccessories["peg"]
 
@@ -2057,7 +2056,7 @@ class TestJointAssembly:
         assert ordered.cuttings["b"].assembly_ordering == Ordering(2, 0)
         assert ordered.jointAccessories["peg"].assembly_ordering == Ordering(3, 0)
 
-    def test_with_order_mapping_partial_keeps_unnamed(self, float_mode):
+    def test_with_order_mapping_partial_keeps_unnamed(self):
         _, _, joint = self.build_joint()
 
         ordered = joint.with_order({"a": 5})
@@ -2066,7 +2065,7 @@ class TestJointAssembly:
         assert ordered.cuttings["b"].assembly_ordering == Ordering(0, 0)
         assert ordered.jointAccessories["peg"].assembly_ordering == Ordering(0, 0)
 
-    def test_with_order_rejects_unknown_references(self, float_mode):
+    def test_with_order_rejects_unknown_references(self):
         _, _, joint = self.build_joint()
         _, foreign_timber, _ = self.build_joint(ticket_a="x", ticket_b="y", offset_x=50)
 
@@ -2075,7 +2074,7 @@ class TestJointAssembly:
         with pytest.raises(ValueError, match="not a timber or accessory"):
             joint.with_order([(foreign_timber, 1)])
 
-    def test_with_order_mapping_rejects_suborder_precedence_violations(self, float_mode):
+    def test_with_order_mapping_rejects_suborder_precedence_violations(self):
         # The peg (suborder 0) must come out before the cuttings (suborder 1);
         # explicit orders may not invert or collapse that.
         _, _, joint = self.build_joint(suborders=True)
@@ -2090,7 +2089,7 @@ class TestJointAssembly:
         assert ordered.jointAccessories["peg"].assembly_ordering == Ordering(1, 0)
         assert ordered.cuttings["a"].assembly_ordering == Ordering(2, 0)
 
-    def test_solve_frame_assembly_end_to_end(self, float_mode):
+    def test_solve_frame_assembly_end_to_end(self):
         _, _, joint_one = self.build_joint(ticket_a="post_one", ticket_b="beam_one", freedoms=True, suborders=True)
         _, _, joint_two = self.build_joint(ticket_a="post_two", ticket_b="beam_two", offset_x=50, freedoms=True, suborders=True)
         joint_one = joint_one.with_order(1)
@@ -2116,13 +2115,13 @@ class TestJointAssembly:
             joint_one.cuttings["b"].timber.ticket.kumiki_id,
         }
 
-    def test_solve_frame_assembly_returns_none_without_freedoms(self, float_mode):
+    def test_solve_frame_assembly_returns_none_without_freedoms(self):
         _, _, joint = self.build_joint()
         frame = Frame.from_joints([joint], name="no assembly")
 
         assert solve_frame_assembly(frame) is None
 
-    def test_solve_frame_assembly_combines_duplicate_timber_entries(self, float_mode):
+    def test_solve_frame_assembly_combines_duplicate_timber_entries(self):
         # A compound-style joint where the same timber appears under two
         # cutting keys: freedoms union, earliest ordering wins.
         timber_a, timber_b, joint = self.build_joint()

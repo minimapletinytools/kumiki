@@ -12,7 +12,6 @@ from each board's LEFT face (the global-bottom face shared by all three boards
 regardless of their plan rotation), split half-and-half at the midpoint.
 """
 
-from sympy import cos, sin
 
 from kumiki import *
 from kumiki.ticket import BoardTicket

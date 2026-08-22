@@ -3,7 +3,6 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -48,7 +47,7 @@ class TestHouseJoint:
         assert _render_cutting(joint.cuttings["timberB"]).contains_point(housed_timber.transform.global_to_local(origin))
         
 
-    def test_house_joint_prism_matches_housed_timber_global_space(self, symbolic_mode):
+    def test_house_joint_prism_matches_housed_timber_global_space(self):
         """
         Test that the prism being cut from the housing timber matches the housed timber
         when both are compared in global coordinates.

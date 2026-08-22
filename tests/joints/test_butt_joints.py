@@ -3,7 +3,6 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -31,7 +30,7 @@ class TestButtJoint:
     """Test cut_plain_butt_joint_on_face_aligned_timbers function."""
 
     # 🐪
-    def test_basic_butt_joint_on_face_aligned_timbers(self, symbolic_mode):
+    def test_basic_butt_joint_on_face_aligned_timbers(self):
         """Test butt joint between two perpendicular timbers."""
         # Create two perpendicular timbers meeting at the origin
         # timberA extends along +X (bottom at origin, top at x=100)
@@ -75,7 +74,6 @@ class TestButtJoint:
         cut_normal_global = timberB.orientation.matrix * cut_normal_local
         
         dot_with_length = (cut_normal_global.T * timberB.get_length_direction_global())[0, 0]
-        from sympy import simplify, Abs
         assert simplify(Abs(dot_with_length)) == 1, \
             "Cut normal should be parallel or anti-parallel to butt timber's length direction"
         

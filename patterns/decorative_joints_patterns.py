@@ -2,7 +2,6 @@
 Decorative Joints Patterns
 """
 
-from sympy import pi
 
 from kumiki import *
 from kumiki.pathcsg import LineSegment, ArcSegment

@@ -5,10 +5,8 @@ Kumiki - Decorative joint construction functions
 import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
-from sympy import Abs, Matrix
-
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
-from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation
+from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation, Abs, Matrix
 from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg
 from kumiki.pathcsg import PathSegment, LineSegment, Path, PathExtrusion
 from kumiki.measuring import get_center_point_on_face_global

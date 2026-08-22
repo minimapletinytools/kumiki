@@ -31,10 +31,9 @@ from .timber import CutTimber, Frame, Accessory
 
 import numpy as np
 import trimesh
-from sympy import Expr
 
 
-def sympy_to_float(value: Union[Expr, float, int]) -> float:
+def sympy_to_float(value: Union[float, int]) -> float:
     return float(value)
 
 BRepPrimAPI_MakeBox = cast(Any, None)

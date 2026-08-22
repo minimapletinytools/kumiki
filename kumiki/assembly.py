@@ -1489,8 +1489,8 @@ def solve_assembly(
                 unit = _scale3(vector, 1.0 / magnitude)
                 movements.append(MemberMovement(
                     member_key=key,
-                    direction=create_v3(sp.Float(unit[0]), sp.Float(unit[1]), sp.Float(unit[2])),
-                    distance=sp.Float(magnitude),
+                    direction=create_v3(unit[0], unit[1], unit[2]),
+                    distance=magnitude,
                     dragged=key not in primaries,
                 ))
             if movements:
@@ -1617,8 +1617,8 @@ def _clear_out(
                 unit = _scale3(vector, 1.0 / magnitude)
                 extra.append(MemberMovement(
                     member_key=key,
-                    direction=create_v3(sp.Float(unit[0]), sp.Float(unit[1]), sp.Float(unit[2])),
-                    distance=sp.Float(magnitude),
+                    direction=create_v3(unit[0], unit[1], unit[2]),
+                    distance=magnitude,
                     dragged=True,
                 ))
                 cumulative[key] = _add3(cumulative.get(key, (0.0, 0.0, 0.0)), vector)

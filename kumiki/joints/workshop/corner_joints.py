@@ -196,7 +196,6 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # Calculate offset for each timber's miter cut
     # The cut plane should pass through the outer edges (tips) of the joint, not at the centerline intersection.
     # For each timber, we offset the plane outward by an amount depending on the cross-section and joint angle.
-    from sympy import sqrt, atan2, pi
 
     # Compute the angle between the timber directions
     cos_angle = safe_dot_product(normA, normB)
@@ -748,7 +747,6 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     timberA_reference_miter_face = arrangement.front_face_on_timber1
     timberB = arrangement.timber2
     timberB_end = arrangement.timber2_end
-    from sympy import acos, pi
 
     # ========================================================================
     # Step 1: Parameter validation and find matching miter faces
@@ -808,7 +806,6 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     dot_product = safe_dot_product(safe_normalize_vector(directionA), safe_normalize_vector(directionB))
 
     # Clamp to [-1, 1] to avoid numerical issues with acos
-    from sympy import Max, Min
     dot_product_clamped = Max(scalar(-1), Min(scalar(1), dot_product))
     angle = acos(dot_product_clamped)
 
@@ -942,7 +939,6 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
 
     # Compute the angle between the two timbers to get the correct scale factor
     # The half-angle is the angle between the diagonal and either timber's length direction
-    from sympy import acos, sin, sqrt
     cos_angle = safe_dot_product(directionA, directionB)
     timber_angle = acos(cos_angle)  # Angle between the two timbers
     half_angle = timber_angle / scalar(2)  # Angle between diagonal and timber length
@@ -985,7 +981,6 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     finger_length = lap_thickness_final
 
     # Finger size: X = miter_face_width, Y = miter_face_width * tan(half_angle)
-    from sympy import pi, tan
     finger_size_x = miter_face_width
     finger_size_y = miter_face_width * tan(half_angle)
     finger_size = create_v2(finger_size_x, finger_size_y)
@@ -1142,7 +1137,6 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
 
         # Rotate it around the diagonal direction (X-axis) by the same rotation angle as the fingers
         # This aligns the key with the finger geometry
-        from sympy import atan2
         key_rotation_sign = -1 if i % 2 == 0 else 1
         key_rotation_angle = key_rotation_sign * atan2(key_thickness, key_width)
         rotation_for_key = Orientation.from_axis_angle(diagonal_direction, radians(key_rotation_angle))

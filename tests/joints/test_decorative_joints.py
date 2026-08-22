@@ -4,7 +4,6 @@ import math
 import warnings
 
 import pytest
-from sympy import Matrix
 
 from kumiki.joints.workshop.decorative_joints import (
     cut_practice_roundover_decoration,
@@ -12,7 +11,7 @@ from kumiki.joints.workshop.decorative_joints import (
     cut_practice_rounded_end_decoration,
 )
 from kumiki.ticket import TimberTicket
-from kumiki.rule import scalar, Transform
+from kumiki.rule import scalar, Transform, Matrix
 from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge
 from kumiki.cutcsg import Difference, Cylinder
 from kumiki.triangles import triangulate_cutcsg

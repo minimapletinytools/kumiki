@@ -306,7 +306,6 @@ def cut_mortise_and_tenon_joint(
     # -------------------------------------------------------------------------
     # Tenon prism (origin at marking_space) and shoulder half-space
     # -------------------------------------------------------------------------
-    from sympy import Abs, sqrt
 
     # Back-extension from shoulder so prism fully contains tenon at oblique angles
     sin_angle_sq = scalar(1) - cos_angle * cos_angle
@@ -1650,7 +1649,6 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     # Assembly: the tenon backs out of the mortise along a diagonal direction
     # determined by the wedge_angle. The wedge (always present) locks it
     # and pops first, so the timbers slide at suborder 1.
-    from sympy import cos, sin
     wedge_angle = wedge_accessory_parameters.wedge_angle
     cos_angle = cos(wedge_angle)
     sin_angle = sin(wedge_angle)

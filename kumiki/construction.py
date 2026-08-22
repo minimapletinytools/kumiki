@@ -221,7 +221,6 @@ def create_vertical_timber_on_footprint_corner(footprint: Footprint, corner_inde
                           next_corner[1] - corner[1]])
     
     # Normalize the direction vector
-    from sympy import sqrt
     outgoing_len_sq = outgoing_dir[0]**2 + outgoing_dir[1]**2
     outgoing_len = sqrt(outgoing_len_sq)
     outgoing_dir_normalized = outgoing_dir / outgoing_len
@@ -303,7 +302,6 @@ def create_vertical_timber_on_footprint_side(footprint: Footprint, side_index: i
                        end_corner[1] - start_corner[1]])
     
     # Normalize the direction vector
-    from sympy import sqrt
     side_len_sq = side_dir[0]**2 + side_dir[1]**2
     side_len = sqrt(side_len_sq)
     side_dir_normalized = side_dir / side_len
@@ -401,7 +399,6 @@ def create_horizontal_timber_on_footprint(footprint: Footprint, corner_index: in
 
     # Calculate length from boundary side if not provided
     if length is None:
-        from sympy import sqrt
         dx = end_point[0] - start_point[0]
         dy = end_point[1] - start_point[1]
         length = sqrt(dx**2 + dy**2)
@@ -704,7 +701,7 @@ def attach_plane_aligned_timber(
         f"original_timber must be a timber (PerfectTimberWithin), got {type(original_timber).__name__}"
     assert isinstance(original_timber_long_face_that_attached_timber_points_to, TimberLongFace), \
         f"original_timber_long_face_that_attached_timber_points_to must be TimberLongFace, got {type(original_timber_long_face_that_attached_timber_points_to).__name__}"
-    assert isinstance(attached_timber_length_or_target, (PerfectTimberWithin, Expr, int)), \
+    assert isinstance(attached_timber_length_or_target, (PerfectTimberWithin, float, int)), \
         f"attached_timber_length_or_target must be a numeric length or a timber (PerfectTimberWithin), got {type(attached_timber_length_or_target).__name__}"
     assert isinstance(attached_timber_stickout, Stickout), \
         f"attached_timber_stickout must be Stickout, got {type(attached_timber_stickout).__name__}"
@@ -1590,7 +1587,6 @@ class ButtJointTimberArrangement:
     def compute_arrangement_acute_angle(self) -> Numeric:
         """Compute the angle between the 2 timbers"""
         dot = safe_dot_product(self.butt_timber.get_face_direction_global(self.butt_timber_end), self.receiving_timber.get_length_direction_global())
-        from sympy import acos
         return acos(dot)
 
 

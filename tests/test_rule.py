@@ -2,15 +2,14 @@
 Tests for rule.py module.
 
 This module contains tests for the Orientation class which represents
-3D rotations using sympy matrices.
+3D rotations using a numpy-backed Matrix.
 """
 
 import pytest
 import math
-import sympy as sp
-from sympy import Matrix, pi, simplify, Abs, eye, det, Rational, Integer, cos, sin, sqrt
 from kumiki.rule import (
     scalar,
+    Matrix,
     Orientation,
     Transform,
     Axis,
@@ -20,7 +19,6 @@ from kumiki.rule import (
     create_v3,
     safe_normalize_vector,
     radians,
-    is_complex_expr,
     safe_det,
     safe_simplify,
     safe_compare,
@@ -30,18 +28,12 @@ from kumiki.rule import (
     degrees,
     are_vectors_perpendicular,
     giraffe_evalf,
-    prune,
-    CollapseMode,
     giraffe_dot_product,
     giraffe_norm,
     numeric_dot_product,
     numeric_norm,
     numeric_normalize_vector,
-    GIRAFFE_EVALF_PRECISION,
-    set_smart_node_guard_enabled,
-    is_smart_node_guard_enabled,
-    set_smart_node_guard_max_nodes,
-    get_smart_node_guard_max_nodes,
+    pi, simplify, Abs, eye, det, cos, sin, sqrt,
 )
 import random
 from tests.testing_shavings import generate_random_orientation, assert_is_valid_rotation_matrix
@@ -75,7 +67,7 @@ class TestOrientation:
         
         # Two 90° rotations should equal 180° rotation
         expected = Orientation(Matrix([[-1, 0, 0], [0, -1, 0], [0, 0, 1]]))  # 180° rotation
-        assert simplify(result.matrix - expected.matrix) == Matrix.zeros(3, 3)
+        assert (result.matrix - expected.matrix).equals(Matrix.zeros(3, 3))
     
     def test_multiply_operator(self):
         """Test multiplication using * operator."""
@@ -98,7 +90,7 @@ class TestOrientation:
         
         # Left rotation inverted should be right rotation
         expected = Orientation.rotate_right()
-        assert simplify(inverted.matrix - expected.matrix) == Matrix.zeros(3, 3)
+        assert (inverted.matrix - expected.matrix).equals(Matrix.zeros(3, 3))
     
     def test_invert_identity_property(self):
         """Test that orientation * invert = identity."""
@@ -204,7 +196,7 @@ class TestOrientationConstants:
         
         result = left * right
         identity = Matrix.eye(3)
-        assert simplify(result.matrix - identity) == Matrix.zeros(3, 3)
+        assert (result.matrix - identity).equals(Matrix.zeros(3, 3))
 
 
 class TestEulerAngles:
@@ -214,14 +206,17 @@ class TestEulerAngles:
         """Test from_euleryZYX with zero angles gives identity."""
         orientation = Orientation.from_euleryZYX(radians(0), radians(0), radians(0))
         expected = Matrix.eye(3)
-        assert simplify(orientation.matrix - expected) == Matrix.zeros(3, 3)
+        assert (orientation.matrix - expected).equals(Matrix.zeros(3, 3))
     
     def test_from_euleryZYX_yaw_only(self):
         """Test from_euleryZYX with only yaw rotation."""
         # 90° yaw should match rotate_left
         orientation = Orientation.from_euleryZYX(radians(pi/2), radians(0), radians(0))
         expected = Orientation.rotate_left().matrix
-        assert simplify(orientation.matrix - expected) == Matrix.zeros(3, 3)
+        diff = orientation.matrix - expected
+        for i in range(3):
+            for j in range(3):
+                assert abs(float(diff[i, j])) < 1e-10
     
     def test_from_euleryZYX_pitch_only(self):
         """Test from_euleryZYX with only pitch rotation."""
@@ -455,7 +450,7 @@ class TestTimberOrientations:
         # east * east should give identity (180° + 180° = 360°)
         result = east * east
         identity = Matrix.eye(3)
-        assert simplify(result.matrix - identity) == Matrix.zeros(3, 3)
+        assert (result.matrix - identity).equals(Matrix.zeros(3, 3))
     
     def test_facing_north_south_are_90_apart(self):
         """Test facing_north and facing_south are 90° rotations from west."""
@@ -465,7 +460,7 @@ class TestTimberOrientations:
         # north * north * north * north should be identity (4 * 90° = 360°)
         result = north * north * north * north
         identity = Matrix.eye(3)
-        assert simplify(result.matrix - identity) == Matrix.zeros(3, 3)
+        assert (result.matrix - identity).equals(Matrix.zeros(3, 3))
 
 
 class TestFlipOrientation:
@@ -666,7 +661,7 @@ class TestDimensionalHelpers:
         assert result == expected
     
     def test_inches_float(self):
-        """Test inches with float input (converts to Rational)."""
+        """Test inches with float input."""
         result = inches(3.5)
         expected = scalar(7, 2) * INCH_TO_METER
         assert result == expected
@@ -714,11 +709,9 @@ class TestDimensionalHelpers:
         assert result == expected
     
     def test_mm_float(self):
-        """Test millimeters with Rational input for exact comparison."""
-        # Use exact Rational instead of float to avoid binary representation issues
+        """Test millimeters with a pre-scaled float for exact comparison."""
         result = mm(scalar(254, 10))  # Exactly 25.4mm
-        # Float conversion creates exact Rational from binary representation
-        assert isinstance(result, Rational)
+        assert isinstance(result, float)
         # Check it equals exactly 1 inch
         expected = inches(1)
         assert result == expected
@@ -810,22 +803,22 @@ class TestDimensionalHelpers:
         assert result_10bu == result_1sun
         assert result_100bu == result_1shaku
     
-    def test_all_return_rational(self):
-        """Test that all helper functions return Rational types."""
+    def test_all_return_float(self):
+        """Test that all helper functions return plain float types."""
         # Test with integer inputs
-        assert isinstance(inches(1), Rational)
-        assert isinstance(feet(1), Rational)
-        assert isinstance(mm(1), Rational)
-        assert isinstance(cm(1), Rational)
-        assert isinstance(m(1), Rational)
-        assert isinstance(shaku(1), Rational)
-        assert isinstance(sun(1), Rational)
-        assert isinstance(bu(1), Rational)
-        
-        # Test with float inputs (should convert to Rational)
-        assert isinstance(inches(1.5), Rational)
-        assert isinstance(feet(6.5), Rational)
-        assert isinstance(mm(25.4), Rational)
+        assert isinstance(inches(1), float)
+        assert isinstance(feet(1), float)
+        assert isinstance(mm(1), float)
+        assert isinstance(cm(1), float)
+        assert isinstance(m(1), float)
+        assert isinstance(shaku(1), float)
+        assert isinstance(sun(1), float)
+        assert isinstance(bu(1), float)
+
+        # Test with float inputs
+        assert isinstance(inches(1.5), float)
+        assert isinstance(feet(6.5), float)
+        assert isinstance(mm(25.4), float)
     
     def test_conversion_consistency(self):
         """Test that 1 inch equals 25.4 mm exactly."""
@@ -839,13 +832,13 @@ class TestDimensionalHelpers:
         width = inches(3, 2)  # 1.5 inches
         height = inches(7, 2)  # 3.5 inches
         
-        # Verify they're Rational
-        assert isinstance(width, Rational)
-        assert isinstance(height, Rational)
-        
-        # Verify exact metric values
-        assert width == scalar(381, 10000)  # Exactly 38.1mm
-        assert height == scalar(889, 10000)  # Exactly 88.9mm
+        assert isinstance(width, float)
+        assert isinstance(height, float)
+
+        # Verify metric values (independently-rounded literals, so compare
+        # with tolerance rather than exact float equality)
+        assert safe_equality_test(width, scalar(381, 10000))  # ~38.1mm
+        assert safe_equality_test(height, scalar(889, 10000))  # ~88.9mm
     
     def test_practical_example_metric(self):
         """Test a practical carpentry example with metric units."""
@@ -853,8 +846,8 @@ class TestDimensionalHelpers:
         width = mm(90)
         height = mm(90)
         
-        assert isinstance(width, Rational)
-        assert isinstance(height, Rational)
+        assert isinstance(width, float)
+        assert isinstance(height, float)
         assert width == scalar(9, 100)  # 0.09 meters
     
     def test_practical_example_japanese(self):
@@ -863,9 +856,9 @@ class TestDimensionalHelpers:
         width = sun(4)
         height = sun(4)
         
-        assert isinstance(width, Rational)
-        assert isinstance(height, Rational)
-        
+        assert isinstance(width, float)
+        assert isinstance(height, float)
+
         # Verify they're equal and exact
         assert width == height
         assert width == scalar(4) * SHAKU_TO_METER / 10
@@ -1152,16 +1145,11 @@ class TestTransformRotateAroundAxis:
 # Simple tests for previously uncovered rule.py functions (one test per method)
 # =============================================================================
 
-class TestIsComplexExpr:
-    def test_simple_rational_is_not_complex(self):
-        assert is_complex_expr(scalar(1, 2)) is False
-
-
 class TestGiraffeEvalf:
-    def test_evaluates_rational(self):
+    def test_evaluates_scalar(self):
         result = giraffe_evalf(scalar(1, 3))
-        assert isinstance(result, sp.Float)
-        assert abs(float(result) - 1/3) < 10**(-GIRAFFE_EVALF_PRECISION + 2)
+        assert isinstance(result, float)
+        assert abs(result - 1/3) < 1e-8
 
     def test_evaluates_sqrt(self):
         result = giraffe_evalf(sqrt(2))
@@ -1172,151 +1160,39 @@ class TestGiraffeEvalf:
         assert float(result) == 42.0
 
 
-class TestCollapseMode:
-    def test_smart_preserves_simple_in_symbolic_mode(self, symbolic_mode):
-        from kumiki.rule import _collapse_scalar
-        expr = scalar(1, 2)
-        result = _collapse_scalar(expr, CollapseMode.SMART)
-        assert result == scalar(1, 2)
-
-    def test_always_collapses_simple(self):
-        from kumiki.rule import _collapse_scalar
-        expr = scalar(1, 2)
-        result = _collapse_scalar(expr, CollapseMode.ALWAYS)
-        assert isinstance(result, sp.Float)
-
-    def test_never_preserves_complex(self):
-        from kumiki.rule import _collapse_scalar
-        # sin(1) is flagged as complex by is_complex_expr
-        expr = sin(scalar(1)) + cos(scalar(2))
-        result = _collapse_scalar(expr, CollapseMode.NEVER)
-        assert result is expr  # unchanged
-
-
-class TestSmartNodeGuardControls:
-    @staticmethod
-    def _make_medium_complex_expr():
-        # Keep expression unevaluated so node-count heuristics can trigger in SMART mode.
-        terms = [scalar(i, i + 1) * scalar(i + 2, i + 3) for i in range(1, 13)]
-        return sp.Add(*terms, evaluate=False)
-
-    def test_can_toggle_guard(self):
-        original_enabled = is_smart_node_guard_enabled()
-        try:
-            set_smart_node_guard_enabled(False)
-            assert is_smart_node_guard_enabled() is False
-            set_smart_node_guard_enabled(True)
-            assert is_smart_node_guard_enabled() is True
-        finally:
-            set_smart_node_guard_enabled(original_enabled)
-
-    def test_can_set_guard_threshold(self):
-        original_threshold = get_smart_node_guard_max_nodes()
-        try:
-            set_smart_node_guard_max_nodes(7)
-            assert get_smart_node_guard_max_nodes() == 7
-        finally:
-            set_smart_node_guard_max_nodes(original_threshold)
-
-    def test_guard_off_keeps_large_expr_symbolic_in_smart_float_mode(self, float_mode):
-        from kumiki.rule import _collapse_scalar
-
-        original_enabled = is_smart_node_guard_enabled()
-        original_threshold = get_smart_node_guard_max_nodes()
-        try:
-            set_smart_node_guard_enabled(False)
-            set_smart_node_guard_max_nodes(5)
-            expr = self._make_medium_complex_expr()
-            result = _collapse_scalar(expr, CollapseMode.SMART)
-            assert not isinstance(result, sp.Float)
-        finally:
-            set_smart_node_guard_enabled(original_enabled)
-            set_smart_node_guard_max_nodes(original_threshold)
-
-    def test_guard_on_collapses_large_expr_in_smart_float_mode(self, float_mode):
-        from kumiki.rule import _collapse_scalar
-
-        original_enabled = is_smart_node_guard_enabled()
-        original_threshold = get_smart_node_guard_max_nodes()
-        try:
-            set_smart_node_guard_enabled(True)
-            set_smart_node_guard_max_nodes(5)
-            expr = self._make_medium_complex_expr()
-            result = _collapse_scalar(expr, CollapseMode.SMART)
-            assert isinstance(result, sp.Float)
-        finally:
-            set_smart_node_guard_enabled(original_enabled)
-            set_smart_node_guard_max_nodes(original_threshold)
-
-
-class TestPrune:
-    @staticmethod
-    def _make_medium_complex_expr():
-        terms = [scalar(i, i + 1) * scalar(i + 2, i + 3) for i in range(1, 13)]
-        return sp.Add(*terms, evaluate=False)
-
-    def test_prune_scalar_respects_smart_mode(self, float_mode):
-        original_enabled = is_smart_node_guard_enabled()
-        original_threshold = get_smart_node_guard_max_nodes()
-        try:
-            set_smart_node_guard_enabled(True)
-            set_smart_node_guard_max_nodes(5)
-            expr = self._make_medium_complex_expr()
-            result = prune(expr)
-            assert isinstance(result, sp.Float)
-        finally:
-            set_smart_node_guard_enabled(original_enabled)
-            set_smart_node_guard_max_nodes(original_threshold)
-
-    def test_prune_matrix_prunes_complex_elements(self, float_mode):
-        original_enabled = is_smart_node_guard_enabled()
-        original_threshold = get_smart_node_guard_max_nodes()
-        try:
-            set_smart_node_guard_enabled(True)
-            set_smart_node_guard_max_nodes(5)
-            expr = self._make_medium_complex_expr()
-            mat = Matrix([[expr], [scalar(1, 2)]])
-            result = prune(mat)
-            assert isinstance(result[0], sp.Float)
-            assert result[1] == scalar(1, 2)
-        finally:
-            set_smart_node_guard_enabled(original_enabled)
-            set_smart_node_guard_max_nodes(original_threshold)
-
-
 class TestNumericWrappers:
     def test_numeric_dot_product_returns_float(self):
         v1 = create_v3(1, 0, 0)
         v2 = create_v3(0, 1, 0)
         result = numeric_dot_product(v1, v2)
-        assert isinstance(result, sp.Float)
+        assert isinstance(result, float)
 
     def test_numeric_norm_returns_float(self):
         v = create_v3(3, 4, 0)
         result = numeric_norm(v)
-        assert isinstance(result, sp.Float)
+        assert isinstance(result, float)
         assert abs(float(result) - 5.0) < 1e-10
 
     def test_numeric_normalize_returns_float_elements(self):
         v = create_v3(3, 4, 0)
         result = numeric_normalize_vector(v)
         for elem in result:
-            assert isinstance(elem, (sp.Float, sp.Rational))
+            assert isinstance(elem, float)
         # Should be unit vector
         assert abs(float(result[0]) - 0.6) < 1e-10
         assert abs(float(result[1]) - 0.8) < 1e-10
 
 
 class TestGiraffeDotProduct:
-    def test_orthogonal_is_zero(self, symbolic_mode):
+    def test_orthogonal_is_zero(self):
         v1 = create_v3(1, 0, 0)
         v2 = create_v3(0, 1, 0)
-        result = giraffe_dot_product(v1, v2, CollapseMode.NEVER)
+        result = giraffe_dot_product(v1, v2)
         assert result == 0
 
-    def test_parallel_unit_is_one(self, symbolic_mode):
+    def test_parallel_unit_is_one(self):
         v = create_v3(1, 0, 0)
-        result = giraffe_dot_product(v, v, CollapseMode.NEVER)
+        result = giraffe_dot_product(v, v)
         assert result == 1
 
 
@@ -1327,9 +1203,9 @@ class TestSafeDet:
 
 
 class TestSafeSimplify:
-    def test_simplify_leaves_rational_unchanged(self):
+    def test_simplify_leaves_value_unchanged(self):
         x = scalar(1, 2) + scalar(1, 3)
-        assert safe_simplify(x) == scalar(5, 6)
+        assert safe_equality_test(safe_simplify(x), scalar(5, 6))
 
 
 class TestSafeCompare:
@@ -1370,7 +1246,7 @@ class TestAreVectorsPerpendicular:
 
 
 class TestTransformMul:
-    def test_identity_times_identity(self, symbolic_mode):
+    def test_identity_times_identity(self):
         T = Transform(position=create_v3(0, 0, 0), orientation=Orientation.identity())
         result = T * T
         assert result.position == create_v3(0, 0, 0)
@@ -1386,7 +1262,7 @@ class TestTransformInvert:
 
 
 class TestTransformToGlobalTransform:
-    def test_to_global_with_identity_parent(self, symbolic_mode):
+    def test_to_global_with_identity_parent(self):
         T = Transform(position=create_v3(1, 2, 3), orientation=Orientation.identity())
         parent = Transform(position=create_v3(0, 0, 0), orientation=Orientation.identity())
         global_t = T.to_global_transform(parent)
@@ -1395,7 +1271,7 @@ class TestTransformToGlobalTransform:
 
 
 class TestTransformToLocalTransform:
-    def test_to_local_with_identity_parent(self, symbolic_mode):
+    def test_to_local_with_identity_parent(self):
         T = Transform(position=create_v3(1, 2, 3), orientation=Orientation.identity())
         parent = Transform(position=create_v3(0, 0, 0), orientation=Orientation.identity())
         local_t = T.to_local_transform(parent)

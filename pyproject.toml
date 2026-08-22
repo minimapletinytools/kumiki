@@ -6,7 +6,7 @@ requires-python = ">=3.10"
 license = "MPL-2.0"
 authors = [{ name = "minimaple" }]
 readme = "README.md"
-keywords = ["timber", "woodworking", "cad", "parametric", "sympy"]
+keywords = ["timber", "woodworking", "cad", "parametric"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
@@ -22,6 +22,9 @@ classifiers = [
     "Topic :: Software Development :: Libraries",
 ]
 dependencies = [
+    # Used only for the exact-rational LP backstop in kumiki/assembly.py
+    # (_lp_sign_feasible_null_vector); all scalar/matrix/geometry math is
+    # plain float + numpy.
     "sympy>=1.12.0",
     "numpy>=1.21.0",
     "trimesh>=4.7.0",

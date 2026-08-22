@@ -520,7 +520,6 @@ def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbe
     Returns:
         Joint object containing the two CutTimbers and, if use_wedge=True, a "wedge" accessory.
     """
-    from sympy import atan
 
     assert isinstance(tenon_end, TimberEnd), f"expected TimberEnd, got {type(tenon_end).__name__}"
     assert isinstance(tenon_timber, TimberLike), f"expected TimberLike, got {type(tenon_timber).__name__}"

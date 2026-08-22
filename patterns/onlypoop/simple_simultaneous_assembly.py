@@ -5,7 +5,6 @@ with a basic mortise and tenon joint. This creates a reciprocal frame cycle such
 all n timbers need to be disassembled simultaneously.
 """
 
-from sympy import pi, cos, sin
 from kumiki import *
 from kumiki.ticket import TimberTicket
 

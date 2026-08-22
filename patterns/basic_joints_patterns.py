@@ -3,8 +3,7 @@ Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
 """
 
-from sympy import Matrix, sqrt
-from kumiki.rule import inches, Transform, scalar, create_v2, degrees
+from kumiki.rule import inches, Transform, scalar, create_v2, degrees, Matrix, sqrt
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
     PegShape, create_timber,
@@ -250,8 +249,6 @@ def example_basic_dropin_dovetail_butt_joint(position=None):
     Create a basic housed dovetail butt joint.
     Uses canonical butt joint timbers (receiving along X, butt/dovetail along Y).
     """
-    from sympy import Integer
-
     arrangement = create_canonical_example_butt_joint_timbers(position)
     # Face perpendicular to receiving timber length (X): use RIGHT (normal +Z) on butt timber
     dovetail_timber_face = TimberLongFace.RIGHT

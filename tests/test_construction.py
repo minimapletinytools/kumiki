@@ -5,7 +5,6 @@ Tests for Kumiki timber framing system
 from typing import Any, Dict
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs
 from kumiki.rule import Orientation
 from kumiki import *
 from tests.testing_shavings import (
@@ -37,7 +36,7 @@ class TestTimberCreation:
         assert timber.get_bottom_position_global()[1] == scalar(1)
         assert timber.get_bottom_position_global()[2] == scalar(0)
     
-    def test_create_axis_aligned_timber(self, symbolic_mode):
+    def test_create_axis_aligned_timber(self):
         """Test axis-aligned timber creation with explicit width_direction."""
         position = create_v3(0, 0, 0)  # Use exact integers
         size = create_v2(scalar(1, 10), scalar(1, 10))  # 0.1 as exact rational
@@ -53,7 +52,7 @@ class TestTimberCreation:
         assert timber.get_length_direction_global()[2] == 1  # Up (exact integer)
         assert timber.get_width_direction_global()[0] == 1    # East (exact integer)
     
-    def test_create_axis_aligned_timber_default_width(self, symbolic_mode):
+    def test_create_axis_aligned_timber_default_width(self):
         """Test axis-aligned timber creation with default width_direction."""
         position = create_v3(0, 0, 0)
         size = create_v2(scalar(1, 10), scalar(1, 10))
@@ -88,7 +87,7 @@ class TestTimberCreation:
         assert timber3.get_length_direction_global()[0] == 1  # Length in +X
         assert timber3.get_width_direction_global()[2] == 1    # Width in +Z (special case)
     
-    def test_create_axis_aligned_timber_explicit_overrides_default(self, symbolic_mode):
+    def test_create_axis_aligned_timber_explicit_overrides_default(self):
         """Test that explicit width_direction overrides the default."""
         position = create_v3(0, 0, 0)
         size = create_v2(scalar(1, 10), scalar(1, 10))
@@ -103,7 +102,7 @@ class TestTimberCreation:
         assert timber.get_length_direction_global()[0] == 1  # Length in +X
         assert timber.get_width_direction_global()[1] == 1    # Width in +Y (explicit)
     
-    def test_create_vertical_timber_on_footprint_corner(self, symbolic_mode):
+    def test_create_vertical_timber_on_footprint_corner(self):
         """Test vertical timber creation on footprint corner with INSIDE, OUTSIDE, and CENTER."""
         # Create a square footprint with exact integer corners
         corners = [
@@ -173,7 +172,7 @@ class TestTimberCreation:
         assert timber_outside.get_width_direction_global()[0] == 1
         assert timber_outside.get_width_direction_global()[1] == 0
     
-    def test_create_vertical_timber_on_footprint_side(self, symbolic_mode):
+    def test_create_vertical_timber_on_footprint_side(self):
         """Test vertical timber creation on footprint side with INSIDE, OUTSIDE, and CENTER."""
         # Create a square footprint with exact integer corners
         corners = [
@@ -242,7 +241,7 @@ class TestTimberCreation:
         assert timber_outside.get_width_direction_global()[0] == 1
         assert timber_outside.get_width_direction_global()[1] == 0
 
-    def test_inside_corner_lines_up_with_inside_side(self, symbolic_mode):
+    def test_inside_corner_lines_up_with_inside_side(self):
         """INSIDE corner and INSIDE side placement should lie on the same inside boundary line."""
         corners = [
             create_v2(0, 0),
@@ -265,7 +264,7 @@ class TestTimberCreation:
         assert side_post_inside.get_bottom_position_global()[1] == size[1] / 2
         assert corner_post_inside.get_bottom_position_global()[1] == side_post_inside.get_bottom_position_global()[1]
 
-    def test_corner_side_location_alignment_pairs(self, symbolic_mode):
+    def test_corner_side_location_alignment_pairs(self):
         """CENTER/CENTER and OUTSIDE/OUTSIDE align, while INSIDE/CENTER do not."""
         corners = [
             create_v2(0, 0),
@@ -297,7 +296,7 @@ class TestTimberCreation:
         assert corner_outside.get_bottom_position_global()[1] == side_outside.get_bottom_position_global()[1]
         assert corner_inside.get_bottom_position_global()[1] != side_center.get_bottom_position_global()[1]
     
-    def test_create_horizontal_timber_on_footprint(self, symbolic_mode):
+    def test_create_horizontal_timber_on_footprint(self):
         """Test horizontal timber creation on footprint."""
         corners = [
             create_v2(scalar(0), scalar(0)),
@@ -319,7 +318,7 @@ class TestTimberCreation:
         assert timber.get_length_direction_global()[0] == 1
         assert timber.get_length_direction_global()[2] == 0
     
-    def test_create_horizontal_timber_on_footprint_location_types(self, symbolic_mode):
+    def test_create_horizontal_timber_on_footprint_location_types(self):
         """Test horizontal timber positioning with INSIDE, OUTSIDE, and CENTER location types."""
         # Create a square footprint with exact integer coordinates
         corners = [
@@ -411,7 +410,7 @@ class TestTimberCreation:
         assert timber_center_right.get_bottom_position_global()[0] == scalar(2)  # X on boundary
         assert timber_center_right.get_bottom_position_global()[1] == scalar(0)  # Y unchanged
     
-    def test_stretch_timber(self, symbolic_mode):
+    def test_stretch_timber(self):
         """Test timber extension creation with correct length calculation."""
         # Create a vertical timber from Z=0 to Z=10
         original_timber = create_standard_vertical_timber(height=10, size=(0.2, 0.2), position=(0, 0, 0))
@@ -642,7 +641,7 @@ class TestJoinTimbers:
                 orientation_face_on_timber1=TimberFace.TOP
             )
     
-    def test_join_face_aligned_on_face_aligned_timbers_auto_size(self, symbolic_mode):
+    def test_join_face_aligned_on_face_aligned_timbers_auto_size(self):
         """Test automatic size determination in join_face_aligned_on_face_aligned_timbers."""
         # Create two vertical posts with 1" x 2" cross-section
         post1 = create_standard_vertical_timber(height=3, size=(inches(1), inches(2)), position=(0, 0, 0))
@@ -686,7 +685,7 @@ class TestJoinTimbers:
         assert beam.get_bottom_position_global()[2] == expected_bottom_z, \
             f"Beam should be at Z={expected_bottom_z}, got Z={beam.get_bottom_position_global()[2]}"
 
-    def test_join_timbers_creates_orthogonal_rotation_matrix(self, symbolic_mode):
+    def test_join_timbers_creates_orthogonal_rotation_matrix(self):
         """Test that join_timbers creates valid orthogonal orientation matrices."""
         # Create two non-parallel timbers to ensure non-trivial orientation
         # Use exact integer/rational inputs for exact SymPy results
@@ -716,27 +715,27 @@ class TestJoinTimbers:
         identity = Matrix.eye(3)
         
         # Check that M * M^T = I exactly
-        assert simplify(product - identity) == Matrix.zeros(3, 3), "M * M^T should equal identity matrix"
+        assert (product - identity).equals(Matrix.zeros(3, 3)), "M * M^T should equal identity matrix"
         
         # Check determinant is exactly 1 (proper rotation, not reflection)
         det = orientation_matrix.det()
-        assert simplify(det - 1) == 0, "Determinant should be exactly 1"
+        assert safe_zero_test(det - 1), "Determinant should be exactly 1"
         
         # Verify direction vectors are unit length (exact SymPy comparison)
         length_dir = joining_timber.get_length_direction_global()
         width_dir = joining_timber.get_width_direction_global()  
         height_dir = joining_timber.get_height_direction_global()
         
-        assert simplify(length_dir.norm() - 1) == 0, "Length direction should be unit vector"
-        assert simplify(width_dir.norm() - 1) == 0, "Face direction should be unit vector"
-        assert simplify(height_dir.norm() - 1) == 0, "Height direction should be unit vector"
+        assert safe_zero_test(length_dir.norm() - 1), "Length direction should be unit vector"
+        assert safe_zero_test(width_dir.norm() - 1), "Face direction should be unit vector"
+        assert safe_zero_test(height_dir.norm() - 1), "Height direction should be unit vector"
         
         # Verify directions are orthogonal to each other
         assert_vectors_perpendicular(length_dir, width_dir)
         assert_vectors_perpendicular(length_dir, height_dir)
         assert_vectors_perpendicular(width_dir, height_dir)
 
-    def test_create_timber_creates_orthogonal_matrix(self, symbolic_mode):
+    def test_create_timber_creates_orthogonal_matrix(self):
         """Test that create_timber creates valid orthogonal orientation matrices."""
         # Test with arbitrary (but orthogonal) input directions using exact inputs
         length_dir = create_v3(1, 1, 0)  # Will be normalized (integers)
@@ -758,13 +757,13 @@ class TestJoinTimbers:
         identity = Matrix.eye(3)
         
         # Check that M * M^T = I exactly
-        assert simplify(product - identity) == Matrix.zeros(3, 3), "M * M^T should equal identity matrix"
+        assert (product - identity).equals(Matrix.zeros(3, 3)), "M * M^T should equal identity matrix"
         
         # Check determinant is exactly 1
         det = orientation_matrix.det()
-        assert simplify(det - 1) == 0, "Determinant should be exactly 1"
+        assert safe_zero_test(det - 1), "Determinant should be exactly 1"
 
-    def test_orthogonal_matrix_with_non_orthogonal_input(self, symbolic_mode):
+    def test_orthogonal_matrix_with_non_orthogonal_input(self):
         """Test that orthogonal matrix is created even with non-orthogonal input directions."""
         # Use non-orthogonal input directions to test the orthogonalization process
         # Using exact rational numbers for exact results
@@ -787,11 +786,11 @@ class TestJoinTimbers:
         identity = Matrix.eye(3)
         
         # Check that M * M^T = I exactly
-        assert simplify(product - identity) == Matrix.zeros(3, 3), "M * M^T should equal identity matrix"
+        assert (product - identity).equals(Matrix.zeros(3, 3)), "M * M^T should equal identity matrix"
         
         # Check determinant is exactly 1
         det = orientation_matrix.det()
-        assert simplify(det - 1) == 0, "Determinant should be exactly 1"
+        assert safe_zero_test(det - 1), "Determinant should be exactly 1"
 
     def test_join_perpendicular_face_aligned_timbers_comprehensive(self):
         """Test comprehensive face-aligned timber joining with random configurations."""
@@ -840,7 +839,7 @@ class TestJoinTimbers:
         for timber in base_timbers:
             top_face_z = timber.get_bottom_position_global()[2] + timber.get_height_direction_global()[2] * timber.size[1]
             expected_top_z = base_z + timber_size[1]  # base_z + height
-            assert simplify(top_face_z - expected_top_z) == 0, f"Base timber {timber.ticket.path} not at expected height"
+            assert safe_zero_test(top_face_z - expected_top_z), f"Base timber {timber.ticket.path} not at expected height"
         
         # Test joining multiple base timbers to the beam
         joining_timbers = []
@@ -1593,7 +1592,7 @@ class TestTimberFootprintOrientation:
 class TestSplitTimber:
     """Test the split_timber method"""
     
-    def test_split_timber_basic(self, symbolic_mode):
+    def test_split_timber_basic(self):
         """Test basic timber splitting at midpoint"""
         # Create a simple vertical timber
         timber = create_standard_vertical_timber(height=10, size=(4, 4), position=(0, 0, 0), ticket="Test Timber")
@@ -1619,7 +1618,7 @@ class TestSplitTimber:
         assert top_timber.get_width_direction_global() == create_v3(scalar(1), scalar(0), scalar(0))
         assert top_timber.ticket.path == "Test Timber/top"
     
-    def test_split_timber_horizontal(self, symbolic_mode):
+    def test_split_timber_horizontal(self):
         """Test splitting a horizontal timber"""
         # Create a horizontal timber along X axis
         timber = create_timber(
@@ -1641,7 +1640,7 @@ class TestSplitTimber:
         assert top_timber.length == scalar(12)
         assert top_timber.get_bottom_position_global() == create_v3(scalar(13), scalar(10), scalar(2))  # 5 + 8
     
-    def test_split_timber_diagonal(self, symbolic_mode):
+    def test_split_timber_diagonal(self):
         """Test splitting a diagonal timber"""
         # Create a diagonal timber at 45 degrees
         length_dir = safe_normalize_vector(create_v3(scalar(1), scalar(1), scalar(0)))
@@ -1666,13 +1665,13 @@ class TestSplitTimber:
         
         # Top timber should start at 4 units along the diagonal
         expected_top_pos = create_v3(scalar(0), scalar(0), scalar(0)) + scalar(4) * length_dir
-        assert top_timber.get_bottom_position_global() == expected_top_pos
+        assert top_timber.get_bottom_position_global().equals(expected_top_pos)
         
         # Both should maintain same orientation
-        assert bottom_timber.get_length_direction_global() == length_dir
-        assert top_timber.get_length_direction_global() == length_dir
+        assert bottom_timber.get_length_direction_global().equals(length_dir)
+        assert top_timber.get_length_direction_global().equals(length_dir)
     
-    def test_split_timber_with_rational(self, symbolic_mode):
+    def test_split_timber_with_rational(self):
         """Test splitting with exact rational arithmetic"""
         # Create a timber with rational values
         timber = create_timber(
@@ -1791,11 +1790,11 @@ class TestAttachFaceAlignedTimber:
         )
 
     def _assert_v3(self, v, x, y, z):
-        assert simplify(v[0] - x) == 0, f"x: got {v[0]}, expected {x}"
-        assert simplify(v[1] - y) == 0, f"y: got {v[1]}, expected {y}"
-        assert simplify(v[2] - z) == 0, f"z: got {v[2]}, expected {z}"
+        assert safe_zero_test(v[0] - x), f"x: got {v[0]}, expected {x}"
+        assert safe_zero_test(v[1] - y), f"y: got {v[1]}, expected {y}"
+        assert safe_zero_test(v[2] - z), f"z: got {v[2]}, expected {z}"
 
-    def test_basic_orientation_and_position(self, symbolic_mode):
+    def test_basic_orientation_and_position(self):
         post = self._make_post()
         beam = attach_face_aligned_timber(
             original_timber=post,
@@ -1808,13 +1807,13 @@ class TestAttachFaceAlignedTimber:
         self._assert_v3(beam.get_length_direction_global(), 1, 0, 0)
         # width axis runs along the post's length (+Z) per the orientation convention
         self._assert_v3(beam.get_width_direction_global(), 0, 0, 1)
-        assert simplify(beam.length - scalar(5)) == 0
+        assert safe_zero_test(beam.length - scalar(5))
         # with defaults the bottom end sits at the post centerline and the beam extends out
         self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
         # fully face-aligned with the post
         assert are_timbers_face_aligned(post, beam)
 
-    def test_length_and_lateral_position(self, symbolic_mode):
+    def test_length_and_lateral_position(self):
         post = self._make_post()
         beam = attach_face_aligned_timber(
             original_timber=post,
@@ -1830,7 +1829,7 @@ class TestAttachFaceAlignedTimber:
         # (front face at y=1 -> centerline lands at y=0)
         self._assert_v3(beam.get_bottom_position_global(), 0, 0, 4)
 
-    def test_opposite_length_bottom_end(self, symbolic_mode):
+    def test_opposite_length_bottom_end(self):
         post = self._make_post()
         beam = attach_face_aligned_timber(
             original_timber=post,
@@ -1839,11 +1838,11 @@ class TestAttachFaceAlignedTimber:
             attached_timber_length_or_target=scalar(5),
             attached_timber_stickout=Stickout(scalar(1)),
         )
-        assert simplify(beam.length - scalar(6)) == 0
+        assert safe_zero_test(beam.length - scalar(6))
         # bottom end (toward the original) is 1 on the far side of the post centerline
         self._assert_v3(beam.get_bottom_position_global(), -1, 0, 0)
 
-    def test_top_end_points_toward_original(self, symbolic_mode):
+    def test_top_end_points_toward_original(self):
         post = self._make_post()
         beam = attach_face_aligned_timber(
             original_timber=post,
@@ -1853,14 +1852,14 @@ class TestAttachFaceAlignedTimber:
             attached_timber_stickout=Stickout(scalar(1)),
             attached_timber_end_that_points_towards_original_timber=TimberEnd.TOP,
         )
-        assert simplify(beam.length - scalar(6)) == 0
+        assert safe_zero_test(beam.length - scalar(6))
         # length now points back toward the post (-X); the bottom sticks out at x=5
         self._assert_v3(beam.get_length_direction_global(), -1, 0, 0)
         self._assert_v3(beam.get_bottom_position_global(), 5, 0, 0)
         # the physical span [-1, 5] in X is identical to the BOTTOM-end case
         self._assert_v3(locate_top_center_position(beam).position, -1, 0, 0)
 
-    def test_length_measure_to_long_face(self, symbolic_mode):
+    def test_length_measure_to_long_face(self):
         post = self._make_post()
         beam = attach_face_aligned_timber(
             original_timber=post,
@@ -1872,11 +1871,11 @@ class TestAttachFaceAlignedTimber:
         )
         # the beam's LEFT face (its lower face along +Z) is exactly 4 up from the post bottom
         left_face_center = get_center_point_on_face_global(TimberLongFace.LEFT, beam)
-        assert simplify(left_face_center[2] - scalar(4)) == 0
+        assert safe_zero_test(left_face_center[2] - scalar(4))
         # the beam center is half its width (1) above that face
         self._assert_v3(beam.get_bottom_position_global(), 0, 0, 5)
 
-    def test_face_aligned_for_each_long_face(self, symbolic_mode):
+    def test_face_aligned_for_each_long_face(self):
         # attaching out of each of the post's long faces stays face-aligned
         post = self._make_post()
         for face in [TimberLongFace.RIGHT, TimberLongFace.LEFT, TimberLongFace.FRONT, TimberLongFace.BACK]:
@@ -1893,7 +1892,7 @@ class TestAttachFaceAlignedTimber:
                 post.get_face_direction_global(face),
             )
 
-    def test_assert_lateral_from_non_lateral_face(self, symbolic_mode):
+    def test_assert_lateral_from_non_lateral_face(self):
         post = self._make_post()
         with pytest.raises(AssertionError):
             attach_face_aligned_timber(
@@ -1906,7 +1905,7 @@ class TestAttachFaceAlignedTimber:
                 lateral_position_measurement=scalar(1),
             )
 
-    def test_assert_conflicting_orientation_faces(self, symbolic_mode):
+    def test_assert_conflicting_orientation_faces(self):
         # the length face and lateral face both reference the width (X) axis -> they imply
         # contradictory cross-section orientations, which must error
         post = self._make_post()
@@ -1924,7 +1923,7 @@ class TestAttachFaceAlignedTimber:
                 lateral_position_measurement=scalar(1),
             )
 
-    def test_orientation_derived_from_named_lateral_face(self, symbolic_mode):
+    def test_orientation_derived_from_named_lateral_face(self):
         post = self._make_post()
         # naming a FRONT/BACK lateral face -> the width axis runs along the post length (+Z)
         beam_fb = attach_face_aligned_timber(
@@ -1959,7 +1958,7 @@ class TestAttachFaceAlignedTimber:
             ticket="FarPost",
         )
 
-    def test_extend_to_target_references(self, symbolic_mode):
+    def test_extend_to_target_references(self):
         # a target timber instead of a numeric length: stickoutReference2 picks which feature
         # of the target the beam extends to
         post = self._make_post()
@@ -1978,9 +1977,9 @@ class TestAttachFaceAlignedTimber:
             )
             # starts at the post centerline and ends on the far post's reference feature
             self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
-            assert simplify(beam.length - end_x) == 0, f"length for {ref2}: got {beam.length}, expected {end_x}"
+            assert safe_zero_test(beam.length - end_x), f"length for {ref2}: got {beam.length}, expected {end_x}"
 
-    def test_extend_to_target_with_stickout2(self, symbolic_mode):
+    def test_extend_to_target_with_stickout2(self):
         post = self._make_post()
         far_post = self._make_far_post()
         beam = attach_face_aligned_timber(
@@ -1992,9 +1991,9 @@ class TestAttachFaceAlignedTimber:
         )
         # 1 beyond the far post's near face at x=9
         self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
-        assert simplify(beam.length - scalar(10)) == 0
+        assert safe_zero_test(beam.length - scalar(10))
 
-    def test_stickout1_references(self, symbolic_mode):
+    def test_stickout1_references(self):
         # stickoutReference1 picks which feature of the original timber the start end sits on
         post = self._make_post()
         for ref1, start_x in [
@@ -2010,9 +2009,9 @@ class TestAttachFaceAlignedTimber:
                 attached_timber_stickout=Stickout(scalar(0), scalar(0), ref1, StickoutReference.CENTER_LINE),
             )
             self._assert_v3(beam.get_bottom_position_global(), start_x, 0, 0)
-            assert simplify(beam.length - (scalar(5) - start_x)) == 0, f"length for {ref1}: got {beam.length}"
+            assert safe_zero_test(beam.length - (scalar(5) - start_x)), f"length for {ref1}: got {beam.length}"
 
-    def test_stickout1_extends_beyond_reference(self, symbolic_mode):
+    def test_stickout1_extends_beyond_reference(self):
         post = self._make_post()
         beam = attach_face_aligned_timber(
             original_timber=post,
@@ -2023,9 +2022,9 @@ class TestAttachFaceAlignedTimber:
         )
         # half a unit back from the RIGHT face at x=1
         self._assert_v3(beam.get_bottom_position_global(), scalar(1, 2), 0, 0)
-        assert simplify(beam.length - scalar(9, 2)) == 0
+        assert safe_zero_test(beam.length - scalar(9, 2))
 
-    def test_extend_to_rotated_target(self, symbolic_mode):
+    def test_extend_to_rotated_target(self):
         # a target post rotated 45 degrees about its own axis: INSIDE/OUTSIDE reference the
         # near/far corner edges of its projected silhouette rather than its (diagonal) faces
         post = self._make_post()
@@ -2050,9 +2049,9 @@ class TestAttachFaceAlignedTimber:
                 attached_timber_stickout=Stickout(scalar(0), scalar(0), StickoutReference.CENTER_LINE, ref2),
             )
             self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
-            assert simplify(beam.length - end_x) == 0, f"length for {ref2}: got {beam.length}, expected {end_x}"
+            assert safe_zero_test(beam.length - end_x), f"length for {ref2}: got {beam.length}, expected {end_x}"
 
-    def test_extend_to_target_parallel_to_lateral_axis(self, symbolic_mode):
+    def test_extend_to_target_parallel_to_lateral_axis(self):
         # a target timber running along Y (parallel to the lateral axis t): its centerline
         # projects to a single *point* on the attachment plane, which is dropped perpendicularly
         # onto the attached timber's length axis
@@ -2080,9 +2079,9 @@ class TestAttachFaceAlignedTimber:
             # the cross beam's z-offset (3) is irrelevant: the projected point is dropped
             # perpendicularly onto the attached centerline, which runs along +X at z=0
             self._assert_v3(beam.get_bottom_position_global(), 0, 0, 0)
-            assert simplify(beam.length - end_x) == 0, f"length for {ref2}: got {beam.length}, expected {end_x}"
+            assert safe_zero_test(beam.length - end_x), f"length for {ref2}: got {beam.length}, expected {end_x}"
 
-    def test_numeric_length_ignores_stickout2_with_warning(self, symbolic_mode):
+    def test_numeric_length_ignores_stickout2_with_warning(self):
         post = self._make_post()
         with pytest.warns(UserWarning):
             beam = attach_face_aligned_timber(
@@ -2092,7 +2091,7 @@ class TestAttachFaceAlignedTimber:
                 attached_timber_length_or_target=scalar(5),
                 attached_timber_stickout=Stickout(scalar(0), scalar(2)),
             )
-        assert simplify(beam.length - scalar(5)) == 0
+        assert safe_zero_test(beam.length - scalar(5))
 
 
 class TestAttachPlaneAlignedTimber:
@@ -2109,11 +2108,11 @@ class TestAttachPlaneAlignedTimber:
         )
 
     def _assert_v3(self, v, x, y, z):
-        assert simplify(v[0] - x) == 0, f"x: got {v[0]}, expected {x}"
-        assert simplify(v[1] - y) == 0, f"y: got {v[1]}, expected {y}"
-        assert simplify(v[2] - z) == 0, f"z: got {v[2]}, expected {z}"
+        assert safe_zero_test(v[0] - x), f"x: got {v[0]}, expected {x}"
+        assert safe_zero_test(v[1] - y), f"y: got {v[1]}, expected {y}"
+        assert safe_zero_test(v[2] - z), f"z: got {v[2]}, expected {z}"
 
-    def test_reduces_to_face_aligned_at_ninety_degrees(self, symbolic_mode):
+    def test_reduces_to_face_aligned_at_ninety_degrees(self):
         # at pi/2 the plane-aligned attach must match the face-aligned attach exactly
         post = self._make_post()
         common: Dict[str, Any] = dict(
@@ -2131,13 +2130,13 @@ class TestAttachPlaneAlignedTimber:
         face = attach_face_aligned_timber(**common)
         bp, bf = plane.get_bottom_position_global(), face.get_bottom_position_global()
         self._assert_v3(bp, bf[0], bf[1], bf[2])
-        assert simplify(plane.length - face.length) == 0  # ty: ignore[no-matching-overload]
+        assert safe_zero_test(plane.length - face.length)  # ty: ignore[no-matching-overload]
         ld, lf = plane.get_length_direction_global(), face.get_length_direction_global()
         self._assert_v3(ld, lf[0], lf[1], lf[2])
         wd, wf = plane.get_width_direction_global(), face.get_width_direction_global()
         self._assert_v3(wd, wf[0], wf[1], wf[2])
 
-    def test_angled_brace_direction_and_plane_alignment(self, symbolic_mode):
+    def test_angled_brace_direction_and_plane_alignment(self):
         # a 45-degree brace out the RIGHT face runs up-and-out and stays plane-aligned
         post = self._make_post()
         brace = attach_plane_aligned_timber(
@@ -2148,13 +2147,13 @@ class TestAttachPlaneAlignedTimber:
             attached_timber_length_or_target=scalar(6),
         )
         ld = brace.get_length_direction_global()
-        assert simplify(ld[0] - ld[2]) == 0      # equal +X and +Z components
-        assert simplify(ld[1]) == 0              # nothing lateral
-        assert simplify(ld[0] ** 2 + ld[2] ** 2 - 1) == 0  # unit length
+        assert safe_zero_test(ld[0] - ld[2])      # equal +X and +Z components
+        assert safe_zero_test(ld[1])              # nothing lateral
+        assert safe_zero_test(ld[0] ** 2 + ld[2] ** 2 - 1)  # unit length
         assert simplify(ld[0]) > 0 and simplify(ld[2]) > 0  # up and out
         assert are_timbers_plane_aligned(post, brace)
 
-    def test_end_flips_the_angle(self, symbolic_mode):
+    def test_end_flips_the_angle(self):
         # the end that points toward the original flips the length direction (angle -> pi - angle)
         post = self._make_post()
         kw: Dict[str, Any] = dict(
@@ -2172,7 +2171,7 @@ class TestAttachPlaneAlignedTimber:
         # the two length directions are exact opposites
         self._assert_v3(lb, -lt[0], -lt[1], -lt[2])
 
-    def test_extend_to_target_centerline_at_angle(self, symbolic_mode):
+    def test_extend_to_target_centerline_at_angle(self):
         # a 45-degree brace out the RIGHT face, extended to a second post's centerline at x=10:
         # the far-end centerline point must land exactly on that centerline (projected onto the
         # attachment plane)
@@ -2194,11 +2193,11 @@ class TestAttachPlaneAlignedTimber:
         )
         # the default length-position pins the brace *center* at the post-bottom height (z=0),
         # so the brace runs from (0,0,-5) on the post centerline to (10,0,5) on the far post's
-        assert simplify(brace.length - 10 * sqrt(2)) == 0
+        assert safe_zero_test(brace.length - 10 * sqrt(2))
         self._assert_v3(brace.get_bottom_position_global(), 0, 0, -5)
         self._assert_v3(locate_top_center_position(brace).position, 10, 0, 5)
 
-    def test_extend_to_target_couples_with_center_positioning(self, symbolic_mode):
+    def test_extend_to_target_couples_with_center_positioning(self):
         # extending at an angle to a *horizontal* target makes the touch condition depend on the
         # solved length itself (the length-position measurement pins the brace center, which
         # moves as the length grows): the far-end centerline point must still land exactly on
@@ -2223,13 +2222,13 @@ class TestAttachPlaneAlignedTimber:
         # forces a span from (0,0,-15) to (30,0,15)
         self._assert_v3(locate_top_center_position(brace).position, 30, 0, 15)
         self._assert_v3(brace.get_bottom_position_global(), 0, 0, -15)
-        assert simplify(brace.length - 30 * sqrt(2)) == 0
+        assert safe_zero_test(brace.length - 30 * sqrt(2))
 
 
 class TestAttachTimber:
     """Test for attach_timber (arbitrary direction, no face/plane alignment)."""
 
-    def test_direction_position_and_lateral_offset(self, symbolic_mode):
+    def test_direction_position_and_lateral_offset(self):
         post = create_timber(
             length=scalar(10),
             size=create_v2(scalar(2), scalar(2)),
@@ -2246,7 +2245,7 @@ class TestAttachTimber:
             attached_timber_length=scalar(5),
             length_position_measurement=scalar(4),
         )
-        assert simplify(beam.length - scalar(5)) == 0
+        assert safe_zero_test(beam.length - scalar(5))
         self._assert_v3(beam.get_length_direction_global(), 1, 0, 0)
         # the near end sits on the post centerline at height 4 and the beam extends out +X
         self._assert_v3(beam.get_bottom_position_global(), 0, 0, 4)
@@ -2263,9 +2262,9 @@ class TestAttachTimber:
         self._assert_v3(offset_beam.get_bottom_position_global(), 0, 3, 4)
 
     def _assert_v3(self, v, x, y, z):
-        assert simplify(v[0] - x) == 0, f"x: got {v[0]}, expected {x}"
-        assert simplify(v[1] - y) == 0, f"y: got {v[1]}, expected {y}"
-        assert simplify(v[2] - z) == 0, f"z: got {v[2]}, expected {z}"
+        assert safe_zero_test(v[0] - x), f"x: got {v[0]}, expected {x}"
+        assert safe_zero_test(v[1] - y), f"y: got {v[1]}, expected {y}"
+        assert safe_zero_test(v[2] - z), f"z: got {v[2]}, expected {z}"
 
 
 class TestPanelBoardArrangement:

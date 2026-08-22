@@ -4,7 +4,6 @@ Tests for mortise and tenon joint construction functions
 
 import pytest
 from typing import List
-from sympy import Matrix, sqrt, simplify, Abs, sin, cos, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -112,7 +111,7 @@ def sample_points_in_box(center: V3, size: V3, num_samples: int = 5) -> List[V3]
 
 class TestMortiseAndTenonGeometry:
     
-    def test_mortise_tenon_centerline_containment(self, symbolic_mode, simple_T_configuration):
+    def test_mortise_tenon_centerline_containment(self, simple_T_configuration):
         """
         Test points along the tenon centerline to verify correct joint geometry.
         
@@ -229,7 +228,7 @@ class TestMortiseAndTenonGeometry:
 class TestMortiseAndTenonJointNotchReliefConfig:
     """Tests for relief=ButtJointNotchReliefConfig() in cut_mortise_and_tenon_joint."""
 
-    def test_notch_relief_actually_relieves_the_butt_timber(self, symbolic_mode, simple_T_configuration):
+    def test_notch_relief_actually_relieves_the_butt_timber(self, simple_T_configuration):
         """
         Regression guard: relief=ButtJointNotchReliefConfig() must actually change the
         tenon (butt timber)'s cut geometry for an imperfect (oversized) tenon, not just the
@@ -317,7 +316,7 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
     def _mortise_local(gx, gy, gz):
         return create_v3(scalar(gy), scalar(gz), gx + scalar(50))
 
-    def test_notch_relief_actually_applied_via_face_aligned_wrapper(self, symbolic_mode, simple_T_configuration):
+    def test_notch_relief_actually_applied_via_face_aligned_wrapper(self, simple_T_configuration):
         """Regression guard mirroring TestMortiseAndTenonJointNotchReliefConfig's own:
         relief must have a real effect through this wrapper too, not be silently dropped."""
         tenon_timber, mortise_timber = simple_T_configuration
@@ -355,7 +354,7 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
         assert not mortise_csg_no_relief.contains_point(p_axis_edge_point)
         assert mortise_csg_with_relief.contains_point(p_axis_edge_point)
 
-    def test_uses_2sided_not_4sided_notch(self, symbolic_mode, simple_T_configuration):
+    def test_uses_2sided_not_4sided_notch(self, simple_T_configuration):
         """
         Distinguishing behavior vs the 4-sided notch (used when calling
         cut_mortise_and_tenon_joint directly): the P-axis (Y here) must stay FLAT at the
@@ -387,7 +386,7 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
         just_inside_p_edge = self._mortise_local(0, scalar(29, 10), 4)
         assert mortise_csg.contains_point(just_inside_p_edge)
 
-    def test_does_not_also_apply_the_redundant_default_scribe_housing_cut(self, symbolic_mode, simple_T_configuration):
+    def test_does_not_also_apply_the_redundant_default_scribe_housing_cut(self, simple_T_configuration):
         """
         Regression guard: previously, relief=ButtJointNotchReliefConfig() through this
         wrapper passed relief=None down to cut_mortise_and_tenon_joint, which (since None
@@ -433,7 +432,7 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
         just_beyond_q_reach_near_shoulder = self._mortise_local(3, 0, scalar(21, 10))
         assert not mortise_csg.contains_point(just_beyond_q_reach_near_shoulder)
 
-    def test_forwards_through_face_aligned_to_plane_aligned_wrapper(self, symbolic_mode, simple_T_configuration):
+    def test_forwards_through_face_aligned_to_plane_aligned_wrapper(self, simple_T_configuration):
         """cut_mortise_and_tenon_joint_on_face_aligned_timbers and
         cut_mortise_and_tenon_joint_on_plane_aligned_timbers must produce identical results
         for an arrangement that's valid for both (face-aligned implies plane-aligned)."""
@@ -540,7 +539,7 @@ class TestMortiseAndTenonRelativeTenonSizing:
 
 class TestPegStuff:
     # 🐪
-    def test_simple_peg_basic_stuff(self, symbolic_mode, simple_T_configuration):
+    def test_simple_peg_basic_stuff(self, simple_T_configuration):
         """Test that peg is perpendicular to the face it goes through."""
         tenon_timber, mortise_timber = simple_T_configuration
         
@@ -603,7 +602,7 @@ class TestPegStuff:
             "SolidUnion should contain base cut plus peg holes"
 
     # 🐪
-    def test_peg_custom_stickout_length(self, symbolic_mode, simple_T_configuration):
+    def test_peg_custom_stickout_length(self, simple_T_configuration):
         """Test that custom stickout_length parameter works."""
         tenon_timber, mortise_timber = simple_T_configuration
         
@@ -634,7 +633,7 @@ class TestPegStuff:
         assert peg.stickout_length == 0
 
     # 🐪
-    def test_peg_geometry(self, symbolic_mode, simple_T_configuration):
+    def test_peg_geometry(self, simple_T_configuration):
         """Test points on peg hole boundary using is_point_on_boundary()."""
         tenon_timber, mortise_timber = simple_T_configuration
         
@@ -759,7 +758,7 @@ class TestPegStuff:
                 f"Each peg should have depth 5, got {peg.forward_length}"
     
     # 🐪
-    def test_peg_depth_from_mortise_surface_projection(self, symbolic_mode):
+    def test_peg_depth_from_mortise_surface_projection(self):
         """Peg depth (auto) is the full chord through the mortise timber in the peg direction.
 
         Uses a non-square mortise (width=4 in peg direction, height=10) so the test

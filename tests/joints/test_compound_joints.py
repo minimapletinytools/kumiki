@@ -1,7 +1,6 @@
 """Tests for compound joints."""
 
 import pytest
-from sympy import Matrix
 from kumiki import *
 
 
@@ -99,7 +98,7 @@ class TestMultiCrossLapJoint:
         )
         return board_0, board_1, board_2
 
-    def test_two_board_x_stacking_zones_are_exclusive(self, symbolic_mode):
+    def test_two_board_x_stacking_zones_are_exclusive(self):
         """
         2-board X cross-lap: at the crossing, each Z zone belongs to exactly one board.
         Below the cut boundary (Z<3): board_0 present, board_1 absent.
@@ -123,7 +122,7 @@ class TestMultiCrossLapJoint:
         assert not _contains(r0, board_0, upper), "board_0 must be cut away in the upper zone"
         assert _contains(r1, board_1, upper), "board_1 must be present in the upper zone"
 
-    def test_three_board_stacking_zones_are_exclusive(self, symbolic_mode):
+    def test_three_board_stacking_zones_are_exclusive(self):
         """
         3-board star: the three Z zones (Z<2, 2<Z<4, Z>4) each contain exactly one
         board at the relevant intersection point.
@@ -159,7 +158,7 @@ class TestMultiCrossLapJoint:
         assert not _contains(r1, board_1, p_hi), "board_1 must be cut away in the upper zone"
         assert _contains(r2, board_2, p_hi), "board_2 must be present in the upper zone"
 
-    def test_fill_cuts_prevent_non_adjacent_board_overlap(self, symbolic_mode):
+    def test_fill_cuts_prevent_non_adjacent_board_overlap(self):
         """
         3-board star: board_0 and board_2 are non-adjacent and physically overlap at
         X=5 (far outside the board_1 joint region), Y=1.5 (inside both boards' Y cross-sections).

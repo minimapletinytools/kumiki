@@ -6,13 +6,12 @@ import pytest
 from kumiki.measuring import *
 from kumiki.timber import create_timber, TimberFace, TimberLongEdge, TimberEdge, TimberCenterline, TimberCorner
 from kumiki.rule import create_v3, create_v2, Transform, Orientation, scalar
-from sympy import Matrix
 
 
 class TestGetPointOnFace:
     """Tests for get_center_point_on_face_global helper function"""
 
-    def test_get_point_on_right_face(self, symbolic_mode):
+    def test_get_point_on_right_face(self):
         """Test getting a point on the RIGHT face of a vertical timber"""
         timber = create_timber(
             length=scalar(100),
@@ -29,7 +28,7 @@ class TestGetPointOnFace:
         assert point[1] == scalar(0)
         assert point[2] == scalar(50)
 
-    def test_get_point_on_top_face(self, symbolic_mode):
+    def test_get_point_on_top_face(self):
         """Test getting a point on the TOP face of a vertical timber"""
         timber = create_timber(
             length=scalar(100),
@@ -67,7 +66,7 @@ class TestMeasureOntoFace:
         # Should be 0 (on the surface)
         assert marking.distance == scalar(0)
     
-    def test_project_point_inside_timber(self, symbolic_mode):
+    def test_project_point_inside_timber(self):
         """Test projecting a point inside the timber"""
         timber = create_timber(
             length=scalar(100),
@@ -84,7 +83,7 @@ class TestMeasureOntoFace:
         # Should be positive (inside the timber)
         assert marking.distance == scalar(3)
     
-    def test_project_point_outside_timber(self, symbolic_mode):
+    def test_project_point_outside_timber(self):
         """Test projecting a point outside the timber"""
         timber = create_timber(
             length=scalar(100),
@@ -101,7 +100,7 @@ class TestMeasureOntoFace:
         # Should be negative (outside the timber)
         assert marking.distance == scalar(-3)
     
-    def test_project_point_on_left_face(self, symbolic_mode):
+    def test_project_point_on_left_face(self):
         """Test projection onto LEFT face"""
         timber = create_timber(
             length=scalar(100),
@@ -119,7 +118,7 @@ class TestMeasureOntoFace:
         # Should be positive (inside the timber from LEFT face)
         assert marking.distance == scalar(3)
     
-    def test_project_point_on_front_face(self, symbolic_mode):
+    def test_project_point_on_front_face(self):
         """Test projection onto FRONT face"""
         timber = create_timber(
             length=scalar(100),
@@ -137,7 +136,7 @@ class TestMeasureOntoFace:
         # Should be positive (inside the timber from FRONT face)
         assert marking.distance == scalar(5)
     
-    def test_project_point_with_offset_timber(self, symbolic_mode):
+    def test_project_point_with_offset_timber(self):
         """Test projection on a timber not centered at origin"""
         timber = create_timber(
             length=scalar(48),
@@ -313,7 +312,7 @@ class TestGetPointOnFeature:
 class TestMeasureFromFace:
     """Tests for locate_into_face function"""
     
-    def test_locate_zero_distance_from_face(self, symbolic_mode):
+    def test_locate_zero_distance_from_face(self):
         """Test measuring zero distance creates plane at face surface"""
         timber = create_timber(
             length=scalar(100),
@@ -332,7 +331,7 @@ class TestMeasureFromFace:
         # Point should be at the face surface (x=5)
         assert plane.point[0] == scalar(5)
     
-    def test_locate_positive_distance_from_face(self, symbolic_mode):
+    def test_locate_positive_distance_from_face(self):
         """Test measuring positive distance INTO the face"""
         timber = create_timber(
             length=scalar(100),
@@ -352,7 +351,7 @@ class TestMeasureFromFace:
 class TestMarkFromFace:
     """Tests for mark_distance_from_face_in_normal_direction function"""
     
-    def test_mark_onto_face_round_trip(self, symbolic_mode):
+    def test_mark_onto_face_round_trip(self):
         """Test that mark_distance_from_face_in_normal_direction is inverse of locate_into_face"""
         timber = create_timber(
             length=scalar(100),
@@ -368,7 +367,7 @@ class TestMarkFromFace:
             marking = mark_distance_from_face_in_normal_direction(plane, timber, TimberFace.RIGHT)
             assert marking.distance == distance
     
-    def test_mark_point_from_face(self, symbolic_mode):
+    def test_mark_point_from_face(self):
         """Test marking a point feature from a face"""
         timber = create_timber(
             length=scalar(100),
@@ -388,7 +387,7 @@ class TestMarkFromFace:
 class TestMeasureFace:
     """Tests for locate_face function"""
     
-    def test_locate_face_right(self, symbolic_mode):
+    def test_locate_face_right(self):
         """Test measuring the RIGHT face of a vertical timber"""
         timber = create_timber(
             length=scalar(100),
@@ -410,7 +409,7 @@ class TestMeasureFace:
         assert plane.point[1] == scalar(0)
         assert plane.point[2] == scalar(50)
     
-    def test_locate_face_front(self, symbolic_mode):
+    def test_locate_face_front(self):
         """Test measuring the FRONT face of a vertical timber"""
         timber = create_timber(
             length=scalar(100),
@@ -434,7 +433,7 @@ class TestMeasureFace:
 class TestMeasureLongEdge:
     """Tests for locate_long_edge function"""
     
-    def test_locate_long_edge_right_front(self, symbolic_mode):
+    def test_locate_long_edge_right_front(self):
         """Test measuring the RIGHT_FRONT edge of a vertical timber"""
         timber = create_timber(
             length=scalar(100),
@@ -456,7 +455,7 @@ class TestMeasureLongEdge:
         assert line.point[1] == scalar(10)  # Front face at y=10
         assert line.point[2] == scalar(0)   # At bottom
     
-    def test_locate_long_edge_left_back(self, symbolic_mode):
+    def test_locate_long_edge_left_back(self):
         """Test measuring the LEFT_BACK edge of a vertical timber"""
         timber = create_timber(
             length=scalar(100),
@@ -476,7 +475,7 @@ class TestMeasureLongEdge:
         assert line.point[1] == scalar(-10)  # Back face at y=-10
         assert line.point[2] == scalar(0)    # At bottom
     
-    def test_locate_long_edge_horizontal_timber(self, symbolic_mode):
+    def test_locate_long_edge_horizontal_timber(self):
         """Test measuring edge on a horizontal timber"""
         # Horizontal timber pointing in +X direction
         timber = create_timber(
@@ -501,7 +500,7 @@ class TestMeasureLongEdge:
 class TestMeasureShortEdge:
     """Tests for locate_edge with short edges"""
 
-    def test_bottom_right_edge_vertical_timber(self, symbolic_mode):
+    def test_bottom_right_edge_vertical_timber(self):
         """BOTTOM_RIGHT edge on a vertical 10x20 timber at origin.
 
         The edge runs from the back-right corner (5, -10, 0) to the
@@ -523,7 +522,7 @@ class TestMeasureShortEdge:
         assert line.point[1] == scalar(-10)
         assert line.point[2] == scalar(0)
 
-    def test_top_front_edge_vertical_timber(self, symbolic_mode):
+    def test_top_front_edge_vertical_timber(self):
         """TOP_FRONT edge on a vertical 10x20 timber at origin.
 
         The edge runs from the front-left corner (-5, 10, 100) to the
@@ -549,7 +548,7 @@ class TestMeasureShortEdge:
 class TestMeasurePlaneFromEdgeInDirection:
     """Tests for locate_plane_from_edge_in_direction function"""
 
-    def test_plane_from_centerline_offset_in_x(self, symbolic_mode):
+    def test_plane_from_centerline_offset_in_x(self):
         """Plane through centerline offset 3 in +X should have normal +X and point at (3, 0, 50)."""
         timber = create_timber(
             length=scalar(100),
@@ -572,7 +571,7 @@ class TestMeasurePlaneFromEdgeInDirection:
 class TestMeasureCenterLine:
     """Tests for locate_centerline function"""
     
-    def test_locate_centerline_vertical(self, symbolic_mode):
+    def test_locate_centerline_vertical(self):
         """Test measuring the center line of a vertical timber"""
         timber = create_timber(
             length=scalar(100),
@@ -594,7 +593,7 @@ class TestMeasureCenterLine:
         assert line.point[1] == scalar(0)
         assert line.point[2] == scalar(50)  # Mid-length
     
-    def test_locate_centerline_horizontal(self, symbolic_mode):
+    def test_locate_centerline_horizontal(self):
         """Test measuring the center line of a horizontal timber"""
         timber = create_timber(
             length=scalar(48),
@@ -747,7 +746,7 @@ class TestDistanceFromLongEdgeOnFaceMark:
 class TestMeasureOntoCenterline:
     """Test mark_distance_from_end_along_centerline function"""
     
-    def test_locate_plane_onto_centerline(self, symbolic_mode):
+    def test_locate_plane_onto_centerline(self):
         """Test measuring a plane intersection onto centerline"""
         timber = create_timber(
             length=scalar(100),
@@ -778,7 +777,7 @@ class TestMeasureOntoCenterline:
         point = marking.locate()
         assert point.position.equals(create_v3(0, 0, 30))  # At the plane location
     
-    def test_locate_line_onto_centerline(self, symbolic_mode):
+    def test_locate_line_onto_centerline(self):
         """Test measuring closest point between a line and centerline"""
         timber = create_timber(
             length=scalar(100),
@@ -813,7 +812,7 @@ class TestMeasureOntoCenterline:
 class TestMarkPlaneFromEdgeInDirection:
     """Tests for mark_plane_from_edge_in_direction function"""
 
-    def test_round_trip_with_measure(self, symbolic_mode):
+    def test_round_trip_with_measure(self):
         """measure then mark should recover the original direction and distance."""
         timber = create_timber(
             length=scalar(100),
@@ -833,9 +832,6 @@ class TestMarkPlaneFromEdgeInDirection:
 
     def test_round_trip_diagonal_timber_and_direction(self):
         """Round-trip on a diagonal timber with a non-axis-aligned direction."""
-        from kumiki.rule import safe_normalize_vector as safe_normalize_vector, safe_zero_test
-        from sympy import simplify
-
         timber = create_timber(
             length=scalar(60),
             size=create_v2(4, 6),
@@ -860,7 +856,7 @@ class TestMarkPlaneFromEdgeInDirection:
 class TestPointFromCornerInFaceDirection:
     """Tests for PointFromCornerInFaceDirection"""
 
-    def test_valid_and_invalid_face_direction(self, symbolic_mode):
+    def test_valid_and_invalid_face_direction(self):
         """TOP is valid from BOT_RIGHT_FRONT (points inward); RIGHT is invalid (points outward)."""
         timber = create_timber(
             length=scalar(100),
@@ -895,7 +891,7 @@ class TestPointFromCornerInFaceDirection:
 class TestMarkDistanceFromCornerAlongEdge:
     """Tests for mark_distance_from_corner_along_edge_by_intersecting_plane"""
 
-    def test_intersect_plane_with_centerline(self, symbolic_mode):
+    def test_intersect_plane_with_centerline(self):
         """Plane at z=30 intersects the centerline of a 100-long vertical timber.
         From BOTTOM (z=0), distance should be 30."""
         timber = create_timber(
@@ -916,7 +912,7 @@ class TestMarkDistanceFromCornerAlongEdge:
         pt = result.locate()
         assert pt.position[2] == scalar(30)
 
-    def test_closest_point_on_centerline_to_perpendicular_line(self, symbolic_mode):
+    def test_closest_point_on_centerline_to_perpendicular_line(self):
         """A horizontal line at z=40 perpendicular to a vertical timber's centerline.
         The closest point on the centerline is at z=40, so distance from BOTTOM = 40."""
         timber = create_timber(

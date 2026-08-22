@@ -3,7 +3,6 @@ Tests for double butt joint construction functions.
 """
 
 from dataclasses import replace
-from sympy import Abs
 from kumiki import *
 from kumiki.example_shavings import create_canonical_example_opposing_double_butt_joint_timbers
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters

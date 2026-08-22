@@ -11,7 +11,6 @@ from kumiki.rule import *
 from kumiki.cutcsg import *
 from kumiki.construction import *
 from kumiki.measuring import *
-from sympy import Abs
 
 
 
@@ -704,8 +703,6 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
           should be decomposed into multiple convex profiles
     """
     assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
-    from sympy import Matrix
-    from kumiki.rule import safe_normalize_vector as safe_normalize_vector
 
     # Check if we have a single profile or multiple profiles
     # If the first element is a list, we have multiple profiles
@@ -839,7 +836,7 @@ def draw_gooseneck_polygon_NONCONVEX(length: Numeric, small_width: Numeric, larg
     Returns:
         List of 2D points forming the non-convex gooseneck polygon (counter-clockwise).
     """
-    from sympy import Matrix as _Matrix
+    from kumiki.rule import Matrix as _Matrix
     return [
             _Matrix([small_width/2, 0]),
             _Matrix([small_width/2, length-head_length]),
@@ -869,7 +866,7 @@ def draw_gooseneck_polygon_CONVEX(length: Numeric, small_width: Numeric, large_w
     Returns:
         List of two convex polygon point lists: [neck_rectangle, head_trapezoid].
     """
-    from sympy import Matrix as _Matrix
+    from kumiki.rule import Matrix as _Matrix
     # Decompose the gooseneck into 2 convex polygons
     # Center rectangle and head trapezoid
 

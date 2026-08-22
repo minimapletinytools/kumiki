@@ -246,7 +246,7 @@ def create_canonical_example_corner_joint_timbers(
         corner_angle: Angle in radians for timber2 rotation. Defaults to pi/2 (90 degrees).
         position: Bottom position where timbers meet. Defaults to origin.
     """
-    from sympy import sin, cos, pi
+    from .rule import sin, cos, pi
     
     # Default to 90 degrees (pi/2 radians)
     if corner_angle is None:
@@ -307,7 +307,7 @@ def create_canonical_example_right_angle_corner_joint_timbers(
     Args:
         position: Bottom position where timbers meet. Defaults to origin.
     """
-    from sympy import pi
+    from .rule import pi
     return create_canonical_example_corner_joint_timbers(
         corner_angle=radians(pi / scalar(2)),
         position=position,
@@ -397,7 +397,7 @@ def create_canonical_example_brace_joint_timbers(
     Args:
         position: Bottom position where corner timbers meet. Defaults to origin.
     """
-    from sympy import sqrt
+    from .rule import sqrt
     
     if position is None:
         position = create_v3(scalar(0), scalar(0), scalar(0))

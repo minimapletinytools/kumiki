@@ -11,7 +11,6 @@ from tests.testing_shavings import (
     create_standard_horizontal_timber,
     create_centered_horizontal_timber,
 )
-from sympy import sqrt, simplify
 
 
 class TestFindOpposingFaceOnAnotherTimber:
@@ -72,7 +71,6 @@ class TestFindOpposingFaceOnAnotherTimber:
     
     def test_timbers_at_30_degrees_in_xy_plane(self):
         """Test finding opposing face on two timbers at 30 degrees to each other in the XY plane."""
-        from sympy import cos, sin, pi, sqrt
         
         # Both timbers lying flat in XY plane (height points up in Z)
         timber_size = create_v2(inches(4), inches(6))
@@ -174,7 +172,6 @@ class TestFindOpposingFaceOnAnotherTimber:
         # Actually wait, FRONT points North which IS parallel to Timber A's RIGHT
         
         # Let me use a more complex orientation
-        from sympy import sqrt
         
         # Timber B with non-axis-aligned orientation
         timber_b = create_timber(
@@ -211,7 +208,7 @@ class TestSupportDistance:
         t = create_standard_vertical_timber(size=(scalar(4), scalar(6)))
         result = get_perfect_support_distance_from_centerline(t, create_v2(1, 1))
         expected = scalar(5) / sqrt(2)
-        assert simplify(result - expected) == 0
+        assert safe_zero_test(result - expected)
 
     def test_rough_support_distance_from_centerline_asymmetric(self):
         t = Timber(
@@ -536,7 +533,7 @@ class TestCreatePegGoingIntoFace:
 class TestProjectGlobalPointOntoTimberFace:
     """Test Timber.project_global_point_onto_timber_face_global() method."""
     
-    def test_project_onto_top_face_axis_aligned(self, symbolic_mode):
+    def test_project_onto_top_face_axis_aligned(self):
         """Test projecting a point onto the top face of an axis-aligned timber."""
         # Create a simple vertical timber
         timber = create_timber(
@@ -555,9 +552,9 @@ class TestProjectGlobalPointOntoTimberFace:
         # In local coords, top face is at Z = length/2 = 1
         # In global coords (since timber bottom is at 0,0,0), top face center is at 0,0,1
         expected_global = create_v3(0, 0, 1)
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_onto_bottom_face_axis_aligned(self, symbolic_mode):
+    def test_project_onto_bottom_face_axis_aligned(self):
         """Test projecting a point onto the bottom face."""
         timber = create_timber(
             length=scalar(2),
@@ -575,9 +572,9 @@ class TestProjectGlobalPointOntoTimberFace:
         # In global coords, that's 0,0,-1 relative to bottom_position (0,0,0)
         # So the projected point should maintain X,Y but be at Z = -1
         expected_global = create_v3(scalar("0.05"), scalar("0.1"), -1)
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_onto_right_face_axis_aligned(self, symbolic_mode):
+    def test_project_onto_right_face_axis_aligned(self):
         """Test projecting a point onto the right face."""
         timber = create_timber(
             length=scalar(2),
@@ -594,9 +591,9 @@ class TestProjectGlobalPointOntoTimberFace:
         # Right face is at X = width/2 = 0.1 in local coords
         # In global coords (axis-aligned), that's 0.1, 0, 0
         expected_global = create_v3(scalar("0.1"), 0, 0)
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_onto_left_face_axis_aligned(self, symbolic_mode):
+    def test_project_onto_left_face_axis_aligned(self):
         """Test projecting a point onto the left face."""
         timber = create_timber(
             length=scalar(2),
@@ -612,9 +609,9 @@ class TestProjectGlobalPointOntoTimberFace:
         
         # Left face is at X = -width/2 = -0.1 in local coords
         expected_global = create_v3(scalar("-0.1"), scalar("0.1"), scalar("0.5"))
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_onto_front_face_axis_aligned(self, symbolic_mode):
+    def test_project_onto_front_face_axis_aligned(self):
         """Test projecting a point onto the front face."""
         timber = create_timber(
             length=scalar(2),
@@ -630,9 +627,9 @@ class TestProjectGlobalPointOntoTimberFace:
         
         # Front face is at Y = height/2 = 0.15 in local coords
         expected_global = create_v3(0, scalar("0.15"), 0)
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_onto_back_face_axis_aligned(self, symbolic_mode):
+    def test_project_onto_back_face_axis_aligned(self):
         """Test projecting a point onto the back face."""
         timber = create_timber(
             length=scalar(2),
@@ -648,9 +645,9 @@ class TestProjectGlobalPointOntoTimberFace:
         
         # Back face is at Y = -height/2 = -0.15 in local coords
         expected_global = create_v3(scalar("0.05"), scalar("-0.15"), scalar("0.5"))
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_point_already_on_face(self, symbolic_mode):
+    def test_project_point_already_on_face(self):
         """Test that projecting a point already on the face returns the same point."""
         timber = create_timber(
             length=scalar(2),
@@ -666,9 +663,9 @@ class TestProjectGlobalPointOntoTimberFace:
         
         # Should return the same point in global coords
         expected_global = create_v3(scalar("0.05"), scalar("0.1"), 1)
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_onto_rotated_timber(self, symbolic_mode):
+    def test_project_onto_rotated_timber(self):
         """Test projecting onto a face of a rotated timber."""
         # Create a timber pointing east (along X-axis)
         timber = create_timber(
@@ -687,9 +684,9 @@ class TestProjectGlobalPointOntoTimberFace:
         # For this timber, local Z-axis (length) points in global X direction
         # So top face center in local coords (0, 0, 1) maps to global (1, 0, 0)
         expected_global = create_v3(1, 0, 0)
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_with_offset_bottom_position(self, symbolic_mode):
+    def test_project_with_offset_bottom_position(self):
         """Test projection on a timber with non-zero bottom position."""
         timber = create_timber(
             length=scalar(2),
@@ -705,9 +702,9 @@ class TestProjectGlobalPointOntoTimberFace:
         
         # Top face in local coords is at Z=1, which in global should be at (5, 10, 21)
         expected_global = create_v3(5, 10, 21)
-        assert projected_global == expected_global
+        assert projected_global.equals(expected_global)
     
-    def test_project_accepts_timber_reference_end(self, symbolic_mode):
+    def test_project_accepts_timber_reference_end(self):
         """Test that the method accepts TimberEnd as well as TimberFace."""
         timber = create_timber(
             length=scalar(2),

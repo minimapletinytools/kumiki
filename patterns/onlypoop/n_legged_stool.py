@@ -5,7 +5,6 @@ symmetry splaying out by 10 degrees, and a ring of stretchers.
 All members (seat, legs, stretchers) are round timbers.
 """
 
-from sympy import pi, cos, sin
 from kumiki import *
 from kumiki.ticket import TimberTicket
 

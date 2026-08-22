@@ -661,7 +661,6 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     require_check(None if STW > 0 else "stub_tenon_width must be positive")
 
 
-    from sympy import tan, atan2, sqrt
 
     # see diagram in docs folder
     # ![](assets/kumiki_code_ref_images/joints/workshop/splice_joints/internal_kanawa_tsugi_diagram_1.png)     

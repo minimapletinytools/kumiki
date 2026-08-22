@@ -63,7 +63,7 @@ def assert_opposite_escape_pair(joint, key_a, key_b, expect_zero_freed_after=Fal
 
 
 class TestButtFamilyFreedoms:
-    def test_plain_butt(self, float_mode):
+    def test_plain_butt(self):
         # Canonical: butt timber runs +Y, TOP end into the receiving timber.
         # A plain butt has no mechanical engagement, so freed_after is 0;
         # disassembly code adds its own visual-separation padding on top.
@@ -77,7 +77,7 @@ class TestButtFamilyFreedoms:
         )
         assert_opposite_escape_pair(joint, "butt_timber", "receiving_timber", expect_zero_freed_after=True)
 
-    def test_mortise_and_tenon_with_pegs(self, float_mode):
+    def test_mortise_and_tenon_with_pegs(self):
         arrangement = create_canonical_example_butt_joint_timbers()
         joint = cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
             tenon_timber=arrangement.butt_timber,
@@ -98,7 +98,7 @@ class TestButtFamilyFreedoms:
         assert joint.cuttings["butt_timber"].assembly_ordering == Ordering(0, 0)
         assert joint.cuttings["receiving_timber"].assembly_ordering == Ordering(0, 0)
 
-    def test_mortise_and_tenon_without_pegs_has_no_suborder(self, float_mode):
+    def test_mortise_and_tenon_without_pegs_has_no_suborder(self):
         arrangement = create_canonical_example_butt_joint_timbers()
         joint = cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
             tenon_timber=arrangement.butt_timber,
@@ -109,13 +109,13 @@ class TestButtFamilyFreedoms:
 
         assert joint.cuttings["butt_timber"].assembly_ordering == Ordering(0, 0)
 
-    def test_tongue_and_fork_butt(self, float_mode):
+    def test_tongue_and_fork_butt(self):
         joint = cut_basic_tongue_and_fork_butt_joint_on_plane_aligned_timbers(create_canonical_example_butt_joint_timbers())
 
         assert_authored_translation(joint.cuttings["tongue_timber"].assembly_freedom, (0, 1, 0))
         assert_opposite_escape_pair(joint, "tongue_timber", "fork_timber")
 
-    def test_dropin_dovetail_is_unidirectional(self, float_mode):
+    def test_dropin_dovetail_is_unidirectional(self):
         arrangement = create_canonical_example_butt_joint_timbers()
         joint = cut_basic_dropin_dovetail_butt_joint_on_face_aligned_timbers(
             dovetail_timber=arrangement.butt_timber,
@@ -136,7 +136,7 @@ class TestButtFamilyFreedoms:
         assert len(dovetail_freedom.translations) == 1
         assert_opposite_escape_pair(joint, "butt_timber", "receiving_timber")
 
-    def test_dropin_housed_is_unidirectional(self, float_mode):
+    def test_dropin_housed_is_unidirectional(self):
         arrangement = create_canonical_example_butt_joint_timbers()
         joint = cut_basic_dropin_housed_butt_joint_on_face_aligned_timbers(
             housed_timber=arrangement.butt_timber,
@@ -154,12 +154,12 @@ class TestButtFamilyFreedoms:
 
 
 class TestLapAndSpliceFreedoms:
-    def test_plain_cross_lap(self, float_mode):
+    def test_plain_cross_lap(self):
         joint = cut_basic_plain_cross_lap_joint_on_face_aligned_timbers(create_canonical_example_cross_joint_timbers())
 
         assert_opposite_escape_pair(joint, "timberA", "timberB")
 
-    def test_plain_miter(self, float_mode):
+    def test_plain_miter(self):
         joint = cut_basic_plain_miter_joint(create_canonical_example_right_angle_corner_joint_timbers())
 
         # Each timber pulls back along its own axis (timber1 runs +Y, timber2 +X;
@@ -169,7 +169,7 @@ class TestLapAndSpliceFreedoms:
         assert_authored_translation(joint.cuttings["timberA"].assembly_freedom, expect_zero_freed_after=True)
         assert_authored_translation(joint.cuttings["timberB"].assembly_freedom, expect_zero_freed_after=True)
 
-    def test_plain_butt_splice(self, float_mode):
+    def test_plain_butt_splice(self):
         # A plain butt splice has no mechanical engagement, so freed_after is
         # 0; disassembly code adds its own visual-separation padding on top.
         joint = cut_basic_plain_butt_splice_joint_on_aligned_timbers(
@@ -178,7 +178,7 @@ class TestLapAndSpliceFreedoms:
 
         assert_opposite_escape_pair(joint, "timberA", "timberB", expect_zero_freed_after=True)
 
-    def test_plain_splice_lap(self, float_mode):
+    def test_plain_splice_lap(self):
         joint = cut_basic_plain_splice_lap_joint_on_aligned_timbers(
             create_canonical_example_splice_joint_timbers()
         )
@@ -187,7 +187,7 @@ class TestLapAndSpliceFreedoms:
 
 
 class TestLockedJointFreedoms:
-    def test_mitered_and_keyed_lap(self, float_mode):
+    def test_mitered_and_keyed_lap(self):
         arrangement = create_canonical_example_right_angle_corner_joint_timbers()
         if arrangement.front_face_on_timber1 is None:
             arrangement = replace(arrangement, front_face_on_timber1=TimberLongFace.RIGHT)
@@ -202,7 +202,7 @@ class TestLockedJointFreedoms:
         assert_authored_translation(key_wedge.assembly_freedom)
         assert key_wedge.assembly_ordering == Ordering(0, -1)
 
-    def test_splined_opposing_double_butt(self, float_mode):
+    def test_splined_opposing_double_butt(self):
         arrangement = create_canonical_example_opposing_double_butt_joint_timbers()
         joint = cut_basic_splined_opposing_double_butt_joint_on_face_aligned_timbers(
             arrangement,
@@ -225,8 +225,7 @@ class TestLockedJointFreedoms:
         assert_authored_translation(spline.assembly_freedom)
         assert spline.assembly_ordering == Ordering(0, 0)
 
-    def test_wedged_half_dovetail_mortise_and_tenon(self, float_mode):
-        from sympy import Matrix, cos, sin
+    def test_wedged_half_dovetail_mortise_and_tenon(self):
         arrangement = replace(create_canonical_example_butt_joint_timbers(), top_face_on_butt_timber=TimberLongFace.FRONT)
         joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
             arrangement=arrangement,
@@ -247,7 +246,7 @@ class TestLockedJointFreedoms:
 
 
 class TestApproximatedJointFreedoms:
-    def test_lapped_gooseneck_lifts_along_front_face(self, float_mode):
+    def test_lapped_gooseneck_lifts_along_front_face(self):
         arrangement = create_canonical_example_splice_joint_timbers()
         gooseneck_timber = arrangement.timber1
         receiving_timber = arrangement.timber2

@@ -5,7 +5,6 @@ Posts are on the INSIDE of the footprint. Front is the 15' side.
 
 import sys
 
-from sympy import sqrt
 from typing import Optional
 
 from kumiki import *

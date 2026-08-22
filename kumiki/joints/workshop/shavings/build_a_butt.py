@@ -580,7 +580,7 @@ def dovetail_tenon_geometry(
     #   - if wedge_from_receiving_timber_side is True, the wedge spec origin is on the receiving
     #     timber's far face; the wedge enters from there and points back toward the butt timber.
     #     wedge_small_height is measured at the shoulder (X = 0).
-    from sympy import tan as _sym_tan
+    from kumiki.rule import tan as _sym_tan
 
     wedge_accessory_csg = None
     wedge_slot_in_mortise_csg = None
@@ -784,7 +784,7 @@ def tusk_tenon_geometry(
         TuskTenonGeometryResult with the tenon hole, optional mortise clearance, and the tusk
         accessory, all in global space.
     """
-    from sympy import tan as _sym_tan
+    from kumiki.rule import tan as _sym_tan
 
     tenon_timber = arrangement.butt_timber
 

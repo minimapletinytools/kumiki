@@ -585,8 +585,6 @@ class TestChopButtJointShoulderNotchReliefOnPlaneAlignedTimbers2Sided:
         arrangement = ButtJointTimberArrangement(
             receiving_timber=mortise_timber, butt_timber=tenon_timber, butt_timber_end=TimberEnd.BOTTOM,
         )
-        from sympy import pi as _pi
-
         geom_default = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(arrangement, scalar(2))
         geom_angled = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
             arrangement, scalar(2), notch_angle=degrees(60),

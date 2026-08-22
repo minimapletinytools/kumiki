@@ -5,7 +5,6 @@ This module provides CSG primitives and operations for representing timber cuts
 and geometry operations. All operations use SymPy symbolic math for exact computation.
 """
 
-from sympy import Matrix, Expr, sqrt, oo, Abs
 from typing import List, Optional, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
@@ -422,19 +421,19 @@ class RectangularPrism(CutCSG):
             True if all components are equal, False otherwise
         """
         # Check size components
-        if not self.size[0].equals(other.size[0]) or not self.size[1].equals(other.size[1]):
+        if not safe_equality_test(self.size[0], other.size[0]) or not safe_equality_test(self.size[1], other.size[1]):
             return False
-        
+
         # Check transform position
-        if not (self.transform.position[0].equals(other.transform.position[0]) and
-                self.transform.position[1].equals(other.transform.position[1]) and
-                self.transform.position[2].equals(other.transform.position[2])):
+        if not (safe_equality_test(self.transform.position[0], other.transform.position[0]) and
+                safe_equality_test(self.transform.position[1], other.transform.position[1]) and
+                safe_equality_test(self.transform.position[2], other.transform.position[2])):
             return False
-        
+
         # Check transform orientation matrix
         for i in range(3):
             for j in range(3):
-                if not self.transform.orientation.matrix[i, j].equals(other.transform.orientation.matrix[i, j]):
+                if not safe_equality_test(self.transform.orientation.matrix[i, j], other.transform.orientation.matrix[i, j]):
                     return False
         
         # Check start_distance (handle None case)
@@ -1748,7 +1747,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
 
     def _height_fraction(self, z_coord: Numeric) -> Numeric:
         """Fraction along the loft (0 at start_distance, 1 at end_distance) for a local Z coordinate."""
-        return cast(Numeric, (z_coord - self.start_distance) / (self.end_distance - self.start_distance))
+        return (z_coord - self.start_distance) / (self.end_distance - self.start_distance)
 
     def _cross_section_at(self, t: Numeric) -> Profile:
         """The (index-matched, linearly interpolated) polygon at height-fraction t."""

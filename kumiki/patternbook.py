@@ -5,7 +5,6 @@ This module provides a convenient way to organize multiple patterns (frames or C
 and raise them at different positions for visualization and testing.
 """
 
-from sympy import Rational
 import inspect
 from typing import Any, Dict, List, Tuple, Optional, Callable, Union, Literal, Sequence
 from dataclasses import dataclass, field, replace
@@ -312,7 +311,7 @@ class PatternBook:
     def raise_pattern_group(
         self, 
         group_name: str, 
-        separation_distance: Union[float, int, Rational],
+        separation_distance: Union[float, int],
         start_center: Optional[V3] = None
     ) -> Union[Frame, List[CutCSG]]:
         """
@@ -386,7 +385,7 @@ class PatternBook:
 
     def raise_patternbook_as_frame(
         self,
-        separation_distance: Union[float, int, Rational] = scalar(2),
+        separation_distance: Union[float, int] = scalar(2),
         start_center: Optional[V3] = None,
     ) -> Frame:
         """Raise this PatternBook as a single combined Frame.
@@ -431,13 +430,13 @@ class PatternBook:
 
     def _normalize_spacing_args(
         self,
-        separation_distance: Union[float, int, Rational],
+        separation_distance: Union[float, int],
         start_center: Optional[V3],
-    ) -> Tuple[Rational, V3]:
+    ) -> Tuple[float, V3]:
         if start_center is None:
             start_center = create_v3(scalar(0), scalar(0), scalar(0))
 
-        if not isinstance(separation_distance, Rational):
+        if not isinstance(separation_distance, float):
             separation_distance = scalar(separation_distance)
 
         return separation_distance, start_center
@@ -445,7 +444,7 @@ class PatternBook:
     def _raise_entries_with_spacing(
         self,
         entries: List[Tuple[PatternMetadata, PatternLambda]],
-        separation_distance: Rational,
+        separation_distance: float,
         start_center: V3,
     ) -> List[Union[Frame, CutCSG]]:
 

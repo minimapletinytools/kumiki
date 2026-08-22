@@ -7,12 +7,13 @@ import warnings
 from dataclasses import replace
 from typing import Dict, List, Tuple, Union, Optional
 
-from sympy import Matrix, cos, tan
-
 from kumiki.timber import AssemblyFreedom, Board, TimberFace, Cutting, Joint, JointTicket, require_check
 from kumiki.rule import (
     Numeric,
     V3,
+    Matrix,
+    cos,
+    tan,
     scalar,
     create_v2,
     Comparison,

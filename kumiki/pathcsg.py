@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
 from typing import List, Optional, Tuple
 
-from sympy import cos, sin, sqrt as sym_sqrt, Float
+from .rule import sqrt as sym_sqrt
 
 from .rule import *
 from .cutcsg import (

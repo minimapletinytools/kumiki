@@ -2,7 +2,6 @@
 Butt Joints Patterns
 """
 
-from sympy import Matrix, sqrt, sin, cos, pi
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -72,7 +71,6 @@ def make_tongue_and_fork_butt_joint_angled_inset_example(position: V3, use_round
     Create a tongue-and-fork butt joint at 138 degrees.
     The butt (tongue) timber approaches the receiving (fork) timber at an angle.
     """
-    from sympy import sin, cos, Integer
     angle = degrees(138)
     if position is None:
         position = create_v3(scalar(0), scalar(0), scalar(0))
@@ -113,7 +111,6 @@ def make_tongue_and_fork_butt_joint_angled_example(position: V3, use_round_timbe
     make_tongue_and_fork_butt_joint_angled_inset_example, isolating the angled
     furthest-tip end-cut behavior from the separate shoulder-inset housing behavior.
     """
-    from sympy import sin, cos, Integer
     angle = degrees(138)
     if position is None:
         position = create_v3(scalar(0), scalar(0), scalar(0))
@@ -188,7 +185,6 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
     Butt timber: direction (-2, 1, 1)/sqrt(6) — has significant X, Y, and Z components.
     The TOP end is positioned to meet the receiving post's right (+X) face at mid-height.
     """
-    from sympy import sqrt
 
     sqrt6 = sqrt(6)
     sqrt5 = sqrt(5)

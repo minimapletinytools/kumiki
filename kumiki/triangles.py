@@ -14,7 +14,6 @@ from typing import Iterable, Optional, Sequence, Tuple, Union
 import numpy as np
 import trimesh
 
-from sympy import Expr
 
 from .cutcsg import (
     ConvexPolygonExtrusion,
@@ -535,9 +534,6 @@ def _matrix3_to_numpy(matrix: Matrix) -> np.ndarray:
 
 
 def _numeric_to_float(value: Numeric) -> float:
-    if isinstance(value, Expr):
-        evaluated = value.evalf(TRIANGLES_FLOAT_DIGITS)
-        return round(float(evaluated), TRIANGLES_FLOAT_DIGITS)
     return round(float(value), TRIANGLES_FLOAT_DIGITS)
 
 

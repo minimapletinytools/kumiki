@@ -2,7 +2,6 @@
 Splice Joints Patterns
 """
 
-from sympy import Matrix, sqrt
 from typing import Union, List, Optional
 from dataclasses import replace
 

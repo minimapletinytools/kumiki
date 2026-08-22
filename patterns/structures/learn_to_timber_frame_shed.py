@@ -793,7 +793,6 @@ def build_shed_frame() -> Frame:
     #  - 1" dovetail depth (taper over 7" tenon depth)
     #  - Through-tenons flush with post outside faces, with wedge accessories.
 
-    from sympy import atan
 
     tie_beam_size = create_v2(inches(8), inches(7))  # 8" in Z axis, 7" in Y axis
     tb_tenon_depth = inches(7)      # 7" post depth through to outside face
@@ -1204,7 +1203,6 @@ def build_shed_frame() -> Frame:
     #  Alignment: Outside face of every brace is flush with the outside surface of the structure.
     #  Joints: Barefaced M&T joints with 3.5" orthogonal mortise depth and ¾" round pegs.
 
-    from sympy import pi, sqrt
 
     brace_size = create_v2(inches(5), inches(3))
     plate_brace_length_pos = inches(8) + inches(18)  # 26" from post top (18" from top plate bottom)

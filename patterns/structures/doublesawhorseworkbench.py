@@ -45,7 +45,7 @@ post_tenon_length = inches(5)
 # offset in the tenon pulls the shoulder tight when the peg is driven.
 post_peg_parameters = SimplePegParameters(
     shape=PegShape.SQUARE,
-    peg_positions=[(inches(3, 2), Rational(0))],
+    peg_positions=[(inches(3, 2), scalar(0))],
     size=inches(1),
     depth=None,  # through peg
     tenon_hole_offset=inches(1, 16),
@@ -153,7 +153,7 @@ def build_double_sawhorse_workbench() -> Frame:
     # post rows, ends sticking out past the outer post faces.
     stretcher = create_axis_aligned_timber(
         bottom_position=create_v3(-footprint_x / 2 - stretcher_stickout,
-                                  Rational(0), stretcher_center_z),
+                                  scalar(0), stretcher_center_z),
         length=footprint_x + 2 * stretcher_stickout,
         size=stretcher_size,
         length_direction=TimberFace.RIGHT,  # +X

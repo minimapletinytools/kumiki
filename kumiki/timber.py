@@ -3,7 +3,6 @@ Kumiki - Timber types, enums, constants, and core classes
 Contains all core data structures and type definitions for the timber framing system
 """
 
-from sympy import Matrix, Abs, Rational, Expr, sqrt, simplify, Min, Max
 from .rule import *
 from .footprint import *
 from .cutcsg import *
@@ -1439,7 +1438,6 @@ class RegularPolygonTimber(PerfectTimberWithin):
             List of V2 vertices for the polygon
         """
         assert self.num_sides >= 3, "RegularPolygonTimber must have at least 3 sides"
-        from sympy import pi, cos, sin
         # Use the smaller dimension of size as the diameter of the inscribed circle
         radius = min(self.size[0], self.size[1]) / scalar(2)
         vertices = []
@@ -2306,8 +2304,6 @@ class Wedge(Accessory):
         Returns:
             CutCSG: The CSG representation of the wedge
         """
-        from sympy import pi
-        
         # Create trapezoid polygon in XZ plane
         # Points are (x, z) where x is X coordinate and y (2D) is Z coordinate
         # Ordered counter-clockwise when viewed from +Y
@@ -2696,8 +2692,6 @@ class Frame:
         Raises:
             ValueError: If the frame contains no cut timbers
         """
-        from sympy import Min as SymMin, Max as SymMax
-        
         if not self.cut_timbers:
             raise ValueError("Cannot compute bounding box for empty frame (no cut timbers)")
         
@@ -2747,97 +2741,18 @@ class Frame:
                     min_z = global_corner[2]
                     max_z = global_corner[2]
                 else:
-                    min_x = SymMin(min_x, global_corner[0])
-                    max_x = SymMax(max_x, global_corner[0])
-                    min_y = SymMin(min_y, global_corner[1])
-                    max_y = SymMax(max_y, global_corner[1])
-                    min_z = SymMin(min_z, global_corner[2])
-                    max_z = SymMax(max_z, global_corner[2])
+                    min_x = min(min_x, global_corner[0])
+                    max_x = max(max_x, global_corner[0])
+                    min_y = min(min_y, global_corner[1])
+                    max_y = max(max_y, global_corner[1])
+                    min_z = min(min_z, global_corner[2])
+                    max_z = max(max_z, global_corner[2])
         
         min_corner = Matrix([min_x, min_y, min_z])
         max_corner = Matrix([max_x, max_y, max_z])
         
         return (min_corner, max_corner)
     
-    def __post_init__(self):
-        """Validate that the frame contains no floating point numbers."""
-        self._check_no_python_floats()
-        pass
-    
-    def _check_no_python_floats(self):
-        """
-        Check that all numeric values in the frame use SymPy Rationals, not floats.
-        
-        Raises:
-            AssertionError: If any float values are found in the frame
-        """
-        # Check all cut timbers
-        for cut_timber in self.cut_timbers:
-            timber = cut_timber.timber
-            self._check_timber_no_python_floats(timber)
-            
-            # Check all cuts on this timber
-            for cut in cut_timber.cuts:
-                self._check_cut_no_python_floats(cut)
-        
-        # Check all accessories
-        for accessory in self.accessories:
-            self._check_accessory_no_python_floats(accessory)
-    
-    def _check_timber_no_python_floats(self, timber: PerfectTimberWithin):
-        """Check a single timber for float values."""
-        self._check_numeric_value_no_python_floats(timber.length, f"Timber '{timber.ticket.path}' length")
-        self._check_vector_no_python_floats(timber.size, f"Timber '{timber.ticket.path}' size")
-        self._check_vector_no_python_floats(timber.transform.position, f"Timber '{timber.ticket.path}' transform.position")
-        # Note: orientation.matrix is checked as part of the matrix
-        self._check_matrix_no_python_floats(timber.transform.orientation.matrix, f"Timber '{timber.ticket.path}' transform.orientation")
-    
-    def _check_accessory_no_python_floats(self, accessory: Accessory):
-        """Check an accessory for float values."""
-        if isinstance(accessory, Peg):
-            self._check_vector_no_python_floats(accessory.transform.position, f"Peg transform.position")
-            self._check_numeric_value_no_python_floats(accessory.size, f"Peg size")
-            self._check_numeric_value_no_python_floats(accessory.forward_length, f"Peg forward_length")
-            self._check_numeric_value_no_python_floats(accessory.stickout_length, f"Peg stickout_length")
-            self._check_matrix_no_python_floats(accessory.transform.orientation.matrix, f"Peg transform.orientation")
-        elif isinstance(accessory, Wedge):
-            self._check_vector_no_python_floats(accessory.transform.position, f"Wedge transform.position")
-            self._check_numeric_value_no_python_floats(accessory.base_width, f"Wedge base_width")
-            self._check_numeric_value_no_python_floats(accessory.tip_width, f"Wedge tip_width")
-            self._check_numeric_value_no_python_floats(accessory.height, f"Wedge height")
-            self._check_numeric_value_no_python_floats(accessory.length, f"Wedge length")
-            self._check_numeric_value_no_python_floats(accessory.stickout_length, f"Wedge stickout_length")
-            self._check_matrix_no_python_floats(accessory.transform.orientation.matrix, f"Wedge transform.orientation")
-        elif isinstance(accessory, CSGAccessory):
-            self._check_vector_no_python_floats(accessory.transform.position, f"CSGAccessory transform.position")
-            self._check_matrix_no_python_floats(accessory.transform.orientation.matrix, f"CSGAccessory transform.orientation")
-    
-    def _check_cut_no_python_floats(self, cut: Cutting):
-        """Check a cut for float values."""
-        # Cutting contains arbitrary CSG in negative_csg - would need recursive checking
-        # For now, we'll skip deep CSG validation of the negative_csg field
-        # (This could be extended to recursively check all CSG nodes if needed)
-        pass
-    
-    def _check_numeric_value_no_python_floats(self, value: Numeric, description: str):
-        """Check that a numeric value is not a float."""
-        if isinstance(value, float):
-            raise AssertionError(
-                f"Float detected in Frame: {description} = {value}. "
-                f"All numeric values must use SymPy Rational, not float."
-            )
-    
-    def _check_vector_no_python_floats(self, vec: Matrix, description: str):
-        """Check that all elements in a vector are not floats."""
-        for i in range(vec.rows):
-            self._check_numeric_value_no_python_floats(vec[i], f"{description}[{i}]")
-    
-    def _check_matrix_no_python_floats(self, mat: Matrix, description: str):
-        """Check that all elements in a matrix are not floats."""
-        for i in range(mat.rows):
-            for j in range(mat.cols):
-                self._check_numeric_value_no_python_floats(mat[i, j], f"{description}[{i},{j}]")
-
 
 
 class KumikiArrangementError(ValueError):

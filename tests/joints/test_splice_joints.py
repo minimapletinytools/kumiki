@@ -3,7 +3,6 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, pi, atan2, sin, cos
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -62,7 +61,7 @@ class TestSpliceJoint:
         # - TimberA: cut at TOP, normal points +X (away from timber body)
         # - TimberB: cut at BOTTOM, normal points -X (away from timber body)
         # So they should be opposite
-        assert simplify(global_normalA + global_normalB).norm() == 0, \
+        assert safe_zero_test((global_normalA + global_normalB).norm()), \
             f"Normals should be opposite! A={global_normalA.T}, B={global_normalB.T}"
         
     # 🐪
@@ -163,7 +162,7 @@ class TestSpliceJoint:
 class TestSpliceLapJoint:
     """Test cut_plain_splice_lap_joint_on_aligned_timbers function."""
     
-    def test_splice_lap_joint_geometry(self, symbolic_mode):
+    def test_splice_lap_joint_geometry(self):
         """
         Test splice lap joint creates correct geometry with proper containment.
         
@@ -319,7 +318,7 @@ class TestSpliceLapJoint:
 class TestHalfBlindTenonedDadoedRabbetedScarfJoint:
     """Test cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers."""
 
-    def test_basic_construction_and_stub_tenon_interlock(self, float_mode):
+    def test_basic_construction_and_stub_tenon_interlock(self):
         """The joint builds two end-cut cuttings with an interlocking stub
         tenon (each timber retains its own peg and has a matching pocket for
         the other's), a Kusabi wedge peg accessory, and an assembly freedom

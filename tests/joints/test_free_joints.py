@@ -3,7 +3,6 @@ Tests for Kumiki timber framing system
 """
 
 import pytest
-from sympy import Matrix, sqrt, simplify, Abs, pi
 from kumiki import *
 from tests.testing_shavings import (
     create_standard_vertical_timber,
@@ -21,7 +20,7 @@ class TestFreeHouseJoint:
     """Test cut_free_house_joint function."""
 
     # 🐪
-    def test_free_house_joint_timberlike_points_in_housed_not_in_housing(self, symbolic_mode):
+    def test_free_house_joint_timberlike_points_in_housed_not_in_housing(self):
         """
         A 1×1 housed timber enters halfway into a 3×3 housing timber.
         Points strictly inside the housed timber's body must not be inside
@@ -66,7 +65,7 @@ class TestFreeHouseJoint:
         assert housing_rendered.contains_point(housing_local_away)
 
     # 🐪
-    def test_free_house_joint_cut_timber_relief_matches_actual_body(self, symbolic_mode):
+    def test_free_house_joint_cut_timber_relief_matches_actual_body(self):
         """
         A 2×2 CutTimber with its lower-Z half removed is housed in a 3×3 timber.
         The relief must match the CutTimber's remaining body (upper Z half only),
@@ -125,7 +124,7 @@ class TestFreeHouseJoint:
             "Z=9.5 should still be inside the housing (relief does not reach the removed region)"
 
     # 🐪
-    def test_free_house_joint_extends_cut_timber_for_skewed_end_cut(self, symbolic_mode):
+    def test_free_house_joint_extends_cut_timber_for_skewed_end_cut(self):
         """
         A housed CutTimber's un-extended local Z origin sits exactly at the housing's
         centerline, but a SKEWED end cut (e.g. a miter) means the piece's true, as-cut
@@ -199,7 +198,7 @@ class TestFreeHouseJoint:
         assert housing_rendered.contains_point(housing_local_trimmed), \
             "housing must remain solid where the housed body was trimmed away"
 
-    def test_free_house_joint_multiple_housed_timbers_relief_union(self, symbolic_mode):
+    def test_free_house_joint_multiple_housed_timbers_relief_union(self):
         """
         Two housed timbers should produce one housing relief that removes both occupied regions.
         """

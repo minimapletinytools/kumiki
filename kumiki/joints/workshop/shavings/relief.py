@@ -10,7 +10,6 @@ import warnings
 from dataclasses import dataclass, replace
 from typing import List, Optional, Union
 
-from sympy import Abs, Max, Min, acos, sqrt
 
 from kumiki.construction import ButtJointTimberArrangement, ArrangementNames
 from kumiki.cutcsg import (
@@ -454,7 +453,6 @@ def chop_shoulder_notch_aligned_with_timber(
     normal, since anything less would leave housing walls colliding with the
     raking butting timber above the shoulder plane.
     """
-    from sympy import Max, cos, sqrt
 
     notch_length_dir_global = notch_timber.get_length_direction_global()
 
@@ -633,7 +631,6 @@ def chop_shoulder_notch_on_timber_face(
     """
     Create a rectangular shoulder notch on a timber face with optional angled walls.
     """
-    from sympy import cos
 
     if notch_face == TimberFace.TOP or notch_face == TimberFace.BOTTOM:
         raise ValueError("Cannot cut shoulder notch on end faces (TOP or BOTTOM)")
@@ -913,7 +910,6 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
         tan_half = sin_dihedral / (scalar(1) + cos_dihedral)
         assert not safe_zero_test(tan_half), "butt timber's Q-axis face is parallel to the shoulder plane"
         if notch_angle is not None:
-            from sympy import tan
             tan_half = Max(tan_half, tan(notch_angle))
         return tan_half
 
@@ -1450,7 +1446,6 @@ def chop_relief_for_butt_joint_arrangement(
     Returns ``None`` when no notch is required (shoulder sits at or past the
     receiving timber's rough entry face).
     """
-    from sympy import sqrt
 
     if not does_shoulder_plane_need_notching(
         arrangement,

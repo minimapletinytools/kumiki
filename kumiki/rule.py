@@ -4,7 +4,7 @@ The main class is the Orientation class which stores rotation in 2 components.
 
 Coordinate System (RHS):
 
-(up) Z 
+(up) Z
      ^  ^ Y (north)
      | /
      |/
@@ -16,281 +16,335 @@ Coordinate System (RHS):
 
 RHS = Right Hand System
 - X-axis: points east
-- Y-axis: points north  
+- Y-axis: points north
 - Z-axis: points up
 - Thumb = X, Index = Y, Middle = Z
 
 
-This library supports both numeric and symbolic computations. This library comes with 2 variants of each math function:
-- `numeric_*` variant always evals expressions to numeric Floats and returns Floats
-- `safe_*` variant returns symbolic expressions when possible, but will automatically eval to Float when expressions get too complex (e.g. large node count, or contain transcendental functions).
-
-Avoid `safe_*` variants in general unless it's being used for some top level geometry declaration where having symbolic exactness might be nice, otherwise just stick with numeric. 
-
+All numeric values in this library are plain Python floats. Users declare
+measurements with the helpers below (`scalar`, `inches`, `mm`, `degrees`, ...)
+for convenience and unit-conversion, but the values themselves are ordinary
+floats -- there is no lazy/symbolic expression tree, and no separate
+"numeric mode" to switch between.
 '''
 
-import sympy as sp
-from sympy import Matrix, cos, sin, pi, Float, Rational, Abs, S, sympify, Expr
-from typing import Optional, Union
+import math
+import numpy as np
+from typing import Optional, Union, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
-import warnings
 
 
-def scalar(numerator, denominator=1) -> Rational:
+# ============================================================================
+# Scalar constructors
+# ============================================================================
+
+
+def scalar(numerator, denominator=1) -> float:
     """
-    Create a Rational scalar value.
-    
+    Create a float scalar value.
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value
-    
+        float value
+
     Examples:
-        scalar(3)             # 3
-        scalar(1, 2)          # 1/2
-        scalar(2.5)           # 2.5 (converted to Rational)
+        scalar(3)             # 3.0
+        scalar(1, 2)          # 0.5
+        scalar(2.5)           # 2.5
         scalar("1.5")         # 1.5 from string
         scalar("1/32")        # Parses fraction string
     """
-    return Rational(numerator, denominator)
+    if isinstance(numerator, str):
+        text = numerator.strip()
+        if "/" in text:
+            num_str, den_str = text.split("/", 1)
+            value = float(num_str) / float(den_str)
+        else:
+            value = float(text)
+    else:
+        value = float(numerator)
+    return value / denominator if denominator != 1 else value
+
 
 # ============================================================================
-# Global Numeric Mode
+# sympy-compatibility shims
+#
+# These exist so files that used to do `from sympy import X` can instead do
+# `from kumiki.rule import X` with an otherwise-unchanged import list. Real
+# symbolic/arbitrary-precision behavior is gone -- these are plain float/math
+# equivalents. `Rational` is deliberately NOT provided here: it was used both
+# as a 2-arg exact-fraction constructor (now `scalar`) and as an isinstance
+# target (now `float`), which can't share one name.
 # ============================================================================
 
-NUMERIC_MODE = "float"
+Expr = float
+Float = float
+Integer = int
+S = float
+sympify = float
+oo = math.inf
+
+Abs = abs
+Min = min
+Max = max
+pi = math.pi
 
 
-def set_numeric_mode(mode: str) -> None:
-    """Set global numeric mode. Valid values: 'symbolic' or 'float'."""
-    global NUMERIC_MODE
-    if mode not in ("symbolic", "float"):
-        raise ValueError(f"Invalid numeric mode: {mode}. Expected 'symbolic' or 'float'.")
-    NUMERIC_MODE = mode
+def sin(x):
+    return math.sin(x)
 
 
-def get_numeric_mode() -> str:
-    """Get current global numeric mode."""
-    return NUMERIC_MODE
+def cos(x):
+    return math.cos(x)
 
 
-def is_float_numeric_mode() -> bool:
-    """Return True when float-first numeric mode is enabled."""
-    return NUMERIC_MODE == "float"
+def tan(x):
+    return math.tan(x)
+
+
+def atan(x):
+    return math.atan(x)
+
+
+def atan2(y, x):
+    return math.atan2(y, x)
+
+
+def acos(x):
+    return math.acos(x)
+
+
+def sqrt(x):
+    # Tolerate tiny float noise around zero (e.g. two squares that should be
+    # exactly equal, now computed with float rounding) without masking real
+    # negative-argument bugs further away from zero.
+    if -EPSILON_GENERIC < x < 0:
+        return 0.0
+    return math.sqrt(x)
+
+
+def simplify(expr):
+    """No-op: floats need no symbolic simplification. Kept so old call sites
+    (mostly `simplify(a - b) == 0`-style exactness checks) still parse; see
+    `safe_equality_test`/`safe_zero_test` for the epsilon-based replacement."""
+    return expr
 
 
 # ============================================================================
 # Type Aliases
 # ============================================================================
 
-# Type aliases for vectors using sympy, these are just to provide some semantic 
-# clarity in the interfaces and are not enforced by the type system.
+# Numeric leaf values are plain floats (ints are accepted for convenience and
+# coerce naturally through arithmetic).
+Numeric = Union[float, int]
+
+
+# ============================================================================
+# Matrix -- thin numpy-backed replacement for sympy.Matrix
+#
+# Duck-types exactly the subset of sympy.Matrix's API used across this
+# codebase: nested/flat-list construction, (i, j)/slice indexing, matrix
+# multiplication via `*` (not elementwise, unlike raw numpy), elementwise
+# +/-/negation, `.T`, `.shape`, `.rows`/`.cols`, `.dot`, `.cross`, `.det`,
+# `.copy`, and the `Matrix.eye`/`Matrix.zeros` constructors.
+# ============================================================================
+
+class Matrix:
+    __slots__ = ("_data",)
+
+    def __init__(self, data):
+        if isinstance(data, Matrix):
+            self._data = np.array(data._data, dtype=float, copy=True)
+            return
+        if isinstance(data, np.ndarray):
+            arr = np.array(data, dtype=float)
+            self._data = arr.reshape(-1, 1) if arr.ndim == 1 else arr
+            return
+        data = list(data)
+        if len(data) > 0 and isinstance(data[0], (list, tuple)):
+            self._data = np.array([[float(v) for v in row] for row in data], dtype=float)
+        else:
+            self._data = np.array([float(v) for v in data], dtype=float).reshape(-1, 1)
+
+    @classmethod
+    def _wrap(cls, arr: np.ndarray) -> 'Matrix':
+        out = cls.__new__(cls)
+        out._data = arr
+        return out
+
+    @classmethod
+    def eye(cls, n: int) -> 'Matrix':
+        return cls._wrap(np.eye(n, dtype=float))
+
+    @classmethod
+    def zeros(cls, rows: int, cols: Optional[int] = None) -> 'Matrix':
+        return cls._wrap(np.zeros((rows, cols if cols is not None else rows), dtype=float))
+
+    @property
+    def shape(self) -> Tuple[int, int]:
+        rows, cols = self._data.shape
+        return (rows, cols)
+
+    @property
+    def rows(self) -> int:
+        return self._data.shape[0]
+
+    @property
+    def cols(self) -> int:
+        return self._data.shape[1]
+
+    @property
+    def T(self) -> 'Matrix':
+        return Matrix._wrap(np.ascontiguousarray(self._data.T))
+
+    def copy(self) -> 'Matrix':
+        return Matrix._wrap(self._data.copy())
+
+    def det(self) -> float:
+        return float(np.linalg.det(self._data))
+
+    def dot(self, other: 'Matrix') -> float:
+        other_data = other._data if isinstance(other, Matrix) else np.asarray(other, dtype=float)
+        return float(np.dot(self._data.flatten(), other_data.flatten()))
+
+    def cross(self, other: 'Matrix') -> 'Matrix':
+        other_data = other._data if isinstance(other, Matrix) else np.asarray(other, dtype=float)
+        result = np.cross(self._data.flatten(), other_data.flatten())
+        return Matrix._wrap(result.reshape(-1, 1))
+
+    def equals(self, other: 'Matrix', tolerance: Optional[float] = None) -> bool:
+        """Elementwise approximate equality (tolerates float noise from trig/sqrt)."""
+        if not isinstance(other, Matrix) or self._data.shape != other._data.shape:
+            return False
+        tol = EPSILON_GENERIC if tolerance is None else tolerance
+        return bool(np.all(np.abs(self._data - other._data) < tol))
+
+    def norm(self) -> float:
+        return float(np.linalg.norm(self._data))
+
+    def tolist(self) -> list:
+        return self._data.tolist()
+
+    def __getitem__(self, key):
+        if isinstance(key, tuple):
+            result = self._data[key]
+        else:
+            result = self._data.flat[key]
+        if isinstance(result, np.ndarray):
+            if result.ndim == 1:
+                # A row-slice (int row, slice col) -> keep as a row vector;
+                # anything else (col-slice, or a flat slice) -> column vector,
+                # matching sympy's Matrix slicing shapes.
+                if isinstance(key, tuple) and isinstance(key[0], int):
+                    result = result.reshape(1, -1)
+                else:
+                    result = result.reshape(-1, 1)
+            return Matrix._wrap(result)
+        return float(result)
+
+    def __setitem__(self, key, value) -> None:
+        data = value._data if isinstance(value, Matrix) else np.asarray(value, dtype=float)
+        if isinstance(key, tuple):
+            self._data[key] = data.reshape(np.shape(self._data[key]))
+        else:
+            self._data.flat[key] = data
+
+    def __iter__(self):
+        return iter(self._data.flatten().tolist())
+
+    def __len__(self) -> int:
+        return int(self._data.size)
+
+    def __mul__(self, other):
+        if isinstance(other, Matrix):
+            return Matrix._wrap(self._data @ other._data)
+        return Matrix._wrap(self._data * float(other))
+
+    def __rmul__(self, other):
+        return Matrix._wrap(self._data * float(other))
+
+    def __truediv__(self, other):
+        return Matrix._wrap(self._data / float(other))
+
+    def __add__(self, other):
+        other_data = other._data if isinstance(other, Matrix) else other
+        return Matrix._wrap(self._data + other_data)
+
+    def __radd__(self, other):
+        return self.__add__(other)
+
+    def __sub__(self, other):
+        other_data = other._data if isinstance(other, Matrix) else other
+        return Matrix._wrap(self._data - other_data)
+
+    def __rsub__(self, other):
+        other_data = other._data if isinstance(other, Matrix) else other
+        return Matrix._wrap(other_data - self._data)
+
+    def __neg__(self):
+        return Matrix._wrap(-self._data)
+
+    def __eq__(self, other):
+        if not isinstance(other, Matrix):
+            return NotImplemented
+        return self._data.shape == other._data.shape and bool(np.array_equal(self._data, other._data))
+
+    def __repr__(self) -> str:
+        return f"Matrix({self._data.tolist()!r})"
+
+
+def eye(n: int) -> Matrix:
+    return Matrix.eye(n)
+
+
+def det(matrix: Matrix) -> float:
+    return matrix.det()
+
+
+# Type aliases for vectors, these are just to provide some semantic clarity
+# in the interfaces and are not enforced by the type system.
 V2 = Matrix  # 2D vector - 2x1 Matrix
-V3 = Matrix  # 3D vector - 3x1 Matrix  
+V3 = Matrix  # 3D vector - 3x1 Matrix
 Direction3D = Matrix  # 3D direction vector - 3x1 Matrix
 
 
-# python floats must be explicitly converted to Expr using Rational or Float
-# but python ints are allowed for conevience.... RIP
-Numeric = Union[Expr, int] 
-
-
 # ============================================================================
-# Giraffe Math Utilities - Complexity Detection & Collapse Control
-# ============================================================================
-
-
-# Precision for all numeric evaluation — single constant to tune globally.
-GIRAFFE_EVALF_PRECISION = 10
 # Epsilon constants for numerical comparisons
-EPSILON_GENERIC = scalar('1e-8')      # Generic epsilon threshold for float comparisons, make sure this is larger than GIRAFFE_EVALF_PRECISION to avoid false positives
-EPSILON_FLOAT = 1e-10                # Epsilon for plain Python float comparisons (used in safe_compare)
-COMPLEX_NUM_NODES_THRESHOLD = 50  # Max number of nodes in expression tree before considering it complex
-# In SMART mode, we can apply an explicit node budget guard while running in
-# float mode to prevent intermediate expression-tree blowups in hot paths.
-SMART_NODE_GUARD_ENABLED = True
-SMART_NODE_GUARD_MAX_NODES = COMPLEX_NUM_NODES_THRESHOLD
+# ============================================================================
+
+EPSILON_GENERIC = scalar('1e-8')  # Generic epsilon threshold for float comparisons
+EPSILON_FLOAT = 1e-10             # Epsilon for plain Python float comparisons (used in compare)
 
 
-class CollapseMode(Enum):
-    """Controls when symbolic expressions are collapsed to numeric Floats."""
-    ALWAYS = "always"    # Eagerly collapse to Float via giraffe_evalf
-    NEVER = "never"      # Keep symbolic form (for testing/debugging)
-    SMART = "smart"      # Collapse only when expression complexity exceeds threshold
+# ============================================================================
+# prune() -- kept as a compatibility identity
+#
+# There is no expression tree left to collapse, but `prune()` is called
+# directly in real geometry logic (not just internally), so it stays as a
+# no-op rather than being deleted outright.
+# ============================================================================
 
-
-def set_smart_node_guard_enabled(enabled: bool) -> None:
-    """Enable/disable SMART-mode node-guard short-circuiting."""
-    global SMART_NODE_GUARD_ENABLED
-    SMART_NODE_GUARD_ENABLED = bool(enabled)
-
-
-def is_smart_node_guard_enabled() -> bool:
-    """Return whether SMART-mode node-guard short-circuiting is enabled."""
-    return SMART_NODE_GUARD_ENABLED
-
-
-def set_smart_node_guard_max_nodes(max_nodes: int) -> None:
-    """Set node budget used by SMART-mode node-guard checks."""
-    global SMART_NODE_GUARD_MAX_NODES
-    if max_nodes <= 0:
-        raise ValueError("SMART node guard max_nodes must be > 0")
-    SMART_NODE_GUARD_MAX_NODES = max_nodes
-
-
-def get_smart_node_guard_max_nodes() -> int:
-    """Get current SMART-mode node-guard budget."""
-    return SMART_NODE_GUARD_MAX_NODES
-
-
-def _smart_node_guard_active() -> bool:
-    """Guard is only active in float mode so symbolic-focused tests can opt in/out easily."""
-    return is_float_numeric_mode() and SMART_NODE_GUARD_ENABLED
-
-
-def giraffe_evalf(expr):
-    """
-    Evaluate a SymPy expression to a numeric Float. All numeric evaluation in the
-    library is bottlenecked through this function so we can swap strategy later
-    (e.g. lambdify, caching, timeouts) without touching callers.
-    """
-    if hasattr(expr, 'evalf'):
-        result = expr.evalf(GIRAFFE_EVALF_PRECISION)
-        # Ensure we always return a Float (e.g. scalar(0).evalf() returns Zero)
-        if not isinstance(result, Float):
-            return Float(float(result), GIRAFFE_EVALF_PRECISION)
-        return result
-    return Float(float(expr), GIRAFFE_EVALF_PRECISION)
-
-
-def _should_collapse(expr, collapse_mode: CollapseMode) -> bool:
-    """
-    Decide whether *expr* should be collapsed to a numeric Float.
-
-    - ALWAYS → True
-    - NEVER  → False
-    - SMART  → True when the expression exceeds the complexity threshold
-               (is_complex_expr).
-    """
-    if collapse_mode == CollapseMode.ALWAYS:
-        return True
-    if collapse_mode == CollapseMode.NEVER:
-        return False
-    # SMART mode — collapse only when expression is complex
-    max_nodes = SMART_NODE_GUARD_MAX_NODES if SMART_NODE_GUARD_ENABLED else COMPLEX_NUM_NODES_THRESHOLD
-    return is_complex_expr(expr, max_nodes)
-
-
-def _collapse_scalar(value, collapse_mode: CollapseMode):
-    """Optionally collapse a scalar SymPy expression to Float."""
-    if _should_collapse(value, collapse_mode):
-        return giraffe_evalf(value)
+def prune(value, collapse_mode=None):
     return value
 
 
-def _collapse_matrix(mat: Matrix, collapse_mode: CollapseMode) -> Matrix:
-    """Optionally collapse each element of a vector/matrix to Float, preserving shape."""
-    if collapse_mode == CollapseMode.NEVER:
-        return mat
-    rows, cols = mat.shape
-    if collapse_mode == CollapseMode.ALWAYS:
-        collapsed = [[giraffe_evalf(mat[i, j]) for j in range(cols)] for i in range(rows)]
-        if cols == 1:
-            return Matrix([row[0] for row in collapsed])
-        return Matrix(collapsed)
-    # SMART: only collapse elements that are individually complex
-    collapsed = []
-    for i in range(rows):
-        row = []
-        for j in range(cols):
-            elem = mat[i, j]
-            if _should_collapse(elem, CollapseMode.SMART):
-                if not is_float_numeric_mode():
-                    warnings.warn(
-                        f"Matrix element exceeded complexity threshold and will be collapsed "
-                        f"to Float: {repr(elem)[:120]}",
-                        stacklevel=3,
-                    )
-                row.append(giraffe_evalf(elem))
-            else:
-                row.append(elem)
-        collapsed.append(row)
-    if cols == 1:
-        return Matrix([row[0] for row in collapsed])
-    return Matrix(collapsed)
+safe_prune = prune
+numeric_prune = prune
 
 
-def prune(value, collapse_mode: CollapseMode = CollapseMode.SMART):
-    """
-    Unified entry point for expression-tree pruning.
+# ============================================================================
+# giraffe_evalf -- kept as a compatibility shim
+#
+# Several call sites use this purely to "get a definite float for sorting/
+# comparison"; with float-native scalars this is just float().
+# ============================================================================
 
-    - Scalar values are routed through scalar collapse logic.
-    - Matrix values are routed through element-wise matrix collapse logic.
-    """
-    if isinstance(value, Matrix):
-        return _collapse_matrix(value, collapse_mode)
-    return _collapse_scalar(value, collapse_mode)
-
-
-def safe_prune(value):
-    """Prune using SMART collapse behavior."""
-    return prune(value, CollapseMode.SMART)
-
-
-def numeric_prune(value):
-    """Prune eagerly using ALWAYS collapse behavior."""
-    return prune(value, CollapseMode.ALWAYS)
-
-
-def is_complex_expr(expr, max_nodes: int = COMPLEX_NUM_NODES_THRESHOLD) -> bool:
-    """
-    Detect if a SymPy expression is complex enough to potentially cause slow operations.
-    
-    Uses heuristics with early bailout for performance:
-    - Contains transcendental functions (sin, cos, exp, log) - always complex
-    - Node count > max_nodes in expression tree (uses lazy traversal with early exit)
-    - Contains sqrt with node count > COMPLEX_NUM_NODES_THRESHOLD
-    
-    Args:
-        expr: SymPy expression to check
-        max_nodes: Maximum node count before considering complex (default 50)
-    
-    Returns:
-        True if expression is complex, False otherwise
-    """
-    from sympy import sin, cos, exp, log, sqrt, Number
-    from sympy import preorder_traversal as _pot
-    
-    # Fast check: SymPy Number types (One, Zero, NegativeOne, Integer, Rational, Float, etc.)
-    # are always simple and don't have preorder_traversal()
-    if isinstance(expr, Number):
-        return False
-    
-    if not hasattr(expr, 'has'):
-        return False
-    
-    # Check for transcendental functions first (fast check)
-    has_transcendental = any(expr.has(f) for f in [sin, cos, exp, log])
-    if has_transcendental:
-        return True
-    
-    # Check for sqrt (may use lower threshold)
-    has_sqrt = expr.has(sqrt)
-    threshold = 30 if has_sqrt else max_nodes
-    
-    # Count nodes with early bailout (uses module-level preorder_traversal
-    # because not all expression types expose the method)
-    try:
-        for i, _ in enumerate(_pot(expr)):
-            if i >= threshold:
-                return True  # Hit threshold, expression is complex
-        return False  # Finished traversal, expression is simple
-    except:
-        # If traversal fails, assume complex to be safe
-        return True
+def giraffe_evalf(expr) -> float:
+    return float(expr)
 
 
 # ============================================================================
@@ -310,7 +364,7 @@ class Transform:
     """
     position: V3
     orientation: 'Orientation'
-    
+
     @classmethod
     def identity(cls) -> 'Transform':
         """Create an identity transform at origin with identity orientation."""
@@ -318,30 +372,30 @@ class Transform:
             position=create_v3(scalar(0), scalar(0), scalar(0)),
             orientation=Orientation.identity()
         )
-    
+
     # TODO consider renaming to do_transform
     def local_to_global(self, local_point: V3) -> V3:
         """
         Convert a point from local coordinates to global world coordinates.
-        
+
         Args:
             local_point: A point in local coordinates
-            
+
         Returns:
             The same point in global world coordinates
         """
         # Rotate to global frame, then translate to position
         # global = R * local + position
         return safe_transform_vector(self.orientation.matrix, local_point) + self.position
-    
+
     # TODO consider renaming to undo_transform
     def global_to_local(self, global_point: V3) -> V3:
         """
         Convert a point from global world coordinates to local coordinates.
-        
+
         Args:
             global_point: A point in global world coordinates
-            
+
         Returns:
             The same point in local coordinates
         """
@@ -369,7 +423,7 @@ class Transform:
     def invert(self) -> 'Transform':
         """
         Return the inverse of this transform.
-        
+
         For a transform T that converts local to global (global = T * local),
         the inverse converts global to local (local = T^-1 * global).
         """
@@ -378,18 +432,18 @@ class Transform:
         # Transform the position by the inverted orientation and negate
         inv_position = -safe_transform_vector(inv_orientation.matrix, self.position)
         return Transform(position=inv_position, orientation=inv_orientation)
-    
+
     def __mul__(self, other: 'Transform') -> 'Transform':
         """
         Compose two transforms: result = self * other.
-        
+
         This applies other first, then self.
         Equivalent to: global = self.local_to_global(other.local_to_global(local))
         """
         new_orientation = self.orientation * other.orientation
         new_position = safe_transform_vector(self.orientation.matrix, other.position) + self.position
         return Transform(position=new_position, orientation=new_orientation)
-    
+
     # TODO consider renaming to become_child_transform
     def to_local_transform(self, new_parent: 'Transform') -> 'Transform':
         """
@@ -400,116 +454,80 @@ class Transform:
     def rotate_around_axis(self, axis: Axis, radians: Numeric) -> 'Transform':
         """
         Rotate this transform counterclockwise around an axis and return the new transform.
-        
+
         The axis can be positioned anywhere in space (not just through the origin).
         Uses Rodrigues' rotation formula after translating to make the axis pass through origin.
-        
+
         Args:
             axis: Axis with position and direction to rotate around
             radians: Angle to rotate in radians (counterclockwise when looking along axis direction)
-        
+
         Returns:
             New Transform with rotated position and orientation
         """
-        from sympy import cos, sin, eye
-        
         # Normalize the axis direction
         axis_normalized = safe_normalize_vector(axis.direction)
         kx, ky, kz = axis_normalized[0], axis_normalized[1], axis_normalized[2]
-        
+
         # Rodrigues' rotation formula for rotation matrix around axis k by angle θ:
         # R = I + sin(θ)K + (1 - cos(θ))K²
         # where K is the skew-symmetric cross-product matrix of k
-        
+
         # K = [[0, -kz, ky], [kz, 0, -kx], [-ky, kx, 0]]
         K = Matrix([
             [scalar(0), -kz, ky],
             [kz, scalar(0), -kx],
             [-ky, kx, scalar(0)]
         ])
-        
+
         # K² = K * K
         K_squared = K * K
-        
+
         # R = I + sin(θ)K + (1 - cos(θ))K²
         I = eye(3)
         rotation_matrix = I + sin(radians) * K + (scalar(1) - cos(radians)) * K_squared
-        
+
         # To rotate around an axis not through origin:
         # 1. Translate so axis passes through origin
         # 2. Rotate
         # 3. Translate back
-        
+
         # Translate position relative to axis position
         position_relative = self.position - axis.position
-        
+
         # Apply rotation to the relative position
         rotated_relative = rotation_matrix * position_relative
-        
+
         # Translate back
         new_position = rotated_relative + axis.position
-        
+
         # Apply rotation to orientation (orientation is independent of translation)
         new_orientation_matrix = rotation_matrix * self.orientation.matrix
         new_orientation = Orientation(new_orientation_matrix)
-        
+
         return Transform(position=new_position, orientation=new_orientation)
 
 # ============================================================================
-# Giraffe Math Operations — Base Layer
+# Giraffe Math Operations
 #
-# Each giraffe_* function does the actual computation with a collapse_mode
-# parameter.  The public API is:
-#   safe_*    → giraffe_*(…, CollapseMode.SMART)   — default, backwards-compatible
-#   numeric_* → giraffe_*(…, CollapseMode.ALWAYS)  — for hot paths (e.g. CSG)
+# `safe_*`/`numeric_*`/`giraffe_*` are kept as aliases of the same plain
+# float/numpy implementation -- the three-way split used to control when a
+# sympy expression tree got collapsed to Float, which no longer applies.
 # ============================================================================
 
-def giraffe_norm(vec: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART):
-    """
-    Compute vector norm with optional collapse to Float.
-
-    Uses manual element-wise sum-of-squares to bypass SymPy's matrix internals,
-    then applies *collapse_mode* to the result.
-    """
-    from sympy import sqrt
-
-    # Manual sum of squares — avoids SymPy matrix .norm() which triggers
-    # slow property checking on complex expressions.
-    # In SMART+float mode, collapse partial sums when node budget is exceeded.
-    sum_sq = scalar(0)
-    if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
-        for c in vec:
-            sum_sq = sum_sq + c * c
-            if is_complex_expr(sum_sq, SMART_NODE_GUARD_MAX_NODES):
-                sum_sq = giraffe_evalf(sum_sq)
-    else:
-        sum_sq = sum(c * c for c in vec)
-
-    result = sqrt(sum_sq)
-    return _collapse_scalar(result, collapse_mode)
+def giraffe_norm(vec: Matrix, collapse_mode=None) -> float:
+    """Compute vector norm."""
+    return vec.norm()
 
 
-def giraffe_det(matrix: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART):
-    """Compute matrix determinant with optional collapse."""
-    result = matrix.det()
-    return _collapse_scalar(result, collapse_mode)
+def giraffe_det(matrix: Matrix, collapse_mode=None) -> float:
+    """Compute matrix determinant."""
+    return matrix.det()
 
 
-def giraffe_simplify(expr, collapse_mode: CollapseMode = CollapseMode.SMART):
-    """
-    Simplify a SymPy expression.
-
-    If the expression is complex, skip simplification entirely (SymPy simplify
-    can be extremely slow on large trees).  Otherwise simplify, then optionally
-    collapse.
-    """
-    from sympy import simplify as sp_simplify
-
-    if is_complex_expr(expr):
-        return _collapse_scalar(expr, collapse_mode)
-
-    result = sp_simplify(expr)
-    return _collapse_scalar(result, collapse_mode)
+def giraffe_simplify(expr, collapse_mode=None):
+    """No-op (see module-level `simplify`)."""
+    return expr
 
 
 class Comparison(Enum):
@@ -523,15 +541,22 @@ class Comparison(Enum):
 
 
 def _apply_comparison(val: float, comp: Comparison) -> bool:
-    """Apply comparison operation to a float value against zero."""
+    """Apply comparison operation to a float value against zero.
+
+    GT/LT/GE/LE are epsilon-widened around zero, not just EQ/NE: exact
+    rational arithmetic used to make e.g. a polygon-edge containment check
+    land on exactly 0 at a vertex; float arithmetic can now land a hair to
+    either side of 0 for the same geometrically-exact case, so a strict
+    `val > 0`/`val < 0` here would flip the answer on noise alone.
+    """
     if comp == Comparison.GT:
-        return val > 0
+        return val > EPSILON_FLOAT
     elif comp == Comparison.LT:
-        return val < 0
+        return val < -EPSILON_FLOAT
     elif comp == Comparison.GE:
-        return val >= 0
+        return val >= -EPSILON_FLOAT
     elif comp == Comparison.LE:
-        return val <= 0
+        return val <= EPSILON_FLOAT
     elif comp == Comparison.EQ:
         return abs(val) < EPSILON_FLOAT
     elif comp == Comparison.NE:
@@ -540,217 +565,71 @@ def _apply_comparison(val: float, comp: Comparison) -> bool:
         raise ValueError(f"Unknown comparison: {comp}")
 
 
-def giraffe_compare(a, b, comparison: Comparison, collapse_mode: CollapseMode = CollapseMode.SMART) -> bool:
+def giraffe_compare(a, b, comparison: Comparison, collapse_mode=None) -> bool:
     """
-    Compare two SymPy expressions: evaluates ``a - b`` and applies *comparison*
-    against zero.
+    Compare two values: evaluates ``a - b`` and applies *comparison* against zero.
 
     Examples:
         giraffe_compare(x, y, Comparison.GT)   # x > y ?
         giraffe_compare(x, 0, Comparison.EQ)   # x == 0 ?
     """
-    diff = a - b
-    # Fast path: always collapse or expression is complex or is/has a Float → evaluate numerically
-    if collapse_mode == CollapseMode.ALWAYS or _should_collapse(diff, collapse_mode) or isinstance(diff, (float, Float)) or (hasattr(diff, "has") and diff.has(Float)):
-        try:
-            val = float(giraffe_evalf(diff))
-            return _apply_comparison(val, comparison)
-        except Exception:
-            return False
-
-    # Symbolic path (NEVER mode, or SMART mode with simple expr in symbolic numeric mode)
     try:
-        if comparison == Comparison.GT:
-            return bool(diff > 0)
-        elif comparison == Comparison.LT:
-            return bool(diff < 0)
-        elif comparison == Comparison.GE:
-            return bool(diff >= 0)
-        elif comparison == Comparison.LE:
-            return bool(diff <= 0)
-        elif comparison == Comparison.EQ:
-            return bool(diff == 0)
-        elif comparison == Comparison.NE:
-            return bool(diff != 0)
-        else:
-            raise ValueError(f"Unknown comparison: {comparison}")
+        val = float(a) - float(b)
     except Exception:
-        # Fallback to numerical evaluation
-        try:
-            val = float(giraffe_evalf(diff))
-            return _apply_comparison(val, comparison)
-        except Exception:
-            return False
+        return False
+    return _apply_comparison(val, comparison)
 
 
-def giraffe_dot_product(vec1: Matrix, vec2: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART):
-    """
-    Compute dot product manually (bypasses SymPy's matrix multiplication).
-    Optionally collapse result to Float.
-    """
-    vec1_values = [vec1[i, j] for i in range(vec1.rows) for j in range(vec1.cols)]
-    vec2_values = [vec2[i, j] for i in range(vec2.rows) for j in range(vec2.cols)]
-    assert len(vec1_values) == len(vec2_values), "Vectors must have the same number of elements"
-
-    if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
-        result = scalar(0)
-        for v1, v2 in zip(vec1_values, vec2_values):
-            result = result + v1 * v2
-            if is_complex_expr(result, SMART_NODE_GUARD_MAX_NODES):
-                result = giraffe_evalf(result)
-    else:
-        result = sum(v1 * v2 for v1, v2 in zip(vec1_values, vec2_values))
-
-    return _collapse_scalar(result, collapse_mode)
+def giraffe_dot_product(vec1: Matrix, vec2: Matrix, collapse_mode=None) -> float:
+    """Compute dot product."""
+    return vec1.dot(vec2)
 
 
-def giraffe_transform_vector(matrix: Matrix, vector: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART) -> Matrix:
-    """
-    Compute matrix * vector (or matrix * matrix) transformation manually
-    to avoid SymPy's property checking.  Optionally collapse elements to Float.
-    """
-    mat_data = [[matrix[i, j] for j in range(matrix.cols)] for i in range(matrix.rows)]
-    vec_data = [[vector[i, j] for j in range(vector.cols)] for i in range(vector.rows)]
-
-    result = []
-    for i in range(len(mat_data)):
-        row = []
-        for k in range(len(vec_data[0])):
-            if collapse_mode == CollapseMode.SMART and _smart_node_guard_active():
-                elem = scalar(0)
-                for j in range(len(vec_data)):
-                    elem = elem + mat_data[i][j] * vec_data[j][k]
-                    if is_complex_expr(elem, SMART_NODE_GUARD_MAX_NODES):
-                        elem = giraffe_evalf(elem)
-            else:
-                elem = sum(mat_data[i][j] * vec_data[j][k] for j in range(len(vec_data)))
-
-            if collapse_mode == CollapseMode.ALWAYS:
-                elem = giraffe_evalf(elem)
-            elif collapse_mode == CollapseMode.SMART and is_complex_expr(elem, SMART_NODE_GUARD_MAX_NODES):
-                if not is_float_numeric_mode():
-                    warnings.warn(
-                        f"Matrix element exceeded complexity threshold and will be collapsed "
-                        f"to Float: {repr(elem)[:120]}",
-                        stacklevel=3,
-                    )
-                elem = giraffe_evalf(elem)
-            row.append(elem)
-        result.append(row)
-
-    if len(result[0]) == 1:
-        return Matrix([row[0] for row in result])
-    return Matrix(result)
+def giraffe_transform_vector(matrix: Matrix, vector: Matrix, collapse_mode=None) -> Matrix:
+    """Compute matrix * vector (or matrix * matrix) transformation."""
+    return matrix * vector
 
 
-def giraffe_normalize_vector(vec: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART) -> Matrix:
-    """
-    Normalize a vector.  Uses giraffe_norm for the magnitude, then divides
-    element-wise.  Result elements are optionally collapsed to Float.
-    """
-    norm = giraffe_norm(vec, collapse_mode)
-
-    if safe_zero_test(norm):
+def giraffe_normalize_vector(vec: Matrix, collapse_mode=None) -> Matrix:
+    """Normalize a vector."""
+    norm = giraffe_norm(vec)
+    if norm < EPSILON_FLOAT:
         return vec
-
-    # For Float / numeric norms, divide directly (result elements are Float)
-    if isinstance(norm, Float):
-        norm_val = float(norm)
-        if abs(norm_val) < 1e-15:
-            return vec
-        normalized = [giraffe_evalf(component) / norm for component in vec]
-        return Matrix(normalized)
-
-    # For exact symbolic norms (sqrt, Rational, Integer) — divide exactly
     return vec / norm
 
 
-def giraffe_magnitude(vec: Matrix, collapse_mode: CollapseMode = CollapseMode.SMART):
-    """Compute vector magnitude.  Alias for giraffe_norm."""
-    return giraffe_norm(vec, collapse_mode)
+def giraffe_magnitude(vec: Matrix, collapse_mode=None) -> float:
+    """Compute vector magnitude. Alias for giraffe_norm."""
+    return giraffe_norm(vec)
 
 
 # ============================================================================
-# safe_* wrappers — backwards-compatible, use CollapseMode.SMART
+# safe_* / numeric_* aliases -- kept for the ~800 existing call sites
 # ============================================================================
 
-def safe_norm(vec: Matrix):
-    """Compute vector norm with smart collapse."""
-    return giraffe_norm(vec, CollapseMode.SMART)
+safe_norm = giraffe_norm
+numeric_norm = giraffe_norm
 
+safe_det = giraffe_det
+numeric_det = giraffe_det
 
-def safe_det(matrix: Matrix):
-    """Compute matrix determinant with smart collapse."""
-    return giraffe_det(matrix, CollapseMode.SMART)
+safe_simplify = giraffe_simplify
 
+safe_compare = giraffe_compare
+numeric_compare = giraffe_compare
 
-def safe_simplify(expr):
-    """Simplify with smart collapse."""
-    return giraffe_simplify(expr, CollapseMode.SMART)
+safe_dot_product = giraffe_dot_product
+numeric_dot_product = giraffe_dot_product
 
+safe_transform_vector = giraffe_transform_vector
+numeric_transform_vector = giraffe_transform_vector
 
-def safe_compare(a, b, comparison: Comparison) -> bool:
-    """Compare two expressions with smart collapse: ``a <op> b``."""
-    return giraffe_compare(a, b, comparison, CollapseMode.SMART)
+safe_normalize_vector = giraffe_normalize_vector
+numeric_normalize_vector = giraffe_normalize_vector
 
+safe_magnitude = giraffe_magnitude
+numeric_magnitude = giraffe_magnitude
 
-def safe_dot_product(vec1: Matrix, vec2: Matrix):
-    """Compute dot product with smart collapse."""
-    return giraffe_dot_product(vec1, vec2, CollapseMode.SMART)
-
-
-def safe_transform_vector(matrix: Matrix, vector: Matrix) -> Matrix:
-    """Compute matrix * vector transformation with smart collapse."""
-    return giraffe_transform_vector(matrix, vector, CollapseMode.SMART)
-
-
-def safe_normalize_vector(vec: Matrix) -> Matrix:
-    """Normalize a vector with smart collapse."""
-    return giraffe_normalize_vector(vec, CollapseMode.SMART)
-
-
-def safe_magnitude(vec: Matrix):
-    """Compute vector magnitude with smart collapse."""
-    return giraffe_magnitude(vec, CollapseMode.SMART)
-
-
-# ============================================================================
-# numeric_* wrappers — always collapse to Float, for hot paths
-# ============================================================================
-
-def numeric_norm(vec: Matrix):
-    """Compute vector norm, always collapsed to Float."""
-    return giraffe_norm(vec, CollapseMode.ALWAYS)
-
-
-def numeric_det(matrix: Matrix):
-    """Compute determinant, always collapsed to Float."""
-    return giraffe_det(matrix, CollapseMode.ALWAYS)
-
-
-def numeric_compare(a, b, comparison: Comparison) -> bool:
-    """Compare two expressions, always using numeric evaluation: ``a <op> b``."""
-    return giraffe_compare(a, b, comparison, CollapseMode.ALWAYS)
-
-
-def numeric_dot_product(vec1: Matrix, vec2: Matrix):
-    """Compute dot product, always collapsed to Float."""
-    return giraffe_dot_product(vec1, vec2, CollapseMode.ALWAYS)
-
-
-def numeric_transform_vector(matrix: Matrix, vector: Matrix) -> Matrix:
-    """Compute matrix * vector transformation, always collapsed to Float."""
-    return giraffe_transform_vector(matrix, vector, CollapseMode.ALWAYS)
-
-
-def numeric_normalize_vector(vec: Matrix) -> Matrix:
-    """Normalize a vector, always collapsed to Float."""
-    return giraffe_normalize_vector(vec, CollapseMode.ALWAYS)
-
-
-def numeric_magnitude(vec: Matrix):
-    """Compute vector magnitude, always collapsed to Float."""
-    return giraffe_magnitude(vec, CollapseMode.ALWAYS)
 
 # ============================================================================
 # Helper Functions for Vector Operations
@@ -780,13 +659,13 @@ def radians(angle: Numeric) -> Numeric:
     """
     Identity function for angles already in radians.
     Use this to make it explicit that an angle is in radians.
-    
+
     Args:
         angle: Angle value in radians
-    
+
     Returns:
         The same angle value (unchanged)
-    
+
     Examples:
         radians(pi / 2)      # 90 degrees in radians
         radians(pi / 4)       # 45 degrees in radians
@@ -796,13 +675,13 @@ def radians(angle: Numeric) -> Numeric:
 def degrees(angle: Numeric) -> Numeric:
     """
     Convert an angle from degrees to radians.
-    
+
     Args:
         angle: Angle value in degrees
-    
+
     Returns:
         Angle value in radians
-    
+
     Examples:
         degrees(90)           # 90 degrees = pi/2 radians
         degrees(45)           # 45 degrees = pi/4 radians
@@ -815,13 +694,13 @@ def degrees(angle: Numeric) -> Numeric:
 # Unit Conversion Constants
 # ============================================================================
 
-# Conversion factors to meters (exact Rationals)
+# Conversion factors to meters
 INCH_TO_METER = scalar(254, 10000)      # 0.0254 m (exact by definition)
 FOOT_TO_METER = scalar(3048, 10000)     # 0.3048 m (exact by definition)
 SHAKU_TO_METER = scalar(10, 33)         # ~0.303030... m (1 shaku = 10/33 m, traditional)
 
 # Note: The traditional Japanese shaku is defined as 10/33 meters
-# This gives approximately 303.03mm, and ensures exact rational arithmetic
+# This gives approximately 303.03mm
 
 
 # ============================================================================
@@ -830,19 +709,19 @@ SHAKU_TO_METER = scalar(10, 33)         # ~0.303030... m (1 shaku = 10/33 m, tra
 
 def inches(numerator, denominator=1):
     """
-    Create a Rational measurement in meters from inches.
-    
+    Create a measurement in meters from inches.
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         inches(1, 32)        # 1/32 inch
         inches(4)            # 4 inches
-        inches(3.5)          # 3.5 inches (converted to Rational)
+        inches(3.5)          # 3.5 inches
         inches("1.5")        # 1.5 inches from string
         inches("1/32")       # Parses fraction string
     """
@@ -851,116 +730,116 @@ def inches(numerator, denominator=1):
 
 def feet(numerator, denominator=1):
     """
-    Create a Rational measurement in meters from feet.
-    
+    Create a measurement in meters from feet.
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         feet(8)              # 8 feet
         feet(1, 2)           # 1/2 foot
-        feet(6.5)            # 6.5 feet (converted to Rational)
+        feet(6.5)            # 6.5 feet
     """
     return scalar(numerator, denominator) * FOOT_TO_METER
 
 
 def mm(numerator, denominator=1):
     """
-    Create a Rational measurement in meters from millimeters.
-    
+    Create a measurement in meters from millimeters.
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         mm(90)               # 90 millimeters
         mm(1, 2)             # 1/2 millimeter
-        mm(25.4)             # 25.4 millimeters (converted to Rational)
+        mm(25.4)             # 25.4 millimeters
     """
     return scalar(numerator, denominator) / 1000
 
 
 def cm(numerator, denominator=1):
     """
-    Create a Rational measurement in meters from centimeters.
-    
+    Create a measurement in meters from centimeters.
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         cm(9)                # 9 centimeters
         cm(1, 2)             # 1/2 centimeter
-        cm(2.54)             # 2.54 centimeters (converted to Rational)
+        cm(2.54)             # 2.54 centimeters
     """
     return scalar(numerator, denominator) / 100
 
 
 def m(numerator, denominator=1):
     """
-    Create a Rational measurement in meters.
-    
+    Create a measurement in meters.
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         m(1)                 # 1 meter
         m(1, 2)              # 1/2 meter
-        m(2.5)               # 2.5 meters (converted to Rational)
+        m(2.5)               # 2.5 meters
     """
     return scalar(numerator, denominator)
 
 
 def shaku(numerator, denominator=1):
     """
-    Create a Rational measurement in meters from shaku (尺).
+    Create a measurement in meters from shaku (尺).
     Traditional Japanese carpentry unit.
-    
+
     1 shaku ≈ 303.03 mm (exactly 10/33 meters)
-    
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         shaku(1)             # 1 shaku
         shaku(3, 2)          # 3/2 shaku (1.5 shaku)
-        shaku(2.5)           # 2.5 shaku (converted to Rational)
+        shaku(2.5)           # 2.5 shaku
     """
     return scalar(numerator, denominator) * SHAKU_TO_METER
 
 
 def sun(numerator, denominator=1):
     """
-    Create a Rational measurement in meters from sun (寸).
+    Create a measurement in meters from sun (寸).
     Traditional Japanese carpentry unit.
-    
+
     1 sun = 1/10 shaku ≈ 30.303 mm
-    
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         sun(1)               # 1 sun
         sun(5)               # 5 sun
@@ -971,18 +850,18 @@ def sun(numerator, denominator=1):
 
 def bu(numerator, denominator=1):
     """
-    Create a Rational measurement in meters from bu (分).
+    Create a measurement in meters from bu (分).
     Traditional Japanese carpentry unit.
-    
+
     1 bu = 1/10 sun = 1/100 shaku ≈ 3.0303 mm
-    
+
     Args:
-        numerator: The numerator (can be int, float, str, or Rational)
+        numerator: The numerator (can be int, float, or str)
         denominator: The denominator (default=1)
-    
+
     Returns:
-        Rational value in meters
-    
+        float value in meters
+
     Examples:
         bu(1)                # 1 bu
         bu(5)                # 5 bu
@@ -1012,41 +891,41 @@ def safe_equality_test(value, expected) -> bool:
 def are_vectors_parallel(vector1: Matrix, vector2: Matrix) -> bool:
     """
     Check if two vectors are parallel.
-    
+
     For normalized vectors: dot product ≈ ±1 means parallel
-    
+
     Args:
         vector1: First direction vector
         vector2: Second direction vector
-    
+
     Returns:
         True if |abs(dot_product) - 1| is approximately zero (vectors are parallel)
     """
     # Compute dot product
     dot_product = vector1.dot(vector2)
-    
+
     # Check if |abs(dot_product) - 1| is approximately zero
     # This is equivalent to checking if abs(dot_product) is approximately 1
     deviation = Abs(Abs(dot_product) - 1)
-    
+
     return safe_zero_test(deviation)
 
 def are_vectors_perpendicular(vector1: Matrix, vector2: Matrix) -> bool:
     """
     Check if two vectors are perpendicular.
-    
+
     For any vectors: dot product ≈ 0 means perpendicular
-    
+
     Args:
         vector1: First direction vector
         vector2: Second direction vector
-    
+
     Returns:
         True if dot_product is approximately zero (vectors are perpendicular)
     """
     # Compute dot product
     dot_product = vector1.dot(vector2)
-    
+
     # Check if dot product is approximately zero
     return safe_zero_test(dot_product)
 
@@ -1059,20 +938,19 @@ def are_vectors_perpendicular(vector1: Matrix, vector2: Matrix) -> bool:
 class Orientation:
     """
     Represents a 3D rotation using a 3x3 rotation matrix.
-    Uses sympy for symbolic mathematics.
     I guess we never slerp and don't care about memory usage so apparently we're using matrices to implement this class.
     """
     matrix: Matrix = field(default_factory=lambda: Matrix.eye(3))
-    
+
     def __post_init__(self):
         """Convert to Matrix and validate that the matrix is 3x3."""
         # Convert to Matrix if necessary (handles list/tuple inputs)
         if not isinstance(self.matrix, Matrix):
             object.__setattr__(self, 'matrix', Matrix(self.matrix))
-        
+
         if self.matrix.shape != (3, 3):
             raise ValueError("Rotation matrix must be 3x3")
-    
+
     def multiply(self, other: 'Orientation') -> 'Orientation':
         """
         Multiply this orientation with another orientation.
@@ -1081,7 +959,7 @@ class Orientation:
         if not isinstance(other, Orientation):
             raise TypeError("Can only multiply with another Orientation")
         return Orientation(safe_transform_vector(self.matrix, other.matrix))
-    
+
     def invert(self) -> 'Orientation':
         """
         Return the inverse of this orientation.
@@ -1101,11 +979,11 @@ class Orientation:
         if flip_z:
             new_matrix[:, 2] = -new_matrix[:, 2]
         return Orientation(new_matrix)
-    
+
     def __mul__(self, other: 'Orientation') -> 'Orientation':
         """Allow using * operator for multiplication"""
         return self.multiply(other)
-    
+
     def __repr__(self) -> str:
         return f"Orientation(\n{self.matrix}\n)"
 
@@ -1118,7 +996,7 @@ class Orientation:
             [0, 0, 1]
         ])
         return cls(matrix)
-    
+
     @classmethod
     def rotate_left(cls) -> 'Orientation':
         """Rotate left: +X axis rotates to +Y axis (counterclockwise around Z)"""
@@ -1132,7 +1010,6 @@ class Orientation:
     @classmethod
     def from_angle_axis(cls, radians: Numeric, axis: Direction3D) -> 'Orientation':
         """Create an orientation from an angle-axis rotation (Rodrigues' formula)."""
-        from sympy import cos, sin, eye
         k = safe_normalize_vector(axis)
         kx, ky, kz = k[0], k[1], k[2]
         K = Matrix([
@@ -1142,8 +1019,8 @@ class Orientation:
         ])
         R = eye(3) + sin(radians) * K + (scalar(1) - cos(radians)) * K * K
         return cls(R)
-        
-    
+
+
     # Static constants for cardinal directions
     @staticmethod
     def identity() -> 'Orientation':
@@ -1220,7 +1097,7 @@ class Orientation:
         return Orientation(rotation_matrix)
 
     @staticmethod
-    def from_euleryZYX(yaw: Union[float, int, sp.Basic], pitch: Union[float, int, sp.Basic], roll: Union[float, int, sp.Basic]) -> 'Orientation':
+    def from_euleryZYX(yaw: Numeric, pitch: Numeric, roll: Numeric) -> 'Orientation':
         """
         Create an Orientation from Euler angles using ZYX rotation sequence.
 

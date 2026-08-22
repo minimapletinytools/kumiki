@@ -3,8 +3,7 @@ Tests for build-a-butt-joint shoulder helpers
 """
 
 import pytest
-from sympy import cos, sin, pi
-from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, safe_zero_test, safe_dot_product, safe_normalize_vector as safe_normalize_vector, safe_compare, Comparison, scalar
+from kumiki.rule import create_v2, inches, radians, are_vectors_parallel, safe_zero_test, safe_dot_product, safe_normalize_vector as safe_normalize_vector, safe_compare, Comparison, scalar, cos, sin, pi
 from kumiki.timber import (
     TimberEnd,
     create_timber, create_v3
@@ -56,7 +55,7 @@ class TestMeasureMortiseShoulderPlane:
         assert plane_offset.point.equals(expected_offset_point), \
             f"At distance 1, plane point should be offset 1 in -Y (normal dir), got {plane_offset.point} vs {expected_offset_point}"
 
-    def test_angled_non_intersecting_centerlines(self, symbolic_mode):
+    def test_angled_non_intersecting_centerlines(self):
         """40-degree butt joint where centerlines do NOT intersect.
 
         Mortise timber along +X at origin, tenon timber at 40 degrees in the

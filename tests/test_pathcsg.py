@@ -4,9 +4,8 @@ primitive, including decompose_path_into_convex_pieces.
 """
 
 import pytest
-from sympy import pi
 
-from kumiki.rule import create_v2, create_v3, Transform, scalar, Rational
+from kumiki.rule import create_v2, create_v3, Transform, scalar, pi
 from kumiki.cutcsg import ExtrusionCap
 from kumiki.pathcsg import ArcSegment, LineSegment, FancyPath, Path, PathExtrusion
 from kumiki.triangles import mesh_cutcsg
@@ -23,8 +22,8 @@ class TestPathCSG:
     # decomposition band (the old algorithm assumed at most one).
     # ------------------------------------------------------------------
     def test_circle_extrusion_contains_and_meshes_correctly(self):
-        radius = Rational(1, 20)
-        height = Rational(1, 10)
+        radius = scalar(1, 20)
+        height = scalar(1, 10)
         center = create_v2(scalar(0), scalar(0))
         path = FancyPath(segments=[
             ArcSegment(center=center, radius=radius, start_angle=scalar(0), sweep_angle=pi),
@@ -65,14 +64,14 @@ class TestPathCSG:
     # two cap pieces meeting at a pole disagreeing on the seam).
     # ------------------------------------------------------------------
     def test_concave_notch_excludes_void_and_meshes_watertight(self):
-        r = Rational(1, 50)
-        notch_center = create_v2(Rational(1, 20), Rational(1, 10))
+        r = scalar(1, 50)
+        notch_center = create_v2(scalar(1, 20), scalar(1, 10))
         p_bl = create_v2(scalar(0), scalar(0))
-        p_br = create_v2(Rational(1, 10), scalar(0))
-        p_tr = create_v2(Rational(1, 10), Rational(1, 10))
-        notch_start = create_v2(Rational(1, 20) + r, Rational(1, 10))
-        notch_end = create_v2(Rational(1, 20) - r, Rational(1, 10))
-        p_tl = create_v2(scalar(0), Rational(1, 10))
+        p_br = create_v2(scalar(1, 10), scalar(0))
+        p_tr = create_v2(scalar(1, 10), scalar(1, 10))
+        notch_start = create_v2(scalar(1, 20) + r, scalar(1, 10))
+        notch_end = create_v2(scalar(1, 20) - r, scalar(1, 10))
+        p_tl = create_v2(scalar(0), scalar(1, 10))
         notch_arc = ArcSegment(center=notch_center, radius=r, start_angle=scalar(0), sweep_angle=-pi)
 
         path = FancyPath([
@@ -90,11 +89,11 @@ class TestPathCSG:
         assert float(path.signed_area()) == pytest.approx(expected_area)
 
         # Directly under the notch (in the bitten-out void) is NOT material...
-        assert not path.contains_point_2d(create_v2(Rational(1, 20), Rational(1, 10) - r / 2))
+        assert not path.contains_point_2d(create_v2(scalar(1, 20), scalar(1, 10) - r / 2))
         # ...but the rest of the square body still is.
-        assert path.contains_point_2d(create_v2(Rational(1, 20), Rational(1, 50)))
+        assert path.contains_point_2d(create_v2(scalar(1, 20), scalar(1, 50)))
 
-        height = Rational(1, 50)
+        height = scalar(1, 50)
         extrusion = PathExtrusion(path=path, transform=Transform.identity(),
                                    start_distance=scalar(0), end_distance=height)
         mesh = mesh_cutcsg(extrusion).mesh
@@ -110,18 +109,18 @@ class TestPathCSG:
     # ------------------------------------------------------------------
     def _leg_profile_path(self) -> FancyPath:
         p0 = create_v2(scalar(0), scalar(0))
-        p1 = create_v2(Rational(3, 100), scalar(0))
+        p1 = create_v2(scalar(3, 100), scalar(0))
         line_foot = LineSegment(p0, p1)
 
-        knee = ArcSegment(center=create_v2(Rational(3, 100), Rational(5, 100)),
-                           radius=Rational(5, 100), start_angle=-pi / 2, sweep_angle=pi / 2)
-        ankle = ArcSegment(center=create_v2(Rational(8, 100), Rational(9, 100)),
-                            radius=Rational(4, 100), start_angle=-pi / 2, sweep_angle=-pi / 2)
-        foot_bulge = ArcSegment(center=create_v2(Rational(4, 100), Rational(11, 100)),
-                                 radius=Rational(2, 100), start_angle=-pi / 2, sweep_angle=pi / 2)
+        knee = ArcSegment(center=create_v2(scalar(3, 100), scalar(5, 100)),
+                           radius=scalar(5, 100), start_angle=-pi / 2, sweep_angle=pi / 2)
+        ankle = ArcSegment(center=create_v2(scalar(8, 100), scalar(9, 100)),
+                            radius=scalar(4, 100), start_angle=-pi / 2, sweep_angle=-pi / 2)
+        foot_bulge = ArcSegment(center=create_v2(scalar(4, 100), scalar(11, 100)),
+                                 radius=scalar(2, 100), start_angle=-pi / 2, sweep_angle=pi / 2)
 
-        p5 = create_v2(Rational(2, 100), Rational(15, 100))
-        p6 = create_v2(scalar(0), Rational(15, 100))
+        p5 = create_v2(scalar(2, 100), scalar(15, 100))
+        p6 = create_v2(scalar(0), scalar(15, 100))
         line_shin = LineSegment(foot_bulge.end, p5)
         line_top = LineSegment(p5, p6)
         line_back = LineSegment(p6, p0)
@@ -142,19 +141,19 @@ class TestPathCSG:
         # The point at the middle of the straight chord the concave "ankle"
         # arc replaces sits outside the material -- proof the shape is
         # actually concave there, not just a rounded-corner convex blob.
-        chord_mid = create_v2(Rational(6, 100), Rational(7, 100))
+        chord_mid = create_v2(scalar(6, 100), scalar(7, 100))
         assert not path.contains_point_2d(chord_mid)
 
         # Deep inside the "knee" bulge, and against the flat back, are both material.
-        assert path.contains_point_2d(create_v2(Rational(3, 100), Rational(3, 100)))
-        assert path.contains_point_2d(create_v2(Rational(1, 100), Rational(1, 10)))
+        assert path.contains_point_2d(create_v2(scalar(3, 100), scalar(3, 100)))
+        assert path.contains_point_2d(create_v2(scalar(1, 100), scalar(1, 10)))
 
         # Far outside the whole silhouette is not.
-        assert not path.contains_point_2d(create_v2(Rational(15, 100), Rational(7, 100)))
+        assert not path.contains_point_2d(create_v2(scalar(15, 100), scalar(7, 100)))
 
     def test_leg_profile_extrusion_meshes_watertight_and_matches_analytic_area(self):
         path = self._leg_profile_path()
-        height = Rational(1, 25)
+        height = scalar(1, 25)
         extrusion = PathExtrusion(path=path, transform=Transform.identity(),
                                    start_distance=scalar(0), end_distance=height)
 
@@ -172,7 +171,7 @@ class TestPathCSG:
         path = self._leg_profile_path()
         extrusion = PathExtrusion(
             path=path, transform=Transform.identity(),
-            start_distance=scalar(0), end_distance=Rational(1, 25),
+            start_distance=scalar(0), end_distance=scalar(1, 25),
             named_features=[
                 ("foot", 0),       # line_foot: planar, should resolve
                 ("knee_bulge", 1),  # knee: curved (ArcSegment), should never match
@@ -180,12 +179,12 @@ class TestPathCSG:
             ],
         )
 
-        on_foot = create_v3(Rational(1, 100), scalar(0), Rational(1, 50))
+        on_foot = create_v3(scalar(1, 100), scalar(0), scalar(1, 50))
         assert [f.name for f in extrusion.get_all_features(on_foot)] == ["foot"]
 
-        knee_mid_local = path.segments[1].closest_point(create_v2(Rational(6, 100), Rational(2, 100)))
-        on_knee = create_v3(knee_mid_local[0], knee_mid_local[1], Rational(1, 50))
+        knee_mid_local = path.segments[1].closest_point(create_v2(scalar(6, 100), scalar(2, 100)))
+        on_knee = create_v3(knee_mid_local[0], knee_mid_local[1], scalar(1, 50))
         assert extrusion.get_all_features(on_knee) == []
 
-        on_top = create_v3(Rational(1, 100), Rational(15, 100), Rational(1, 25))
+        on_top = create_v3(scalar(1, 100), scalar(15, 100), scalar(1, 25))
         assert [f.name for f in extrusion.get_all_features(on_top)] == ["top"]

@@ -13,9 +13,8 @@ NOTE: Prism positioning follows the Timber convention:
 - So a prism at position=(0,0,0) with size=[1,1] spans X=[-0.5,0.5], Y=[-0.5,0.5]
 """
 
-from sympy import Matrix, eye, sqrt
 from kumiki.cutcsg import *
-from kumiki.rule import Orientation, Transform, inches, feet, scalar
+from kumiki.rule import Orientation, Transform, inches, feet, scalar, Matrix, eye, sqrt
 from kumiki.timber import Timber, TimberEnd, TimberFace, create_timber
 from kumiki.joints.workshop.shavings import chop_lap_on_timber_end, chop_profile_on_timber_face
 from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face

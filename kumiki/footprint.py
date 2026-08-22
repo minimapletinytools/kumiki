@@ -4,7 +4,6 @@ Footprint class for Kumiki - Represents the 2D footprint of a structure
 
 from enum import Enum
 from typing import List, Tuple
-from sympy import Matrix
 from dataclasses import dataclass
 from .rule import *
 
@@ -291,7 +290,6 @@ class Footprint:
         dy = end[1] - start[1]
         
         # Normalize the direction
-        from sympy import sqrt
         length = sqrt(dx * dx + dy * dy)
         if safe_zero_test(length):
             raise ValueError(f"Side {side_index} has zero length")

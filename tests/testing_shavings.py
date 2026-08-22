@@ -14,7 +14,6 @@ import pytest
 import random
 import math
 from typing import Optional, Tuple
-from sympy import Matrix, Rational, simplify, det, eye
 from kumiki.rule import *
 from kumiki import *
 
@@ -220,15 +219,14 @@ def assert_vector_normalized(v: Matrix, tolerance: float = TOLERANCE):
 # uh this is questionable, let's keep it for now and get rid of it when,.. if casuse problems later
 def assert_rational_equal(actual, expected, msg: str = ""):
     """
-    Assert that two values are equal, handling both Rational and numeric types.
-    
+    Assert that two float values are approximately equal.
+
     Args:
         actual: Actual value
         expected: Expected value
         msg: Optional message to display on failure
     """
-    diff = simplify(actual - expected)
-    assert diff == 0, \
+    assert safe_equality_test(actual, expected), \
         f"{msg}: Expected {expected}, got {actual}" if msg else f"Expected {expected}, got {actual}"
 
 

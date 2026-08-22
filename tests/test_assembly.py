@@ -7,7 +7,6 @@ names below (closure, ring escape, centering, compaction, clear-out).
 """
 
 import pytest
-from sympy import Float
 
 from kumiki.assembly import (
     AssemblyFreedom,
@@ -19,7 +18,7 @@ from kumiki.assembly import (
     RotationDof,
     solve_assembly,
 )
-from kumiki.rule import create_v3, giraffe_evalf
+from kumiki.rule import create_v3, giraffe_evalf, Float
 
 
 X = create_v3(1, 0, 0)

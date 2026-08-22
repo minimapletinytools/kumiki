@@ -2,7 +2,6 @@
 Corner Joints Patterns
 """
 
-from sympy import Matrix, sqrt
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -121,7 +120,6 @@ def make_miter_joint_3d_angles_example(position: V3, use_round_timbers=False) ->
     TimberB runs with components in all three axes: direction (2, 4, 3)/sqrt(29).
     Neither timber is axis-aligned, demonstrating the general 3D case.
     """
-    from sympy import sqrt
 
     sqrt29 = sqrt(29)
     sqrt5 = sqrt(5)

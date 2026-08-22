@@ -2,7 +2,6 @@
 Mortise and Tenon Joints Patterns
 """
 
-from sympy import Matrix, sqrt, sin, cos, pi
 from typing import Union, List, Optional
 from dataclasses import replace
 
@@ -203,7 +202,6 @@ def example_double_angled_mortise_and_tenon(position=None, use_round_timbers=Fal
     is no longer axis-aligned. The brace enters the rotated timber1 at a
     compound angle -- non-orthogonal in both the horizontal and vertical planes.
     """
-    from sympy import Integer, pi
     from dataclasses import replace
     from kumiki.rule import Orientation, radians
     from kumiki.ticket import Ticket
@@ -265,7 +263,6 @@ def example_double_angled_mortise_and_tenon_with_notch_relief(position=None, use
     from dataclasses import replace
     from kumiki.rule import Orientation, radians
     from kumiki.ticket import Ticket
-    from sympy import pi
 
     if position is None:
         position = create_v3(0, 0, 0)
@@ -330,7 +327,6 @@ def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None, 
       scribe-based housing cut), but the notch itself is anchored to the mortise entry
       face instead, so it reads as starting at the timber's outer face.
     """
-    from sympy import sin, cos, pi
 
     if position is None:
         position = create_v3(scalar(0), scalar(0), scalar(0))
@@ -746,7 +742,6 @@ def example_compound_angle_offset_parallel_shoulder(position=None, use_round_tim
     Mortise and tenon joint with compound angle (45 degrees in both axes),
     1 inch lateral centerline offset, and shoulder parallel to the FRONT face.
     """
-    from sympy import pi
     from dataclasses import replace
     from kumiki.rule import Orientation, degrees
     from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
@@ -819,7 +814,6 @@ def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
     The tenon timber approaches the mortise at ~30 degrees (angled in the XY
     plane). The shoulder is inset 1" from the mortise timber's centerline.
     """
-    from sympy import sqrt
     from kumiki.rule import Orientation, degrees, radians
     from kumiki.ticket import TimberTicket
 
@@ -841,7 +835,6 @@ def example_inset_shoulder_notch_angled(position=None, use_round_timbers=False):
 
     # Tenon timber: approaches from below at 30 degrees from the Y axis in the XY plane.
     # Direction: (sin30, cos30, 0) = (0.5, sqrt(3)/2, 0)
-    from sympy import sin, cos, pi, Rational
     angle = pi / scalar(6)  # 30 degrees
     tenon_dir = safe_normalize_vector(create_v3(sin(angle), cos(angle), scalar(0)))
     tenon_width_dir = safe_normalize_vector(create_v3(cos(angle), -sin(angle), scalar(0)))
@@ -888,7 +881,6 @@ def example_inset_shoulder_scribe_angled(position=None, use_round_timbers=False)
     Difference(tenon_prism, shoulder_half_space) cut — the exact 3-D shadow
     of the tenon — rather than a rectangular housing notch.
     """
-    from sympy import sin, cos, pi, sqrt
     from kumiki.rule import Orientation, degrees, radians
     from kumiki.ticket import TimberTicket
 

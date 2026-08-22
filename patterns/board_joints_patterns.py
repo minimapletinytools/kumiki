@@ -2,7 +2,6 @@
 
 from dataclasses import replace
 
-from sympy import Matrix
 
 from kumiki.joints.workshop.board_joints import (
     cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timbers,
@@ -16,7 +15,7 @@ from kumiki.example_shavings import (
     create_canonical_example_board_butt_joint_boards_end_to_face,
 )
 from kumiki.patternbook import Pattern, make_pattern_from_joint, make_pattern_from_frame
-from kumiki.rule import degrees, feet, inches
+from kumiki.rule import degrees, feet, inches, Matrix
 from kumiki.ticket import BoardTicket, TimberTicket
 from kumiki.timber import Board, Frame, Orientation, Timber, TimberEnd, Transform, create_v3
 

@@ -113,8 +113,6 @@ import textwrap
 import traceback
 from typing import Any, Dict, Iterable, List, Literal, Mapping, Optional, Tuple, get_args, get_origin
 
-from sympy import Float, Rational
-
 from .rule import scalar
 from .patternbook import Pattern
 
@@ -447,10 +445,6 @@ class RenderParameterDescriptor:
         return payload
 
 
-def _looks_like_sympy_number(value: Any) -> bool:
-    return hasattr(value, "is_real") and hasattr(value, "evalf")
-
-
 def _looks_like_v3_value(value: Any) -> bool:
     shape = getattr(value, "shape", None)
     return shape in ((3, 1), (1, 3))
@@ -464,7 +458,7 @@ def _infer_parameter_kind_from_annotation(annotation: Any, annotation_text: Opti
         return "boolean"
     if annotation is str:
         return "string"
-    if annotation in (int, float, Rational, Float):
+    if annotation in (int, float):
         return "number"
     return None
 
@@ -479,9 +473,7 @@ def _infer_parameter_kind(default_value: Any, annotation: Any = None, annotation
         return "string"
     if _looks_like_v3_value(default_value):
         return "v3"
-    if isinstance(default_value, (int, float, Rational, Float)):
-        return "number"
-    if _looks_like_sympy_number(default_value):
+    if isinstance(default_value, (int, float)):
         return "number"
     return "string"
 
@@ -694,10 +686,6 @@ def _coerce_number(value: Any, param_name: str) -> Any:
         return scalar(value)
     if isinstance(value, float):
         return scalar(str(value))
-    if isinstance(value, (Rational, Float)):
-        return value
-    if _looks_like_sympy_number(value):
-        return value
     if isinstance(value, str):
         stripped = value.strip()
         if not stripped:
@@ -804,10 +792,6 @@ def serialize_render_parameter_value(value: Any) -> Any:
             "y": serialize_render_parameter_value(value[1]),
             "z": serialize_render_parameter_value(value[2]),
         }
-    if isinstance(value, (Rational, Float)):
-        return str(value)
-    if _looks_like_sympy_number(value):
-        return str(value)
     if isinstance(value, (list, tuple)):
         return [serialize_render_parameter_value(item) for item in value]
     if isinstance(value, dict):
