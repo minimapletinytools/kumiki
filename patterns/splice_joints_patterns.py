@@ -225,10 +225,12 @@ def create_half_blind_tenoned_dadoed_rabbeted_scarf_example(position: Optional[V
     joint = cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         arrangement=arrangement,
         stepped_shoulder_depth=inches(1),
+        #stepped_shoulder_depth=inches(2),
         scarf_length=inches(10),
         dado_depth=inches(1),
         dado_height=inches(1.5),
         stub_tenon_width=inches(1.5),
+        #stub_tenon_width=inches(2),
         joint_center_relative_to_timber1_end=overlap,
     )
 

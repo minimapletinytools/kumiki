@@ -646,6 +646,12 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     SSL = stepped_shoulder_length
     STW = stub_tenon_width
 
+    from sympy import tan, atan2
+    # this is a little weird cuz SSL is assuming the scarf part is in line with the timber but it's tilted
+    # let's just roll with that cuz it's easier, so the actual scarf will be slightly smaller
+    scarf_angle = atan2(SSD/scalar(2),  (SL + SSL)/scalar(2))
+    tan_scarf_angle = tan(scarf_angle) 
+
     require_check(
         None if SSL == SSD
         else "stepped_shoulder_length must equal stepped_shoulder_depth: the Kusabi peg accessory "
@@ -722,7 +728,9 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     p2 = (p1[0] - DD, DH)
     p3 = (p2[0], H / scalar(2))
     p4 = (corner[0] - (SL + SSL) / scalar(2), -SSD / scalar(2))
-    p5 = (p4[0], SSD / scalar(2))
+    # TODO this isn't quite right, you need go SSD at an angle
+    #p5 = (p4[0], (1-2*tan_scarf_angle) * SSD / scalar(2)) 
+    p5 = (p4[0], SSD / scalar(2)) 
     p6 = (p5[0] - (SL - SSL) / scalar(2), 0)
     p7 = (p6[0], p6[1] - DH)
     p8 = (p7[0] + DD, p7[1])
@@ -901,8 +909,12 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     front_face_dir = arrangement.timber1.get_face_direction_global(arrangement.front_face_on_timber1)
 
     # TODO don't use a peg, use a wedge
+    peg_orientation = Orientation.from_z_and_y(front_face_dir, v_dir)
+    # TODO rotate the peg
+    #peg_orientation = Orientation.from_angle_axis(scarf_angle, front_face_dir) * peg_orientation
     peg = Peg(
-            transform = Transform(position = scarf_joint_center_global, orientation=Orientation.from_z_and_y(front_face_dir, v_dir)),
+            transform = Transform(position = scarf_joint_center_global, orientation=peg_orientation),
+            #size = stepped_shoulder_depth*(1-tan_scarf_angle),
             size = stepped_shoulder_depth,
             shape = PegShape.SQUARE,
             forward_length = depth_size * scalar(3/5),
