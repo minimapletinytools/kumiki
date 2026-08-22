@@ -8,7 +8,7 @@ from sympy import Matrix
 
 from kumiki.joints.workshop.decorative_joints import (
     cut_practice_roundover_decoration,
-    cut_practice_rafter_tail_scallop_decoration,
+    cut_practice_rafter_tail_scallop_corner_end_decoration,
     cut_practice_rounded_end_decoration,
 )
 from kumiki.ticket import TimberTicket
@@ -121,7 +121,7 @@ class TestRoundoverDecoration:
 
 
 class TestRafterTailScallopDecoration:
-    """Tests for cut_practice_rafter_tail_scallop_decoration."""
+    """Tests for cut_practice_rafter_tail_scallop_corner_end_decoration."""
 
     def test_scallop_cut_is_watertight_and_removes_expected_material(self):
         # end_side=TOP, cut_side=BACK: scallop cut into the BACK face near the
@@ -132,7 +132,7 @@ class TestRafterTailScallopDecoration:
         radius = (scallop_length ** 2 + scallop_height ** 2) / (2 * scallop_height)
 
         timber = _make_timber()
-        joint = cut_practice_rafter_tail_scallop_decoration(
+        joint = cut_practice_rafter_tail_scallop_corner_end_decoration(
             timber,
             short_edge=TimberShortEdge.TOP_BACK,
             scallop_height=scallop_height,
@@ -185,7 +185,7 @@ class TestRafterTailScallopDecoration:
 
     def test_scallop_cut_accepts_timber_edge(self):
         timber = _make_timber()
-        joint = cut_practice_rafter_tail_scallop_decoration(
+        joint = cut_practice_rafter_tail_scallop_corner_end_decoration(
             timber,
             short_edge=TimberEdge.TOP_BACK,
             scallop_height=scalar(2),

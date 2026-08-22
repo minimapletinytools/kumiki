@@ -250,15 +250,7 @@ def cut_practice_rounded_end_decoration(
         ticket=JointTicket(joint_type="rounded_end_decoration"),
     )
 
-#_______________
-#               |
-#______________◜  ←scallop_height
-#              ↑
-#              scallop_width
-#    
-
-# TODO rename to cut_practice_rafter_tail_scallop_corner_end_decoration
-def cut_practice_rafter_tail_scallop_decoration(
+def cut_practice_rafter_tail_scallop_corner_end_decoration(
     timber: BlockLike,
     # TODO rename to corner, do not allow TimberEdge in the type must be ShortEdge
     short_edge: Union[TimberShortEdge, TimberEdge],
@@ -266,6 +258,14 @@ def cut_practice_rafter_tail_scallop_decoration(
     scallop_length: Numeric,
 ) -> Joint:
     """
+
+    _______________
+                   |
+    ______________◜  ←scallop_height
+                ↑
+                scallop_width
+    
+
     cuts out a "scallop" shape from cut_side from scallop_height measured up from cut_side on the end_side
     to scallop_width (scallop_length) measured inwards from the end on the cut_side
     the scallop is the circle touching the 2 points above such that the circle is perpendicular with the end_side face.

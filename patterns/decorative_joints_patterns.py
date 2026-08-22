@@ -55,7 +55,7 @@ def example_rafter_tail_scallop_decoration() -> Joint:
         transform=Transform.identity(),
         ticket=TimberTicket(path="timber"),
     )
-    return cut_practice_rafter_tail_scallop_decoration(
+    return cut_practice_rafter_tail_scallop_corner_end_decoration(
         timber=timber,
         short_edge=TimberShortEdge.TOP_BACK,
         scallop_height=inches(2),
