@@ -840,12 +840,22 @@ def export_frame_step(
             adopt_csg(ct.timber.transform, Transform.identity(), local_csg)
             if (combined or not local) else None
         )
-        shape = _csg_to_ocp(local_csg if local else global_csg)
+        if local:
+            shape = _csg_to_ocp(local_csg)
+        else:
+            # global_csg is computed above whenever `combined or not local`,
+            # which `not local` here already satisfies.
+            assert global_csg is not None
+            shape = _csg_to_ocp(global_csg)
         dest = output_dir / f"{name}.step"
         _write_step(shape, str(dest), name=name)
         written.append(dest)
         if combined:
-            combined_shape = shape if not local else _csg_to_ocp(global_csg)
+            if not local:
+                combined_shape = shape
+            else:
+                assert global_csg is not None
+                combined_shape = _csg_to_ocp(global_csg)
             named_combined_shapes.append((name, combined_shape))
 
     if include_accessories:
@@ -866,12 +876,22 @@ def export_frame_step(
                 adopt_csg(transform, Transform.identity(), local_csg)
                 if (combined or not local) else None
             )
-            shape = _csg_to_ocp(local_csg if local else global_csg)
+            if local:
+                shape = _csg_to_ocp(local_csg)
+            else:
+                # global_csg is computed above whenever `combined or not local`,
+                # which `not local` here already satisfies.
+                assert global_csg is not None
+                shape = _csg_to_ocp(global_csg)
             dest = output_dir / f"{name}.step"
             _write_step(shape, str(dest), name=name)
             written.append(dest)
             if combined:
-                combined_shape = shape if not local else _csg_to_ocp(global_csg)
+                if not local:
+                    combined_shape = shape
+                else:
+                    assert global_csg is not None
+                    combined_shape = _csg_to_ocp(global_csg)
                 named_combined_shapes.append((name, combined_shape))
 
     if combined and named_combined_shapes:

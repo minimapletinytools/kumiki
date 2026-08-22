@@ -346,6 +346,9 @@ def cut_mortise_and_tenon_joint(
     # why did the agent do safe_zero_test(scalar(1) - cos_angle * cos_angle)...
     do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not safe_zero_test(scalar(1) - cos_angle * cos_angle)
     if do_lengthwise_cropping:
+        # do_lengthwise_cropping implies bore_mortise_perpendicular_to_face, which the
+        # require_check above already guarantees means mortise_depth is not None.
+        assert mortise_depth is not None
         # TODO you could support this on non plane-aligned timbers as well but you need to choose a different plane to do the cropping
         # Compute mortise_face locally — cropping is only used for plane-aligned timbers
         mortise_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
