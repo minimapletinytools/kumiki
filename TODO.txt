@@ -211,15 +211,13 @@ DONE-rough/perfect timber within bounding box rendering
   -rough box
 DONE-make no overlay the default
 DONE-fix top end being backwards bug
-
-
--update examples to use tenon_width_relative_to_joint and tenon_height_relative_to_joint
-
--BUG th egeomoetery fro the center hole in kanawa tsugi is twrong
+DONE-update examples to use tenon_width_relative_to_joint and tenon_height_relative_to_joint
+DONE-BUG th egeomoetery fro the center hole in kanawa tsugi is twrong
   -the A part draws the line to the far corner of the center hole and the B parts are draws the line to the close corner
   -you alos need to slightly tilt the vertical lines so the hole remains square
   -and you need to slightly tilt the peg as well
 
+-research removing sympy entirely...
 -DRAWING TIME
   -review feature referencing in kumiki
 		-create feature enum point/edge/face and support them

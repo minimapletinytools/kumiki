@@ -37,7 +37,7 @@ from enum import Enum
 import warnings
 
 
-def scalar(numerator, denominator=1):
+def scalar(numerator, denominator=1) -> Rational:
     """
     Create a Rational scalar value.
     

@@ -596,6 +596,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         scarf_length: Numeric,
         dado_depth: Numeric,
         dado_height: Numeric, 
+        # TODO add num_stubs argument
         # TODO add support to handle stub_tenon_width = 0 without generating extra dud geometry, also set this to 0 by defalut I guess?
         stub_tenon_width: Numeric,
         stepped_shoulder_length: Optional[Numeric] = None,
@@ -611,7 +612,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         dado_depth: the "depth" of both dadoes (measured in the length axis of the timbers)
         dado_height: the "height" of both dadoes (measured in the long face axis of the long face adjacent front_face_on_timber1), the dado width is always the entire size of the timber in the front_face_on_timber1 axis
         stub_tenon_width: the "width" of the stub tenon (measured in the long face axis of the long face adjacent front_face_on_timber1), the stub tenon depth is always the distance from the surface to the dado wall.
-        stepped_shoulder_length: determines the length of the stepped shoulder cut in the scarf joint, if None, defaults to stepped_shoulder_depth (forming a rectangular peg hole)
+        stepped_shoulder_length: determines the length of the stepped shoulder cut in the scarf joint, if None, defaults to stepped_shoulder_depth (forming a rectangular peg hole). Note this measures the width of the rectangular hole that gets created by the stepped shoulder, rather than the width from corner to corner of the rectangular hole which is how you might draw this joint by hand.
         joint_center_relative_to_timber1_end: determines the "center" of the joint (right in the middle of the rectangular peg hole) measured inward from the joint end of timber1. (positive means the joint center is further into timber1)
         lateral_offset_from_midline: determines the lateral offset of the joint profiles centerline from the midline of front_face_on_timber1
 
@@ -646,23 +647,32 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     SSL = stepped_shoulder_length
     STW = stub_tenon_width
 
-    from sympy import tan, atan2
-    # this is a little weird cuz SSL is assuming the scarf part is in line with the timber but it's tilted
-    # let's just roll with that cuz it's easier, so the actual scarf will be slightly smaller
-    scarf_angle = atan2(SSD/scalar(2),  (SL + SSL)/scalar(2))
-    tan_scarf_angle = tan(scarf_angle) 
-
     require_check(
         None if SSL == SSD
         else "stepped_shoulder_length must equal stepped_shoulder_depth: the Kusabi peg accessory "
              "(kumiki.timber.Peg) only supports a square or round cross-section, so a non-square "
              "peg hole can't yet be represented by an accessory"
     )
+    require_check(None if SL >= SSD else "stepped_shoulder_depth must be less than scarf_length")
     require_check(None if DD > 0 else "dado_depth must be positive")
     require_check(None if DH > 0 else "dado_height must be positive")
     require_check(None if SSD > 0 else "stepped_shoulder_depth must be positive")
     require_check(None if SL > 0 else "scarf_length must be positive")
     require_check(None if STW > 0 else "stub_tenon_width must be positive")
+
+
+    from sympy import tan, atan2, sqrt
+
+    # see diagram in docs folder
+    # ![](assets/kumiki_code_ref_images/joints/workshop/splice_joints/internal_kanawa_tsugi_diagram_1.png)     
+    some_var_x = sqrt((SL/scalar(2))**2 - (SSD/scalar(2))**2) 
+    scarf_hypotneuse = some_var_x + SSL/scalar(2)
+    tan_scarf_angle = SSD/scalar(2) / some_var_x
+    scarf_angle = atan2(SSD/scalar(2), some_var_x)
+    sin_scarf_angle = sin(scarf_angle)
+    cos_scarf_angle = cos(scarf_angle)
+
+
 
     H = timber1.get_size_in_face_normal_axis(v_face)
     depth_size = timber1.get_size_in_face_normal_axis(front_face)
@@ -727,11 +737,11 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     p1 = (corner[0], DH)
     p2 = (p1[0] - DD, DH)
     p3 = (p2[0], H / scalar(2))
-    p4 = (corner[0] - (SL + SSL) / scalar(2), -SSD / scalar(2))
-    # TODO this isn't quite right, you need go SSD at an angle
-    #p5 = (p4[0], (1-2*tan_scarf_angle) * SSD / scalar(2)) 
-    p5 = (p4[0], SSD / scalar(2)) 
-    p6 = (p5[0] - (SL - SSL) / scalar(2), 0)
+
+    p4 = (corner[0] - cos_scarf_angle*scarf_hypotneuse, corner[1] - (sin_scarf_angle * scarf_hypotneuse))
+    p5 = (p4[0] - sin_scarf_angle*SSD, p4[1] + cos_scarf_angle*SSD)
+
+    p6 = (-SL / scalar(2), 0)
     p7 = (p6[0], p6[1] - DH)
     p8 = (p7[0] + DD, p7[1])
     p9 = (p8[0], -H / scalar(2))
@@ -910,11 +920,9 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
 
     # TODO don't use a peg, use a wedge
     peg_orientation = Orientation.from_z_and_y(front_face_dir, v_dir)
-    # TODO rotate the peg
-    #peg_orientation = Orientation.from_angle_axis(scarf_angle, front_face_dir) * peg_orientation
+    peg_orientation = Orientation.from_angle_axis(scarf_angle, front_face_dir) * peg_orientation
     peg = Peg(
             transform = Transform(position = scarf_joint_center_global, orientation=peg_orientation),
-            #size = stepped_shoulder_depth*(1-tan_scarf_angle),
             size = stepped_shoulder_depth,
             shape = PegShape.SQUARE,
             forward_length = depth_size * scalar(3/5),
