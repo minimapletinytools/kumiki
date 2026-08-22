@@ -198,7 +198,8 @@ def build_shed_frame() -> Frame:
     #   the tenon starts at 2" from the end and is 5" wide, ending at 7" (fully within the 7" mudsill width).
     #   The tenon center is at 4.5", which is offset inwards by exactly 1" from the mudsill centerline (3.5").
     #   Therefore, tenon_position Y-offset is -1" (opposite of local +Y axis).
-    tenon_size = create_v2(inches(1.5), inches(5))
+    tenon_width_relative_to_joint = inches(5)
+    tenon_height_relative_to_joint = inches(1.5)
     tenon_length = inches(3)
     mortise_depth = inches(13, 4) # 3.25" (3" tenon + 1/4" clearance)
     
@@ -221,7 +222,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_position,
@@ -236,7 +238,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_position,
@@ -251,7 +254,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_position,
@@ -266,7 +270,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.RIGHT,
         ),
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=tenon_height_relative_to_joint,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_position,
@@ -327,7 +332,8 @@ def build_shed_frame() -> Frame:
     #   Center of the tenon is at local X = +0.25" (+1/4" offset).
     # - Butt joint: joist extends 3" into sills, so housing_length = 3", housing_width = 5"
     #   (width of joist), housing_depth = 4.5" (pocket depth; remaining 2.5" of the 7" joist is cut away).
-    joist_tenon_size = create_v2(inches(1.5), inches(5))
+    joist_tenon_width_relative_to_joint = inches(5)
+    joist_tenon_height_relative_to_joint = inches(1.5)
     joist_tenon_length = inches(3)
     joist_mortise_depth = inches(13, 4) # 3.25"
     joist_tenon_position = create_v2(inches(1, 4), scalar(0)) # +0.25" local X (depth to bottom is 4.5")
@@ -346,7 +352,8 @@ def build_shed_frame() -> Frame:
                     butt_timber_end=TimberEnd.BOTTOM,
                     front_face_on_butt_timber=TimberLongFace.LEFT,
                 ),
-                tenon_size=joist_tenon_size,
+                tenon_width_relative_to_joint=joist_tenon_width_relative_to_joint,
+                tenon_height_relative_to_joint=joist_tenon_height_relative_to_joint,
                 tenon_length=joist_tenon_length,
                 mortise_depth=joist_mortise_depth,
                 tenon_position=joist_tenon_position,
@@ -359,7 +366,8 @@ def build_shed_frame() -> Frame:
                     butt_timber_end=TimberEnd.TOP,
                     front_face_on_butt_timber=TimberLongFace.LEFT,
                 ),
-                tenon_size=joist_tenon_size,
+                tenon_width_relative_to_joint=joist_tenon_width_relative_to_joint,
+                tenon_height_relative_to_joint=joist_tenon_height_relative_to_joint,
                 tenon_length=joist_tenon_length,
                 mortise_depth=joist_mortise_depth,
                 tenon_position=joist_tenon_position,
@@ -414,9 +422,9 @@ def build_shed_frame() -> Frame:
     #    the outside edge, leaving a 1.5" gap (= 2.25" − 1.5"/2) between the
     #    tenon outer face and the mudsill outside edge.
 
-    # Tenon parameters for posts whose local Y is perpendicular to the E/W mudsill
-    # (SE, NW corner posts and both center posts): thickness in local Y, width in local X.
-    post_tenon_size     = create_v2(inches(13, 2), inches(3, 2))  # 6.5" (local X, along mudsill) × 1.5" (local Y, perp to mudsill)
+    # Tenon parameters for post-to-mudsill joints: width=6.5" parallel to mudsill, height=1.5" perpendicular to mudsill.
+    post_tenon_width_relative_to_joint  = inches(13, 2)
+    post_tenon_height_relative_to_joint = inches(3, 2)
     post_tenon_length   = inches(3)                                # 3" deep tenon
     post_mortise_depth  = inches(13, 4)                            # 3.25" mortise (+ 0.25" clearance)
     # -1.25" in local Y: centers tenon 2.25" from the mudsill outside edge → 1.5" gap
@@ -424,7 +432,6 @@ def build_shed_frame() -> Frame:
 
     # Tenon parameters for SW and NE corner posts, which connect to the E/W mudsills
     # via their local X axis (thickness in local X, width in local Y).
-    corner_ew_tenon_size     = create_v2(inches(3, 2), inches(13, 2))  # 1.5" (local X, perp to mudsill) × 6.5" (local Y, along mudsill)
     # -1.25" in local X: centers tenon 2.25" from the mudsill outside edge → 1.5" gap
     corner_ew_tenon_position = create_v2(-inches(5, 4), scalar(0))
 
@@ -495,7 +502,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=corner_ew_tenon_size,
+        tenon_width_relative_to_joint=post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=post_tenon_height_relative_to_joint,
         tenon_length=post_tenon_length,
         mortise_depth=post_mortise_depth,
         tenon_position=corner_ew_tenon_position,
@@ -509,7 +517,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=post_tenon_size,
+        tenon_width_relative_to_joint=post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=post_tenon_height_relative_to_joint,
         tenon_length=post_tenon_length,
         mortise_depth=post_mortise_depth,
         tenon_position=post_tenon_position,
@@ -525,7 +534,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=corner_ew_tenon_size,
+        tenon_width_relative_to_joint=post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=post_tenon_height_relative_to_joint,
         tenon_length=post_tenon_length,
         mortise_depth=post_mortise_depth,
         tenon_position=corner_ew_tenon_position,
@@ -539,7 +549,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=None,
         ),
-        tenon_size=post_tenon_size,
+        tenon_width_relative_to_joint=post_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=post_tenon_height_relative_to_joint,
         tenon_length=post_tenon_length,
         mortise_depth=post_mortise_depth,
         tenon_position=post_tenon_position,
@@ -556,7 +567,8 @@ def build_shed_frame() -> Frame:
                 butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=None,
             ),
-            tenon_size=post_tenon_size,
+            tenon_width_relative_to_joint=post_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=post_tenon_height_relative_to_joint,
             tenon_length=post_tenon_length,
             mortise_depth=post_mortise_depth,
             tenon_position=post_tenon_position,
@@ -569,7 +581,8 @@ def build_shed_frame() -> Frame:
                 butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=None,
             ),
-            tenon_size=post_tenon_size,
+            tenon_width_relative_to_joint=post_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=post_tenon_height_relative_to_joint,
             tenon_length=post_tenon_length,
             mortise_depth=post_mortise_depth,
             tenon_position=post_tenon_position,
@@ -659,10 +672,8 @@ def build_shed_frame() -> Frame:
         stickout_length=scalar(0)
     )
 
-    # Posts where 1.5" is in local X and 6.5" is in local Y: SW, NE
-    top_tenon_size_A = create_v2(inches(3, 2), inches(13, 2))   # (1.5" localX, 6.5" localY)
-    # Posts where 6.5" is in local X and 1.5" is in local Y: NW, W-center, SE, E-center
-    top_tenon_size_B = create_v2(inches(13, 2), inches(3, 2))   # (6.5" localX, 1.5" localY)
+    top_tenon_width_relative_to_joint = inches(13, 2)
+    top_tenon_height_relative_to_joint = inches(3, 2)
 
     # West side post-to-plate joints
     # The aligned-plane normal = Z_post × Y_plate = +Z × +Y = −X_global.
@@ -680,7 +691,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.LEFT,   # −localX = −X_global
         ),
-        tenon_size=top_tenon_size_A,
+        tenon_width_relative_to_joint=top_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=top_tenon_height_relative_to_joint,
         tenon_length=top_plate_tenon_length,
         mortise_depth=top_plate_mortise_depth,
         peg_parameters=top_peg_params,
@@ -696,7 +708,8 @@ def build_shed_frame() -> Frame:
                 butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.BACK,   # −localY = −X_global
             ),
-            tenon_size=top_tenon_size_B,
+            tenon_width_relative_to_joint=top_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=top_tenon_height_relative_to_joint,
             tenon_length=top_plate_tenon_length,
             mortise_depth=top_plate_mortise_depth,
             peg_parameters=top_peg_params,
@@ -711,7 +724,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.BACK,   # −localY = −X_global
         ),
-        tenon_size=top_tenon_size_B,
+        tenon_width_relative_to_joint=top_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=top_tenon_height_relative_to_joint,
         tenon_length=top_plate_tenon_length,
         mortise_depth=top_plate_mortise_depth,
         peg_parameters=top_peg_params,
@@ -725,7 +739,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,  # +localY = −X_global
         ),
-        tenon_size=top_tenon_size_B,
+        tenon_width_relative_to_joint=top_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=top_tenon_height_relative_to_joint,
         tenon_length=top_plate_tenon_length,
         mortise_depth=top_plate_mortise_depth,
         peg_parameters=top_peg_params,
@@ -741,7 +756,8 @@ def build_shed_frame() -> Frame:
                 butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.FRONT,  # +localY = −X_global
             ),
-            tenon_size=top_tenon_size_B,
+            tenon_width_relative_to_joint=top_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=top_tenon_height_relative_to_joint,
             tenon_length=top_plate_tenon_length,
             mortise_depth=top_plate_mortise_depth,
             peg_parameters=top_peg_params,
@@ -756,7 +772,8 @@ def build_shed_frame() -> Frame:
             butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.RIGHT,  # +localX = −X_global
         ),
-        tenon_size=top_tenon_size_A,
+        tenon_width_relative_to_joint=top_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=top_tenon_height_relative_to_joint,
         tenon_length=top_plate_tenon_length,
         mortise_depth=top_plate_mortise_depth,
         peg_parameters=top_peg_params,
@@ -939,7 +956,8 @@ def build_shed_frame() -> Frame:
     #
     # Spec: 1.5" thick × 4" wide (Z axis) × 4" deep into post. Round pegs.
     # Barefaced: tenon face is flush with the inside face of the girt (shoulder on outside face).
-    girt_tenon_size = create_v2(inches(4), inches(3, 2))
+    girt_tenon_width_relative_to_joint = inches(4)
+    girt_tenon_height_relative_to_joint = inches(3, 2)
     girt_tenon_length = inches(4)
     girt_mortise_depth = inches(17, 4)  # 4.25" (4" + 1/4" clearance)
 
@@ -977,7 +995,8 @@ def build_shed_frame() -> Frame:
                 butt_timber_end=end,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=girt_tenon_size,
+            tenon_width_relative_to_joint=girt_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=girt_tenon_height_relative_to_joint,
             tenon_length=girt_tenon_length,
             mortise_depth=girt_mortise_depth,
             tenon_position=pos,
@@ -1028,7 +1047,8 @@ def build_shed_frame() -> Frame:
     )
 
     # Barefaced M&T joints for door posts (bottom unpegged, top pegged)
-    dp_tenon_size = create_v2(inches(4), inches(3, 2))  # 4" wide in X, 1.5" thick in Y
+    dp_tenon_width_relative_to_joint = inches(4)
+    dp_tenon_height_relative_to_joint = inches(3, 2)
     dp_tenon_length = inches(4)
     dp_mortise_depth = inches(17, 4)  # 4.25" depth
     dp_tenon_pos = create_v2(scalar(0), inches(5, 4))   # +1.25" in Y (flush with inside face Y=4")
@@ -1040,7 +1060,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=south_mudsill, butt_timber=west_door_post, butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=dp_tenon_size, tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
+            tenon_width_relative_to_joint=dp_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=dp_tenon_height_relative_to_joint,
+            tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
             tenon_position=dp_tenon_pos, peg_parameters=None,
         ),
         # West Door Post top (tie beam) - PEGGED
@@ -1049,7 +1071,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=south_tie_beam, butt_timber=west_door_post, butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=dp_tenon_size, tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
+            tenon_width_relative_to_joint=dp_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=dp_tenon_height_relative_to_joint,
+            tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
             tenon_position=dp_tenon_pos, peg_parameters=girt_peg_params,
         ),
         # East Door Post bottom (mudsill) - UNPEGGED
@@ -1058,7 +1082,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=south_mudsill, butt_timber=east_door_post, butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=dp_tenon_size, tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
+            tenon_width_relative_to_joint=dp_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=dp_tenon_height_relative_to_joint,
+            tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
             tenon_position=dp_tenon_pos, peg_parameters=None,
         ),
         # East Door Post top (tie beam) - PEGGED
@@ -1067,7 +1093,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=south_tie_beam, butt_timber=east_door_post, butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=dp_tenon_size, tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
+            tenon_width_relative_to_joint=dp_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=dp_tenon_height_relative_to_joint,
+            tenon_length=dp_tenon_length, mortise_depth=dp_mortise_depth,
             tenon_position=dp_tenon_pos, peg_parameters=girt_peg_params,
         ),
     ]
@@ -1129,7 +1157,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=post_sw, butt_timber=s_w_girt, butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=girt_tenon_size, tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
+            tenon_width_relative_to_joint=girt_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=girt_tenon_height_relative_to_joint,
+            tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
             tenon_position=sw_bareface_pos, peg_parameters=girt_peg_params,
         ),
         # South West Girt -> West Door Post (CENTERED, pegged)
@@ -1138,7 +1168,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=west_door_post, butt_timber=s_w_girt, butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=girt_tenon_size, tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
+            tenon_width_relative_to_joint=girt_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=girt_tenon_height_relative_to_joint,
+            tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
             tenon_position=centered_pos, peg_parameters=girt_peg_params,
         ),
         # South East Girt -> SE post (barefaced, pegged)
@@ -1147,7 +1179,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=post_se, butt_timber=s_e_girt, butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=TimberLongFace.BACK,
             ),
-            tenon_size=girt_tenon_size, tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
+            tenon_width_relative_to_joint=girt_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=girt_tenon_height_relative_to_joint,
+            tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
             tenon_position=se_bareface_pos, peg_parameters=girt_peg_params,
         ),
         # South East Girt -> East Door Post (CENTERED, pegged)
@@ -1156,7 +1190,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=east_door_post, butt_timber=s_e_girt, butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=TimberLongFace.BACK,
             ),
-            tenon_size=girt_tenon_size, tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
+            tenon_width_relative_to_joint=girt_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=girt_tenon_height_relative_to_joint,
+            tenon_length=girt_tenon_length, mortise_depth=girt_mortise_depth,
             tenon_position=centered_pos, peg_parameters=girt_peg_params,
         ),
     ]
@@ -1175,7 +1211,8 @@ def build_shed_frame() -> Frame:
     tie_brace_length_pos = inches(22) + inches(18)   # 40" from post top (18" from tie beam bottom)
     b_length = inches(18) * sqrt(2)  # Exact 18" layout hypotenuse (25.456")
 
-    brace_tenon_size = create_v2(inches(7, 2), inches(3, 2))  # 3.5" wide in wall plane × 1.5" thick
+    brace_tenon_width_relative_to_joint = inches(7, 2)
+    brace_tenon_height_relative_to_joint = inches(3, 2)
     brace_tenon_length = inches(4)
     brace_mortise_depth = inches(7, 2)  # 3.5" orthogonal depth into mortise face
 
@@ -1249,7 +1286,7 @@ def build_shed_frame() -> Frame:
             attached_timber_length_or_target=b_length,
             attached_timber_stickout=Stickout.symmetric(inches(0), StickoutReference.INSIDE),
             original_timber_end_to_measure_from_for_length_position=TimberEnd.TOP,
-            attached_timber_long_face_to_measure_to_for_length_position=TimberLongFace.RIGHT,
+            attached_timber_long_face_to_measure_to_for_length_position=TimberCenterline.CENTERLINE,
             length_position_measurement=length_pos,
             original_timber_face_to_measure_from_for_lateral_position=orig_lat,
             attached_timber_long_face_to_measure_to_for_lateral_position=att_lat,
@@ -1261,7 +1298,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=post, butt_timber=b, butt_timber_end=TimberEnd.BOTTOM,
                 front_face_on_butt_timber=peg_face,
             ),
-            tenon_size=brace_tenon_size, tenon_length=brace_tenon_length, mortise_depth=brace_mortise_depth,
+            tenon_width_relative_to_joint=brace_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=brace_tenon_height_relative_to_joint,
+            tenon_length=brace_tenon_length, mortise_depth=brace_mortise_depth,
             tenon_position=tenon_pos, peg_parameters=girt_peg_params,
             bore_mortise_perpendicular_to_face=True,
         )
@@ -1270,7 +1309,9 @@ def build_shed_frame() -> Frame:
                 receiving_timber=target_beam, butt_timber=b, butt_timber_end=TimberEnd.TOP,
                 front_face_on_butt_timber=peg_face,
             ),
-            tenon_size=brace_tenon_size, tenon_length=brace_tenon_length, mortise_depth=brace_mortise_depth,
+            tenon_width_relative_to_joint=brace_tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=brace_tenon_height_relative_to_joint,
+            tenon_length=brace_tenon_length, mortise_depth=brace_mortise_depth,
             tenon_position=tenon_pos, peg_parameters=girt_peg_params,
             bore_mortise_perpendicular_to_face=True,
         )
@@ -1424,7 +1465,8 @@ def build_shed_frame() -> Frame:
         ticket=TimberTicket(path="North Collar Tie", tags=("beam", "collar"))
     )
 
-    collar_tenon_size = create_v2(inches(4), inches(3, 2))  # 4" high in Z × 1.5" thick in Y
+    collar_tenon_width_relative_to_joint = inches(4)
+    collar_tenon_height_relative_to_joint = inches(3, 2)
     collar_tenon_length = inches(4)
     collar_mortise_depth = inches(4)
 
@@ -1436,7 +1478,9 @@ def build_shed_frame() -> Frame:
             receiving_timber=rw2, butt_timber=collar_south, butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        tenon_size=collar_tenon_size, tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
+        tenon_width_relative_to_joint=collar_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=collar_tenon_height_relative_to_joint,
+        tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
         tenon_position=tenon_pos_south, peg_parameters=girt_peg_params,
         bore_mortise_perpendicular_to_face=True,
     )
@@ -1445,7 +1489,9 @@ def build_shed_frame() -> Frame:
             receiving_timber=re2, butt_timber=collar_south, butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.FRONT,
         ),
-        tenon_size=collar_tenon_size, tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
+        tenon_width_relative_to_joint=collar_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=collar_tenon_height_relative_to_joint,
+        tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
         tenon_position=tenon_pos_south, peg_parameters=girt_peg_params,
         bore_mortise_perpendicular_to_face=True,
     )
@@ -1455,7 +1501,9 @@ def build_shed_frame() -> Frame:
             receiving_timber=rw8, butt_timber=collar_north, butt_timber_end=TimberEnd.BOTTOM,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size=collar_tenon_size, tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
+        tenon_width_relative_to_joint=collar_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=collar_tenon_height_relative_to_joint,
+        tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
         tenon_position=tenon_pos_north, peg_parameters=girt_peg_params,
         bore_mortise_perpendicular_to_face=True,
     )
@@ -1464,7 +1512,9 @@ def build_shed_frame() -> Frame:
             receiving_timber=re8, butt_timber=collar_north, butt_timber_end=TimberEnd.TOP,
             front_face_on_butt_timber=TimberLongFace.BACK,
         ),
-        tenon_size=collar_tenon_size, tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
+        tenon_width_relative_to_joint=collar_tenon_width_relative_to_joint,
+        tenon_height_relative_to_joint=collar_tenon_height_relative_to_joint,
+        tenon_length=collar_tenon_length, mortise_depth=collar_mortise_depth,
         tenon_position=tenon_pos_north, peg_parameters=girt_peg_params,
         bore_mortise_perpendicular_to_face=True,
     )

@@ -480,7 +480,8 @@ def cut_basic_mortise_and_tenon_joint_on_face_aligned_timbers(
     )
     return cut_mortise_and_tenon_joint_on_face_aligned_timbers(
         arrangement=arrangement,
-        tenon_size=tenon_size,
+        tenon_width_relative_to_joint=tenon_mortise_width_size,
+        tenon_height_relative_to_joint=tenon_mortise_length_size,
         tenon_length=tenon_length,
         mortise_depth=mortise_depth,
         tenon_position=tenon_position,

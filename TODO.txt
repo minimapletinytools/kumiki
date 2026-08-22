@@ -209,8 +209,12 @@ DONE-rough/perfect timber within bounding box rendering
   -rename actual to rough (actualy geometry)
   -perfect box
   -rough box
+DONE-make no overlay the default
+DONE-fix top end being backwards bug
+
+
 -update examples to use tenon_width_relative_to_joint and tenon_height_relative_to_joint
--make no overlay the default
+
 -BUG th egeomoetery fro the center hole in kanawa tsugi is twrong
   -the A part draws the line to the far corner of the center hole and the B parts are draws the line to the close corner
   -you alos need to slightly tilt the vertical lines so the hole remains square
@@ -232,7 +236,6 @@ DONE-rough/perfect timber within bounding box rendering
 
 -make parameters human readable
 -fix tusk failing from other direction bug
-DONE-fix top end being backwards bug
 -add N/S/E/W labels to the cube
 -create helper method for building cut timber from list of joints
 -house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
