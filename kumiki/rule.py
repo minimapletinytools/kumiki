@@ -154,24 +154,34 @@ Numeric = Union[float, int]
 # ============================================================================
 
 class Matrix:
+    """Immutable: `_data` is set once at construction and never written to
+    again (enforced both by omitting `__setitem__` and by marking the
+    underlying numpy buffer read-only), matching the frozen dataclasses
+    (Transform/Orientation/Axis) that hold Matrix-typed fields elsewhere in
+    this module -- without this, `some_frozen_transform.position[0] = 5`
+    would silently succeed despite the dataclass being frozen.
+    """
+
     __slots__ = ("_data",)
 
     def __init__(self, data):
         if isinstance(data, Matrix):
-            self._data = np.array(data._data, dtype=float, copy=True)
-            return
-        if isinstance(data, np.ndarray):
+            arr = np.array(data._data, dtype=float, copy=True)
+        elif isinstance(data, np.ndarray):
             arr = np.array(data, dtype=float)
-            self._data = arr.reshape(-1, 1) if arr.ndim == 1 else arr
-            return
-        data = list(data)
-        if len(data) > 0 and isinstance(data[0], (list, tuple)):
-            self._data = np.array([[float(v) for v in row] for row in data], dtype=float)
+            arr = arr.reshape(-1, 1) if arr.ndim == 1 else arr
         else:
-            self._data = np.array([float(v) for v in data], dtype=float).reshape(-1, 1)
+            data = list(data)
+            if len(data) > 0 and isinstance(data[0], (list, tuple)):
+                arr = np.array([[float(v) for v in row] for row in data], dtype=float)
+            else:
+                arr = np.array([float(v) for v in data], dtype=float).reshape(-1, 1)
+        arr.setflags(write=False)
+        self._data = arr
 
     @classmethod
     def _wrap(cls, arr: np.ndarray) -> 'Matrix':
+        arr.setflags(write=False)
         out = cls.__new__(cls)
         out._data = arr
         return out
@@ -200,9 +210,6 @@ class Matrix:
     @property
     def T(self) -> 'Matrix':
         return Matrix._wrap(np.ascontiguousarray(self._data.T))
-
-    def copy(self) -> 'Matrix':
-        return Matrix._wrap(self._data.copy())
 
     def det(self) -> float:
         return float(np.linalg.det(self._data))
@@ -245,13 +252,6 @@ class Matrix:
                     result = result.reshape(-1, 1)
             return Matrix._wrap(result)
         return float(result)
-
-    def __setitem__(self, key, value) -> None:
-        data = value._data if isinstance(value, Matrix) else np.asarray(value, dtype=float)
-        if isinstance(key, tuple):
-            self._data[key] = data.reshape(np.shape(self._data[key]))
-        else:
-            self._data.flat[key] = data
 
     def __iter__(self):
         return iter(self._data.flatten().tolist())
@@ -971,14 +971,16 @@ class Orientation:
         """
         Return the orientation with the given axes flipped.
         """
-        new_matrix = self.matrix.copy()
+        # Matrix is frozen, so mutate a raw numpy buffer here and wrap it
+        # fresh at the end rather than assigning into an existing Matrix.
+        arr = self.matrix._data.copy()
         if flip_x:
-            new_matrix[0, :] = -new_matrix[0, :]
+            arr[0, :] = -arr[0, :]
         if flip_y:
-            new_matrix[:, 0] = -new_matrix[:, 0]
+            arr[:, 0] = -arr[:, 0]
         if flip_z:
-            new_matrix[:, 2] = -new_matrix[:, 2]
-        return Orientation(new_matrix)
+            arr[:, 2] = -arr[:, 2]
+        return Orientation(Matrix._wrap(arr))
 
     def __mul__(self, other: 'Orientation') -> 'Orientation':
         """Allow using * operator for multiplication"""

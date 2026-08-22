@@ -621,8 +621,8 @@ class TestFlipOrientation:
     def test_flip_immutability(self):
         """Test that flip doesn't modify the original orientation."""
         orientation = Orientation.facing_north()
-        original_matrix = orientation.matrix.copy()
-        
+        original_matrix = orientation.matrix  # frozen -- safe to hold without copying
+
         # Call flip
         flipped = orientation.flip(flip_x=True, flip_y=True, flip_z=True)
         

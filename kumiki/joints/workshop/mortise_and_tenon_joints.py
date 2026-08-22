@@ -412,10 +412,11 @@ def cut_mortise_and_tenon_joint(
                 label="mortise_hole",
             )
         else:
-            mortise_hole_size = create_v2(0,0)
-            mortise_hole_size[1] = tenon_size[joint_angle_axis_index] / sin_angle_safe
             opp_index = 1 if joint_angle_axis_index == 0 else 0
-            mortise_hole_size[0] = tenon_size[opp_index]
+            mortise_hole_size = create_v2(
+                tenon_size[opp_index],
+                tenon_size[joint_angle_axis_index] / sin_angle_safe,
+            )
 
             mortise_hole_orientation = Orientation.from_z_and_y(
                 z_direction=-mortise_face_normal,
