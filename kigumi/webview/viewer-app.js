@@ -589,7 +589,7 @@ class ViewerSettingsPanel {
                 </label>
                 <label>
                     ${t('viewer.options.edges.label')}
-                    <select id="edge-mode-select" .value=${this.app.edgeMode || 'overlay'}>
+                    <select id="edge-mode-select" .value=${this.app.edgeMode || 'noOverlay'}>
                         <option value="none">${t('viewer.options.edges.none')}</option>
                         <option value="overlay">${t('viewer.options.edges.overlay')}</option>
                         <option value="noOverlay">${t('viewer.options.edges.noOverlay')}</option>
@@ -780,7 +780,7 @@ class ViewerSettingsPanel {
             {
                 id: 'edge-mode-select', on: 'change',
                 apply: (el) => app.setEdgeMode(el.value),
-                sync: (el) => { el.value = app.edgeMode || 'overlay'; },
+                sync: (el) => { el.value = app.edgeMode || 'noOverlay'; },
             },
             { id: 'shadows-toggle', on: 'change', apply: (el) => app.setShadowsEnabled(el.checked) },
             { id: 'reflections-toggle', on: 'change', apply: (el) => app.setReflectionsEnabled(el.checked) },
@@ -1108,7 +1108,7 @@ class KigumiViewerApp extends LitElement {
         this.mouseActionMoved = false;
 
         this.showCenterGizmo = true;
-        this.edgeMode = 'overlay';
+        this.edgeMode = 'noOverlay';
         this.edgeLineThicknessPx = 1.5;
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
@@ -1813,7 +1813,7 @@ class KigumiViewerApp extends LitElement {
             viewerOptions: { ...this.viewerOptions },
             ui: {
                 showCenterGizmo: Boolean(this.showCenterGizmo),
-                edgeMode: String(this.edgeMode || 'overlay'),
+                edgeMode: String(this.edgeMode || 'noOverlay'),
                 edgeLineVisibilityPercent: Number(this.edgeLineVisibilityPercent),
                 edgeLineThicknessPx: Number(this.edgeLineThicknessPx),
                 shadowsEnabled: Boolean(this.shadowsEnabled),
@@ -3478,7 +3478,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     setEdgeMode(mode) {
-        const next = VALID_EDGE_MODES.has(mode) ? mode : 'overlay';
+        const next = VALID_EDGE_MODES.has(mode) ? mode : 'noOverlay';
         if (this.edgeMode === next) {
             return;
         }
