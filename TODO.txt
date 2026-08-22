@@ -162,6 +162,157 @@ def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement : Bu
 
 
 :: TODO
+
+
+-drawing time prep
+  -add proper reference face/edge support to timbers
+  -consider donig measurement mode (select 1 feature to enter measurement mode)
+  -think about how to reverse map selected face into feature (already works I guess but maybe the code is a bit dodgy)
+  -think about how to select edges, points, axis, and make it compatible with face selection
+
+
+-DRAWING TIME
+  -review feature referencing in kumiki
+		-create feature enum point/edge/face and support them
+		-CSGfeature class should return more info about the feature
+			-face features need to beintersectable with another face for edges
+			-edges can be intersected with face for point,s but we don't actually need this
+		-we need some special face treatment
+			-figure out when faces intersect via union/interseciton/difference
+			-if 2 named face features intersect thisp roduces a named edge feature,
+				-careful that you don't end up with too many of these if you have several such CSG operations
+					-I think in most cases you'd rather a prism define its own edge feature then rely on intersecting
+				-in general the one place we really need this is where the shoulder plane intersect the PTW faces of the timber, so PTW timber faces are kinda special in this sense
+	-review reference face/edge in kumiki
+
+-make parameters human readable
+-fix tusk failing from other direction bug
+-add N/S/E/W labels to the cube
+-create helper method for building cut timber from list of joints
+-house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
+
+-add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
+-would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
+
+
+-rename/reorg all mortise and tenon joints
+  DONE-mortise_and_tenon_join/...
+  DONE-delete 45 degree relative tenon size, basic, 
+  -face_aligned
+  -plane_aligned
+  -through_tenon
+  -face_aligned_inset_shoulder
+  -plane_aligned_notch_relief
+  -plane_aligned_scribe_relief
+  -double_angled_notch_relief
+  -double_angled_scribe_relief
+
+
+-add STL mesh support shouldn't be hard :O
+  -make a cabriole leg table example 
+    -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
+
+-consider doing the big 1 joint per file reorg
+  -decide how to reorg examples too...
+  -maybe get ird of folder + example support, examples are always leaf nodes?
+-do joint rename to match what's in your new book
+-add shouder to cross lap joint
+
+
+-update shed example to include panels
+  -make a video about this maybe after you do some more edge joints
+
+-patern book changes
+  -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
+  -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
+-maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
+
+
+
+-enable potato (scribe) notching on the remaining joints?
+-update wedged half dovtail to support shoulder shapes and peg
+ -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
+-add relief imple for DropinButtJointSweepScribeReliefConfig D:
+-create test runner for examples so the exmaples are also tests :O
+-test frame scanning fixes
+-test the install cadquery stuff 
+-do reorg on patterns and eaxmples again
+  -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
+  -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
+  -"Example Frames" -> "Examples"
+-selecting cylinders, their surfaces render over the ends, I guess atht's probably intentional TBH...
+
+
+
+-new kigumi icon
+  DONE-make suer to update the sidebar icon as well
+-add an optional scale ruler to the view and havei t default off
+-maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
+-add sensibility checks to arrangement (so basically they intersect at least a little bit)
+  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
+
+-consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
+-you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
+-add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
+    - joint type tags should be prioritized, or instead sort by tags that show up most often
+    - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
+    Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
+-you broke notching on mortise and tenon joint again
+-look into promoting some plain joints
+-rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future 
+
+-add more tests using the right way
+
+-assembly
+  -rename dissamebly to tatamae LOL`
+  -make assembiles work in patterns
+  -do V2 of assembly allowing multi step dissameblies
+-the right way to do hashing is to have all joints hash their input properties and store a _hash property
+-IFC rendering?
+
+
+-JOINTS
+  DONE-finish build a butt joint to do the wedged dovetail morties and tenon
+  DONE-wedged_half_dovetail_mortise_and_tenon
+  DONE-cut_dropin_housed_butt_joint
+    -assert that timbers are face aligned (orthogonal not required)
+    -assert that faces of both timbers on the "front" of the joint 
+    -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
+    -takes a dropin_depth measured from the dropin face (based on front_face_on_butt_timber) are coplaner. this is the "dropin" face on the receeiving timber
+    -if orthognoal, cut a prism out of the receiving timber to match
+    -take a half space cut on the butt timber angled to the receiving timber and aligned to the insertion depth
+    -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
+    -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
+    -leave a TODO to add notching for non perfect timbers
+  DONE-kanawa tsugi joint
+  DONE-I guessy ou probably want to do tusked mortise and tenon joint too
+  DONE-difference joint 
+    -where 1 CutTimber is just substracted from another timber, useful for making modifications not readily supported... 
+    -may as well do a union joint then? (these would really be decorative joints...)
+    -or would it be better just to have folsk make custom joints
+  -finish cut_board_in_dado_joint_on_plane_aligned_timbers
+  -do router joint stuff
+  -add wedges to mortise and tenon
+  -add screw joint
+  -do the castle joint 3 way joint thingy that should be easy?
+    -may as well do the oscar hsed 3 way joint hingy as well
+  -do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
+  -nuki_end_joint
+    -this is actually just your wedged half dovetail joint :O
+  -nuki_cross_joint
+  -allow decorative extrusions (polygon on a face that extrudes into the face) so you can cut the \____/ shape out of the sawhores feet
+  -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap
+    -# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
+  -lincoln log joints?
+  -double butt spline joint should allow timbers to be placed on either side of the spline (top/bottom)
+  -drop in house joint + notching only on one side
+    -update drop in dovetail joint to notch only on one side
+    -ideally mortise and tenon joint can notch only on one side too... so maybe we should just make notching config genericall ysupport this
+  -dovetail splined tenon butt joint thingy (figure out what it's cutally called in japnasee)
+
+
+
+:: TODONE 
 DONE-give the footprint  rendering a color and amke it turn on/offable (or have swatches to change its collor or transparent)
 DONE-update agent insturctions on orientation conventions
 DONE/IGNORE-try and run a full loop agent test on this to see if it all works
@@ -217,221 +368,32 @@ DONE-BUG th egeomoetery fro the center hole in kanawa tsugi is twrong
   -you alos need to slightly tilt the vertical lines so the hole remains square
   -and you need to slightly tilt the peg as well
 DONE-research removing sympy entirely...
-
-
-
--DRAWING TIME
-  -review feature referencing in kumiki
-		-create feature enum point/edge/face and support them
-		-CSGfeature class should return more info about the feature
-			-face features need to beintersectable with another face for edges
-			-edges can be intersected with face for point,s but we don't actually need this
-		-we need some special face treatment
-			-figure out when faces intersect via union/interseciton/difference
-			-if 2 named face features intersect thisp roduces a named edge feature,
-				-careful that you don't end up with too many of these if you have several such CSG operations
-					-I think in most cases you'd rather a prism define its own edge feature then rely on intersecting
-				-in general the one place we really need this is where the shoulder plane intersect the PTW faces of the timber, so PTW timber faces are kinda special in this sense
-	-review reference face/edge in kumiki
-
--make parameters human readable
--fix tusk failing from other direction bug
--add N/S/E/W labels to the cube
--create helper method for building cut timber from list of joints
--house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
-
--add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
-
-
--rename/reorg all mortise and tenon joints
-  DONE-mortise_and_tenon_join/...
-  DONE-delete 45 degree relative tenon size, basic, 
-  -face_aligned
-  -plane_aligned
-  -through_tenon
-  -face_aligned_inset_shoulder
-  -plane_aligned_notch_relief
-  -plane_aligned_scribe_relief
-  -double_angled_notch_relief
-  -double_angled_scribe_relief
-
-  
--do more derocative joints 
-  -polyline profile
-  -maybe support arc to?
-  -one for just removing random circles
-  -one for rounding over outside edges on boards (for butt crack table)
-
-
--add STL mesh support shouldn't be hard :O
-  -make a cabriole leg table example 
-    -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
-
--consider doing the big 1 joint per file reorg
-  -decide how to reorg examples too...
-  -maybe get ird of folder + example support, examples are always leaf nodes?
--do joint rename to match what's in your new book
--add shouder to cross lap joint
-
-
--furniture joints
+DONE-do more derocative joints 
+  DONE-polyline profile
+  DONE-maybe support arc to?
+  DONE-one for just removing random circles
+  DONE-one for rounding over outside edges on boards (for butt crack table)
+IGNORE-do spiral castle design hehe
+  -you need the castle joint I guess, time to try out 3 way joints
+IGNORE-add CutCSG::get_surface_curvature(point: V3) -> Optional[Tuple[V3, Numeric, V3, Numeric]] (returns derivative and basis for the derivative) so you can properly do the point on boundary check.. welly ou may as well just have a get_surface_info that returns stuff like its curvature, whether it's an edge or face, and the curvature info.
+DONE-furniture joints
   DONE-probably rename t opractice joint
   DONE-create BoardPanelArrangement List[Board] and update borad joints to use this
   DONE-create ExtendedTimberArrangement List[TimberLike]
   DONE-update joints to use new arrangements
-  -finish cut_board_in_dado_joint_on_plane_aligned_timbers
-  -do router joint stuff
-  -do router video
-  
--add wedges to mortise and tenon
--update shed example to include panels
-  -make a video about this maybe after you do some more edge joints
-
--patern book changes
-  -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
-  -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
--maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
-
-
--rename dissamebly to tatamae LOL`
--make assembiles work in patterns
--add stl support for joint accessories so you can use framing hardware
--enable potato (scribe) notching on the remaining joints?
--update wedged half dovtail to support shoulder shapes and peg
- -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
--add relief imple for DropinButtJointSweepScribeReliefConfig D:
--reimplement tongue and fork using mortise and tenon (make a short vid about this)
+DONE-reimplement tongue and fork using mortise and tenon (make a short vid about this)
   the current tongue and fork joint does not suport pegs which eems strange since a tongue and fork joint is just a simplified mortise an tenon joint. I wanted them as 2 as separate functions to simplify things, however they don't need 2 separate implementations as they do right now. "Please reimplement tongue and fork joint using cut_mortise_and_tenon_joint_on_plane_aligned_timbers, in addition, add support for pegs while you do this"
--create test runner for examples so the exmaples are also tests :O
--test frame scanning fixes
--test the install cadquery stuff 
--do reorg on patterns and eaxmples again
-  -get rid of the "Main" tag, a main tag is just anytthing with children, maybe you need to get ird of the folder icons too? or give folder/patterns their own icon
-  -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
-  -"Example Frames" -> "Examples"
--selecting cylinders, their surfaces render over the ends, I guess atht's probably intentional TBH...
-
-
--do V2 of assembly allowing multi step dissameblies
--new kigumi icon
-  DONE-make suer to update the sidebar icon as well
--add an optional scale ruler to the view and havei t default off
--maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
--add sensibility checks to arrangement (so basically they intersect at least a little bit)
-  -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
-
-- probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
--should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
--consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
--you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
--add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
-    - joint type tags should be prioritized, or instead sort by tags that show up most often
-    - prompt: lets update the kigumi sidebar so that it's possible to search for patterns. Is it possible ot add like a tag selector and search bar to it using the existing exlporer/list view? Or should we just build a custom web view.
-    Or is it possible to have the top hal bea custo webview with our buttons and search stuff and the bottom have just the reults. The only issue with that is there shouldn't be a divider between the 2 sections otherwise its unclear that the searching affects the bottom ahlf
--add support for actual AABB render mode
+DONE-add support for actual AABB render mode
   -BUG figure out why box view doesn't render right for the gooseneck, end cut is correct
--you broke notching on mortise and tenon joint again
--can you make meshing run in parallel?
--UI feature select
-  -if 2 feature sselected, do measurement rendering between them :O
-  -byd efault, noly features are the 6 sides of a timber
-    -you can usually not select the end face so how can we tell which is the top/bottom?
-      -maybe add an arrow gizmo pointing to the top in the center of teh timber?
-      -or for features that coincide with local cardinal dircetions of timber you can flag it
--look into promoting some plain joints
--rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future 
--do assembly metadata
+DONE- probably update agent instruciotns so that when user asks for 4x4 2x4 etc it uses true dimensions, or prompt user what it wants
+IGNORE-should we attach meta info to Timbers, it would be nice if timbers were aware of their location on the footprint to assist in finding reference faces for joint operations
+IGNORE-can you make meshing run in parallel?
+DONE-do assembly metadata
   DONE-create assemblydirection class 
   -for accessories, have assemblydriection but also have locking accessory
   -can you rename accessory btw??
   -add assembly directions to existing joints
     -can have helpers from arragement classes to do this in most cases
--add more tests using the right way
--the right way to do hashing is to have all joints hash their input properties and store a _hash property
-
-
-
-
-
-
--JOINTS
-  DONE-finish build a butt joint to do the wedged dovetail morties and tenon
-  DONE-wedged_half_dovetail_mortise_and_tenon
-  DONE-cut_dropin_housed_butt_joint
-    -assert that timbers are face aligned (orthogonal not required)
-    -assert that faces of both timbers on the "front" of the joint 
-    -takes a insertion_depth paremeter measured orthognoally from the receiving timber's receiving face
-    -takes a dropin_depth measured from the dropin face (based on front_face_on_butt_timber) are coplaner. this is the "dropin" face on the receeiving timber
-    -if orthognoal, cut a prism out of the receiving timber to match
-    -take a half space cut on the butt timber angled to the receiving timber and aligned to the insertion depth
-    -next take a prism cut off the "bottom" side of the butt timber to match the dropin depth and aligned with the shoulder of the joint (the receiving face of the receiving timber)
-    -don't forget to set the maybe end cut position paremeter on the butt timber. if the half space cut is orthogonal, this is just the z position of the half space cut, however if it is angled, you need to intersect it with the perfect timber within cross section of the timebr and find the furthest point, projecting that back onto the centerline. note that we do this opertaion in several other joints so please refactor this out into its own helper function!!!
-    -leave a TODO to add notching for non perfect timbers
-  DONE-kanawa tsugi joint
-  -add screw joint
-  DONE-I guessy ou probably want to do tusked mortise and tenon joint too
-  -do the castle joint 3 way joint thingy that should be easy?
-    -may as well do the oscar hsed 3 way joint hingy as well
-  -do compound joint example of the cross lap on post joint using both compound joinery and single 3 way jonit technique
-  -nuki_end_joint
-    -this is actually just your wedged half dovetail joint :O
-  -nuki_cross_joint
-  -allow decorative extrusions (polygon on a face that extrudes into the face) so you can cut the \____/ shape out of the sawhores feet
-  -allow corner lap joint to take non plane aligned timber, you choose one of the timber sto take the "normal" lap and the other one takes the angled lap
-    -# TODO rename to _on_PAT or add support for non plane aligned cases, in which case, provide another parmeter to decide to what extent the lap cut is in each timber's orientation (default to 0 or 0.5)
-  -lincoln log joints?
-  DONE-difference joint 
-    -where 1 CutTimber is just substracted from another timber, useful for making modifications not readily supported... 
-    -may as well do a union joint then? (these would really be decorative joints...)
-    -or would it be better just to have folsk make custom joints
-  -double butt spline joint should allow timbers to be placed on either side of the spline (top/bottom)
-  -drop in house joint + notching only on one side
-    -update drop in dovetail joint to notch only on one side
-    -ideally mortise and tenon joint can notch only on one side too... so maybe we should just make notching config genericall ysupport this
-  -dovetail splined tenon butt joint thingy (figure out what it's cutally called in japnasee)
-
--do spiral castle design hehe
-  -you need the castle joint I guess, time to try out 3 way joints
-
--add CutCSG::get_surface_curvature(point: V3) -> Optional[Tuple[V3, Numeric, V3, Numeric]] (returns derivative and basis for the derivative) so you can properly do the point on boundary check.. welly ou may as well just have a get_surface_info that returns stuff like its curvature, whether it's an edge or face, and the curvature info.
-
-
-    
-
-
--M3 (reward: HNT gordon plane :D)
-  -decorative cuts
-    -basically joints with 1 timber
-    -you'll need to add curve CSG D:
-  -add more features to mortise and tenon joint
-    -extract out peg creation stuff, it will be useful in other places
-      -basically, just figure out the start point and direction of the peg... it will return to you a tuple of prisms to substract from the mortise and tenon timber, and a peg accessory
-    -end wedged mortise and tenon
-    -fox wedge mortise and tenon
-    -Hōzo-zashi Komisen-dome (ほぞ差し込み栓止め)
-      -same as draw bore but with komisen peg,
-    -support tenon_rotation
-    -end_mortise_and_tenon (opitonally extends the mortising timber and offsets the tenon)
-      -otherwise calls into mortise_and_tenon above
-      -also needs to convert the mortise into an "end cut"
-  -a few more fancy ones from here https://architizer.com/blog/inspiration/industry/japanese-art-of-wood-joinery/
-  
-
-M4
-  -drawing support
-  -IFC rendering?
-  -more joints
-    -splice joints
-      -TODO 
-    -coner joints
-      -mortise and tenon end joint (calls mortise and tenon but positions the tenon in away from the end)
-  -chamfer render support?
-
-
-
-
-
-:: TODONE 
 DONE/IGNORE-do tinyhouse shed
   DONE-fix joists between intermediate posts, they should mortise and tenon into the posts
   DONE-make floor joist dovetails smaller so they don't intersect with the post tenons
