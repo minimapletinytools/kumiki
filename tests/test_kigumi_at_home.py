@@ -354,6 +354,7 @@ def _run_render_script(body: str) -> Path:
     return out_path
 
 
+@pytest.mark.gui
 @pytest.mark.skipif(not _PYGLET_AVAILABLE, reason="pyglet (kumiki[render]) not installed")
 class TestRenderFrameToPngTrimeshPygletEndToEnd:
     def test_writes_a_png_file(self):
@@ -477,6 +478,7 @@ class TestPygletImportGuard:
 
 
 class TestAccessoryFocusHeuristicTrimeshPyglet:
+    @pytest.mark.gui
     @pytest.mark.skipif(not _PYGLET_AVAILABLE, reason="pyglet (kumiki[render]) not installed")
     def test_accessory_near_focus_timber_is_included(self):
         with tempfile.TemporaryDirectory() as td:

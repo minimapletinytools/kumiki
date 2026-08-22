@@ -1,4 +1,4 @@
-.PHONY: help setup test test-verbose test-cov typecheck typecheck-watch clean profile stepout pattern-index docs docs-serve
+.PHONY: help setup test test-verbose test-gui test-cov typecheck typecheck-watch clean profile stepout pattern-index docs docs-serve
 
 # Local build output directory for `make docs`; CI overrides this to land the
 # build inside the Astro site's output dir, e.g. `make docs SITE_DIR=website/dist/docs`.
@@ -30,6 +30,9 @@ test:
 
 test-verbose:
 	uv run --group dev python -m pytest tests/ -v
+
+test-gui:
+	uv run --group dev python -m pytest tests/ -m gui
 
 test-cov:
 	uv run --group dev python -m pytest tests/ --cov=kumiki --cov-report=html --cov-report=term-missing

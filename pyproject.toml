@@ -78,6 +78,10 @@ filterwarnings = [
     "ignore::DeprecationWarning",
     "ignore::PendingDeprecationWarning",
 ]
+markers = [
+    "gui: opens a real GUI/OpenGL window (pyglet's trimesh viewer, which has no headless mode). Excluded by default; run with `pytest -m gui` or `make test-gui`.",
+]
+addopts = "-m 'not gui'"
 
 [dependency-groups]
 dev = [
