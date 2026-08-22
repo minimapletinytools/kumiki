@@ -29,7 +29,8 @@ side_length = mm(600)
 side_spacing = mm(500)
 end_inset = mm(100)
 
-tenon_size = Matrix([mm(80), mm(40)])
+tenon_width_relative_to_joint = mm(80)
+tenon_height_relative_to_joint = mm(40)
 tenon_length = mm(75)
 mortise_depth = tenon_length + mm(6)
 
@@ -105,7 +106,8 @@ def build_frame() -> Frame:
                 butt_timber_end=cross_end,
                 front_face_on_butt_timber=TimberLongFace.FRONT,
             ),
-            tenon_size=tenon_size,
+            tenon_width_relative_to_joint=tenon_width_relative_to_joint,
+            tenon_height_relative_to_joint=tenon_height_relative_to_joint,
             tenon_length=tenon_length,
             mortise_depth=mortise_depth,
             peg_parameters=peg_params,
