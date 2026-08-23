@@ -29,7 +29,7 @@ from kumiki.measuring import (
     Space,
 )
 from kumiki.timber_shavings import are_timbers_plane_aligned
-from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder
+from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder, SimpleRectangularPrismFeature
 from .shavings.build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
     locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
@@ -332,12 +332,12 @@ def cut_mortise_and_tenon_joint(
             transform=marking_space.transform,
             start_distance=-back_extension,
             end_distance=tenon_length,
-            named_features=[
-                ("tenon_right", PrismFace.RIGHT),
-                ("tenon_left", PrismFace.LEFT),
-                ("tenon_front", PrismFace.FRONT),
-                ("tenon_back", PrismFace.BACK),
-                (tenon_tip_name, PrismFace.TOP),
+            _features=[
+                SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT),
+                SimpleRectangularPrismFeature("tenon_left", face=PrismFace.LEFT),
+                SimpleRectangularPrismFeature("tenon_front", face=PrismFace.FRONT),
+                SimpleRectangularPrismFeature("tenon_back", face=PrismFace.BACK),
+                SimpleRectangularPrismFeature(tenon_tip_name, face=PrismFace.TOP),
             ],
             label="tenon",
         )

@@ -24,6 +24,8 @@ from kumiki.cutcsg import (
     CutCSG,
     Cylinder,
     Difference,
+    HalfSpaceFeature,
+    SimpleRectangularPrismFeature,
     PrismFace,
     RectangularPrism,
 )
@@ -173,14 +175,22 @@ class TestNavigateToLeaf:
         assert {face for _, face in tenon_hits} >= {"tenon_top", "tenon_front"}
 
     def test_uncut_timber_faces_stay_at_the_root(self, mortise_and_tenon_frame):
-        """Faces of the timber body itself report an empty path and a face name."""
+        """Faces of the timber body report an empty path and a reserved rough name.
+
+        The rendered CSG is built from the timber's actual (as-sawn) body, so
+        its faces are the ``rough.*`` set. The ``ptw.*`` set names the same six
+        directions on the perfect-timber-within prism, which is a different
+        solid -- keeping them distinct is what lets drawing generation tell a
+        reference face from a rough one.
+        """
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
         found = _navigate_every_surface_point(
             cut_timber.render_timber_with_cuts_csg_local()
         )
 
         root_faces = {face for path, face in found if path == ()}
-        assert root_faces >= {"left", "right", "front", "back"}
+        assert root_faces >= {"rough.left", "rough.right", "rough.front", "rough.back"}
+        assert not any(f.startswith("ptw.") for f in root_faces)
 
     def test_mortise_hole_faces_resolve_to_a_labeled_path(
         self, mortise_and_tenon_frame
@@ -226,7 +236,7 @@ def _timber_prism(named=True):
         transform=Transform.identity(),
         start_distance=scalar(0),
         end_distance=scalar(100),
-        named_features=[("right", PrismFace.RIGHT)] if named else None,
+        _features=[SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT)] if named else None,
     )
 
 
@@ -308,7 +318,7 @@ class TestDetectFaceLabel:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(100),
-            named_features=[("tenon_right", PrismFace.RIGHT)],
+            _features=[SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT)],
         )
         assert runner._detect_face_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
 
@@ -334,7 +344,7 @@ class TestDetectFaceLabel:
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)),
             offset=scalar(50),
-            named_feature="shoulder",
+            _features=[HalfSpaceFeature("shoulder")],
         )
         assert runner._detect_face_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
 

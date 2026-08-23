@@ -211,18 +211,12 @@ def _compute_csg_depth(csg: Any) -> int:
 
 def _count_csg_nodes_and_features(csg: Any) -> Tuple[int, int]:
     """Return (node_count, named_feature_count) for the CSG tree."""
-    from kumiki.cutcsg import SolidUnion, Difference, HalfSpace, RectangularPrism
+    from kumiki.cutcsg import SolidUnion, Difference
 
     nodes = 1
     features = 0
 
-    if isinstance(csg, HalfSpace):
-        if getattr(csg, "named_feature", None) is not None:
-            features += 1
-    elif isinstance(csg, RectangularPrism):
-        nf = getattr(csg, "named_features", None)
-        if nf is not None:
-            features += len(nf)
+    features += len(_declared_feature_names(csg))
 
     if isinstance(csg, SolidUnion):
         for child in csg.children:
@@ -1128,25 +1122,13 @@ def _walk_labeled_csg(csg: Any, current_path: List[str], collected: List[Dict[st
     through the tree -- not to be confused with a ticket's ``tags``, which are
     free-form user metadata on timbers and joints.
     """
-    from kumiki.cutcsg import (
-        SolidUnion, Difference, HalfSpace, RectangularPrism,
-    )
+    from kumiki.cutcsg import SolidUnion, Difference
 
     label = getattr(csg, "label", None)
     next_path = current_path
     if label:
         next_path = current_path + [label]
-        features: List[str] = []
-        if isinstance(csg, RectangularPrism):
-            named_features = getattr(csg, "named_features", None)
-            if named_features:
-                for feature_name, _face in named_features:
-                    if feature_name and feature_name not in features:
-                        features.append(feature_name)
-        elif isinstance(csg, HalfSpace):
-            named_feature = getattr(csg, "named_feature", None)
-            if named_feature and named_feature not in features:
-                features.append(named_feature)
+        features = _declared_feature_names(csg)
         collected.append({
             "label": label,
             "path": list(next_path),
@@ -1556,6 +1538,15 @@ def _inv_transform_point(rot: List[List[float]], pos: List[float], pt: List[floa
     ]
 
 
+def _declared_feature_names(csg: Any) -> List[str]:
+    """Names of the features *csg* declares, in declaration order."""
+    names: List[str] = []
+    for declared in csg.get_declared_features():
+        if declared.name not in names:
+            names.append(declared.name)
+    return names
+
+
 def _to_v3(pt: List[float]) -> Any:
     """Wrap a plain [x, y, z] in the V3 kumiki's CSG API expects."""
     from kumiki.rule import create_v3
@@ -1959,29 +1950,17 @@ def _handle_find_csg_by_path(state: RunnerState, payload: Dict[str, Any], slot_s
     # Resolve the CSG node at the given path (no point hint needed)
     target_csg = _resolve_csg_at_path(local_csg, path, None, eps)
 
-    # If a feature label is specified, resolve the named face on the target
+    # If a feature name was requested, confirm the target actually declares it.
+    # The mesh target stays the CSG either way -- _extract_highlight_mesh does
+    # the per-face narrowing itself, via feature_label.
     actual_feature_label = None
-    feature_target = target_csg
-    if feature_label:
-        from kumiki.cutcsg import RectangularPrism, HalfSpace
-        if isinstance(target_csg, RectangularPrism):
-            named_features = getattr(target_csg, "named_features", None)
-            if named_features:
-                for label, face in named_features:
-                    if label == feature_label:
-                        feature_target = face
-                        actual_feature_label = label
-                        break
-        elif isinstance(target_csg, HalfSpace):
-            named_feature = getattr(target_csg, "named_feature", None)
-            if named_feature == feature_label:
-                actual_feature_label = feature_label
-                feature_target = target_csg
+    if feature_label and feature_label in _declared_feature_names(target_csg):
+        actual_feature_label = feature_label
 
     hl_verts, hl_idx, matched, total = _extract_highlight_mesh(
         mesh["vertices"],
         mesh["indices"],
-        feature_target if actual_feature_label else target_csg,
+        target_csg,
         timber_rot,
         timber_pos,
         eps,
@@ -1992,7 +1971,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: Dict[str, Any], slot_s
     )
 
     parent_hl = None
-    if actual_feature_label and target_csg is not feature_target:
+    if actual_feature_label:
         p_verts, p_idx, _, _ = _extract_highlight_mesh(
             mesh["vertices"],
             mesh["indices"],

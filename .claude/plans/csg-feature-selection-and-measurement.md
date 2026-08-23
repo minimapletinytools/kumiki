@@ -169,38 +169,88 @@ cut planes.
 
 kigumi then calls kumiki directly and the float shadow (finding 1) is deleted.
 
-### D2 — `named_features` becomes a dataclass (`cutcsg.py`, `pathcsg.py`)
+### D2 — Features are objects stored on the primitive (`cutcsg.py`, `pathcsg.py`)
+
+An earlier revision of this section had a `NamedFeature` *declaration* struct stored on the
+primitive, converted at query time into a separate `CSGFeature` carrying an `owner`. That
+shape was built and then rejected as too complicated: one concept in two types, joined by a
+`_metadata_from` copy bridge, and — worse — the matching logic written twice, since each
+primitive's `get_all_features` restated what the corresponding feature's `test_point`
+already did (127 duplicated lines across six overrides).
+
+The root cause was constructing features lazily so they could hold `owner`. Removing that
+constraint collapses the design:
 
 ```python
-class FeatureGroup(Enum):
-    A  = 1   # intersects with B1 and B2
-    B1 = 2   # intersects with A only
-    B2 = 3   # intersects with A, and with itself
-    C  = 4   # intersects with itself only
-
 @dataclass(frozen=True)
-class NamedFeature:
-    name: str
-    key: FeatureKey                      # PrismFace | ExtrusionFeatureKey | CylinderPart
+class FeatureProperties:
     group: FeatureGroup = FeatureGroup.A
     real: bool = True
     priority: int = 0
-    # measurement tags land here later -- see D9 / feature 3
+
+@dataclass(frozen=True)
+class CSGFeature(ABC):
+    name: str
+    properties: FeatureProperties = field(default_factory=FeatureProperties)
+
+    @abstractmethod
+    def test_point(self, owner: 'CutCSG', point: V3, eps=None) -> bool: ...
 ```
 
-Every primitive that can name faces takes `named_features: Optional[List[NamedFeature]]`,
-and that now includes `Cylinder` and `ConvexPolygonSimpleLoft`, which have no such field
-today.
+A feature holds no reference to its owner; the owner is an argument. That makes a feature
+constructible *before* the primitive it belongs to, which is what lets the primitive store
+it.
 
-`priority` is currently hardcoded to `0` at all six construction sites, so the priority
-sort in `find_feature` is a no-op. It becomes meaningful here.
+`_features` lives on `CutCSG` itself (private, kw-only, beside `label`), so it is declared
+once rather than on six primitives, and a compound node can name features of its own if it
+ever needs to. `get_all_features` then has **one** implementation for every primitive:
 
-NO SHIM ~kumiki ships on PyPI (0.4.10) and joint authors write these literals, so accept the old
-`List[Tuple[str, Face]]` form in `__post_init__` and coerce it to `NamedFeature` with
-defaults. One release of overlap, then drop the shim.~ NO SHIM
+```python
+def get_all_features(self, point, eps=None):
+    if not self._features or not self.is_point_on_boundary(point, eps=eps):
+        return []
+    return [FeatureHit(feature=f, owner=self)
+            for f in self._features if f.test_point(self, point, eps=eps)]
+```
 
-**Group defaults to start:** PTW long faces → `B1`; every named joint feature → `A`.
-`B2` and `C` stay defined but unused until something needs them.
+Compound nodes (`SolidUnion`, `Difference`, `Intersection`) override it to gather from
+their children *and* `super()`.
+
+Queries return a `FeatureHit(feature, owner)` pair, since a feature alone does not know
+where it lives and step 4's `locate()` / `get_extent()` will need the owner. This is not
+the two-type problem returning: the pair duplicates no metadata and has no copy bridge.
+`FeatureHit.name` and `.properties` forward, so most call sites read unchanged.
+
+Concrete feature classes:
+
+| class | identified by |
+| --- | --- |
+| `HalfSpaceFeature` | nothing — a half-space has one face |
+| `SimpleRectangularPrismFeature` | `PrismFace` |
+| `SimpleCylinderFeature` | `CylinderPart` (TOP / BOTTOM / BARREL) |
+| `SimpleConvexPolygonExtrusionFeature` | `ExtrusionFeatureKey` |
+| `SimpleLoftFeature` | `ExtrusionFeatureKey` |
+| `SimplePathExtrusionFeature` | `ExtrusionFeatureKey` |
+| `ProgrammableCSGFeature` | an arbitrary predicate |
+
+Every feature also answers `feature_type() -> CSGFeatureType` (FACE / EDGE / POINT). It is
+an **abstract method, not a field**, so a feature cannot be told it is something it is not:
+the six `Simple*` classes return FACE as a constant because that is what they name by
+construction, and only `ProgrammableCSGFeature` -- whose kind genuinely varies with its
+predicate -- stores one, in `declared_type`. Being abstract also means a new feature class
+cannot forget to declare its kind.
+
+Kept off `FeatureProperties` deliberately: the type says what a feature *is*, the
+properties say how it should be *treated*. Step 8's measurement dispatch keys off the pair
+of types.
+
+`ProgrammableCSGFeature` is the extension point: a formula-defined region, half a face, or
+an edge derived from two other features, with no new class and no change to the owner's
+query path. Step 5's derived edges are expected to use it. Each simple class types its own
+key concretely, so the `FeatureKey` union and its `isinstance` guards are gone.
+
+`Cylinder` and `ConvexPolygonSimpleLoft` can now carry names at all, which they could not
+before — a peg hole was permanently anonymous.
 
 ### D3 — Edges are the conjunction of their parents (`cutcsg.py`)
 
@@ -213,12 +263,14 @@ class DerivedEdgeFeature(CSGFeature):
     a: CSGFeature
     b: CSGFeature
 
-    def test_point(self, p, eps=...):
-        return self.a.test_point(p, eps) and self.b.test_point(p, eps)
-
-    def locate(self) -> Line:
-        return intersect_planes(self.a.locate(), self.b.locate())
+    def test_point(self, owner, point, eps=None):
+        return self.a.test_point(owner, point, eps) and self.b.test_point(owner, point, eps)
 ```
+
+(Or a `ProgrammableCSGFeature` whose predicate is that conjunction, if it turns out no
+extra class is warranted. Note both parents must share an owner for the single-owner form
+above; an edge between features of two *different* primitives needs the pair of owners,
+which is what `FeatureHit` already carries.)
 
 Note the deliberate asymmetry: `locate()` returns an **unbounded** `Line` for the
 measurement math ("as if they were infinite lines"), while `test_point` stays bounded for
@@ -244,6 +296,9 @@ gets the same identity regardless of which way traversal reached it — sort by
 `(group, name)`. Reads well in a breadcrumb: `tenon_front x ptw.right`.
 
 ### D4 — Extent, for placing annotations (`cutcsg.py`, `runner.py`)
+
+(The `CSGFeatureKind` half of this landed early, as `CSGFeatureType` on `CSGFeature` —
+see D2. What remains here is the extent.)
 
 Measurement rendering needs to know roughly *where* a feature is, separately from the
 unbounded geometry it measures against:
@@ -398,7 +453,8 @@ anything to point at.
 Today the info line is a single string, `timberName > face (label)`, built in `updateInfo`
 (`viewer-app.js`).
 
-- **Feature type** — needs `CSGFeatureKind` (point / edge / face). New.
+- **Feature type** — `CSGFeatureType` (FACE / EDGE / POINT) is on every feature and
+  forwarded by `FeatureHit`. Done; the viewer just has to show it.
 - **Joint it came from** — D7 delivers this directly.
 - **Expandable CSG feature tree** — needs finding 2 fixed first; the hierarchy is already
   authored. Two-way binding is the new work: clicking a node highlights the feature in 3D,
@@ -453,9 +509,8 @@ it from the CSG path — CSG selection goes to a separate `csgSelection` slot ho
 1. ~~**Fix `tag` → `label` in `runner.py`.**~~ **DONE** -- see "Implementation notes".
 2. ~~**Tolerance parameters, then delete the float shadow.**~~ **DONE** -- see
    "Implementation notes".
-3. **`NamedFeature` dataclass + reserved PTW/rough names.** D2 and D6 together — both touch
-   the same construction sites. Adds `named_features` to `Cylinder` and
-   `ConvexPolygonSimpleLoft`.
+3. ~~**`NamedFeature` dataclass + reserved PTW/rough names.**~~ **DONE** -- see
+   "Implementation notes".
 4. **Build out `CSGFeature`.** D4 and D5: `kind`, `real`, `locate()`, `get_extent()`,
    non-real priority and cropping, snap tolerance.
 5. **Derive edges from face groups.** D3. A x B1 to start, with the parallel / coincident /
@@ -476,7 +531,7 @@ path and a redundant one.
 
 ---
 
-## Implementation notes (steps 1 and 2)
+## Implementation notes (steps 1-3)
 
 ### Step 1 -- `tag` -> `label`
 
@@ -577,6 +632,75 @@ dovetail housing -> ('sliding_dovetail', 'dovetail_housing')        ConvexPolygo
 path decoration -> ('path_extrusion_corner_end_decoration',)        PathExtrusion
 roundovers      -> ('roundover_decoration', 'roundover_top_left')   Cylinder   (x12, each distinct)
 ```
+
+### Step 3 -- feature classes, feature types, and reserved PTW/rough names
+
+No compat shim: the old `List[Tuple[str, Face]]` form had 12 construction sites in total
+(one in the joint library, eleven in tests), so a clean break was cheaper than carrying a
+deprecation path on a published API.
+
+**Feature classes (D2).** Built once around a stored `NamedFeature` declaration plus a
+resolved `CSGFeature`, then rebuilt when that proved too complicated -- see D2 for the
+shape that shipped and why. The rebuild deleted 127 lines of duplicated matching logic,
+the `NamedFeature` type, `_metadata_from`, the `FeatureKey` union and every `isinstance`
+guard that union forced, and replaced six per-primitive `get_all_features` overrides with
+one implementation on `CutCSG`.
+
+`priority` was previously hardcoded to 0 at all six construction sites, making
+`find_feature`'s priority sort a no-op. It is now settable via `FeatureProperties` and
+covered by a test.
+
+**`CSGFeatureType` (D4, pulled forward).** FACE / EDGE / POINT, forwarded by `FeatureHit`.
+First built as a field with a FACE default, then changed to an abstract method so it cannot
+be set incorrectly -- a `SimpleRectangularPrismFeature` had no way to refuse `EDGE`, and
+step 5 and step 8 both act on this, so a wrong value would propagate into derived edges and
+measurement dispatch. As a method there is nothing to set: face-by-construction classes
+return a constant, `ProgrammableCSGFeature` stores `declared_type`, and abstractness stops
+a new class forgetting to declare its kind. Tests cover all three.
+
+**`FeatureGroup` + `FEATURE_GROUP_PAIRS` (D3 groundwork).** A/B1/B2/C with
+`feature_groups_intersect()`. A test asserts the table is symmetric in both directions, so
+step 5 can rely on that rather than checking both orders.
+
+**New key enum.** `CylinderPart` (TOP / BOTTOM / BARREL). The barrel is deliberately a
+single feature: a bore wall is one thing to reference, and there is no non-arbitrary way
+to divide a curved surface into named faces. (A `FeatureKey` union over every key type
+existed in the first cut and is gone -- each Simple* class now types its own key.)
+
+**`Cylinder` and `ConvexPolygonSimpleLoft` can now carry names**, which they could not
+before -- a peg hole was permanently anonymous. Both needed a new feature class;
+the loft also needed a `_point_on_side` helper, which tests against the cross-section at
+the point's own height because its sides are ruled surfaces, not planes.
+
+**Reserved `ptw.` / `rough.` prefixes (D6).** `_timber_face_tags()` split into
+`_ptw_face_tags()` / `_rough_face_tags()`, both group B1. The rule applied: a prism's tag
+set names *which prism it is*, not whether the two happen to coincide -- so a perfect
+timber's actual body is still `rough.*`, and coincidence stays a separate question
+answered by `is_face_perfect`. `_create_extended_rectangular_prism` serves both the actual
+and the perfect paths, so it takes the tag set as a parameter; the four call sites were
+assigned from their enclosing method (`get_extended_perfect_csg_local` -> ptw, the three
+`get_extended_actual_csg_local` overrides -> rough).
+
+**Runner cleanup that fell out.** `_declared_feature_names()` replaces two isinstance
+ladders that only understood `RectangularPrism` and `HalfSpace`, so the CSG tree panel and
+the member list's feature count now see cylinders, extrusions and lofts too.
+`_handle_find_csg_by_path` had a latent bug -- it assigned a `PrismFace` enum to
+`feature_target` and passed it where a CSG was expected. Unreachable while paths were
+broken (step 1), live now; the mesh target stays the CSG and `feature_label` does the
+per-face narrowing, which is how `_extract_highlight_mesh` already worked.
+
+**Typecheck.** The wide `FeatureKey` union in the first cut produced 7 new `ty`
+diagnostics where a key reached a helper expecting `int`. The redesign removes the union
+entirely, so those cannot recur. Back to the 8 pre-existing diagnostics.
+
+**A mistake worth recording.** Deleting the six obsolete `get_all_features` overrides by
+AST line range, I sorted the ranges by class *name* instead of line number, so the
+deletions applied out of order and corrupted unrelated method bodies in `cutcsg.py`.
+Recovered by reverting `cutcsg.py` / `pathcsg.py` to the step-2 commit and reapplying the
+redesign with anchor-based string replacement instead of line numbers -- cheap here only
+because everything step 3 had added to those two files was superseded by the redesign
+anyway. Delete by matching text, not by coordinates computed from a stale parse.
+
 
 ### Follow-ups noticed while in there
 

@@ -13,7 +13,7 @@ raycast hit lands on a boolean-mesh vertex that is only approximately on the
 analytic primitive, so the default 1e-10 rejects nearly every real hit.
 """
 
-from typing import List, Optional, Tuple, Union, cast
+from typing import Callable, List, Optional, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -89,6 +89,87 @@ class ExtrusionCap(Enum):
 ExtrusionFeatureKey = Union[int, ExtrusionCap]
 
 
+class CylinderPart(Enum):
+    """Which surface of a Cylinder a feature is on.
+
+    BARREL is the curved lateral surface. Unlike a prism's four sides it is a
+    single feature, not four -- there is no non-arbitrary way to cut it up, and
+    nothing in joinery wants to reference "a quarter of a peg hole wall".
+    """
+    TOP = 1
+    BOTTOM = 2
+    BARREL = 3
+
+
+class CSGFeatureType(Enum):
+    """What kind of geometry a feature names.
+
+    The three cases measurement cares about: measuring between two features
+    dispatches on this pair (two parallel faces measure like two parallel
+    planes, a point and a face measure a projected distance, and so on).
+
+    Everything nameable on a primitive today is a FACE. EDGE arrives with
+    features derived from intersecting face pairs; POINT with their vertices.
+    """
+    FACE = 1
+    EDGE = 2
+    POINT = 3
+
+
+class FeatureGroup(Enum):
+    """Which other features a feature is allowed to form an edge with.
+
+    Deriving edges from every pair of faces in a CSG tree produces mostly
+    nonsense -- a tenon cheek and the far end of the timber do not meet. Groups
+    make the useful pairs declarable instead of searched for:
+
+        A  intersects with B1 and B2
+        B1 intersects with A only
+        B2 intersects with A, and with itself
+        C  intersects with itself only
+
+    Defaults today: a timber's perfect-timber-within long faces are B1, and
+    every named joint feature is A -- so joint geometry meets the timber body
+    and not itself. B2 and C are defined but unused until something needs them.
+    """
+    A = 1
+    B1 = 2
+    B2 = 3
+    C = 4
+
+
+# Which groups each group forms edges with. Symmetric by construction; see
+# FeatureGroup for what the letters mean.
+FEATURE_GROUP_PAIRS: dict = {
+    FeatureGroup.A: frozenset({FeatureGroup.B1, FeatureGroup.B2}),
+    FeatureGroup.B1: frozenset({FeatureGroup.A}),
+    FeatureGroup.B2: frozenset({FeatureGroup.A, FeatureGroup.B2}),
+    FeatureGroup.C: frozenset({FeatureGroup.C}),
+}
+
+
+def feature_groups_intersect(a: FeatureGroup, b: FeatureGroup) -> bool:
+    """Whether features in groups *a* and *b* may form an edge together."""
+    return b in FEATURE_GROUP_PAIRS[a]
+
+
+@dataclass(frozen=True)
+class FeatureProperties:
+    """Metadata every feature carries, independent of how it is identified.
+
+    Args:
+        group: which other features this one may form an edge with.
+        real: False for a feature that names no actual surface (a bore's centre
+            axis, a reference plane). Real features can be cropped away by the
+            CSG tree and so are tested against the triangulated result first;
+            non-real ones are unaffected by boolean operations.
+        priority: lower wins when several features claim the same point.
+    """
+    group: FeatureGroup = FeatureGroup.A
+    real: bool = True
+    priority: int = 0
+
+
 def _squared_eps(eps: Optional[Numeric]) -> Optional[Numeric]:
     """Adapt a linear distance tolerance for comparison against a SQUARED distance.
 
@@ -106,99 +187,257 @@ def _squared_eps(eps: Optional[Numeric]) -> Optional[Numeric]:
 
 @dataclass(frozen=True)
 class CSGFeature(ABC):
-    """
-    Represents a feature of a CSG object, such as a face or edge, that can be used for referencing in tickets.
+    """A named region of a CutCSG's boundary -- a face today, edges and points later.
+
+    A feature is stored on the primitive it belongs to and does NOT hold a
+    reference back to it: the owner is passed in to every method that needs
+    geometry. That keeps a feature constructible before its owner exists (which
+    it must be, to be passed to the owner's constructor) and means there is one
+    feature type rather than a stored declaration plus a resolved copy.
+
+    Because a feature alone does not know where it lives, queries hand back a
+    FeatureHit pairing it with the primitive that matched.
+
+    Subclasses say how the feature is identified: by an enum member for the
+    simple per-primitive cases, or by an arbitrary predicate for
+    ProgrammableCSGFeature.
     """
     name: str
-    priority: int 
+    properties: FeatureProperties = field(default_factory=FeatureProperties)
 
     @abstractmethod
-    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+    def feature_type(self) -> CSGFeatureType:
+        """What kind of geometry this feature names.
+
+        A method rather than a field so it cannot be set to something the
+        feature is not: a face feature has no way to claim it is an edge.
+        Subclasses that name one kind by construction return a constant; only
+        a feature whose kind genuinely varies stores one.
+
+        Kept off FeatureProperties deliberately -- this says what the feature
+        *is*, while properties say how it should be treated.
         """
-        Test if a given point is on this feature (e.g. on the face or edge).
-        This can be used to determine if a cut should reference this feature.
+        ...
+
+    @property
+    def group(self) -> FeatureGroup:
+        return self.properties.group
+
+    @property
+    def real(self) -> bool:
+        return self.properties.real
+
+    @property
+    def priority(self) -> int:
+        return self.properties.priority
+
+    @abstractmethod
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        """Whether *point* lies on this feature of *owner*.
+
+        Callers reach this through owner.get_all_features(), which has already
+        established that the point is on the owner's boundary at all.
         """
-        pass
+        ...
+
+
+@dataclass(frozen=True)
+class ProgrammableCSGFeature(CSGFeature):
+    """A feature identified by an arbitrary predicate rather than an enum member.
+
+    The escape hatch for anything the simple per-primitive classes cannot name:
+    a formula-defined region, half of a face, an edge derived from two other
+    features. Works on any primitive, since the owner is just an argument.
+
+    The predicate is called only for points already known to be on the owner's
+    boundary, and receives the same eps the query was made with.
+    """
+    predicate: Optional[Callable[['CutCSG', V3, Optional[Numeric]], bool]] = None
+    # The only class that stores its kind: a predicate can describe a face, an
+    # edge or a point, so there is nothing constant to return.
+    declared_type: CSGFeatureType = CSGFeatureType.FACE
+
+    def feature_type(self) -> CSGFeatureType:
+        return self.declared_type
+
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        if self.predicate is None:
+            return False
+        return self.predicate(owner, point, eps)
 
 
 @dataclass(frozen=True)
 class HalfSpaceFeature(CSGFeature):
-    """Feature representing the entire boundary plane of a HalfSpace."""
-    owner: 'HalfSpace'
+    """The entire boundary plane of a HalfSpace.
 
-    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        return self.owner.is_point_on_boundary(point, eps=eps)
+    A half-space has exactly one face, so this needs no key to say which.
+    """
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.FACE
+
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        return owner.is_point_on_boundary(point, eps=eps)
 
 
 @dataclass(frozen=True)
-class RectangularPrismFeature(CSGFeature):
-    """Feature representing a single face of a RectangularPrism."""
-    owner: 'RectangularPrism'
-    face: PrismFace
+class SimpleRectangularPrismFeature(CSGFeature):
+    """One of the six faces of a RectangularPrism, named by PrismFace."""
+    face: PrismFace = PrismFace.TOP
 
-    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        if not self.owner.is_point_on_boundary(point, eps=eps):
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.FACE
+
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, RectangularPrism):
             return False
-        x, y, z = self.owner._local_coords(point)
-        hw = self.owner.size[0] / 2
-        hh = self.owner.size[1] / 2
+        x, y, z = owner._local_coords(point)
+        half_width = owner.size[0] / 2
+        half_height = owner.size[1] / 2
         if self.face == PrismFace.RIGHT:
-            return safe_equality_test(x, hw, eps=eps)
-        elif self.face == PrismFace.LEFT:
-            return safe_equality_test(x, -hw, eps=eps)
-        elif self.face == PrismFace.FRONT:
-            return safe_equality_test(y, hh, eps=eps)
-        elif self.face == PrismFace.BACK:
-            return safe_equality_test(y, -hh, eps=eps)
-        elif self.face == PrismFace.TOP:
-            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance, eps=eps)
-        elif self.face == PrismFace.BOTTOM:
-            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance, eps=eps)
+            return safe_equality_test(x, half_width, eps=eps)
+        if self.face == PrismFace.LEFT:
+            return safe_equality_test(x, -half_width, eps=eps)
+        if self.face == PrismFace.FRONT:
+            return safe_equality_test(y, half_height, eps=eps)
+        if self.face == PrismFace.BACK:
+            return safe_equality_test(y, -half_height, eps=eps)
+        if self.face == PrismFace.TOP:
+            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=eps)
+        if self.face == PrismFace.BOTTOM:
+            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=eps)
         return False
 
 
 @dataclass(frozen=True)
-class ConvexPolygonExtrusionFeature(CSGFeature):
-    """Feature representing one side face (points[key] -> points[key+1 mod n])
-    or an end cap (ExtrusionCap.TOP/BOTTOM) of a ConvexPolygonExtrusion."""
-    owner: 'ConvexPolygonExtrusion'
-    key: ExtrusionFeatureKey
+class SimpleCylinderFeature(CSGFeature):
+    """One surface of a Cylinder: an end cap, or the barrel."""
+    part: CylinderPart = CylinderPart.BARREL
 
-    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        if not self.owner.is_point_on_boundary(point, eps=eps):
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.FACE
+
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, Cylinder):
             return False
-        x, y, z = self.owner._local_coords(point)
+        axial, radial = owner._axial_and_radial(point)
+        if self.part == CylinderPart.TOP:
+            return owner.end_distance is not None and safe_equality_test(axial, owner.end_distance, eps=eps)
+        if self.part == CylinderPart.BOTTOM:
+            return owner.start_distance is not None and safe_equality_test(axial, owner.start_distance, eps=eps)
+        return safe_equality_test(radial, owner.radius, eps=eps)
+
+
+@dataclass(frozen=True)
+class SimpleConvexPolygonExtrusionFeature(CSGFeature):
+    """One side face (points[key] -> points[key+1 mod n]) or end cap of a
+    ConvexPolygonExtrusion."""
+    key: ExtrusionFeatureKey = ExtrusionCap.TOP
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.FACE
+
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, ConvexPolygonExtrusion):
+            return False
+        x, y, z = owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance, eps=eps)
+            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=eps)
         if self.key == ExtrusionCap.BOTTOM:
-            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance, eps=eps)
-        return self.owner._point_on_side(self.key, x, y, eps=eps)
+            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=eps)
+        return owner._point_on_side(self.key, x, y, eps=eps)
+
+
+@dataclass(frozen=True)
+class SimpleLoftFeature(CSGFeature):
+    """One side face or end cap of a ConvexPolygonSimpleLoft.
+
+    Side faces are ruled surfaces and are only planar in the special case of a
+    pure per-axis taper, so a named side is a surface, not necessarily a plane.
+    Edge derivation (which assumes planes) has to account for that.
+    """
+    key: ExtrusionFeatureKey = ExtrusionCap.TOP
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.FACE
+
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, ConvexPolygonSimpleLoft):
+            return False
+        x, y, z = owner._local_coords(point)
+        if self.key == ExtrusionCap.TOP:
+            return safe_equality_test(z, owner.end_distance, eps=eps)
+        if self.key == ExtrusionCap.BOTTOM:
+            return safe_equality_test(z, owner.start_distance, eps=eps)
+        return owner._point_on_side(self.key, x, y, z, eps=eps)
+
+
+@dataclass(frozen=True)
+class FeatureHit:
+    """A feature, paired with the primitive it was found on.
+
+    A CSGFeature holds no reference to its owner, so a query hands back both.
+    Anything needing the feature's geometry -- its plane, its extent -- needs
+    the owner too.
+    """
+    feature: CSGFeature
+    owner: 'CutCSG'
+
+    @property
+    def name(self) -> str:
+        return self.feature.name
+
+    def feature_type(self) -> CSGFeatureType:
+        return self.feature.feature_type()
+
+    @property
+    def properties(self) -> FeatureProperties:
+        return self.feature.properties
 
 
 @dataclass(frozen=True)
 class CutCSG(ABC):
     """Base class for all CSG operations."""
     label: Optional[str] = field(default=None, kw_only=True)
+    # Features this node names on its own boundary. Private: read it through
+    # get_declared_features(), query it through get_all_features(). Declared
+    # once here rather than on each primitive, so a compound node can name
+    # features of its own if it ever needs to.
+    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
 
     @abstractmethod
     def __repr__(self) -> str:
         """String representation for debugging."""
         pass
 
-    def find_feature(self, point: V3, eps: Optional[Numeric] = None) -> Optional[CSGFeature]:
-        """Return the highest-priority feature at *point*, or None."""
-        features = self.get_all_features(point, eps=eps)
-        if not features:
-            return None
-        features.sort(key=lambda f: f.priority)
-        for f in features:
-            if f.test_point(point, eps=eps):
-                return f
-        return None
+    def get_declared_features(self) -> List[CSGFeature]:
+        """Features this node names, whether or not any point lies on them."""
+        return list(self._features or ())
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
-        """Return all features that the point may belong to."""
-        return []
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
+        """Every feature of this node that *point* lies on.
+
+        One implementation for every primitive: the boundary test is the
+        primitive's own, and each feature decides for itself whether the point
+        is on it. Compound nodes override this to gather from their children.
+        """
+        if not self._features:
+            return []
+        if not self.is_point_on_boundary(point, eps=eps):
+            return []
+        return [
+            FeatureHit(feature=f, owner=self)
+            for f in self._features
+            if f.test_point(self, point, eps=eps)
+        ]
+
+    def find_feature(self, point: V3, eps: Optional[Numeric] = None) -> Optional['FeatureHit']:
+        """The highest-priority feature at *point*, or None."""
+        hits = self.get_all_features(point, eps=eps)
+        if not hits:
+            return None
+        hits.sort(key=lambda hit: hit.feature.priority)
+        return hits[0]
 
 
     @abstractmethod
@@ -300,7 +539,6 @@ class HalfSpace(CutCSG):
     """
     normal: Direction3D
     offset: Numeric = scalar(0)
-    named_feature: Optional[str] = None
 
     def __repr__(self) -> str:
         return f"HalfSpace(normal={self.normal.T}, offset={self.offset})"
@@ -352,11 +590,6 @@ class HalfSpace(CutCSG):
         """
         return -self.normal
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
-        if self.named_feature is not None and self.is_point_on_boundary(point, eps=eps):
-            return [HalfSpaceFeature(name=self.named_feature, priority=0, owner=self)]
-        return []
-
     def get_aabb(self) -> BoundingBox:
         warnings.warn(
             "get_aabb() called on HalfSpace, which has infinite extent — result is unbounded",
@@ -395,7 +628,6 @@ class RectangularPrism(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None  # starting distance of the prism in the direction of the +Z axis. None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # ending distance of the prism in the direction of the +Z axis. None means infinite in positive direction
-    named_features: Optional[List[Tuple[str, PrismFace]]] = None
 
     def get_bottom_position(self) -> V3:
         """
@@ -607,26 +839,6 @@ class RectangularPrism(CutCSG):
         # Should not reach here if point is actually on boundary
         return None
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
-        if self.named_features is None or not self.is_point_on_boundary(point, eps=eps):
-            return []
-        x, y, z = self._local_coords(point)
-        hw = self.size[0] / 2
-        hh = self.size[1] / 2
-        face_checks = {
-            PrismFace.RIGHT: lambda: safe_equality_test(x, hw, eps=eps),
-            PrismFace.LEFT: lambda: safe_equality_test(x, -hw, eps=eps),
-            PrismFace.FRONT: lambda: safe_equality_test(y, hh, eps=eps),
-            PrismFace.BACK: lambda: safe_equality_test(y, -hh, eps=eps),
-            PrismFace.TOP: lambda: self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps),
-            PrismFace.BOTTOM: lambda: self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps),
-        }
-        features: List[CSGFeature] = []
-        for name, face in self.named_features:
-            if face_checks[face]():
-                features.append(RectangularPrismFeature(name=name, priority=0, owner=self, face=face))
-        return features
-
     def get_aabb(self) -> BoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
@@ -725,6 +937,14 @@ class Cylinder(CutCSG):
     position: V3 = field(default_factory=lambda: Matrix([scalar(0), scalar(0), scalar(0)]))  # Position in global coordinates
     start_distance: Optional[Numeric] = None  # None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # None means infinite in positive direction
+
+    def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
+        """Distance along the axis from `position`, and distance from the axis."""
+        local_point = point - self.position
+        axis = self.axis_direction / safe_norm(self.axis_direction)
+        axial = safe_dot_product(local_point, axis)
+        perpendicular = local_point - axis * axial
+        return axial, safe_norm(perpendicular)
 
     def __repr__(self) -> str:
         return (f"Cylinder(axis={self.axis_direction.T}, "
@@ -977,12 +1197,12 @@ class SolidUnion(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
-        features: List[CSGFeature] = []
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
+        hits = list(super().get_all_features(point, eps=eps))
         for child in self.children:
-            features.extend(child.get_all_features(point, eps=eps))
-        features.sort(key=lambda f: f.priority)
-        return features
+            hits.extend(child.get_all_features(point, eps=eps))
+        hits.sort(key=lambda hit: hit.feature.priority)
+        return hits
 
     def get_aabb(self) -> BoundingBox:
         # Empty children contribute no points to the union, so they're excluded
@@ -1060,14 +1280,14 @@ class Intersection(CutCSG):
 
         return None
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
         if not self.is_point_on_boundary(point, eps=eps):
             return []
-        features: List[CSGFeature] = []
-        features.extend(self.left.get_all_features(point, eps=eps))
-        features.extend(self.right.get_all_features(point, eps=eps))
-        features.sort(key=lambda f: f.priority)
-        return features
+        hits = list(super().get_all_features(point, eps=eps))
+        hits.extend(self.left.get_all_features(point, eps=eps))
+        hits.extend(self.right.get_all_features(point, eps=eps))
+        hits.sort(key=lambda hit: hit.feature.priority)
+        return hits
 
     def get_aabb(self) -> BoundingBox:
         left_bbox = self.left.get_aabb()
@@ -1257,16 +1477,16 @@ class Difference(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
         if not self.is_point_on_boundary(point, eps=eps):
             return []
-        # Collect features from both the base and subtract children
-        features: List[CSGFeature] = []
-        features.extend(self.base.get_all_features(point, eps=eps))
-        for sub in self.subtract:
-            features.extend(sub.get_all_features(point, eps=eps))
-        features.sort(key=lambda f: f.priority)
-        return features
+        # Both the base and the subtracted solids contribute surface here.
+        hits = list(super().get_all_features(point, eps=eps))
+        hits.extend(self.base.get_all_features(point, eps=eps))
+        for sub_csg in self.subtract:
+            hits.extend(sub_csg.get_all_features(point, eps=eps))
+        hits.sort(key=lambda hit: hit.feature.priority)
+        return hits
 
     def get_aabb(self) -> BoundingBox:
         bbox = self.base.get_aabb()
@@ -1319,7 +1539,6 @@ class ConvexPolygonExtrusion(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None  # starting distance in the direction of the -Z axis. None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # ending distance in the direction of the +Z axis. None means infinite in positive direction
-    named_features: Optional[List[Tuple[str, ExtrusionFeatureKey]]] = None
 
     def get_bottom_position(self) -> V3:
         """
@@ -1619,22 +1838,6 @@ class ConvexPolygonExtrusion(CutCSG):
         distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
         return safe_zero_test(distance_sq, eps=_squared_eps(eps))
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
-        if self.named_features is None or not self.is_point_on_boundary(point, eps=eps):
-            return []
-        x, y, z = self._local_coords(point)
-        features: List[CSGFeature] = []
-        for name, key in self.named_features:
-            if key == ExtrusionCap.TOP:
-                if self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps):
-                    features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
-            elif key == ExtrusionCap.BOTTOM:
-                if self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps):
-                    features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
-            elif self._point_on_side(key, x, y, eps=eps):
-                features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
-        return features
-
     def get_aabb(self) -> BoundingBox:
         if self.start_distance is None or self.end_distance is None:
             warnings.warn(
@@ -1775,6 +1978,29 @@ class ConvexPolygonSimpleLoft(CutCSG):
     def _cross_section_at(self, t: Numeric) -> Profile:
         """The (index-matched, linearly interpolated) polygon at height-fraction t."""
         return [bottom + (top - bottom) * t for bottom, top in zip(self.bottom_points, self.top_points)]
+
+    def _point_on_side(self, index: int, x: Numeric, y: Numeric, z: Numeric,
+                       eps: Optional[Numeric] = None) -> bool:
+        """Whether local (x, y, z) lies on the ruled side face running from vertex
+        *index* to vertex *index+1*.
+
+        The side is a ruled surface, so this tests against the cross-section at
+        the point's own height rather than against a fixed plane.
+        """
+        cross_section = self._cross_section_at(self._height_fraction(z))
+        p1 = cross_section[index]
+        p2 = cross_section[(index + 1) % len(cross_section)]
+        edge = p2 - p1
+        to_point = Matrix([x, y]) - p1
+        edge_length_sq = edge[0] ** 2 + edge[1] ** 2
+        if safe_zero_test(edge_length_sq, eps=_squared_eps(eps)):
+            return False
+        t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
+        if not (safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps)):
+            return False
+        closest_point = p1 + edge * t
+        distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
+        return safe_zero_test(distance_sq, eps=_squared_eps(eps))
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """

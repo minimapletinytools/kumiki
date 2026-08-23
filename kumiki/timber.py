@@ -1023,7 +1023,7 @@ class PerfectTimberWithin(ABC):
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=self.length,
-            named_features=_timber_face_tags(),
+            _features=_ptw_face_tags(),
         )
     
     def get_actual_csg_local(self) -> CutCSG:
@@ -1053,6 +1053,7 @@ class PerfectTimberWithin(ABC):
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
+            face_tags=_rough_face_tags(),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1077,6 +1078,7 @@ class PerfectTimberWithin(ABC):
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
+            face_tags=_ptw_face_tags(),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1201,7 +1203,7 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=scalar(0),
             end_distance=self.length,
-            named_features=_timber_face_tags(),
+            _features=_rough_face_tags(),
         )
 
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
@@ -1224,7 +1226,7 @@ class Timber(PerfectTimberWithin):
             transform=Transform(position=offset, orientation=Orientation.identity()),
             start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length,
-            named_features=_timber_face_tags(),
+            _features=_rough_face_tags(),
         )
     
 
@@ -1269,6 +1271,7 @@ class Board(PerfectTimberWithin):
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
+            face_tags=_rough_face_tags(),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1403,6 +1406,7 @@ class MeshTimber(PerfectTimberWithin):
             CutCSG representing the extended geometry in local coordinates
         """
         return _create_extended_rectangular_prism(
+            face_tags=_rough_face_tags(),
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
@@ -1664,19 +1668,65 @@ def _get_rough_size_and_offset(timber: PerfectTimberWithin) -> Tuple[V2, V3]:
             create_v3(offset_x, offset_y, scalar(0)))
 
 
-def _timber_face_tags() -> List[Tuple[str, PrismFace]]:
-    """Standard named feature tags for the 6 faces of a timber RectangularPrism."""
+# Reserved prefixes for a timber's own two bounding prisms. Joint authors must
+# not use them for their own features: drawing generation depends on being able
+# to tell a perfect-timber-within face from a rough (as-sawn) one, and every
+# timber has exactly one set of each.
+#
+# These used to share a single unprefixed set of names ("right", "left", ...),
+# which made a feature called "right" ambiguous between the two prisms -- and
+# only the rough prism ever appears in the rendered CSG tree, so the ambiguity
+# resolved silently and wrongly.
+PTW_FACE_PREFIX = "ptw."
+ROUGH_FACE_PREFIX = "rough."
+
+_TIMBER_FACES: List[Tuple[str, PrismFace]] = [
+    ("right", PrismFace.RIGHT),
+    ("left", PrismFace.LEFT),
+    ("front", PrismFace.FRONT),
+    ("back", PrismFace.BACK),
+    ("top", PrismFace.TOP),
+    ("bottom", PrismFace.BOTTOM),
+]
+
+
+def _ptw_face_tags() -> List[CSGFeature]:
+    """Named features for the 6 faces of a timber's perfect-timber-within prism.
+
+    Group B1: these are what joint features (group A) form edges against. They
+    do not form edges with each other -- opposite faces never meet, and the
+    four arrises of an uncut timber are not interesting to measure from.
+    """
     return [
-        ("right", PrismFace.RIGHT),
-        ("left", PrismFace.LEFT),
-        ("front", PrismFace.FRONT),
-        ("back", PrismFace.BACK),
-        ("top", PrismFace.TOP),
-        ("bottom", PrismFace.BOTTOM),
+        SimpleRectangularPrismFeature(
+            name=PTW_FACE_PREFIX + face_name,
+            face=face,
+            properties=FeatureProperties(group=FeatureGroup.B1),
+        )
+        for face_name, face in _TIMBER_FACES
+    ]
+
+
+def _rough_face_tags() -> List[CSGFeature]:
+    """Named features for the 6 faces of a timber's rough (as-sawn) prism.
+
+    Group B1 as well, but kept separately named: a rough face only coincides
+    with its perfect-timber-within counterpart on a reference face, and
+    measurements may never be taken from one that does not (see
+    PerfectTimberWithin.is_face_perfect).
+    """
+    return [
+        SimpleRectangularPrismFeature(
+            name=ROUGH_FACE_PREFIX + face_name,
+            face=face,
+            properties=FeatureProperties(group=FeatureGroup.B1),
+        )
+        for face_name, face in _TIMBER_FACES
     ]
 
 
 def _create_extended_rectangular_prism(
+    face_tags: List[CSGFeature],
     size: V2,
     length: Numeric,
     extend_bot: bool,
@@ -1699,7 +1749,7 @@ def _create_extended_rectangular_prism(
         transform=Transform.identity(),
         start_distance=None if extend_bot else scalar(0),
         end_distance=None if extend_top else length,
-        named_features=_timber_face_tags(),
+        _features=face_tags,
     )
 
 

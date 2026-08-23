@@ -5,7 +5,7 @@ This module contains tests for the CSG primitives and operations.
 """
 
 import pytest
-from kumiki.rule import Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test
+from kumiki.rule import Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test, safe_compare, Comparison
 from kumiki.cutcsg import (
     HalfSpace,
     RectangularPrism,
@@ -18,8 +18,19 @@ from kumiki.cutcsg import (
     BoundingBox,
     EmptyCSG,
     PrismFace,
+    CSGFeature,
+    CSGFeatureType,
+    FeatureProperties,
+    ProgrammableCSGFeature,
     HalfSpaceFeature,
-    RectangularPrismFeature,
+    SimpleCylinderFeature,
+    SimpleLoftFeature,
+    SimpleRectangularPrismFeature,
+    FeatureGroup,
+    CylinderPart,
+    ExtrusionCap,
+    feature_groups_intersect,
+    HalfSpaceFeature,
     adopt_csg,
     translate_csg,
     translate_profile,
@@ -2493,16 +2504,17 @@ class TestCSGFeatures:
     """Tests for opt-in named CSG features on primitives."""
 
     def test_halfspace_named_feature(self):
-        """HalfSpace with named_feature returns a HalfSpaceFeature for boundary points."""
-        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(5), named_feature="shoulder")
+        """A HalfSpace with a declared feature hits it for boundary points."""
+        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(5),
+                       _features=[HalfSpaceFeature("shoulder")])
         on_boundary = create_v3(scalar(0), scalar(0), scalar(5))
         off_boundary = create_v3(scalar(0), scalar(0), scalar(6))
 
-        feat = hs.find_feature(on_boundary)
-        assert feat is not None
-        assert isinstance(feat, HalfSpaceFeature)
-        assert feat.name == "shoulder"
-        assert feat.owner is hs
+        hit = hs.find_feature(on_boundary)
+        assert hit is not None
+        assert isinstance(hit.feature, HalfSpaceFeature)
+        assert hit.name == "shoulder"
+        assert hit.owner is hs
 
         assert hs.find_feature(off_boundary) is None
 
@@ -2514,29 +2526,31 @@ class TestCSGFeatures:
         assert hs.get_all_features(on_boundary) == []
 
     def test_rectangular_prism_named_features(self):
-        """RectangularPrism with named_features returns features only for named faces."""
+        """A prism hits only the faces it actually declares."""
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            named_features=[("my_right", PrismFace.RIGHT), ("my_top", PrismFace.TOP)],
+            _features=[SimpleRectangularPrismFeature("my_right", face=PrismFace.RIGHT),
+                       SimpleRectangularPrismFeature("my_top", face=PrismFace.TOP)],
         )
         # Point on right face (x = +2, within height and length bounds)
         right_pt = create_v3(scalar(2), scalar(0), scalar(5))
-        feat = prism.find_feature(right_pt)
-        assert feat is not None
-        assert isinstance(feat, RectangularPrismFeature)
-        assert feat.name == "my_right"
-        assert feat.face == PrismFace.RIGHT
+        hit = prism.find_feature(right_pt)
+        assert hit is not None
+        assert isinstance(hit.feature, SimpleRectangularPrismFeature)
+        assert hit.name == "my_right"
+        assert hit.feature.face == PrismFace.RIGHT
+        assert hit.owner is prism
 
         # Point on top face (z = 10)
         top_pt = create_v3(scalar(0), scalar(0), scalar(10))
-        feat = prism.find_feature(top_pt)
-        assert feat is not None
-        assert isinstance(feat, RectangularPrismFeature)
-        assert feat.name == "my_top"
-        assert feat.face == PrismFace.TOP
+        hit = prism.find_feature(top_pt)
+        assert hit is not None
+        assert isinstance(hit.feature, SimpleRectangularPrismFeature)
+        assert hit.name == "my_top"
+        assert hit.feature.face == PrismFace.TOP
 
         # Point on left face — not named, so no feature
         left_pt = create_v3(scalar(-2), scalar(0), scalar(5))
@@ -2567,13 +2581,14 @@ class TestCSGFeatures:
 
     def test_solid_union_collects_child_features(self):
         """SolidUnion collects features from children that have named features."""
-        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0), named_feature="floor")
+        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0),
+                       _features=[HalfSpaceFeature("floor")])
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(4)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            named_features=[("wall", PrismFace.RIGHT)],
+            _features=[SimpleRectangularPrismFeature("wall", face=PrismFace.RIGHT)],
         )
         union = SolidUnion(children=[hs, prism])
 
@@ -2590,12 +2605,12 @@ class TestCSGFeatures:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(20),
-            named_features=[("base_top", PrismFace.TOP)],
+            _features=[SimpleRectangularPrismFeature("base_top", face=PrismFace.TOP)],
         )
         cut = HalfSpace(
             normal=Matrix([scalar(0), scalar(0), scalar(-1)]),
             offset=scalar(-15),
-            named_feature="cut_plane",
+            _features=[HalfSpaceFeature("cut_plane")],
         )
         diff = Difference(base=base, subtract=[cut])
 
@@ -2731,7 +2746,7 @@ class TestPointQueryTolerance:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            named_features=[("my_right", PrismFace.RIGHT)],
+            _features=[SimpleRectangularPrismFeature("my_right", face=PrismFace.RIGHT)],
         )
 
     def test_default_tolerance_rejects_a_near_miss(self):
@@ -2786,3 +2801,318 @@ class TestPointQueryTolerance:
         near_miss = create_v3(scalar(2), scalar(4) + 1e-6, scalar(5))
         assert not extrusion.is_point_on_boundary(near_miss)
         assert extrusion.is_point_on_boundary(near_miss, 5e-4)
+
+
+class TestFeatureGroups:
+    """Which features may pair up to form an edge (see FeatureGroup)."""
+
+    def test_a_pairs_with_both_b_groups(self):
+        assert feature_groups_intersect(FeatureGroup.A, FeatureGroup.B1)
+        assert feature_groups_intersect(FeatureGroup.A, FeatureGroup.B2)
+
+    def test_a_does_not_pair_with_itself(self):
+        """Joint features meet the timber body, not each other."""
+        assert not feature_groups_intersect(FeatureGroup.A, FeatureGroup.A)
+
+    def test_b1_pairs_only_with_a(self):
+        assert feature_groups_intersect(FeatureGroup.B1, FeatureGroup.A)
+        assert not feature_groups_intersect(FeatureGroup.B1, FeatureGroup.B1)
+        assert not feature_groups_intersect(FeatureGroup.B1, FeatureGroup.B2)
+
+    def test_b2_and_c_pair_with_themselves(self):
+        assert feature_groups_intersect(FeatureGroup.B2, FeatureGroup.B2)
+        assert feature_groups_intersect(FeatureGroup.C, FeatureGroup.C)
+        assert not feature_groups_intersect(FeatureGroup.C, FeatureGroup.A)
+
+    def test_pairing_is_symmetric(self):
+        """Every declared pairing holds in both directions."""
+        for a in FeatureGroup:
+            for b in FeatureGroup:
+                assert feature_groups_intersect(a, b) == feature_groups_intersect(b, a), (a, b)
+
+
+class TestFeatureProperties:
+    """Metadata reaches a feature and the hit a query hands back."""
+
+    def test_defaults(self):
+        feature = HalfSpaceFeature("shoulder")
+        assert feature.group == FeatureGroup.A
+        assert feature.real is True
+        assert feature.priority == 0
+
+    def test_metadata_reaches_the_resolved_feature(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[
+                SimpleRectangularPrismFeature(
+                    "body_right", face=PrismFace.RIGHT,
+                    properties=FeatureProperties(group=FeatureGroup.B1, real=False, priority=7),
+                ),
+            ],
+        )
+        hit = prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        assert hit is not None
+        assert hit.name == "body_right"
+        assert hit.feature.group == FeatureGroup.B1
+        assert hit.feature.real is False
+        assert hit.feature.priority == 7
+        assert hit.properties.group == FeatureGroup.B1
+
+    def test_priority_orders_competing_features(self):
+        """find_feature returns the lowest-priority claimant at a point."""
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[
+                SimpleRectangularPrismFeature("loser", face=PrismFace.RIGHT,
+                                              properties=FeatureProperties(priority=5)),
+                SimpleRectangularPrismFeature("winner", face=PrismFace.RIGHT,
+                                              properties=FeatureProperties(priority=1)),
+            ],
+        )
+        feature = prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        assert feature is not None and feature.name == "winner"
+
+
+class TestCylinderFeatures:
+    """Cylinder could not carry a name at all before -- a peg hole was anonymous."""
+
+    def _bore(self, **kwargs):
+        return Cylinder(
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            radius=scalar(2),
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            **kwargs,
+        )
+
+    def test_barrel_resolves(self):
+        bore = self._bore(_features=[
+            SimpleCylinderFeature("peg_hole_wall", part=CylinderPart.BARREL),
+        ])
+        on_wall = create_v3(scalar(2), scalar(0), scalar(5))
+        feature = bore.find_feature(on_wall)
+        assert feature is not None and feature.name == "peg_hole_wall"
+
+    def test_end_caps_resolve_separately_from_the_barrel(self):
+        bore = self._bore(_features=[
+            SimpleCylinderFeature("wall", part=CylinderPart.BARREL),
+            SimpleCylinderFeature("bore_bottom", part=CylinderPart.BOTTOM),
+            SimpleCylinderFeature("bore_top", part=CylinderPart.TOP),
+        ])
+        assert bore.find_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "bore_bottom"
+        assert bore.find_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "bore_top"
+        assert bore.find_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "wall"
+
+    def test_unnamed_cylinder_yields_nothing(self):
+        assert self._bore().get_all_features(create_v3(scalar(2), scalar(0), scalar(5))) == []
+
+    def test_a_cap_is_not_claimed_by_the_barrel_name(self):
+        bore = self._bore(_features=[SimpleCylinderFeature("wall", part=CylinderPart.BARREL)])
+        assert bore.find_feature(create_v3(scalar(0), scalar(0), scalar(0))) is None
+
+
+class TestLoftFeatures:
+    """ConvexPolygonSimpleLoft could not carry a name either."""
+
+    def _taper(self, **kwargs):
+        return ConvexPolygonSimpleLoft(
+            bottom_points=[
+                Matrix([scalar(-2), scalar(-2)]), Matrix([scalar(2), scalar(-2)]),
+                Matrix([scalar(2), scalar(2)]), Matrix([scalar(-2), scalar(2)]),
+            ],
+            top_points=[
+                Matrix([scalar(-1), scalar(-1)]), Matrix([scalar(1), scalar(-1)]),
+                Matrix([scalar(1), scalar(1)]), Matrix([scalar(-1), scalar(1)]),
+            ],
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            transform=Transform.identity(),
+            **kwargs,
+        )
+
+    def test_end_caps_resolve(self):
+        loft = self._taper(_features=[
+            SimpleLoftFeature("wide_end", key=ExtrusionCap.BOTTOM),
+            SimpleLoftFeature("narrow_end", key=ExtrusionCap.TOP),
+        ])
+        assert loft.find_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "wide_end"
+        assert loft.find_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "narrow_end"
+
+    def test_a_tapered_side_resolves_at_its_own_height(self):
+        """Sides are ruled surfaces, so the test tracks the cross-section."""
+        loft = self._taper(_features=[SimpleLoftFeature("front_face", key=0)])
+        # Side 0 runs from (-2,-2) to (2,-2) at the bottom, narrowing to y=-1
+        # at the top. Halfway up, that edge sits at y = -1.5.
+        midway = create_v3(scalar(0), scalar(-3, 2), scalar(5))
+        feature = loft.find_feature(midway)
+        assert feature is not None and feature.name == "front_face"
+
+    def test_unnamed_loft_yields_nothing(self):
+        assert self._taper().get_all_features(create_v3(scalar(0), scalar(0), scalar(0))) == []
+
+
+class TestProgrammableCSGFeature:
+    """The escape hatch: a feature identified by a predicate, not an enum member.
+
+    This is what lets a primitive name something the Simple* classes cannot --
+    half a face, a formula-defined region, an edge derived from two others --
+    without adding a class or touching the owner's query path.
+    """
+
+    def _prism(self, *features):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=list(features),
+        )
+
+    def test_predicate_decides_membership(self):
+        """Names the lower half of the right face -- no enum could say that."""
+        lower_right = ProgrammableCSGFeature(
+            "lower_right_half",
+            predicate=lambda owner, point, eps: (
+                safe_equality_test(owner._local_coords(point)[0], owner.size[0] / 2, eps=eps)
+                and safe_compare(owner._local_coords(point)[2], scalar(5), Comparison.LE, eps=eps)
+            ),
+        )
+        prism = self._prism(lower_right)
+
+        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(2))) is not None
+        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(8))) is None
+
+    def test_it_still_requires_the_point_to_be_on_the_boundary(self):
+        """A predicate that says yes to everything cannot claim interior points."""
+        always = ProgrammableCSGFeature("always", predicate=lambda owner, point, eps: True)
+        prism = self._prism(always)
+
+        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5))) is not None
+        # Dead centre of the solid -- on no face at all.
+        assert prism.find_feature(create_v3(scalar(0), scalar(0), scalar(5))) is None
+
+    def test_it_receives_the_query_tolerance(self):
+        recorded = []
+        spy = ProgrammableCSGFeature(
+            "spy",
+            predicate=lambda owner, point, eps: (recorded.append(eps), True)[1],
+        )
+        prism = self._prism(spy)
+        prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5)), 5e-4)
+        assert recorded == [5e-4]
+
+    def test_a_predicateless_feature_matches_nothing(self):
+        prism = self._prism(ProgrammableCSGFeature("inert"))
+        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5))) is None
+
+    def test_it_coexists_with_simple_features_and_respects_priority(self):
+        prism = self._prism(
+            SimpleRectangularPrismFeature("plain_right", face=PrismFace.RIGHT,
+                                          properties=FeatureProperties(priority=5)),
+            ProgrammableCSGFeature("computed_right",
+                                   properties=FeatureProperties(priority=1),
+                                   predicate=lambda owner, point, eps: safe_equality_test(
+                                       owner._local_coords(point)[0], owner.size[0] / 2, eps=eps)),
+        )
+        hits = prism.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
+        assert {h.name for h in hits} == {"plain_right", "computed_right"}
+        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "computed_right"
+
+
+class TestDeclaredFeatures:
+    def test_lists_features_without_needing_a_point(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[
+                SimpleRectangularPrismFeature("a", face=PrismFace.RIGHT),
+                SimpleRectangularPrismFeature("b", face=PrismFace.TOP),
+            ],
+        )
+        assert [f.name for f in prism.get_declared_features()] == ["a", "b"]
+
+    def test_is_empty_when_nothing_is_declared(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+        assert prism.get_declared_features() == []
+
+
+class TestCSGFeatureType:
+    """Every feature says what kind of geometry it names.
+
+    Measurement dispatches on the pair of types (face/face, point/face, ...),
+    so this has to be right before step 8 can key off it.
+    """
+
+    def _prism(self, *features):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=list(features),
+        )
+
+    def test_the_simple_classes_are_faces_by_construction(self):
+        """Faces are all a primitive can name directly."""
+        assert HalfSpaceFeature("shoulder").feature_type() == CSGFeatureType.FACE
+        assert SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).feature_type() == CSGFeatureType.FACE
+        assert SimpleCylinderFeature("w", part=CylinderPart.BARREL).feature_type() == CSGFeatureType.FACE
+        assert SimpleLoftFeature("s", key=0).feature_type() == CSGFeatureType.FACE
+
+    def test_a_face_feature_cannot_be_told_it_is_something_else(self):
+        """The kind is computed, so there is no field to set wrongly."""
+        with pytest.raises(TypeError):
+            SimpleRectangularPrismFeature(
+                "r", face=PrismFace.RIGHT, feature_type=CSGFeatureType.EDGE)  # type: ignore[call-arg]
+
+    def test_a_new_feature_class_must_declare_its_kind(self):
+        """feature_type is abstract, so it cannot be forgotten."""
+        class Forgetful(CSGFeature):
+            def test_point(self, owner, point, eps=None):
+                return True
+
+        with pytest.raises(TypeError, match="abstract"):
+            Forgetful("oops")
+
+    def test_a_programmable_feature_can_name_an_edge_or_a_point(self):
+        edge = ProgrammableCSGFeature("arris", declared_type=CSGFeatureType.EDGE)
+        vertex = ProgrammableCSGFeature("corner", declared_type=CSGFeatureType.POINT)
+        assert edge.feature_type() == CSGFeatureType.EDGE
+        assert vertex.feature_type() == CSGFeatureType.POINT
+
+    def test_it_survives_the_round_trip_through_a_query(self):
+        axis = ProgrammableCSGFeature(
+            "centre_axis",
+            declared_type=CSGFeatureType.EDGE,
+            properties=FeatureProperties(real=False),
+            predicate=lambda owner, point, eps: True,
+        )
+        hit = self._prism(axis).find_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        assert hit is not None
+        assert hit.feature_type() == CSGFeatureType.EDGE
+        assert hit.feature.feature_type() == CSGFeatureType.EDGE
+        assert hit.properties.real is False
+
+    def test_type_is_independent_of_properties(self):
+        """What a feature *is* and how it should be *treated* are separate."""
+        feature = SimpleRectangularPrismFeature(
+            "r", face=PrismFace.RIGHT,
+            properties=FeatureProperties(group=FeatureGroup.B1, real=False),
+        )
+        assert feature.feature_type() == CSGFeatureType.FACE
+        assert feature.group == FeatureGroup.B1
+        assert feature.real is False

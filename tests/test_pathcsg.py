@@ -7,7 +7,10 @@ import pytest
 
 from kumiki.rule import create_v2, create_v3, Transform, scalar, pi
 from kumiki.cutcsg import ExtrusionCap
-from kumiki.pathcsg import ArcSegment, LineSegment, FancyPath, Path, PathExtrusion
+from kumiki.pathcsg import (
+    ArcSegment, LineSegment, FancyPath, Path, PathExtrusion,
+    SimplePathExtrusionFeature,
+)
 from kumiki.triangles import mesh_cutcsg
 
 
@@ -172,10 +175,10 @@ class TestPathCSG:
         extrusion = PathExtrusion(
             path=path, transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1, 25),
-            named_features=[
-                ("foot", 0),       # line_foot: planar, should resolve
-                ("knee_bulge", 1),  # knee: curved (ArcSegment), should never match
-                ("top", ExtrusionCap.TOP),
+            _features=[
+                SimplePathExtrusionFeature("foot", key=0),        # line_foot: planar, should resolve
+                SimplePathExtrusionFeature("knee_bulge", key=1),  # knee: curved (ArcSegment), never matches
+                SimplePathExtrusionFeature("top", key=ExtrusionCap.TOP),
             ],
         )
 

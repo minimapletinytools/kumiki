@@ -26,9 +26,11 @@ from .rule import *
 from .cutcsg import (
     BoundingBox,
     CSGFeature,
+    CSGFeatureType,
     CutCSG,
     ExtrusionCap,
     ExtrusionFeatureKey,
+    FeatureHit,
     Profile,
     _squared_eps,
 )
@@ -823,26 +825,29 @@ def decompose_path_into_convex_pieces(path: FancyPath, tolerance: float) -> List
 # ============================================================================
 
 @dataclass(frozen=True)
-class PathExtrusionFeature(CSGFeature):
-    """
-    Feature on a PathExtrusion side face (key = segment index) or cap
-    (key = ExtrusionCap). Only ever constructed by get_all_features for a
-    planar member (segment.is_planar() True, or a cap) -- a named entry
-    pointing at a curved segment index is simply never matched into a
-    feature, which is the graceful-fail behavior, not a special case.
-    """
-    owner: 'PathExtrusion'
-    key: ExtrusionFeatureKey
+class SimplePathExtrusionFeature(CSGFeature):
+    """One side face (key = segment index) or end cap of a PathExtrusion.
 
-    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
-        if not self.owner.is_point_on_boundary(point, eps=eps):
+    A key pointing at a curved segment never matches any point: there is no
+    planar face there to name. That is the graceful-fail behaviour, not a
+    special case -- the feature simply stays unmatched.
+    """
+    key: ExtrusionFeatureKey = ExtrusionCap.TOP
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.FACE
+
+    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not isinstance(owner, PathExtrusion):
             return False
-        x, y, z = self.owner._local_coords(point)
+        x, y, z = owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance, eps=eps)
+            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=eps)
         if self.key == ExtrusionCap.BOTTOM:
-            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance, eps=eps)
-        located = self.owner.path.locate_boundary_segment(create_v2(x, y), eps=eps)
+            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=eps)
+        if not owner.path.segments[self.key].is_planar():
+            return False
+        located = owner.path.locate_boundary_segment(create_v2(x, y), eps=eps)
         return located is not None and located[0] == self.key
 
 
@@ -862,7 +867,6 @@ class PathExtrusion(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None
     end_distance: Optional[Numeric] = None
-    named_features: Optional[List[Tuple[str, ExtrusionFeatureKey]]] = None
 
     def __repr__(self) -> str:
         return (f"PathExtrusion({len(self.path.segments)} segments, "
@@ -905,27 +909,6 @@ class PathExtrusion(CutCSG):
         n2 = seg.outward_local_normal(create_v2(x, y), eps=eps)
         local_normal = Matrix([n2[0], n2[1], scalar(0)])
         return safe_transform_vector(self.transform.orientation.matrix, local_normal)
-
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
-        if self.named_features is None or not self.is_point_on_boundary(point, eps=eps):
-            return []
-        x, y, z = self._local_coords(point)
-        features: List[CSGFeature] = []
-        for name, key in self.named_features:
-            if key == ExtrusionCap.TOP:
-                if self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps):
-                    features.append(PathExtrusionFeature(name=name, priority=0, owner=self, key=key))
-            elif key == ExtrusionCap.BOTTOM:
-                if self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps):
-                    features.append(PathExtrusionFeature(name=name, priority=0, owner=self, key=key))
-            else:
-                segment = self.path.segments[key]
-                if not segment.is_planar():
-                    continue  # curved segment named as a feature -- nothing to emit, by design
-                located = self.path.locate_boundary_segment(create_v2(x, y), eps=eps)
-                if located is not None and located[0] == key:
-                    features.append(PathExtrusionFeature(name=name, priority=0, owner=self, key=key))
-        return features
 
     def get_aabb(self) -> BoundingBox:
         if self.start_distance is None or self.end_distance is None:
