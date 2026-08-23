@@ -92,12 +92,12 @@ def _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_
     tenon_dir = tenon_centerline.direction
     proj = prune(tenon_dir - mortise_length_dir * safe_dot_product(tenon_dir, mortise_length_dir))
     proj_len_sq = safe_dot_product(proj, proj)
-    if not safe_zero_test(proj_len_sq):
+    if not safe_zero_test_sq(proj_len_sq):
         direction_in_plane = safe_normalize_vector(proj)
     else:
         MP = P - M
         mp_len_sq = safe_dot_product(MP, MP)
-        if not safe_zero_test(mp_len_sq):
+        if not safe_zero_test_sq(mp_len_sq):
             direction_in_plane = safe_normalize_vector(MP)
         else:
             direction_in_plane = mortise_timber.get_width_direction_global()

@@ -36,7 +36,6 @@ from .cutcsg import (
     ExtrusionFeatureKey,
     FeatureHit,
     Profile,
-    _squared_eps,
 )
 
 
@@ -227,11 +226,9 @@ class LineSegment(PathSegment):
     def closest_point(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         edge = self.line_end - self.line_start
         edge_len_sq = edge[0] ** 2 + edge[1] ** 2
-        # Whether the segment is degenerate is a property of the path, not of
-        # how close the caller clicked, so this deliberately does NOT take the
-        # query tolerance: a pick eps of 0.5mm would declare any segment
-        # shorter than ~22mm zero-length (the value being compared is squared).
-        if safe_zero_test(edge_len_sq):
+        # Degeneracy is a property of the path, not of how close the caller
+        # clicked, so this takes no query tolerance.
+        if safe_zero_test_sq(edge_len_sq):
             return self.line_start
 
         to_point = point - self.line_start
@@ -631,7 +628,7 @@ class FancyPath:
         get_outward_normal already accepts at its own edges/corners."""
         for index, seg in enumerate(self.segments):
             closest = seg.closest_point(point, eps=eps)
-            if safe_zero_test((closest[0] - point[0]) ** 2 + (closest[1] - point[1]) ** 2, eps=_squared_eps(eps)):
+            if safe_zero_test_sq((closest[0] - point[0]) ** 2 + (closest[1] - point[1]) ** 2, eps):
                 return index, seg
         return None
 

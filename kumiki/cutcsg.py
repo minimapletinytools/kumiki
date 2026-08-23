@@ -294,21 +294,6 @@ def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeri
     return (start + end) / scalar(2)
 
 
-def _squared_eps(eps: Optional[Numeric]) -> Optional[Numeric]:
-    """Adapt a linear distance tolerance for comparison against a SQUARED distance.
-
-    Several containment tests compare a squared distance against the tolerance
-    directly, which quietly makes `eps` mean different things on different
-    primitives -- eps=5e-4 would be half a millimetre against a prism face but
-    22mm against a polygon edge. Squaring it here keeps `eps` a plain distance
-    in model units everywhere.
-
-    None passes through unchanged, preserving the historical default (1e-10
-    applied to the squared value, i.e. an effective linear tolerance of 1e-5).
-    """
-    return None if eps is None else eps * eps
-
-
 # What locate() can hand back. Unbounded on purpose: measurement between two
 # features works on infinite lines and planes, and bounds travel separately in
 # CSGFeatureExtent.
@@ -456,7 +441,7 @@ class HalfSpaceFeature(CSGFeature):
         # The solid is dot(normal, p) >= offset, so the boundary plane is
         # dot(normal, p) == offset and the outward normal points out of it.
         normal_length_sq = safe_dot_product(owner.normal, owner.normal)
-        if safe_zero_test(normal_length_sq):
+        if safe_zero_test_sq(normal_length_sq):
             return None
         closest_to_origin = owner.normal * (owner.offset / normal_length_sq)
         return Plane(normal=-owner.normal, point=closest_to_origin)
@@ -2173,7 +2158,7 @@ class ConvexPolygonExtrusion(CutCSG):
         point_2d = Matrix([x_coord, y_coord])
         for vertex_2d in self.points:
             distance_sq = (point_2d[0] - vertex_2d[0])**2 + (point_2d[1] - vertex_2d[1])**2
-            if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
+            if safe_zero_test_sq(distance_sq, eps):
                 return True  # Point is on a vertical edge
         
         # Check if on any horizontal edge of the polygon (side face at this z)
@@ -2188,11 +2173,9 @@ class ConvexPolygonExtrusion(CutCSG):
             
             # If edge is zero-length, skip it
             edge_length_sq = edge[0]**2 + edge[1]**2
-            # Whether an edge is degenerate is a property of the polygon,
-            # not of how close the caller clicked, so this deliberately does
-            # NOT take the query tolerance: a pick eps of 0.5mm would declare
-            # any edge shorter than ~22mm zero-length (the value is squared).
-            if safe_zero_test(edge_length_sq):
+            # Degeneracy is a property of the polygon, not of how close the
+            # caller clicked, so this takes no query tolerance.
+            if safe_zero_test_sq(edge_length_sq):
                 continue
             
             # Project to_point onto edge
@@ -2204,7 +2187,7 @@ class ConvexPolygonExtrusion(CutCSG):
             if t_in_range:
                 closest_point = p1 + edge * t
                 distance_sq = (point_2d[0] - closest_point[0])**2 + (point_2d[1] - closest_point[1])**2
-                if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
+                if safe_zero_test_sq(distance_sq, eps):
                     return True
         
         return False
@@ -2254,11 +2237,9 @@ class ConvexPolygonExtrusion(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0]**2 + edge[1]**2
-            # Whether an edge is degenerate is a property of the polygon,
-            # not of how close the caller clicked, so this deliberately does
-            # NOT take the query tolerance: a pick eps of 0.5mm would declare
-            # any edge shorter than ~22mm zero-length (the value is squared).
-            if safe_zero_test(edge_length_sq):
+            # Degeneracy is a property of the polygon, not of how close the
+            # caller clicked, so this takes no query tolerance.
+            if safe_zero_test_sq(edge_length_sq):
                 continue
 
             t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
@@ -2266,7 +2247,7 @@ class ConvexPolygonExtrusion(CutCSG):
             if safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps):
                 closest_point = p1 + edge * t
                 distance_sq = (point_2d[0] - closest_point[0])**2 + (point_2d[1] - closest_point[1])**2
-                if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
+                if safe_zero_test_sq(distance_sq, eps):
                     # Point is on this edge
                     # Normal is perpendicular to edge (in 2D), pointing outward
                     # Left perpendicular of (dx, dy) is (-dy, dx)
@@ -2307,18 +2288,16 @@ class ConvexPolygonExtrusion(CutCSG):
         edge = p2 - p1
         to_point = Matrix([x, y]) - p1
         edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-        # Whether an edge is degenerate is a property of the polygon,
-        # not of how close the caller clicked, so this deliberately does
-        # NOT take the query tolerance: a pick eps of 0.5mm would declare
-        # any edge shorter than ~22mm zero-length (the value is squared).
-        if safe_zero_test(edge_length_sq):
+        # Degeneracy is a property of the polygon, not of how close the
+        # caller clicked, so this takes no query tolerance.
+        if safe_zero_test_sq(edge_length_sq):
             return False
         t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
         if not (safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps)):
             return False
         closest_point = p1 + edge * t
         distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
-        return safe_zero_test(distance_sq, eps=_squared_eps(eps))
+        return safe_zero_test_sq(distance_sq, eps)
 
     def get_aabb(self) -> BoundingBox:
         if self.start_distance is None or self.end_distance is None:
@@ -2482,18 +2461,16 @@ class ConvexPolygonSimpleLoft(CutCSG):
         edge = p2 - p1
         to_point = Matrix([x, y]) - p1
         edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-        # Whether an edge is degenerate is a property of the polygon,
-        # not of how close the caller clicked, so this deliberately does
-        # NOT take the query tolerance: a pick eps of 0.5mm would declare
-        # any edge shorter than ~22mm zero-length (the value is squared).
-        if safe_zero_test(edge_length_sq):
+        # Degeneracy is a property of the polygon, not of how close the
+        # caller clicked, so this takes no query tolerance.
+        if safe_zero_test_sq(edge_length_sq):
             return False
         t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
         if not (safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps)):
             return False
         closest_point = p1 + edge * t
         distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
-        return safe_zero_test(distance_sq, eps=_squared_eps(eps))
+        return safe_zero_test_sq(distance_sq, eps)
 
     def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
@@ -2553,7 +2530,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
         # matching top vertex, evaluated at this height)
         for vertex_2d in cross_section:
             distance_sq = (point_2d[0] - vertex_2d[0]) ** 2 + (point_2d[1] - vertex_2d[1]) ** 2
-            if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
+            if safe_zero_test_sq(distance_sq, eps):
                 return True
 
         # On a side face at this height
@@ -2564,11 +2541,9 @@ class ConvexPolygonSimpleLoft(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-            # Whether an edge is degenerate is a property of the polygon,
-            # not of how close the caller clicked, so this deliberately does
-            # NOT take the query tolerance: a pick eps of 0.5mm would declare
-            # any edge shorter than ~22mm zero-length (the value is squared).
-            if safe_zero_test(edge_length_sq):
+            # Degeneracy is a property of the polygon, not of how close the
+            # caller clicked, so this takes no query tolerance.
+            if safe_zero_test_sq(edge_length_sq):
                 continue
 
             u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
@@ -2577,7 +2552,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
             if u_in_range:
                 closest_point = p1 + edge * u
                 distance_sq = (point_2d[0] - closest_point[0]) ** 2 + (point_2d[1] - closest_point[1]) ** 2
-                if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
+                if safe_zero_test_sq(distance_sq, eps):
                     return True
 
         return False
@@ -2619,11 +2594,9 @@ class ConvexPolygonSimpleLoft(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-            # Whether an edge is degenerate is a property of the polygon,
-            # not of how close the caller clicked, so this deliberately does
-            # NOT take the query tolerance: a pick eps of 0.5mm would declare
-            # any edge shorter than ~22mm zero-length (the value is squared).
-            if safe_zero_test(edge_length_sq):
+            # Degeneracy is a property of the polygon, not of how close the
+            # caller clicked, so this takes no query tolerance.
+            if safe_zero_test_sq(edge_length_sq):
                 continue
 
             u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
@@ -2632,7 +2605,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
 
             closest_point = p1 + edge * u
             distance_sq = (point_2d[0] - closest_point[0]) ** 2 + (point_2d[1] - closest_point[1]) ** 2
-            if not safe_zero_test(distance_sq, eps=_squared_eps(eps)):
+            if not safe_zero_test_sq(distance_sq, eps):
                 continue
 
             # Point is on the side face spanning edge i. Parametrize the face by
@@ -2960,7 +2933,7 @@ def adopt_csg(
             )
 
         normal_length_sq = numeric_dot_product(hp.normal, hp.normal)
-        if safe_zero_test(normal_length_sq):
+        if safe_zero_test_sq(normal_length_sq):
             return replace(hp, normal=new_normal, offset=hp.offset)
 
         point_on_plane_in_orig = hp.normal * (hp.offset / normal_length_sq)

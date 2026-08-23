@@ -145,7 +145,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
     # and the plane_normal. This is the cross product: bisector × plane_normal
     # For parallel timbers plane_normal is zero, so fall back to a perpendicular end cut.
     plane_normal_sq = safe_dot_product(plane_normal, plane_normal)
-    if safe_zero_test(plane_normal_sq):
+    if safe_zero_test_sq(plane_normal_sq):
         miter_normal = normA
     else:
         miter_normal = safe_normalize_vector(cross_product(bisector, plane_normal))

@@ -309,7 +309,7 @@ def cut_mortise_and_tenon_joint(
 
     # Back-extension from shoulder so prism fully contains tenon at oblique angles
     sin_angle_sq = scalar(1) - cos_angle * cos_angle
-    sin_angle_safe = scalar(1, 10000) if safe_zero_test(sin_angle_sq) else sqrt(Abs(sin_angle_sq))
+    sin_angle_safe = scalar(1, 10000) if safe_zero_test_sq(sin_angle_sq) else sqrt(Abs(sin_angle_sq))
     back_extension = max(tenon_size[0], tenon_size[1]) / sin_angle_safe
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"

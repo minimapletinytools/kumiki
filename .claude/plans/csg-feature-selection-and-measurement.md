@@ -817,7 +817,19 @@ default tolerance and never the query's. Regression test added with a deliberate
 (20mm) profile.
 
 That is the second bug of exactly this shape -- squared quantity, linear tolerance -- after
-`_squared_eps` earlier. Worth watching for at any new `safe_zero_test` on a `*_sq` value.
+`_squared_eps` earlier.
+
+**`safe_zero_test_sq()` closes the class of bug.** `rule.py` now has a helper that takes a
+LINEAR tolerance for a SQUARED value and squares it internally, so `eps` means a distance
+in model units at every call site. All 23 squared-quantity tests across `cutcsg`,
+`pathcsg` and the joint library go through it, and `_squared_eps` -- which required
+remembering to wrap, and was silently wrong if you forgot -- is deleted.
+
+Its default is `EPSILON_GENERIC` treated as a linear distance, which is 10,000x tighter
+than the old `safe_zero_test(v_sq)` default it replaces (that compared a squared value
+against a linear 1e-8, i.e. an effective 1e-4 distance). The suite passes at the stricter
+value, so nothing was relying on the looser one. It also makes degeneracy mean what it
+says: only a genuinely zero-length edge is degenerate, not one under 0.1mm.
 
 
 ### Follow-ups noticed while in there

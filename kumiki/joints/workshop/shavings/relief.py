@@ -548,7 +548,7 @@ def chop_shoulder_notch_aligned_with_timber(
     n_global = shoulder_plane.normal
     b_in_plane = b_global - n_global * safe_dot_product(b_global, n_global)
     b_in_plane_len_sq = safe_dot_product(b_in_plane, b_in_plane)
-    if not safe_zero_test(b_in_plane_len_sq):
+    if not safe_zero_test_sq(b_in_plane_len_sq):
         notch_width_axis_global = safe_normalize_vector(b_in_plane)
     else:
         notch_width_axis_global = notch_length_dir_global

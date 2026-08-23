@@ -897,6 +897,26 @@ def safe_equality_test(value, expected, eps: Optional[float] = None) -> bool:
     return safe_compare(value, expected, Comparison.EQ, eps=eps)
 
 
+def safe_zero_test_sq(value_squared, eps: Optional[float] = None) -> bool:
+    """Test whether a SQUARED quantity is approximately zero.
+
+    Takes a LINEAR tolerance and squares it internally, so *eps* means the
+    same thing here as everywhere else in the library: a distance in model
+    units, never a distance squared.
+
+        safe_zero_test_sq(dx * dx + dy * dy, eps)   # is the distance ~0?
+
+    Use this rather than safe_zero_test wherever the value under test is a
+    square. Passing a squared value to safe_zero_test compares it against a
+    linear tolerance, which sounds harmless and is not: at eps=5e-4 it treats
+    any length below 22mm as zero. That has been the shape of two real bugs
+    here already -- polygon edges declared degenerate, and pick tolerances
+    meaning millimetres on one primitive and centimetres on another.
+    """
+    tolerance = EPSILON_GENERIC if eps is None else eps
+    return safe_compare(value_squared, 0, Comparison.EQ, eps=tolerance * tolerance)
+
+
 # ============================================================================
 # Parallel and Perpendicular Check Functions
 # ============================================================================

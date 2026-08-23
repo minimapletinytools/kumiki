@@ -22,7 +22,7 @@ from kumiki.cutcsg import (
     CSGFeature,
     CSGFeatureExtent,
     crop_line_to_csg,
-    _squared_eps,
+    safe_zero_test_sq,
     CSGFeatureType,
     FeatureEpsilons,
     FeatureProperties,
@@ -3313,8 +3313,8 @@ class TestNonRealFeatures:
             "peg_axis",
             declared_type=CSGFeatureType.EDGE,
             properties=FeatureProperties(real=False),
-            predicate=lambda owner, point, eps: safe_zero_test(
-                float(point[1]) ** 2 + (float(point[2]) - 5.0) ** 2, eps=_squared_eps(eps)),
+            predicate=lambda owner, point, eps: safe_zero_test_sq(
+                float(point[1]) ** 2 + (float(point[2]) - 5.0) ** 2, eps),
         )
 
     def test_a_non_real_feature_is_found_inside_the_void(self):
@@ -3364,8 +3364,8 @@ class TestNonRealFeatures:
                     "centre_line",
                     declared_type=CSGFeatureType.EDGE,
                     properties=FeatureProperties(real=False),
-                    predicate=lambda owner, point, eps: safe_zero_test(
-                        float(point[0]) ** 2 + float(point[1]) ** 2, eps=_squared_eps(eps)),
+                    predicate=lambda owner, point, eps: safe_zero_test_sq(
+                        float(point[0]) ** 2 + float(point[1]) ** 2, eps),
                 ),
             ],
         )
@@ -3563,3 +3563,44 @@ class TestFeatureEpsilonsScaling:
         near_miss = create_v3(scalar(2) + 1e-4, scalar(0), scalar(5))
         assert prism.find_feature(near_miss, tight) is None
         assert prism.find_feature(near_miss, tight * scalar(1000)) is not None
+
+
+class TestSafeZeroTestSq:
+    """safe_zero_test_sq takes a LINEAR tolerance for a SQUARED value.
+
+    Passing a squared value to plain safe_zero_test compares it against a
+    linear tolerance, which sounds harmless and is not. That mismatch has been
+    the shape of two real bugs here: polygon edges wrongly declared degenerate,
+    and a pick tolerance meaning half a millimetre on one primitive and 22
+    millimetres on another.
+    """
+
+    def test_eps_means_a_distance_not_a_distance_squared(self):
+        assert safe_zero_test_sq(scalar(4, 10000) ** 2, scalar(5, 10000))      # 0.4mm within 0.5mm
+        assert not safe_zero_test_sq(scalar(6, 10000) ** 2, scalar(5, 10000))  # 0.6mm is not
+
+    def test_a_real_length_is_never_zero_at_a_pick_tolerance(self):
+        """The trap, stated directly: a 20mm edge at a 0.5mm tolerance."""
+        twenty_mm_squared = scalar(2, 100) ** 2
+        assert not safe_zero_test_sq(twenty_mm_squared, scalar(5, 10000))
+        # ... whereas the unsquared test would have called it zero
+        assert safe_zero_test(twenty_mm_squared, eps=scalar(5, 10000))
+
+    def test_a_genuinely_zero_value_is_zero(self):
+        assert safe_zero_test_sq(scalar(0))
+        assert safe_zero_test_sq(scalar(0), scalar(5, 10000))
+
+    def test_the_default_tolerance_is_the_generic_epsilon(self):
+        from kumiki.rule import EPSILON_GENERIC
+
+        assert safe_zero_test_sq((EPSILON_GENERIC / 10) ** 2)
+        assert not safe_zero_test_sq((EPSILON_GENERIC * 10) ** 2)
+
+    def test_the_admitted_distance_is_linear_in_eps(self):
+        """Doubling the tolerance admits twice the distance, not four times."""
+        eps = scalar(2)
+        assert safe_zero_test_sq(scalar(19, 10) ** 2, eps)       # 1.9 away: in
+        assert not safe_zero_test_sq(scalar(21, 10) ** 2, eps)   # 2.1 away: out
+        # Double the tolerance and 2.1 comes inside, 4.1 does not.
+        assert safe_zero_test_sq(scalar(21, 10) ** 2, eps * scalar(2))
+        assert not safe_zero_test_sq(scalar(41, 10) ** 2, eps * scalar(2))
