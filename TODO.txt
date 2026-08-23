@@ -1,3 +1,83 @@
+:: 8/22/2026 drawing ruminations
+
+We're getting ready to add some general measurement related features. Here are some larefgly disorganized note,s please do some research of what's in the code already and what's needed to achieve the features we want.
+
+-in kigumi you can select timbers, once at imber is selected, you can then select some face fetaures on the timbers.
+-it appears not all face features can be selected. what are the rules for what face features can be selected?
+-how are face features selected, in particular, how do we map it back to the CSG tree
+-we have named features and features derived from the cSG geometery, (they are suppose to map from each other, but currently it's just the test_point function, we need to add more abilities to select named features from points that were raycasted on the meshed geometry)
+
+some questions on how we want to proceed
+
+-we want to be able to identify certain face intersections in the CSG tree, there should be some general rule for which intersecting faces produce edges, for now lets go with the following
+  -define 3  face groups A B1 B2 C (we may add more in teh future)
+    -features in group A intersect with featuers in B1 and B2
+    -fetaures in group B2 interesct with themselves
+    -fetaures in group C intersect with themselves
+  -I think for new we can keep it simple, we just need group A and group. B1. by default, all of the perfect timber within long faces go into B1 and all named fetaures go into group A, but the above is what a mor egeneral system could look like
+
+-we want to build out the rest of the CSG feature class, so it should support points, edges, faces. Note that points and edges. 
+  -note that a CSG feature may not correspond to acutaly geometry, we should probably be able to tag CSGfeature as real geometry or not
+    -real geometry may get cropped by the CSG tree so when selecting for real geometry, it FIRST tests the actual triangulated CSG geometrey before testing the CSGFeature
+    -non-real geometry can get tested without checking against triangulated geometry first as CSG operations do not affect it
+
+To help inform the above, here are the user facing features we ultimately want to build on top of thi ssystem
+
+1. we want to improve fetaure selection display, it should be multi lined  
+  -feature type
+  -joint the feature came from
+  -maybe show the feature highlighted within the CSG tree (expandable)
+  -which local face on the timber it most points towards
+
+2. the ability to "store" 1 selected feature in kigumi, and then click on other features to create measurements that render in the kigumi viewer. these measurements can be saved so that we can keep making more selections to show more measurements. 
+  -Dont' worry about UI for this right now, just make sure it's possible to select the features we want
+  -in addition, 2 features need to be able to be measured relative to each other and this follows a set of rules e.g.
+    -2 parallel edges measures the distance between the 2 edeges as if they were infinite lines
+    -2 parallel faces similar
+    -ponit and face/line measures the projected distance
+    -etc
+  -when rendering measurements, each type measurements renders in a different way, general speaking distances have 2 lines that come out of the points being measured and then a line drown between thoes 2 lines with the distance label on it.
+    -we should be able to customize how this looks a little bit on a per mesaurement basis, but don't worry about teh UI for this just yet, just so long as the funcitonality is there.
+  -non real CSG features may need to be rendered so that the user knows they can cilck on it (e.g. center axis of a peg hole)
+    -we also need some way to determine when to prioritize non real geometry vs clicking on the real geometery, I think in general we can always just prioritize non real geometry, but make sure things like cylinder axis aren't too long (i.e. cropped to the faces in the case of a peg hole)
+  -accessories are excluded from this
+
+3. automatic drawing eneration, thisi s a complicated topic, but the main thing relevant to us here is that we need to be able to tag certain named features to nidicate they should be measured in a certain way for the drawing generatino algorithm to do its magic. I need to work through the details, but here are a couple of use case examples
+  -timbers may have a reference edge which all measurements should be taken from where possible
+  -measurements may alos be taken from rough faces of the timebr if they match the perfect timber within dimensions
+  -timbers have rough faces that do not match their perfect timber within dimensions, measurements should never be taken from rough faces (there may be some exceptions such as for certain features tagged as "Decorative" though)
+  -if no face matches perfect timber within dimenisons, we may need to render a perfectt timber within wireframe to take measurements from
+  -we may want to take a "ladder" of measurements for eaxmple a series of mortise holes, where each measurement is taken from the previous, this would be across several joints, or within a joint
+  -within a joint, we may want to say certain features are always preferred to be measured local to another feature of that joint, for example peg holes are measured local to the centerline of the tenon and the joint shoulder
+  -in general we want to ensure every named feature can be derived somehow, but we may have some ability to turn off features needing to be measured, for eaxmple a series of mortise holes where each hole is the same size
+
+
+-followups
+  -I think in general we can always just prioritize non real geometry, but make sure things like cylinder axis aren't too long (i.e. cropped to the faces in the case of a peg hole)
+  -+1 to That argues for promoting named_features from List[Tuple[str, Face]] to a small dataclass with name, group, and later measurement tags.
+  -add epsilon parmeter to test functions in cutcsg.py
+  -for intersecting planes, we simply test if the point is on both planes in question right, and that deals with the infinite line issue. I tihnk in some sense CSG featuer is implicitly bound by points being on the boundary or contained in the CSG featuer itself. note though that we may eventually have face features that aren't complete faces e.g. just a lower triangle of a prism face or something. 
+  -+1 to Naming. An edge derived from two faces needs a stable identity for ladders and drawing references. The obvious one is the ordered pair of parent feature names, which also makes it human-readable in a breadcrumb.
+  -PTW faces may need special treatment as when we generate the CSG tree we use the rough CSG of the timber, at the very least we should do the following
+    -both the PTW and rough timber CSGs should have special reserved names so that their faces can ALWAYS be uniquely identified and any timber will only have 1 set of these faces
+    -in viewer mode, we may either render PTW, rough timber, or both. 
+      -for now measurements are only drawn if the feature is being rendered
+      -we may eventually want to show PTW measurements when rendering teh rough timber, lets put a pin on it, 
+  -RE feature 1
+    -can we add some additional metadata to CSG, so that a CSG can be attributed to a joint? seems like a nice to have for organizational reasons even if not necesasry
+    -I still want to be able to show the entire CSG feature tree in an expandable drop down, very useful for debugging
+      -click on the tree hierarchy highlighs the fetaure, clicking on the feature selects in the hierarchy
+  -RE feature 2
+    -one consideratino here is we need to know where to draw the measurement lines too. It's helpful to know at least the bounds of the feature being selected (exact geo may not be necessary)
+      -for edges we want to know its ends
+      -for faces we want to know its approximate "center"
+  -RE feature 3
+    -lets add awraning instead if reference face is not a perfect face, I think there may be cases where there are no perfect faces but we still pick an arbitrary face to pull all measurements from and render the internal PTW face in this case to show measurements
+    -I think we should be able to support center planes. I think we need to add the 2 LongCenterPlane to the timber fetaur eenum so that they can be reference here
+    -mark a TODO, we should consider changing reference_faces to a list of reference FEATURES that are chosen in order of priority to take measurements from. that's more generic, and then drops the rough == perfect requirement
+
+
+
 :: 8/7/2026 short shed script
 
 
@@ -162,6 +242,22 @@ def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement : Bu
 
 
 :: TODO
+
+-TODOS
+  -Fix tag → label in runner.py
+  -float_epsilon should just be generic_epsilon in rule.py
+  -Give the kumiki feature API a tolerance, then delete the float shadow, tolerance parmeter defaults to a new feature_test_epsilon or osemtihing that's a little bigger than the generi cone
+
+  
+
+DONE-test on regular vscode on mac
+-get vmware fusion and test on windows
+
+-improve fetaure selection display, it should be multi lined  
+  -feature type
+  -joint the feature came from
+  -maybe show the feature highlighted within the CSG tree (expandable)
+  -which local face on the timber it most points towards
 
 
 -drawing time prep
