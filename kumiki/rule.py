@@ -540,7 +540,7 @@ class Comparison(Enum):
     NE = "!="     # Not equal
 
 
-def _apply_comparison(val: float, comp: Comparison) -> bool:
+def _apply_comparison(val: float, comp: Comparison, eps: Optional[float] = None) -> bool:
     """Apply comparison operation to a float value against zero.
 
     GT/LT/GE/LE are epsilon-widened around zero, not just EQ/NE: exact
@@ -548,26 +548,34 @@ def _apply_comparison(val: float, comp: Comparison) -> bool:
     land on exactly 0 at a vertex; float arithmetic can now land a hair to
     either side of 0 for the same geometrically-exact case, so a strict
     `val > 0`/`val < 0` here would flip the answer on noise alone.
+
+    *eps* defaults to EPSILON_FLOAT. Callers doing geometry against meshed
+    (rather than analytic) input pass a wider one -- see the ``eps`` parameter
+    threaded through cutcsg/pathcsg's point queries.
     """
+    if eps is None:
+        eps = EPSILON_FLOAT
     if comp == Comparison.GT:
-        return val > EPSILON_FLOAT
+        return val > eps
     elif comp == Comparison.LT:
-        return val < -EPSILON_FLOAT
+        return val < -eps
     elif comp == Comparison.GE:
-        return val >= -EPSILON_FLOAT
+        return val >= -eps
     elif comp == Comparison.LE:
-        return val <= EPSILON_FLOAT
+        return val <= eps
     elif comp == Comparison.EQ:
-        return abs(val) < EPSILON_FLOAT
+        return abs(val) < eps
     elif comp == Comparison.NE:
-        return abs(val) >= EPSILON_FLOAT
+        return abs(val) >= eps
     else:
         raise ValueError(f"Unknown comparison: {comp}")
 
 
-def giraffe_compare(a, b, comparison: Comparison, collapse_mode=None) -> bool:
+def giraffe_compare(a, b, comparison: Comparison, collapse_mode=None, eps: Optional[float] = None) -> bool:
     """
     Compare two values: evaluates ``a - b`` and applies *comparison* against zero.
+
+    *eps* overrides the default comparison tolerance for this one call.
 
     Examples:
         giraffe_compare(x, y, Comparison.GT)   # x > y ?
@@ -577,7 +585,7 @@ def giraffe_compare(a, b, comparison: Comparison, collapse_mode=None) -> bool:
         val = float(a) - float(b)
     except Exception:
         return False
-    return _apply_comparison(val, comparison)
+    return _apply_comparison(val, comparison, eps)
 
 
 def giraffe_dot_product(vec1: Matrix, vec2: Matrix, collapse_mode=None) -> float:
@@ -874,21 +882,21 @@ def bu(numerator, denominator=1):
 # Zero / Equality Test Helper Functions
 # ============================================================================
 
-def safe_zero_test(value) -> bool:
-    """Test if a value is approximately zero."""
-    return safe_compare(value, 0, Comparison.EQ)
+def safe_zero_test(value, eps: Optional[float] = None) -> bool:
+    """Test if a value is approximately zero, within *eps* (default EPSILON_FLOAT)."""
+    return safe_compare(value, 0, Comparison.EQ, eps=eps)
 
 
-def safe_equality_test(value, expected) -> bool:
-    """Test if two values are approximately equal."""
-    return safe_compare(value, expected, Comparison.EQ)
+def safe_equality_test(value, expected, eps: Optional[float] = None) -> bool:
+    """Test if two values are approximately equal, within *eps* (default EPSILON_FLOAT)."""
+    return safe_compare(value, expected, Comparison.EQ, eps=eps)
 
 
 # ============================================================================
 # Parallel and Perpendicular Check Functions
 # ============================================================================
 
-def are_vectors_parallel(vector1: Matrix, vector2: Matrix) -> bool:
+def are_vectors_parallel(vector1: Matrix, vector2: Matrix, eps: Optional[float] = None) -> bool:
     """
     Check if two vectors are parallel.
 
@@ -908,9 +916,9 @@ def are_vectors_parallel(vector1: Matrix, vector2: Matrix) -> bool:
     # This is equivalent to checking if abs(dot_product) is approximately 1
     deviation = Abs(Abs(dot_product) - 1)
 
-    return safe_zero_test(deviation)
+    return safe_zero_test(deviation, eps)
 
-def are_vectors_perpendicular(vector1: Matrix, vector2: Matrix) -> bool:
+def are_vectors_perpendicular(vector1: Matrix, vector2: Matrix, eps: Optional[float] = None) -> bool:
     """
     Check if two vectors are perpendicular.
 
@@ -927,7 +935,7 @@ def are_vectors_perpendicular(vector1: Matrix, vector2: Matrix) -> bool:
     dot_product = vector1.dot(vector2)
 
     # Check if dot product is approximately zero
-    return safe_zero_test(dot_product)
+    return safe_zero_test(dot_product, eps)
 
 
 # ============================================================================

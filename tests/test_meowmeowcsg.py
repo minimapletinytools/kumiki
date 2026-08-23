@@ -2712,3 +2712,77 @@ class TestCSGNaming:
         result = cutting.get_negative_csg_local()
         assert isinstance(result, HalfSpace)
 
+
+
+class TestPointQueryTolerance:
+    """The eps parameter on the CSG point queries.
+
+    Comparisons default to EPSILON_FLOAT (1e-10), far tighter than a raycast
+    hit can manage -- those land on boolean-mesh vertices only approximately
+    on the analytic primitive. Passing eps widens the tolerance for that call,
+    and it has to reach all the way down: a primitive that delegates its
+    containment test to a helper is exactly the case where a tolerance that
+    stops at the top-level method is useless.
+    """
+
+    def _prism(self):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            named_features=[("my_right", PrismFace.RIGHT)],
+        )
+
+    def test_default_tolerance_rejects_a_near_miss(self):
+        near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
+        assert not self._prism().is_point_on_boundary(near_miss)
+
+    def test_eps_accepts_a_near_miss(self):
+        near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
+        assert self._prism().is_point_on_boundary(near_miss, 5e-4)
+
+    def test_eps_finds_a_named_feature_a_near_miss_would_lose(self):
+        prism = self._prism()
+        near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
+        assert prism.find_feature(near_miss) is None
+        feature = prism.find_feature(near_miss, 5e-4)
+        assert feature is not None
+        assert feature.name == "my_right"
+
+    def test_eps_does_not_persist_into_later_calls(self):
+        """The tolerance is per-call, not sticky."""
+        prism = self._prism()
+        near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
+        assert prism.is_point_on_boundary(near_miss, 5e-4)
+        assert not prism.is_point_on_boundary(near_miss)
+
+    def test_eps_reaches_through_a_difference_into_its_children(self):
+        """A combinator must hand its tolerance down, not swallow it."""
+        cut = RectangularPrism(
+            size=Matrix([scalar(2), scalar(2)]),
+            transform=Transform.identity(),
+            start_distance=scalar(4),
+            end_distance=scalar(6),
+        )
+        diff = Difference(base=self._prism(), subtract=[cut])
+        # On the cut pocket's x=1 wall, a hair outside it.
+        near_miss = create_v3(scalar(1) + 1e-6, scalar(0), scalar(5))
+        assert not diff.is_point_on_boundary(near_miss)
+        assert diff.is_point_on_boundary(near_miss, 5e-4)
+
+    def test_eps_reaches_through_an_extrusion(self):
+        extrusion = ConvexPolygonExtrusion(
+            points=[
+                Matrix([scalar(0), scalar(0)]),
+                Matrix([scalar(4), scalar(0)]),
+                Matrix([scalar(4), scalar(4)]),
+                Matrix([scalar(0), scalar(4)]),
+            ],
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+        near_miss = create_v3(scalar(2), scalar(4) + 1e-6, scalar(5))
+        assert not extrusion.is_point_on_boundary(near_miss)
+        assert extrusion.is_point_on_boundary(near_miss, 5e-4)

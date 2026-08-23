@@ -188,3 +188,81 @@ class TestPathCSG:
 
         on_top = create_v3(scalar(1, 100), scalar(15, 100), scalar(1, 25))
         assert [f.name for f in extrusion.get_all_features(on_top)] == ["top"]
+
+
+class TestPathExtrusionTolerance:
+    """PathExtrusion must hand its eps all the way down.
+
+    This is the primitive that motivated threading the tolerance explicitly
+    rather than scoping it globally. PathExtrusion does almost none of its own
+    comparing: containment and boundary tests delegate to FancyPath, which
+    delegates to each PathSegment's ray_crossings / closest_point. A tolerance
+    that stopped at PathExtrusion's own methods would be useless here -- and
+    silently so, since the answer would just be "not on the boundary".
+    """
+
+    def _circle(self, radius):
+        center = create_v2(scalar(0), scalar(0))
+        return FancyPath(segments=[
+            ArcSegment(center=center, radius=radius, start_angle=scalar(0), sweep_angle=pi),
+            ArcSegment(center=center, radius=radius, start_angle=pi, sweep_angle=pi),
+        ])
+
+    def _square(self):
+        a = create_v2(scalar(0), scalar(0))
+        b = create_v2(scalar(1, 10), scalar(0))
+        c = create_v2(scalar(1, 10), scalar(1, 10))
+        d = create_v2(scalar(0), scalar(1, 10))
+        return FancyPath([LineSegment(a, b), LineSegment(b, c),
+                          LineSegment(c, d), LineSegment(d, a)])
+
+    def test_eps_reaches_a_line_segment_boundary(self):
+        """Through FancyPath.locate_boundary_segment into LineSegment."""
+        extrusion = PathExtrusion(
+            path=self._square(), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(1, 10),
+        )
+        # A hair outside the x = 0.1 wall.
+        near_miss = create_v3(scalar(1, 10) + 1e-4, scalar(5, 100), scalar(5, 100))
+        assert not extrusion.is_point_on_boundary(near_miss)
+        assert extrusion.is_point_on_boundary(near_miss, 5e-4)
+
+    def test_eps_reaches_an_arc_segment_boundary(self):
+        """Through FancyPath into ArcSegment.closest_point / ray_crossings."""
+        radius = scalar(1, 20)
+        extrusion = PathExtrusion(
+            path=self._circle(radius), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(1, 10),
+        )
+        # A hair outside the barrel, on the +x side.
+        near_miss = create_v3(radius + 1e-4, scalar(0), scalar(5, 100))
+        assert not extrusion.is_point_on_boundary(near_miss)
+        assert extrusion.is_point_on_boundary(near_miss, 5e-4)
+
+    def test_widened_eps_does_not_raise_on_an_arc(self):
+        """Regression: ArcSegment.ray_crossings' sqrt(1 - sin^2).
+
+        The hit gate accepts y within the comparison tolerance of a monotonic
+        subrange's endpoints, so at a widened tolerance sin_theta can land
+        outside [-1, 1] -- far enough to blow past rule.sqrt's own
+        small-negative guard and raise "math domain error". sin_theta is
+        clamped now.
+        """
+        radius = scalar(1, 20)
+        extrusion = PathExtrusion(
+            path=self._circle(radius), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(1, 10),
+        )
+        # Level with the circle's top pole, where the subrange endpoints meet.
+        at_pole = create_v3(scalar(0), radius, scalar(5, 100))
+        assert extrusion.contains_point(at_pole, 5e-4) in (True, False)
+        assert extrusion.is_point_on_boundary(at_pole, 5e-4)
+
+    def test_eps_does_not_persist_into_later_calls(self):
+        extrusion = PathExtrusion(
+            path=self._square(), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(1, 10),
+        )
+        near_miss = create_v3(scalar(1, 10) + 1e-4, scalar(5, 100), scalar(5, 100))
+        assert extrusion.is_point_on_boundary(near_miss, 5e-4)
+        assert not extrusion.is_point_on_boundary(near_miss)

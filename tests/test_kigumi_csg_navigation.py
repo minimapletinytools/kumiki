@@ -19,12 +19,19 @@ from pathlib import Path
 
 import pytest
 
-from kumiki.cutcsg import CutCSG
+from kumiki.cutcsg import (
+    ConvexPolygonExtrusion,
+    CutCSG,
+    Cylinder,
+    Difference,
+    PrismFace,
+    RectangularPrism,
+)
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.mortise_and_tenon_joints import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
 )
-from kumiki.rule import create_v3, inches
+from kumiki.rule import Matrix, Transform, create_v3, inches, scalar
 from kumiki.timber import Frame
 from kumiki.triangles import triangulate_cutcsg
 
@@ -210,3 +217,141 @@ class TestSerializeCuttingSummary:
         assert cuts_meta, "expected at least one cutting on the tenon timber"
         assert cuts_meta[0]["label"] == "mortise_and_tenon"
         assert cuts_meta[0]["displayName"] == "mortise_and_tenon"
+
+
+def _timber_prism(named=True):
+    """A plain 4x6x100 timber body, optionally with its faces named."""
+    return RectangularPrism(
+        size=Matrix([scalar(4), scalar(6)]),
+        transform=Transform.identity(),
+        start_distance=scalar(0),
+        end_distance=scalar(100),
+        named_features=[("right", PrismFace.RIGHT)] if named else None,
+    )
+
+
+class TestNonPrismPrimitivesArePickable:
+    """Extrusions, path extrusions and lofts used to be invisible to picking.
+
+    kigumi carried its own float reimplementation of the point tests that only
+    understood HalfSpace, RectangularPrism and Cylinder. Every other primitive
+    failed the boundary test outright, so a click on (say) a dovetail cheek
+    fell through to the timber body and came back labeled with a bare "face".
+    The runner now calls kumiki's own CutCSG methods, which cover every
+    primitive.
+    """
+
+    def test_extrusion_surface_is_on_the_boundary(self):
+        """A point on a subtracted extrusion's wall registers as boundary."""
+        extrusion = ConvexPolygonExtrusion(
+            points=[
+                Matrix([scalar(0), scalar(-1)]),
+                Matrix([scalar(2), scalar(-1)]),
+                Matrix([scalar(2), scalar(1)]),
+                Matrix([scalar(0), scalar(1)]),
+            ],
+            transform=Transform.identity(),
+            start_distance=scalar(10),
+            end_distance=scalar(20),
+            label="dovetail_housing",
+        )
+        # On the extrusion's x=2 wall, inside the timber body.
+        point = [2.0, 0.0, 15.0]
+        assert runner._csg_point_on_boundary(extrusion, point, PICK_EPS)
+
+    def test_extrusion_cut_resolves_to_its_label_not_the_timber_body(self):
+        csg = Difference(base=_timber_prism(), subtract=[
+            ConvexPolygonExtrusion(
+                points=[
+                    Matrix([scalar(0), scalar(-1)]),
+                    Matrix([scalar(2), scalar(-1)]),
+                    Matrix([scalar(2), scalar(1)]),
+                    Matrix([scalar(0), scalar(1)]),
+                ],
+                transform=Transform.identity(),
+                start_distance=scalar(10),
+                end_distance=scalar(20),
+                label="dovetail_housing",
+            ),
+        ])
+        path, target, _face = runner._navigate_csg_to_leaf(csg, [2.0, 0.0, 15.0], PICK_EPS)
+        assert path == ["dovetail_housing"]
+        assert isinstance(target, ConvexPolygonExtrusion)
+
+    def test_cylinder_cut_resolves_to_its_label(self):
+        csg = Difference(base=_timber_prism(), subtract=[
+            Cylinder(
+                axis_direction=create_v3(scalar(0), scalar(1), scalar(0)),
+                radius=scalar(1),
+                position=create_v3(scalar(0), scalar(-5), scalar(50)),
+                start_distance=scalar(0),
+                end_distance=scalar(10),
+                label="peg_hole",
+            ),
+        ])
+        # On the bore wall, one radius off the axis.
+        path, target, face = runner._navigate_csg_to_leaf(csg, [1.0, 0.0, 50.0], PICK_EPS)
+        assert path == ["peg_hole"]
+        assert isinstance(target, Cylinder)
+        assert face == "cylindrical_surface"
+
+
+class TestDetectFaceLabel:
+    def test_prefers_a_declared_named_feature(self):
+        """A declared name beats the geometric guess.
+
+        A prism built in its own local frame has a "top" that need not be the
+        timber's top, so a name the author gave always wins.
+        """
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(100),
+            named_features=[("tenon_right", PrismFace.RIGHT)],
+        )
+        assert runner._detect_face_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
+
+    def test_falls_back_to_the_timber_local_direction(self):
+        """An unnamed face is named by which timber face it points along."""
+        prism = _timber_prism(named=False)
+        assert runner._detect_face_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "right"
+        assert runner._detect_face_label(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "left"
+        assert runner._detect_face_label(prism, [0.0, 3.0, 50.0], PICK_EPS) == "front"
+        assert runner._detect_face_label(prism, [0.0, 0.0, 100.0], PICK_EPS) == "top"
+
+    def test_half_space_reports_a_cut_plane(self):
+        from kumiki.cutcsg import HalfSpace
+
+        plane = HalfSpace(
+            normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(50)
+        )
+        assert runner._detect_face_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "cut_plane"
+
+    def test_half_space_named_feature_wins_over_cut_plane(self):
+        from kumiki.cutcsg import HalfSpace
+
+        plane = HalfSpace(
+            normal=create_v3(scalar(0), scalar(0), scalar(1)),
+            offset=scalar(50),
+            named_feature="shoulder",
+        )
+        assert runner._detect_face_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
+
+
+class TestPickingToleranceIsPerCall:
+    def test_widened_picking_does_not_affect_a_later_default_query(
+        self, mortise_and_tenon_frame
+    ):
+        """Picking passes a wide eps; that must not leak into anything else."""
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+
+        # A point 1e-4 off the timber's bottom face: inside the pick tolerance,
+        # outside the default one.
+        near_miss = create_v3(scalar(0), scalar(0), scalar(-1e-4))
+        assert csg.is_point_on_boundary(near_miss, PICK_EPS)
+
+        runner._navigate_csg_to_leaf(csg, [0.0, 0.0, 0.0], PICK_EPS)
+
+        assert not csg.is_point_on_boundary(near_miss)

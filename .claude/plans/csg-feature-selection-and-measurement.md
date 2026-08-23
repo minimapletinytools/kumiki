@@ -450,11 +450,9 @@ it from the CSG path — CSG selection goes to a separate `csgSelection` slot ho
 
 ## Build order
 
-1. **Fix `tag` → `label` in `runner.py`.** Seven `getattr` sites. Add a regression test
-   asserting a known pattern produces a non-empty path, so the next rename fails loudly.
-2. **Tolerance parameters, then delete the float shadow.** D1. Add the missing
-   `Intersection`, extrusion and loft cases while porting, and point kigumi at kumiki. This
-   is where extrusions and lofts become selectable at all.
+1. ~~**Fix `tag` → `label` in `runner.py`.**~~ **DONE** -- see "Implementation notes".
+2. ~~**Tolerance parameters, then delete the float shadow.**~~ **DONE** -- see
+   "Implementation notes".
 3. **`NamedFeature` dataclass + reserved PTW/rough names.** D2 and D6 together — both touch
    the same construction sites. Adds `named_features` to `Cylinder` and
    `ConvexPolygonSimpleLoft`.
@@ -475,6 +473,121 @@ it from the CSG path — CSG selection goes to a separate `csgSelection` slot ho
 
 Steps 1 and 2 are worth doing regardless of where the rest lands — they remove a broken code
 path and a redundant one.
+
+---
+
+## Implementation notes (steps 1 and 2)
+
+### Step 1 -- `tag` -> `label`
+
+All seven reads in `runner.py` retargeted. Since nothing consumed the wire keys yet
+(`mergeCSGTreePayload` in `layers-panel.js` is a stub and the `cuts` payload has no JS
+reader), the naming was made honest throughout rather than left half-renamed:
+
+- `_walk_tagged_csg` -> `_walk_labeled_csg`, `_find_tagged` -> `_find_labeled`
+- wire keys `"tag"` -> `"label"`, `"taggedCSGs"` -> `"labeledCSGs"`
+- local names `base_tag` / `ch_tag` / `sub_tag` -> `*_label`
+
+"Tagged" was actively misleading next to ticket `tags`, which are a real and separate
+concept the same file also handles (`_normalize_ticket_tags`).
+
+Regression coverage in `tests/test_kigumi_csg_navigation.py`. Reintroducing the exact
+historical bug fails 7 of its tests. `test_cutcsg_label_field_is_named_label` asserts the
+kumiki-side field name directly, so the next rename fails loudly rather than silently.
+
+### Step 2 -- tolerance, and deleting the float shadow
+
+**Implemented exactly as D1 specifies: an explicit parameter, threaded.** An earlier
+attempt used a module-level tolerance scope instead, on the theory that an explicit
+epsilon could not reach the helpers `PathExtrusion` delegates to. That was wrong, and the
+numbers say so. Measuring the actual call closure by fixed point over the AST -- start at
+the five query methods, keep any callee that reaches a tolerance-sensitive `safe_*`
+primitive -- gives **14 method names**, not the whole of `pathcsg`:
+
+```
+contains_point            is_point_on_boundary     get_outward_normal
+get_all_features          find_feature             test_point
+contains_point_2d         is_point_on_boundary_2d  locate_boundary_segment
+ray_crossings             closest_point            outward_local_normal
+_monotonic_subranges      _point_on_side
+```
+
+Six of those were new (the `FancyPath` / `PathSegment` ones); the rest were already being
+touched. Across all their class implementations that is 66 `def`s and 187 threaded call
+sites, applied mechanically from the AST rather than by hand.
+
+Deliberately excluded from the tolerance-sensitive set: `safe_norm`,
+`safe_normalize_vector`, `safe_dot_product`, `safe_transform_vector`. Those are pure
+arithmetic, and normalize's internal `EPSILON_FLOAT` is a degeneracy guard that should not
+scale with a pick tolerance.
+
+`rule.py` gained an optional `eps` on `safe_compare`, `safe_zero_test`,
+`safe_equality_test`, `are_vectors_parallel` and `are_vectors_perpendicular`. All are
+trailing optional parameters, so every existing call site in the library is unaffected.
+
+**First bug found: `eps` did not mean the same thing on every primitive.** Several
+containment tests compare a *squared* distance against the tolerance directly --
+`safe_zero_test(distance_sq)` in `ConvexPolygonExtrusion._point_on_side`,
+`ConvexPolygonSimpleLoft`, and `FancyPath.locate_boundary_segment`. Passing eps straight
+through would have made `eps=5e-4` mean half a millimetre against a prism face but **22
+millimetres** against a polygon edge. `_squared_eps()` now adapts the value at those eight
+sites, so `eps` is a plain distance in model units everywhere. `None` passes through
+unchanged, preserving the historical default (1e-10 on the squared value, an effective
+linear tolerance of 1e-5).
+
+**Second bug found: `ArcSegment.ray_crossings` domain error.** It computes
+`sqrt(1 - sin_theta**2)` after a hit gate that accepts `y` within the comparison tolerance
+of a monotonic subrange's endpoints. At a widened tolerance `sin_theta` lands far enough
+outside [-1, 1] to blow past `rule.sqrt`'s own small-negative guard, raising
+`ValueError: math domain error` on any path-extrusion pick. `sin_theta` is now clamped --
+the gate has already established the point lies on the subrange, so the excess is noise.
+
+**`_detect_face_label` rewritten.** Two layers now: kumiki's `find_feature` first (a
+declared name always beats a geometric guess), then a generic fallback that names the face
+by whichever of the timber's six local directions its *outward normal* points along. That
+fallback replaces `_generic_label_in_timber_local_space`, which approximated the normal
+from the prism's rotation axis and therefore only worked for `RectangularPrism`. The
+normal-based version works for every primitive. `HalfSpace` still reports `cut_plane` and a
+cylinder barrel still reports `cylindrical_surface`, since neither has a face in the
+timber's sense.
+
+**Verified equivalence before deleting.** Both implementations were run over every triangle
+centroid of five patterns (524 surface points). `is_point_on_boundary` disagreed on 86
+points, **all in the same direction** -- kumiki finds boundary where the shadow found none,
+i.e. exactly the extrusion / path-extrusion / loft surfaces that were unselectable. Zero
+regressions in the other direction.
+
+`contains_point` disagreed on 122, mixed. Those come from kumiki's coincident-surface rule
+in `Difference.contains_point` (base and subtract sharing a face plane, resolved by
+comparing outward normals), which the shadow's `-eps` strict-interior test did not model.
+It does not affect picking: `contains_point` survives only as a tie-break in
+`_resolve_csg_at_path` when several children share a label, and the boundary answers -- what
+picking actually uses -- agree everywhere.
+
+**Performance.** kumiki is ~2x the shadow on a whole-tree walk (~72 us, once per click) and
+~3.7x on the per-triangle leaf test used by highlight extraction. Worst realistic case
+measured: a 3-cut timber with 572 triangles at 7.9 ms for the full highlight pass. Fine for
+a click; revisit only if timbers get much denser.
+
+**Result.** Previously unselectable geometry now resolves with real paths:
+
+```
+dovetail tongue -> ('sliding_dovetail', 'dovetail_tongue_profile')  ConvexPolygonExtrusion
+dovetail housing -> ('sliding_dovetail', 'dovetail_housing')        ConvexPolygonExtrusion
+path decoration -> ('path_extrusion_corner_end_decoration',)        PathExtrusion
+roundovers      -> ('roundover_decoration', 'roundover_top_left')   Cylinder   (x12, each distinct)
+```
+
+### Follow-ups noticed while in there
+
+- Some cuts produce a doubled path segment, e.g.
+  `('sliding_dovetail', 'sliding_dovetail', 'dovetail_tongue_profile')`, because
+  `Cutting.label` and the inner CSG's own `label` are the same string. Cosmetic, and it
+  comes from the joint authoring rather than the navigation -- worth collapsing when step 7
+  passes through the joint library.
+- `ConvexPolygonExtrusion.get_outward_normal` returns `None` for a few points (edges and
+  corners), which falls back to the bare label `"face"`. Pre-existing; not a regression.
+- `cutcsg.py`'s stale "uses SymPy symbolic math" docstring is fixed.
 
 ---
 

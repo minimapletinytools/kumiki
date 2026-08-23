@@ -2,7 +2,15 @@
 CutCSG - Constructive Solid Geometry operations for Kumiki
 
 This module provides CSG primitives and operations for representing timber cuts
-and geometry operations. All operations use SymPy symbolic math for exact computation.
+and geometry operations. All operations use plain Python floats (see rule.py);
+comparisons go through the safe_* helpers so they carry a tolerance rather than
+testing for bit-exact equality.
+
+The point-query methods -- contains_point, is_point_on_boundary,
+get_outward_normal, get_all_features, find_feature -- take an optional ``eps``
+that widens that tolerance for the duration of the call. Picking needs it: a
+raycast hit lands on a boolean-mesh vertex that is only approximately on the
+analytic primitive, so the default 1e-10 rejects nearly every real hit.
 """
 
 from typing import List, Optional, Tuple, Union, cast
@@ -81,6 +89,21 @@ class ExtrusionCap(Enum):
 ExtrusionFeatureKey = Union[int, ExtrusionCap]
 
 
+def _squared_eps(eps: Optional[Numeric]) -> Optional[Numeric]:
+    """Adapt a linear distance tolerance for comparison against a SQUARED distance.
+
+    Several containment tests compare a squared distance against the tolerance
+    directly, which quietly makes `eps` mean different things on different
+    primitives -- eps=5e-4 would be half a millimetre against a prism face but
+    22mm against a polygon edge. Squaring it here keeps `eps` a plain distance
+    in model units everywhere.
+
+    None passes through unchanged, preserving the historical default (1e-10
+    applied to the squared value, i.e. an effective linear tolerance of 1e-5).
+    """
+    return None if eps is None else eps * eps
+
+
 @dataclass(frozen=True)
 class CSGFeature(ABC):
     """
@@ -90,7 +113,7 @@ class CSGFeature(ABC):
     priority: int 
 
     @abstractmethod
-    def test_point(self, point: V3) -> bool:
+    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Test if a given point is on this feature (e.g. on the face or edge).
         This can be used to determine if a cut should reference this feature.
@@ -103,8 +126,8 @@ class HalfSpaceFeature(CSGFeature):
     """Feature representing the entire boundary plane of a HalfSpace."""
     owner: 'HalfSpace'
 
-    def test_point(self, point: V3) -> bool:
-        return self.owner.is_point_on_boundary(point)
+    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+        return self.owner.is_point_on_boundary(point, eps=eps)
 
 
 @dataclass(frozen=True)
@@ -113,24 +136,24 @@ class RectangularPrismFeature(CSGFeature):
     owner: 'RectangularPrism'
     face: PrismFace
 
-    def test_point(self, point: V3) -> bool:
-        if not self.owner.is_point_on_boundary(point):
+    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not self.owner.is_point_on_boundary(point, eps=eps):
             return False
         x, y, z = self.owner._local_coords(point)
         hw = self.owner.size[0] / 2
         hh = self.owner.size[1] / 2
         if self.face == PrismFace.RIGHT:
-            return safe_equality_test(x, hw)
+            return safe_equality_test(x, hw, eps=eps)
         elif self.face == PrismFace.LEFT:
-            return safe_equality_test(x, -hw)
+            return safe_equality_test(x, -hw, eps=eps)
         elif self.face == PrismFace.FRONT:
-            return safe_equality_test(y, hh)
+            return safe_equality_test(y, hh, eps=eps)
         elif self.face == PrismFace.BACK:
-            return safe_equality_test(y, -hh)
+            return safe_equality_test(y, -hh, eps=eps)
         elif self.face == PrismFace.TOP:
-            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance)
+            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance, eps=eps)
         elif self.face == PrismFace.BOTTOM:
-            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance)
+            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance, eps=eps)
         return False
 
 
@@ -141,15 +164,15 @@ class ConvexPolygonExtrusionFeature(CSGFeature):
     owner: 'ConvexPolygonExtrusion'
     key: ExtrusionFeatureKey
 
-    def test_point(self, point: V3) -> bool:
-        if not self.owner.is_point_on_boundary(point):
+    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not self.owner.is_point_on_boundary(point, eps=eps):
             return False
         x, y, z = self.owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance)
+            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance, eps=eps)
         if self.key == ExtrusionCap.BOTTOM:
-            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance)
-        return self.owner._point_on_side(self.key, x, y)
+            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance, eps=eps)
+        return self.owner._point_on_side(self.key, x, y, eps=eps)
 
 
 @dataclass(frozen=True)
@@ -162,24 +185,24 @@ class CutCSG(ABC):
         """String representation for debugging."""
         pass
 
-    def find_feature(self, point: V3) -> Optional[CSGFeature]:
+    def find_feature(self, point: V3, eps: Optional[Numeric] = None) -> Optional[CSGFeature]:
         """Return the highest-priority feature at *point*, or None."""
-        features = self.get_all_features(point)
+        features = self.get_all_features(point, eps=eps)
         if not features:
             return None
         features.sort(key=lambda f: f.priority)
         for f in features:
-            if f.test_point(point):
+            if f.test_point(point, eps=eps):
                 return f
         return None
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
         """Return all features that the point may belong to."""
         return []
 
 
     @abstractmethod
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the CSG object.
         
@@ -192,7 +215,7 @@ class CutCSG(ABC):
         pass
 
     @abstractmethod
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the CSG object.
         
@@ -205,7 +228,7 @@ class CutCSG(ABC):
         pass
     
     @abstractmethod
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -241,13 +264,13 @@ class EmptyCSG(CutCSG):
     def __repr__(self) -> str:
         return "EmptyCSG()"
 
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         return False
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         return False
 
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         return None
 
     def get_aabb(self) -> 'BoundingBox':
@@ -282,7 +305,7 @@ class HalfSpace(CutCSG):
     def __repr__(self) -> str:
         return f"HalfSpace(normal={self.normal.T}, offset={self.offset})"
     
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the half-plane.
         
@@ -296,9 +319,9 @@ class HalfSpace(CutCSG):
         """
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
-        return safe_compare(dot_product, self.offset, Comparison.GE)
+        return safe_compare(dot_product, self.offset, Comparison.GE, eps=eps)
     
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the half-plane.
         
@@ -313,9 +336,9 @@ class HalfSpace(CutCSG):
         # Compute dot product: point · normal
         dot_product = safe_dot_product(point, self.normal)
         # Use safe_zero_test to handle Float vs Integer comparison with tolerance
-        return safe_zero_test(dot_product - self.offset)
+        return safe_zero_test(dot_product - self.offset, eps=eps)
     
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -329,8 +352,8 @@ class HalfSpace(CutCSG):
         """
         return -self.normal
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
-        if self.named_feature is not None and self.is_point_on_boundary(point):
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+        if self.named_feature is not None and self.is_point_on_boundary(point, eps=eps):
             return [HalfSpaceFeature(name=self.named_feature, priority=0, owner=self)]
         return []
 
@@ -471,7 +494,7 @@ class RectangularPrism(CutCSG):
         z_coord = safe_dot_product(local_point, length_dir)
         return x_coord, y_coord, z_coord
 
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the prism.
 
@@ -488,18 +511,18 @@ class RectangularPrism(CutCSG):
         half_height = self.size[1] / 2
 
         # Check width and height bounds
-        if safe_compare(Abs(x_coord), half_width, Comparison.GT) or safe_compare(Abs(y_coord), half_height, Comparison.GT):
+        if safe_compare(Abs(x_coord), half_width, Comparison.GT, eps=eps) or safe_compare(Abs(y_coord), half_height, Comparison.GT, eps=eps):
             return False
 
         # Check length bounds
-        if self.start_distance is not None and safe_compare(z_coord, self.start_distance, Comparison.LT):
+        if self.start_distance is not None and safe_compare(z_coord, self.start_distance, Comparison.LT, eps=eps):
             return False
-        if self.end_distance is not None and safe_compare(z_coord, self.end_distance, Comparison.GT):
+        if self.end_distance is not None and safe_compare(z_coord, self.end_distance, Comparison.GT, eps=eps):
             return False
 
         return True
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the prism.
 
@@ -510,7 +533,7 @@ class RectangularPrism(CutCSG):
             True if the point is on the boundary of the prism, False otherwise
         """
         # First check if point is contained
-        if not self.contains_point(point):
+        if not self.contains_point(point, eps=eps):
             return False
 
         x_coord, y_coord, z_coord = self._local_coords(point)
@@ -520,22 +543,22 @@ class RectangularPrism(CutCSG):
         half_height = self.size[1] / 2
 
         # On width faces
-        if safe_equality_test(Abs(x_coord), half_width):
+        if safe_equality_test(Abs(x_coord), half_width, eps=eps):
             return True
 
         # On height faces
-        if safe_equality_test(Abs(y_coord), half_height):
+        if safe_equality_test(Abs(y_coord), half_height, eps=eps):
             return True
 
         # On length faces (if finite)
-        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance, eps=eps):
             return True
-        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance, eps=eps):
             return True
 
         return False
 
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
 
@@ -562,21 +585,21 @@ class RectangularPrism(CutCSG):
         # TODO you should check if point is on edges and return averages instead
 
         # On length faces (top/bottom) - check these first
-        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance, eps=eps):
             return -length_dir  # Bottom face, normal points in -length direction (outward)
-        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance, eps=eps):
             return length_dir  # Top face, normal points in +length direction (outward)
 
         # On width faces (right/left)
-        if safe_equality_test(Abs(x_coord), half_width):
-            if safe_compare(x_coord, 0, Comparison.GT):
+        if safe_equality_test(Abs(x_coord), half_width, eps=eps):
+            if safe_compare(x_coord, 0, Comparison.GT, eps=eps):
                 return width_dir  # Right face, normal points in +width direction
             else:
                 return -width_dir  # Left face, normal points in -width direction
 
         # On height faces (front/back)
-        if safe_equality_test(Abs(y_coord), half_height):
-            if safe_compare(y_coord, 0, Comparison.GT):
+        if safe_equality_test(Abs(y_coord), half_height, eps=eps):
+            if safe_compare(y_coord, 0, Comparison.GT, eps=eps):
                 return height_dir  # Front face, normal points in +height direction
             else:
                 return -height_dir  # Back face, normal points in -height direction
@@ -584,19 +607,19 @@ class RectangularPrism(CutCSG):
         # Should not reach here if point is actually on boundary
         return None
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
-        if self.named_features is None or not self.is_point_on_boundary(point):
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+        if self.named_features is None or not self.is_point_on_boundary(point, eps=eps):
             return []
         x, y, z = self._local_coords(point)
         hw = self.size[0] / 2
         hh = self.size[1] / 2
         face_checks = {
-            PrismFace.RIGHT: lambda: safe_equality_test(x, hw),
-            PrismFace.LEFT: lambda: safe_equality_test(x, -hw),
-            PrismFace.FRONT: lambda: safe_equality_test(y, hh),
-            PrismFace.BACK: lambda: safe_equality_test(y, -hh),
-            PrismFace.TOP: lambda: self.end_distance is not None and safe_equality_test(z, self.end_distance),
-            PrismFace.BOTTOM: lambda: self.start_distance is not None and safe_equality_test(z, self.start_distance),
+            PrismFace.RIGHT: lambda: safe_equality_test(x, hw, eps=eps),
+            PrismFace.LEFT: lambda: safe_equality_test(x, -hw, eps=eps),
+            PrismFace.FRONT: lambda: safe_equality_test(y, hh, eps=eps),
+            PrismFace.BACK: lambda: safe_equality_test(y, -hh, eps=eps),
+            PrismFace.TOP: lambda: self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps),
+            PrismFace.BOTTOM: lambda: self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps),
         }
         features: List[CSGFeature] = []
         for name, face in self.named_features:
@@ -709,7 +732,7 @@ class Cylinder(CutCSG):
                 f"position={self.position.T}, "
                 f"start={self.start_distance}, end={self.end_distance})")
     
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the cylinder.
         
@@ -729,9 +752,9 @@ class Cylinder(CutCSG):
         axial_coord = safe_dot_product(local_point, axis)
 
         # Check axial bounds
-        if self.start_distance is not None and safe_compare(axial_coord, self.start_distance, Comparison.LT):
+        if self.start_distance is not None and safe_compare(axial_coord, self.start_distance, Comparison.LT, eps=eps):
             return False
-        if self.end_distance is not None and safe_compare(axial_coord, self.end_distance, Comparison.GT):
+        if self.end_distance is not None and safe_compare(axial_coord, self.end_distance, Comparison.GT, eps=eps):
             return False
 
         # Calculate radial distance from axis
@@ -740,9 +763,9 @@ class Cylinder(CutCSG):
         radial_distance = safe_norm(radial_vector)
 
         # Check if within radius
-        return safe_compare(radial_distance, self.radius, Comparison.LE)
+        return safe_compare(radial_distance, self.radius, Comparison.LE, eps=eps)
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the cylinder.
         
@@ -757,7 +780,7 @@ class Cylinder(CutCSG):
             True if the point is on the boundary of the cylinder, False otherwise
         """
         # First check if point is contained
-        if not self.contains_point(point):
+        if not self.contains_point(point, eps=eps):
             return False
         
         # Transform point to local coordinates
@@ -775,18 +798,18 @@ class Cylinder(CutCSG):
         radial_distance = safe_norm(radial_vector)
 
         # On cylindrical surface
-        if safe_equality_test(radial_distance, self.radius):
+        if safe_equality_test(radial_distance, self.radius, eps=eps):
             return True
 
         # On end caps (if finite and at the end)
-        if self.start_distance is not None and safe_equality_test(axial_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(axial_coord, self.start_distance, eps=eps):
             return True
-        if self.end_distance is not None and safe_equality_test(axial_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(axial_coord, self.end_distance, eps=eps):
             return True
 
         return False
     
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -813,9 +836,9 @@ class Cylinder(CutCSG):
         radial_distance = safe_norm(radial_vector)
 
         # Check if on cylindrical surface first (most common case)
-        if safe_equality_test(radial_distance, self.radius):
+        if safe_equality_test(radial_distance, self.radius, eps=eps):
             # Normal is the radial direction (normalized)
-            if safe_zero_test(radial_distance):
+            if safe_zero_test(radial_distance, eps=eps):
                 # Point is on the axis, which shouldn't happen for the cylindrical surface
                 # This might be an edge case on the cap center
                 pass
@@ -823,10 +846,10 @@ class Cylinder(CutCSG):
                 return radial_vector / radial_distance
 
         # Check if on end caps
-        if self.start_distance is not None and safe_equality_test(axial_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(axial_coord, self.start_distance, eps=eps):
             # Bottom cap, normal points in -axis direction (outward)
             return -axis
-        if self.end_distance is not None and safe_equality_test(axial_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(axial_coord, self.end_distance, eps=eps):
             # Top cap, normal points in +axis direction (outward)
             return axis
 
@@ -875,7 +898,7 @@ class SolidUnion(CutCSG):
     def __repr__(self) -> str:
         return f"SolidUnion({len(self.children)} children)"
     
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the union.
         
@@ -887,9 +910,9 @@ class SolidUnion(CutCSG):
         Returns:
             True if the point is in any of the children, False otherwise
         """
-        return any(child.contains_point(point) for child in self.children)
+        return any(child.contains_point(point, eps=eps) for child in self.children)
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the union.
         
@@ -903,14 +926,14 @@ class SolidUnion(CutCSG):
             True if the point is on the boundary of the union, False otherwise
         """
         # Point must be contained in the union
-        if not self.contains_point(point):
+        if not self.contains_point(point, eps=eps):
             return False
         
         # Check if on boundary of any child and not strictly inside all others
         on_any_boundary = False
         for child in self.children:
-            if child.contains_point(point):
-                if child.is_point_on_boundary(point):
+            if child.contains_point(point, eps=eps):
+                if child.is_point_on_boundary(point, eps=eps):
                     on_any_boundary = True
                 else:
                     # Point is strictly inside this child, so not on union boundary
@@ -918,7 +941,7 @@ class SolidUnion(CutCSG):
         
         return on_any_boundary
     
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -934,8 +957,8 @@ class SolidUnion(CutCSG):
         normals = []
         
         for child in self.children:
-            if child.is_point_on_boundary(point):
-                normal = child.get_outward_normal(point)
+            if child.is_point_on_boundary(point, eps=eps):
+                normal = child.get_outward_normal(point, eps=eps)
                 if normal is not None:
                     normals.append(normal)
         
@@ -950,14 +973,14 @@ class SolidUnion(CutCSG):
                 avg_normal = avg_normal + n
             # Normalize
             norm = safe_norm(avg_normal)
-            if safe_zero_test(norm):
+            if safe_zero_test(norm, eps=eps):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
         features: List[CSGFeature] = []
         for child in self.children:
-            features.extend(child.get_all_features(point))
+            features.extend(child.get_all_features(point, eps=eps))
         features.sort(key=lambda f: f.priority)
         return features
 
@@ -1004,45 +1027,45 @@ class Intersection(CutCSG):
     def __repr__(self) -> str:
         return f"Intersection(left={self.left}, right={self.right})"
 
-    def contains_point(self, point: V3) -> bool:
-        return self.left.contains_point(point) and self.right.contains_point(point)
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+        return self.left.contains_point(point, eps=eps) and self.right.contains_point(point, eps=eps)
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         # Boundary of intersection = points in both solids that are on either boundary.
-        if not self.contains_point(point):
+        if not self.contains_point(point, eps=eps):
             return False
-        return self.left.is_point_on_boundary(point) or self.right.is_point_on_boundary(point)
+        return self.left.is_point_on_boundary(point, eps=eps) or self.right.is_point_on_boundary(point, eps=eps)
 
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
-        left_on_boundary = self.left.is_point_on_boundary(point)
-        right_on_boundary = self.right.is_point_on_boundary(point)
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
+        left_on_boundary = self.left.is_point_on_boundary(point, eps=eps)
+        right_on_boundary = self.right.is_point_on_boundary(point, eps=eps)
 
         if left_on_boundary and not right_on_boundary:
-            return self.left.get_outward_normal(point)
+            return self.left.get_outward_normal(point, eps=eps)
         if right_on_boundary and not left_on_boundary:
-            return self.right.get_outward_normal(point)
+            return self.right.get_outward_normal(point, eps=eps)
 
         if left_on_boundary and right_on_boundary:
-            left_normal = self.left.get_outward_normal(point)
-            right_normal = self.right.get_outward_normal(point)
+            left_normal = self.left.get_outward_normal(point, eps=eps)
+            right_normal = self.right.get_outward_normal(point, eps=eps)
             if left_normal is None:
                 return right_normal
             if right_normal is None:
                 return left_normal
             avg_normal = left_normal + right_normal
             norm = safe_norm(avg_normal)
-            if safe_zero_test(norm):
+            if safe_zero_test(norm, eps=eps):
                 return left_normal
             return avg_normal / norm
 
         return None
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
-        if not self.is_point_on_boundary(point):
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+        if not self.is_point_on_boundary(point, eps=eps):
             return []
         features: List[CSGFeature] = []
-        features.extend(self.left.get_all_features(point))
-        features.extend(self.right.get_all_features(point))
+        features.extend(self.left.get_all_features(point, eps=eps))
+        features.extend(self.right.get_all_features(point, eps=eps))
         features.sort(key=lambda f: f.priority)
         return features
 
@@ -1096,7 +1119,7 @@ class Difference(CutCSG):
     def __repr__(self) -> str:
         return f"Difference(base={self.base}, subtract={len(self.subtract)} objects)"
     
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the difference.
         
@@ -1110,24 +1133,24 @@ class Difference(CutCSG):
             True if the point is in base but not in any subtract objects, False otherwise
         """
         # Point must be in base
-        if not self.base.contains_point(point):
+        if not self.base.contains_point(point, eps=eps):
             return False
         
         # Check if on base boundary
-        on_base_boundary = self.base.is_point_on_boundary(point)
+        on_base_boundary = self.base.is_point_on_boundary(point, eps=eps)
         
         # Point must not be strictly inside any subtract object
         # If point is on boundary of both base and subtract, check normals
         for sub in self.subtract:
-            if sub.contains_point(point):
-                if not sub.is_point_on_boundary(point):
+            if sub.contains_point(point, eps=eps):
+                if not sub.is_point_on_boundary(point, eps=eps):
                     # Point is strictly inside a subtract object
                     return False
                 elif on_base_boundary:
                     # Point is on boundary of both base and subtract
                     # Check the outward normals
-                    base_normal = self.base.get_outward_normal(point)
-                    sub_normal = sub.get_outward_normal(point)
+                    base_normal = self.base.get_outward_normal(point, eps=eps)
+                    sub_normal = sub.get_outward_normal(point, eps=eps)
                     
                     if base_normal is not None and sub_normal is not None:
                         # Compute dot product of normals
@@ -1135,7 +1158,7 @@ class Difference(CutCSG):
                         
                         # If dot product == 1, surfaces overlap, exclude the point
                         # TODO what were really wanting to chec khere is that the surfaces are the same locally which may not be the case if the normal was on an edge with this condition. To fix this you should introduce an is_on_edge function HOWEVER this also won't work in the case of stuff like cylinders, so to fix that you probably really need a surface_derivative (curvature) function...
-                        if safe_equality_test(dot_product, 1):
+                        if safe_equality_test(dot_product, 1, eps=eps):
                             return False
                     else:
                         # Cannot determine normals, use conservative approach: exclude
@@ -1143,7 +1166,7 @@ class Difference(CutCSG):
         
         return True
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the difference.
         
@@ -1164,7 +1187,7 @@ class Difference(CutCSG):
             True if the point is on the boundary of the difference, False otherwise
         """
         # Point must be contained in base
-        if not self.base.contains_point(point):
+        if not self.base.contains_point(point, eps=eps):
             return False
         
         # Check if point is in any subtract region (strictly inside, not just boundary)
@@ -1172,8 +1195,8 @@ class Difference(CutCSG):
         on_subtract_boundary = False
         
         for sub in self.subtract:
-            if sub.contains_point(point):
-                if sub.is_point_on_boundary(point):
+            if sub.contains_point(point, eps=eps):
+                if sub.is_point_on_boundary(point, eps=eps):
                     on_subtract_boundary = True
                 else:
                     # Point is strictly inside a subtract object
@@ -1189,9 +1212,9 @@ class Difference(CutCSG):
             return True
         
         # Otherwise, check if it's on the base boundary
-        return self.base.is_point_on_boundary(point)
+        return self.base.is_point_on_boundary(point, eps=eps)
     
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -1205,16 +1228,16 @@ class Difference(CutCSG):
             The outward normal vector, or None if cannot be determined
         """
         # If point is on base boundary, return base's normal
-        if self.base.is_point_on_boundary(point):
-            return self.base.get_outward_normal(point)
+        if self.base.is_point_on_boundary(point, eps=eps):
+            return self.base.get_outward_normal(point, eps=eps)
         
         # Otherwise, point must be on subtract boundary (creating a "hole")
         # The normal should point inward to the subtract (which is outward from the difference)
         # So we negate the subtract's outward normal
         normals = []
         for sub in self.subtract:
-            if sub.is_point_on_boundary(point):
-                normal = sub.get_outward_normal(point)
+            if sub.is_point_on_boundary(point, eps=eps):
+                normal = sub.get_outward_normal(point, eps=eps)
                 if normal is not None:
                     # Negate because we want the normal pointing into the remaining material
                     normals.append(-normal)
@@ -1230,18 +1253,18 @@ class Difference(CutCSG):
                 avg_normal = avg_normal + n
             # Normalize
             norm = safe_norm(avg_normal)
-            if safe_zero_test(norm):
+            if safe_zero_test(norm, eps=eps):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
-        if not self.is_point_on_boundary(point):
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+        if not self.is_point_on_boundary(point, eps=eps):
             return []
         # Collect features from both the base and subtract children
         features: List[CSGFeature] = []
-        features.extend(self.base.get_all_features(point))
+        features.extend(self.base.get_all_features(point, eps=eps))
         for sub in self.subtract:
-            features.extend(sub.get_all_features(point))
+            features.extend(sub.get_all_features(point, eps=eps))
         features.sort(key=lambda f: f.priority)
         return features
 
@@ -1371,7 +1394,7 @@ class ConvexPolygonExtrusion(CutCSG):
                 (all(safe_compare(cp, 0, Comparison.GT) for cp in non_zero_crosses) or
                  all(safe_compare(cp, 0, Comparison.LT) for cp in non_zero_crosses)))
 
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the extruded polygon.
         
@@ -1394,9 +1417,9 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check Z bounds (use safe_compare for tolerance with Float vs Integer)
-        if self.start_distance is not None and safe_compare(z_coord - self.start_distance, 0, Comparison.LT):
+        if self.start_distance is not None and safe_compare(z_coord - self.start_distance, 0, Comparison.LT, eps=eps):
             return False
-        if self.end_distance is not None and safe_compare(z_coord - self.end_distance, 0, Comparison.GT):
+        if self.end_distance is not None and safe_compare(z_coord - self.end_distance, 0, Comparison.GT, eps=eps):
             return False
         
         # Check if (x_coord, y_coord) is inside the convex polygon
@@ -1420,12 +1443,12 @@ class ConvexPolygonExtrusion(CutCSG):
             cross = edge[0] * to_point[1] - edge[1] * to_point[0]
             
             # Use safe_compare with tolerance to handle Float vs Integer comparisons
-            if safe_compare(cross, 0, Comparison.LT):
+            if safe_compare(cross, 0, Comparison.LT, eps=eps):
                 return False
         
         return True
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the extruded polygon.
         
@@ -1440,7 +1463,7 @@ class ConvexPolygonExtrusion(CutCSG):
             True if the point is on the boundary, False otherwise
         """
         # First check if point is contained
-        if not self.contains_point(point):
+        if not self.contains_point(point, eps=eps):
             return False
         
         # Transform point to local coordinates
@@ -1452,16 +1475,16 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check if on top or bottom face (if finite)
-        if self.start_distance is not None and safe_zero_test(z_coord - self.start_distance):
+        if self.start_distance is not None and safe_zero_test(z_coord - self.start_distance, eps=eps):
             return True
-        if self.end_distance is not None and safe_zero_test(z_coord - self.end_distance):
+        if self.end_distance is not None and safe_zero_test(z_coord - self.end_distance, eps=eps):
             return True
         
         # Check if on a vertical edge (point is at a vertex XY coordinate)
         point_2d = Matrix([x_coord, y_coord])
         for vertex_2d in self.points:
             distance_sq = (point_2d[0] - vertex_2d[0])**2 + (point_2d[1] - vertex_2d[1])**2
-            if safe_zero_test(distance_sq):
+            if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
                 return True  # Point is on a vertical edge
         
         # Check if on any horizontal edge of the polygon (side face at this z)
@@ -1476,24 +1499,24 @@ class ConvexPolygonExtrusion(CutCSG):
             
             # If edge is zero-length, skip it
             edge_length_sq = edge[0]**2 + edge[1]**2
-            if safe_zero_test(edge_length_sq):
+            if safe_zero_test(edge_length_sq, eps=eps):
                 continue
             
             # Project to_point onto edge
             t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
             
             # Check if projection is on the segment [0, 1]
-            t_in_range = safe_compare(t, 0, Comparison.GE) and safe_compare(t - scalar(1), 0, Comparison.LE)
+            t_in_range = safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t - scalar(1), 0, Comparison.LE, eps=eps)
             
             if t_in_range:
                 closest_point = p1 + edge * t
                 distance_sq = (point_2d[0] - closest_point[0])**2 + (point_2d[1] - closest_point[1])**2
-                if safe_zero_test(distance_sq):
+                if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
                     return True
         
         return False
     
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
         
@@ -1514,13 +1537,13 @@ class ConvexPolygonExtrusion(CutCSG):
         z_coord = local_coords[2]
         
         # Check if on top face
-        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(z_coord, self.end_distance, eps=eps):
             # Top face, normal points in +Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
         # Check if on bottom face
-        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(z_coord, self.start_distance, eps=eps):
             # Bottom face, normal points in -Z direction in local coords
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
@@ -1538,15 +1561,15 @@ class ConvexPolygonExtrusion(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0]**2 + edge[1]**2
-            if safe_zero_test(edge_length_sq):
+            if safe_zero_test(edge_length_sq, eps=eps):
                 continue
 
             t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
 
-            if safe_compare(t, 0, Comparison.GE) and safe_compare(t, 1, Comparison.LE):
+            if safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps):
                 closest_point = p1 + edge * t
                 distance_sq = (point_2d[0] - closest_point[0])**2 + (point_2d[1] - closest_point[1])**2
-                if safe_zero_test(distance_sq):
+                if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
                     # Point is on this edge
                     # Normal is perpendicular to edge (in 2D), pointing outward
                     # Left perpendicular of (dx, dy) is (-dy, dx)
@@ -1563,7 +1586,7 @@ class ConvexPolygonExtrusion(CutCSG):
                     to_edge = closest_point - center
 
                     # If dot product is negative, flip the normal
-                    if safe_compare(edge_normal_2d[0] * to_edge[0] + edge_normal_2d[1] * to_edge[1], 0, Comparison.LT):
+                    if safe_compare(edge_normal_2d[0] * to_edge[0] + edge_normal_2d[1] * to_edge[1], 0, Comparison.LT, eps=eps):
                         edge_normal_2d = -edge_normal_2d
 
                     # Convert to 3D local normal (no Z component for side faces)
@@ -1579,7 +1602,7 @@ class ConvexPolygonExtrusion(CutCSG):
         local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
         return local_coords[0], local_coords[1], local_coords[2]
 
-    def _point_on_side(self, index: int, x: Numeric, y: Numeric) -> bool:
+    def _point_on_side(self, index: int, x: Numeric, y: Numeric, eps: Optional[Numeric] = None) -> bool:
         """Whether local (x, y) lies on the side face running from points[index]
         to points[(index+1) % len(points)]."""
         p1 = self.points[index]
@@ -1587,28 +1610,28 @@ class ConvexPolygonExtrusion(CutCSG):
         edge = p2 - p1
         to_point = Matrix([x, y]) - p1
         edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-        if safe_zero_test(edge_length_sq):
+        if safe_zero_test(edge_length_sq, eps=eps):
             return False
         t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
-        if not (safe_compare(t, 0, Comparison.GE) and safe_compare(t, 1, Comparison.LE)):
+        if not (safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps)):
             return False
         closest_point = p1 + edge * t
         distance_sq = (x - closest_point[0]) ** 2 + (y - closest_point[1]) ** 2
-        return safe_zero_test(distance_sq)
+        return safe_zero_test(distance_sq, eps=_squared_eps(eps))
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
-        if self.named_features is None or not self.is_point_on_boundary(point):
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+        if self.named_features is None or not self.is_point_on_boundary(point, eps=eps):
             return []
         x, y, z = self._local_coords(point)
         features: List[CSGFeature] = []
         for name, key in self.named_features:
             if key == ExtrusionCap.TOP:
-                if self.end_distance is not None and safe_equality_test(z, self.end_distance):
+                if self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps):
                     features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
             elif key == ExtrusionCap.BOTTOM:
-                if self.start_distance is not None and safe_equality_test(z, self.start_distance):
+                if self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps):
                     features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
-            elif self._point_on_side(key, x, y):
+            elif self._point_on_side(key, x, y, eps=eps):
                 features.append(ConvexPolygonExtrusionFeature(name=name, priority=0, owner=self, key=key))
         return features
 
@@ -1753,7 +1776,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
         """The (index-matched, linearly interpolated) polygon at height-fraction t."""
         return [bottom + (top - bottom) * t for bottom, top in zip(self.bottom_points, self.top_points)]
 
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is contained within the loft.
 
@@ -1765,9 +1788,9 @@ class ConvexPolygonSimpleLoft(CutCSG):
         """
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if safe_compare(z_coord - self.start_distance, 0, Comparison.LT):
+        if safe_compare(z_coord - self.start_distance, 0, Comparison.LT, eps=eps):
             return False
-        if safe_compare(z_coord - self.end_distance, 0, Comparison.GT):
+        if safe_compare(z_coord - self.end_distance, 0, Comparison.GT, eps=eps):
             return False
 
         cross_section = self._cross_section_at(self._height_fraction(z_coord))
@@ -1779,12 +1802,12 @@ class ConvexPolygonSimpleLoft(CutCSG):
             edge = p2 - p1
             to_point = point_2d - p1
             cross = edge[0] * to_point[1] - edge[1] * to_point[0]
-            if safe_compare(cross, 0, Comparison.LT):
+            if safe_compare(cross, 0, Comparison.LT, eps=eps):
                 return False
 
         return True
 
-    def is_point_on_boundary(self, point: V3) -> bool:
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         """
         Check if a point is on the boundary of the loft.
 
@@ -1794,14 +1817,14 @@ class ConvexPolygonSimpleLoft(CutCSG):
         Returns:
             True if the point is on the boundary, False otherwise
         """
-        if not self.contains_point(point):
+        if not self.contains_point(point, eps=eps):
             return False
 
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if safe_zero_test(z_coord - self.start_distance):
+        if safe_zero_test(z_coord - self.start_distance, eps=eps):
             return True
-        if safe_zero_test(z_coord - self.end_distance):
+        if safe_zero_test(z_coord - self.end_distance, eps=eps):
             return True
 
         cross_section = self._cross_section_at(self._height_fraction(z_coord))
@@ -1811,7 +1834,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
         # matching top vertex, evaluated at this height)
         for vertex_2d in cross_section:
             distance_sq = (point_2d[0] - vertex_2d[0]) ** 2 + (point_2d[1] - vertex_2d[1]) ** 2
-            if safe_zero_test(distance_sq):
+            if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
                 return True
 
         # On a side face at this height
@@ -1822,21 +1845,21 @@ class ConvexPolygonSimpleLoft(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-            if safe_zero_test(edge_length_sq):
+            if safe_zero_test(edge_length_sq, eps=eps):
                 continue
 
             u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
-            u_in_range = safe_compare(u, 0, Comparison.GE) and safe_compare(u - scalar(1), 0, Comparison.LE)
+            u_in_range = safe_compare(u, 0, Comparison.GE, eps=eps) and safe_compare(u - scalar(1), 0, Comparison.LE, eps=eps)
 
             if u_in_range:
                 closest_point = p1 + edge * u
                 distance_sq = (point_2d[0] - closest_point[0]) ** 2 + (point_2d[1] - closest_point[1]) ** 2
-                if safe_zero_test(distance_sq):
+                if safe_zero_test(distance_sq, eps=_squared_eps(eps)):
                     return True
 
         return False
 
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.
 
@@ -1853,11 +1876,11 @@ class ConvexPolygonSimpleLoft(CutCSG):
         """
         x_coord, y_coord, z_coord = self._local_coords(point)
 
-        if safe_zero_test(z_coord - self.end_distance):
+        if safe_zero_test(z_coord - self.end_distance, eps=eps):
             local_normal = Matrix([scalar(0), scalar(0), scalar(1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
-        if safe_zero_test(z_coord - self.start_distance):
+        if safe_zero_test(z_coord - self.start_distance, eps=eps):
             local_normal = Matrix([scalar(0), scalar(0), scalar(-1)])
             return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
@@ -1873,16 +1896,16 @@ class ConvexPolygonSimpleLoft(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-            if safe_zero_test(edge_length_sq):
+            if safe_zero_test(edge_length_sq, eps=eps):
                 continue
 
             u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
-            if not (safe_compare(u, 0, Comparison.GE) and safe_compare(u, 1, Comparison.LE)):
+            if not (safe_compare(u, 0, Comparison.GE, eps=eps) and safe_compare(u, 1, Comparison.LE, eps=eps)):
                 continue
 
             closest_point = p1 + edge * u
             distance_sq = (point_2d[0] - closest_point[0]) ** 2 + (point_2d[1] - closest_point[1]) ** 2
-            if not safe_zero_test(distance_sq):
+            if not safe_zero_test(distance_sq, eps=_squared_eps(eps)):
                 continue
 
             # Point is on the side face spanning edge i. Parametrize the face by
@@ -1906,7 +1929,7 @@ class ConvexPolygonSimpleLoft(CutCSG):
             center_y = sum(p[1] for p in cross_section) / n
             to_edge = closest_point - Matrix([center_x, center_y])
             outward_dot = local_normal[0] * to_edge[0] + local_normal[1] * to_edge[1]
-            if safe_compare(outward_dot, 0, Comparison.LT):
+            if safe_compare(outward_dot, 0, Comparison.LT, eps=eps):
                 local_normal = -local_normal
 
             return safe_normalize_vector(safe_transform_vector(self.transform.orientation.matrix, local_normal))

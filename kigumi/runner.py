@@ -1534,10 +1534,6 @@ def get_member_result(frame: Any, member_name: str) -> Dict[str, Any]:
 # CSG navigation + highlight-mesh extraction (Phase B)
 # ===========================================================================
 
-def _dot3(a: List[float], b: List[float]) -> float:
-    return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]
-
-
 def _build_inv_transform_float(transform: Any) -> Tuple[List[List[float]], List[float]]:
     """Pre-compute float data for global→local.  Returns (rot_cols, position).
     local = R^T * (global - pos) where rot_cols is the FORWARD rotation matrix."""
@@ -1560,131 +1556,34 @@ def _inv_transform_point(rot: List[List[float]], pos: List[float], pt: List[floa
     ]
 
 
-def _is_point_inside_csg_float(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
-    """True if *pt* (timber-local floats) is inside *csg* (±eps tolerance)."""
-    from kumiki.cutcsg import (
-        HalfSpace, RectangularPrism, Cylinder, SolidUnion, Difference,
-        ConvexPolygonExtrusion,
-    )
-
-    if isinstance(csg, HalfSpace):
-        n = [float(csg.normal[i]) for i in range(3)]
-        return _dot3(n, pt) >= float(csg.offset) - eps
-
-    if isinstance(csg, RectangularPrism):
-        rot, pos = _build_inv_transform_float(csg.transform)
-        lp = _inv_transform_point(rot, pos, pt)
-        hw = float(csg.size[0]) / 2.0
-        hh = float(csg.size[1]) / 2.0
-        z0 = float(csg.start_distance) if csg.start_distance is not None else -1e9
-        z1 = float(csg.end_distance) if csg.end_distance is not None else 1e9
-        return (-hw - eps <= lp[0] <= hw + eps
-                and -hh - eps <= lp[1] <= hh + eps
-                and z0 - eps <= lp[2] <= z1 + eps)
-
-    if isinstance(csg, Cylinder):
-        n = [float(csg.axis_direction[i]) for i in range(3)]
-        c = [float(csg.position[i]) for i in range(3)]
-        d = [pt[i] - c[i] for i in range(3)]
-        along = _dot3(d, n)
-        perp = [d[i] - along * n[i] for i in range(3)]
-        dist_sq = _dot3(perp, perp)
-        r = float(csg.radius)
-        z0 = float(csg.start_distance) if csg.start_distance is not None else -1e9
-        z1 = float(csg.end_distance) if csg.end_distance is not None else 1e9
-        return dist_sq <= (r + eps) ** 2 and z0 - eps <= along <= z1 + eps
-
-    if isinstance(csg, SolidUnion):
-        return any(_is_point_inside_csg_float(ch, pt, eps) for ch in csg.children)
-
-    if isinstance(csg, Difference):
-        if not _is_point_inside_csg_float(csg.base, pt, eps):
-            return False
-        return not any(_is_point_inside_csg_float(sub, pt, -eps) for sub in csg.subtract)
-
-    if isinstance(csg, ConvexPolygonExtrusion):
-        # Conservative fallback — treat as always inside
-        return True
-
-    return False
+def _to_v3(pt: List[float]) -> Any:
+    """Wrap a plain [x, y, z] in the V3 kumiki's CSG API expects."""
+    from kumiki.rule import create_v3
+    return create_v3(float(pt[0]), float(pt[1]), float(pt[2]))
 
 
-def _is_point_on_csg_boundary_float(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
-    """True if *pt* (timber-local floats) lies on the boundary of *csg*."""
-    from kumiki.cutcsg import (
-        HalfSpace, RectangularPrism, Cylinder, SolidUnion, Difference,
-        ConvexPolygonExtrusion,
-    )
-
-    if isinstance(csg, HalfSpace):
-        n = [float(csg.normal[i]) for i in range(3)]
-        return abs(_dot3(n, pt) - float(csg.offset)) < eps
-
-    if isinstance(csg, RectangularPrism):
-        rot, pos = _build_inv_transform_float(csg.transform)
-        lp = _inv_transform_point(rot, pos, pt)
-        hw = float(csg.size[0]) / 2.0
-        hh = float(csg.size[1]) / 2.0
-        z0 = float(csg.start_distance) if csg.start_distance is not None else None
-        z1 = float(csg.end_distance) if csg.end_distance is not None else None
-        # Must be within bounds
-        if lp[0] < -hw - eps or lp[0] > hw + eps:
-            return False
-        if lp[1] < -hh - eps or lp[1] > hh + eps:
-            return False
-        if z0 is not None and lp[2] < z0 - eps:
-            return False
-        if z1 is not None and lp[2] > z1 + eps:
-            return False
-        # Must be on at least one face
-        on_x = abs(lp[0] + hw) < eps or abs(lp[0] - hw) < eps
-        on_y = abs(lp[1] + hh) < eps or abs(lp[1] - hh) < eps
-        on_z0 = z0 is not None and abs(lp[2] - z0) < eps
-        on_z1 = z1 is not None and abs(lp[2] - z1) < eps
-        return on_x or on_y or on_z0 or on_z1
-
-    if isinstance(csg, Cylinder):
-        n = [float(csg.axis_direction[i]) for i in range(3)]
-        c = [float(csg.position[i]) for i in range(3)]
-        d = [pt[i] - c[i] for i in range(3)]
-        along = _dot3(d, n)
-        perp = [d[i] - along * n[i] for i in range(3)]
-        dist = _dot3(perp, perp) ** 0.5
-        r = float(csg.radius)
-        z0 = float(csg.start_distance) if csg.start_distance is not None else None
-        z1 = float(csg.end_distance) if csg.end_distance is not None else None
-        if z0 is not None and along < z0 - eps:
-            return False
-        if z1 is not None and along > z1 + eps:
-            return False
-        on_side = abs(dist - r) < eps
-        on_cap_lo = z0 is not None and abs(along - z0) < eps and dist <= r + eps
-        on_cap_hi = z1 is not None and abs(along - z1) < eps and dist <= r + eps
-        return on_side or on_cap_lo or on_cap_hi
-
-    if isinstance(csg, SolidUnion):
-        return any(_is_point_on_csg_boundary_float(ch, pt, eps) for ch in csg.children)
-
-    if isinstance(csg, Difference):
-        on_base = _is_point_on_csg_boundary_float(csg.base, pt, eps)
-        if on_base and not any(_is_point_inside_csg_float(sub, pt, -eps) for sub in csg.subtract):
-            return True
-        if _is_point_inside_csg_float(csg.base, pt, eps):
-            return any(_is_point_on_csg_boundary_float(sub, pt, eps) for sub in csg.subtract)
-        return False
-
-    # ConvexPolygonExtrusion — not yet implemented
-    return False
+def _csg_contains_point(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
+    """True if *pt* (timber-local floats) is inside *csg*, within *eps*."""
+    return csg.contains_point(_to_v3(pt), eps)
 
 
-# Prism-local generic label -> (axis index into a rotation matrix's columns, sign).
-# Column `axis_index` of a prism's forward rotation matrix is that prism-local
-# axis expressed in the outer (timber-local) space -- see _build_inv_transform_float.
-_GENERIC_LABEL_AXIS = {
-    "right": (0, 1.0), "left": (0, -1.0),
-    "front": (1, 1.0), "back": (1, -1.0),
-    "top": (2, 1.0), "bottom": (2, -1.0),
-}
+def _csg_point_on_boundary(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
+    """True if *pt* (timber-local floats) lies on the boundary of *csg*, within *eps*.
+
+    These two are thin adapters over kumiki's own CutCSG methods. kigumi used to
+    carry a parallel float reimplementation of both, from when kumiki was
+    sympy-backed and a symbolic point test was too slow to run per raycast.
+    kumiki is plain floats now, so the shadow copy bought nothing but drift --
+    it covered only HalfSpace, RectangularPrism and Cylinder, which silently
+    made every ConvexPolygonExtrusion, PathExtrusion, ConvexPolygonSimpleLoft
+    and Intersection surface unselectable (the click fell through to the timber
+    body and reported a bare "face").
+    """
+    return csg.is_point_on_boundary(_to_v3(pt), eps)
+
+
+# Timber-local outward directions, used to name an unnamed face by whichever of
+# the timber's own six faces it most points toward.
 _TIMBER_LOCAL_FACE_NORMALS = (
     ("right", (1.0, 0.0, 0.0)), ("left", (-1.0, 0.0, 0.0)),
     ("front", (0.0, 1.0, 0.0)), ("back", (0.0, -1.0, 0.0)),
@@ -1692,117 +1591,63 @@ _TIMBER_LOCAL_FACE_NORMALS = (
 )
 
 
-def _generic_label_in_timber_local_space(rot: List[List[float]], prism_local_label: str) -> str:
-    """Re-express a prism-local generic face label in the outer timber's own
-    six canonical face directions.
+def _nearest_timber_local_face_name(normal: Any) -> str:
+    """Name an outward *normal* (in timber-local space) by the timber face it
+    most closely points along.
 
-    Some RectangularPrisms are built in their own local space, independent of
-    (and sometimes flipped relative to) the timber's own top/bottom/etc.
-    convention -- e.g. a tenon's marking_space, whose local Z points along
-    whichever direction the tenon protrudes, not the timber's own length axis.
-    A user browsing a timber's faces only ever wants an answer relative to
-    THAT timber, never relative to some CSG primitive's own incidental local
-    frame, so re-project the matched face's outward normal into timber-local
-    space and report whichever of the timber's six directions it best matches.
+    A CSG primitive often lives in its own local frame, unrelated to the
+    timber's length axis -- a tenon's marking_space local Z points along
+    whichever way the tenon protrudes, not the timber's own top/bottom. Someone
+    browsing a timber's faces only ever wants an answer relative to THAT
+    timber, so the answer is always reported in the timber's own six
+    directions.
     """
-    axis_index, sign = _GENERIC_LABEL_AXIS[prism_local_label]
-    normal = [sign * rot[0][axis_index], sign * rot[1][axis_index], sign * rot[2][axis_index]]
-
-    best_label = prism_local_label
-    best_dot = -2.0
-    for label, direction in _TIMBER_LOCAL_FACE_NORMALS:
-        dot = normal[0]*direction[0] + normal[1]*direction[1] + normal[2]*direction[2]
+    n = [float(normal[0]), float(normal[1]), float(normal[2])]
+    best_name, best_dot = "face", -2.0
+    for name, direction in _TIMBER_LOCAL_FACE_NORMALS:
+        dot = n[0] * direction[0] + n[1] * direction[1] + n[2] * direction[2]
         if dot > best_dot:
-            best_dot = dot
-            best_label = label
-    return best_label
+            best_dot, best_name = dot, name
+    return best_name
 
 
 def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
-    """Determine which face of a primitive CSG node *pt* lies on."""
-    from kumiki.cutcsg import HalfSpace, RectangularPrism, Cylinder, PrismFace
+    """Name the feature of primitive *csg* that *pt* lies on.
+
+    Two layers, in order:
+
+    1. The primitive's own named feature, via kumiki's CSGFeature lookup. This
+       is authoritative -- a prism built in its own local frame (a tenon's
+       marking_space, say) has a "top" that is not the timber's top, so a
+       declared name always beats a geometric guess.
+    2. Failing that, a generic label. Most joint geometry is still unnamed, so
+       this is the common path today: name the face by whichever of the
+       timber's own six directions its outward normal points along.
+
+    HalfSpace and a cylinder's barrel get fixed names instead -- neither has a
+    "face" in the timber's sense, and naming them by direction would read as a
+    timber face that isn't there.
+    """
+    from kumiki.cutcsg import Cylinder, HalfSpace
+    from kumiki.rule import are_vectors_perpendicular
+
+    point = _to_v3(pt)
+
+    feature = csg.find_feature(point, eps)
+    if feature is not None:
+        return feature.name
 
     if isinstance(csg, HalfSpace):
-        return getattr(csg, "named_feature", None) or "cut_plane"
+        return "cut_plane"
 
-    if isinstance(csg, RectangularPrism):
-        rot, pos = _build_inv_transform_float(csg.transform)
-        lp = _inv_transform_point(rot, pos, pt)
-        hw = float(csg.size[0]) / 2.0
-        hh = float(csg.size[1]) / 2.0
-        z0 = float(csg.start_distance) if csg.start_distance is not None else None
-        z1 = float(csg.end_distance) if csg.end_distance is not None else None
-
-        # Collect candidates (label, distance_from_face)
-        candidates: List[Tuple[str, float]] = []
-        candidates.append(("left", abs(lp[0] + hw)))
-        candidates.append(("right", abs(lp[0] - hw)))
-        candidates.append(("front", abs(lp[1] - hh)))
-        candidates.append(("back", abs(lp[1] + hh)))
-        if z0 is not None:
-            candidates.append(("bottom", abs(lp[2] - z0)))
-        if z1 is not None:
-            candidates.append(("top", abs(lp[2] - z1)))
-
-        within_eps = [(label, d) for label, d in candidates if d < eps]
-        if within_eps:
-            within_eps.sort(key=lambda c: c[1])
-            generic_label = within_eps[0][0]
-
-            # Some RectangularPrisms are built in their OWN local space, unrelated
-            # to the outer timber's own length axis (e.g. a tenon's marking_space,
-            # whose local Z points along whichever direction the tenon protrudes --
-            # not the timber's own top/bottom). For those, generic_label's
-            # "top"/"bottom" is only meaningful within that sub-prism's own frame
-            # and can be actively misleading (e.g. a BOTTOM-end tenon's outward tip
-            # sits at that sub-prism's own end_distance, i.e. generic "top"). Prefer
-            # the prism's own named_features, if it declares one for this face, over
-            # the geometry-only guess.
-            named_features = getattr(csg, "named_features", None)
-            if named_features:
-                face_by_label = {
-                    "top": PrismFace.TOP,
-                    "bottom": PrismFace.BOTTOM,
-                    "right": PrismFace.RIGHT,
-                    "left": PrismFace.LEFT,
-                    "front": PrismFace.FRONT,
-                    "back": PrismFace.BACK,
-                }
-                target_face = face_by_label.get(generic_label)
-                for name, face in named_features:
-                    if face == target_face:
-                        return name
-
-            return _generic_label_in_timber_local_space(rot, generic_label)
+    normal = csg.get_outward_normal(point, eps)
+    if normal is None:
         return "face"
 
-    if isinstance(csg, Cylinder):
-        n = [float(csg.axis_direction[i]) for i in range(3)]
-        c = [float(csg.position[i]) for i in range(3)]
-        d = [pt[i] - c[i] for i in range(3)]
-        along = _dot3(d, n)
-        perp = [d[i] - along * n[i] for i in range(3)]
-        dist = _dot3(perp, perp) ** 0.5
-        r = float(csg.radius)
-        z0 = float(csg.start_distance) if csg.start_distance is not None else None
-        z1 = float(csg.end_distance) if csg.end_distance is not None else None
-
-        # Flat end caps (top/bottom) are distinguishable, like a prism's end
-        # faces; the round barrel isn't split into left/right/front/back, so
-        # every point on it stays "cylindrical_surface".
-        candidates: List[Tuple[str, float]] = [("cylindrical_surface", abs(dist - r))]
-        if z0 is not None and dist <= r + eps:
-            candidates.append(("bottom", abs(along - z0)))
-        if z1 is not None and dist <= r + eps:
-            candidates.append(("top", abs(along - z1)))
-
-        within_eps = [(label, d) for label, d in candidates if d < eps]
-        if within_eps:
-            within_eps.sort(key=lambda c: c[1])
-            return within_eps[0][0]
+    if isinstance(csg, Cylinder) and are_vectors_perpendicular(normal, csg.axis_direction):
         return "cylindrical_surface"
 
-    return "face"
+    return _nearest_timber_local_face_name(normal)
 
 
 def _resolve_csg_at_path(csg: Any, path: List[str], pt: Optional[List[float]] = None, eps: float = 1e-4) -> Any:
@@ -1848,10 +1693,10 @@ def _resolve_csg_at_path(csg: Any, path: List[str], pt: Optional[List[float]] = 
             # Multiple with same name — pick the one on boundary
             picked = candidates[0]
             for c in candidates:
-                if _is_point_on_csg_boundary_float(c, pt, eps):
+                if _csg_point_on_boundary(c, pt, eps):
                     picked = c
                     break
-                if _is_point_inside_csg_float(c, pt, eps):
+                if _csg_contains_point(c, pt, eps):
                     picked = c
             node = picked
     return node
@@ -1872,7 +1717,7 @@ def _navigate_csg_one_level(
     if isinstance(node, Difference):
         # Check which subtract child the point lies on
         for sub in node.subtract:
-            if _is_point_on_csg_boundary_float(sub, pt_local, eps):
+            if _csg_point_on_boundary(sub, pt_local, eps):
                 sub_label = getattr(sub, "label", None)
                 if sub_label:
                     return (current_path + [sub_label], sub, None)
@@ -1890,7 +1735,7 @@ def _navigate_csg_one_level(
 
     if isinstance(node, SolidUnion):
         for ch in node.children:
-            if _is_point_on_csg_boundary_float(ch, pt_local, eps):
+            if _csg_point_on_boundary(ch, pt_local, eps):
                 ch_label = getattr(ch, "label", None)
                 if ch_label:
                     return (current_path + [ch_label], ch, None)
@@ -1966,7 +1811,7 @@ def _extract_highlight_mesh(
         cz = (mesh_vertices[i0*3+2] + mesh_vertices[i1*3+2] + mesh_vertices[i2*3+2]) / 3.0
         # Convert centroid to timber-local
         local_c = _inv_transform_point(timber_rot, timber_pos, [cx, cy, cz])
-        if _is_point_on_csg_boundary_float(target_csg, local_c, eps):
+        if _csg_point_on_boundary(target_csg, local_c, eps):
             if enforce_owner:
                 owner = _resolve_csg_at_path(root_csg, selected_path, local_c, eps)
                 if owner is not selected_ref:
@@ -2020,7 +1865,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     else:
         if current_path:
             node = _resolve_csg_at_path(local_csg, current_path, pt_local, eps)
-            on_boundary = _is_point_on_csg_boundary_float(node, pt_local, eps)
+            on_boundary = _csg_point_on_boundary(node, pt_local, eps)
             if not on_boundary:
                 node = local_csg
                 current_path = []

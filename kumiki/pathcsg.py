@@ -30,6 +30,7 @@ from .cutcsg import (
     ExtrusionCap,
     ExtrusionFeatureKey,
     Profile,
+    _squared_eps,
 )
 
 
@@ -63,7 +64,7 @@ class PathSegment(ABC):
         """
 
     @abstractmethod
-    def ray_crossings(self, y: Numeric, inclusive: bool = False) -> List[Numeric]:
+    def ray_crossings(self, y: Numeric, inclusive: bool = False, eps: Optional[Numeric] = None) -> List[Numeric]:
         """
         x-coordinates where this segment crosses height y.
 
@@ -90,11 +91,11 @@ class PathSegment(ABC):
         """
 
     @abstractmethod
-    def closest_point(self, point: V2) -> V2:
+    def closest_point(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         """Nearest point on this segment to `point`."""
 
     @abstractmethod
-    def outward_local_normal(self, point: V2) -> V2:
+    def outward_local_normal(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         """
         2D outward normal at `point`, assumed to lie on this segment and
         assumed the Path is CCW-wound (Path.is_valid() checks this).
@@ -194,18 +195,18 @@ class LineSegment(PathSegment):
     def is_planar(self) -> bool:
         return True
 
-    def ray_crossings(self, y: Numeric, inclusive: bool = False) -> List[Numeric]:
+    def ray_crossings(self, y: Numeric, inclusive: bool = False, eps: Optional[Numeric] = None) -> List[Numeric]:
         y0, y1 = self.line_start[1], self.line_end[1]
-        if safe_zero_test(y1 - y0):
+        if safe_zero_test(y1 - y0, eps=eps):
             return []  # horizontal segment: no crossings, doesn't bound any band
 
         if inclusive:
-            lo, hi = (y0, y1) if safe_compare(y0, y1, Comparison.LE) else (y1, y0)
-            hit = safe_compare(lo, y, Comparison.LE) and safe_compare(y, hi, Comparison.LE)
+            lo, hi = (y0, y1) if safe_compare(y0, y1, Comparison.LE, eps=eps) else (y1, y0)
+            hit = safe_compare(lo, y, Comparison.LE, eps=eps) and safe_compare(y, hi, Comparison.LE, eps=eps)
         else:
             hit = (
-                (safe_compare(y0, y, Comparison.LE) and safe_compare(y, y1, Comparison.LT))
-                or (safe_compare(y1, y, Comparison.LE) and safe_compare(y, y0, Comparison.LT))
+                (safe_compare(y0, y, Comparison.LE, eps=eps) and safe_compare(y, y1, Comparison.LT, eps=eps))
+                or (safe_compare(y1, y, Comparison.LE, eps=eps) and safe_compare(y, y0, Comparison.LT, eps=eps))
             )
         if not hit:
             return []
@@ -217,21 +218,21 @@ class LineSegment(PathSegment):
     def v_extrema(self) -> List[Numeric]:
         return []
 
-    def closest_point(self, point: V2) -> V2:
+    def closest_point(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         edge = self.line_end - self.line_start
         edge_len_sq = edge[0] ** 2 + edge[1] ** 2
-        if safe_zero_test(edge_len_sq):
+        if safe_zero_test(edge_len_sq, eps=eps):
             return self.line_start
 
         to_point = point - self.line_start
         t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_len_sq
-        if safe_compare(t, 0, Comparison.LT):
+        if safe_compare(t, 0, Comparison.LT, eps=eps):
             t = scalar(0)
-        elif safe_compare(t, 1, Comparison.GT):
+        elif safe_compare(t, 1, Comparison.GT, eps=eps):
             t = scalar(1)
         return self.line_start + edge * t
 
-    def outward_local_normal(self, point: V2) -> V2:
+    def outward_local_normal(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         edge = self.line_end - self.line_start
         return safe_normalize_vector(_right_perpendicular(edge))
 
@@ -324,7 +325,7 @@ class ArcSegment(PathSegment):
     def is_planar(self) -> bool:
         return False
 
-    def _monotonic_subranges(self) -> List[Tuple[Numeric, Numeric, int]]:
+    def _monotonic_subranges(self, eps: Optional[Numeric] = None) -> List[Tuple[Numeric, Numeric, int]]:
         """
         Split this arc at any interior pole (pi/2 or 3*pi/2 mod 2*pi, where
         dy/dtheta == 0) into pieces where y(theta) is monotonic -- and
@@ -337,7 +338,7 @@ class ArcSegment(PathSegment):
         matters to callers (sample_interior) that need points in a
         particular direction.
         """
-        clockwise = safe_compare(self.sweep_angle, 0, Comparison.LT)
+        clockwise = safe_compare(self.sweep_angle, 0, Comparison.LT, eps=eps)
         angle_lo = self.end_angle if clockwise else self.start_angle
         angle_hi = self.start_angle if clockwise else self.end_angle
 
@@ -351,11 +352,11 @@ class ArcSegment(PathSegment):
         poles: List[Numeric] = []
         for pole_base in (pi / 2, scalar(3) * pi / 2):
             pole = pole_base
-            while safe_compare(pole, angle_lo, Comparison.LE):
+            while safe_compare(pole, angle_lo, Comparison.LE, eps=eps):
                 pole += 2 * pi
-            while safe_compare(pole, angle_hi, Comparison.GE):
+            while safe_compare(pole, angle_hi, Comparison.GE, eps=eps):
                 pole -= 2 * pi
-            if safe_compare(pole, angle_lo, Comparison.GT):
+            if safe_compare(pole, angle_lo, Comparison.GT, eps=eps):
                 poles.append(pole)
 
         poles = sorted(set(poles), key=giraffe_evalf)  # ascending; de-dupes exact repeats
@@ -368,26 +369,33 @@ class ArcSegment(PathSegment):
         for i in range(len(bounds) - 1):
             a, b = bounds[i], bounds[i + 1]
             mid = (a + b) / scalar(2)
-            cos_sign = 1 if safe_compare(cos(mid), 0, Comparison.GE) else -1
+            cos_sign = 1 if safe_compare(cos(mid), 0, Comparison.GE, eps=eps) else -1
             pieces.append((a, b, cos_sign))
         return pieces
 
-    def ray_crossings(self, y: Numeric, inclusive: bool = False) -> List[Numeric]:
+    def ray_crossings(self, y: Numeric, inclusive: bool = False, eps: Optional[Numeric] = None) -> List[Numeric]:
         results: List[Numeric] = []
-        for angle_lo, angle_hi, cos_sign in self._monotonic_subranges():
+        for angle_lo, angle_hi, cos_sign in self._monotonic_subranges(eps=eps):
             y_lo = self.center[1] + self.radius * sin(angle_lo)
             y_hi = self.center[1] + self.radius * sin(angle_hi)
             if inclusive:
-                lo, hi = (y_lo, y_hi) if safe_compare(y_lo, y_hi, Comparison.LE) else (y_hi, y_lo)
-                hit = safe_compare(lo, y, Comparison.LE) and safe_compare(y, hi, Comparison.LE)
+                lo, hi = (y_lo, y_hi) if safe_compare(y_lo, y_hi, Comparison.LE, eps=eps) else (y_hi, y_lo)
+                hit = safe_compare(lo, y, Comparison.LE, eps=eps) and safe_compare(y, hi, Comparison.LE, eps=eps)
             else:
                 hit = (
-                    (safe_compare(y_lo, y, Comparison.LE) and safe_compare(y, y_hi, Comparison.LT))
-                    or (safe_compare(y_hi, y, Comparison.LE) and safe_compare(y, y_lo, Comparison.LT))
+                    (safe_compare(y_lo, y, Comparison.LE, eps=eps) and safe_compare(y, y_hi, Comparison.LT, eps=eps))
+                    or (safe_compare(y_hi, y, Comparison.LE, eps=eps) and safe_compare(y, y_lo, Comparison.LT, eps=eps))
                 )
             if not hit:
                 continue
             sin_theta = (y - self.center[1]) / self.radius
+            # The hit test above accepts y within the comparison tolerance of
+            # this subrange's endpoints, so at the extremes sin_theta can land
+            # a hair outside [-1, 1] -- far enough outside to blow past sqrt's
+            # own small-negative guard once the tolerance is widened for
+            # picking. The gate has already established y lies on this
+            # subrange, so clamp instead of failing on the noise.
+            sin_theta = min(scalar(1), max(scalar(-1), sin_theta))
             cos_theta = cos_sign * sym_sqrt(scalar(1) - sin_theta ** 2)
             results.append(self.center[0] + self.radius * cos_theta)
         return results
@@ -411,7 +419,7 @@ class ArcSegment(PathSegment):
         lo, hi = self._angle_extent_float()
         return _normalize_angle_to_range(angle, lo, hi)
 
-    def closest_point(self, point: V2) -> V2:
+    def closest_point(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         angle = self._angle_for_point(point)
         lo, hi = self._angle_extent_float()
         if lo - 1e-9 <= angle <= hi + 1e-9:
@@ -420,16 +428,16 @@ class ArcSegment(PathSegment):
         start_pt, end_pt = self.start, self.end
         d_start = (point[0] - start_pt[0]) ** 2 + (point[1] - start_pt[1]) ** 2
         d_end = (point[0] - end_pt[0]) ** 2 + (point[1] - end_pt[1]) ** 2
-        return start_pt if safe_compare(d_start, d_end, Comparison.LE) else end_pt
+        return start_pt if safe_compare(d_start, d_end, Comparison.LE, eps=eps) else end_pt
 
-    def outward_local_normal(self, point: V2) -> V2:
+    def outward_local_normal(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         # For CCW (positive sweep) travel, outward is +radial (away from
         # center) -- e.g. the rim of a convex bulge. For CW (negative sweep,
         # a concave bite), it's -radial (toward center, into the void the
         # bite carves out). See the class docstring: this sign is exactly
         # what makes a concave arc possible at all for a fixed start/end.
         radial = point - self.center
-        if safe_compare(self.sweep_angle, 0, Comparison.LT):
+        if safe_compare(self.sweep_angle, 0, Comparison.LT, eps=eps):
             radial = -radial
         return safe_normalize_vector(radial)
 
@@ -605,29 +613,29 @@ class FancyPath:
             if safe_compare(hi[1], max_y, Comparison.GT): max_y = hi[1]
         return create_v2(min_x, min_y), create_v2(max_x, max_y)
 
-    def locate_boundary_segment(self, point: V2) -> Optional[Tuple[int, PathSegment]]:
+    def locate_boundary_segment(self, point: V2, eps: Optional[Numeric] = None) -> Optional[Tuple[int, PathSegment]]:
         """First segment (in order) whose closest point to `point` is ~point,
         i.e. the segment `point` lies on -- or None if point isn't on the
         boundary at all. At a shared vertex between two segments this is an
         arbitrary but consistent choice, same ambiguity RectangularPrism's
         get_outward_normal already accepts at its own edges/corners."""
         for index, seg in enumerate(self.segments):
-            closest = seg.closest_point(point)
-            if safe_zero_test((closest[0] - point[0]) ** 2 + (closest[1] - point[1]) ** 2):
+            closest = seg.closest_point(point, eps=eps)
+            if safe_zero_test((closest[0] - point[0]) ** 2 + (closest[1] - point[1]) ** 2, eps=_squared_eps(eps)):
                 return index, seg
         return None
 
-    def is_point_on_boundary_2d(self, point: V2) -> bool:
-        return self.locate_boundary_segment(point) is not None
+    def is_point_on_boundary_2d(self, point: V2, eps: Optional[Numeric] = None) -> bool:
+        return self.locate_boundary_segment(point, eps=eps) is not None
 
-    def contains_point_2d(self, point: V2) -> bool:
-        if self.is_point_on_boundary_2d(point):
+    def contains_point_2d(self, point: V2, eps: Optional[Numeric] = None) -> bool:
+        if self.is_point_on_boundary_2d(point, eps=eps):
             return True
         x, y = point[0], point[1]
         count = 0
         for seg in self.segments:
-            for cross_x in seg.ray_crossings(y):
-                if safe_compare(cross_x, x, Comparison.GT):
+            for cross_x in seg.ray_crossings(y, eps=eps):
+                if safe_compare(cross_x, x, Comparison.GT, eps=eps):
                     count += 1
         return count % 2 == 1
 
@@ -826,15 +834,15 @@ class PathExtrusionFeature(CSGFeature):
     owner: 'PathExtrusion'
     key: ExtrusionFeatureKey
 
-    def test_point(self, point: V3) -> bool:
-        if not self.owner.is_point_on_boundary(point):
+    def test_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not self.owner.is_point_on_boundary(point, eps=eps):
             return False
         x, y, z = self.owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance)
+            return self.owner.end_distance is not None and safe_equality_test(z, self.owner.end_distance, eps=eps)
         if self.key == ExtrusionCap.BOTTOM:
-            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance)
-        located = self.owner.path.locate_boundary_segment(create_v2(x, y))
+            return self.owner.start_distance is not None and safe_equality_test(z, self.owner.start_distance, eps=eps)
+        located = self.owner.path.locate_boundary_segment(create_v2(x, y), eps=eps)
         return located is not None and located[0] == self.key
 
 
@@ -865,56 +873,56 @@ class PathExtrusion(CutCSG):
         local_coords = safe_transform_vector(self.transform.orientation.invert().matrix, local_point)
         return local_coords[0], local_coords[1], local_coords[2]
 
-    def contains_point(self, point: V3) -> bool:
+    def contains_point(self, point: V3, eps: Optional[Numeric] = None) -> bool:
         x, y, z = self._local_coords(point)
-        if self.start_distance is not None and safe_compare(z, self.start_distance, Comparison.LT):
+        if self.start_distance is not None and safe_compare(z, self.start_distance, Comparison.LT, eps=eps):
             return False
-        if self.end_distance is not None and safe_compare(z, self.end_distance, Comparison.GT):
+        if self.end_distance is not None and safe_compare(z, self.end_distance, Comparison.GT, eps=eps):
             return False
-        return self.path.contains_point_2d(create_v2(x, y))
+        return self.path.contains_point_2d(create_v2(x, y), eps=eps)
 
-    def is_point_on_boundary(self, point: V3) -> bool:
-        if not self.contains_point(point):
+    def is_point_on_boundary(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+        if not self.contains_point(point, eps=eps):
             return False
         x, y, z = self._local_coords(point)
-        if self.start_distance is not None and safe_zero_test(z - self.start_distance):
+        if self.start_distance is not None and safe_zero_test(z - self.start_distance, eps=eps):
             return True
-        if self.end_distance is not None and safe_zero_test(z - self.end_distance):
+        if self.end_distance is not None and safe_zero_test(z - self.end_distance, eps=eps):
             return True
-        return self.path.is_point_on_boundary_2d(create_v2(x, y))
+        return self.path.is_point_on_boundary_2d(create_v2(x, y), eps=eps)
 
-    def get_outward_normal(self, point: V3) -> Optional[Direction3D]:
+    def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         x, y, z = self._local_coords(point)
-        if self.end_distance is not None and safe_equality_test(z, self.end_distance):
+        if self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps):
             return safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), scalar(1)]))
-        if self.start_distance is not None and safe_equality_test(z, self.start_distance):
+        if self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps):
             return safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), scalar(-1)]))
 
-        located = self.path.locate_boundary_segment(create_v2(x, y))
+        located = self.path.locate_boundary_segment(create_v2(x, y), eps=eps)
         if located is None:
             return None
         _, seg = located
-        n2 = seg.outward_local_normal(create_v2(x, y))
+        n2 = seg.outward_local_normal(create_v2(x, y), eps=eps)
         local_normal = Matrix([n2[0], n2[1], scalar(0)])
         return safe_transform_vector(self.transform.orientation.matrix, local_normal)
 
-    def get_all_features(self, point: V3) -> List[CSGFeature]:
-        if self.named_features is None or not self.is_point_on_boundary(point):
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List[CSGFeature]:
+        if self.named_features is None or not self.is_point_on_boundary(point, eps=eps):
             return []
         x, y, z = self._local_coords(point)
         features: List[CSGFeature] = []
         for name, key in self.named_features:
             if key == ExtrusionCap.TOP:
-                if self.end_distance is not None and safe_equality_test(z, self.end_distance):
+                if self.end_distance is not None and safe_equality_test(z, self.end_distance, eps=eps):
                     features.append(PathExtrusionFeature(name=name, priority=0, owner=self, key=key))
             elif key == ExtrusionCap.BOTTOM:
-                if self.start_distance is not None and safe_equality_test(z, self.start_distance):
+                if self.start_distance is not None and safe_equality_test(z, self.start_distance, eps=eps):
                     features.append(PathExtrusionFeature(name=name, priority=0, owner=self, key=key))
             else:
                 segment = self.path.segments[key]
                 if not segment.is_planar():
                     continue  # curved segment named as a feature -- nothing to emit, by design
-                located = self.path.locate_boundary_segment(create_v2(x, y))
+                located = self.path.locate_boundary_segment(create_v2(x, y), eps=eps)
                 if located is not None and located[0] == key:
                     features.append(PathExtrusionFeature(name=name, priority=0, owner=self, key=key))
         return features
