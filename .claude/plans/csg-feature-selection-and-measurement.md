@@ -273,17 +273,25 @@ So an edge needs no bounds of its own:
 ```python
 @dataclass(frozen=True)
 class DerivedEdgeFeature(CSGFeature):
-    a: CSGFeature
-    b: CSGFeature
+    a: OwnedFeatureHit      # parent feature + the primitive it lives on
+    b: OwnedFeatureHit
 
-    def test_point(self, owner, point, eps=None):
-        return self.a.test_point(owner, point, eps) and self.b.test_point(owner, point, eps)
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.EDGE
+
+    def test_point(self, owner, point, test_tolerance=None):
+        return (self.a.feature.test_point(self.a.owner, point, test_tolerance)
+            and self.b.feature.test_point(self.b.owner, point, test_tolerance))
+
+    def locate(self, owner) -> Optional[Line]:
+        return intersect_planes(self.a.locate(), self.b.locate())
 ```
 
-(Or a `ProgrammableCSGFeature` whose predicate is that conjunction, if it turns out no
-extra class is warranted. Note both parents must share an owner for the single-owner form
-above; an edge between features of two *different* primitives needs the pair of owners,
-which is what `FeatureHit` already carries.)
+The two parents generally live on *different* primitives -- that is the whole point of
+A x B1, a joint feature meeting the timber body -- so each is carried as an
+`OwnedFeatureHit` (feature + the primitive it belongs to). The derived edge's own owner,
+the one a query reports, is the **compound node** (`Difference` / `SolidUnion` /
+`Intersection`) containing both: the first node in the tree that can see the pair at all.
 
 Note the deliberate asymmetry: `locate()` returns an **unbounded** `Line` for the
 measurement math ("as if they were infinite lines"), while `test_point` stays bounded for
@@ -293,20 +301,70 @@ This also survives a face feature that is not a whole face (e.g. the lower trian
 prism face). Whatever partial region its `test_point` defines automatically bounds every
 edge derived from it, with no extra machinery.
 
-Cases to guard:
+#### Finding them: scan wide, then narrow
 
-- **Parallel parents** — no intersection. Not an edge; skip.
-- **Coincident parents** — the planes are the same. Not an edge either, but keep the
-  relation: coplanarity is exactly the "rough face matches the perfect timber within" test
-  that feature 3 needs.
+Derived edges cannot be inferred from the face hits a normal query returns. A face hit is
+established at the *face* tolerance, and an edge wants the *edge* tolerance -- near an
+edge, "within 0.5mm of both planes" is only about 0.7mm from the edge, so the 2mm snap
+would never apply and `CSGFeatureType.EDGE` having its own tolerance would be pointless.
+
+Enumerating every declared pair in the subtree and testing each at the edge tolerance
+works but is O(n^2) per query. The cheaper route, and the one to build: scan once at the
+widest tolerance in play, pair up what that returns, then narrow.
+
+```
+scan_tolerance = max(face, edge, point)
+loose  = children's hits at uniform(scan_tolerance)      # pass 1
+edges  = pairs of FACE hits in `loose` whose groups intersect
+narrow = children's hits at the real per-type tolerances # pass 2
+return narrow + edges
+```
+
+Pass 1 does the work: if two face features both claim the point at the edge tolerance,
+their conjunction holds at that tolerance *by construction*, so the derived edge is a hit
+with no further testing. Pairing is then O(k^2) over the handful of faces actually near
+the point, not over everything declared.
+
+When `face >= edge` the two passes are the same query, so pass 2 is skipped and `loose` is
+reused.
+
+This assumes `test_point` is monotonic in its tolerance -- that a tighter tolerance accepts
+a subset of what a looser one does. Every implementation today satisfies it (they all
+reduce to `safe_equality_test` / `safe_compare` / `safe_zero_test_sq` on a distance), but
+it is now load-bearing and worth stating where `test_point` is declared.
+
+Caching the derived edges rather than re-deriving per query is the obvious later
+optimisation, and belongs in a separate field from `_features` (which is authored, not
+derived).
+
+#### Cases to guard
+
+- **Parallel parents** — no intersection. Not an edge; reject cheaply at derivation via
+  `are_vectors_parallel`.
+- **A non-planar parent** — `locate()` returns None for a cylinder barrel, a lofted side,
+  or an extrusion side following a curved segment. The edge is still pickable; it just
+  cannot be located, the same graceful decline `locate()` already makes.
 - **Two unbounded parents** — two `HalfSpace` features conjoined give an unbounded line,
-  because `HalfSpaceFeature.test_point` delegates to the infinite plane. Bounding must come
-  from the enclosing solid in that case; crop explicitly rather than letting a dimension
-  line run to the horizon.
+  because `HalfSpaceFeature.test_point` delegates to the infinite plane. Crop with
+  `crop_line_to_csg` rather than letting a dimension line run to the horizon.
+- **Coincident parents** — the planes are the same. Not an edge, and deliberately **out of
+  scope here**: the relation is exactly the "rough face matches the perfect timber within"
+  test, which belongs with the reference-face work in D9.
 
 **Naming:** the ordered pair of parent names, with a deterministic order so the same edge
 gets the same identity regardless of which way traversal reached it — sort by
 `(group, name)`. Reads well in a breadcrumb: `tenon_front x ptw.right`.
+
+**Ordering:** a derived edge outranks its own parent faces when both claim a point.
+Selecting an edge is the more specific answer, and the existing `(real, priority)` sort in
+`find_feature` needs the edge to come first.
+
+#### Group assignment
+
+PTW faces move from B1 to **B2**. B1 pairs only with A, which means two PTW faces never
+form an edge -- and a timber's own four long arrises are exactly that. Feature 3 wants
+them: a reference edge is defined as the edge between two reference faces. B2 pairs with A
+*and* with itself, which is what timber faces actually want. Rough faces follow.
 
 ### D4 — Extent, for placing annotations (`cutcsg.py`, `runner.py`)
 
@@ -525,8 +583,19 @@ it from the CSG path — CSG selection goes to a separate `csgSelection` slot ho
 3. ~~**`NamedFeature` dataclass + reserved PTW/rough names.**~~ **DONE** -- see
    "Implementation notes".
 4. ~~**Build out `CSGFeature`.**~~ **DONE** -- see "Implementation notes".
-5. **Derive edges from face groups.** D3. A x B1 to start, with the parallel / coincident /
-   unbounded guards and pair-derived naming.
+5. **Derive edges from face groups.** D3. In order:
+   1. `intersect_planes(Plane, Plane) -> Optional[Line]` in `geometry.py`.
+   2. Rename `FeatureHit` -> `OwnedFeatureHit`; one type serves both "found at a query"
+      and "parent of a derived edge", since both are a feature plus its primitive.
+   3. Move PTW and rough face tags from B1 to B2, so a timber's own arrises derive.
+   4. `DerivedEdgeFeature` with pair-derived naming and the parallel / non-planar /
+      unbounded guards.
+   5. Scan-wide-then-narrow in the compound `get_all_features`, and state `test_point`'s
+      monotonicity-in-tolerance requirement where it is declared.
+   6. Ordering: a derived edge outranks its parent faces at the same point.
+   7. Tests: a tenon cheek x PTW face producing a real located edge; a timber arris from
+      two B2 faces; each guard; naming stability across traversal order; the edge winning
+      the pick over its parents; and that the edge tolerance is what governs the snap.
 6. **Joint attribution + the CSG feature tree UI.** D7 plus feature 1's expandable tree with
    two-way selection. This is the debugging surface for everything after it, which is a good
    reason to have it early.

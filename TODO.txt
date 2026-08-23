@@ -243,10 +243,12 @@ def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement : Bu
 
 :: TODO
 
--TODOS
-  -Fix tag → label in runner.py
-  -float_epsilon should just be generic_epsilon in rule.py
-  -Give the kumiki feature API a tolerance, then delete the float shadow, tolerance parmeter defaults to a new feature_test_epsilon or osemtihing that's a little bigger than the generi cone
+DONE-Fix tag → label in runner.py
+DONE-Give the kumiki feature API a tolerance, then delete the float shadow, tolerance parmeter defaults to a new feature_test_epsilon or osemtihing that's a little bigger than the generi cone
+DONE-maybe get rid of snap_eps, or create a feature eps hierarch (generic, face_eps, line_eps, point_eps) or just use 1 eps for everything and keep it simple...
+DONE-probbaly get rid of _features in CSGFeature base class as difference/union/interseciton does not need/want this, maybe in the future we cach efeatuers but that should be adifferent var
+DONE-float_epsilon should just be generic_epsilon in rule.py
+  
 
   
 
