@@ -301,37 +301,43 @@ This also survives a face feature that is not a whole face (e.g. the lower trian
 prism face). Whatever partial region its `test_point` defines automatically bounds every
 edge derived from it, with no extra machinery.
 
-#### Finding them: scan wide, then narrow
+#### Finding them: two gathers
 
 Derived edges cannot be inferred from the face hits a normal query returns. A face hit is
 established at the *face* tolerance, and an edge wants the *edge* tolerance -- near an
 edge, "within 0.5mm of both planes" is only about 0.7mm from the edge, so the 2mm snap
 would never apply and `CSGFeatureType.EDGE` having its own tolerance would be pointless.
 
-Enumerating every declared pair in the subtree and testing each at the edge tolerance
-works but is O(n^2) per query. The cheaper route, and the one to build: scan once at the
-widest tolerance in play, pair up what that returns, then narrow.
+So `get_all_features` gathers twice, because "near enough to count" means a different
+distance depending on what is being asked:
 
-```
-scan_tolerance = max(face, edge, point)
-loose  = children's hits at uniform(scan_tolerance)      # pass 1
-edges  = pairs of FACE hits in `loose` whose groups intersect
-narrow = children's hits at the real per-type tolerances # pass 2
-return narrow + edges
+```python
+tolerances = DEFAULT if test_tolerances is None else test_tolerances
+hits = self.collect_hits(point, tolerances)                       # each at its own type
+faces = faces_of(self.collect_hits(point, uniform(tolerances.edge)))
+return _sort_feature_hits(hits + derive_edge_hits(self, faces))
 ```
 
-Pass 1 does the work: if two face features both claim the point at the edge tolerance,
-their conjunction holds at that tolerance *by construction*, so the derived edge is a hit
-with no further testing. Pairing is then O(k^2) over the handful of faces actually near
-the point, not over everything declared.
+`collect_hits` is the only recursive method. It tests each feature at the tolerance its own
+type calls for, right where the feature is, and gates real ones on their primitive's
+boundary. Compound nodes override nothing else: they extend the gather over their children
+and apply `_drop_real_hits_off_boundary` at their own level.
 
-When `face >= edge` the two passes are the same query, so pass 2 is skipped and `loose` is
-reused.
+An earlier version instead gathered once at `max(face, edge, point)` and refined that twice.
+It works, but it needs `test_point` to be monotonic in its tolerance -- a subtle constraint
+on every future implementation, and one that is easy to violate without noticing. Two plain
+gathers cost a second traversal of a tree tens of nodes deep and need no invariant at all.
 
-This assumes `test_point` is monotonic in its tolerance -- that a tighter tolerance accepts
-a subset of what a looser one does. Every implementation today satisfies it (they all
-reduce to `safe_equality_test` / `safe_compare` / `safe_zero_test_sq` on a distance), but
-it is now load-bearing and worth stating where `test_point` is declared.
+**Derivation runs in `get_all_features`, not in the gather**, and so happens once, at
+whichever node the caller asked about. Putting it in `collect_hits` would either recurse
+into itself or have every nested compound re-derive what its parent derives. Because of
+that, nothing is deduplicated -- and nothing should be: two tenons on one timber
+legitimately declare the same face names, so their edges share a name while being genuinely
+different edges.
+
+**A primitive derives its own arrises too**, since the logic lives on the base class rather
+than on the compound nodes. That matters practically: kigumi picking navigates to a leaf
+primitive and queries *that*, so it is what makes edges reachable from the viewer at all.
 
 Caching the derived edges rather than re-deriving per query is the obvious later
 optimisation, and belongs in a separate field from `_features` (which is authored, not
@@ -583,19 +589,7 @@ it from the CSG path — CSG selection goes to a separate `csgSelection` slot ho
 3. ~~**`NamedFeature` dataclass + reserved PTW/rough names.**~~ **DONE** -- see
    "Implementation notes".
 4. ~~**Build out `CSGFeature`.**~~ **DONE** -- see "Implementation notes".
-5. **Derive edges from face groups.** D3. In order:
-   1. `intersect_planes(Plane, Plane) -> Optional[Line]` in `geometry.py`.
-   2. Rename `FeatureHit` -> `OwnedFeatureHit`; one type serves both "found at a query"
-      and "parent of a derived edge", since both are a feature plus its primitive.
-   3. Move PTW and rough face tags from B1 to B2, so a timber's own arrises derive.
-   4. `DerivedEdgeFeature` with pair-derived naming and the parallel / non-planar /
-      unbounded guards.
-   5. Scan-wide-then-narrow in the compound `get_all_features`, and state `test_point`'s
-      monotonicity-in-tolerance requirement where it is declared.
-   6. Ordering: a derived edge outranks its parent faces at the same point.
-   7. Tests: a tenon cheek x PTW face producing a real located edge; a timber arris from
-      two B2 faces; each guard; naming stability across traversal order; the edge winning
-      the pick over its parents; and that the edge tolerance is what governs the snap.
+5. ~~**Derive edges from face groups.**~~ **DONE** -- see "Implementation notes".
 6. **Joint attribution + the CSG feature tree UI.** D7 plus feature 1's expandable tree with
    two-way selection. This is the debugging surface for everything after it, which is a good
    reason to have it early.
@@ -612,7 +606,7 @@ path and a redundant one.
 
 ---
 
-## Implementation notes (steps 1-4)
+## Implementation notes (steps 1-5)
 
 ### Step 1 -- `tag` -> `label`
 
@@ -907,6 +901,75 @@ than the old `safe_zero_test(v_sq)` default it replaces (that compared a squared
 against a linear 1e-8, i.e. an effective 1e-4 distance). The suite passes at the stricter
 value, so nothing was relying on the looser one. It also makes degeneracy mean what it
 says: only a genuinely zero-length edge is degenerate, not one under 0.1mm.
+
+
+### Step 5 -- derived edges
+
+Built as planned, with one correction found while testing.
+
+**Two gathers, not one gather plus refinement.** The first cut derived edges straight from
+a wide gather, which let the *widest* tolerance in play set the edge snap -- a 2mm edge
+tolerance snapped from 3mm because a 4mm point tolerance had set the gather width. The
+first fix refined before pairing, which was correct but leaned on `test_point` being
+monotonic in its tolerance. The version that shipped drops that: `collect_hits` takes the
+whole tolerance struct and tests each feature at its own type's tolerance directly, and
+`get_all_features` simply gathers a second time at the edge tolerance for the faces it
+pairs. No invariant, no refinement stage. See D3.
+
+That also collapsed the structure. `collect_hits` is the only recursive method; the three
+compound overrides are five or six lines of gathering each and override nothing else;
+`get_all_features` is a short non-recursive gather-derive-sort. Deduplication went away
+with it -- and was a latent bug, since it would have collapsed two genuinely different
+edges that happened to share a name.
+
+**Pieces.** `intersect_planes` / `planes_are_parallel` in `geometry.py`;
+`DerivedEdgeFeature` with a `derive()` factory carrying the group, face-type, and
+parallel checks; `collect_face_hits` recursing the subtree on every compound node;
+`derive_edge_hits` pairing what it returns; `_finalize_feature_hits` deduplicating and
+ordering. `FeatureHit` is now `OwnedFeatureHit` and forwards `locate` / `get_extent`, since
+a derived edge holds two of them.
+
+**Ordering** is now `(real, specificity, priority)`, where specificity is POINT < EDGE <
+FACE. A point sits on an edge sits on a face, so the narrowest claimant is the better
+answer, and an edge beats the two faces that formed it.
+
+**Deduplication is by name, and only for derived edges.** Every compound node derives over
+its own subtree, so a nested one reports edges its parent reports again; deterministic
+naming makes collapsing them exact. Authored features are deliberately not deduplicated --
+two tenons on one timber legitimately both declare `tenon_right`, and those are two faces,
+not one seen twice.
+
+**PTW and rough faces moved B1 -> B2** so a timber's own arrises derive. Verified on a real
+mortise-and-tenon: clicking the rough.right/rough.front arris returns
+`rough.front×rough.right` located exactly on the arris, and the snap boundary tracks the
+edge tolerance as it is varied.
+
+**Reaches the viewer already.** Because derivation lives on the base class, a leaf
+primitive derives its own arrises -- and `_detect_face_label` queries exactly that, the
+leaf `_navigate_csg_to_leaf` reached. Clicking an arris on a real mortise-and-tenon returns
+`rough.front x rough.right` through the existing runner path, with no kigumi change.
+
+What a leaf query does NOT see is an edge between features on *different* primitives -- a
+tenon cheek meeting the timber body -- since those need a node that can see both. Surfacing
+those means having the picking path query the root as well, which is step 6/8 work.
+
+**A pre-existing gap this exposed.** `SolidUnion` gathered its children's hits without
+re-gating on its own boundary, unlike `Difference` and `Intersection`. A small member's
+face buried inside a larger one was therefore reported as if it were surface -- and once
+edges arrived, derived a spurious arris there too. Fixed by applying
+`_drop_real_hits_off_boundary` in `SolidUnion.collect_hits` as well, which
+`is_point_on_boundary` already supports (it rejects points strictly inside a sibling).
+
+**Known weakness: a derived edge's extent.** `get_extent` returns only an anchor, and that
+anchor is the point on the infinite line closest to the origin -- which is not necessarily
+anywhere near the piece of edge that actually exists. `ends` is None. Fine for picking,
+which only needs `test_point`, but step 8 will need the real endpoints, which means
+cropping the line to the solid (`crop_line_to_csg`) at a level that knows the enclosing
+timber.
+
+**Deferred.** Caching derived edges instead of re-deriving per query (belongs in a separate
+field from `_features`, which is authored rather than derived); edge x edge -> point;
+coincident faces as a coplanarity relation, which is D9's reference work.
 
 
 ### Follow-ups noticed while in there

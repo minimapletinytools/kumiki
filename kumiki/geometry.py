@@ -18,7 +18,19 @@ keeps working.
 
 from dataclasses import dataclass
 
-from .rule import Direction3D, Transform, V3, safe_transform_vector
+from typing import Optional
+
+from .rule import (
+    Direction3D,
+    Transform,
+    V3,
+    are_vectors_parallel,
+    cross_product,
+    safe_dot_product,
+    safe_normalize_vector,
+    safe_transform_vector,
+    safe_zero_test_sq,
+)
 
 
 @dataclass(frozen=True)
@@ -119,3 +131,44 @@ class Space:
 
     def __repr__(self) -> str:
         return f"Space(transform={self.transform})"
+
+
+def intersect_planes(a: Optional[Plane], b: Optional[Plane]) -> Optional[Line]:
+    """The infinite line where two planes meet, or None if they never do.
+
+    None covers three cases that all mean "no line here": either plane missing
+    (a caller passing through a locate() that declined), the planes parallel,
+    and the planes coincident. Coincident planes are geometrically a whole
+    shared plane rather than a line, so they are not an intersection this can
+    describe -- that relation is worth capturing separately, since two
+    coincident faces is exactly the rough-matches-perfect test, but it is not
+    an edge.
+
+    The returned direction is normalised; the returned point is the point on
+    the line closest to the origin.
+    """
+    if a is None or b is None:
+        return None
+
+    direction = cross_product(a.normal, b.normal)
+    # |n1 x n2| is |n1||n2|sin(theta), so this is zero exactly when the normals
+    # are parallel. It is a SQUARED magnitude, hence safe_zero_test_sq.
+    magnitude_squared = safe_dot_product(direction, direction)
+    if safe_zero_test_sq(magnitude_squared):
+        return None
+
+    # Each plane is dot(normal, x) == offset; solve the pair for a point on both.
+    offset_a = safe_dot_product(a.normal, a.point)
+    offset_b = safe_dot_product(b.normal, b.point)
+    point = (
+        cross_product(b.normal, direction) * offset_a
+        + cross_product(direction, a.normal) * offset_b
+    ) / magnitude_squared
+    return Line(direction=safe_normalize_vector(direction), point=point)
+
+
+def planes_are_parallel(a: Optional[Plane], b: Optional[Plane]) -> bool:
+    """Whether two planes never meet in a line (parallel, or the same plane)."""
+    if a is None or b is None:
+        return False
+    return are_vectors_parallel(a.normal, b.normal)

@@ -34,7 +34,7 @@ from .cutcsg import (
     _finite_midpoint,
     ExtrusionCap,
     ExtrusionFeatureKey,
-    FeatureHit,
+    OwnedFeatureHit,
     Profile,
 )
 

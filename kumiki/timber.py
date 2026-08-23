@@ -1693,15 +1693,16 @@ _TIMBER_FACES: List[Tuple[str, PrismFace]] = [
 def _ptw_face_tags() -> List[CSGFeature]:
     """Named features for the 6 faces of a timber's perfect-timber-within prism.
 
-    Group B1: these are what joint features (group A) form edges against. They
-    do not form edges with each other -- opposite faces never meet, and the
-    four arrises of an uncut timber are not interesting to measure from.
+    Group B2: they form edges against joint features (group A), and also
+    against each other -- the latter being the timber's own four long arrises,
+    which drawing generation needs, since a reference edge is defined as the
+    edge between two reference faces.
     """
     return [
         SimpleRectangularPrismFeature(
             name=PTW_FACE_PREFIX + face_name,
             face=face,
-            properties=FeatureProperties(group=FeatureGroup.B1),
+            properties=FeatureProperties(group=FeatureGroup.B2),
         )
         for face_name, face in _TIMBER_FACES
     ]
@@ -1710,7 +1711,7 @@ def _ptw_face_tags() -> List[CSGFeature]:
 def _rough_face_tags() -> List[CSGFeature]:
     """Named features for the 6 faces of a timber's rough (as-sawn) prism.
 
-    Group B1 as well, but kept separately named: a rough face only coincides
+    Group B2 as well, but kept separately named: a rough face only coincides
     with its perfect-timber-within counterpart on a reference face, and
     measurements may never be taken from one that does not (see
     PerfectTimberWithin.is_face_perfect).
@@ -1719,7 +1720,7 @@ def _rough_face_tags() -> List[CSGFeature]:
         SimpleRectangularPrismFeature(
             name=ROUGH_FACE_PREFIX + face_name,
             face=face,
-            properties=FeatureProperties(group=FeatureGroup.B1),
+            properties=FeatureProperties(group=FeatureGroup.B2),
         )
         for face_name, face in _TIMBER_FACES
     ]

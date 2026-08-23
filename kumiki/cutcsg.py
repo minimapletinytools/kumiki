@@ -24,7 +24,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import warnings
 from .rule import *
-from .geometry import Line, Plane, Point
+from .geometry import Line, Plane, Point, intersect_planes, planes_are_parallel
 
 
 # ============================================================================
@@ -212,6 +212,16 @@ class FeatureTestTolerances:
 DEFAULT_FEATURE_TEST_TOLERANCES = FeatureTestTolerances()
 
 
+# How specific each kind of feature is, most specific first. A point sits on
+# an edge which sits on a face, so when several claim the same click the
+# narrowest one is the better answer.
+_FEATURE_TYPE_SPECIFICITY = {
+    CSGFeatureType.POINT: 0,
+    CSGFeatureType.EDGE: 1,
+    CSGFeatureType.FACE: 2,
+}
+
+
 class FeatureGroup(Enum):
     """Which other features a feature is allowed to form an edge with.
 
@@ -266,12 +276,55 @@ class FeatureProperties:
     priority: int = 0
 
 
+def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
+    """Best answer first.
+
+    Non-real beats real: selecting a centre axis is a deliberate snap, and a
+    surface it happens to lie on should not steal the click. Then the more
+    specific kind -- a point sits on an edge sits on a face, and the narrowest
+    claimant is the better answer, so an edge beats the two faces that formed
+    it. Then author-set priority.
+    """
+    return sorted(hits, key=lambda hit: (
+        hit.feature.real,
+        _FEATURE_TYPE_SPECIFICITY[hit.feature.feature_type()],
+        hit.feature.priority,
+    ))
+
+
+def derive_edge_hits(
+    owner: 'CutCSG',
+    face_hits: List['OwnedFeatureHit'],
+) -> List['OwnedFeatureHit']:
+    """Every edge formed by a pair of *face_hits*, owned by *owner*.
+
+    The pairs come from a scan run at the edge tolerance, so if two faces both
+    turned up there, the conjunction that defines their edge holds at that
+    tolerance by construction -- no further point testing needed. That is what
+    makes this O(k^2) over the few faces near the point rather than over
+    everything the subtree declares.
+
+    Not deduplicated: derivation runs once, at whichever node the caller
+    queried, so nothing arrives here twice. Names are not unique enough to
+    dedupe by anyway -- two tenons on one timber legitimately declare the same
+    face names, which makes their edges share a name while being genuinely
+    different edges.
+    """
+    hits: List['OwnedFeatureHit'] = []
+    for i in range(len(face_hits)):
+        for j in range(i + 1, len(face_hits)):
+            edge = DerivedEdgeFeature.derive(face_hits[i], face_hits[j])
+            if edge is not None:
+                hits.append(OwnedFeatureHit(feature=edge, owner=owner))
+    return hits
+
+
 def _drop_real_hits_off_boundary(
     node: 'CutCSG',
-    hits: List['FeatureHit'],
+    hits: List['OwnedFeatureHit'],
     point: V3,
     test_tolerances: Optional['FeatureTestTolerances'],
-) -> List['FeatureHit']:
+) -> List['OwnedFeatureHit']:
     """Keep only what can legitimately be claimed at *point* on *node*.
 
     A child's real feature can name surface that this node's boolean removed --
@@ -342,7 +395,7 @@ class CSGFeature(ABC):
     feature type rather than a stored declaration plus a resolved copy.
 
     Because a feature alone does not know where it lives, queries hand back a
-    FeatureHit pairing it with the primitive that matched.
+    OwnedFeatureHit pairing it with the primitive that matched.
 
     Subclasses say how the feature is identified: by an enum member for the
     simple per-primitive cases, or by an arbitrary predicate for
@@ -408,6 +461,7 @@ class CSGFeature(ABC):
 
         Callers reach this through owner.get_all_features(), which has already
         established that the point is on the owner's boundary at all.
+
         """
         ...
 
@@ -435,6 +489,107 @@ class ProgrammableCSGFeature(CSGFeature):
         if self.predicate is None:
             return False
         return self.predicate(owner, point, test_tolerance)
+
+
+def _as_plane(geometry: Optional['LocatedGeometry']) -> Optional[Plane]:
+    """Narrow a located geometry to a Plane, or None if it is not one.
+
+    locate() can hand back a Point or a Line as well, and a face that declines
+    to locate hands back nothing. Only planes intersect into edges.
+    """
+    return geometry if isinstance(geometry, Plane) else None
+
+
+@dataclass(frozen=True)
+class DerivedEdgeFeature(CSGFeature):
+    """The edge where two face features meet.
+
+    Built rather than authored: joints declare faces, and the edges between
+    them fall out of which faces are allowed to meet (see FeatureGroup). Use
+    `derive()` rather than constructing directly -- it applies the group rules,
+    rejects pairs that form no edge, and names the result deterministically.
+
+    The two parents generally live on different primitives (a tenon cheek and
+    the timber body, say), so each is carried with its own owner. The `owner`
+    passed to this feature's own methods is the compound node that contains
+    both, and is unused here -- the geometry comes from the parents.
+    """
+    a: Optional['OwnedFeatureHit'] = None
+    b: Optional['OwnedFeatureHit'] = None
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.EDGE
+
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        if self.a is None or self.b is None:
+            return False
+        return (self.a.feature.test_point(self.a.owner, point, test_tolerance)
+                and self.b.feature.test_point(self.b.owner, point, test_tolerance))
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        if self.a is None or self.b is None:
+            return None
+        # None if either parent is a surface with no plane -- a cylinder
+        # barrel, a lofted side. The edge is still pickable; it just cannot be
+        # measured against, the same decline locate() makes elsewhere.
+        return intersect_planes(_as_plane(self.a.locate()), _as_plane(self.b.locate()))
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        """Where this edge sits -- currently only approximately.
+
+        SHORTCOMING, deliberate for now: `ends` is None and `anchor` is the
+        point on the INFINITE line closest to the origin, which need not be
+        anywhere near the stretch of edge that actually exists. An edge a metre
+        up a post can anchor at the origin end of its own line.
+
+        That is harmless for picking, which only ever calls test_point, but it
+        is not good enough to hang a dimension line off. Fixing it means
+        cropping the line to the solid (see crop_line_to_csg), and the solid in
+        question is the enclosing timber -- which this feature cannot see,
+        since its owner is whichever node derived it. So the crop has to happen
+        a level up, where the timber is known, and that is measurement's job
+        rather than the feature's.
+        """
+        if self.a is None or self.b is None:
+            return None
+        line = self.locate(owner)
+        if not isinstance(line, Line):
+            return None
+        return CSGFeatureExtent(anchor=line.point)
+
+    @staticmethod
+    def derive(a: 'OwnedFeatureHit', b: 'OwnedFeatureHit') -> Optional['DerivedEdgeFeature']:
+        """The edge where *a* and *b* meet, or None if they form none.
+
+        None when: either is not a face; their groups are not allowed to meet;
+        or their planes are parallel (which includes being the same plane --
+        coincident faces share a whole plane, not a line).
+        """
+        if a.feature.feature_type() != CSGFeatureType.FACE:
+            return None
+        if b.feature.feature_type() != CSGFeatureType.FACE:
+            return None
+        if not feature_groups_intersect(a.feature.group, b.feature.group):
+            return None
+        if planes_are_parallel(_as_plane(a.locate()), _as_plane(b.locate())):
+            return None
+
+        # Deterministic order, so the same edge gets the same identity however
+        # traversal reached it.
+        first, second = sorted(
+            (a, b), key=lambda hit: (hit.feature.group.value, hit.feature.name))
+        return DerivedEdgeFeature(
+            name=f"{first.feature.name}\u00d7{second.feature.name}",
+            properties=FeatureProperties(
+                # An edge exists only where both its faces do.
+                real=a.feature.real and b.feature.real,
+                priority=max(a.feature.priority, b.feature.priority),
+                # Groups govern which faces meet; nothing pairs edges yet, so
+                # this is not meaningful for a derived edge and stays default.
+            ),
+            a=first,
+            b=second,
+        )
 
 
 @dataclass(frozen=True)
@@ -715,12 +870,16 @@ class SimpleLoftFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
-class FeatureHit:
-    """A feature, paired with the primitive it was found on.
+class OwnedFeatureHit:
+    """A feature, paired with the primitive it belongs to.
 
-    A CSGFeature holds no reference to its owner, so a query hands back both.
+    A CSGFeature holds no reference to its owner, so anything handing one
+    around carries both. That covers two jobs with the same shape: what a query
+    hands back, and how a DerivedEdgeFeature refers to the two parents it was
+    built from -- which generally live on different primitives.
+
     Anything needing the feature's geometry -- its plane, its extent -- needs
-    the owner too.
+    the owner too, so `locate` and `get_extent` are forwarded here.
     """
     feature: CSGFeature
     owner: 'CutCSG'
@@ -735,6 +894,12 @@ class FeatureHit:
     @property
     def properties(self) -> FeatureProperties:
         return self.feature.properties
+
+    def locate(self) -> Optional['LocatedGeometry']:
+        return self.feature.locate(self.owner)
+
+    def get_extent(self) -> Optional['CSGFeatureExtent']:
+        return self.feature.get_extent(self.owner)
 
 
 @dataclass(frozen=True)
@@ -758,57 +923,86 @@ class CutCSG(ABC):
         """
         return []
 
-    def get_all_features(
+    def collect_hits(
         self,
         point: V3,
-        test_tolerances: Optional[FeatureTestTolerances] = None,
-    ) -> List['FeatureHit']:
-        """Every feature of this node that *point* lies on.
+        tolerances: FeatureTestTolerances,
+    ) -> List['OwnedFeatureHit']:
+        """Every declared feature in this subtree that *point* lies on.
 
-        One implementation for every primitive: the boundary test is the
-        primitive's own, and each feature decides for itself whether the point
-        is on it. Compound nodes override this to gather from their children.
+        Each feature is tested at the tolerance its own type calls for, right
+        here -- a face at the face tolerance, a declared edge at the edge one.
+        Compound nodes extend this over their children; they declare nothing
+        themselves.
 
         Real and non-real features are gated differently, which is the whole
         reason `real` exists:
 
-        - A real feature names actual surface, so the point has to be on this
-          node's boundary at all before any of them can claim it.
+        - A real feature names actual surface, so the point has to be on the
+          boundary of the primitive declaring it. That gate is a surface
+          question, hence the face tolerance whatever the feature's own type.
         - A non-real feature (a bore's centre axis, a reference plane) names
           nothing the CSG tree ever cut, so boolean operations cannot have
-          removed it and the boundary gate does not apply.
+          removed it and the gate does not apply.
 
-        The tolerance each feature is tested at, by contrast, comes from its
-        *type* rather than its realness -- see FeatureTestTolerances.
+        Takes a concrete FeatureTestTolerances, not an optional one: the
+        defaulting happens once, at the public entry point, so nothing on the
+        recursive path can quietly re-default.
         """
         declared = self.get_declared_features()
         if not declared:
             return []
-        tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
-        real_features = [f for f in declared if f.real]
-        unreal_features = [f for f in declared if not f.real]
-
-        def claimed(feature: CSGFeature) -> bool:
-            return feature.test_point(
-                self, point,
-                test_tolerance=tolerances.for_type(feature.feature_type()))
-
-        hits: List['FeatureHit'] = [
-            FeatureHit(feature=f, owner=self) for f in unreal_features if claimed(f)
-        ]
-        # The boundary gate is a surface question, so it uses the face tolerance
-        # whatever kinds of feature are hanging off it.
-        if real_features and self.is_point_on_boundary(point, eps=tolerances.face):
-            hits.extend(
-                FeatureHit(feature=f, owner=self) for f in real_features if claimed(f)
-            )
+        on_boundary: Optional[bool] = None  # computed at most once, only if needed
+        hits: List['OwnedFeatureHit'] = []
+        for feature in declared:
+            if not feature.test_point(
+                self, point, tolerances.for_type(feature.feature_type())
+            ):
+                continue
+            if feature.real:
+                if on_boundary is None:
+                    on_boundary = self.is_point_on_boundary(point, eps=tolerances.face)
+                if not on_boundary:
+                    continue
+            hits.append(OwnedFeatureHit(feature=feature, owner=self))
         return hits
+
+    def get_all_features(
+        self,
+        point: V3,
+        test_tolerances: Optional[FeatureTestTolerances] = None,
+    ) -> List['OwnedFeatureHit']:
+        """Every feature at *point*: those declared in this subtree, plus the
+        edges they form with each other.
+
+        Two gathers, because "near enough to count" means a different distance
+        depending on what is being asked. The first collects features at the
+        tolerance each one's type calls for. The second collects faces at the
+        EDGE tolerance and pairs them, which is what makes an edge selectable
+        from further away than either of its faces -- a face 1.5mm off cannot
+        claim the point itself, but it can still form an edge that is
+        selectable there, because you cannot click exactly on a line.
+
+        Derivation happens here rather than inside collect_hits, and so runs
+        once, at whichever node the caller asked about. Putting it in the
+        recursive gather would either recurse into itself or have every nested
+        compound re-derive what its parent derives.
+        """
+        tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
+        hits = self.collect_hits(point, tolerances)
+        at_edge_tolerance = self.collect_hits(
+            point, FeatureTestTolerances.uniform(tolerances.edge))
+        faces = [
+            hit for hit in at_edge_tolerance
+            if hit.feature.feature_type() == CSGFeatureType.FACE
+        ]
+        return _sort_feature_hits(hits + derive_edge_hits(self, faces))
 
     def find_feature(
         self,
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
-    ) -> Optional['FeatureHit']:
+    ) -> Optional['OwnedFeatureHit']:
         """The best feature at *point*, or None.
 
         Non-real features win outright over real ones. They are lines and
@@ -819,8 +1013,7 @@ class CutCSG(ABC):
         hits = self.get_all_features(point, test_tolerances=test_tolerances)
         if not hits:
             return None
-        hits.sort(key=lambda hit: (hit.feature.real, hit.feature.priority))
-        return hits[0]
+        return _sort_feature_hits(hits)[0]
 
 
     @abstractmethod
@@ -1600,13 +1793,13 @@ class SolidUnion(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3,
-                         test_tolerances: Optional[FeatureTestTolerances] = None) -> List['FeatureHit']:
-        hits: List['FeatureHit'] = []
+    def collect_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
+        hits = super().collect_hits(point, tolerances)
         for child in self.children:
-            hits.extend(child.get_all_features(point, test_tolerances=test_tolerances))
-        hits.sort(key=lambda hit: hit.feature.priority)
-        return hits
+            hits.extend(child.collect_hits(point, tolerances))
+        # A child's face can be buried inside a sibling, which is surface the
+        # union does not have. is_point_on_boundary rejects exactly that case.
+        return _drop_real_hits_off_boundary(self, hits, point, tolerances)
 
     def get_aabb(self) -> BoundingBox:
         # Empty children contribute no points to the union, so they're excluded
@@ -1684,14 +1877,11 @@ class Intersection(CutCSG):
 
         return None
 
-    def get_all_features(self, point: V3,
-                         test_tolerances: Optional[FeatureTestTolerances] = None) -> List['FeatureHit']:
-        hits: List['FeatureHit'] = []
-        hits.extend(self.left.get_all_features(point, test_tolerances=test_tolerances))
-        hits.extend(self.right.get_all_features(point, test_tolerances=test_tolerances))
-        hits = _drop_real_hits_off_boundary(self, hits, point, test_tolerances)
-        hits.sort(key=lambda hit: hit.feature.priority)
-        return hits
+    def collect_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
+        hits = super().collect_hits(point, tolerances)
+        hits.extend(self.left.collect_hits(point, tolerances))
+        hits.extend(self.right.collect_hits(point, tolerances))
+        return _drop_real_hits_off_boundary(self, hits, point, tolerances)
 
     def get_aabb(self) -> BoundingBox:
         left_bbox = self.left.get_aabb()
@@ -1881,16 +2071,12 @@ class Difference(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3,
-                         test_tolerances: Optional[FeatureTestTolerances] = None) -> List['FeatureHit']:
-        # Both the base and the subtracted solids contribute surface here.
-        hits: List['FeatureHit'] = []
-        hits.extend(self.base.get_all_features(point, test_tolerances=test_tolerances))
+    def collect_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
+        hits = super().collect_hits(point, tolerances)
+        hits.extend(self.base.collect_hits(point, tolerances))
         for sub_csg in self.subtract:
-            hits.extend(sub_csg.get_all_features(point, test_tolerances=test_tolerances))
-        hits = _drop_real_hits_off_boundary(self, hits, point, test_tolerances)
-        hits.sort(key=lambda hit: hit.feature.priority)
-        return hits
+            hits.extend(sub_csg.collect_hits(point, tolerances))
+        return _drop_real_hits_off_boundary(self, hits, point, tolerances)
 
     def get_aabb(self) -> BoundingBox:
         bbox = self.base.get_aabb()
