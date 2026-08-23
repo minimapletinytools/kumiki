@@ -1,5 +1,84 @@
 # CSG feature selection and measurement: audit + design
 
+## Status — paused after step 5 (2026-08-23)
+
+Steps 1-5 are done and committed on branch **`csg-feature-selection-steps-1-5`**, nine
+commits ahead of `main`, unpushed. Land with:
+
+```
+git checkout main && git merge --ff-only csg-feature-selection-steps-1-5
+```
+
+Suite at the tip: **1016 python + 9 gui + 212 jest passing**, `make typecheck` at its 8
+long-standing diagnostics (all pre-existing, none in files this work touched -- see "Loose
+ends"). `TODO.txt` has uncommitted edits that are the user's, not part of this work.
+
+### What works now
+
+Clicking a timber in kigumi resolves to a named CSG feature with a real breadcrumb path.
+Every primitive can name features; features know their own type, geometry and rough extent;
+tolerances are a coherent per-type struct that scales with zoom; and edges derive from
+declared face pairs. Clicking an arris returns e.g. `rough.front x rough.right` through the
+existing runner path.
+
+| # | Step | Commit |
+| --- | --- | --- |
+| 1 | Fix `tag` -> `label` in runner.py | `8b43c83` |
+| 2 | Tolerance on the point queries; delete kigumi's float shadow | `638fcb9` |
+| 3 | Real feature model: `CSGFeature`, `feature_type()`, reserved `ptw.`/`rough.` names | `f828b14` |
+| 4 | `locate()`, `get_extent()`, non-real features, `crop_line_to_csg` | `a06b1a8` |
+| — | One epsilon constant; `FeatureTestTolerances` | `cc9467a` |
+| — | `safe_zero_test_sq` | `d9e03c6` |
+| — | Rename epsilons -> test tolerances | `c3f1a04` |
+| 5 | Derive edges where declared faces meet | `dce0689` |
+
+### Picking up: step 6
+
+**Joint attribution + the CSG feature tree UI.** Outlined in full below under "Build order",
+but the short version is that the transport already exists end to end and only the two ends
+are missing:
+
+- **A (python).** `Cutting.joint_ticket`, stamped in `Joint.__post_init__` via
+  `object.__setattr__` so none of the 32 `Joint(...)` call sites change.
+- **B (python).** `serialize_cut_csg_tree` should walk the whole timber's rendered CSG
+  rather than one cutting's negative, include untagged intermediates, and carry per-node
+  feature metadata.
+- **C (python).** `find_csg_at_point` gains `featureType`, `jointName`, `facesToward` --
+  all three now have their data.
+- **D (js).** `mergeCSGTreePayload` in `layers-panel.js` is a stub; the multi-line info
+  panel and two-way tree binding are the remaining work.
+
+A-C are testable python; D is JS with no harness beyond jest on pure modules. Doing A-C
+first means a clean stopping point either way.
+
+**Two decisions left open**, both in the step 6 outline: whether the CSG tree gets its own
+pane or joins the layers panel (leaning own pane -- different lifetime, follows selection),
+and whether derived edges appear in the tree at all (leaning no -- they belong to a *pair*,
+not a node, so showing them per-node would mislead).
+
+### Then
+
+7 -- name features across the joint library (still one call site; `shavings/relief.py` and
+`build_a_butt.py` generate most of the geometry). 8 -- measurement pairs, feature 2 proper.
+9 -- reference features, center planes, the `reference_faces` warning downgrade.
+
+### Known gaps, deliberate
+
+- **A derived edge's `get_extent` is approximate.** `ends` is None and `anchor` is the
+  infinite line's closest point to the origin, which need not be near the real edge.
+  Harmless for picking; step 8 needs it fixed, which means cropping to the enclosing
+  timber. Documented at the method.
+- **A leaf query cannot see cross-primitive edges.** A tenon cheek meeting the timber body
+  needs a node that sees both, and kigumi picking queries the leaf. Step 6/8.
+- **Runner-side extent from triangles** (D4) not built -- the analytic version describes
+  the uncut primitive, not what survived the CSG tree.
+- **Coincident faces** are not detected as a coplanarity relation. That is the
+  rough-matches-PTW test and belongs with step 9.
+- **Derived edges are re-derived per query.** Caching belongs in a field separate from
+  `_features`, which is authored rather than derived.
+
+---
+
 ## Context
 
 We want three user-facing features on top of CSG feature selection:
@@ -590,9 +669,54 @@ it from the CSG path — CSG selection goes to a separate `csgSelection` slot ho
    "Implementation notes".
 4. ~~**Build out `CSGFeature`.**~~ **DONE** -- see "Implementation notes".
 5. ~~**Derive edges from face groups.**~~ **DONE** -- see "Implementation notes".
-6. **Joint attribution + the CSG feature tree UI.** D7 plus feature 1's expandable tree with
-   two-way selection. This is the debugging surface for everything after it, which is a good
-   reason to have it early.
+6. **Joint attribution + the CSG feature tree UI.** D7 plus feature 1's expandable tree
+   with two-way selection. The debugging surface for everything after it, and the last
+   piece of user-facing feature 1.
+
+   The transport already exists end to end -- only the two ends are missing:
+
+   | piece | state |
+   | --- | --- |
+   | `requestCSGTree` -> `serialize_cut_csg_tree` -> `csgTree` message | works |
+   | `mergeCSGTreePayload` in `layers-panel.js` | **stub, renders nothing** |
+   | `requestCSGByPath` -> `_handle_find_csg_by_path` -> highlight | works |
+   | `selectionManager.selectCSG(timberKey, path, featureLabel)` | exists |
+   | `csgNode` layer-node shape `{type, timberKey, path}` | exists |
+
+   **A. Joint attribution (python).** `Cutting.joint_ticket`, stamped in
+   `Joint.__post_init__` via `object.__setattr__` -- `Joint` is frozen, and `timber.py`
+   already uses `__post_init__` elsewhere. None of the 32 `Joint(...)` construction sites
+   change, and `with_order`'s `replace()` re-stamps idempotently.
+   `get_negative_csg_local()` then carries it onto the labelled wrapper it already builds.
+
+   **B. Tree payload (python).** Three changes to `serialize_cut_csg_tree`:
+   walk the whole timber's `render_timber_with_cuts_csg_local()` rather than one cutting's
+   negative CSG (that is the tree picking actually runs against); include untagged
+   intermediates, since those are exactly what you need to see when something is wrong;
+   and carry per-node feature metadata (name, type, group, real).
+
+   **C. Enrich the pick result (python).** `find_csg_at_point` returns
+   `{path, featureLabel, highlightMesh, stats}`; feature 1 wants three more, all of which
+   now have their data: `featureType` from `hit.feature_type()`, `jointName` from A, and
+   `facesToward` from `get_closest_oriented_face_from_global_direction` fed the feature's
+   outward normal at the pick point -- replacing `_generic_label_in_timber_local_space`,
+   which approximates from the prism's rotation axis and only works for RectangularPrism.
+
+   **D. UI (js).** Multi-line info panel, and `mergeCSGTreePayload` actually rendering.
+   Two-way binding: click a tree node -> `requestCSGByPath` -> highlight; pick in 3D ->
+   reveal and select the node.
+
+   A-C are testable python; D is JS with no harness beyond jest on pure modules. Doing
+   A-C first gives a clean stopping point either way.
+
+   **Open decisions.** (i) Whether the CSG tree gets its own pane or joins the layers
+   panel. The panel's hierarchy machinery exists but is organised around members and
+   joints; a per-timber CSG tree is a different axis with a different lifetime (it follows
+   selection, not the frame). Leaning: own pane. (ii) Whether derived edges appear in the
+   tree. They are not declared on any node -- they are computed per query from face pairs
+   -- so listing them per node would misrepresent them as belonging to one. Leaning: omit
+   from the tree, show in the selection info line, revisit if that turns out to be what
+   needs debugging.
 7. **Name features across the joint library.** The long tail — one call site today.
    Prioritise `shavings/relief.py` and `build_a_butt.py`, which generate most of the
    geometry, and design defaults so common cases need no hand authoring.
