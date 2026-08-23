@@ -851,12 +851,12 @@ def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
     cuts_meta: List[Dict[str, Any]] = []
     cuts = list(getattr(cut_timber, "cuts", []) or [])
     for idx, cut in enumerate(cuts):
-        tag = getattr(cut, "tag", None)
+        label = getattr(cut, "label", None)
         has_csg = getattr(cut, "negative_csg", None) is not None
         has_top = getattr(cut, "maybe_top_end_cut_distance_from_bottom", None) is not None
         has_bot = getattr(cut, "maybe_bottom_end_cut_distance_from_bottom", None) is not None
-        if tag and isinstance(tag, str):
-            display = tag
+        if label and isinstance(label, str):
+            display = label
         elif has_csg:
             display = f"cut {idx + 1}"
         elif has_top or has_bot:
@@ -865,7 +865,7 @@ def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
             display = f"cut {idx + 1}"
         cuts_meta.append({
             "cutIndex": idx,
-            "tag": tag,
+            "label": label,
             "hasCSG": has_csg,
             "hasEndCut": has_top or has_bot,
             "displayName": display,
@@ -1121,29 +1121,34 @@ def _build_assembly_payload(
     }
 
 
-def _walk_tagged_csg(csg: Any, current_path: List[str], collected: List[Dict[str, Any]]) -> None:
-    """Walk a CSG tree, collecting tagged nodes with their path and feature labels."""
+def _walk_labeled_csg(csg: Any, current_path: List[str], collected: List[Dict[str, Any]]) -> None:
+    """Walk a CSG tree, collecting labeled nodes with their path and feature names.
+
+    A CSG node's *label* (``CutCSG.label``) is what forms the navigable path
+    through the tree -- not to be confused with a ticket's ``tags``, which are
+    free-form user metadata on timbers and joints.
+    """
     from kumiki.cutcsg import (
         SolidUnion, Difference, HalfSpace, RectangularPrism,
     )
 
-    tag = getattr(csg, "tag", None)
+    label = getattr(csg, "label", None)
     next_path = current_path
-    if tag:
-        next_path = current_path + [tag]
+    if label:
+        next_path = current_path + [label]
         features: List[str] = []
         if isinstance(csg, RectangularPrism):
             named_features = getattr(csg, "named_features", None)
             if named_features:
-                for label, _face in named_features:
-                    if label and label not in features:
-                        features.append(label)
+                for feature_name, _face in named_features:
+                    if feature_name and feature_name not in features:
+                        features.append(feature_name)
         elif isinstance(csg, HalfSpace):
             named_feature = getattr(csg, "named_feature", None)
             if named_feature and named_feature not in features:
                 features.append(named_feature)
         collected.append({
-            "tag": tag,
+            "label": label,
             "path": list(next_path),
             "type": type(csg).__name__,
             "features": features,
@@ -1151,11 +1156,11 @@ def _walk_tagged_csg(csg: Any, current_path: List[str], collected: List[Dict[str
 
     if isinstance(csg, SolidUnion):
         for child in csg.children:
-            _walk_tagged_csg(child, next_path, collected)
+            _walk_labeled_csg(child, next_path, collected)
     elif isinstance(csg, Difference):
-        _walk_tagged_csg(csg.base, next_path, collected)
+        _walk_labeled_csg(csg.base, next_path, collected)
         for sub in csg.subtract:
-            _walk_tagged_csg(sub, next_path, collected)
+            _walk_labeled_csg(sub, next_path, collected)
 
 
 def serialize_cut_csg_tree(cut_timber: Any, cut_index: int) -> Dict[str, Any]:
@@ -1166,10 +1171,10 @@ def serialize_cut_csg_tree(cut_timber: Any, cut_index: int) -> Dict[str, Any]:
     csg = cut.get_negative_csg_local() if hasattr(cut, "get_negative_csg_local") else getattr(cut, "negative_csg", None)
     collected: List[Dict[str, Any]] = []
     if csg is not None:
-        _walk_tagged_csg(csg, [], collected)
+        _walk_labeled_csg(csg, [], collected)
     return {
         "cutIndex": cut_index,
-        "taggedCSGs": collected,
+        "labeledCSGs": collected,
     }
 
 
@@ -1801,40 +1806,40 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
 
 
 def _resolve_csg_at_path(csg: Any, path: List[str], pt: Optional[List[float]] = None, eps: float = 1e-4) -> Any:
-    """Walk the CSG tree following *path* of tagged CSG nodes.
+    """Walk the CSG tree following *path* of labeled CSG nodes.
 
-    Searches through untagged intermediate Difference/SolidUnion nodes
+    Searches through unlabeled intermediate Difference/SolidUnion nodes
     transparently.  When *pt* is given and multiple children share the
-    same tag, prefer the one whose boundary contains *pt*.
+    same label, prefer the one whose boundary contains *pt*.
     """
     from kumiki.cutcsg import SolidUnion, Difference
 
-    def _find_tagged(node: Any, tag_name: str) -> List[Any]:
-        """Return all descendants of *node* with the given *tag*, searching
-        through untagged compound intermediaries."""
+    def _find_labeled(node: Any, label_name: str) -> List[Any]:
+        """Return all descendants of *node* with the given *label*, searching
+        through unlabeled compound intermediaries."""
         results: List[Any] = []
         children: List[Any] = []
         if isinstance(node, Difference):
             children = list(node.subtract)
             # Also check base
-            base_tag = getattr(node.base, "tag", None)
-            if base_tag == tag_name:
+            base_label = getattr(node.base, "label", None)
+            if base_label == label_name:
                 results.append(node.base)
-            elif isinstance(node.base, (SolidUnion, Difference)) and base_tag is None:
-                results.extend(_find_tagged(node.base, tag_name))
+            elif isinstance(node.base, (SolidUnion, Difference)) and base_label is None:
+                results.extend(_find_labeled(node.base, label_name))
         elif isinstance(node, SolidUnion):
             children = list(node.children)
         for ch in children:
-            ch_tag = getattr(ch, "tag", None)
-            if ch_tag == tag_name:
+            ch_label = getattr(ch, "label", None)
+            if ch_label == label_name:
                 results.append(ch)
-            elif isinstance(ch, (SolidUnion, Difference)) and ch_tag is None:
-                results.extend(_find_tagged(ch, tag_name))
+            elif isinstance(ch, (SolidUnion, Difference)) and ch_label is None:
+                results.extend(_find_labeled(ch, label_name))
         return results
 
     node = csg
     for name in path:
-        candidates = _find_tagged(node, name)
+        candidates = _find_labeled(node, name)
         if not candidates:
             break
         if len(candidates) == 1 or pt is None:
@@ -1868,17 +1873,17 @@ def _navigate_csg_one_level(
         # Check which subtract child the point lies on
         for sub in node.subtract:
             if _is_point_on_csg_boundary_float(sub, pt_local, eps):
-                sub_tag = getattr(sub, "tag", None)
-                if sub_tag:
-                    return (current_path + [sub_tag], sub, None)
-                # Unnamed compound → drill through transparently
+                sub_label = getattr(sub, "label", None)
+                if sub_label:
+                    return (current_path + [sub_label], sub, None)
+                # Unlabeled compound → drill through transparently
                 if isinstance(sub, (SolidUnion, Difference)):
                     return _navigate_csg_one_level(sub, pt_local, current_path, eps)
                 return (current_path, sub, _detect_face_label(sub, pt_local, eps))
         # Point is on the base surface
-        base_tag = getattr(node.base, "tag", None)
-        if base_tag:
-            return (current_path + [base_tag], node.base, None)
+        base_label = getattr(node.base, "label", None)
+        if base_label:
+            return (current_path + [base_label], node.base, None)
         if isinstance(node.base, (SolidUnion, Difference)):
             return _navigate_csg_one_level(node.base, pt_local, current_path, eps)
         return (current_path, node.base, _detect_face_label(node.base, pt_local, eps))
@@ -1886,10 +1891,10 @@ def _navigate_csg_one_level(
     if isinstance(node, SolidUnion):
         for ch in node.children:
             if _is_point_on_csg_boundary_float(ch, pt_local, eps):
-                ch_tag = getattr(ch, "tag", None)
-                if ch_tag:
-                    return (current_path + [ch_tag], ch, None)
-                # Unnamed compound → drill through transparently
+                ch_label = getattr(ch, "label", None)
+                if ch_label:
+                    return (current_path + [ch_label], ch, None)
+                # Unlabeled compound → drill through transparently
                 if isinstance(ch, (SolidUnion, Difference)):
                     return _navigate_csg_one_level(ch, pt_local, current_path, eps)
                 return (current_path, ch, _detect_face_label(ch, pt_local, eps))
@@ -1905,7 +1910,7 @@ def _navigate_csg_to_leaf(
     pt_local: List[float],
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
-    """Ctrl+click: traverse from root to deepest named node, then report face."""
+    """Ctrl+click: traverse from root to deepest labeled node, then report face."""
     from kumiki.cutcsg import SolidUnion, Difference
 
     path: List[str] = []
@@ -2044,7 +2049,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         feature_label=feature_label,
     )
 
-    # When a feature (face) is selected, also extract the parent tagged CSG mesh
+    # When a feature (face) is selected, also extract the parent labeled CSG mesh
     # so the viewer can render the parent dimmer and the feature brighter.
     parent_hl = None
     if feature_label is not None and parent_csg is not None:
