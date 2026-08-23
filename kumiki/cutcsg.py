@@ -6,11 +6,16 @@ and geometry operations. All operations use plain Python floats (see rule.py);
 comparisons go through the safe_* helpers so they carry a tolerance rather than
 testing for bit-exact equality.
 
-The point-query methods -- contains_point, is_point_on_boundary,
-get_outward_normal, get_all_features, find_feature -- take an optional ``eps``
-that widens that tolerance for the duration of the call. Picking needs it: a
-raycast hit lands on a boolean-mesh vertex that is only approximately on the
-analytic primitive, so the default 1e-10 rejects nearly every real hit.
+The low-level point tests -- contains_point, is_point_on_boundary,
+get_outward_normal -- take an optional ``eps`` that widens that tolerance for
+the duration of the call.
+
+The feature queries -- get_all_features, find_feature, and CSGFeature.
+test_point -- take a *test tolerance* instead, which is a different thing
+wearing similar clothes. An epsilon absorbs float error; a test tolerance
+absorbs the gap between a raycast hit on the triangulated mesh and the
+analytic surface it stands for, and how far a click lands from an edge or a
+point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 from typing import Callable, List, Optional, Tuple, Union, cast
@@ -120,19 +125,26 @@ class CSGFeatureType(Enum):
 # Default tolerances for deciding whether a point is on a feature. Units are
 # model units (metres), so these are 0.5mm / 2mm / 4mm.
 #
-# They are deliberately far looser than EPSILON_GENERIC, because feature
-# queries exist for picking: a raycast hit lands on a vertex of the
-# triangulated mesh, not on the analytic surface, and at 1e-8 almost none of
-# them would register. Code doing exact analytic work wants
-# FeatureEpsilons.exact() instead.
-FEATURE_FACE_EPSILON = scalar('5e-4')
-FEATURE_EDGE_EPSILON = scalar('2e-3')
-FEATURE_POINT_EPSILON = scalar('4e-3')
+# These are tolerances rather than epsilons, and the distinction is the point
+# of the name: an epsilon absorbs float error, and EPSILON_GENERIC (1e-8) is
+# sized for that. These absorb something far larger -- the gap between a
+# raycast hit on the triangulated mesh and the analytic surface it stands for,
+# plus, for edges and points, however far a human click lands from a target it
+# cannot hit exactly. Code doing exact analytic work wants
+# FeatureTestTolerances.exact() instead.
+FEATURE_FACE_TOLERANCE = scalar('5e-4')
+FEATURE_EDGE_TOLERANCE = scalar('2e-3')
+FEATURE_POINT_TOLERANCE = scalar('4e-3')
 
 
 @dataclass(frozen=True)
-class FeatureEpsilons:
+class FeatureTestTolerances:
     """How close a point must be to count as on a feature, per feature type.
+
+    Not epsilons: an epsilon absorbs float error, while these absorb the gap
+    between meshed and analytic geometry and the imprecision of a human click.
+    They are several orders of magnitude larger than EPSILON_GENERIC and are
+    chosen, not derived.
 
     One tolerance does not fit all three, and the reason is about how features
     get selected rather than about the geometry:
@@ -149,55 +161,55 @@ class FeatureEpsilons:
     keyed the wider tolerance off `real` instead. Type is the better key: a
     real derived edge is just as unclickable as a non-real centre axis.
     """
-    face: Numeric = FEATURE_FACE_EPSILON
-    edge: Numeric = FEATURE_EDGE_EPSILON
-    point: Numeric = FEATURE_POINT_EPSILON
+    face: Numeric = FEATURE_FACE_TOLERANCE
+    edge: Numeric = FEATURE_EDGE_TOLERANCE
+    point: Numeric = FEATURE_POINT_TOLERANCE
 
     def for_type(self, feature_type: 'CSGFeatureType') -> Numeric:
-        """The tolerance to test a feature of *feature_type* with."""
+        """The test tolerance for a feature of *feature_type*."""
         if feature_type == CSGFeatureType.EDGE:
             return self.edge
         if feature_type == CSGFeatureType.POINT:
             return self.point
         return self.face
 
-    def __mul__(self, factor: Numeric) -> 'FeatureEpsilons':
+    def __mul__(self, factor: Numeric) -> 'FeatureTestTolerances':
         """Scale every tolerance by *factor*.
 
         The reason this exists is camera zoom. Selecting an edge or a point is
         a snap, and how much slack a snap needs is a screen-space question: a
         fixed 2mm is a comfortable target zoomed in and an invisible one zoomed
-        out. A viewport can hold one FeatureEpsilons describing the tolerances
+        out. A viewport can hold one FeatureTestTolerances describing the tolerances
         at some reference zoom and scale it by world-units-per-pixel per query.
         """
         if safe_compare(factor, 0, Comparison.LE):
-            raise ValueError(f"feature epsilons must scale by a positive factor, got {factor}")
-        return FeatureEpsilons(
+            raise ValueError(f"feature test tolerances must scale by a positive factor, got {factor}")
+        return FeatureTestTolerances(
             face=self.face * factor,
             edge=self.edge * factor,
             point=self.point * factor,
         )
 
-    def __rmul__(self, factor: Numeric) -> 'FeatureEpsilons':
+    def __rmul__(self, factor: Numeric) -> 'FeatureTestTolerances':
         return self.__mul__(factor)
 
-    def __truediv__(self, divisor: Numeric) -> 'FeatureEpsilons':
+    def __truediv__(self, divisor: Numeric) -> 'FeatureTestTolerances':
         if safe_compare(divisor, 0, Comparison.LE):
-            raise ValueError(f"feature epsilons must divide by a positive factor, got {divisor}")
+            raise ValueError(f"feature test tolerances must divide by a positive factor, got {divisor}")
         return self.__mul__(scalar(1) / divisor)
 
     @staticmethod
-    def uniform(eps: Numeric) -> 'FeatureEpsilons':
+    def uniform(eps: Numeric) -> 'FeatureTestTolerances':
         """The same tolerance for every feature type."""
-        return FeatureEpsilons(face=eps, edge=eps, point=eps)
+        return FeatureTestTolerances(face=eps, edge=eps, point=eps)
 
     @staticmethod
-    def exact() -> 'FeatureEpsilons':
+    def exact() -> 'FeatureTestTolerances':
         """Analytic tolerance, for geometry that was never triangulated."""
-        return FeatureEpsilons.uniform(EPSILON_GENERIC)
+        return FeatureTestTolerances.uniform(EPSILON_GENERIC)
 
 
-DEFAULT_FEATURE_EPSILONS = FeatureEpsilons()
+DEFAULT_FEATURE_TEST_TOLERANCES = FeatureTestTolerances()
 
 
 class FeatureGroup(Enum):
@@ -258,7 +270,7 @@ def _drop_real_hits_off_boundary(
     node: 'CutCSG',
     hits: List['FeatureHit'],
     point: V3,
-    epsilons: Optional['FeatureEpsilons'],
+    test_tolerances: Optional['FeatureTestTolerances'],
 ) -> List['FeatureHit']:
     """Keep only what can legitimately be claimed at *point* on *node*.
 
@@ -275,7 +287,7 @@ def _drop_real_hits_off_boundary(
         return hits
     if not any(hit.feature.real for hit in hits):
         return hits
-    tolerances = DEFAULT_FEATURE_EPSILONS if epsilons is None else epsilons
+    tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
     if node.is_point_on_boundary(point, eps=tolerances.face):
         return hits
     return [hit for hit in hits if not hit.feature.real]
@@ -391,7 +403,7 @@ class CSGFeature(ABC):
         return self.properties.priority
 
     @abstractmethod
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         """Whether *point* lies on this feature of *owner*.
 
         Callers reach this through owner.get_all_features(), which has already
@@ -419,10 +431,10 @@ class ProgrammableCSGFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return self.declared_type
 
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if self.predicate is None:
             return False
-        return self.predicate(owner, point, eps)
+        return self.predicate(owner, point, test_tolerance)
 
 
 @dataclass(frozen=True)
@@ -449,8 +461,8 @@ class HalfSpaceFeature(CSGFeature):
     # get_extent stays None: a half-space's plane is unbounded, so there is no
     # box to give and no midpoint that means anything.
 
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
-        return owner.is_point_on_boundary(point, eps=eps)
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        return owner.is_point_on_boundary(point, eps=test_tolerance)
 
 
 @dataclass(frozen=True)
@@ -503,24 +515,24 @@ class SimpleRectangularPrismFeature(CSGFeature):
         _, centre = frame
         return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
 
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, RectangularPrism):
             return False
         x, y, z = owner._local_coords(point)
         half_width = owner.size[0] / 2
         half_height = owner.size[1] / 2
         if self.face == PrismFace.RIGHT:
-            return safe_equality_test(x, half_width, eps=eps)
+            return safe_equality_test(x, half_width, eps=test_tolerance)
         if self.face == PrismFace.LEFT:
-            return safe_equality_test(x, -half_width, eps=eps)
+            return safe_equality_test(x, -half_width, eps=test_tolerance)
         if self.face == PrismFace.FRONT:
-            return safe_equality_test(y, half_height, eps=eps)
+            return safe_equality_test(y, half_height, eps=test_tolerance)
         if self.face == PrismFace.BACK:
-            return safe_equality_test(y, -half_height, eps=eps)
+            return safe_equality_test(y, -half_height, eps=test_tolerance)
         if self.face == PrismFace.TOP:
-            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=eps)
+            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=test_tolerance)
         if self.face == PrismFace.BOTTOM:
-            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=eps)
+            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=test_tolerance)
         return False
 
 
@@ -558,15 +570,15 @@ class SimpleCylinderFeature(CSGFeature):
             return None
         return CSGFeatureExtent(anchor=owner.position + axis * distance)
 
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, Cylinder):
             return False
         axial, radial = owner._axial_and_radial(point)
         if self.part == CylinderPart.TOP:
-            return owner.end_distance is not None and safe_equality_test(axial, owner.end_distance, eps=eps)
+            return owner.end_distance is not None and safe_equality_test(axial, owner.end_distance, eps=test_tolerance)
         if self.part == CylinderPart.BOTTOM:
-            return owner.start_distance is not None and safe_equality_test(axial, owner.start_distance, eps=eps)
-        return safe_equality_test(radial, owner.radius, eps=eps)
+            return owner.start_distance is not None and safe_equality_test(axial, owner.start_distance, eps=test_tolerance)
+        return safe_equality_test(radial, owner.radius, eps=test_tolerance)
 
 
 @dataclass(frozen=True)
@@ -627,15 +639,15 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
         _, centre = frame
         return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
 
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonExtrusion):
             return False
         x, y, z = owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=eps)
+            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=test_tolerance)
         if self.key == ExtrusionCap.BOTTOM:
-            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=eps)
-        return owner._point_on_side(self.key, x, y, eps=eps)
+            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=test_tolerance)
+        return owner._point_on_side(self.key, x, y, eps=test_tolerance)
 
 
 @dataclass(frozen=True)
@@ -691,15 +703,15 @@ class SimpleLoftFeature(CSGFeature):
             aabb=owner.get_aabb(),
         )
 
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
             return False
         x, y, z = owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return safe_equality_test(z, owner.end_distance, eps=eps)
+            return safe_equality_test(z, owner.end_distance, eps=test_tolerance)
         if self.key == ExtrusionCap.BOTTOM:
-            return safe_equality_test(z, owner.start_distance, eps=eps)
-        return owner._point_on_side(self.key, x, y, z, eps=eps)
+            return safe_equality_test(z, owner.start_distance, eps=test_tolerance)
+        return owner._point_on_side(self.key, x, y, z, eps=test_tolerance)
 
 
 @dataclass(frozen=True)
@@ -749,7 +761,7 @@ class CutCSG(ABC):
     def get_all_features(
         self,
         point: V3,
-        epsilons: Optional[FeatureEpsilons] = None,
+        test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> List['FeatureHit']:
         """Every feature of this node that *point* lies on.
 
@@ -766,19 +778,20 @@ class CutCSG(ABC):
           nothing the CSG tree ever cut, so boolean operations cannot have
           removed it and the boundary gate does not apply.
 
-        Tolerance, by contrast, comes from the feature's *type* rather than its
-        realness -- see FeatureEpsilons.
+        The tolerance each feature is tested at, by contrast, comes from its
+        *type* rather than its realness -- see FeatureTestTolerances.
         """
         declared = self.get_declared_features()
         if not declared:
             return []
-        tolerances = DEFAULT_FEATURE_EPSILONS if epsilons is None else epsilons
+        tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
         real_features = [f for f in declared if f.real]
         unreal_features = [f for f in declared if not f.real]
 
         def claimed(feature: CSGFeature) -> bool:
             return feature.test_point(
-                self, point, eps=tolerances.for_type(feature.feature_type()))
+                self, point,
+                test_tolerance=tolerances.for_type(feature.feature_type()))
 
         hits: List['FeatureHit'] = [
             FeatureHit(feature=f, owner=self) for f in unreal_features if claimed(f)
@@ -794,7 +807,7 @@ class CutCSG(ABC):
     def find_feature(
         self,
         point: V3,
-        epsilons: Optional[FeatureEpsilons] = None,
+        test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> Optional['FeatureHit']:
         """The best feature at *point*, or None.
 
@@ -803,7 +816,7 @@ class CutCSG(ABC):
         deliberately snapped to it, and a surface it happens to sit on should
         not steal the click. Priority breaks ties within each of the two.
         """
-        hits = self.get_all_features(point, epsilons=epsilons)
+        hits = self.get_all_features(point, test_tolerances=test_tolerances)
         if not hits:
             return None
         hits.sort(key=lambda hit: (hit.feature.real, hit.feature.priority))
@@ -1588,10 +1601,10 @@ class SolidUnion(CutCSG):
             return avg_normal / norm
 
     def get_all_features(self, point: V3,
-                         epsilons: Optional[FeatureEpsilons] = None) -> List['FeatureHit']:
+                         test_tolerances: Optional[FeatureTestTolerances] = None) -> List['FeatureHit']:
         hits: List['FeatureHit'] = []
         for child in self.children:
-            hits.extend(child.get_all_features(point, epsilons=epsilons))
+            hits.extend(child.get_all_features(point, test_tolerances=test_tolerances))
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -1672,11 +1685,11 @@ class Intersection(CutCSG):
         return None
 
     def get_all_features(self, point: V3,
-                         epsilons: Optional[FeatureEpsilons] = None) -> List['FeatureHit']:
+                         test_tolerances: Optional[FeatureTestTolerances] = None) -> List['FeatureHit']:
         hits: List['FeatureHit'] = []
-        hits.extend(self.left.get_all_features(point, epsilons=epsilons))
-        hits.extend(self.right.get_all_features(point, epsilons=epsilons))
-        hits = _drop_real_hits_off_boundary(self, hits, point, epsilons)
+        hits.extend(self.left.get_all_features(point, test_tolerances=test_tolerances))
+        hits.extend(self.right.get_all_features(point, test_tolerances=test_tolerances))
+        hits = _drop_real_hits_off_boundary(self, hits, point, test_tolerances)
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -1869,13 +1882,13 @@ class Difference(CutCSG):
             return avg_normal / norm
 
     def get_all_features(self, point: V3,
-                         epsilons: Optional[FeatureEpsilons] = None) -> List['FeatureHit']:
+                         test_tolerances: Optional[FeatureTestTolerances] = None) -> List['FeatureHit']:
         # Both the base and the subtracted solids contribute surface here.
         hits: List['FeatureHit'] = []
-        hits.extend(self.base.get_all_features(point, epsilons=epsilons))
+        hits.extend(self.base.get_all_features(point, test_tolerances=test_tolerances))
         for sub_csg in self.subtract:
-            hits.extend(sub_csg.get_all_features(point, epsilons=epsilons))
-        hits = _drop_real_hits_off_boundary(self, hits, point, epsilons)
+            hits.extend(sub_csg.get_all_features(point, test_tolerances=test_tolerances))
+        hits = _drop_real_hits_off_boundary(self, hits, point, test_tolerances)
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 

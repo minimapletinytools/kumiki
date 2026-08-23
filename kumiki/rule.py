@@ -555,8 +555,8 @@ def _apply_comparison(val: float, comp: Comparison, eps: Optional[float] = None)
 
     *eps* defaults to EPSILON_GENERIC. Callers doing geometry against meshed
     (rather than analytic) input pass a wider one -- see cutcsg's
-    FeatureEpsilons and the ``eps`` parameter threaded through its point
-    queries.
+    FeatureTestTolerances, which is the same idea sized for picking rather
+    than for float error.
     """
     if eps is None:
         eps = EPSILON_GENERIC

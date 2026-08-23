@@ -1619,7 +1619,7 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
     "face" in the timber's sense, and naming them by direction would read as a
     timber face that isn't there.
     """
-    from kumiki.cutcsg import Cylinder, FeatureEpsilons, HalfSpace
+    from kumiki.cutcsg import Cylinder, FeatureTestTolerances, HalfSpace
     from kumiki.rule import are_vectors_perpendicular
 
     point = _to_v3(pt)
@@ -1628,7 +1628,7 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
     # the analytic face and the triangulated mesh the ray actually hit. Edges
     # and points keep their (wider) defaults, since hitting one is a snap
     # rather than a direct hit.
-    feature = csg.find_feature(point, FeatureEpsilons(face=eps))
+    feature = csg.find_feature(point, FeatureTestTolerances(face=eps))
     if feature is not None:
         return feature.name
 

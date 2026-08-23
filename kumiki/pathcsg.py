@@ -895,17 +895,17 @@ class SimplePathExtrusionFeature(CSGFeature):
             aabb=owner.get_aabb(),
         )
 
-    def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
+    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, PathExtrusion):
             return False
         x, y, z = owner._local_coords(point)
         if self.key == ExtrusionCap.TOP:
-            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=eps)
+            return owner.end_distance is not None and safe_equality_test(z, owner.end_distance, eps=test_tolerance)
         if self.key == ExtrusionCap.BOTTOM:
-            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=eps)
+            return owner.start_distance is not None and safe_equality_test(z, owner.start_distance, eps=test_tolerance)
         if not owner.path.segments[self.key].is_planar():
             return False
-        located = owner.path.locate_boundary_segment(create_v2(x, y), eps=eps)
+        located = owner.path.locate_boundary_segment(create_v2(x, y), eps=test_tolerance)
         return located is not None and located[0] == self.key
 
 

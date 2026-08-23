@@ -147,7 +147,7 @@ Every rule in user-facing feature 3 turns on telling these apart.
 
 ### D1 — Tolerance parameter on every point test (`cutcsg.py`, `pathcsg.py`)
 
-(Superseded in part: the feature *queries* now take a `FeatureEpsilons` struct rather than
+(Superseded in part: the feature *queries* now take a `FeatureTestTolerances` struct rather than
 a bare `eps` — see "Feature epsilons" below. The lower-level point tests still take a plain
 `eps` as described here.)
 
@@ -791,7 +791,7 @@ small-negative guard. Two thresholds a hundred times apart with no rule for whic
 where is a trap, so `EPSILON_FLOAT` is gone and `EPSILON_GENERIC` is the single fallback.
 The whole suite passes at the looser value.
 
-**`FeatureEpsilons` (face / edge / point).** Replaces the `eps` + `snap_eps` pair on
+**`FeatureTestTolerances` (face / edge / point).** Replaces the `eps` + `snap_eps` pair on
 `get_all_features` / `find_feature`. Type is the better key than realness: a *real* derived
 edge is exactly as unclickable as a non-real centre axis, so the wider tolerance should
 follow the kind of geometry, not whether the CSG tree could have cut it. `real` still
@@ -800,7 +800,15 @@ governs the boundary gate and the priority ordering; it no longer governs tolera
 Defaults are picking-shaped -- 0.5mm / 2mm / 4mm -- because picking is what feature
 queries exist for: a raycast hit lands on a vertex of the triangulated mesh, not on the
 analytic surface, and at `EPSILON_GENERIC` almost none would register.
-`FeatureEpsilons.exact()` gives the analytic tolerance for code that wants it, and
+They are called *test tolerances*, not epsilons, deliberately: an epsilon absorbs float
+error and `EPSILON_GENERIC` is sized for that, while these absorb the gap between meshed
+and analytic geometry plus however far a click lands from a target it cannot hit exactly.
+Several orders of magnitude apart, and chosen rather than derived. The parameter on
+`get_all_features` / `find_feature` is `test_tolerances` and the one on
+`CSGFeature.test_point` is `test_tolerance`, so the distinction is visible at the call
+site; the lower-level point tests keep a plain `eps`.
+
+`FeatureTestTolerances.exact()` gives the analytic tolerance for code that wants it, and
 `.uniform(eps)` one value for all three. `*` and `/` scale all three at once, because how
 much slack a snap needs is a screen-space question: a viewport holds one struct describing
 the tolerances at a reference zoom and scales it by world-units-per-pixel per query. A
