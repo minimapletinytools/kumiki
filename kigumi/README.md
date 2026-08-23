@@ -9,7 +9,7 @@ To use Kigumi, you need:
 - **VS Code** with the Kigumi extension installed
 - **uv** or **Python** so Kigumi has something to bootstrap the python virtual environment.
   - Preferred: install `uv` ahead of time: https://docs.astral.sh/uv/getting-started/installation/
-  - Auto-bootstrap fallback: Kigumi tries `python3.13`, then `python3`/`python` (or `py -3.13`/`py -3` on Windows) to install uv
+  - Auto-bootstrap fallback: Kigumi tries `python3.13`, then `python3`/`python` (or `py -3.13`/`py -3` on Windows) and installs uv into a throwaway virtual environment at `.kigumi/uv-bootstrap/`
 
 Kigumi does NOT require pre-installed packages. It handles dependency setup in a project-local virtual environment automatically.
 
@@ -70,7 +70,7 @@ This lets you open a single Python file and still bootstrap a runnable Kigumi pr
 On first render in a project, Kumiki bootstraps a project-local environment automatically:
 
 1. Finds project root by walking upward from the target file
-2. Ensures `uv` is available (uses installed `uv` when present, otherwise attempts to install it via Python)
+2. Ensures `uv` is available (uses installed `uv` when present -- including the usual install locations that a GUI-launched editor's `PATH` can miss -- otherwise bootstraps it into `.kigumi/uv-bootstrap/`)
 3. Creates `.venv` with `uv venv --python 3.13 .venv`
 4. Installs required dependencies via `pip`:
    - Local dev checkout: `pip install -e <projectRoot>` (editable kumiki)
