@@ -1,3 +1,60 @@
+:: 8/23/2026 drawing details
+
+-improve footprint system
+  -allow adding slice lines from the footprint and also auto derive slice lines from the footprint boundary
+  -slice lines are tagged with slice tag (see below)
+-improve tagging system
+  -tags become typed, if a vanilla string is passed in, it gets converted to arbitrary
+    -slice: user defined slice sections, although there should maybe be a slice creation function that creates a slice from a slicing plane. (these need to get passed into the final frame too) 
+    -member: enum type that takes values mudsill, post, joist, girt, brace, rafter, tie_beam, etc. These will have their own default marking instructions in the drawing system
+    -generic: for user space stuff
+
+-plan generator: plans are for positioning multiple timbers in a frame
+  -plans are generated based on slices
+    -only timbers in that silce are shown
+    -a timber can be in many slices of course
+    -would be cool to have a 3d plan view, and this can be done with a non axis aligned slice that everything gets thrown into
+  -timbers in each slice are joint-aware, so timber ends butting into joints or corners on both ends don't  need their length marked 
+    -??this is tricky though, we nede a new parameter on the joint to indicate its position can be determined from a perfect face of another timber
+  -when generating plans for ecah slice, we can customize each timber, e.g. drawn from centerline, or drawn for outside,/inside, use ladder
+    -these can be overriden with defaults based on member tags
+  -each slice will pre process the members in it attempting to categorize by its position
+    -touching bottom or close to bottom
+    -horizontal/vertical
+    -organize parallel members from left to right, top to bottom
+    -figure out which members butt into other members
+
+-drawing generator: drawings are for marking joints on a timber
+  -some features can be tagged
+    -measure locally, which indicates they should be measured to local featuers of that joints
+    -measure locally from, which indicates what other local feature they should eb measured from
+    -must be marked
+    -marking optional
+    -never mark
+  -we want to indicate which feature to be measured globally
+    -so for example, we may choose th ecenterline of tenon to be measured globally,
+    -can be proiritized listo f features to pick from, and that gives the algo some flexibility to pick the most appropritae feature
+  -do we need jonit level tagging so fjoint level measurement styling? (or maybe feature level tagging is sufficient)
+    -one thing is that some joints may have many many features (e.g. from notching) but most of them don't need to be marked... but maybe by default all features are unmarked unless tagged?
+  -do we need an override mechanism for feature styling?
+    -so for example, a cut timber with multiple of the same mortises may want to disable local feature marking on all but one mortise
+
+-feature solving
+  -come up with al ist of all features to be solved
+  -ensure every feature can be fully measured from every other featuer
+  -solve requirements
+    -faces: needs point and normal
+    -edges: 2 points, or 1 point and direction
+    -point: 1 point
+    note that normal/direction can be solved against the drawing orthographic orientation
+
+-drawing edit mode
+  -shows drawing dimensions in viewer
+  -user can drag to reposition measurements or add new labels to them
+  -user can delete measurements
+  -user can create new measurements by picknig 2 measureable features
+  -upon save, writes a file that gets read by the drawing generator to override auto generated drawings
+
 :: 8/22/2026 drawing ruminations
 
 We're getting ready to add some general measurement related features. Here are some larefgly disorganized note,s please do some research of what's in the code already and what's needed to achieve the features we want.
@@ -248,12 +305,17 @@ DONE-Give the kumiki feature API a tolerance, then delete the float shadow, tole
 DONE-maybe get rid of snap_eps, or create a feature eps hierarch (generic, face_eps, line_eps, point_eps) or just use 1 eps for everything and keep it simple...
 DONE-probbaly get rid of _features in CSGFeature base class as difference/union/interseciton does not need/want this, maybe in the future we cach efeatuers but that should be adifferent var
 DONE-float_epsilon should just be generic_epsilon in rule.py
-  
-
-  
-
 DONE-test on regular vscode on mac
--get vmware fusion and test on windows
+IGNORE-get vmware fusion and test on windows
+
+-continue fetaure impl --resume b9de226c-0f18-4592-b200-d230dd6f9902
+
+-need some rule or test to ensure no confilcting feature names within a joint
+  -or qualify by CSG tree (probbaly a bad ide,a tree topology may vary too)
+  -better just ensure no confilcts and require joint sto prefix all their cuts
+  -conflicting names across joints allowed, they get qualified by the joint itself
+    -but yo ustil need a way to distinguish 2 different joints on a imber
+
 
 -improve fetaure selection display, it should be multi lined  
   -feature type
