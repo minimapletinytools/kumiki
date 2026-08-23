@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const os = require('os');
 const {
     ensureKigumiYaml,
     resolveProjectEnvironment,
@@ -178,6 +179,7 @@ function ensureGitignore(workspaceRoot) {
         '.venv/',
         'kigumi_exports/',
         '.kigumi/logs/',
+        '.kigumi/uv-bootstrap/',
     ];
 
     if (!fs.existsSync(gitignorePath)) {
@@ -255,15 +257,107 @@ async function findBootstrapPythonLauncher(workspaceRoot) {
     return null;
 }
 
+// Throwaway virtual environment used only to run uv when the machine has no uv
+// of its own; see bootstrapUvIntoVenv.
+const UV_BOOTSTRAP_VENV_RELATIVE_PATH = path.join('.kigumi', 'uv-bootstrap');
+
+function getUvBootstrapVenvRoot(workspaceRoot) {
+    return path.join(workspaceRoot, UV_BOOTSTRAP_VENV_RELATIVE_PATH);
+}
+
+function getUvBootstrapVenvPython(workspaceRoot) {
+    const venvRoot = getUvBootstrapVenvRoot(workspaceRoot);
+    return process.platform === 'win32'
+        ? path.join(venvRoot, 'Scripts', 'python.exe')
+        : path.join(venvRoot, 'bin', 'python');
+}
+
+// A GUI-launched editor does not always inherit the shell PATH that uv installs
+// itself onto, so an installed uv can be invisible to a plain `uv` probe.
+function getWellKnownUvPaths() {
+    const home = os.homedir();
+    if (!home) {
+        return [];
+    }
+
+    if (process.platform === 'win32') {
+        return [
+            path.join(home, '.local', 'bin', 'uv.exe'),
+            path.join(home, '.cargo', 'bin', 'uv.exe'),
+        ];
+    }
+
+    return [
+        path.join(home, '.local', 'bin', 'uv'),
+        path.join(home, '.cargo', 'bin', 'uv'),
+        '/opt/homebrew/bin/uv',
+        '/usr/local/bin/uv',
+    ];
+}
+
+// Last-resort bootstrap: install uv into a virtual environment of its own under
+// .kigumi/. Installing into the interpreter that runs it is not an option --
+// Homebrew and distro Pythons are marked externally managed (PEP 668), so both
+// `pip install --user` and `ensurepip` fail there. A venv is never externally
+// managed and already carries pip, so this path works on those Pythons.
+async function bootstrapUvIntoVenv(workspaceRoot, pythonLauncher) {
+    const uvArgs = ['-m', 'uv'];
+    const venvPython = getUvBootstrapVenvPython(workspaceRoot);
+
+    if (!fs.existsSync(venvPython)) {
+        const venvRoot = getUvBootstrapVenvRoot(workspaceRoot);
+        fs.mkdirSync(path.dirname(venvRoot), { recursive: true });
+        try {
+            await runCommand(
+                pythonLauncher.command,
+                [...pythonLauncher.prefixArgs, '-m', 'venv', venvRoot],
+                workspaceRoot,
+            );
+        } catch (error) {
+            throw new Error(
+                'Unable to create the virtual environment used to bootstrap uv. Install uv manually ' +
+                `(https://docs.astral.sh/uv/getting-started/installation/) and retry initialization. Original error: ${error.message}`
+            );
+        }
+    }
+
+    if (await canRunCommand(venvPython, [...uvArgs, '--version'], workspaceRoot)) {
+        return { command: venvPython, prefixArgs: uvArgs };
+    }
+
+    try {
+        await runCommand(venvPython, ['-m', 'pip', 'install', '--upgrade', 'uv'], workspaceRoot);
+    } catch (error) {
+        throw new Error(
+            'Unable to install uv into the bootstrap virtual environment. Install uv manually ' +
+            `(https://docs.astral.sh/uv/getting-started/installation/) and retry initialization. Original error: ${error.message}`
+        );
+    }
+
+    if (await canRunCommand(venvPython, [...uvArgs, '--version'], workspaceRoot)) {
+        return { command: venvPython, prefixArgs: uvArgs };
+    }
+
+    throw new Error(
+        'Unable to bootstrap uv automatically. Install uv manually (https://docs.astral.sh/uv/getting-started/installation/) and retry initialization.'
+    );
+}
+
 async function ensureUvLauncher(workspaceRoot) {
     if (await canRunCommand('uv', ['--version'], workspaceRoot)) {
         return { command: 'uv', prefixArgs: [] };
     }
 
+    for (const uvPath of getWellKnownUvPaths()) {
+        if (fs.existsSync(uvPath) && await canRunCommand(uvPath, ['--version'], workspaceRoot)) {
+            return { command: uvPath, prefixArgs: [] };
+        }
+    }
+
     const pythonLauncher = await findBootstrapPythonLauncher(workspaceRoot);
     if (!pythonLauncher) {
         throw new Error(
-            'uv was not found and Python was not found. Install uv (https://docs.astral.sh/uv/getting-started/installation/) or install Python 3.13+ and retry initialization.'
+            'uv was not found and Python was not found. Install uv (https://docs.astral.sh/uv/getting-started/installation/) or install Python 3.10+ and retry initialization.'
         );
     }
 
@@ -272,34 +366,7 @@ async function ensureUvLauncher(workspaceRoot) {
         return { command: pythonLauncher.command, prefixArgs: [...pythonLauncher.prefixArgs, '-m', 'uv'] };
     }
 
-    // Best-effort bootstrap path: install uv into the current user site-packages.
-    try {
-        await runCommand(
-            pythonLauncher.command,
-            [...pythonLauncher.prefixArgs, '-m', 'pip', 'install', '--user', '--upgrade', 'uv'],
-            workspaceRoot,
-        );
-    } catch (_error) {
-        // Some Python installs do not include pip by default.
-        await runCommand(
-            pythonLauncher.command,
-            [...pythonLauncher.prefixArgs, '-m', 'ensurepip', '--upgrade'],
-            workspaceRoot,
-        );
-        await runCommand(
-            pythonLauncher.command,
-            [...pythonLauncher.prefixArgs, '-m', 'pip', 'install', '--user', '--upgrade', 'uv'],
-            workspaceRoot,
-        );
-    }
-
-    if (await canRunCommand(pythonLauncher.command, pythonUvArgs, workspaceRoot)) {
-        return { command: pythonLauncher.command, prefixArgs: [...pythonLauncher.prefixArgs, '-m', 'uv'] };
-    }
-
-    throw new Error(
-        'Unable to bootstrap uv automatically. Install uv manually (https://docs.astral.sh/uv/getting-started/installation/) and retry initialization.'
-    );
+    return bootstrapUvIntoVenv(workspaceRoot, pythonLauncher);
 }
 
 function yamlQuote(value) {

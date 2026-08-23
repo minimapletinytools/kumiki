@@ -8,6 +8,12 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kigumi
+
+#### Fixed
+
+- Fixed project initialization failing with `error: externally-managed-environment` on machines without `uv`. The uv bootstrap no longer installs into the system interpreter (`pip install --user`, falling back to `ensurepip`), which PEP 668 forbids on Homebrew and distro Pythons; it now creates a throwaway virtual environment at `.kigumi/uv-bootstrap/` (gitignored) and installs uv there. Initialization also now probes the usual uv install locations (`~/.local/bin`, `~/.cargo/bin`, Homebrew) before bootstrapping, since a GUI-launched editor does not always inherit the shell `PATH` that uv is installed onto.
+
 ## [0.4.10] - 2026-08-22
 
 ### kumiki
