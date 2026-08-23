@@ -19,6 +19,7 @@ from abc import ABC, abstractmethod
 from enum import Enum
 import warnings
 from .rule import *
+from .geometry import Line, Plane, Point
 
 
 # ============================================================================
@@ -170,6 +171,45 @@ class FeatureProperties:
     priority: int = 0
 
 
+def _drop_real_hits_off_boundary(
+    node: 'CutCSG',
+    hits: List['FeatureHit'],
+    point: V3,
+    eps: Optional[Numeric],
+) -> List['FeatureHit']:
+    """Keep only what can legitimately be claimed at *point* on *node*.
+
+    A child's real feature can name surface that this node's boolean removed --
+    a base prism face inside a subtracted pocket, say -- so real hits survive
+    only where the combined solid actually has boundary.
+
+    Non-real features are exempt: they name nothing the boolean ever cut (a
+    bore's centre axis lies in the void the bore made), so gating them on the
+    combined boundary would make them unselectable, which is the opposite of
+    what `real=False` is for.
+    """
+    if not hits:
+        return hits
+    if not any(hit.feature.real for hit in hits):
+        return hits
+    if node.is_point_on_boundary(point, eps=eps):
+        return hits
+    return [hit for hit in hits if not hit.feature.real]
+
+
+def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeric:
+    """Midpoint of a possibly-infinite extent along an axis.
+
+    An anchor point only has to be somewhere sensible on the feature, so an
+    end that runs to infinity contributes the finite one instead of NaN.
+    """
+    if start is None:
+        return scalar(0) if end is None else end
+    if end is None:
+        return start
+    return (start + end) / scalar(2)
+
+
 def _squared_eps(eps: Optional[Numeric]) -> Optional[Numeric]:
     """Adapt a linear distance tolerance for comparison against a SQUARED distance.
 
@@ -183,6 +223,31 @@ def _squared_eps(eps: Optional[Numeric]) -> Optional[Numeric]:
     applied to the squared value, i.e. an effective linear tolerance of 1e-5).
     """
     return None if eps is None else eps * eps
+
+
+# What locate() can hand back. Unbounded on purpose: measurement between two
+# features works on infinite lines and planes, and bounds travel separately in
+# CSGFeatureExtent.
+LocatedGeometry = Union[Point, Line, Plane]
+
+
+@dataclass(frozen=True)
+class CSGFeatureExtent:
+    """Roughly where a feature is, for placing annotations against it.
+
+    Separate from locate(): that gives the unbounded geometry a measurement is
+    computed on, this says where to actually draw the thing. Approximate is
+    fine -- a dimension line only needs somewhere sensible to attach.
+
+    Args:
+        anchor: a representative point -- a face's centre, an edge's midpoint,
+            or the point itself.
+        ends: for an edge, its two endpoints.
+        aabb: for a face, a rough bounding box.
+    """
+    anchor: V3
+    ends: Optional[Tuple[V3, V3]] = None
+    aabb: Optional['BoundingBox'] = None
 
 
 @dataclass(frozen=True)
@@ -218,6 +283,31 @@ class CSGFeature(ABC):
         *is*, while properties say how it should be treated.
         """
         ...
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        """The unbounded geometry this feature lies on, in the owner's space.
+
+        A Plane for a planar face, a Line for an edge, a Point for a vertex.
+
+        None when the feature names a surface that is not one of those -- a
+        cylinder's barrel, a lofted side, an extrusion side that follows a
+        curved path segment. Those are perfectly good features to select and
+        highlight; there is just no single plane to measure against, so
+        measurement has to decline rather than invent one.
+
+        Note the space: the CSG tree is timber-local, so this is too. Anything
+        comparing features across timbers has to lift both through the timber
+        transform first.
+        """
+        return None
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        """Roughly where this feature sits, for placing annotations.
+
+        None when the feature has no bounded extent at all (a half-space's
+        plane), or when it is not worked out for this shape yet.
+        """
+        return None
 
     @property
     def group(self) -> FeatureGroup:
@@ -276,6 +366,20 @@ class HalfSpaceFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        if not isinstance(owner, HalfSpace):
+            return None
+        # The solid is dot(normal, p) >= offset, so the boundary plane is
+        # dot(normal, p) == offset and the outward normal points out of it.
+        normal_length_sq = safe_dot_product(owner.normal, owner.normal)
+        if safe_zero_test(normal_length_sq):
+            return None
+        closest_to_origin = owner.normal * (owner.offset / normal_length_sq)
+        return Plane(normal=-owner.normal, point=closest_to_origin)
+
+    # get_extent stays None: a half-space's plane is unbounded, so there is no
+    # box to give and no midpoint that means anything.
+
     def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
         return owner.is_point_on_boundary(point, eps=eps)
 
@@ -287,6 +391,48 @@ class SimpleRectangularPrismFeature(CSGFeature):
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
+
+    def _face_frame(self, owner: 'RectangularPrism') -> Optional[Tuple[Direction3D, V3]]:
+        """(outward normal, centre point) of this face, in the owner's space."""
+        width_dir, height_dir, length_dir = owner._local_axes()
+        half_width = owner.size[0] / 2
+        half_height = owner.size[1] / 2
+        centre = owner.transform.position
+        if self.face in (PrismFace.TOP, PrismFace.BOTTOM):
+            distance = owner.end_distance if self.face == PrismFace.TOP else owner.start_distance
+            if distance is None:
+                return None  # that end runs to infinity; no face there
+            sign = scalar(1) if self.face == PrismFace.TOP else scalar(-1)
+            return length_dir * sign, centre + length_dir * distance
+        mid_length = _finite_midpoint(owner.start_distance, owner.end_distance)
+        base = centre + length_dir * mid_length
+        if self.face == PrismFace.RIGHT:
+            return width_dir, base + width_dir * half_width
+        if self.face == PrismFace.LEFT:
+            return -width_dir, base - width_dir * half_width
+        if self.face == PrismFace.FRONT:
+            return height_dir, base + height_dir * half_height
+        if self.face == PrismFace.BACK:
+            return -height_dir, base - height_dir * half_height
+        return None
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        if not isinstance(owner, RectangularPrism):
+            return None
+        frame = self._face_frame(owner)
+        if frame is None:
+            return None
+        normal, centre = frame
+        return Plane(normal=normal, point=centre)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        if not isinstance(owner, RectangularPrism):
+            return None
+        frame = self._face_frame(owner)
+        if frame is None:
+            return None
+        _, centre = frame
+        return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
 
     def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, RectangularPrism):
@@ -317,6 +463,32 @@ class SimpleCylinderFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        if not isinstance(owner, Cylinder):
+            return None
+        # The barrel is curved: no single plane describes it, so decline rather
+        # than invent one. (Its axis is a separate, non-real feature -- see D5.)
+        if self.part == CylinderPart.BARREL:
+            return None
+        axis = safe_normalize_vector(owner.axis_direction)
+        distance = owner.end_distance if self.part == CylinderPart.TOP else owner.start_distance
+        if distance is None:
+            return None
+        sign = scalar(1) if self.part == CylinderPart.TOP else scalar(-1)
+        return Plane(normal=axis * sign, point=owner.position + axis * distance)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        if not isinstance(owner, Cylinder):
+            return None
+        axis = safe_normalize_vector(owner.axis_direction)
+        if self.part == CylinderPart.BARREL:
+            mid = _finite_midpoint(owner.start_distance, owner.end_distance)
+            return CSGFeatureExtent(anchor=owner.position + axis * mid)
+        distance = owner.end_distance if self.part == CylinderPart.TOP else owner.start_distance
+        if distance is None:
+            return None
+        return CSGFeatureExtent(anchor=owner.position + axis * distance)
+
     def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, Cylinder):
             return False
@@ -336,6 +508,55 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
+
+    def _frame(self, owner: 'ConvexPolygonExtrusion') -> Optional[Tuple[Direction3D, V3]]:
+        """(outward normal, centre point) of this face, in the owner's space."""
+        orientation = owner.transform.orientation.matrix
+        length_dir = safe_transform_vector(orientation, Matrix([scalar(0), scalar(0), scalar(1)]))
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            distance = owner.end_distance if self.key == ExtrusionCap.TOP else owner.start_distance
+            if distance is None:
+                return None
+            sign = scalar(1) if self.key == ExtrusionCap.TOP else scalar(-1)
+            return length_dir * sign, owner.transform.position + length_dir * distance
+        # A straight extrusion, so every side face is planar.
+        points = owner.points
+        p1 = points[self.key]
+        p2 = points[(self.key + 1) % len(points)]
+        edge = p2 - p1
+        edge_length = safe_norm(Matrix([edge[0], edge[1]]))
+        if safe_zero_test(edge_length):
+            return None
+        # Outward normal of a CCW-wound polygon edge is (dy, -dx) negated; the
+        # winding is normalised by is_valid(), so take the side away from the
+        # polygon centroid to stay right either way.
+        candidate = Matrix([edge[1], -edge[0]]) / edge_length
+        midpoint_2d = (p1 + p2) / scalar(2)
+        centroid_2d = sum(points[1:], points[0]) / scalar(len(points))
+        if safe_compare(safe_dot_product(candidate, midpoint_2d - centroid_2d), 0, Comparison.LT):
+            candidate = -candidate
+        normal = safe_transform_vector(orientation, Matrix([candidate[0], candidate[1], scalar(0)]))
+        mid_length = _finite_midpoint(owner.start_distance, owner.end_distance)
+        local_mid = Matrix([midpoint_2d[0], midpoint_2d[1], mid_length])
+        return normal, owner.transform.position + safe_transform_vector(orientation, local_mid)
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        if not isinstance(owner, ConvexPolygonExtrusion):
+            return None
+        frame = self._frame(owner)
+        if frame is None:
+            return None
+        normal, centre = frame
+        return Plane(normal=normal, point=centre)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        if not isinstance(owner, ConvexPolygonExtrusion):
+            return None
+        frame = self._frame(owner)
+        if frame is None:
+            return None
+        _, centre = frame
+        return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
 
     def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonExtrusion):
@@ -360,6 +581,46 @@ class SimpleLoftFeature(CSGFeature):
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        if not isinstance(owner, ConvexPolygonSimpleLoft):
+            return None
+        # Only the caps are reliably planar. A side is a ruled surface, planar
+        # only in the special case of a pure per-axis taper -- so decline
+        # rather than return a plane that is right for some lofts and wrong
+        # for others. Refining this to detect the planar case is worth doing
+        # when something actually needs to measure from a tapered side.
+        if self.key not in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            return None
+        orientation = owner.transform.orientation.matrix
+        length_dir = safe_transform_vector(orientation, Matrix([scalar(0), scalar(0), scalar(1)]))
+        is_top = self.key == ExtrusionCap.TOP
+        distance = owner.end_distance if is_top else owner.start_distance
+        sign = scalar(1) if is_top else scalar(-1)
+        return Plane(normal=length_dir * sign, point=owner.transform.position + length_dir * distance)
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        if not isinstance(owner, ConvexPolygonSimpleLoft):
+            return None
+        orientation = owner.transform.orientation.matrix
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            is_top = self.key == ExtrusionCap.TOP
+            profile = owner.top_points if is_top else owner.bottom_points
+            distance = owner.end_distance if is_top else owner.start_distance
+        else:
+            profile = [(b + t) / scalar(2) for b, t in zip(owner.bottom_points, owner.top_points)]
+            distance = _finite_midpoint(owner.start_distance, owner.end_distance)
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            centroid_2d = sum(profile[1:], profile[0]) / scalar(len(profile))
+        else:
+            p1 = profile[self.key]
+            p2 = profile[(self.key + 1) % len(profile)]
+            centroid_2d = (p1 + p2) / scalar(2)
+        local = Matrix([centroid_2d[0], centroid_2d[1], distance])
+        return CSGFeatureExtent(
+            anchor=owner.transform.position + safe_transform_vector(orientation, local),
+            aabb=owner.get_aabb(),
+        )
 
     def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
@@ -399,11 +660,6 @@ class FeatureHit:
 class CutCSG(ABC):
     """Base class for all CSG operations."""
     label: Optional[str] = field(default=None, kw_only=True)
-    # Features this node names on its own boundary. Private: read it through
-    # get_declared_features(), query it through get_all_features(). Declared
-    # once here rather than on each primitive, so a compound node can name
-    # features of its own if it ever needs to.
-    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
 
     @abstractmethod
     def __repr__(self) -> str:
@@ -411,32 +667,82 @@ class CutCSG(ABC):
         pass
 
     def get_declared_features(self) -> List[CSGFeature]:
-        """Features this node names, whether or not any point lies on them."""
-        return list(self._features or ())
+        """Features this node names on its own boundary, whether or not any
+        point lies on them.
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
+        Empty by default, and it stays empty for the compound nodes: a
+        SolidUnion, Difference or Intersection has no surface of its own to
+        name, only the surfaces its children contribute. Each primitive
+        declares a private `_features` and overrides this to expose it.
+        """
+        return []
+
+    def get_all_features(
+        self,
+        point: V3,
+        eps: Optional[Numeric] = None,
+        snap_eps: Optional[Numeric] = None,
+    ) -> List['FeatureHit']:
         """Every feature of this node that *point* lies on.
 
         One implementation for every primitive: the boundary test is the
         primitive's own, and each feature decides for itself whether the point
         is on it. Compound nodes override this to gather from their children.
-        """
-        if not self._features:
-            return []
-        if not self.is_point_on_boundary(point, eps=eps):
-            return []
-        return [
-            FeatureHit(feature=f, owner=self)
-            for f in self._features
-            if f.test_point(self, point, eps=eps)
-        ]
 
-    def find_feature(self, point: V3, eps: Optional[Numeric] = None) -> Optional['FeatureHit']:
-        """The highest-priority feature at *point*, or None."""
-        hits = self.get_all_features(point, eps=eps)
+        Real and non-real features are tested differently, which is the whole
+        reason `real` exists:
+
+        - A real feature names actual surface, so the point has to be on this
+          node's boundary at all before any of them can claim it.
+        - A non-real feature (a bore's centre axis, a reference plane) names
+          nothing the CSG tree ever cut, so boolean operations cannot have
+          removed it and the boundary gate does not apply.
+
+        *snap_eps* is the tolerance for non-real features, defaulting to *eps*.
+        It usually wants to be considerably larger: you cannot click exactly on
+        a line, so selecting one means snapping to it, the same way any CAD
+        package does. Callers driving this from a raycast should derive it from
+        screen space, or an axis is unhittable zoomed out and greedy zoomed in.
+        """
+        declared = self.get_declared_features()
+        if not declared:
+            return []
+        real_features = [f for f in declared if f.real]
+        unreal_features = [f for f in declared if not f.real]
+
+        hits: List['FeatureHit'] = []
+        if unreal_features:
+            snap = eps if snap_eps is None else snap_eps
+            hits.extend(
+                FeatureHit(feature=f, owner=self)
+                for f in unreal_features
+                if f.test_point(self, point, eps=snap)
+            )
+        if real_features and self.is_point_on_boundary(point, eps=eps):
+            hits.extend(
+                FeatureHit(feature=f, owner=self)
+                for f in real_features
+                if f.test_point(self, point, eps=eps)
+            )
+        return hits
+
+    def find_feature(
+        self,
+        point: V3,
+        eps: Optional[Numeric] = None,
+        snap_eps: Optional[Numeric] = None,
+    ) -> Optional['FeatureHit']:
+        """The best feature at *point*, or None.
+
+        Non-real features win outright over real ones. They are lines and
+        points inside or alongside the solid, so anything selecting one has
+        deliberately snapped to it, and a surface it happens to sit on should
+        not steal the click. Priority breaks ties within each of the two.
+        """
+        hits = self.get_all_features(point, eps=eps, snap_eps=snap_eps)
         if not hits:
             return None
-        hits.sort(key=lambda hit: hit.feature.priority)
+        hits.sort(key=lambda hit: (hit.feature.real, hit.feature.priority))
         return hits[0]
 
 
@@ -539,6 +845,12 @@ class HalfSpace(CutCSG):
     """
     normal: Direction3D
     offset: Numeric = scalar(0)
+    # Features this primitive names on its own boundary. Private: read it
+    # through get_declared_features(), query it through get_all_features().
+    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
+
+    def get_declared_features(self) -> List[CSGFeature]:
+        return list(self._features or ())
 
     def __repr__(self) -> str:
         return f"HalfSpace(normal={self.normal.T}, offset={self.offset})"
@@ -628,6 +940,13 @@ class RectangularPrism(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None  # starting distance of the prism in the direction of the +Z axis. None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # ending distance of the prism in the direction of the +Z axis. None means infinite in positive direction
+
+    # Features this primitive names on its own boundary. Private: read it
+    # through get_declared_features(), query it through get_all_features().
+    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
+
+    def get_declared_features(self) -> List[CSGFeature]:
+        return list(self._features or ())
 
     def get_bottom_position(self) -> V3:
         """
@@ -938,6 +1257,13 @@ class Cylinder(CutCSG):
     start_distance: Optional[Numeric] = None  # None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # None means infinite in positive direction
 
+    # Features this primitive names on its own boundary. Private: read it
+    # through get_declared_features(), query it through get_all_features().
+    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
+
+    def get_declared_features(self) -> List[CSGFeature]:
+        return list(self._features or ())
+
     def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
         """Distance along the axis from `position`, and distance from the axis."""
         local_point = point - self.position
@@ -1197,10 +1523,11 @@ class SolidUnion(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
-        hits = list(super().get_all_features(point, eps=eps))
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None,
+                         snap_eps: Optional[Numeric] = None) -> List['FeatureHit']:
+        hits: List['FeatureHit'] = []
         for child in self.children:
-            hits.extend(child.get_all_features(point, eps=eps))
+            hits.extend(child.get_all_features(point, eps=eps, snap_eps=snap_eps))
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -1280,12 +1607,12 @@ class Intersection(CutCSG):
 
         return None
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
-        if not self.is_point_on_boundary(point, eps=eps):
-            return []
-        hits = list(super().get_all_features(point, eps=eps))
-        hits.extend(self.left.get_all_features(point, eps=eps))
-        hits.extend(self.right.get_all_features(point, eps=eps))
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None,
+                         snap_eps: Optional[Numeric] = None) -> List['FeatureHit']:
+        hits: List['FeatureHit'] = []
+        hits.extend(self.left.get_all_features(point, eps=eps, snap_eps=snap_eps))
+        hits.extend(self.right.get_all_features(point, eps=eps, snap_eps=snap_eps))
+        hits = _drop_real_hits_off_boundary(self, hits, point, eps)
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -1477,14 +1804,14 @@ class Difference(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None) -> List['FeatureHit']:
-        if not self.is_point_on_boundary(point, eps=eps):
-            return []
+    def get_all_features(self, point: V3, eps: Optional[Numeric] = None,
+                         snap_eps: Optional[Numeric] = None) -> List['FeatureHit']:
         # Both the base and the subtracted solids contribute surface here.
-        hits = list(super().get_all_features(point, eps=eps))
-        hits.extend(self.base.get_all_features(point, eps=eps))
+        hits: List['FeatureHit'] = []
+        hits.extend(self.base.get_all_features(point, eps=eps, snap_eps=snap_eps))
         for sub_csg in self.subtract:
-            hits.extend(sub_csg.get_all_features(point, eps=eps))
+            hits.extend(sub_csg.get_all_features(point, eps=eps, snap_eps=snap_eps))
+        hits = _drop_real_hits_off_boundary(self, hits, point, eps)
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -1500,6 +1827,63 @@ class Difference(CutCSG):
 # TODO come upw ith a cuter/better name for these
 Profile = List[V2]
 Profiles = List[Profile]
+
+def crop_line_to_csg(
+    line: Line,
+    solid: CutCSG,
+    search_extent: Numeric,
+    samples: int = 256,
+    eps: Optional[Numeric] = None,
+) -> Optional[Tuple[V3, V3]]:
+    """Clip an infinite *line* to the span of it that lies inside *solid*.
+
+    Non-real features are unbounded by construction -- a bore's centre axis is
+    an infinite line -- but drawing one has to stop somewhere, and the sensible
+    somewhere is where it enters and leaves the timber. Note that this is the
+    timber's UNCUT body: a bore is a void, so clipping the axis to the cut
+    result would return nothing at all.
+
+    Returns (entry, exit) in the same space as *line* and *solid*, or None if
+    the line misses the solid entirely.
+
+    Deliberately a free function rather than a method on the feature: the
+    relevant solid is the enclosing timber, which a feature's owner (the bore
+    primitive) knows nothing about. The caller supplies it.
+
+    The span is found by sampling *samples* points across +/-*search_extent*
+    about the line's origin and bisecting the two crossings. That is enough for
+    the convex, axis-aligned cases this exists for; a line that enters and
+    leaves a concave solid more than once reports only the outermost span.
+    """
+    direction = safe_normalize_vector(line.direction)
+
+    def at(t: Numeric) -> V3:
+        return line.point + direction * t
+
+    step = (search_extent * scalar(2)) / scalar(samples)
+    inside_ts = []
+    for i in range(samples + 1):
+        t = -search_extent + step * scalar(i)
+        if solid.contains_point(at(t), eps=eps):
+            inside_ts.append(t)
+    if not inside_ts:
+        return None
+
+    def refine(outside: Numeric, inside: Numeric) -> Numeric:
+        """Bisect toward the boundary between a known outside and inside t."""
+        for _ in range(40):
+            middle = (outside + inside) / scalar(2)
+            if solid.contains_point(at(middle), eps=eps):
+                inside = middle
+            else:
+                outside = middle
+        return inside
+
+    first, last = inside_ts[0], inside_ts[-1]
+    entry_t = first if safe_compare(first, -search_extent, Comparison.LE) else refine(first - step, first)
+    exit_t = last if safe_compare(last, search_extent, Comparison.GE) else refine(last + step, last)
+    return at(entry_t), at(exit_t)
+
 
 def translate_profile(profile: Profile, translation: V2) -> Profile:
     """
@@ -1539,6 +1923,13 @@ class ConvexPolygonExtrusion(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None  # starting distance in the direction of the -Z axis. None means infinite in negative direction
     end_distance: Optional[Numeric] = None    # ending distance in the direction of the +Z axis. None means infinite in positive direction
+
+    # Features this primitive names on its own boundary. Private: read it
+    # through get_declared_features(), query it through get_all_features().
+    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
+
+    def get_declared_features(self) -> List[CSGFeature]:
+        return list(self._features or ())
 
     def get_bottom_position(self) -> V3:
         """
@@ -1906,6 +2297,13 @@ class ConvexPolygonSimpleLoft(CutCSG):
     start_distance: Numeric
     end_distance: Numeric
     transform: Transform = field(default_factory=Transform.identity)
+
+    # Features this primitive names on its own boundary. Private: read it
+    # through get_declared_features(), query it through get_all_features().
+    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
+
+    def get_declared_features(self) -> List[CSGFeature]:
+        return list(self._features or ())
 
     def get_bottom_position(self) -> V3:
         """Get the position of the bottom of the loft (at start_distance)."""

@@ -6,6 +6,7 @@ This module contains tests for the CSG primitives and operations.
 
 import pytest
 from kumiki.rule import Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test, safe_compare, Comparison
+from kumiki.geometry import Line, Plane, Point
 from kumiki.cutcsg import (
     HalfSpace,
     RectangularPrism,
@@ -19,10 +20,14 @@ from kumiki.cutcsg import (
     EmptyCSG,
     PrismFace,
     CSGFeature,
+    CSGFeatureExtent,
+    crop_line_to_csg,
+    _squared_eps,
     CSGFeatureType,
     FeatureProperties,
     ProgrammableCSGFeature,
     HalfSpaceFeature,
+    SimpleConvexPolygonExtrusionFeature,
     SimpleCylinderFeature,
     SimpleLoftFeature,
     SimpleRectangularPrismFeature,
@@ -3116,3 +3121,339 @@ class TestCSGFeatureType:
         assert feature.feature_type() == CSGFeatureType.FACE
         assert feature.group == FeatureGroup.B1
         assert feature.real is False
+
+
+class TestFeatureLocate:
+    """locate() gives the unbounded geometry a measurement is computed on."""
+
+    def _prism(self, **kwargs):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            **kwargs,
+        )
+
+    def test_a_prism_face_locates_as_an_outward_plane(self):
+        face = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT)
+        prism = self._prism(_features=[face])
+        plane = face.locate(prism)
+        assert isinstance(plane, Plane)
+        # +X outward, anchored at the centre of that face
+        assert float(plane.normal[0]) == pytest.approx(1.0)
+        assert float(plane.point[0]) == pytest.approx(2.0)
+        assert float(plane.point[2]) == pytest.approx(5.0)
+
+    def test_opposite_faces_locate_with_opposite_normals(self):
+        prism = self._prism()
+        right = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).locate(prism)
+        left = SimpleRectangularPrismFeature("l", face=PrismFace.LEFT).locate(prism)
+        assert isinstance(right, Plane) and isinstance(left, Plane)
+        assert float(right.normal[0]) == pytest.approx(-float(left.normal[0]))
+        assert float(right.point[0]) == pytest.approx(2.0)
+        assert float(left.point[0]) == pytest.approx(-2.0)
+
+    def test_end_faces_locate_along_the_length_axis(self):
+        prism = self._prism()
+        top = SimpleRectangularPrismFeature("t", face=PrismFace.TOP).locate(prism)
+        assert isinstance(top, Plane)
+        assert float(top.normal[2]) == pytest.approx(1.0)
+        assert float(top.point[2]) == pytest.approx(10.0)
+
+    def test_an_infinite_end_has_no_face_to_locate(self):
+        open_ended = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=None,
+        )
+        assert SimpleRectangularPrismFeature("t", face=PrismFace.TOP).locate(open_ended) is None
+
+    def test_a_half_space_locates_as_its_boundary_plane(self):
+        hs = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(5))
+        plane = HalfSpaceFeature("shoulder").locate(hs)
+        assert isinstance(plane, Plane)
+        assert float(plane.point[2]) == pytest.approx(5.0)
+        # outward = out of the solid, i.e. opposite the half-space normal
+        assert float(plane.normal[2]) == pytest.approx(-1.0)
+
+    def test_a_cylinder_cap_locates_but_the_barrel_declines(self):
+        bore = Cylinder(
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            radius=scalar(2),
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+        cap = SimpleCylinderFeature("top", part=CylinderPart.TOP).locate(bore)
+        assert isinstance(cap, Plane)
+        assert float(cap.point[2]) == pytest.approx(10.0)
+        # A curved surface has no single plane; declining beats inventing one.
+        assert SimpleCylinderFeature("wall", part=CylinderPart.BARREL).locate(bore) is None
+
+    def test_an_extrusion_side_locates_with_an_outward_normal(self):
+        extrusion = ConvexPolygonExtrusion(
+            points=[
+                Matrix([scalar(0), scalar(0)]),
+                Matrix([scalar(4), scalar(0)]),
+                Matrix([scalar(4), scalar(4)]),
+                Matrix([scalar(0), scalar(4)]),
+            ],
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+        # side 1 runs (4,0) -> (4,4), so it faces +X
+        plane = SimpleConvexPolygonExtrusionFeature("east", key=1).locate(extrusion)
+        assert isinstance(plane, Plane)
+        assert float(plane.normal[0]) == pytest.approx(1.0)
+        assert float(plane.point[0]) == pytest.approx(4.0)
+
+    def test_a_lofted_side_declines_but_its_caps_do_not(self):
+        taper = ConvexPolygonSimpleLoft(
+            bottom_points=[Matrix([scalar(-2), scalar(-2)]), Matrix([scalar(2), scalar(-2)]),
+                           Matrix([scalar(2), scalar(2)]), Matrix([scalar(-2), scalar(2)])],
+            top_points=[Matrix([scalar(-1), scalar(-1)]), Matrix([scalar(1), scalar(-1)]),
+                        Matrix([scalar(1), scalar(1)]), Matrix([scalar(-1), scalar(1)])],
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            transform=Transform.identity(),
+        )
+        assert SimpleLoftFeature("side", key=0).locate(taper) is None
+        cap = SimpleLoftFeature("wide", key=ExtrusionCap.BOTTOM).locate(taper)
+        assert isinstance(cap, Plane)
+        assert float(cap.normal[2]) == pytest.approx(-1.0)
+
+    def test_a_feature_asked_about_the_wrong_owner_declines(self):
+        prism = self._prism()
+        assert SimpleCylinderFeature("w", part=CylinderPart.TOP).locate(prism) is None
+
+
+class TestFeatureExtent:
+    """get_extent() says where to draw an annotation, not what to measure."""
+
+    def _prism(self):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+
+    def test_a_prism_face_anchors_at_its_centre(self):
+        prism = self._prism()
+        extent = SimpleRectangularPrismFeature("r", face=PrismFace.RIGHT).get_extent(prism)
+        assert extent is not None
+        assert float(extent.anchor[0]) == pytest.approx(2.0)
+        assert float(extent.anchor[1]) == pytest.approx(0.0)
+        assert float(extent.anchor[2]) == pytest.approx(5.0)
+        assert extent.aabb is not None
+
+    def test_a_half_space_has_no_extent(self):
+        """Its plane is unbounded, so there is no honest box or midpoint."""
+        hs = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(5))
+        assert HalfSpaceFeature("shoulder").get_extent(hs) is None
+
+    def test_a_cylinder_barrel_still_has_an_anchor(self):
+        """No plane to locate, but a dimension line still needs somewhere to attach."""
+        bore = Cylinder(
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            radius=scalar(2),
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+        extent = SimpleCylinderFeature("wall", part=CylinderPart.BARREL).get_extent(bore)
+        assert extent is not None
+        assert float(extent.anchor[2]) == pytest.approx(5.0)
+
+
+class TestNonRealFeatures:
+    """real=False features name nothing the CSG tree could have cut away."""
+
+    def _bore_in_a_timber(self, axis_feature):
+        body = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[SimpleRectangularPrismFeature("rough.right", face=PrismFace.RIGHT)],
+        )
+        bore = Cylinder(
+            axis_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+            radius=scalar(1),
+            position=create_v3(scalar(0), scalar(0), scalar(5)),
+            start_distance=scalar(-5),
+            end_distance=scalar(5),
+            _features=[axis_feature],
+        )
+        return Difference(base=body, subtract=[bore])
+
+    def _axis_feature(self):
+        """A bore's centre axis: real geometry nowhere, selectable anyway."""
+        return ProgrammableCSGFeature(
+            "peg_axis",
+            declared_type=CSGFeatureType.EDGE,
+            properties=FeatureProperties(real=False),
+            predicate=lambda owner, point, eps: safe_zero_test(
+                float(point[1]) ** 2 + (float(point[2]) - 5.0) ** 2, eps=_squared_eps(eps)),
+        )
+
+    def test_a_non_real_feature_is_found_inside_the_void(self):
+        """The point is in the hole -- on no surface at all -- and still hits."""
+        solid = self._bore_in_a_timber(self._axis_feature())
+        on_axis = create_v3(scalar(0), scalar(0), scalar(5))
+        assert not solid.is_point_on_boundary(on_axis)
+        hit = solid.find_feature(on_axis, 1e-6)
+        assert hit is not None and hit.name == "peg_axis"
+
+    def test_a_real_feature_off_the_boundary_is_still_dropped(self):
+        """The exemption is for non-real features only, not a blanket bypass."""
+        solid = self._bore_in_a_timber(self._axis_feature())
+        # Inside the solid, off the axis: no surface here, and no axis either.
+        interior = create_v3(scalar(0), scalar(2), scalar(2))
+        assert solid.find_feature(interior, 1e-6) is None
+
+    def test_a_non_real_feature_outranks_a_real_one_at_the_same_point(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[
+                SimpleRectangularPrismFeature("the_face", face=PrismFace.RIGHT,
+                                              properties=FeatureProperties(priority=0)),
+                ProgrammableCSGFeature("the_axis",
+                                       properties=FeatureProperties(real=False, priority=99),
+                                       predicate=lambda owner, point, eps: True),
+            ],
+        )
+        on_face = create_v3(scalar(2), scalar(0), scalar(5))
+        assert {h.name for h in prism.get_all_features(on_face)} == {"the_face", "the_axis"}
+        # ... and the non-real one wins despite the far worse priority
+        best = prism.find_feature(on_face)
+        assert best is not None and best.name == "the_axis"
+
+    def test_snap_eps_widens_only_the_non_real_test(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[
+                ProgrammableCSGFeature(
+                    "centre_line",
+                    properties=FeatureProperties(real=False),
+                    predicate=lambda owner, point, eps: safe_zero_test(
+                        float(point[0]) ** 2 + float(point[1]) ** 2, eps=_squared_eps(eps)),
+                ),
+            ],
+        )
+        near_axis = create_v3(scalar(1, 100), scalar(0), scalar(5))
+        assert prism.find_feature(near_axis) is None
+        assert prism.find_feature(near_axis, snap_eps=scalar(1, 10)) is not None
+
+
+class TestCropLineToCSG:
+    """Non-real geometry is unbounded; drawing it means clipping it to the body."""
+
+    def _prism(self):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+
+    def test_it_clips_to_where_the_line_enters_and_leaves(self):
+        across = Line(direction=create_v3(scalar(1), scalar(0), scalar(0)),
+                      point=create_v3(scalar(0), scalar(0), scalar(5)))
+        span = crop_line_to_csg(across, self._prism(), search_extent=scalar(50))
+        assert span is not None
+        entry, exit_ = span
+        assert float(entry[0]) == pytest.approx(-2.0, abs=1e-6)
+        assert float(exit_[0]) == pytest.approx(2.0, abs=1e-6)
+
+    def test_it_clips_along_the_length_axis(self):
+        along = Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                     point=create_v3(scalar(0), scalar(0), scalar(5)))
+        span = crop_line_to_csg(along, self._prism(), search_extent=scalar(50))
+        assert span is not None
+        assert float(span[0][2]) == pytest.approx(0.0, abs=1e-6)
+        assert float(span[1][2]) == pytest.approx(10.0, abs=1e-6)
+
+    def test_a_line_that_misses_returns_none(self):
+        miss = Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                    point=create_v3(scalar(99), scalar(0), scalar(0)))
+        assert crop_line_to_csg(miss, self._prism(), search_extent=scalar(50)) is None
+
+    def test_it_clips_to_the_uncut_body_not_the_cut_result(self):
+        """A bore is a void: clipping its axis to the cut solid finds nothing."""
+        body = self._prism()
+        bore = Cylinder(
+            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+            radius=scalar(1),
+            position=create_v3(scalar(0), scalar(0), scalar(0)),
+            start_distance=scalar(-1),
+            end_distance=scalar(11),
+        )
+        axis = Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                    point=create_v3(scalar(0), scalar(0), scalar(5)))
+        assert crop_line_to_csg(axis, Difference(base=body, subtract=[bore]),
+                                search_extent=scalar(50)) is None
+        span = crop_line_to_csg(axis, body, search_extent=scalar(50))
+        assert span is not None
+        assert float(span[1][2]) == pytest.approx(10.0, abs=1e-6)
+
+
+class TestCompoundNodesOwnNoFeatures:
+    """A SolidUnion, Difference or Intersection has no surface of its own.
+
+    It only combines what its children name, so it has no `_features` field to
+    declare one in -- which makes the mistake a construction error rather than
+    something that half works until a query happens to land on it.
+    """
+
+    def _prism(self):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+
+    def _rogue_feature(self):
+        return ProgrammableCSGFeature("rogue", predicate=lambda owner, point, eps: True)
+
+    def test_a_union_cannot_be_given_features(self):
+        with pytest.raises(TypeError, match="_features"):
+            SolidUnion(children=[self._prism()], _features=[self._rogue_feature()])  # type: ignore[call-arg]
+
+    def test_a_difference_cannot_be_given_features(self):
+        with pytest.raises(TypeError, match="_features"):
+            Difference(base=self._prism(), subtract=[], _features=[self._rogue_feature()])  # type: ignore[call-arg]
+
+    def test_an_intersection_cannot_be_given_features(self):
+        with pytest.raises(TypeError, match="_features"):
+            Intersection(left=self._prism(), right=self._prism(),
+                         _features=[self._rogue_feature()])  # type: ignore[call-arg]
+
+    def test_compound_nodes_declare_nothing(self):
+        prism = self._prism()
+        assert SolidUnion(children=[prism]).get_declared_features() == []
+        assert Difference(base=prism, subtract=[]).get_declared_features() == []
+        assert Intersection(left=prism, right=prism).get_declared_features() == []
+
+    def test_compound_nodes_without_their_own_features_are_unaffected(self):
+        """The normal path: children's features still come through."""
+        named = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[SimpleRectangularPrismFeature("wall", face=PrismFace.RIGHT)],
+        )
+        union = SolidUnion(children=[named])
+        hits = union.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
+        assert [h.name for h in hits] == ["wall"]

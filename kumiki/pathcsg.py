@@ -23,11 +23,15 @@ from typing import List, Optional, Tuple
 from .rule import sqrt as sym_sqrt
 
 from .rule import *
+from .geometry import Plane
 from .cutcsg import (
     BoundingBox,
     CSGFeature,
+    CSGFeatureExtent,
     CSGFeatureType,
     CutCSG,
+    LocatedGeometry,
+    _finite_midpoint,
     ExtrusionCap,
     ExtrusionFeatureKey,
     FeatureHit,
@@ -837,6 +841,59 @@ class SimplePathExtrusionFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
+    def _midpoint_2d(self, owner: 'PathExtrusion') -> Optional[V2]:
+        """Centre of this face's footprint in the path's own 2D plane."""
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            low, high = owner.path.bounds()
+            return (low + high) / scalar(2)
+        segment = owner.path.segments[self.key]
+        return (segment.start + segment.end) / scalar(2)
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        if not isinstance(owner, PathExtrusion):
+            return None
+        orientation = owner.transform.orientation.matrix
+        length_dir = safe_transform_vector(orientation, Matrix([scalar(0), scalar(0), scalar(1)]))
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            distance = owner.end_distance if self.key == ExtrusionCap.TOP else owner.start_distance
+            if distance is None:
+                return None
+            sign = scalar(1) if self.key == ExtrusionCap.TOP else scalar(-1)
+            return Plane(normal=length_dir * sign, point=owner.transform.position + length_dir * distance)
+        # A side is planar only if its path segment is straight. An arc's wall
+        # is curved, so there is no plane to give -- the same graceful decline
+        # test_point already makes for curved segments.
+        segment = owner.path.segments[self.key]
+        if not segment.is_planar():
+            return None
+        midpoint_2d = self._midpoint_2d(owner)
+        if midpoint_2d is None:
+            return None
+        normal_2d = segment.outward_local_normal(midpoint_2d)
+        normal = safe_transform_vector(orientation, Matrix([normal_2d[0], normal_2d[1], scalar(0)]))
+        mid_length = _finite_midpoint(owner.start_distance, owner.end_distance)
+        local = Matrix([midpoint_2d[0], midpoint_2d[1], mid_length])
+        return Plane(normal=normal, point=owner.transform.position + safe_transform_vector(orientation, local))
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        if not isinstance(owner, PathExtrusion):
+            return None
+        midpoint_2d = self._midpoint_2d(owner)
+        if midpoint_2d is None:
+            return None
+        if self.key in (ExtrusionCap.TOP, ExtrusionCap.BOTTOM):
+            distance = owner.end_distance if self.key == ExtrusionCap.TOP else owner.start_distance
+            if distance is None:
+                return None
+        else:
+            distance = _finite_midpoint(owner.start_distance, owner.end_distance)
+        local = Matrix([midpoint_2d[0], midpoint_2d[1], distance])
+        orientation = owner.transform.orientation.matrix
+        return CSGFeatureExtent(
+            anchor=owner.transform.position + safe_transform_vector(orientation, local),
+            aabb=owner.get_aabb(),
+        )
+
     def test_point(self, owner: 'CutCSG', point: V3, eps: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, PathExtrusion):
             return False
@@ -867,6 +924,13 @@ class PathExtrusion(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None
     end_distance: Optional[Numeric] = None
+
+    # Features this primitive names on its own boundary. Private: read it
+    # through get_declared_features(), query it through get_all_features().
+    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
+
+    def get_declared_features(self) -> List[CSGFeature]:
+        return list(self._features or ())
 
     def __repr__(self) -> str:
         return (f"PathExtrusion({len(self.path.segments)} segments, "

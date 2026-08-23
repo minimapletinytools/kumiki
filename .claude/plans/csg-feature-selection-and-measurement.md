@@ -201,20 +201,29 @@ A feature holds no reference to its owner; the owner is an argument. That makes 
 constructible *before* the primitive it belongs to, which is what lets the primitive store
 it.
 
-`_features` lives on `CutCSG` itself (private, kw-only, beside `label`), so it is declared
-once rather than on six primitives, and a compound node can name features of its own if it
-ever needs to. `get_all_features` then has **one** implementation for every primitive:
+Each primitive declares its own private `_features` (kw-only) and overrides
+`get_declared_features()` to expose it. It deliberately does NOT live on `CutCSG`: a
+`SolidUnion`, `Difference` or `Intersection` has no surface of its own to name, only the
+surfaces its children contribute, so putting the field on the base would offer every
+compound node something meaningless. Keeping it off means giving one features is a
+construction-time `TypeError` rather than something that half works until a query happens
+to land on it.
+
+`CutCSG.get_declared_features()` returns empty by default, which is exactly right for the
+compound nodes, so `get_all_features` still has **one** implementation covering every
+primitive:
 
 ```python
 def get_all_features(self, point, eps=None):
-    if not self._features or not self.is_point_on_boundary(point, eps=eps):
+    declared = self.get_declared_features()
+    if not declared or not self.is_point_on_boundary(point, eps=eps):
         return []
     return [FeatureHit(feature=f, owner=self)
-            for f in self._features if f.test_point(self, point, eps=eps)]
+            for f in declared if f.test_point(self, point, eps=eps)]
 ```
 
 Compound nodes (`SolidUnion`, `Difference`, `Intersection`) override it to gather from
-their children *and* `super()`.
+their children.
 
 Queries return a `FeatureHit(feature, owner)` pair, since a feature alone does not know
 where it lives and step 4's `locate()` / `get_extent()` will need the owner. This is not
@@ -511,8 +520,7 @@ it from the CSG path — CSG selection goes to a separate `csgSelection` slot ho
    "Implementation notes".
 3. ~~**`NamedFeature` dataclass + reserved PTW/rough names.**~~ **DONE** -- see
    "Implementation notes".
-4. **Build out `CSGFeature`.** D4 and D5: `kind`, `real`, `locate()`, `get_extent()`,
-   non-real priority and cropping, snap tolerance.
+4. ~~**Build out `CSGFeature`.**~~ **DONE** -- see "Implementation notes".
 5. **Derive edges from face groups.** D3. A x B1 to start, with the parallel / coincident /
    unbounded guards and pair-derived naming.
 6. **Joint attribution + the CSG feature tree UI.** D7 plus feature 1's expandable tree with
@@ -531,7 +539,7 @@ path and a redundant one.
 
 ---
 
-## Implementation notes (steps 1-3)
+## Implementation notes (steps 1-4)
 
 ### Step 1 -- `tag` -> `label`
 
@@ -700,6 +708,75 @@ Recovered by reverting `cutcsg.py` / `pathcsg.py` to the step-2 commit and reapp
 redesign with anchor-based string replacement instead of line numbers -- cheap here only
 because everything step 3 had added to those two files was superseded by the redesign
 anyway. Delete by matching text, not by coordinates computed from a stale parse.
+
+
+### Step 4 -- locate, extent, and non-real features
+
+**Prerequisite: `kumiki/geometry.py`.** `locate()` returns `measuring.py`'s `Point` /
+`Line` / `Plane`, but `measuring` imports `timber` imports `cutcsg`, so cutcsg could not
+reach them. Those six primitives depend on nothing but `rule`, so they moved to a new
+`geometry.py` below the whole chain; `measuring.py` re-exports them, so every existing
+`from kumiki.measuring import Plane` still works.
+
+**`locate(owner)` (D4).** Returns the unbounded geometry the feature lies on, in the
+owner's (timber-local) space, or None. None is a real answer, not a gap: a cylinder's
+barrel, a lofted side, and an extrusion side following a curved path segment are all
+perfectly good features to select and highlight, but no single plane describes them, so
+measurement has to decline rather than invent one. The same graceful-decline
+`PathExtrusion.test_point` already made for curved segments.
+
+Loft sides decline even though a pure per-axis taper *is* planar -- detecting that case is
+worth doing when something actually needs to measure from a tapered side, and returning a
+plane that is right for some lofts and wrong for others is worse than declining.
+
+**`get_extent(owner)` (D4).** `CSGFeatureExtent(anchor, ends, aabb)`, analytic. Note it is
+answerable where `locate()` is not: a cylinder barrel has no plane but a dimension line
+still needs somewhere to attach, so it gets an anchor. A half-space is the reverse -- it
+locates as a plane but has no extent at all, since the plane is unbounded.
+
+The runner-side shortcut from D4 (deriving extents from the triangles
+`_extract_highlight_mesh` already walks) is NOT built yet. It is still the right way to get
+the extent of a face the CSG tree cropped; the analytic version describes the uncut
+primitive.
+
+**Non-real features (D5).** `get_all_features` now splits its work:
+
+- real features are gated on the point being on this node's boundary,
+- non-real features are not, because they name nothing a boolean could have removed.
+
+`find_feature` sorts by `(real, priority)`, so a non-real feature outranks a real one
+outright -- selecting a line inside a solid is a deliberate snap, and a surface it happens
+to sit on should not steal the click.
+
+`snap_eps` is a second, separate tolerance for the non-real tests, defaulting to `eps`. It
+wants to be much larger in practice: you cannot click exactly on a line.
+
+**A gating bug found while building it.** `Difference` and `Intersection` early-returned
+when the point was off their own boundary, which would have made non-real features
+unreachable in exactly their motivating case -- a bore's centre axis lies in the void the
+bore made, never on the cut solid's surface. Replaced with
+`_drop_real_hits_off_boundary()`: traverse once, then drop only the *real* hits if this
+node's surface does not survive at that point. Preserves the previous behaviour for real
+features exactly.
+
+**Where `_features` lives.** First put on `CutCSG` so it was declared once, with an assert
+in each compound `get_all_features` to catch the unsupported case. Moved onto the
+primitives instead: a compound node has no surface of its own to name, so offering it the
+field at all was the wrong shape, and the assert was a symptom. Now giving one features is
+a construction-time `TypeError` -- caught always, rather than only when a query lands on
+the feature -- and no assert is needed.
+
+**`crop_line_to_csg()` (D5).** Clips an infinite line to the span inside a solid, by
+sampling then bisecting the two crossings. Deliberately a free function, not a method:
+the relevant solid is the enclosing timber, and a feature's owner (the bore primitive)
+knows nothing about it, so the caller supplies it. Tested including the trap the plan
+called out -- clipping a bore axis to the *cut* solid finds nothing, because the bore is a
+void; it has to be the uncut body.
+
+**A bug `ty` caught that the tests did not.** `PathSegment.start` / `.end` are properties,
+and the new `locate()` called them as methods. No test covered path-extrusion `locate()`
+at the time, so it would have shipped. Fixed, and `TestPathExtrusionLocate` now covers
+straight sides, caps, curved-side decline, and extent.
 
 
 ### Follow-ups noticed while in there

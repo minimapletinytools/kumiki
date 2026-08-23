@@ -73,103 +73,18 @@ EdgeOrCenterline = Union[TimberEdge, TimberCenterline]
 # We may also refer to these as `Locations` 
 LocatedTimberFeature = Union['Point', 'Line', 'Plane', 'UnsignedPlane', 'HalfPlane', 'Space']
 
-@dataclass(frozen=True)
-class Point:
-    """
-    Represents a point in 3D space.
-    """
-    position: V3
+# The unbounded geometric primitives live in geometry.py so that cutcsg.py can
+# use them too (measuring -> timber -> cutcsg, so cutcsg cannot import from
+# here). Re-exported so `from kumiki.measuring import Plane` keeps working.
+from .geometry import (
+    HalfPlane,
+    Line,
+    Plane,
+    Point,
+    Space,
+    UnsignedPlane,
+)
 
-    def __repr__(self) -> str:
-        return f"Point(position={self.position})"
-
-
-@dataclass(frozen=True)
-class Line:
-    """
-    Represents an oriented line with origin in 3D space.
-    """
-    direction: Direction3D
-    point: V3
-
-    def __repr__(self) -> str:
-        return f"Line(direction={self.direction}, point={self.point})"
-
-
-@dataclass(frozen=True)
-class Plane:
-    """
-    Represents an oriented plane with origin in 3D space.
-    """
-    normal: Direction3D
-    point: V3
-
-    def __repr__(self) -> str:
-        return f"Plane(normal={self.normal}, point={self.point})"
-
-    @staticmethod
-    def from_transform_and_direction(transform: Transform, direction: Direction3D) -> 'Plane':
-        """
-        Create a plane from a transform and a direction.
-        
-        Args:
-            transform: Transform defining the position and orientation
-            direction: Direction in the transform's local coordinate system
-            
-        Returns:
-            Plane with normal in global coordinates and point at transform position
-        """
-        return Plane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
-
-@dataclass(frozen=True)
-class UnsignedPlane(Plane):
-    """
-    Same as Plane but the sign on the normal should be ignored.
-    """
-    normal: Direction3D
-    point: V3
-
-    def __repr__(self) -> str:
-        return f"UnsignedPlane(normal={self.normal}, point={self.point})"
-
-
-    @staticmethod
-    def from_transform_and_direction(transform: Transform, direction: Direction3D) -> 'UnsignedPlane':
-        """
-        Create an unsigned plane from a transform and a direction.
-        
-        Args:
-            transform: Transform defining the position and orientation
-            direction: Direction in the transform's local coordinate system
-            
-        Returns:
-            UnsignedPlane with normal in global coordinates and point at transform position
-        """
-        return UnsignedPlane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
-
-# TODO rename to LineOnPlane
-@dataclass(frozen=True)
-class HalfPlane:
-    """
-    Represents an oriented half-plane with origin in 3D space.
-    """
-    normal: Direction3D # this is the + direction of any measurements
-    point_on_line: V3
-    line_direction: Direction3D # MUST be perpendicular to the normal
-
-    def __repr__(self) -> str:
-        return f"HalfPlane(normal={self.normal}, point_on_line={self.point_on_line}, line_direction={self.line_direction})"
-
-
-@dataclass(frozen=True)
-class Space:
-    """
-    Represents an ORIENTED 3D space.
-    """
-    transform: Transform
-    
-    def __repr__(self) -> str:
-        return f"Space(transform={self.transform})"
 
 # ============================================================================
 # Marking Classes

@@ -7,6 +7,7 @@ import pytest
 
 from kumiki.rule import create_v2, create_v3, Transform, scalar, pi
 from kumiki.cutcsg import ExtrusionCap
+from kumiki.geometry import Plane
 from kumiki.pathcsg import (
     ArcSegment, LineSegment, FancyPath, Path, PathExtrusion,
     SimplePathExtrusionFeature,
@@ -269,3 +270,51 @@ class TestPathExtrusionTolerance:
         near_miss = create_v3(scalar(1, 10) + 1e-4, scalar(5, 100), scalar(5, 100))
         assert extrusion.is_point_on_boundary(near_miss, 5e-4)
         assert not extrusion.is_point_on_boundary(near_miss)
+
+
+class TestPathExtrusionLocate:
+    """locate() on a path extrusion, where planarity depends on the segment."""
+
+    def _square(self):
+        a = create_v2(scalar(0), scalar(0))
+        b = create_v2(scalar(1, 10), scalar(0))
+        c = create_v2(scalar(1, 10), scalar(1, 10))
+        d = create_v2(scalar(0), scalar(1, 10))
+        return FancyPath([LineSegment(a, b), LineSegment(b, c),
+                          LineSegment(c, d), LineSegment(d, a)])
+
+    def _extrusion(self, path):
+        return PathExtrusion(path=path, transform=Transform.identity(),
+                             start_distance=scalar(0), end_distance=scalar(1, 10))
+
+    def test_a_straight_side_locates_as_an_outward_plane(self):
+        extrusion = self._extrusion(self._square())
+        # segment 1 runs (0.1, 0) -> (0.1, 0.1), so it faces +X
+        plane = SimplePathExtrusionFeature("east", key=1).locate(extrusion)
+        assert isinstance(plane, Plane)
+        assert float(plane.normal[0]) == pytest.approx(1.0)
+        assert float(plane.point[0]) == pytest.approx(0.1)
+
+    def test_a_cap_locates_along_the_extrusion_axis(self):
+        extrusion = self._extrusion(self._square())
+        plane = SimplePathExtrusionFeature("top", key=ExtrusionCap.TOP).locate(extrusion)
+        assert isinstance(plane, Plane)
+        assert float(plane.normal[2]) == pytest.approx(1.0)
+        assert float(plane.point[2]) == pytest.approx(0.1)
+
+    def test_a_curved_side_declines(self):
+        """An arc wall has no plane, the same way test_point never matches it."""
+        radius = scalar(1, 20)
+        centre = create_v2(scalar(0), scalar(0))
+        circle = FancyPath(segments=[
+            ArcSegment(center=centre, radius=radius, start_angle=scalar(0), sweep_angle=pi),
+            ArcSegment(center=centre, radius=radius, start_angle=pi, sweep_angle=pi),
+        ])
+        assert SimplePathExtrusionFeature("wall", key=0).locate(self._extrusion(circle)) is None
+
+    def test_extent_anchors_on_the_face(self):
+        extrusion = self._extrusion(self._square())
+        extent = SimplePathExtrusionFeature("east", key=1).get_extent(extrusion)
+        assert extent is not None
+        assert float(extent.anchor[0]) == pytest.approx(0.1)
+        assert float(extent.anchor[2]) == pytest.approx(0.05)
