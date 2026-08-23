@@ -24,6 +24,7 @@ from kumiki.cutcsg import (
     crop_line_to_csg,
     _squared_eps,
     CSGFeatureType,
+    FeatureEpsilons,
     FeatureProperties,
     ProgrammableCSGFeature,
     HalfSpaceFeature,
@@ -2762,13 +2763,23 @@ class TestPointQueryTolerance:
         near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
         assert self._prism().is_point_on_boundary(near_miss, 5e-4)
 
-    def test_eps_finds_a_named_feature_a_near_miss_would_lose(self):
+    def test_the_default_feature_tolerance_is_picking_shaped(self):
+        """Feature queries exist for picking, so the default is generous.
+
+        A raycast hit lands on a mesh vertex, not the analytic surface; at
+        EPSILON_GENERIC almost none would register.
+        """
         prism = self._prism()
         near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
-        assert prism.find_feature(near_miss) is None
-        feature = prism.find_feature(near_miss, 5e-4)
-        assert feature is not None
-        assert feature.name == "my_right"
+        hit = prism.find_feature(near_miss)
+        assert hit is not None and hit.name == "my_right"
+
+    def test_exact_epsilons_are_available_for_analytic_work(self):
+        prism = self._prism()
+        near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
+        assert prism.find_feature(near_miss, FeatureEpsilons.exact()) is None
+        on_face = create_v3(scalar(2), scalar(0), scalar(5))
+        assert prism.find_feature(on_face, FeatureEpsilons.exact()) is not None
 
     def test_eps_does_not_persist_into_later_calls(self):
         """The tolerance is per-call, not sticky."""
@@ -3003,15 +3014,21 @@ class TestProgrammableCSGFeature:
         # Dead centre of the solid -- on no face at all.
         assert prism.find_feature(create_v3(scalar(0), scalar(0), scalar(5))) is None
 
-    def test_it_receives_the_query_tolerance(self):
+    def test_it_receives_the_tolerance_for_its_own_feature_type(self):
+        """Each feature is tested at the tolerance its type calls for."""
         recorded = []
-        spy = ProgrammableCSGFeature(
-            "spy",
-            predicate=lambda owner, point, eps: (recorded.append(eps), True)[1],
-        )
-        prism = self._prism(spy)
-        prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5)), 5e-4)
-        assert recorded == [5e-4]
+
+        def spy(name, feature_type):
+            return ProgrammableCSGFeature(
+                name,
+                declared_type=feature_type,
+                predicate=lambda owner, point, eps: (recorded.append((name, eps)), True)[1],
+            )
+
+        prism = self._prism(spy("f", CSGFeatureType.FACE), spy("e", CSGFeatureType.EDGE))
+        tolerances = FeatureEpsilons(face=scalar(1, 1000), edge=scalar(1, 100))
+        prism.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)), tolerances)
+        assert dict(recorded) == {"f": scalar(1, 1000), "e": scalar(1, 100)}
 
     def test_a_predicateless_feature_matches_nothing(self):
         prism = self._prism(ProgrammableCSGFeature("inert"))
@@ -3305,7 +3322,7 @@ class TestNonRealFeatures:
         solid = self._bore_in_a_timber(self._axis_feature())
         on_axis = create_v3(scalar(0), scalar(0), scalar(5))
         assert not solid.is_point_on_boundary(on_axis)
-        hit = solid.find_feature(on_axis, 1e-6)
+        hit = solid.find_feature(on_axis, FeatureEpsilons.uniform(scalar(1, 1000000)))
         assert hit is not None and hit.name == "peg_axis"
 
     def test_a_real_feature_off_the_boundary_is_still_dropped(self):
@@ -3313,7 +3330,7 @@ class TestNonRealFeatures:
         solid = self._bore_in_a_timber(self._axis_feature())
         # Inside the solid, off the axis: no surface here, and no axis either.
         interior = create_v3(scalar(0), scalar(2), scalar(2))
-        assert solid.find_feature(interior, 1e-6) is None
+        assert solid.find_feature(interior, FeatureEpsilons.uniform(scalar(1, 1000000))) is None
 
     def test_a_non_real_feature_outranks_a_real_one_at_the_same_point(self):
         prism = RectangularPrism(
@@ -3335,7 +3352,8 @@ class TestNonRealFeatures:
         best = prism.find_feature(on_face)
         assert best is not None and best.name == "the_axis"
 
-    def test_snap_eps_widens_only_the_non_real_test(self):
+    def test_the_edge_tolerance_is_what_widens_an_axis(self):
+        """A centre line is an EDGE, so the edge tolerance governs it."""
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
@@ -3344,6 +3362,7 @@ class TestNonRealFeatures:
             _features=[
                 ProgrammableCSGFeature(
                     "centre_line",
+                    declared_type=CSGFeatureType.EDGE,
                     properties=FeatureProperties(real=False),
                     predicate=lambda owner, point, eps: safe_zero_test(
                         float(point[0]) ** 2 + float(point[1]) ** 2, eps=_squared_eps(eps)),
@@ -3351,8 +3370,8 @@ class TestNonRealFeatures:
             ],
         )
         near_axis = create_v3(scalar(1, 100), scalar(0), scalar(5))
-        assert prism.find_feature(near_axis) is None
-        assert prism.find_feature(near_axis, snap_eps=scalar(1, 10)) is not None
+        assert prism.find_feature(near_axis, FeatureEpsilons(edge=scalar(1, 1000))) is None
+        assert prism.find_feature(near_axis, FeatureEpsilons(edge=scalar(1, 10))) is not None
 
 
 class TestCropLineToCSG:
@@ -3457,3 +3476,90 @@ class TestCompoundNodesOwnNoFeatures:
         union = SolidUnion(children=[named])
         hits = union.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
         assert [h.name for h in hits] == ["wall"]
+
+
+class TestDegeneracyGuardsIgnoreQueryTolerance:
+    """Whether an edge is zero-length is a property of the shape, not of the query.
+
+    Regression: the eps threading initially fed the query tolerance into the
+    degeneracy guards, which compare a SQUARED edge length. A pick tolerance of
+    5e-4 then declared any edge shorter than ~22mm to be zero-length, so real
+    faces of small parts silently stopped resolving. Caught only because the
+    default tolerance later moved from 1e-8 to a picking-shaped value.
+    """
+
+    def _small_extrusion(self):
+        """A 20mm square -- edge_length_sq is 4e-4, below a 5e-4 pick eps."""
+        side = scalar(2, 100)
+        return ConvexPolygonExtrusion(
+            points=[
+                Matrix([scalar(0), scalar(0)]),
+                Matrix([side, scalar(0)]),
+                Matrix([side, side]),
+                Matrix([scalar(0), side]),
+            ],
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(1, 10),
+            _features=[SimpleConvexPolygonExtrusionFeature("east", key=1)],
+        )
+
+    def test_a_small_face_still_resolves_at_the_default_tolerance(self):
+        extrusion = self._small_extrusion()
+        on_east = create_v3(scalar(2, 100), scalar(1, 100), scalar(5, 100))
+        hit = extrusion.find_feature(on_east)
+        assert hit is not None and hit.name == "east"
+
+    def test_a_small_face_resolves_at_a_deliberately_huge_tolerance(self):
+        """Even an absurd pick eps must not make the edge look degenerate."""
+        extrusion = self._small_extrusion()
+        on_east = create_v3(scalar(2, 100), scalar(1, 100), scalar(5, 100))
+        hit = extrusion.find_feature(on_east, FeatureEpsilons.uniform(scalar(1, 100)))
+        assert hit is not None and hit.name == "east"
+
+
+class TestFeatureEpsilonsScaling:
+    """Snap tolerances are a screen-space question, so they scale with zoom."""
+
+    def test_multiplying_scales_every_tolerance(self):
+        scaled = FeatureEpsilons(face=scalar(1), edge=scalar(2), point=scalar(4)) * scalar(3)
+        assert scaled.face == scalar(3)
+        assert scaled.edge == scalar(6)
+        assert scaled.point == scalar(12)
+
+    def test_it_multiplies_from_either_side(self):
+        base = FeatureEpsilons(face=scalar(1), edge=scalar(2), point=scalar(4))
+        assert (base * scalar(3)) == (scalar(3) * base)
+
+    def test_dividing_scales_down(self):
+        halved = FeatureEpsilons(face=scalar(1), edge=scalar(2), point=scalar(4)) / scalar(2)
+        assert halved.face == scalar(1, 2)
+        assert halved.point == scalar(2)
+
+    def test_scaling_leaves_the_original_alone(self):
+        base = FeatureEpsilons()
+        _ = base * scalar(10)
+        assert base == FeatureEpsilons()
+
+    def test_a_non_positive_factor_is_rejected(self):
+        """A zero or negative tolerance is nonsense, and silently so."""
+        base = FeatureEpsilons()
+        with pytest.raises(ValueError):
+            base * scalar(0)
+        with pytest.raises(ValueError):
+            base * scalar(-1)
+        with pytest.raises(ValueError):
+            base / scalar(0)
+
+    def test_scaling_actually_changes_what_resolves(self):
+        prism = RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+            _features=[SimpleRectangularPrismFeature("right", face=PrismFace.RIGHT)],
+        )
+        tight = FeatureEpsilons.uniform(scalar(1, 100000))
+        near_miss = create_v3(scalar(2) + 1e-4, scalar(0), scalar(5))
+        assert prism.find_feature(near_miss, tight) is None
+        assert prism.find_feature(near_miss, tight * scalar(1000)) is not None

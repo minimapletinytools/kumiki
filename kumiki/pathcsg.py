@@ -227,7 +227,11 @@ class LineSegment(PathSegment):
     def closest_point(self, point: V2, eps: Optional[Numeric] = None) -> V2:
         edge = self.line_end - self.line_start
         edge_len_sq = edge[0] ** 2 + edge[1] ** 2
-        if safe_zero_test(edge_len_sq, eps=eps):
+        # Whether the segment is degenerate is a property of the path, not of
+        # how close the caller clicked, so this deliberately does NOT take the
+        # query tolerance: a pick eps of 0.5mm would declare any segment
+        # shorter than ~22mm zero-length (the value being compared is squared).
+        if safe_zero_test(edge_len_sq):
             return self.line_start
 
         to_point = point - self.line_start

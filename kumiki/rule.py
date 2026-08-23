@@ -316,8 +316,12 @@ Direction3D = Matrix  # 3D direction vector - 3x1 Matrix
 # Epsilon constants for numerical comparisons
 # ============================================================================
 
-EPSILON_GENERIC = scalar('1e-8')  # Generic epsilon threshold for float comparisons
-EPSILON_FLOAT = 1e-10             # Epsilon for plain Python float comparisons (used in compare)
+# The single tolerance every approximate comparison in the library falls back
+# to. There used to be a second, tighter EPSILON_FLOAT (1e-10) used by the
+# safe_* comparisons while this one covered Matrix.equals and sqrt's
+# small-negative guard; two thresholds a hundred times apart, with no rule for
+# which applied where, was a trap rather than a feature.
+EPSILON_GENERIC = scalar('1e-8')
 
 
 # ============================================================================
@@ -549,12 +553,13 @@ def _apply_comparison(val: float, comp: Comparison, eps: Optional[float] = None)
     either side of 0 for the same geometrically-exact case, so a strict
     `val > 0`/`val < 0` here would flip the answer on noise alone.
 
-    *eps* defaults to EPSILON_FLOAT. Callers doing geometry against meshed
-    (rather than analytic) input pass a wider one -- see the ``eps`` parameter
-    threaded through cutcsg/pathcsg's point queries.
+    *eps* defaults to EPSILON_GENERIC. Callers doing geometry against meshed
+    (rather than analytic) input pass a wider one -- see cutcsg's
+    FeatureEpsilons and the ``eps`` parameter threaded through its point
+    queries.
     """
     if eps is None:
-        eps = EPSILON_FLOAT
+        eps = EPSILON_GENERIC
     if comp == Comparison.GT:
         return val > eps
     elif comp == Comparison.LT:
@@ -601,7 +606,7 @@ def giraffe_transform_vector(matrix: Matrix, vector: Matrix, collapse_mode=None)
 def giraffe_normalize_vector(vec: Matrix, collapse_mode=None) -> Matrix:
     """Normalize a vector."""
     norm = giraffe_norm(vec)
-    if norm < EPSILON_FLOAT:
+    if norm < EPSILON_GENERIC:
         return vec
     return vec / norm
 
@@ -883,12 +888,12 @@ def bu(numerator, denominator=1):
 # ============================================================================
 
 def safe_zero_test(value, eps: Optional[float] = None) -> bool:
-    """Test if a value is approximately zero, within *eps* (default EPSILON_FLOAT)."""
+    """Test if a value is approximately zero, within *eps* (default EPSILON_GENERIC)."""
     return safe_compare(value, 0, Comparison.EQ, eps=eps)
 
 
 def safe_equality_test(value, expected, eps: Optional[float] = None) -> bool:
-    """Test if two values are approximately equal, within *eps* (default EPSILON_FLOAT)."""
+    """Test if two values are approximately equal, within *eps* (default EPSILON_GENERIC)."""
     return safe_compare(value, expected, Comparison.EQ, eps=eps)
 
 

@@ -147,6 +147,10 @@ Every rule in user-facing feature 3 turns on telling these apart.
 
 ### D1 — Tolerance parameter on every point test (`cutcsg.py`, `pathcsg.py`)
 
+(Superseded in part: the feature *queries* now take a `FeatureEpsilons` struct rather than
+a bare `eps` — see "Feature epsilons" below. The lower-level point tests still take a plain
+`eps` as described here.)
+
 Thread an explicit epsilon through the whole test surface, defaulting to today's behaviour
 so existing callers do not shift:
 
@@ -777,6 +781,43 @@ void; it has to be the uncut body.
 and the new `locate()` called them as methods. No test covered path-extrusion `locate()`
 at the time, so it would have shipped. Fixed, and `TestPathExtrusionLocate` now covers
 straight sides, caps, curved-side decline, and extent.
+
+
+### Feature epsilons, and collapsing EPSILON_FLOAT
+
+**One tolerance constant.** `rule.py` had two: `EPSILON_FLOAT` (1e-10) behind the `safe_*`
+comparisons and `EPSILON_GENERIC` (1e-8) behind `Matrix.equals` and `sqrt`'s
+small-negative guard. Two thresholds a hundred times apart with no rule for which applied
+where is a trap, so `EPSILON_FLOAT` is gone and `EPSILON_GENERIC` is the single fallback.
+The whole suite passes at the looser value.
+
+**`FeatureEpsilons` (face / edge / point).** Replaces the `eps` + `snap_eps` pair on
+`get_all_features` / `find_feature`. Type is the better key than realness: a *real* derived
+edge is exactly as unclickable as a non-real centre axis, so the wider tolerance should
+follow the kind of geometry, not whether the CSG tree could have cut it. `real` still
+governs the boundary gate and the priority ordering; it no longer governs tolerance.
+
+Defaults are picking-shaped -- 0.5mm / 2mm / 4mm -- because picking is what feature
+queries exist for: a raycast hit lands on a vertex of the triangulated mesh, not on the
+analytic surface, and at `EPSILON_GENERIC` almost none would register.
+`FeatureEpsilons.exact()` gives the analytic tolerance for code that wants it, and
+`.uniform(eps)` one value for all three. `*` and `/` scale all three at once, because how
+much slack a snap needs is a screen-space question: a viewport holds one struct describing
+the tolerances at a reference zoom and scales it by world-units-per-pixel per query. A
+non-positive factor raises rather than producing a silently nonsensical tolerance. The boundary gate inside `get_all_features` uses
+`face`, being a surface question whatever kinds of feature hang off it.
+
+**A bug the looser default exposed.** The AST rewrite that threaded `eps` through the query
+closure also threaded it into seven *degeneracy* guards -- `safe_zero_test(edge_length_sq)`
+in the extrusion, loft and `LineSegment.closest_point`. Those compare a SQUARED length, so
+a pick tolerance of 5e-4 declared any edge shorter than ~22mm to be zero-length, and real
+faces of small parts silently stopped resolving. Whether an edge is degenerate is a
+property of the shape, not of how close the caller clicked, so those guards now take the
+default tolerance and never the query's. Regression test added with a deliberately tiny
+(20mm) profile.
+
+That is the second bug of exactly this shape -- squared quantity, linear tolerance -- after
+`_squared_eps` earlier. Worth watching for at any new `safe_zero_test` on a `*_sq` value.
 
 
 ### Follow-ups noticed while in there

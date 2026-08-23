@@ -117,6 +117,89 @@ class CSGFeatureType(Enum):
     POINT = 3
 
 
+# Default tolerances for deciding whether a point is on a feature. Units are
+# model units (metres), so these are 0.5mm / 2mm / 4mm.
+#
+# They are deliberately far looser than EPSILON_GENERIC, because feature
+# queries exist for picking: a raycast hit lands on a vertex of the
+# triangulated mesh, not on the analytic surface, and at 1e-8 almost none of
+# them would register. Code doing exact analytic work wants
+# FeatureEpsilons.exact() instead.
+FEATURE_FACE_EPSILON = scalar('5e-4')
+FEATURE_EDGE_EPSILON = scalar('2e-3')
+FEATURE_POINT_EPSILON = scalar('4e-3')
+
+
+@dataclass(frozen=True)
+class FeatureEpsilons:
+    """How close a point must be to count as on a feature, per feature type.
+
+    One tolerance does not fit all three, and the reason is about how features
+    get selected rather than about the geometry:
+
+    - a FACE you click directly, so the only slack needed is the gap between
+      the analytic surface and the triangulated mesh a raycast actually hits;
+    - an EDGE or a POINT you cannot click exactly at all. Selecting one means
+      snapping to it, the way any CAD package works, so they want considerably
+      more room -- and a caller driving this from a viewport usually wants to
+      derive theirs from screen space, or a line is unhittable zoomed out and
+      greedy zoomed in.
+
+    This replaces the earlier pair of `eps` / `snap_eps` parameters, which
+    keyed the wider tolerance off `real` instead. Type is the better key: a
+    real derived edge is just as unclickable as a non-real centre axis.
+    """
+    face: Numeric = FEATURE_FACE_EPSILON
+    edge: Numeric = FEATURE_EDGE_EPSILON
+    point: Numeric = FEATURE_POINT_EPSILON
+
+    def for_type(self, feature_type: 'CSGFeatureType') -> Numeric:
+        """The tolerance to test a feature of *feature_type* with."""
+        if feature_type == CSGFeatureType.EDGE:
+            return self.edge
+        if feature_type == CSGFeatureType.POINT:
+            return self.point
+        return self.face
+
+    def __mul__(self, factor: Numeric) -> 'FeatureEpsilons':
+        """Scale every tolerance by *factor*.
+
+        The reason this exists is camera zoom. Selecting an edge or a point is
+        a snap, and how much slack a snap needs is a screen-space question: a
+        fixed 2mm is a comfortable target zoomed in and an invisible one zoomed
+        out. A viewport can hold one FeatureEpsilons describing the tolerances
+        at some reference zoom and scale it by world-units-per-pixel per query.
+        """
+        if safe_compare(factor, 0, Comparison.LE):
+            raise ValueError(f"feature epsilons must scale by a positive factor, got {factor}")
+        return FeatureEpsilons(
+            face=self.face * factor,
+            edge=self.edge * factor,
+            point=self.point * factor,
+        )
+
+    def __rmul__(self, factor: Numeric) -> 'FeatureEpsilons':
+        return self.__mul__(factor)
+
+    def __truediv__(self, divisor: Numeric) -> 'FeatureEpsilons':
+        if safe_compare(divisor, 0, Comparison.LE):
+            raise ValueError(f"feature epsilons must divide by a positive factor, got {divisor}")
+        return self.__mul__(scalar(1) / divisor)
+
+    @staticmethod
+    def uniform(eps: Numeric) -> 'FeatureEpsilons':
+        """The same tolerance for every feature type."""
+        return FeatureEpsilons(face=eps, edge=eps, point=eps)
+
+    @staticmethod
+    def exact() -> 'FeatureEpsilons':
+        """Analytic tolerance, for geometry that was never triangulated."""
+        return FeatureEpsilons.uniform(EPSILON_GENERIC)
+
+
+DEFAULT_FEATURE_EPSILONS = FeatureEpsilons()
+
+
 class FeatureGroup(Enum):
     """Which other features a feature is allowed to form an edge with.
 
@@ -175,7 +258,7 @@ def _drop_real_hits_off_boundary(
     node: 'CutCSG',
     hits: List['FeatureHit'],
     point: V3,
-    eps: Optional[Numeric],
+    epsilons: Optional['FeatureEpsilons'],
 ) -> List['FeatureHit']:
     """Keep only what can legitimately be claimed at *point* on *node*.
 
@@ -192,7 +275,8 @@ def _drop_real_hits_off_boundary(
         return hits
     if not any(hit.feature.real for hit in hits):
         return hits
-    if node.is_point_on_boundary(point, eps=eps):
+    tolerances = DEFAULT_FEATURE_EPSILONS if epsilons is None else epsilons
+    if node.is_point_on_boundary(point, eps=tolerances.face):
         return hits
     return [hit for hit in hits if not hit.feature.real]
 
@@ -680,8 +764,7 @@ class CutCSG(ABC):
     def get_all_features(
         self,
         point: V3,
-        eps: Optional[Numeric] = None,
-        snap_eps: Optional[Numeric] = None,
+        epsilons: Optional[FeatureEpsilons] = None,
     ) -> List['FeatureHit']:
         """Every feature of this node that *point* lies on.
 
@@ -689,7 +772,7 @@ class CutCSG(ABC):
         primitive's own, and each feature decides for itself whether the point
         is on it. Compound nodes override this to gather from their children.
 
-        Real and non-real features are tested differently, which is the whole
+        Real and non-real features are gated differently, which is the whole
         reason `real` exists:
 
         - A real feature names actual surface, so the point has to be on this
@@ -698,39 +781,35 @@ class CutCSG(ABC):
           nothing the CSG tree ever cut, so boolean operations cannot have
           removed it and the boundary gate does not apply.
 
-        *snap_eps* is the tolerance for non-real features, defaulting to *eps*.
-        It usually wants to be considerably larger: you cannot click exactly on
-        a line, so selecting one means snapping to it, the same way any CAD
-        package does. Callers driving this from a raycast should derive it from
-        screen space, or an axis is unhittable zoomed out and greedy zoomed in.
+        Tolerance, by contrast, comes from the feature's *type* rather than its
+        realness -- see FeatureEpsilons.
         """
         declared = self.get_declared_features()
         if not declared:
             return []
+        tolerances = DEFAULT_FEATURE_EPSILONS if epsilons is None else epsilons
         real_features = [f for f in declared if f.real]
         unreal_features = [f for f in declared if not f.real]
 
-        hits: List['FeatureHit'] = []
-        if unreal_features:
-            snap = eps if snap_eps is None else snap_eps
+        def claimed(feature: CSGFeature) -> bool:
+            return feature.test_point(
+                self, point, eps=tolerances.for_type(feature.feature_type()))
+
+        hits: List['FeatureHit'] = [
+            FeatureHit(feature=f, owner=self) for f in unreal_features if claimed(f)
+        ]
+        # The boundary gate is a surface question, so it uses the face tolerance
+        # whatever kinds of feature are hanging off it.
+        if real_features and self.is_point_on_boundary(point, eps=tolerances.face):
             hits.extend(
-                FeatureHit(feature=f, owner=self)
-                for f in unreal_features
-                if f.test_point(self, point, eps=snap)
-            )
-        if real_features and self.is_point_on_boundary(point, eps=eps):
-            hits.extend(
-                FeatureHit(feature=f, owner=self)
-                for f in real_features
-                if f.test_point(self, point, eps=eps)
+                FeatureHit(feature=f, owner=self) for f in real_features if claimed(f)
             )
         return hits
 
     def find_feature(
         self,
         point: V3,
-        eps: Optional[Numeric] = None,
-        snap_eps: Optional[Numeric] = None,
+        epsilons: Optional[FeatureEpsilons] = None,
     ) -> Optional['FeatureHit']:
         """The best feature at *point*, or None.
 
@@ -739,7 +818,7 @@ class CutCSG(ABC):
         deliberately snapped to it, and a surface it happens to sit on should
         not steal the click. Priority breaks ties within each of the two.
         """
-        hits = self.get_all_features(point, eps=eps, snap_eps=snap_eps)
+        hits = self.get_all_features(point, epsilons=epsilons)
         if not hits:
             return None
         hits.sort(key=lambda hit: (hit.feature.real, hit.feature.priority))
@@ -1523,11 +1602,11 @@ class SolidUnion(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None,
-                         snap_eps: Optional[Numeric] = None) -> List['FeatureHit']:
+    def get_all_features(self, point: V3,
+                         epsilons: Optional[FeatureEpsilons] = None) -> List['FeatureHit']:
         hits: List['FeatureHit'] = []
         for child in self.children:
-            hits.extend(child.get_all_features(point, eps=eps, snap_eps=snap_eps))
+            hits.extend(child.get_all_features(point, epsilons=epsilons))
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -1607,12 +1686,12 @@ class Intersection(CutCSG):
 
         return None
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None,
-                         snap_eps: Optional[Numeric] = None) -> List['FeatureHit']:
+    def get_all_features(self, point: V3,
+                         epsilons: Optional[FeatureEpsilons] = None) -> List['FeatureHit']:
         hits: List['FeatureHit'] = []
-        hits.extend(self.left.get_all_features(point, eps=eps, snap_eps=snap_eps))
-        hits.extend(self.right.get_all_features(point, eps=eps, snap_eps=snap_eps))
-        hits = _drop_real_hits_off_boundary(self, hits, point, eps)
+        hits.extend(self.left.get_all_features(point, epsilons=epsilons))
+        hits.extend(self.right.get_all_features(point, epsilons=epsilons))
+        hits = _drop_real_hits_off_boundary(self, hits, point, epsilons)
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -1804,14 +1883,14 @@ class Difference(CutCSG):
                 return None
             return avg_normal / norm
 
-    def get_all_features(self, point: V3, eps: Optional[Numeric] = None,
-                         snap_eps: Optional[Numeric] = None) -> List['FeatureHit']:
+    def get_all_features(self, point: V3,
+                         epsilons: Optional[FeatureEpsilons] = None) -> List['FeatureHit']:
         # Both the base and the subtracted solids contribute surface here.
         hits: List['FeatureHit'] = []
-        hits.extend(self.base.get_all_features(point, eps=eps, snap_eps=snap_eps))
+        hits.extend(self.base.get_all_features(point, epsilons=epsilons))
         for sub_csg in self.subtract:
-            hits.extend(sub_csg.get_all_features(point, eps=eps, snap_eps=snap_eps))
-        hits = _drop_real_hits_off_boundary(self, hits, point, eps)
+            hits.extend(sub_csg.get_all_features(point, epsilons=epsilons))
+        hits = _drop_real_hits_off_boundary(self, hits, point, epsilons)
         hits.sort(key=lambda hit: hit.feature.priority)
         return hits
 
@@ -2109,7 +2188,11 @@ class ConvexPolygonExtrusion(CutCSG):
             
             # If edge is zero-length, skip it
             edge_length_sq = edge[0]**2 + edge[1]**2
-            if safe_zero_test(edge_length_sq, eps=eps):
+            # Whether an edge is degenerate is a property of the polygon,
+            # not of how close the caller clicked, so this deliberately does
+            # NOT take the query tolerance: a pick eps of 0.5mm would declare
+            # any edge shorter than ~22mm zero-length (the value is squared).
+            if safe_zero_test(edge_length_sq):
                 continue
             
             # Project to_point onto edge
@@ -2171,7 +2254,11 @@ class ConvexPolygonExtrusion(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0]**2 + edge[1]**2
-            if safe_zero_test(edge_length_sq, eps=eps):
+            # Whether an edge is degenerate is a property of the polygon,
+            # not of how close the caller clicked, so this deliberately does
+            # NOT take the query tolerance: a pick eps of 0.5mm would declare
+            # any edge shorter than ~22mm zero-length (the value is squared).
+            if safe_zero_test(edge_length_sq):
                 continue
 
             t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
@@ -2220,7 +2307,11 @@ class ConvexPolygonExtrusion(CutCSG):
         edge = p2 - p1
         to_point = Matrix([x, y]) - p1
         edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-        if safe_zero_test(edge_length_sq, eps=eps):
+        # Whether an edge is degenerate is a property of the polygon,
+        # not of how close the caller clicked, so this deliberately does
+        # NOT take the query tolerance: a pick eps of 0.5mm would declare
+        # any edge shorter than ~22mm zero-length (the value is squared).
+        if safe_zero_test(edge_length_sq):
             return False
         t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
         if not (safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps)):
@@ -2391,7 +2482,11 @@ class ConvexPolygonSimpleLoft(CutCSG):
         edge = p2 - p1
         to_point = Matrix([x, y]) - p1
         edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-        if safe_zero_test(edge_length_sq, eps=_squared_eps(eps)):
+        # Whether an edge is degenerate is a property of the polygon,
+        # not of how close the caller clicked, so this deliberately does
+        # NOT take the query tolerance: a pick eps of 0.5mm would declare
+        # any edge shorter than ~22mm zero-length (the value is squared).
+        if safe_zero_test(edge_length_sq):
             return False
         t = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
         if not (safe_compare(t, 0, Comparison.GE, eps=eps) and safe_compare(t, 1, Comparison.LE, eps=eps)):
@@ -2469,7 +2564,11 @@ class ConvexPolygonSimpleLoft(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-            if safe_zero_test(edge_length_sq, eps=eps):
+            # Whether an edge is degenerate is a property of the polygon,
+            # not of how close the caller clicked, so this deliberately does
+            # NOT take the query tolerance: a pick eps of 0.5mm would declare
+            # any edge shorter than ~22mm zero-length (the value is squared).
+            if safe_zero_test(edge_length_sq):
                 continue
 
             u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
@@ -2520,7 +2619,11 @@ class ConvexPolygonSimpleLoft(CutCSG):
             to_point = point_2d - p1
 
             edge_length_sq = edge[0] ** 2 + edge[1] ** 2
-            if safe_zero_test(edge_length_sq, eps=eps):
+            # Whether an edge is degenerate is a property of the polygon,
+            # not of how close the caller clicked, so this deliberately does
+            # NOT take the query tolerance: a pick eps of 0.5mm would declare
+            # any edge shorter than ~22mm zero-length (the value is squared).
+            if safe_zero_test(edge_length_sq):
                 continue
 
             u = (to_point[0] * edge[0] + to_point[1] * edge[1]) / edge_length_sq
