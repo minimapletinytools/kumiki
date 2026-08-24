@@ -575,8 +575,8 @@ render_timber_with_cuts_csg_local()   Difference(body, [cut.get_negative_csg_loc
                                       subtract[i] <-> cut_timber.cuts[i], same order
 ```
 
-So the runner does it, and kumiki is untouched: `_joint_by_cutting_id(frame)` builds
-`{id(cutting): joint}`, and `_cutting_for_node(local_csg, cut_timber, target)` finds which
+So the runner does it: `_joint_by_cutting_id(cut_timber)` builds `{id(cutting): joint}`
+from `CutTimber.joints`, and `_cutting_for_node(local_csg, cut_timber, target)` finds which
 subtract subtree contains the picked node by identity. The one positional assumption --
 that subtract order matches cuts order -- is read in a single function, next to the single
 function that creates it, and is length-checked; everything else is identity-based.
@@ -584,8 +584,11 @@ function that creates it, and is length-checked; everything else is identity-bas
 `find_csg_at_point` returns `jointName`, or None for the timber's own body, which no joint
 produced.
 
-`Frame.source_joints` is Optional, so a frame built any other way yields an empty lookup:
-attribution is unavailable rather than wrong.
+The one change to kumiki is populating `CutTimber.joints`, which existed but was only ever
+initialised to `[]`. Reading that rather than `Frame.source_joints` keeps attribution local
+to the timber being picked -- no frame is threaded through, and a Frame assembled by any
+other route does not silently lose joint names. A `CutTimber` built by hand has no joints
+and so declines, which is the honest answer.
 
 ### D8 — Long center planes (`timber.py`, `measuring.py`)
 
@@ -1130,15 +1133,14 @@ coincident faces as a coplanarity relation, which is D9's reference work.
 
 ### Follow-ups noticed while in there
 
-- **`CutTimber.joints` is dead.** Initialised to `[]` at `timber.py:1818` and never
-  appended to by anything. Either populate it in `Frame.from_joints` / `CutTimber.from_joints`
-  -- which would make joint attribution local to the cut timber rather than needing
-  `Frame.source_joints` -- or delete it. Right now it is a field that looks like the
-  answer to "which joints touch this timber?" and silently is not.
-- **`Frame.source_joints` is `Optional`.** Joint attribution degrades to unavailable when
-  it is absent, which is handled, but it means a Frame built by any route other than
-  `from_joints` silently loses the ability to name joints. Worth deciding whether it should
-  be required, or whether populating `CutTimber.joints` (above) makes it unnecessary.
+- ~~**`CutTimber.joints` is dead.**~~ **FIXED.** Both `CutTimber.from_joints` and
+  `Frame.from_joints` now populate it, deduplicated by joint (a joint can hold more than
+  one cutting for the same timber) and in joint order.
+- ~~**`Frame.source_joints` is `Optional`.**~~ **MOOT.** Fixing the above removed the
+  dependency: `_joint_by_cutting_id` reads `CutTimber.joints`, so attribution is local to
+  the timber being picked and no frame is threaded through. A `CutTimber` built by hand
+  still declines rather than guessing, which is the honest answer -- built by hand, there
+  is no joint to name.
 
 - Some cuts produce a doubled path segment, e.g.
   `('sliding_dovetail', 'sliding_dovetail', 'dovetail_tongue_profile')`, because

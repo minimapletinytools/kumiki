@@ -2146,3 +2146,78 @@ class TestJointAssembly:
         step = solution.steps[0]
         assert step.ordering == Ordering(1, 0)
         assert step.movements[0].member_key == timber_a.ticket.kumiki_id
+
+
+class TestCutTimberJoints:
+    """CutTimber.joints -- which joints cut this timber.
+
+    The field existed for a long while but was only ever initialised to [],
+    never populated, so it looked like the answer to "which joints touch this
+    timber?" and silently was not. Joint attribution in the viewer reads it.
+    """
+
+    def _timber(self, name):
+        return create_axis_aligned_timber(
+            bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+            length=scalar(100),
+            size=create_v2(scalar(4), scalar(4)),
+            length_direction=TimberFace.TOP,
+            width_direction=TimberFace.RIGHT,
+            ticket=name,
+        )
+
+    def test_from_joints_records_the_joints_that_cut_the_timber(self):
+        timber = self._timber("A")
+        joint1 = Joint(cuttings={"a": Cutting(timber=timber)},
+                       ticket=JointTicket(path="joints/one"), jointAccessories={})
+        joint2 = Joint(cuttings={"a": Cutting(timber=timber)},
+                       ticket=JointTicket(path="joints/two"), jointAccessories={})
+
+        cut_timber = CutTimber.from_joints(timber, [joint1, joint2])
+        assert cut_timber.joints == [joint1, joint2]
+
+    def test_joints_that_do_not_touch_the_timber_are_excluded(self):
+        timber = self._timber("A")
+        other = self._timber("B")
+        mine = Joint(cuttings={"a": Cutting(timber=timber)},
+                     ticket=JointTicket(path="joints/mine"), jointAccessories={})
+        theirs = Joint(cuttings={"b": Cutting(timber=other)},
+                       ticket=JointTicket(path="joints/theirs"), jointAccessories={})
+
+        cut_timber = CutTimber.from_joints(timber, [mine, theirs])
+        assert cut_timber.joints == [mine]
+
+    def test_a_joint_cutting_the_timber_twice_is_listed_once(self):
+        """Deduplicated by joint, not counted per cutting."""
+        timber = self._timber("A")
+        joint = Joint(
+            cuttings={"a": Cutting(timber=timber), "b": Cutting(timber=timber)},
+            ticket=JointTicket(path="joints/one"),
+            jointAccessories={},
+        )
+        cut_timber = CutTimber.from_joints(timber, [joint])
+        assert cut_timber.joints == [joint]
+        assert len(cut_timber.cuts) == 2
+
+    def test_frame_from_joints_populates_it_too(self):
+        timber = self._timber("A")
+        joint = Joint(cuttings={"a": Cutting(timber=timber)},
+                      ticket=JointTicket(path="joints/one"), jointAccessories={})
+
+        frame = Frame.from_joints([joint])
+        assert len(frame.cut_timbers) == 1
+        assert frame.cut_timbers[0].joints == [joint]
+
+    def test_an_unjointed_timber_has_none(self):
+        jointed = self._timber("A")
+        unjointed = self._timber("B")
+        joint = Joint(cuttings={"a": Cutting(timber=jointed)},
+                      ticket=JointTicket(path="joints/one"), jointAccessories={})
+
+        frame = Frame.from_joints([joint], additional_unjointed_timbers=[unjointed])
+        by_name = {ct.timber.ticket.path: ct for ct in frame.cut_timbers}
+        assert by_name["B"].joints == []
+
+    def test_a_hand_built_cut_timber_has_none(self):
+        """No joints to name, which is the honest answer rather than a guess."""
+        assert CutTimber(self._timber("A"), cuts=[]).joints == []

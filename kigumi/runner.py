@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     # TYPE_CHECKING there is no runtime import at all, so annotations can be
     # concrete while every isinstance check still imports inside its function.
     from kumiki.cutcsg import CutCSG
-    from kumiki.timber import CutTimber, Cutting, Frame, Joint
+    from kumiki.timber import CutTimber, Cutting, Joint
 
 
 def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
@@ -1561,17 +1561,19 @@ def _subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
     return any(_subtree_contains(child, target) for child in csg_children(root))
 
 
-def _joint_by_cutting_id(frame: 'Frame') -> Dict[int, 'Joint']:
-    """{id(cutting): joint} across the whole frame.
+def _joint_by_cutting_id(cut_timber: 'CutTimber') -> Dict[int, 'Joint']:
+    """{id(cutting): joint} for the joints that cut this timber.
 
     A Joint already owns its cuttings, so the reverse link is derived here.
 
-    Empty when the frame has no source_joints (it is Optional, and a Frame
-    built any other way has none), in which case joint attribution is simply
-    unavailable rather than wrong.
+    Reads CutTimber.joints rather than Frame.source_joints, which keeps this
+    local to the timber being picked: no frame has to be threaded through, and
+    a Frame assembled by some route other than from_joints does not silently
+    lose the ability to name joints. Empty for a CutTimber built by hand,
+    where attribution is unavailable rather than wrong.
     """
     lookup: Dict[int, 'Joint'] = {}
-    for joint in getattr(frame, "source_joints", None) or ():
+    for joint in getattr(cut_timber, "joints", None) or ():
         for cutting in (getattr(joint, "cuttings", None) or {}).values():
             lookup[id(cutting)] = joint
     return lookup
@@ -1604,7 +1606,6 @@ def _cutting_for_node(
 
 
 def _joint_name_for_node(
-    frame: 'Frame',
     local_csg: 'CutCSG',
     cut_timber: 'CutTimber',
     target: 'CutCSG',
@@ -1613,7 +1614,7 @@ def _joint_name_for_node(
     cutting = _cutting_for_node(local_csg, cut_timber, target)
     if cutting is None:
         return None
-    joint = _joint_by_cutting_id(frame).get(id(cutting))
+    joint = _joint_by_cutting_id(cut_timber).get(id(cutting))
     if joint is None:
         return None
     ticket = getattr(joint, "ticket", None)
@@ -1995,7 +1996,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         "path": new_path,
         "featureLabel": feature_label,
         # None for the timber's own body, which no joint produced.
-        "jointName": _joint_name_for_node(ss.frame, local_csg, cut_timber, target_csg),
+        "jointName": _joint_name_for_node(local_csg, cut_timber, target_csg),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,

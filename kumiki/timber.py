@@ -1837,25 +1837,53 @@ def did_end_cuts_extend_timber(timber: PerfectTimberWithin, cuts: List['Cutting'
     return False
 
 
+def _joints_touching_timber(
+    joints: List['Joint'],
+    timber: PerfectTimberWithin,
+) -> List['Joint']:
+    """Those *joints* that cut *timber*, in order, each listed once.
+
+    A joint can hold more than one cutting for the same timber, so this
+    deduplicates by identity rather than counting cuttings.
+    """
+    touching: List['Joint'] = []
+    for joint in joints:
+        if not any(cutting.timber is timber for cutting in joint.cuttings.values()):
+            continue
+        if not any(seen is joint for seen in touching):
+            touching.append(joint)
+    return touching
+
+
 class CutTimber:
     """A timber with cuts applied to it."""
     
     # Declare members
     timber: PerfectTimberWithin
     cuts: List['Cutting']
-    joints: List  # List of joints this timber participates in
-    
-    def __init__(self, timber: PerfectTimberWithin, cuts: Optional[List['Cutting']] = None):
+    joints: List['Joint']
+
+    def __init__(
+        self,
+        timber: PerfectTimberWithin,
+        cuts: Optional[List['Cutting']] = None,
+        joints: Optional[List['Joint']] = None,
+    ):
         """
         Create a CutTimber from a Timber.
-        
+
         Args:
             timber: The timber to be cut
             cuts: List of cuts to apply (default: empty list)
+            joints: Joints this timber participates in (default: empty list).
+                Populated by the from_joints constructors. Anything asking
+                "which joint produced this cut?" reads it, so a CutTimber built
+                by hand simply cannot answer that -- which is the honest
+                outcome, since by hand there is no joint to name.
         """
         self.timber = timber
         self.cuts = cuts if cuts is not None else []
-        self.joints = []  # List of joints this timber participates in
+        self.joints = joints if joints is not None else []
 
     @property
     def name(self) -> str:
@@ -1891,7 +1919,8 @@ class CutTimber:
             for cutting in joint.cuttings.values()
             if cutting.timber is timber
         ]
-        return cls(timber, cuts=cuts)
+        contributing = _joints_touching_timber(joints, timber)
+        return cls(timber, cuts=cuts, joints=contributing)
 
     # this one returns the timber without cuts where ends with joints are infinite in length
     def _extended_timber_without_cuts_csg_local(self) -> CutCSG:
@@ -2708,12 +2737,16 @@ class Frame:
             all_cuts.extend(cutting_list)
             
             # Create a single merged CutTimber
-            merged_cut_timber = CutTimber(timber, cuts=all_cuts)
+            merged_cut_timber = CutTimber(
+                timber,
+                cuts=all_cuts,
+                joints=_joints_touching_timber(joints, timber),
+            )
             merged_cut_timbers.append(merged_cut_timber)
         
         # Add additional unjointed timbers as CutTimbers with no cuts
         for timber in additional_unjointed_timbers:
-            merged_cut_timbers.append(CutTimber(timber, cuts=[]))
+            merged_cut_timbers.append(CutTimber(timber, cuts=[], joints=[]))
         
         # Collect all accessories from all joints
         all_accessories: List[Accessory] = []

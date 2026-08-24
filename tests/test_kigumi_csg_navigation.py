@@ -416,8 +416,7 @@ class TestJointAttribution:
         assert tenon_point is not None, "no tenon face found to click on"
 
         target, _label = self._leaf_at(csg, tenon_point)
-        assert runner._joint_name_for_node(
-            named_joint_frame, csg, cut_timber, target) == "corner_a"
+        assert runner._joint_name_for_node(csg, cut_timber, target) == "corner_a"
 
     def test_the_timber_body_belongs_to_no_joint(self, named_joint_frame):
         """A rough face is the timber itself, not something a joint cut."""
@@ -427,12 +426,11 @@ class TestJointAttribution:
 
         target, label = self._leaf_at(csg, [half_width, 0.0, 0.3])
         assert label.startswith("rough.")
-        assert runner._joint_name_for_node(
-            named_joint_frame, csg, cut_timber, target) is None
+        assert runner._joint_name_for_node(csg, cut_timber, target) is None
 
-    def test_a_frame_without_source_joints_declines_rather_than_guesses(self):
-        """source_joints is Optional; attribution is unavailable, not wrong."""
-        from kumiki.timber import Frame as FrameType
+    def test_a_hand_built_cut_timber_declines_rather_than_guesses(self):
+        """Attribution comes from CutTimber.joints, which a hand-built one lacks."""
+        from kumiki.timber import CutTimber
 
         arrangement = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0))
         joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
@@ -442,14 +440,20 @@ class TestJointAttribution:
             tenon_length=inches(3),
             mortise_depth=inches(7, 2),
         )
-        full = Frame.from_joints([joint])
-        bare = FrameType(cut_timbers=full.cut_timbers)  # no source_joints
-        assert runner._joint_by_cutting_id(bare) == {}
+        jointed = _cut_timber_by_name(Frame.from_joints([joint]), "butt_timber")
+        by_hand = CutTimber(jointed.timber, cuts=list(jointed.cuts))
 
-        cut_timber = _cut_timber_by_name(bare, "butt_timber")
-        csg = cut_timber.render_timber_with_cuts_csg_local()
+        assert by_hand.joints == []
+        assert runner._joint_by_cutting_id(by_hand) == {}
+
+        csg = by_hand.render_timber_with_cuts_csg_local()
         target, _ = self._leaf_at(csg, [0.0, 0.0, 0.0])
-        assert runner._joint_name_for_node(bare, csg, cut_timber, target) is None
+        assert runner._joint_name_for_node(csg, by_hand, target) is None
+
+    def test_attribution_does_not_depend_on_the_frame(self, named_joint_frame):
+        """A cut timber can name its joints on its own, with no frame in hand."""
+        cut_timber = _cut_timber_by_name(named_joint_frame, "butt_timber")
+        assert [j.ticket.get_name() for j in cut_timber.joints] == ["corner_a"]
 
     def test_nothing_is_stored_on_the_cutting_or_the_csg(self):
         """The link stays derived -- guard against reintroducing a stored copy."""
