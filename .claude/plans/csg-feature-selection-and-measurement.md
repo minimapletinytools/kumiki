@@ -537,23 +537,41 @@ Viewer behaviour:
 - **Pinned, not designed:** showing PTW measurements while rendering the rough timber.
   Do not build toward it yet.
 
-### D7 — Joint attribution on CSG nodes (`timber.py`)
+### D7 — Joint attribution is derived, not stored (`kigumi/runner.py`)
 
-```python
-@dataclass(frozen=True)
-class Cutting:
-    ...
-    joint_ticket: Optional[JointTicket] = None
+An earlier version of this section put a `joint_ticket` on `Cutting`, stamped by
+`Joint.__post_init__`, and carried it onto CSG nodes via a `CutCSG.joint_ticket` field. That
+was built and rejected. Three things were wrong with it:
+
+- **It duplicated state that already has an owner.** `Joint.cuttings` *is* the
+  relationship. A reverse pointer is a second copy to keep in sync, and `with_order()`
+  rebuilds cuttings via `replace()`, so they genuinely can drift.
+- **It made `cutcsg.py` import a construction concept.** A pure geometry module should not
+  know what a joint is.
+- **It cost six extra call sites** in `translate_csg` / `adopt_csg` purely to stop the
+  field being silently dropped on rebuild -- a lot of surface for metadata. It also broke
+  a test immediately: `replace()` in `__post_init__` fails on the `MockCutting` test double.
+
+The mapping is already derivable from data that exists:
+
+```
+Frame.source_joints                   populated by Frame.from_joints
+joint.cuttings.values()               every Cutting, with its Joint
+render_timber_with_cuts_csg_local()   Difference(body, [cut.get_negative_csg_local() ...])
+                                      subtract[i] <-> cut_timber.cuts[i], same order
 ```
 
-`Joint` (`timber.py:2399`) already holds both its `ticket` and its `cuttings` dict, so stamp
-each cutting with the owning joint's ticket at `Joint` construction (via
-`dataclasses.replace` — `Cutting` is frozen), and have `get_negative_csg_local()` carry it
-onto the labelled wrapper node it already builds.
+So the runner does it, and kumiki is untouched: `_joint_by_cutting_id(frame)` builds
+`{id(cutting): joint}`, and `_cutting_for_node(local_csg, cut_timber, target)` finds which
+subtract subtree contains the picked node by identity. The one positional assumption --
+that subtract order matches cuts order -- is read in a single function, next to the single
+function that creates it, and is length-checked; everything else is identity-based.
 
-Every subtree of a cut then knows its joint, and no joint function has to pass anything.
-This is what feature 1's "joint the feature came from" reads, and it is strictly better than
-inferring it from the subtract index.
+`find_csg_at_point` returns `jointName`, or None for the timber's own body, which no joint
+produced.
+
+`Frame.source_joints` is Optional, so a frame built any other way yields an empty lookup:
+attribution is unavailable rather than wrong.
 
 ### D8 — Long center planes (`timber.py`, `measuring.py`)
 
@@ -1097,6 +1115,16 @@ coincident faces as a coplanarity relation, which is D9's reference work.
 
 
 ### Follow-ups noticed while in there
+
+- **`CutTimber.joints` is dead.** Initialised to `[]` at `timber.py:1818` and never
+  appended to by anything. Either populate it in `Frame.from_joints` / `CutTimber.from_joints`
+  -- which would make joint attribution local to the cut timber rather than needing
+  `Frame.source_joints` -- or delete it. Right now it is a field that looks like the
+  answer to "which joints touch this timber?" and silently is not.
+- **`Frame.source_joints` is `Optional`.** Joint attribution degrades to unavailable when
+  it is absent, which is handled, but it means a Frame built by any route other than
+  `from_joints` silently loses the ability to name joints. Worth deciding whether it should
+  be required, or whether populating `CutTimber.joints` (above) makes it unnecessary.
 
 - Some cuts produce a doubled path segment, e.g.
   `('sliding_dovetail', 'sliding_dovetail', 'dovetail_tongue_profile')`, because

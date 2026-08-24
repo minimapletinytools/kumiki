@@ -22,13 +22,24 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Mapping, Optional, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, List, Tuple
 
 from kumiki.librarian import (
     RenderParameterDescriptor,
     resolve_callable_render_parameters,
     serialize_render_parameter_value,
 )
+
+if TYPE_CHECKING:
+    # Annotations only. kumiki must NOT be imported at module scope for
+    # anything used at runtime: _purge_project_modules drops modules under the
+    # project root that are not in a venv, which in a dev checkout includes
+    # kumiki itself. A module-level class reference would then leave isinstance
+    # comparing against a stale class object after a reload. Under
+    # TYPE_CHECKING there is no runtime import at all, so annotations can be
+    # concrete while every isinstance check still imports inside its function.
+    from kumiki.cutcsg import CutCSG
+    from kumiki.timber import CutTimber, Cutting, Frame, Joint
 
 
 def _find_project_root_from_argv() -> "Tuple[Path | None, bool]":
@@ -1538,6 +1549,77 @@ def _inv_transform_point(rot: List[List[float]], pos: List[float], pt: List[floa
     ]
 
 
+def _subtree_contains(root: 'CutCSG', target: 'CutCSG') -> bool:
+    """Whether *target* is *root* or somewhere beneath it.
+
+    """
+    from kumiki.cutcsg import csg_children
+
+    # note this is identity comparison, not quality as 2 CutCSGs can be `==` equivalent but not the same
+    if root is target:
+        return True
+    return any(_subtree_contains(child, target) for child in csg_children(root))
+
+
+def _joint_by_cutting_id(frame: 'Frame') -> Dict[int, 'Joint']:
+    """{id(cutting): joint} across the whole frame.
+
+    A Joint already owns its cuttings, so the reverse link is derived here.
+
+    Empty when the frame has no source_joints (it is Optional, and a Frame
+    built any other way has none), in which case joint attribution is simply
+    unavailable rather than wrong.
+    """
+    lookup: Dict[int, 'Joint'] = {}
+    for joint in getattr(frame, "source_joints", None) or ():
+        for cutting in (getattr(joint, "cuttings", None) or {}).values():
+            lookup[id(cutting)] = joint
+    return lookup
+
+
+def _cutting_for_node(
+    local_csg: 'CutCSG',
+    cut_timber: 'CutTimber',
+    target: 'CutCSG',
+) -> Optional['Cutting']:
+    """Which Cutting produced *target*, or None if it is the timber body.
+
+    render_timber_with_cuts_csg_local() builds
+    ``Difference(body, [cut.get_negative_csg_local() for cut in cuts])`` -- one
+    subtract child per cutting, in order. That correspondence is created in a
+    single function, so this reads it in a single function; everything else
+    here is identity-based.
+    """
+    from kumiki.cutcsg import Difference
+
+    if not isinstance(local_csg, Difference):
+        return None
+    cuts = list(getattr(cut_timber, "cuts", []) or [])
+    if len(local_csg.subtract) != len(cuts):
+        return None  # shape changed under us; decline rather than guess
+    for subtree, cutting in zip(local_csg.subtract, cuts):
+        if _subtree_contains(subtree, target):
+            return cutting
+    return None
+
+
+def _joint_name_for_node(
+    frame: 'Frame',
+    local_csg: 'CutCSG',
+    cut_timber: 'CutTimber',
+    target: 'CutCSG',
+) -> Optional[str]:
+    """Display name of the joint that produced *target*, if any."""
+    cutting = _cutting_for_node(local_csg, cut_timber, target)
+    if cutting is None:
+        return None
+    joint = _joint_by_cutting_id(frame).get(id(cutting))
+    if joint is None:
+        return None
+    ticket = getattr(joint, "ticket", None)
+    return ticket.get_name() if ticket is not None else None
+
+
 def _declared_feature_names(csg: Any) -> List[str]:
     """Names of the features *csg* declares, in declaration order."""
     names: List[str] = []
@@ -1912,6 +1994,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     result: Dict[str, Any] = {
         "path": new_path,
         "featureLabel": feature_label,
+        # None for the timber's own body, which no joint produced.
+        "jointName": _joint_name_for_node(ss.frame, local_csg, cut_timber, target_csg),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,

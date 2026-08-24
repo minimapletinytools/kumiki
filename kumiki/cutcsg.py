@@ -1072,6 +1072,17 @@ class CutCSG(ABC):
         pass
 
 
+def csg_children(csg: CutCSG) -> List[CutCSG]:
+    """The nodes directly beneath *csg*; empty for a primitive."""
+    if isinstance(csg, SolidUnion):
+        return list(csg.children)
+    if isinstance(csg, Intersection):
+        return [csg.left, csg.right]
+    if isinstance(csg, Difference):
+        return [csg.base, *csg.subtract]
+    return []
+
+
 @dataclass(frozen=True)
 class EmptyCSG(CutCSG):
     """Represents an empty solid (contains no points)."""

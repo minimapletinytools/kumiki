@@ -365,3 +365,96 @@ class TestPickingToleranceIsPerCall:
         runner._navigate_csg_to_leaf(csg, [0.0, 0.0, 0.0], PICK_EPS)
 
         assert not csg.is_point_on_boundary(near_miss)
+
+
+class TestJointAttribution:
+    """Which joint produced a piece of geometry.
+
+    Derived, never stored. A Joint already owns its cuttings, so the reverse
+    link is read from that rather than duplicated onto Cutting or CutCSG --
+    a second copy would need keeping in sync (with_order() rebuilds cuttings
+    via replace(), so it genuinely can drift), and putting a joint ticket on
+    CutCSG would make a pure geometry module carry a construction concept.
+    """
+
+    @pytest.fixture
+    def named_joint_frame(self):
+        """The mortise-and-tenon, with a joint ticket worth reading back."""
+        from dataclasses import replace
+
+        from kumiki.ticket import JointTicket
+
+        arrangement = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0))
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            tenon_width_relative_to_joint=inches(3),
+            tenon_height_relative_to_joint=inches(1),
+            tenon_length=inches(3),
+            mortise_depth=inches(7, 2),
+        )
+        joint = replace(joint, ticket=JointTicket(path="joints/corner_a",
+                                                  joint_type="mortise_and_tenon"))
+        return Frame.from_joints([joint])
+
+    def _leaf_at(self, csg, point):
+        _path, target, label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
+        return target, label
+
+    def test_joint_geometry_reports_its_joint(self, named_joint_frame):
+        cut_timber = _cut_timber_by_name(named_joint_frame, "butt_timber")
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+
+        tenon_point = None
+        for triangle in triangulate_cutcsg(csg).mesh.triangles:
+            centroid = [
+                (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
+            ]
+            _target, label = self._leaf_at(csg, centroid)
+            if label.startswith("tenon"):
+                tenon_point = centroid
+                break
+        assert tenon_point is not None, "no tenon face found to click on"
+
+        target, _label = self._leaf_at(csg, tenon_point)
+        assert runner._joint_name_for_node(
+            named_joint_frame, csg, cut_timber, target) == "corner_a"
+
+    def test_the_timber_body_belongs_to_no_joint(self, named_joint_frame):
+        """A rough face is the timber itself, not something a joint cut."""
+        cut_timber = _cut_timber_by_name(named_joint_frame, "butt_timber")
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        half_width = float(cut_timber.timber.size[0]) / 2
+
+        target, label = self._leaf_at(csg, [half_width, 0.0, 0.3])
+        assert label.startswith("rough.")
+        assert runner._joint_name_for_node(
+            named_joint_frame, csg, cut_timber, target) is None
+
+    def test_a_frame_without_source_joints_declines_rather_than_guesses(self):
+        """source_joints is Optional; attribution is unavailable, not wrong."""
+        from kumiki.timber import Frame as FrameType
+
+        arrangement = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0))
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=arrangement,
+            tenon_width_relative_to_joint=inches(3),
+            tenon_height_relative_to_joint=inches(1),
+            tenon_length=inches(3),
+            mortise_depth=inches(7, 2),
+        )
+        full = Frame.from_joints([joint])
+        bare = FrameType(cut_timbers=full.cut_timbers)  # no source_joints
+        assert runner._joint_by_cutting_id(bare) == {}
+
+        cut_timber = _cut_timber_by_name(bare, "butt_timber")
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        target, _ = self._leaf_at(csg, [0.0, 0.0, 0.0])
+        assert runner._joint_name_for_node(bare, csg, cut_timber, target) is None
+
+    def test_nothing_is_stored_on_the_cutting_or_the_csg(self):
+        """The link stays derived -- guard against reintroducing a stored copy."""
+        from kumiki.cutcsg import CutCSG
+        from kumiki.timber import Cutting
+
+        assert "joint_ticket" not in Cutting.__dataclass_fields__
+        assert "joint_ticket" not in CutCSG.__dataclass_fields__
