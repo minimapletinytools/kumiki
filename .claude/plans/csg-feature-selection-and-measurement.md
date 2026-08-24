@@ -1,15 +1,15 @@
 # CSG feature selection and measurement: audit + design
 
-## Status — step 6 part A done (2026-08-23)
+## Status — step 6 parts A-C done (2026-08-23)
 
-Steps 1-5 are done, plus part A of step 6. All committed on branch
+Steps 1-5 are done, plus parts A-C of step 6. All committed on branch
 **`csg-feature-selection-steps-1-5`**, unpushed, with `main` merged in. Land with:
 
 ```
 git checkout main && git merge --ff-only csg-feature-selection-steps-1-5
 ```
 
-Suite at the tip: **1020 python + 9 gui + 213 jest passing**, and `make typecheck` now
+Suite at the tip: **1036 python + 9 gui + 213 jest passing**, and `make typecheck` now
 passes clean -- the eight long-standing diagnostics were cleared in `6375cd5`, so a new
 error finally has somewhere to stand out. `uv.lock` no longer goes dirty on every `uv run`
 (`1028300`).
@@ -33,18 +33,27 @@ existing runner path.
 | — | Rename epsilons -> test tolerances | `c3f1a04` |
 | 5 | Derive edges where declared faces meet | `dce0689` |
 
-### Picking up: step 6, parts B-D
+### Picking up: step 6, part D (js)
 
-Part A is done (`1f7997a`): picking now reports `jointName`, derived rather than stored --
-see D7 for why the stored version was built and rejected. What is left:
+Parts A-C are done. The python side of feature 1 is complete: a pick now reports
+`featureLabel`, `featureType`, `jointName` and `facesToward`, and `get_csg_tree` returns
+the whole rendered tree with per-node feature metadata.
 
-- **B (python).** `serialize_cut_csg_tree` should walk the whole timber's rendered CSG
-  rather than one cutting's negative, include untagged intermediates, and carry per-node
-  feature metadata.
-- **C (python).** `find_csg_at_point` still needs `featureType` and `facesToward`.
-  `jointName` landed with part A.
-- **D (js).** `mergeCSGTreePayload` in `layers-panel.js` is a stub; the multi-line info
-  panel and two-way tree binding are the remaining work.
+What is left is **D**, all JS: `mergeCSGTreePayload` in `layers-panel.js` is still a stub,
+and the multi-line info panel and two-way tree binding are unbuilt. There is no test
+harness for it beyond jest on pure modules, which is why A-C were done first.
+
+The payload it renders looks like:
+
+```
+{ kind, label, path, role, jointName, features: [{name, type, group, real}], children: [...] }
+```
+
+`role` is base / subtract / child / left / right, so a Difference reads correctly; `path`
+carries labels only, which is what `find_csg_by_path` navigates by.
+
+Both open decisions from the outline still stand: own pane vs the layers panel, and
+whether derived edges appear in the tree at all.
 
 ### Original step 6 outline
 
@@ -1129,6 +1138,53 @@ timber.
 **Deferred.** Caching derived edges instead of re-deriving per query (belongs in a separate
 field from `_features`, which is authored rather than derived); edge x edge -> point;
 coincident faces as a coplanarity relation, which is D9's reference work.
+
+
+### Step 6 parts A-C
+
+**A -- joint attribution.** Derived, not stored; see D7. `CutTimber.joints` was populated
+along the way (it had been declared and never filled), which removed the last reason to
+thread a `Frame` through.
+
+**B -- the CSG tree payload.** `serialize_cut_csg_tree` now walks the timber's *rendered*
+CSG rather than one cutting's negative -- that is the tree picking runs against, so it is
+the one worth debugging -- and returns it nested rather than as a flat list of labelled
+nodes. Untagged intermediates are kept: the shape of the tree is exactly what you need to
+see when the shape is what has gone wrong. Each node carries `kind`, `label`, `path`,
+`role`, `jointName` and its declared features with metadata. The `cutIndex` parameter is
+gone from both the runner and the JS caller, having become meaningless.
+
+**C -- the pick description.** `find_csg_at_point` returns `featureType` and `facesToward`
+alongside the existing fields, via `_describe_pick`, which is separate from
+`_detect_face_label` because that one runs per triangle during highlight extraction and has
+to stay a cheap string lookup.
+
+`facesToward` matches the primitive's outward normal against the timber's six local
+directions directly. The plan had suggested `get_closest_oriented_face_from_global_direction`,
+but that takes a *global* direction and converts back internally, so going through it would
+be a round trip to the same answer -- the CSG tree is already in the timber's local frame.
+
+**The subtlety, and where it ended up.** A primitive's own outward normal is not always out
+of the finished timber: a mortise prism's points out of the hole and into the material, so
+the wall you clicked faces the other way. The first implementation negated for anything
+inside a cutting, which is wrong for a tenon -- the cut is
+`body - Union(Difference(shoulder, tenon), ...)`, so the tenon prism is subtracted from
+something itself subtracted and is net additive. That reported every tenon cheek as the
+opposite face of the timber, and only showed up because the check printed body, shoulder,
+tenon and mortise side by side.
+
+The second implementation counted `Difference.subtract` edges and used the parity. That is
+correct -- union and intersection do not flip polarity, only subtract does -- and it was
+verified against the composed solid across every combinator and nesting. But it was
+unnecessary: `Difference.get_outward_normal` already composes normals, so the primitive can
+supply the direction and the root the sign, and the tree-shape reasoning disappears.
+`_faces_toward` now does that, and a test checks the two agree over every surface point of
+a real joint.
+
+The parity version also carried an assumption worth noting for anything similar: it found
+the node by identity, so a CSG node appearing twice in one tree at different polarities
+would have resolved to whichever occurrence traversal reached first. (No such sharing
+exists in the patterns today -- checked -- but asking the root sidesteps it entirely.)
 
 
 ### Follow-ups noticed while in there

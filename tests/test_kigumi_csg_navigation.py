@@ -107,48 +107,71 @@ def test_cutcsg_label_field_is_named_label():
     )
 
 
-class TestWalkLabeledCSG:
-    def test_collects_labeled_nodes_with_paths(self, mortise_and_tenon_frame):
-        """The tenon timber's tree exposes its joint, shoulder and tenon nodes."""
-        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
-        collected = []
-        runner._walk_labeled_csg(
-            cut_timber.render_timber_with_cuts_csg_local(), [], collected
-        )
+class TestCSGTreeSerialization:
+    """The CSG tree the viewer renders for debugging.
 
-        by_label = {node["label"]: node for node in collected}
-        assert "mortise_and_tenon" in by_label
-        assert "tenon" in by_label
-        assert by_label["mortise_and_tenon"]["path"] == ["mortise_and_tenon"]
-        assert by_label["tenon"]["path"] == ["mortise_and_tenon", "tenon"]
+    It serializes the timber's *rendered* CSG -- the tree picking actually runs
+    against -- rather than one cutting's negative CSG, and it keeps every node
+    including untagged intermediates, since the shape of the tree is exactly
+    what you need to see when the shape is what has gone wrong.
+    """
 
-    def test_reports_named_features_of_labeled_nodes(self, mortise_and_tenon_frame):
-        """The tenon prism's named faces come through on its tree node."""
-        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
-        collected = []
-        runner._walk_labeled_csg(
-            cut_timber.render_timber_with_cuts_csg_local(), [], collected
-        )
+    def _tree(self, frame, name):
+        return runner.serialize_cut_csg_tree(_cut_timber_by_name(frame, name))["tree"]
 
-        tenon = next(node for node in collected if node["label"] == "tenon")
-        assert set(tenon["features"]) >= {
-            "tenon_right",
-            "tenon_left",
-            "tenon_front",
-            "tenon_back",
-        }
+    def _walk(self, node):
+        yield node
+        for child in node["children"]:
+            yield from self._walk(child)
 
-    def test_mortise_hole_is_reachable_on_receiving_timber(
-        self, mortise_and_tenon_frame
-    ):
-        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
-        collected = []
-        runner._walk_labeled_csg(
-            cut_timber.render_timber_with_cuts_csg_local(), [], collected
-        )
+    def _by_label(self, node):
+        return {n["label"]: n for n in self._walk(node) if n["label"]}
 
-        paths = [node["path"] for node in collected]
-        assert ["mortise_and_tenon", "mortise_hole"] in paths
+    def test_the_root_is_the_rendered_difference(self, mortise_and_tenon_frame):
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        assert tree["kind"] == "Difference"
+        assert tree["role"] is None
+        roles = [child["role"] for child in tree["children"]]
+        assert roles[0] == "base" and set(roles[1:]) == {"subtract"}
+
+    def test_untagged_intermediates_are_kept(self, mortise_and_tenon_frame):
+        """The old walker collected only labelled nodes, hiding the shape."""
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        assert any(node["label"] is None for node in self._walk(tree))
+
+    def test_labelled_nodes_carry_their_navigable_path(self, mortise_and_tenon_frame):
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        labelled = self._by_label(tree)
+        assert labelled["mortise_and_tenon"]["path"] == ["mortise_and_tenon"]
+        assert labelled["tenon"]["path"] == ["mortise_and_tenon", "tenon"]
+
+    def test_features_carry_their_metadata(self, mortise_and_tenon_frame):
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        tenon = self._by_label(tree)["tenon"]
+        by_name = {f["name"]: f for f in tenon["features"]}
+        assert {"tenon_right", "tenon_left", "tenon_front", "tenon_back"} <= set(by_name)
+        assert by_name["tenon_right"]["type"] == "FACE"
+        assert by_name["tenon_right"]["real"] is True
+        assert by_name["tenon_right"]["group"] == "A"
+
+    def test_the_timber_body_carries_its_reserved_face_names(self, mortise_and_tenon_frame):
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        base = tree["children"][0]
+        names = {f["name"] for f in base["features"]}
+        assert {"rough.right", "rough.left", "rough.top"} <= names
+        assert all(f["group"] == "B2" for f in base["features"])
+
+    def test_joint_attribution_flows_down_the_cut(self, mortise_and_tenon_frame):
+        """The body belongs to no joint; everything under a cut belongs to one."""
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        assert tree["children"][0]["jointName"] is None  # the timber body
+        cut = tree["children"][1]
+        assert cut["jointName"] is not None
+        assert all(node["jointName"] == cut["jointName"] for node in self._walk(cut))
+
+    def test_the_mortise_shows_up_on_the_receiving_timber(self, mortise_and_tenon_frame):
+        tree = self._tree(mortise_and_tenon_frame, "receiving_timber")
+        assert "mortise_hole" in self._by_label(tree)
 
 
 class TestNavigateToLeaf:
@@ -462,3 +485,156 @@ class TestJointAttribution:
 
         assert "joint_ticket" not in Cutting.__dataclass_fields__
         assert "joint_ticket" not in CutCSG.__dataclass_fields__
+
+
+class TestPickDescription:
+    """What the selection display gets from one click.
+
+    featureLabel / featureType / jointName / facesToward, computed once per
+    pick -- unlike _detect_face_label, which runs per triangle during highlight
+    extraction and stays a cheap string lookup.
+    """
+
+    def _describe(self, frame, name, point):
+        cut_timber = _cut_timber_by_name(frame, name)
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        _path, target, _label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
+        return runner._describe_pick(target, csg, cut_timber, point, PICK_EPS)
+
+    def _point_on(self, frame, name, predicate):
+        """A surface point whose feature label satisfies *predicate*."""
+        cut_timber = _cut_timber_by_name(frame, name)
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        for triangle in triangulate_cutcsg(csg).mesh.triangles:
+            centroid = [
+                (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
+            ]
+            _p, _t, label = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+            if predicate(label):
+                return centroid
+        raise AssertionError("no matching surface point found")
+
+    def test_a_timber_face_describes_itself(self, mortise_and_tenon_frame):
+        point = self._point_on(mortise_and_tenon_frame, "butt_timber",
+                               lambda label: label == "rough.right")
+        described = self._describe(mortise_and_tenon_frame, "butt_timber", point)
+        assert described["featureLabel"] == "rough.right"
+        assert described["featureType"] == "FACE"
+        assert described["jointName"] is None
+        assert described["facesToward"] == "right"
+
+    def test_a_tenon_cheek_faces_the_way_the_tenon_does(self, mortise_and_tenon_frame):
+        """A tenon is inside a cutting but is not a hole.
+
+        The cut is ``body - Union(Difference(shoulder, tenon), ...)``, so the
+        tenon prism is subtracted from something that is itself subtracted, and
+        ends up net additive: its cheeks face the way the prism does. Any rule
+        along the lines of "inside a cutting means flip" reports every cheek as
+        the opposite face of the timber.
+        """
+        point = self._point_on(mortise_and_tenon_frame, "butt_timber",
+                               lambda label: label == "tenon_right")
+        described = self._describe(mortise_and_tenon_frame, "butt_timber", point)
+        assert described["featureLabel"] == "tenon_right"
+        assert described["jointName"] is not None
+        assert described["facesToward"] == "right"
+
+    def test_a_mortise_wall_faces_into_the_timber(self, mortise_and_tenon_frame):
+        """A hole's wall faces the opposite way to the prism that cut it.
+
+        The mortise prism's own outward normal points out of the hole and into
+        the material; the surface someone clicked is the wall of the hole. The
+        composed solid is what settles the sign.
+        """
+        point = self._point_on(mortise_and_tenon_frame, "receiving_timber",
+                               lambda label: label == "back")
+        described = self._describe(mortise_and_tenon_frame, "receiving_timber", point)
+        assert described["facesToward"] == "front"   # opposite of the prism's own "back"
+
+    def test_it_agrees_with_the_composed_solid_everywhere(self, mortise_and_tenon_frame):
+        """The reported direction always matches the finished timber's own normal.
+
+        This is the property the whole thing rests on, so it is checked over
+        every surface point rather than a few chosen ones.
+        """
+        from kumiki.rule import safe_dot_product
+
+        for name in ("butt_timber", "receiving_timber"):
+            cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, name)
+            csg = cut_timber.render_timber_with_cuts_csg_local()
+            for triangle in triangulate_cutcsg(csg).mesh.triangles:
+                centroid = [
+                    (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0
+                    for i in range(3)
+                ]
+                composed = csg.get_outward_normal(runner._to_v3(centroid), PICK_EPS)
+                if composed is None:
+                    continue
+                expected = runner._nearest_timber_local_face_name(composed)
+                _p, target, _l = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+                assert runner._faces_toward(target, csg, centroid, PICK_EPS) == expected
+
+
+class TestJointDisplayName:
+    """How a joint is named in the selection display.
+
+    A joint whose ticket was never given a path falls back to its kumiki id
+    rather than a shared placeholder: several unnamed joints can touch one
+    timber, and "which of these did I just click?" is the question the display
+    exists to answer.
+    """
+
+    def _joint(self, ticket=None):
+        from kumiki.ticket import JointTicket
+        from kumiki.timber import Cutting, Joint
+
+        timber = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0)).butt_timber
+        return Joint(
+            cuttings={"a": Cutting(timber=timber)},
+            ticket=ticket if ticket is not None else JointTicket(),
+            jointAccessories={},
+        )
+
+    def test_a_named_joint_shows_its_name(self):
+        from kumiki.ticket import JointTicket
+
+        joint = self._joint(JointTicket(path="joints/corner_a"))
+        assert runner._joint_display_name(joint) == "corner_a"
+
+    def test_an_unnamed_joint_falls_back_to_its_kumiki_id(self):
+        joint = self._joint()
+        name = runner._joint_display_name(joint)
+        assert name == f"<unnamed joint - {joint.ticket.kumiki_id}>"
+
+    def test_two_unnamed_joints_are_distinguishable(self):
+        """The whole point of using the id rather than a fixed placeholder."""
+        first, second = self._joint(), self._joint()
+        assert runner._joint_display_name(first) != runner._joint_display_name(second)
+
+    def test_a_joint_type_does_not_count_as_a_name(self):
+        """joint_type says what kind of joint, not which one."""
+        from kumiki.ticket import JointTicket
+
+        joint = self._joint(JointTicket(joint_type="mortise_and_tenon"))
+        assert runner._joint_display_name(joint).startswith("<unnamed joint - ")
+
+    def test_a_joint_with_no_ticket_at_all_has_no_id_to_show(self):
+        class TicketlessJoint:
+            ticket = None
+
+        assert runner._joint_display_name(TicketlessJoint()) == "<unnamed joint>"
+
+    def test_it_reaches_the_pick_result(self, mortise_and_tenon_frame):
+        """The fixture's joint is unnamed, so a picked cut shows the fallback."""
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        for triangle in triangulate_cutcsg(csg).mesh.triangles:
+            centroid = [
+                (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
+            ]
+            _p, target, label = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+            if label.startswith("tenon"):
+                name = runner._joint_name_for_node(csg, cut_timber, target)
+                assert name is not None and name.startswith("<unnamed joint - ")
+                return
+        raise AssertionError("no tenon face found to click on")

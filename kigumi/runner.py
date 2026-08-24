@@ -1126,49 +1126,81 @@ def _build_assembly_payload(
     }
 
 
-def _walk_labeled_csg(csg: Any, current_path: List[str], collected: List[Dict[str, Any]]) -> None:
-    """Walk a CSG tree, collecting labeled nodes with their path and feature names.
+def _serialize_feature(feature: Any) -> Dict[str, Any]:
+    """One declared feature, with the metadata the tree view wants to show."""
+    return {
+        "name": feature.name,
+        "type": feature.feature_type().name,
+        "group": feature.group.name,
+        "real": feature.real,
+    }
 
-    A CSG node's *label* (``CutCSG.label``) is what forms the navigable path
-    through the tree -- not to be confused with a ticket's ``tags``, which are
-    free-form user metadata on timbers and joints.
+
+def _serialize_csg_node(
+    csg: 'CutCSG',
+    path: List[str],
+    role: Optional[str],
+    joint_name: Optional[str],
+    cut_timber: 'CutTimber',
+) -> Dict[str, Any]:
+    """One CSG node and everything beneath it.
+
+    Nested rather than flattened, and every node rather than only labelled
+    ones. This is a debugging surface: the shape of the tree, and the untagged
+    intermediates in it, are exactly what you need when the shape is what has
+    gone wrong. `path` still carries labels only, since that is what
+    find_csg_by_path navigates by.
     """
-    from kumiki.cutcsg import SolidUnion, Difference
+    from kumiki.cutcsg import Difference, Intersection, SolidUnion
 
     label = getattr(csg, "label", None)
-    next_path = current_path
-    if label:
-        next_path = current_path + [label]
-        features = _declared_feature_names(csg)
-        collected.append({
-            "label": label,
-            "path": list(next_path),
-            "type": type(csg).__name__,
-            "features": features,
-        })
+    node_path = path + [label] if label else path
 
-    if isinstance(csg, SolidUnion):
-        for child in csg.children:
-            _walk_labeled_csg(child, next_path, collected)
-    elif isinstance(csg, Difference):
-        _walk_labeled_csg(csg.base, next_path, collected)
-        for sub in csg.subtract:
-            _walk_labeled_csg(sub, next_path, collected)
-
-
-def serialize_cut_csg_tree(cut_timber: Any, cut_index: int) -> Dict[str, Any]:
-    cuts = list(getattr(cut_timber, "cuts", []) or [])
-    if cut_index < 0 or cut_index >= len(cuts):
-        raise IndexError(f"cutIndex {cut_index} out of range for timber with {len(cuts)} cuts")
-    cut = cuts[cut_index]
-    csg = cut.get_negative_csg_local() if hasattr(cut, "get_negative_csg_local") else getattr(cut, "negative_csg", None)
-    collected: List[Dict[str, Any]] = []
-    if csg is not None:
-        _walk_labeled_csg(csg, [], collected)
-    return {
-        "cutIndex": cut_index,
-        "labeledCSGs": collected,
+    node: Dict[str, Any] = {
+        "kind": type(csg).__name__,
+        "label": label,
+        "path": list(node_path),
+        "role": role,
+        "jointName": joint_name,
+        "features": [_serialize_feature(f) for f in csg.get_declared_features()],
+        "children": [],
     }
+
+    def child(node_csg: 'CutCSG', child_role: str, child_joint: Optional[str]) -> None:
+        node["children"].append(
+            _serialize_csg_node(node_csg, node_path, child_role, child_joint, cut_timber))
+
+    if isinstance(csg, Difference):
+        child(csg.base, "base", joint_name)
+        cuts = list(getattr(cut_timber, "cuts", []) or [])
+        # Only the timber's own top-level Difference lines up with its cuts;
+        # a nested one inside a joint's own geometry does not, so attribution
+        # is inherited there rather than re-derived.
+        aligned = len(csg.subtract) == len(cuts) and not path
+        for index, sub_csg in enumerate(csg.subtract):
+            sub_joint = joint_name
+            if aligned:
+                sub_joint = _joint_name_for_cutting(cut_timber, cuts[index])
+            child(sub_csg, "subtract", sub_joint)
+    elif isinstance(csg, SolidUnion):
+        for member in csg.children:
+            child(member, "child", joint_name)
+    elif isinstance(csg, Intersection):
+        child(csg.left, "left", joint_name)
+        child(csg.right, "right", joint_name)
+
+    return node
+
+
+def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> Dict[str, Any]:
+    """The whole rendered CSG of a timber, as a nested tree.
+
+    Deliberately the rendered tree -- what picking actually runs against --
+    rather than one cutting's negative CSG, which is a piece of the input and
+    not the thing on screen.
+    """
+    local_csg = cut_timber.render_timber_with_cuts_csg_local()
+    return {"tree": _serialize_csg_node(local_csg, [], None, None, cut_timber)}
 
 
 def _module_file_path(module: Any) -> Optional[Path]:
@@ -1537,11 +1569,11 @@ def _build_inv_transform_float(transform: Any) -> Tuple[List[List[float]], List[
     return rot, pos
 
 
-def _inv_transform_point(rot: List[List[float]], pos: List[float], pt: List[float]) -> List[float]:
-    """Apply inverse transform: local = R^T * (pt - pos)."""
-    dx = pt[0] - pos[0]
-    dy = pt[1] - pos[1]
-    dz = pt[2] - pos[2]
+def _inv_transform_point(rot: List[List[float]], pos: List[float], global_pt: List[float]) -> List[float]:
+    """Apply inverse transform: local = R^T * (global_pt - pos)."""
+    dx = global_pt[0] - pos[0]
+    dy = global_pt[1] - pos[1]
+    dz = global_pt[2] - pos[2]
     return [
         rot[0][0]*dx + rot[1][0]*dy + rot[2][0]*dz,
         rot[0][1]*dx + rot[1][1]*dy + rot[2][1]*dz,
@@ -1605,6 +1637,32 @@ def _cutting_for_node(
     return None
 
 
+def _joint_display_name(joint: 'Joint') -> str:
+    """How to show *joint* in the selection display.
+
+    A joint whose ticket was never given a path falls back to its kumiki id
+    rather than to a shared placeholder: several unnamed joints can touch one
+    timber, and "which of these did I just click?" is the question the display
+    exists to answer. The id is runtime-only, which is fine here -- this string
+    is shown, never stored.
+    """
+    from kumiki.ticket import UNNAMED_TICKET_PATH
+
+    ticket = getattr(joint, "ticket", None)
+    if ticket is None:
+        return "<unnamed joint>"  # no ticket, so no id to distinguish it by
+    name = ticket.get_name()
+    if name and name != UNNAMED_TICKET_PATH:
+        return name
+    return f"<unnamed joint - {ticket.kumiki_id}>"
+
+
+def _joint_name_for_cutting(cut_timber: 'CutTimber', cutting: 'Cutting') -> Optional[str]:
+    """Display name of the joint that owns *cutting*, or None if it owns none."""
+    joint = _joint_by_cutting_id(cut_timber).get(id(cutting))
+    return None if joint is None else _joint_display_name(joint)
+
+
 def _joint_name_for_node(
     local_csg: 'CutCSG',
     cut_timber: 'CutTimber',
@@ -1614,11 +1672,7 @@ def _joint_name_for_node(
     cutting = _cutting_for_node(local_csg, cut_timber, target)
     if cutting is None:
         return None
-    joint = _joint_by_cutting_id(cut_timber).get(id(cutting))
-    if joint is None:
-        return None
-    ticket = getattr(joint, "ticket", None)
-    return ticket.get_name() if ticket is not None else None
+    return _joint_name_for_cutting(cut_timber, cutting)
 
 
 def _declared_feature_names(csg: Any) -> List[str]:
@@ -1636,13 +1690,13 @@ def _to_v3(pt: List[float]) -> Any:
     return create_v3(float(pt[0]), float(pt[1]), float(pt[2]))
 
 
-def _csg_contains_point(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
-    """True if *pt* (timber-local floats) is inside *csg*, within *eps*."""
-    return csg.contains_point(_to_v3(pt), eps)
+def _csg_contains_point(csg: Any, local_pt: List[float], eps: float = 1e-4) -> bool:
+    """True if *local_pt* (timber-local floats) is inside *csg*, within *eps*."""
+    return csg.contains_point(_to_v3(local_pt), eps)
 
 
-def _csg_point_on_boundary(csg: Any, pt: List[float], eps: float = 1e-4) -> bool:
-    """True if *pt* (timber-local floats) lies on the boundary of *csg*, within *eps*.
+def _csg_point_on_boundary(csg: Any, local_pt: List[float], eps: float = 1e-4) -> bool:
+    """True if *local_pt* (timber-local floats) lies on the boundary of *csg*, within *eps*.
 
     These two are thin adapters over kumiki's own CutCSG methods. kigumi used to
     carry a parallel float reimplementation of both, from when kumiki was
@@ -1653,7 +1707,7 @@ def _csg_point_on_boundary(csg: Any, pt: List[float], eps: float = 1e-4) -> bool
     and Intersection surface unselectable (the click fell through to the timber
     body and reported a bare "face").
     """
-    return csg.is_point_on_boundary(_to_v3(pt), eps)
+    return csg.is_point_on_boundary(_to_v3(local_pt), eps)
 
 
 # Timber-local outward directions, used to name an unnamed face by whichever of
@@ -1685,8 +1739,8 @@ def _nearest_timber_local_face_name(normal: Any) -> str:
     return best_name
 
 
-def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
-    """Name the feature of primitive *csg* that *pt* lies on.
+def _detect_face_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> str:
+    """Name the feature of primitive *csg* that *local_pt* lies on.
 
     Two layers, in order:
 
@@ -1705,7 +1759,7 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
     from kumiki.cutcsg import Cylinder, FeatureTestTolerances, HalfSpace
     from kumiki.rule import are_vectors_perpendicular
 
-    point = _to_v3(pt)
+    point = _to_v3(local_pt)
 
     # The raycast tolerance is a surface tolerance: it covers the gap between
     # the analytic face and the triangulated mesh the ray actually hit. Edges
@@ -1728,12 +1782,107 @@ def _detect_face_label(csg: Any, pt: List[float], eps: float = 1e-4) -> str:
     return _nearest_timber_local_face_name(normal)
 
 
-def _resolve_csg_at_path(csg: Any, path: List[str], pt: Optional[List[float]] = None, eps: float = 1e-4) -> Any:
+def _describe_pick(
+    target: 'CutCSG',
+    local_csg: 'CutCSG',
+    cut_timber: 'CutTimber',
+    local_pt: List[float],
+    eps: float,
+) -> Dict[str, Any]:
+    """Everything the selection display wants to say about one click.
+
+    Kept separate from _detect_face_label, which runs per triangle during
+    highlight extraction and must stay a cheap string lookup. This runs once.
+
+    The three CSG-ish arguments are all about one timber and are easy to
+    confuse, so, concretely:
+
+    Args:
+        target: the LEAF primitive the click resolved to -- a RectangularPrism,
+            a Cylinder, a HalfSpace -- as returned by _navigate_csg_to_leaf.
+            This is the thing whose surface was actually hit, and the thing
+            whose feature gets named.
+        local_csg: the ROOT of the tree `target` sits in, i.e.
+            ``cut_timber.render_timber_with_cuts_csg_local()``. Needed because
+            two of the four answers are about where `target` sits in the tree
+            rather than about `target` itself: which joint produced it, and how
+            many Difference.subtract edges lie above it (which decides whether
+            its outward normal points the way the visible surface does).
+        cut_timber: the timber that owns that tree. Supplies `cuts`, which line
+            up with the root Difference's subtract children, and `joints`,
+            which map a cutting back to the joint that made it.
+        local_pt: the clicked point in TIMBER-LOCAL coordinates -- the same space as
+            `local_csg` and `target`, not global. The caller converts.
+        eps: surface tolerance for the hit, covering the gap between the
+            analytic face and the triangulated mesh the ray struck.
+
+    Returns:
+        featureLabel, featureType, jointName and facesToward. jointName is None
+        for the timber's own body, which no joint produced; featureType and
+        facesToward are None when nothing could be determined.
+    """
+    from kumiki.cutcsg import CSGFeatureType, FeatureTestTolerances
+
+    point = _to_v3(local_pt)
+    hit = target.find_feature(point, FeatureTestTolerances(face=eps))
+
+    feature_type = hit.feature_type().name if hit is not None else None
+    return {
+        "featureLabel": _detect_face_label(target, local_pt, eps),
+        "featureType": feature_type,
+        "jointName": _joint_name_for_node(local_csg, cut_timber, target),
+        "facesToward": _faces_toward(target, local_csg, local_pt, eps),
+    }
+
+
+def _faces_toward(
+    target: 'CutCSG',
+    local_csg: 'CutCSG',
+    local_pt: List[float],
+    eps: float,
+) -> Optional[str]:
+    """Which of the timber's own six faces the picked surface points along.
+
+    The tree is already in the timber's local frame, so the normal is matched
+    against the six local directions directly -- going via
+    get_closest_oriented_face_from_global_direction would convert to global and
+    straight back.
+
+    The primitive supplies the direction and the composed solid supplies the
+    sign. A primitive's own normal points out of that primitive, which is not
+    always out of the finished timber: a mortise prism's points out of the hole
+    and into the material, so the wall you clicked faces the other way. Rather
+    than reason about that from the tree shape, ask the root -- Difference
+    already composes normals correctly, and it is the layer that owns the
+    question.
+
+    Args:
+        target: the leaf primitive that was hit, for the face direction.
+        local_csg: the root of the tree it sits in, for the sign.
+        local_pt: the clicked point, in that tree's (timber-local) space.
+        eps: surface tolerance for the normal lookup.
+
+    Returns:
+        A face name ("right", "top", ...), or None if no normal is available.
+    """
+    from kumiki.rule import safe_dot_product
+
+    point = _to_v3(local_pt)
+    normal = target.get_outward_normal(point, eps)
+    if normal is None:
+        return None
+    composed = local_csg.get_outward_normal(point, eps)
+    if composed is not None and safe_dot_product(normal, composed) < 0:
+        normal = -normal
+    return _nearest_timber_local_face_name(normal)
+
+
+def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[float]] = None, eps: float = 1e-4) -> Any:
     """Walk the CSG tree following *path* of labeled CSG nodes.
 
     Searches through unlabeled intermediate Difference/SolidUnion nodes
-    transparently.  When *pt* is given and multiple children share the
-    same label, prefer the one whose boundary contains *pt*.
+    transparently.  When *local_pt* is given and multiple children share the
+    same label, prefer the one whose boundary contains *local_pt*.
     """
     from kumiki.cutcsg import SolidUnion, Difference
 
@@ -1765,16 +1914,16 @@ def _resolve_csg_at_path(csg: Any, path: List[str], pt: Optional[List[float]] = 
         candidates = _find_labeled(node, name)
         if not candidates:
             break
-        if len(candidates) == 1 or pt is None:
+        if len(candidates) == 1 or local_pt is None:
             node = candidates[0]
         else:
             # Multiple with same name — pick the one on boundary
             picked = candidates[0]
             for c in candidates:
-                if _csg_point_on_boundary(c, pt, eps):
+                if _csg_point_on_boundary(c, local_pt, eps):
                     picked = c
                     break
-                if _csg_contains_point(c, pt, eps):
+                if _csg_contains_point(c, local_pt, eps):
                     picked = c
             node = picked
     return node
@@ -1782,7 +1931,7 @@ def _resolve_csg_at_path(csg: Any, path: List[str], pt: Optional[List[float]] = 
 
 def _navigate_csg_one_level(
     node: Any,
-    pt_local: List[float],
+    local_pt: List[float],
     current_path: List[str],
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
@@ -1795,42 +1944,42 @@ def _navigate_csg_one_level(
     if isinstance(node, Difference):
         # Check which subtract child the point lies on
         for sub in node.subtract:
-            if _csg_point_on_boundary(sub, pt_local, eps):
+            if _csg_point_on_boundary(sub, local_pt, eps):
                 sub_label = getattr(sub, "label", None)
                 if sub_label:
                     return (current_path + [sub_label], sub, None)
                 # Unlabeled compound → drill through transparently
                 if isinstance(sub, (SolidUnion, Difference)):
-                    return _navigate_csg_one_level(sub, pt_local, current_path, eps)
-                return (current_path, sub, _detect_face_label(sub, pt_local, eps))
+                    return _navigate_csg_one_level(sub, local_pt, current_path, eps)
+                return (current_path, sub, _detect_face_label(sub, local_pt, eps))
         # Point is on the base surface
         base_label = getattr(node.base, "label", None)
         if base_label:
             return (current_path + [base_label], node.base, None)
         if isinstance(node.base, (SolidUnion, Difference)):
-            return _navigate_csg_one_level(node.base, pt_local, current_path, eps)
-        return (current_path, node.base, _detect_face_label(node.base, pt_local, eps))
+            return _navigate_csg_one_level(node.base, local_pt, current_path, eps)
+        return (current_path, node.base, _detect_face_label(node.base, local_pt, eps))
 
     if isinstance(node, SolidUnion):
         for ch in node.children:
-            if _csg_point_on_boundary(ch, pt_local, eps):
+            if _csg_point_on_boundary(ch, local_pt, eps):
                 ch_label = getattr(ch, "label", None)
                 if ch_label:
                     return (current_path + [ch_label], ch, None)
                 # Unlabeled compound → drill through transparently
                 if isinstance(ch, (SolidUnion, Difference)):
-                    return _navigate_csg_one_level(ch, pt_local, current_path, eps)
-                return (current_path, ch, _detect_face_label(ch, pt_local, eps))
+                    return _navigate_csg_one_level(ch, local_pt, current_path, eps)
+                return (current_path, ch, _detect_face_label(ch, local_pt, eps))
         # Couldn't match a specific child — report face of whole union
         return (current_path, node, "face")
 
     # Leaf primitive — report face
-    return (current_path, node, _detect_face_label(node, pt_local, eps))
+    return (current_path, node, _detect_face_label(node, local_pt, eps))
 
 
 def _navigate_csg_to_leaf(
     csg: Any,
-    pt_local: List[float],
+    local_pt: List[float],
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
     """Ctrl+click: traverse from root to deepest labeled node, then report face."""
@@ -1839,7 +1988,7 @@ def _navigate_csg_to_leaf(
     path: List[str] = []
     node = csg
     while True:
-        new_path, target, label = _navigate_csg_one_level(node, pt_local, path, eps)
+        new_path, target, label = _navigate_csg_one_level(node, local_pt, path, eps)
         if label is not None:
             # Reached a leaf
             return (new_path, target, label)
@@ -1934,16 +2083,16 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     timber_rot, timber_pos = _build_inv_transform_float(timber.transform)
 
     # Convert global click point to timber-local
-    pt_local = _inv_transform_point(timber_rot, timber_pos, [float(p) for p in point])
+    local_pt = _inv_transform_point(timber_rot, timber_pos, [float(p) for p in point])
 
     t0 = time.monotonic()
 
     if ctrl_click:
-        new_path, target_csg, feature_label = _navigate_csg_to_leaf(local_csg, pt_local, eps)
+        new_path, target_csg, feature_label = _navigate_csg_to_leaf(local_csg, local_pt, eps)
     else:
         if current_path:
-            node = _resolve_csg_at_path(local_csg, current_path, pt_local, eps)
-            on_boundary = _csg_point_on_boundary(node, pt_local, eps)
+            node = _resolve_csg_at_path(local_csg, current_path, local_pt, eps)
+            on_boundary = _csg_point_on_boundary(node, local_pt, eps)
             if not on_boundary:
                 node = local_csg
                 current_path = []
@@ -1951,12 +2100,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
             node = local_csg
 
         new_path, target_csg, feature_label = _navigate_csg_one_level(
-            node, pt_local, current_path, eps,
+            node, local_pt, current_path, eps,
         )
 
     parent_csg = None
     if new_path:
-        parent_csg = _resolve_csg_at_path(local_csg, new_path, pt_local, eps)
+        parent_csg = _resolve_csg_at_path(local_csg, new_path, local_pt, eps)
 
     # Extract highlight mesh for the selected target
     hl_verts, hl_idx, matched, total = _extract_highlight_mesh(
@@ -1994,9 +2143,9 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
 
     result: Dict[str, Any] = {
         "path": new_path,
-        "featureLabel": feature_label,
+        # featureLabel / featureType / jointName / facesToward; jointName is
         # None for the timber's own body, which no joint produced.
-        "jointName": _joint_name_for_node(local_csg, cut_timber, target_csg),
+        **_describe_pick(target_csg, local_csg, cut_timber, local_pt, eps),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,
@@ -2379,9 +2528,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
     if command == "get_csg_tree":
         ss = _resolve_slot(state, payload)
         member_key = _require_str(payload, "memberKey", "get_csg_tree requires payload.memberKey")
-        cut_index = payload.get("cutIndex")
-        if not isinstance(cut_index, int):
-            raise ValueError("get_csg_tree requires integer payload.cutIndex")
         cached = ss.mesh_cache.get(member_key)
         cut_timber = cached.get("cut_timber") if cached else None
         if cut_timber is None:
@@ -2391,7 +2537,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             if match is None:
                 raise ValueError(f"Unknown memberKey: {member_key}")
             cut_timber = match["cutTimber"]
-        result = serialize_cut_csg_tree(cut_timber, cut_index)
+        result = serialize_cut_csg_tree(cut_timber)
         result["memberKey"] = member_key
         return state, make_success_response(request_id, command, result), False
 

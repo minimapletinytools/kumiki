@@ -942,10 +942,9 @@ class FrameViewSession {
         if (!this.runnerSession) {
             return;
         }
-        const payload = {
-            memberKey: message.memberKey,
-            cutIndex: Number.isFinite(message.cutIndex) ? Number(message.cutIndex) : 0,
-        };
+        // The whole timber's rendered CSG, not one cutting's negative -- that is
+        // the tree picking runs against, so it is the one worth debugging.
+        const payload = { memberKey: message.memberKey };
         const result = await this.runnerSession.slotRequest('get_csg_tree', this.slotName, payload);
         this._postToWebview({ type: 'csgTree', payload: result });
     }

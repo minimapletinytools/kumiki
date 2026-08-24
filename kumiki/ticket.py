@@ -13,6 +13,11 @@ from typing import NewType, Optional
 
 from typing_extensions import deprecated
 
+# The path a Ticket has when nobody gave it one. Code that displays a name
+# needs to recognise it, since it is a placeholder rather than a name; it was
+# a bare literal in eight places before this.
+UNNAMED_TICKET_PATH = "[no-name]"
+
 KumikiId = NewType("KumikiId", int)
 """Runtime-only identifier type for the Kumiki viewer. See Ticket.kumiki_id."""
 
@@ -34,7 +39,7 @@ class Ticket(ABC):
           The last segment is the display name; preceding segments are folder names.
     """
 
-    path: str = "[no-name]"
+    path: str = UNNAMED_TICKET_PATH
     # Runtime-only identifier for the Kumiki viewer. It has no meaning outside
     # the viewer runtime and should not be used as persistent data.
     kumiki_id: KumikiId = field(
