@@ -202,6 +202,7 @@ class TestRoundedEndDecoration:
             lateral_offset=lateral_offset,
         )
         cutting = joint.cuttings["timber"]
+        assert cutting.negative_csg is not None
         full_prism = timber.get_perfect_timber_within_csg_local()
         result_csg = Difference(base=full_prism, subtract=[cutting.negative_csg])
         return joint, cutting, result_csg

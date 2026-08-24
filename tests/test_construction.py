@@ -1766,7 +1766,7 @@ def test_join_plane_aligned_on_plane_aligned_timbers():
     stickout = Stickout(stickout1=scalar(0), stickout2=scalar(0))
     size = create_v2(10, 10)
 
-    res = join_plane_aligned_on_plane_aligned_timbers(t1, t2, scalar(20), scalar(70), stickout, size)
+    res = join_plane_aligned_on_plane_aligned_timbers(t1, t2, scalar(20), scalar(70), stickout, size)  # ty: ignore[deprecated]
     assert float(res.length) == pytest.approx(138.924, 0.01)
     assert are_vectors_parallel(
         res.get_face_direction_global(TimberLongFace.RIGHT),
@@ -2130,7 +2130,7 @@ class TestAttachPlaneAlignedTimber:
         face = attach_face_aligned_timber(**common)
         bp, bf = plane.get_bottom_position_global(), face.get_bottom_position_global()
         self._assert_v3(bp, bf[0], bf[1], bf[2])
-        assert safe_zero_test(plane.length - face.length)  # ty: ignore[no-matching-overload]
+        assert safe_zero_test(plane.length - face.length)
         ld, lf = plane.get_length_direction_global(), face.get_length_direction_global()
         self._assert_v3(ld, lf[0], lf[1], lf[2])
         wd, wf = plane.get_width_direction_global(), face.get_width_direction_global()

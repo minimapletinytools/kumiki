@@ -23,7 +23,6 @@ import argparse
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-from kumiki.rule import set_numeric_mode, get_numeric_mode
 
 
 def _load_structure_factory(module_name: str, factory_name: str):
@@ -202,7 +201,6 @@ def write_report(filepath, results_construction, results_geometry):
         f.write("=" * 70 + "\n")
         f.write(f"PROFILING REPORT: tinyhouse120\n")
         f.write(f"Generated: {datetime.now().isoformat()}\n")
-        f.write(f"Numeric Mode: {get_numeric_mode()}\n")
         f.write("=" * 70 + "\n\n")
         
         # Frame Construction Timing
@@ -239,16 +237,11 @@ def main():
     parser.add_argument("--hash", action="store_true", help="Include timber hashing time")
     parser.add_argument("--geometry", type=int, default=1, 
                         help="Number of times to generate geometry (default: 1)")
-    parser.add_argument("--numeric-mode", type=str, choices=["symbolic", "float"], default="symbolic",
-                        help="Numeric mode for hot math paths (default: symbolic)")
     parser.add_argument("--output", type=str, default=None,
                         help="Write report to file (default: prints to stdout)")
     
     args = parser.parse_args()
 
-    set_numeric_mode(args.numeric_mode)
-    print(f"Numeric mode: {get_numeric_mode()}")
-    
     # Run profiling
     results_construction = profile_frame_construction(quick=args.quick, hash_timbers=args.hash)
     
@@ -271,7 +264,6 @@ def main():
     print("\n" + "=" * 70)
     print("SUMMARY")
     print("=" * 70)
-    print(f"Numeric mode:        {get_numeric_mode()}")
     print(f"Frame construction:  {results_construction['wall_time']:.3f}s")
     if results_geometry:
         print(f"Geometry generation: {results_geometry['avg_csg_time']:.3f}s (avg)")

@@ -1545,7 +1545,7 @@ class TestCutTimberBoundingBoxPrisms:
         cut_timber = CutTimber(timber, cuts=[cut])
 
         expected = cut_timber.get_perfect_timber_within_bounding_box_prism()
-        for actual in (cut_timber.get_bounding_box_prism(), cut_timber.DEPRECATED_approximate_bounding_prism()):
+        for actual in (cut_timber.get_bounding_box_prism(), cut_timber.DEPRECATED_approximate_bounding_prism()):  # ty: ignore[deprecated]
             assert actual.size == expected.size
             assert actual.start_distance == expected.start_distance
             assert actual.end_distance == expected.end_distance
