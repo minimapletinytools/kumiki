@@ -1,17 +1,18 @@
 # CSG feature selection and measurement: audit + design
 
-## Status — paused after step 5 (2026-08-23)
+## Status — step 6 part A done (2026-08-23)
 
-Steps 1-5 are done and committed on branch **`csg-feature-selection-steps-1-5`**, nine
-commits ahead of `main`, unpushed. Land with:
+Steps 1-5 are done, plus part A of step 6. All committed on branch
+**`csg-feature-selection-steps-1-5`**, unpushed, with `main` merged in. Land with:
 
 ```
 git checkout main && git merge --ff-only csg-feature-selection-steps-1-5
 ```
 
-Suite at the tip: **1016 python + 9 gui + 212 jest passing**, `make typecheck` at its 8
-long-standing diagnostics (all pre-existing, none in files this work touched -- see "Loose
-ends"). `TODO.txt` has uncommitted edits that are the user's, not part of this work.
+Suite at the tip: **1020 python + 9 gui + 213 jest passing**, and `make typecheck` now
+passes clean -- the eight long-standing diagnostics were cleared in `6375cd5`, so a new
+error finally has somewhere to stand out. `uv.lock` no longer goes dirty on every `uv run`
+(`1028300`).
 
 ### What works now
 
@@ -32,7 +33,20 @@ existing runner path.
 | — | Rename epsilons -> test tolerances | `c3f1a04` |
 | 5 | Derive edges where declared faces meet | `dce0689` |
 
-### Picking up: step 6
+### Picking up: step 6, parts B-D
+
+Part A is done (`1f7997a`): picking now reports `jointName`, derived rather than stored --
+see D7 for why the stored version was built and rejected. What is left:
+
+- **B (python).** `serialize_cut_csg_tree` should walk the whole timber's rendered CSG
+  rather than one cutting's negative, include untagged intermediates, and carry per-node
+  feature metadata.
+- **C (python).** `find_csg_at_point` still needs `featureType` and `facesToward`.
+  `jointName` landed with part A.
+- **D (js).** `mergeCSGTreePayload` in `layers-panel.js` is a stub; the multi-line info
+  panel and two-way tree binding are the remaining work.
+
+### Original step 6 outline
 
 **Joint attribution + the CSG feature tree UI.** Outlined in full below under "Build order",
 but the short version is that the transport already exists end to end and only the two ends
