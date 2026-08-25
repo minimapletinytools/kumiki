@@ -345,6 +345,19 @@ IGNORE-get vmware fusion and test on windows
 
 -continue fetaure impl --resume b9de226c-0f18-4592-b200-d230dd6f9902
 
+  
+-refine CSG label
+  -create CSGLabl class
+  -Cutting CSG label setting logic is a little weird, change it to as follows
+    -cutting owns the CSG lable for the joint
+    -always do the `result = SolidUnion([result], label=CutCSGLabel(self.label))` thing, even if no label I tihnk, just more consistent
+  -Cutting should not create EmptyCSG if no cuttings
+
+-next, look at all calls to _create_extended_rectangular_prism, and set the label accordingly, so if it is a board
+  set it to "board", also do the same to get_actual_csg_local and get_extended_actual_csg_local  so it should say
+  "board (rough, extended)" in the case of extende_actual_csg...  you will need to change those to clas methods so
+  we know what the derived class is to set the label correctly.
+
 -selectino feedback
   -name all the rest of your joints
   -should show perfect.face not rough.face if rough == perfect?
@@ -354,6 +367,7 @@ IGNORE-get vmware fusion and test on windows
   -the first level shows "rectangular prism (presumably the timber itself) rather than difference
     -probably just show difference for now...
   -set labels in all the get csg function in timber.py
+
 
 
 -need some rule or test to ensure no confilcting feature names within a joint
