@@ -11,13 +11,13 @@
     //
     // A timber's CSG appears in two places, both built from this one payload:
     //
-    //   by timbers  the body, with every cutting hanging beneath it
-    //   by joints   the body, with just the one cutting belonging to this
-    //               joint member -- so a cutting can be read against the
-    //               timber body it cuts into
+    //   by timbers  the rendered CSG as it is
+    //   by joints   the same tree narrowed to one cutting, so that cutting can
+    //               be read against the timber body it cuts into
     //
-    // Both views therefore start at the timber body rather than at the
-    // rendered Difference, which is a wrapper with nothing to show.
+    // Neither view rearranges the tree. Every node shows its real children,
+    // top tier included, because anything else buries the timber body -- and
+    // the body is where the faces you want to reach live.
 
     /** Roles as the tree displays them, mapped from the payload's roles. */
     function displayRole(role) {
@@ -66,13 +66,9 @@
         return 'csg:j:' + jointId + ':' + timberKey + ':' + cutIndex;
     }
 
-    /**
-     * Build a display node and everything under it. `appended` adds children
-     * the payload does not have -- the cuttings hung beneath the body, which
-     * are siblings of the body in CSG terms but children of it on screen.
-     */
-    function buildNode(payloadNode, prefix, indexPath, appended) {
-        const childPayloads = (payloadNode.children || []).concat(appended || []);
+    /** Build a display node and everything under it. */
+    function buildNode(payloadNode, prefix, indexPath) {
+        const childPayloads = payloadNode.children || [];
         const node = {
             id: nodeId(prefix, indexPath),
             kind: payloadNode.kind,
@@ -91,27 +87,46 @@
         return node;
     }
 
-    /** The by-timbers tree: the body, with every cutting beneath it. */
+    /**
+     * The by-timbers tree: the rendered CSG exactly as it is.
+     *
+     * Nothing is reshaped at the top. The root is the Difference the timber
+     * renders as -- base and cuts as ordinary children -- or the body itself
+     * when the timber has no cuts. Hanging the cuts off the body instead
+     * would read more directly, but it buries the body's own structure under
+     * the things subtracted from it, and the body is exactly where the faces
+     * you want to reach live.
+     */
     function timberTree(payload, timberKey) {
-        const split = splitBodyAndCuts(payload && payload.tree);
-        if (!split) {
+        const root = payload && payload.tree;
+        if (!root) {
             return null;
         }
-        const root = buildNode(split.body, timberPrefix(timberKey), [0], split.cuts);
-        root.role = 'body';
-        return root;
+        return buildNode(root, timberPrefix(timberKey), [0]);
     }
 
-    /** The by-joints tree: the body, with only this member's cutting beneath it. */
+    /**
+     * The by-joints tree: the timber as this one cutting alone would leave it.
+     *
+     * Literally Difference(body, [thisCut]) -- a real sub-CSG of the rendered
+     * tree, not a display arrangement -- so the cutting can be read against
+     * the body it cuts into. A timber with no cuts is just its body.
+     */
     function jointCuttingTree(payload, timberKey, jointId, cutIndex) {
-        const split = splitBodyAndCuts(payload && payload.tree);
-        if (!split) {
+        const root = payload && payload.tree;
+        if (!root) {
             return null;
         }
+        const prefix = jointPrefix(jointId, timberKey, cutIndex);
+        const split = splitBodyAndCuts(root);
         const cut = split.cuts.filter((child) => child.cutIndex === cutIndex);
-        const root = buildNode(split.body, jointPrefix(jointId, timberKey, cutIndex), [0], cut);
-        root.role = 'body';
-        return root;
+        if (!cut.length) {
+            return buildNode(split.body, prefix, [0]);
+        }
+        const justThisCut = Object.assign({}, root, {
+            children: [split.body].concat(cut),
+        });
+        return buildNode(justThisCut, prefix, [0]);
     }
 
     /**

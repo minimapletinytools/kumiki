@@ -122,18 +122,40 @@ describe('splitBodyAndCuts', () => {
 });
 
 describe('timberTree', () => {
-    test('is rooted at the body, with cuttings beneath it', () => {
+    test('is the rendered Difference, with the body as an ordinary child', () => {
+        // The body must stay reachable as its own node: hanging the cuts off
+        // it would bury the very faces you open the tree to find.
         const root = CsgTreeView.timberTree(buttTimberPayload(), 'T1');
+        expect(root.kind).toBe('Difference');
+        expect(root.children.map((c) => [c.kind, c.role])).toEqual([
+            ['RectangularPrism', 'base'],
+            ['SolidUnion', 'cut'],
+        ]);
+    });
+
+    test('the body keeps its own features rather than the cuts', () => {
+        const root = CsgTreeView.timberTree(buttTimberPayload(), 'T1');
+        const body = root.children[0];
+        expect(body.features.map((f) => f.name)).toEqual(['rough.top']);
+        expect(body.children).toEqual([]);
+    });
+
+    test('an uncut timber is its body, with no Difference wrapping it', () => {
+        const bare = {
+            tree: {
+                kind: 'RectangularPrism', label: null, path: [], role: null,
+                features: [], children: [],
+            },
+        };
+        const root = CsgTreeView.timberTree(bare, 'T1');
         expect(root.kind).toBe('RectangularPrism');
-        expect(root.role).toBe('body');
-        expect(root.children).toHaveLength(1);
-        expect(root.children[0].label).toBe('mortise_and_tenon');
-        expect(root.children[0].role).toBe('cut');
+        expect(root.children).toEqual([]);
     });
 
     test('shows every cutting, each keeping its own joint attribution', () => {
         const root = CsgTreeView.timberTree(twoCutPayload(), 'T1');
-        expect(root.children.map((c) => [c.label, c.jointId, c.cutIndex])).toEqual([
+        const cuts = root.children.filter((c) => c.role === 'cut');
+        expect(cuts.map((c) => [c.label, c.jointId, c.cutIndex])).toEqual([
             ['lap', '7', 0],
             ['peg', '9', 1],
         ]);
@@ -141,7 +163,7 @@ describe('timberTree', () => {
 
     test('renders a nested Difference as explicit base and cut children', () => {
         const root = CsgTreeView.timberTree(buttTimberPayload(), 'T1');
-        const nested = root.children[0].children[0];
+        const nested = root.children[1].children[0];
         expect(nested.kind).toBe('Difference');
         expect(nested.children.map((c) => [c.label, c.role])).toEqual([
             ['shoulder', 'base'],
@@ -162,20 +184,25 @@ describe('timberTree', () => {
 });
 
 describe('jointCuttingTree', () => {
-    test('shows the body plus only the cutting asked for', () => {
+    test('is the timber as this one cutting alone would leave it', () => {
         const root = CsgTreeView.jointCuttingTree(twoCutPayload(), 'T1', '9', 1);
-        expect(root.role).toBe('body');
-        expect(root.children.map((c) => c.label)).toEqual(['peg']);
+        expect(root.kind).toBe('Difference');
+        expect(root.children.map((c) => [c.role, c.label])).toEqual([
+            ['base', null],
+            ['cut', 'peg'],
+        ]);
     });
 
-    test('starts at the timber body, so a cutting reads against what it cuts', () => {
+    test('the body is there in full, so a cutting reads against what it cuts', () => {
         const root = CsgTreeView.jointCuttingTree(buttTimberPayload(), 'T1', '3', 0);
-        expect(root.kind).toBe('RectangularPrism');
-        expect(root.features.map((f) => f.name)).toEqual(['rough.top']);
+        const body = root.children[0];
+        expect(body.kind).toBe('RectangularPrism');
+        expect(body.features.map((f) => f.name)).toEqual(['rough.top']);
     });
 
-    test('a cutting that is not on this timber yields a body with no cuts', () => {
+    test('a cutting that is not on this timber yields the body alone', () => {
         const root = CsgTreeView.jointCuttingTree(twoCutPayload(), 'T1', '9', 42);
+        expect(root.kind).toBe('RectangularPrism');
         expect(root.children).toEqual([]);
     });
 
@@ -206,8 +233,9 @@ describe('flatten', () => {
     test('expanding a node reveals its children one level down', () => {
         const root = CsgTreeView.timberTree(buttTimberPayload(), 'T1');
         const rows = CsgTreeView.flatten(root, new Set([root.id]));
-        expect(rows.map((r) => r.depth)).toEqual([0, 1]);
-        expect(rows[1].label).toBe('mortise_and_tenon');
+        expect(rows.map((r) => r.depth)).toEqual([0, 1, 1]);
+        expect(rows[1].role).toBe('base');
+        expect(rows[2].label).toBe('mortise_and_tenon');
     });
 
     test('leaves report no children so they get no chevron', () => {
@@ -218,7 +246,8 @@ describe('flatten', () => {
 
     test('accepts an array of expanded ids as well as a Set', () => {
         const root = CsgTreeView.timberTree(twoCutPayload(), 'T1');
-        expect(CsgTreeView.flatten(root, [root.id])).toHaveLength(3);
+        // root + body + two cuts
+        expect(CsgTreeView.flatten(root, [root.id])).toHaveLength(4);
     });
 });
 
@@ -237,9 +266,14 @@ describe('findByPath', () => {
         expect(CsgTreeView.findByPath(root, ['mortise_and_tenon', 'tenon']).label).toBe('tenon');
     });
 
-    test('an empty path is the timber body', () => {
+    test('an empty path resolves to the tree root', () => {
+        // Shallowest-wins is justified by label ownership, and an empty path
+        // owns no label -- it means the pick found no labelled ancestor at
+        // all. The root is then the honest answer: the path alone cannot say
+        // which unlabelled node was hit, and it is what find_csg_by_path
+        // resolves to, so the 3D highlight agrees.
         const root = CsgTreeView.timberTree(buttTimberPayload(), 'T1');
-        expect(CsgTreeView.findByPath(root, []).role).toBe('body');
+        expect(CsgTreeView.findByPath(root, [])).toBe(root);
     });
 
     test('returns null when no node matches', () => {

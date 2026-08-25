@@ -410,8 +410,7 @@
             const row = document.createElement('div');
             const depth = baseDepth + node.depth;
             row.className = 'lp-row lp-row-csg lp-selectable'
-                + (node.role === 'cut' ? ' lp-csg-cut' : '')
-                + (node.role === 'body' ? ' lp-csg-body' : '');
+                + (node.role === 'cut' ? ' lp-csg-cut' : '');
             row.dataset.nodeId = node.id;
             row.style.paddingLeft = csgIndentPx(depth) + 'px';
 

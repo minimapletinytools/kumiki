@@ -21,9 +21,14 @@ Decisions already made by the user:
   timber the ray hits, even if an unselected timber is nearer along the ray. If the ray hits
   only unselected timbers, select the nearest as usual. Empty space clears. Shift-click keeps
   toggling timber membership on the nearest hit.
-- **Nested Difference**: plain explicit nodes — a `Difference` row with the base and each cut
-  as ordinary children, role-marked ("base" / "− cut"). Only the **first tier** is special:
-  the root row is the timber body, with one child row per cutting attributed to its joint.
+- **Difference**: plain explicit nodes — a `Difference` row with the base and each cut
+  as ordinary children, role-marked ("base" / "− cut").
+  > **Superseded during implementation.** This originally carved out the first tier as
+  > special: the root row was the timber body, with a child row per cutting. That was
+  > built, then removed — hanging the cuts off the body buries the body's own structure,
+  > and the body is exactly where the reachable faces live. The top tier now follows the
+  > same plain rule as every other level: the root is the rendered `Difference` (or the
+  > body itself when the timber has no cuts).
 - **Info pane collapsed state** (the default, and it never auto-expands): counts line +
   selection breadcrumb. Expanding adds the pick detail lines (feature type, joint, faces toward).
 - Tree labels show **base type · tagged name** (e.g. `Prism · shoulder`). SolidUnion /

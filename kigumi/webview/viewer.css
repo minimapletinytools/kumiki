@@ -1365,10 +1365,6 @@ kigumi-layers-view:has(.lp-collapsed) {
     cursor: help;
 }
 
-.lp-csg-body .lp-csg-kind {
-    font-weight: 600;
-}
-
 /* A cut subtree is material being removed. The rule down its left edge makes
    that readable at a glance in a deep tree, where a lone minus sign several
    levels in is easy to miss. */
