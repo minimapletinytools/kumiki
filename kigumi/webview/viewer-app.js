@@ -275,6 +275,11 @@ function createTheme(theme) {
     });
 }
 
+// Rail width limits: wide enough for a deep CSG row to be readable, narrow
+// enough that the rail never takes over the viewport.
+const RAIL_MIN_WIDTH_PX = 180;
+const RAIL_MAX_WIDTH_PX = 640;
+
 const THEMES = Object.freeze({
     'cream': createTheme({
         label: 'Cream',
@@ -482,9 +487,9 @@ const EXPORT_FORMAT_PROP = {
 };
 
 // Classify the current selection into one of SELECTION_VISUAL_STATES from a
-// plain snapshot (list of selected timber keys + the csg subselection), so the
+// plain snapshot (list of selected timber keys + the csg focus), so the
 // decision is pure and independently testable.
-function computeSelectionVisualContext(selectedTimbers, csgSelection) {
+function computeSelectionVisualContext(selectedTimbers, csgFocus) {
     const selectedTimberSet = new Set(selectedTimbers);
     if (selectedTimberSet.size === 0) {
         return {
@@ -495,7 +500,7 @@ function computeSelectionVisualContext(selectedTimbers, csgSelection) {
         };
     }
 
-    const csg = csgSelection;
+    const csg = csgFocus;
     const path = csg && Array.isArray(csg.path) ? csg.path : [];
     const featureLabel = csg && csg.featureLabel ? csg.featureLabel : null;
     const csgTimberKey = csg && csg.timberKey ? csg.timberKey : null;
@@ -1181,6 +1186,12 @@ class KigumiViewerApp extends LitElement {
         this.animationHandle = null;
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
+        // Info pane. Collapsed by default and never auto-expands: it is a
+        // glance, not a workspace, and the CSG trees live in the layers panel.
+        this.infoPanelExpanded = false;
+        this.csgTreesByKey = new Map();  // memberKey -> { memberKey, tree }
+        this.csgTreeRequests = new Set();// memberKeys already asked for
+        this.lastPickDetail = null;      // featureType / jointName / facesToward
         this.renderParameterSchema = [];
         this.appliedRenderParameters = {};
         this.pendingRenderParameters = {};
@@ -1211,6 +1222,11 @@ class KigumiViewerApp extends LitElement {
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
         this.onLayerStateSync = this.onLayerStateSync.bind(this);
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
+        this.onCsgTreeRequested = this.onCsgTreeRequested.bind(this);
+        this.onCsgByPathRequested = this.onCsgByPathRequested.bind(this);
+        this.onRailResizeStart = this.onRailResizeStart.bind(this);
+        this.onRailResizeMove = this.onRailResizeMove.bind(this);
+        this.onRailResizeEnd = this.onRailResizeEnd.bind(this);
         this.onWindowContextMenuDismiss = this.onWindowContextMenuDismiss.bind(this);
     }
 
@@ -1242,8 +1258,12 @@ class KigumiViewerApp extends LitElement {
                     <div id="loading-text">${this.viewState.loadingText}</div>
                     <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
                 </div>
-                <div id="info"></div>
-                <kigumi-layers-view id="layers-view"></kigumi-layers-view>
+                <div id="left-rail">
+                    <div id="info-panel" class="ip-panel"></div>
+                    <kigumi-layers-view id="layers-view"></kigumi-layers-view>
+                    <div id="rail-resize" title=${t('viewer.layers.resize.title')}
+                         @pointerdown=${this.onRailResizeStart}></div>
+                </div>
                 <div id="gizmo-panel" aria-label=${t('viewer.chrome.gizmoPanel.ariaLabel')}>
                     <div class="gizmo-block">
                         <div class="gizmo-title">${t('viewer.chrome.gizmo.camera')}</div>
@@ -1353,7 +1373,7 @@ class KigumiViewerApp extends LitElement {
                 // Only clear CSG when the timber change is a "fresh" user
                 // action (not caused by layers-view setting CSG first, which
                 // also selects the timber for opacity purposes).
-                if (!this.selectionManager.csgSelection) {
+                if (!this.selectionManager.csgFocus) {
                     this.removeCSGHighlight();
                 }
             }
@@ -1371,6 +1391,8 @@ class KigumiViewerApp extends LitElement {
             this._layersView.addEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.addEventListener('layer-state-sync', this.onLayerStateSync);
             this._layersView.addEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
+            this._layersView.addEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
+            this._layersView.addEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
         }
         // Layers tree (and any background assembly solve) data arrives
         // unprompted, pushed by the extension host once it's actually ready
@@ -1393,6 +1415,10 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('pointerup', this.onGizmoPointerUp);
         window.removeEventListener('pointermove', this.onLightDialPointerMove);
         window.removeEventListener('pointerup', this.onLightDialPointerUp);
+        // Only attached mid-drag, so this matters when the panel closes with
+        // the mouse still down.
+        window.removeEventListener('pointermove', this.onRailResizeMove);
+        window.removeEventListener('pointerup', this.onRailResizeEnd);
         if (this.animationHandle) {
             cancelAnimationFrame(this.animationHandle);
             this.animationHandle = null;
@@ -1401,6 +1427,8 @@ class KigumiViewerApp extends LitElement {
             this._layersView.removeEventListener('layer-state-changed', this.onLayerStateChanged);
             this._layersView.removeEventListener('layer-state-sync', this.onLayerStateSync);
             this._layersView.removeEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
+            this._layersView.removeEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
+            this._layersView.removeEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
         }
         if (this.gizmoRenderer) {
             this.gizmoRenderer.dispose();
@@ -1444,8 +1472,7 @@ class KigumiViewerApp extends LitElement {
         }
         if (detail.prop === 'locked' && detail.value === true) {
             if (this.selectionManager.isTimberSelected(key)) {
-                this.selectionManager.clearCSGSelection();
-                this.removeCSGHighlight();
+                this._dropCsgFocus();
                 this.selectionManager.deselectTimber(key);
             }
         }
@@ -2153,6 +2180,10 @@ class KigumiViewerApp extends LitElement {
                     ? AssemblyTimeline.normalizeAssemblyPayload(assemblyPayload)
                     : null);
             }
+            // Same reason the panel drops its copies: a refreshed frame can
+            // have a different CSG, so cached trees must not outlive it.
+            this.csgTreesByKey.clear();
+            this.csgTreeRequests.clear();
             if (this._layersView && typeof this._layersView.setLayersPayload === 'function') {
                 this._layersView.setLayersPayload(message.payload || {});
             }
@@ -2168,9 +2199,11 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (message.type === 'csgTree') {
-            if (this._layersView && typeof this._layersView.mergeCSGTreePayload === 'function') {
-                this._layersView.mergeCSGTreePayload(message.payload || {});
+            const payload = message.payload || {};
+            if (payload.tree) {
+                this.onCsgTreeArrived(payload);
             }
+            this.updateInfo(this.currentFrameData);
             return;
         }
 
@@ -2453,9 +2486,8 @@ class KigumiViewerApp extends LitElement {
             event.preventDefault();
             if (this.contextMenuState) {
                 this.closeMemberContextMenu();
-            } else if (this.selectionManager.csgSelection) {
-                this.selectionManager.clearCSGSelection();
-                this.removeCSGHighlight();
+            } else if (this.selectionManager.csgFocus) {
+                this._dropCsgFocus();
             } else {
                 this.selectionManager.clearTimberSelection();
             }
@@ -2491,20 +2523,20 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    // Raycasts from a client (screen) point into the scene and returns the closest
-    // visible, unlocked member hit, or null. Shared by left-click selection and the
+    // Raycasts from a client (screen) point and returns every visible, unlocked
+    // member hit, nearest first. Shared by left-click selection and the
     // right-click context menu so both use identical hit-testing.
-    _findMemberAtClientPoint(clientX, clientY) {
+    _findMembersAlongRay(clientX, clientY) {
         const canvas = this.renderRoot.querySelector('#c');
         if (!canvas) {
-            return null;
+            return [];
         }
         const rect = canvas.getBoundingClientRect();
         if (
             clientX < rect.left || clientX > rect.right ||
             clientY < rect.top || clientY > rect.bottom
         ) {
-            return null;
+            return [];
         }
 
         const normalizedX = ((clientX - rect.left) / rect.width) * 2 - 1;
@@ -2521,44 +2553,58 @@ class KigumiViewerApp extends LitElement {
             targetMeshes.push(bundle.mesh);
         }
         const intersects = this.navigationRaycaster.intersectObjects(targetMeshes, false);
-        if (intersects.length === 0) {
-            return null;
+        const hits = [];
+        for (const hit of intersects) {
+            const memberKey = this.meshKeyMap.get(hit.object);
+            if (memberKey) {
+                hits.push({ memberKey, hit });
+            }
         }
+        return hits;
+    }
 
-        const hit = intersects[0];
-        const memberKey = this.meshKeyMap.get(hit.object);
-        if (!memberKey) {
-            return null;
-        }
-        return { memberKey, hit };
+    // The closest visible, unlocked member hit, or null. Used where only the
+    // frontmost thing matters, such as the right-click context menu.
+    _findMemberAtClientPoint(clientX, clientY) {
+        return this._findMembersAlongRay(clientX, clientY)[0] || null;
+    }
+
+    /** Drop the CSG focus and everything that hangs off it. */
+    _dropCsgFocus() {
+        this.selectionManager.clearCsgFocus();
+        this.lastPickDetail = null;
+        this.removeCSGHighlight();
     }
 
     handleCanvasClick(event) {
         if (!event) {
             return;
         }
-        const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
+        const hits = this._findMembersAlongRay(event.clientX, event.clientY);
+        const decision = choosePickAction({
+            hits,
+            selectedTimbers: this.selectionManager.selectedTimbers,
+            shiftKey: !!event.shiftKey,
+        });
 
-        if (!found) {
-            this.selectionManager.clearLayerSelection();
-            this.selectionManager.clearCSGSelection();
-            this.removeCSGHighlight();
+        if (decision.action === 'clear') {
+            this._dropCsgFocus();
             this.selectionManager.clearTimberSelection();
             return;
         }
 
-        const { memberKey, hit } = found;
-        this.selectionManager.clearLayerSelection();
+        const { memberKey, hit } = decision;
 
-        if (event.shiftKey) {
-            this.selectionManager.clearCSGSelection();
-            this.removeCSGHighlight();
+        if (decision.action === 'toggle') {
+            this._dropCsgFocus();
             this.selectionManager.toggleTimber(memberKey);
-        } else if (this.selectionManager.isTimberSelected(memberKey) && this.selectionManager.selectedTimbers.size === 1) {
-            // Already selected single timber — navigate CSG tree
+        } else if (decision.action === 'csg') {
+            // Drilling into a timber that is already selected. Ask the runner
+            // what sits under the cursor; the answer comes back as a
+            // csgSelectionResult and becomes the new focus.
             const point = [hit.point.x, hit.point.y, hit.point.z];
-            const csg = this.selectionManager.csgSelection;
-            const currentPath = (csg && csg.timberKey === memberKey) ? csg.path : [];
+            const focus = this.selectionManager.csgFocus;
+            const currentPath = (focus && focus.timberKey === memberKey) ? focus.path : [];
             if (typeof vscode !== 'undefined') {
                 vscode.postMessage({
                     type: 'findCSGAtPoint',
@@ -2569,8 +2615,7 @@ class KigumiViewerApp extends LitElement {
                 });
             }
         } else {
-            this.selectionManager.clearCSGSelection();
-            this.removeCSGHighlight();
+            this._dropCsgFocus();
             this.selectionManager.selectTimber(memberKey, false);
         }
 
@@ -2631,18 +2676,38 @@ class KigumiViewerApp extends LitElement {
     handleCSGSelectionResult(message) {
         const path = Array.isArray(message.path) ? message.path : [];
         const featureLabel = message.featureLabel || null;
+        this.lastPickDetail = {
+            featureType: message.featureType || null,
+            jointName: message.jointName || null,
+            facesToward: message.facesToward || null,
+        };
         const hlMesh = message.highlightMesh;
         const parentHlMesh = message.parentHighlightMesh || null;
         const stats = message.stats;
 
-        // Find which timber this applies to
-        const csg = this.selectionManager.csgSelection;
-        const timberKey = (csg && csg.timberKey) || (this.selectionManager.selectedTimbers.size === 1
-            ? this.selectionManager.getSelectedTimbers()[0]
-            : null);
+        // Which timber this applies to. message.memberKey is authoritative
+        // now that several timbers can be selected at once; the focus and the
+        // lone-selection fallback only cover older runners that omit it.
+        const focus = this.selectionManager.csgFocus;
+        const timberKey = message.memberKey
+            || (focus && focus.timberKey)
+            || (this.selectionManager.selectedTimbers.size === 1
+                ? this.selectionManager.getSelectedTimbers()[0]
+                : null);
 
         if (timberKey) {
-            this.selectionManager.selectCSG(timberKey, path, featureLabel);
+            const cutIndex = this._cutIndexForPick(timberKey, path);
+            const target = CsgTreeView.revealTarget(focus, { timberKey, cutIndex });
+            this.selectionManager.setCsgFocus({
+                timberKey,
+                path,
+                featureLabel,
+                cutIndex,
+                context: target.section === 'joints'
+                    ? { section: 'joints', jointId: target.jointId, cutIndex: target.cutIndex }
+                    : { section: 'timbers' },
+            });
+            this._revealCsgFocusInList(target, path);
         }
 
         const baseUnselectedOpacity = 1 - (this.unselectedTransparencyPercent / 100);
@@ -2745,7 +2810,7 @@ class KigumiViewerApp extends LitElement {
     _getSelectionVisualContext() {
         return computeSelectionVisualContext(
             this.selectionManager.getSelectedTimbers(),
-            this.selectionManager.csgSelection,
+            this.selectionManager.csgFocus,
         );
     }
 
@@ -2940,21 +3005,14 @@ class KigumiViewerApp extends LitElement {
             }
         }
 
-        // Feature/CSG selections reference triangles on the actual-geometry mesh;
-        // the perfect-timber-within mesh is a different surface, so sub-selections become
-        // invalid when geometry swaps. Timber-level selection (memberKey) is
-        // preserved because identity is keyed by memberKey, not by mesh contents.
+        // A CSG focus references triangles on the actual-geometry mesh; the
+        // perfect-timber-within mesh is a different surface, so the focus
+        // becomes invalid when geometry swaps. Timber-level selection survives,
+        // because identity is keyed by memberKey, not by mesh contents.
         if (swappedKeys.size > 0 && this.selectionManager) {
-            const remainingFeatures = (this.selectionManager.selectedFeatures || []).filter(
-                (f) => !swappedKeys.has(f.timberName)
-            );
-            if (remainingFeatures.length !== (this.selectionManager.selectedFeatures || []).length) {
-                this.selectionManager.selectedFeatures = remainingFeatures;
-                this.selectionManager.emit && this.selectionManager.emit({ type: 'clear-features' });
-            }
-            const csgSel = this.selectionManager.csgSelection;
-            if (csgSel && swappedKeys.has(csgSel.timberKey)) {
-                this.selectionManager.clearCSGSelection();
+            const focus = this.selectionManager.csgFocus;
+            if (focus && swappedKeys.has(focus.timberKey)) {
+                this._dropCsgFocus();
             }
         }
 
@@ -4237,21 +4295,236 @@ class KigumiViewerApp extends LitElement {
             selectedSingleName = '';
         }
 
-        let breadcrumb = '';
-        if (selectedSingleName && this.selectionManager.csgSelection) {
-            const csg = this.selectionManager.csgSelection;
-            const parts = [selectedSingleName].concat(csg.path);
-            if (csg.featureLabel) {
-                parts.push('face (' + csg.featureLabel + ')');
+        const focus = this.selectionManager.csgFocus;
+        let breadcrumb = selectedSingleName;
+        if (focus) {
+            const focused = this.memberMetadataByKey.get(focus.timberKey);
+            const parts = [(focused && focused.name) || focus.timberKey].concat(focus.path);
+            if (focus.featureLabel) {
+                parts.push('face (' + focus.featureLabel + ')');
             }
-            breadcrumb = parts.join(' &gt; ');
-        } else {
-            breadcrumb = selectedSingleName;
+            breadcrumb = parts.join(' \u203a ');
         }
 
-        this.renderRoot.querySelector('#info').innerHTML =
-            'timbers (' + selectedTimberCount + '/' + timberCount + ') accesories (' + selectedAccessoryCount + '/' + accessoriesCount + ')' +
-            '<br>' + breadcrumb;
+        this._renderInfoPanel({
+            timberCount,
+            accessoriesCount,
+            selectedTimberCount,
+            selectedAccessoryCount,
+            breadcrumb,
+        });
+    }
+
+    /**
+     * The info pane: a glance at what is selected. It never expands itself --
+     * expanding is the user's choice, and the CSG trees live in the layers
+     * panel below rather than here.
+     */
+    _renderInfoPanel(summary) {
+        const panel = this.renderRoot.querySelector('#info-panel');
+        if (!panel) {
+            return;
+        }
+
+        panel.className = 'ip-panel';
+        panel.innerHTML = '';
+
+        const header = document.createElement('div');
+        header.className = 'ip-header';
+        const chev = document.createElement('span');
+        chev.className = 'ip-chev';
+        chev.textContent = this.infoPanelExpanded ? '\u25be' : '\u25b8';
+        header.appendChild(chev);
+        const headerTitle = document.createElement('span');
+        headerTitle.className = 'ip-title';
+        headerTitle.textContent = t('viewer.selection.header');
+        header.appendChild(headerTitle);
+        header.addEventListener('click', () => {
+            this.infoPanelExpanded = !this.infoPanelExpanded;
+            this.updateInfo(this.currentFrameData);
+        });
+        panel.appendChild(header);
+
+        const body = document.createElement('div');
+        body.className = 'ip-body';
+
+        const counts = document.createElement('div');
+        counts.className = 'ip-counts';
+        counts.textContent = t('viewer.selection.counts', {
+            selectedTimbers: summary.selectedTimberCount,
+            timbers: summary.timberCount,
+            selectedAccessories: summary.selectedAccessoryCount,
+            accessories: summary.accessoriesCount,
+        });
+        body.appendChild(counts);
+
+        if (summary.breadcrumb) {
+            const crumb = document.createElement('div');
+            crumb.className = 'ip-breadcrumb';
+            crumb.textContent = summary.breadcrumb;
+            crumb.title = summary.breadcrumb;
+            body.appendChild(crumb);
+        }
+
+        // Detail lines are the reward for expanding, so they stay behind it.
+        const detail = this.lastPickDetail;
+        if (this.infoPanelExpanded && detail && this.selectionManager.csgFocus) {
+            for (const [key, value] of [
+                ['viewer.selection.featureType', detail.featureType],
+                ['viewer.selection.joint', detail.jointName],
+                ['viewer.selection.facesToward', detail.facesToward],
+            ]) {
+                if (!value) {
+                    continue;
+                }
+                const line = document.createElement('div');
+                line.className = 'ip-detail';
+                const label = document.createElement('span');
+                label.className = 'ip-detail-label';
+                label.textContent = t(key);
+                const val = document.createElement('span');
+                val.className = 'ip-detail-value';
+                val.textContent = String(value).toLowerCase();
+                line.appendChild(label);
+                line.appendChild(val);
+                body.appendChild(line);
+            }
+        }
+
+        panel.appendChild(body);
+    }
+
+    // ------------------------------------------------------------------
+    // CSG trees: fetched here (the vscode channel lives in this component),
+    // rendered by the layers panel.
+    // ------------------------------------------------------------------
+
+    // ------------------------------------------------------------------
+    // Rail width. Both panes are children of #left-rail, so setting the
+    // rail's width resizes the info pane and the timber list together. The
+    // value lives on the host as a CSS variable, which survives lit
+    // re-renders of the shadow tree in a way an inline style on the rail
+    // would not.
+    // ------------------------------------------------------------------
+
+    onRailResizeStart(event) {
+        const rail = this.renderRoot.querySelector('#left-rail');
+        if (!rail || event.button !== 0) {
+            return;
+        }
+        event.preventDefault();
+        this._railResize = {
+            startX: event.clientX,
+            startWidth: rail.getBoundingClientRect().width,
+        };
+        const handle = this.renderRoot.querySelector('#rail-resize');
+        if (handle) {
+            handle.classList.add('is-dragging');
+        }
+        window.addEventListener('pointermove', this.onRailResizeMove);
+        window.addEventListener('pointerup', this.onRailResizeEnd);
+    }
+
+    onRailResizeMove(event) {
+        if (!this._railResize) {
+            return;
+        }
+        const delta = event.clientX - this._railResize.startX;
+        // Wide enough to read a row, narrow enough to leave the model visible.
+        const width = Math.max(RAIL_MIN_WIDTH_PX, Math.min(
+            RAIL_MAX_WIDTH_PX,
+            this._railResize.startWidth + delta,
+        ));
+        this.style.setProperty('--kigumi-rail-width', width + 'px');
+    }
+
+    onRailResizeEnd() {
+        this._railResize = null;
+        const handle = this.renderRoot.querySelector('#rail-resize');
+        if (handle) {
+            handle.classList.remove('is-dragging');
+        }
+        window.removeEventListener('pointermove', this.onRailResizeMove);
+        window.removeEventListener('pointerup', this.onRailResizeEnd);
+    }
+
+    /** The layers panel expanded a row and needs that timber's tree. */
+    onCsgTreeRequested(event) {
+        const detail = (event && event.detail) || {};
+        this.requestCsgTree(detail.memberKey);
+    }
+
+    /** A CSG row was clicked; ask the runner to highlight it in 3D. */
+    onCsgByPathRequested(event) {
+        const detail = (event && event.detail) || {};
+        if (!detail.memberKey || typeof vscode === 'undefined') {
+            return;
+        }
+        vscode.postMessage({
+            type: 'requestCSGByPath',
+            memberKey: detail.memberKey,
+            path: detail.path || [],
+        });
+    }
+
+    /** Ask the runner for a timber's tree, once per timber. */
+    requestCsgTree(memberKey) {
+        if (!memberKey || this.csgTreesByKey.has(memberKey) || this.csgTreeRequests.has(memberKey)) {
+            return;
+        }
+        this.csgTreeRequests.add(memberKey);
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({ type: 'requestCSGTree', memberKey });
+        }
+    }
+
+    /** Which cutting a pick landed on, or null if its tree is not in yet. */
+    _cutIndexForPick(timberKey, path) {
+        const payload = this.csgTreesByKey.get(timberKey);
+        if (!payload) {
+            return null;
+        }
+        return CsgTreeView.cutIndexForPath(payload, path);
+    }
+
+    /**
+     * Show the focused node in the list, fetching the tree first if need be.
+     * A pick can land before its tree arrives, in which case onCsgTreeArrived
+     * finishes the job.
+     */
+    _revealCsgFocusInList(target, path) {
+        this.requestCsgTree(target.timberKey);
+        const view = this._layersView;
+        if (view && typeof view.revealCsg === 'function') {
+            view.revealCsg({ ...target, path });
+        }
+    }
+
+    /** A requested tree came back. */
+    onCsgTreeArrived(payload) {
+        const memberKey = payload && payload.memberKey;
+        if (!memberKey) {
+            return;
+        }
+        this.csgTreeRequests.delete(memberKey);
+        this.csgTreesByKey.set(memberKey, payload);
+
+        const view = this._layersView;
+        if (view && typeof view.setCsgTree === 'function') {
+            view.setCsgTree(memberKey, payload);
+        }
+
+        // A pick that arrived before its tree could not work out its cutting,
+        // and so could not be revealed. Now it can.
+        const focus = this.selectionManager.csgFocus;
+        if (focus && focus.timberKey === memberKey && focus.cutIndex === null) {
+            const cutIndex = CsgTreeView.cutIndexForPath(payload, focus.path);
+            if (cutIndex !== null) {
+                focus.cutIndex = cutIndex;
+            }
+            const target = CsgTreeView.revealTarget(focus, { timberKey: memberKey, cutIndex });
+            this._revealCsgFocusInList(target, focus.path);
+        }
     }
 
     updateDebug(geometryData, profiling) {

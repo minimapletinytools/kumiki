@@ -140,6 +140,16 @@
   "viewer.layers.show.title": "表示",
   "viewer.layers.footer.showAll": "すべて表示",
   "viewer.layers.footer.unlockAll": "すべてロック解除",
+  "viewer.layers.resize.title": "ドラッグでサイズ変更",
+  "viewer.layers.csg.loading": "読み込み中…",
+  "viewer.layers.csg.empty": "CSG なし",
+  "viewer.layers.csg.cutOn": "{timber} · 切断 {cut}",
+
+  "viewer.selection.header": "選択",
+  "viewer.selection.counts": "材 ({selectedTimbers}/{timbers})  金物 ({selectedAccessories}/{accessories})",
+  "viewer.selection.featureType": "フィーチャー",
+  "viewer.selection.joint": "接合",
+  "viewer.selection.facesToward": "向き",
 
   "sidebar.kumikiDevMode": "Kumiki開発モード",
   "sidebar.kumikiDevMode.desc": "kumikiリポジトリを検出しました",

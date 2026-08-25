@@ -8,6 +8,23 @@
     const t = globalScope.KigumiI18n
         ? globalScope.KigumiI18n.createTranslator(_i18nStrings)
         : (key) => key;
+    // The model behind the embedded CSG trees. viewer.html loads it ahead of
+    // this file; capturing it here makes that ordering a stated dependency
+    // rather than something the rows happen to get away with at click time.
+    const CsgTreeView = globalScope.CsgTreeView;
+
+    // CSG rows indent from where the member rows leave off (.lp-depth-0 is
+    // 18px), one step per level. The old 10px step started shallower than the
+    // timber row above it, so a tree read as a sibling of its own timber.
+    const CSG_INDENT_BASE_PX = 18;
+    const CSG_INDENT_STEP_PX = 14;
+    // What .lp-depth-0 / .lp-depth-1 / .lp-depth-2 indent member rows by, kept
+    // here so the guard test can check CSG rows nest deeper than their parent.
+    const MEMBER_ROW_INDENT_PX = [18, 22, 34];
+
+    function csgIndentPx(depth) {
+        return CSG_INDENT_BASE_PX + depth * CSG_INDENT_STEP_PX;
+    }
 
     class LayersPanel {
         constructor(selectionManager, layerStateStore) {
@@ -17,6 +34,11 @@
             this.collapsed = true;
             // Default: top-level sections open, individual nodes closed
             this.expandedNodes = new Set(['section:timbers', 'section:joints']);
+            // Per-timber CSG payloads, fetched lazily when a row is expanded.
+            this.csgTreesByKey = new Map();
+            this.requestedCsgTrees = new Set();
+            this._pendingReveal = null;
+            this._focusedCsgNodeId = null;
             this.filterText = '';
             this.showTagPills = true;
             this.el = null;
@@ -35,6 +57,9 @@
             this._render();
 
             this._unsubSelection = this.selectionManager.onSelectionChanged(() => {
+                if (!this.selectionManager.csgFocus) {
+                    this._focusedCsgNodeId = null;
+                }
                 this._syncHighlight();
             });
             this._unsubLayerState = this.layerStateStore.onStateChanged(() => {
@@ -44,6 +69,12 @@
 
         setHierarchy(hierarchy) {
             this.hierarchy = hierarchy || { timbers: [], joints: [] };
+            // New frame data means the cached CSG could be stale -- an edit to
+            // the source is exactly when the tree changes shape -- so it is
+            // dropped and refetched on the next expand rather than shown as if
+            // it still described the model on screen.
+            this.csgTreesByKey.clear();
+            this.requestedCsgTrees.clear();
             const allKeys = [
                 ...this.hierarchy.timbers.map(t => t.key),
                 ...(this.hierarchy.joints || []).flatMap(j => [...(j.timberKeys || []), ...(j.accessoryKeys || [])]),
@@ -282,11 +313,27 @@
                     if (memberKey && this.layerStateStore.isLocked(memberKey)) {
                         return;
                     }
-                    this.selectionManager.selectLayerNode(selectNode, !!event.shiftKey);
+                    this._applySelection(selectNode, !!event.shiftKey);
                 });
             }
 
             return row;
+        }
+
+        /** Apply a row click to the selection store. */
+        _applySelection(node, additive) {
+            const selection = this.selectionManager;
+            if (node.type === 'timber' || node.type === 'accessory') {
+                if (additive) {
+                    selection.toggleTimber(node.key);
+                } else {
+                    selection.selectTimber(node.key, false);
+                }
+                return;
+            }
+            if (node.type === 'joint') {
+                selection.selectJoint(node.jointId, node.timberKeys || [], additive);
+            }
         }
 
         _buildTimberRows() {
@@ -295,18 +342,180 @@
 
             for (const timber of this.hierarchy.timbers) {
                 if (!this._matchesFilter(timber.name, timber.tags)) continue;
+                const nodeId = 'timber:' + timber.key;
                 rows.push(this._makeRow({
-                    nodeId: 'timber:' + timber.key,
+                    nodeId,
                     rowType: 'timber',
                     depth: 0,
                     label: timber.name,
                     tags: timber.tags || [],
-                    hasChildren: false,
+                    // Every timber has a CSG tree, even an uncut one -- it is
+                    // still a body with faces worth naming.
+                    hasChildren: true,
                     memberKey: timber.key,
                     selectNode: { type: 'timber', key: timber.key },
                 }));
+                if (!this.expandedNodes.has(nodeId)) continue;
+                rows.push(...this._buildCsgRows({
+                    timberKey: timber.key,
+                    context: { section: 'timbers' },
+                    depth: 1,
+                }));
             }
             return rows;
+        }
+
+        // ------------------------------------------------------------------
+        // The CSG trees embedded in both sections
+        // ------------------------------------------------------------------
+
+        /**
+         * Rows for one timber's CSG tree.
+         *
+         * In the timber section this is the body with every cutting beneath
+         * it; in a joint section it is the body with just that joint's
+         * cutting, so the cutting can be read against what it cuts into.
+         */
+        _buildCsgRows({ timberKey, context, depth, jointId, cutIndex }) {
+            const payload = this.csgTreesByKey.get(timberKey);
+            if (!payload) {
+                this._requestCsgTree(timberKey);
+                return [this._makeCsgPlaceholderRow(depth, t('viewer.layers.csg.loading'))];
+            }
+
+            const tree = context.section === 'joints'
+                ? CsgTreeView.jointCuttingTree(payload, timberKey, jointId, cutIndex)
+                : CsgTreeView.timberTree(payload, timberKey);
+            if (!tree) {
+                return [this._makeCsgPlaceholderRow(depth, t('viewer.layers.csg.empty'))];
+            }
+
+            return CsgTreeView.flatten(tree, this.expandedNodes).map((row) => (
+                this._makeCsgRow(row, { timberKey, context, baseDepth: depth })
+            ));
+        }
+
+        _makeCsgPlaceholderRow(depth, text) {
+            const row = document.createElement('div');
+            row.className = 'lp-row lp-row-csg lp-csg-placeholder';
+            // Indented the same way the rows it stands in for will be, so the
+            // list does not jump sideways when the tree arrives.
+            row.style.paddingLeft = csgIndentPx(depth) + 'px';
+            row.textContent = text;
+            return row;
+        }
+
+        /** One CSG node row: its base type, its tag, and what it does. */
+        _makeCsgRow(node, { timberKey, context, baseDepth }) {
+            const row = document.createElement('div');
+            const depth = baseDepth + node.depth;
+            row.className = 'lp-row lp-row-csg lp-selectable'
+                + (node.role === 'cut' ? ' lp-csg-cut' : '')
+                + (node.role === 'body' ? ' lp-csg-body' : '');
+            row.dataset.nodeId = node.id;
+            row.style.paddingLeft = csgIndentPx(depth) + 'px';
+
+            const chev = document.createElement('span');
+            chev.className = 'lp-chev' + (node.hasChildren ? ' lp-has-children' : ' lp-leaf');
+            chev.textContent = node.hasChildren ? (node.expanded ? '\u25be' : '\u25b8') : '';
+            if (node.hasChildren) {
+                chev.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    this._toggle(node.id);
+                });
+            }
+            row.appendChild(chev);
+
+            // A subtracted node reads as removal, so it is marked as such
+            // rather than being left to look like just another child.
+            if (node.role === 'cut') {
+                const minus = document.createElement('span');
+                minus.className = 'lp-csg-minus';
+                minus.textContent = '\u2212';
+                row.appendChild(minus);
+            }
+
+            const kind = document.createElement('span');
+            kind.className = 'lp-csg-kind';
+            kind.textContent = node.kind;
+            row.appendChild(kind);
+
+            if (node.label) {
+                const label = document.createElement('span');
+                label.className = 'lp-csg-label';
+                label.textContent = node.label;
+                row.appendChild(label);
+            }
+
+            // Which joint made this cut is the useful fact in the timber
+            // section; under a joint it is already known, so it is left off.
+            if (context.section === 'timbers' && node.role === 'cut' && node.jointName) {
+                const joint = document.createElement('span');
+                joint.className = 'lp-csg-joint';
+                joint.textContent = node.jointName;
+                row.appendChild(joint);
+            }
+
+            if (node.features && node.features.length) {
+                const feats = document.createElement('span');
+                feats.className = 'lp-csg-features';
+                feats.textContent = String(node.features.length);
+                feats.title = node.features
+                    .map((f) => f.name + ' (' + String(f.type).toLowerCase() + ')')
+                    .join('\n');
+                row.appendChild(feats);
+            }
+
+            row.addEventListener('click', () => {
+                this._focusCsgNode(node, timberKey, context);
+            });
+            return row;
+        }
+
+        /** Clicking a CSG row focuses it, and drives the 3D highlight. */
+        _focusCsgNode(node, timberKey, context) {
+            this.selectionManager.setCsgFocus({
+                timberKey,
+                path: node.path,
+                featureLabel: null,
+                cutIndex: node.cutIndex,
+                context,
+            });
+            this.selectionManager.setFocusedNodeId(node.id);
+            this._focusedCsgNodeId = node.id;
+            this._renderTree();
+            if (node.path && node.path.length) {
+                this._emit('kigumi-request-csg-by-path', { memberKey: timberKey, path: node.path });
+            }
+        }
+
+        _requestCsgTree(timberKey) {
+            if (this.requestedCsgTrees.has(timberKey)) {
+                return;
+            }
+            this.requestedCsgTrees.add(timberKey);
+            this._emit('kigumi-request-csg-tree', { memberKey: timberKey });
+        }
+
+        _emit(type, detail) {
+            if (!this.el) return;
+            this.el.dispatchEvent(new CustomEvent(type, {
+                detail, bubbles: true, composed: true,
+            }));
+        }
+
+        /** A tree came back from the runner. */
+        setCsgTree(timberKey, payload) {
+            if (!timberKey || !payload) return;
+            this.csgTreesByKey.set(timberKey, payload);
+            this.requestedCsgTrees.delete(timberKey);
+            const pending = this._pendingReveal;
+            if (pending && pending.timberKey === timberKey) {
+                this._pendingReveal = null;
+                this.revealCsg(pending);
+                return;
+            }
+            this._renderTree();
         }
 
         _buildJointRows() {
@@ -335,15 +544,43 @@
 
                 if (!hasChildren || !this.expandedNodes.has(jointNodeId)) continue;
 
-                for (const timberKey of (joint.timberKeys || [])) {
+                // One row per cutting rather than per member: a joint that
+                // cuts the same timber twice has two things to show, and each
+                // gets its own tree.
+                const cuttings = joint.cuttings && joint.cuttings.length
+                    ? joint.cuttings
+                    : (joint.timberKeys || []).map((timberKey) => ({ timberKey, cutIndex: null }));
+                const cutsPerTimber = new Map();
+                for (const cutting of cuttings) {
+                    cutsPerTimber.set(cutting.timberKey, (cutsPerTimber.get(cutting.timberKey) || 0) + 1);
+                }
+
+                for (const cutting of cuttings) {
+                    const { timberKey, cutIndex } = cutting;
+                    const cuttingNodeId = 'jcut:' + joint.id + ':' + timberKey + ':' + cutIndex;
+                    const name = nameByKey[timberKey] || timberKey;
+                    // The cut number only earns its space when there is more
+                    // than one cut on this timber to tell apart.
+                    const label = cutsPerTimber.get(timberKey) > 1 && cutIndex !== null
+                        ? t('viewer.layers.csg.cutOn', { timber: name, cut: cutIndex + 1 })
+                        : name;
                     rows.push(this._makeRow({
-                        nodeId: 'jm:' + joint.id + ':' + timberKey,
+                        nodeId: cuttingNodeId,
                         rowType: 'jointMember',
                         depth: 1,
-                        label: nameByKey[timberKey] || timberKey,
+                        label,
                         tags: [],
-                        hasChildren: false,
+                        hasChildren: true,
+                        memberKey: timberKey,
                         selectNode: { type: 'timber', key: timberKey },
+                    }));
+                    if (!this.expandedNodes.has(cuttingNodeId)) continue;
+                    rows.push(...this._buildCsgRows({
+                        timberKey,
+                        context: { section: 'joints', jointId: joint.id, cutIndex },
+                        depth: 2,
+                        jointId: joint.id,
+                        cutIndex,
                     }));
                 }
 
@@ -390,25 +627,14 @@
                 }
             }
 
-            // Layer-node driven: scroll to and highlight the specific node
-            const layerNode = this.selectionManager.selectedLayerNode;
-            if (layerNode) {
-                let nodeId = null;
-                if (layerNode.type === 'timber') nodeId = 'timber:' + layerNode.key;
-                else if (layerNode.type === 'cutting') nodeId = 'cutting:' + layerNode.timberKey + ':' + layerNode.cuttingIdx;
-                else if (layerNode.type === 'csgNode' && layerNode.path && layerNode.path[0]) {
-                    const cuttingIdx = layerNode.cuttingIdx != null ? layerNode.cuttingIdx : 0;
-                    nodeId = 'csgnode:' + layerNode.timberKey + ':' + cuttingIdx + ':' + layerNode.path[0];
-                }
-                else if (layerNode.type === 'joint') nodeId = 'joint:' + layerNode.jointId;
-                else if (layerNode.type === 'accessory') nodeId = 'timber:' + layerNode.key;
-
-                if (nodeId) {
-                    const row = this.el.querySelector('.lp-row[data-node-id="' + CSS.escape(nodeId) + '"]');
-                    if (row) {
-                        row.classList.add('lp-selected');
-                        row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-                    }
+            // The focused CSG row, if it is currently rendered.
+            const focusedId = this._focusedCsgNodeId;
+            if (focusedId) {
+                const row = this.el.querySelector(
+                    '.lp-row-csg[data-node-id="' + CSS.escape(focusedId) + '"]');
+                if (row) {
+                    row.classList.add('lp-selected');
+                    row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
                 }
             } else if (selectedTimbers.size === 1) {
                 // Scroll to selected timber row (canvas click)
@@ -416,6 +642,50 @@
                 const row = this.el.querySelector('.lp-row[data-node-id="timber:' + CSS.escape(key) + '"]');
                 if (row) row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
             }
+        }
+
+        /**
+         * Show a CSG node in the list: open the sections and rows above it,
+         * mark it, and scroll to it. Called when a 3D pick needs the list to
+         * follow. Fetches the tree first if it is not in yet.
+         */
+        revealCsg({ section, timberKey, jointId, cutIndex, path }) {
+            const payload = this.csgTreesByKey.get(timberKey);
+            if (!payload) {
+                this._pendingReveal = { section, timberKey, jointId, cutIndex, path };
+                this._requestCsgTree(timberKey);
+                return;
+            }
+
+            const inJoints = section === 'joints';
+            const tree = inJoints
+                ? CsgTreeView.jointCuttingTree(payload, timberKey, jointId, cutIndex)
+                : CsgTreeView.timberTree(payload, timberKey);
+            if (!tree) {
+                return;
+            }
+
+            // Everything between the section header and the node itself.
+            this.expandedNodes.add(inJoints ? 'section:joints' : 'section:timbers');
+            if (inJoints) {
+                this.expandedNodes.add('joint:' + jointId);
+                this.expandedNodes.add('jcut:' + jointId + ':' + timberKey + ':' + cutIndex);
+            } else {
+                this.expandedNodes.add('timber:' + timberKey);
+            }
+
+            const target = CsgTreeView.findByPath(tree, path || []);
+            if (target) {
+                // Expand down to the node, but not the node itself: revealing
+                // something should not unfold everything beneath it.
+                const chain = CsgTreeView.ancestorIds(tree, target.id);
+                for (const id of chain.slice(0, -1)) {
+                    this.expandedNodes.add(id);
+                }
+                this._focusedCsgNodeId = target.id;
+                this.selectionManager.setFocusedNodeId(target.id);
+            }
+            this._renderTree();
         }
 
         _renderFooter() {
@@ -507,6 +777,20 @@
             }
         }
 
+        /** Hand a fetched CSG tree to the panel. */
+        setCsgTree(memberKey, payload) {
+            if (this._panel) {
+                this._panel.setCsgTree(memberKey, payload);
+            }
+        }
+
+        /** Show a CSG node in the list, opening whatever is above it. */
+        revealCsg(target) {
+            if (this._panel) {
+                this._panel.revealCsg(target);
+            }
+        }
+
         setLayersPayload(payload) {
             this._hierarchy = this._convertRunnerPayload(payload || {});
             this._ensureMounted();
@@ -515,10 +799,6 @@
                 this._panel.setShowTagPills(this._showTagPills);
             }
             this._emitLayerStateSync();
-        }
-
-        mergeCSGTreePayload(_payload) {
-            // CSG subtree expansion is not rendered in this panel yet.
         }
 
         _ensureMounted() {
@@ -626,6 +906,16 @@
                 timberKeys: (Array.isArray(j.members) ? j.members : [])
                     .map((m) => timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId))
                     .filter((key) => typeof key === 'string'),
+                // One entry per cutting, which is what the joint section shows:
+                // a member cut twice by the same joint gets a row per cut.
+                cuttings: (Array.isArray(j.members) ? j.members : []).flatMap((m) => {
+                    const key = timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId);
+                    if (typeof key !== 'string') {
+                        return [];
+                    }
+                    return (Array.isArray(m.cutIndices) ? m.cutIndices : [])
+                        .map((cutIndex) => ({ timberKey: key, cutIndex }));
+                }),
                 accessoryKeys: (Array.isArray(j.accessoryKumikiEphemeralIds) ? j.accessoryKumikiEphemeralIds : [])
                     .map((kid) => accessoryKeyByKumikiEphemeralId.get(kid))
                     .filter((key) => typeof key === 'string'),
@@ -639,7 +929,7 @@
     }
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { LayersPanel, KigumiLayersView };
+        module.exports = { LayersPanel, KigumiLayersView, csgIndentPx, MEMBER_ROW_INDENT_PX };
     }
     globalScope.LayersPanel = LayersPanel;
     globalScope.KigumiLayersView = KigumiLayersView;

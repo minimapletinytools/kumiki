@@ -110,19 +110,133 @@
     font-weight: 700;
 }
 canvas { display: block; width: 100%; height: 100%; }
-#info {
-    position: absolute; top: 12px; left: 12px;
-    background: var(--hv-panel-bg);
-    color: var(--hv-text);
-    font: 12px/1.6 'Segoe UI', sans-serif;
-    padding: 8px 14px; border-radius: 4px;
-    border: 1px solid var(--hv-panel-border);
-    border-left: 3px solid var(--hv-accent);
+/* The left rail stacks the info pane above the timber list. It is laid out as
+   a column so the two panes share the height instead of overlapping: the info
+   pane takes what its content needs and the list gets the rest. The rail
+   itself is click-through, so the gap between the panes does not swallow
+   clicks meant for the model behind it. */
+#left-rail {
+    position: absolute;
+    top: 12px;
+    bottom: 8px;
+    left: 8px;
+    width: var(--kigumi-rail-width, 260px);
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     pointer-events: none;
-    user-select: none;
-    backdrop-filter: blur(4px);
 }
-#info strong { color: var(--hv-strong); font-size: 13px; }
+
+#left-rail > * {
+    pointer-events: auto;
+}
+
+#rail-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: -5px;
+    width: 9px;
+    cursor: ew-resize;
+    background: transparent;
+    z-index: 1;
+}
+
+/* Only hints at itself on approach: a permanent divider would be noise on a
+   rail that mostly just sits there. */
+#rail-resize::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 3px;
+    width: 3px;
+    border-radius: 2px;
+    background: transparent;
+    transition: background 120ms ease;
+}
+
+#rail-resize:hover::after,
+#rail-resize.is-dragging::after {
+    background: var(--hv-accent-border-strong);
+}
+
+/* Sizes to its content, so it never crowds out the list below it. */
+.ip-panel {
+    flex: 0 0 auto;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    background: var(--hv-layers-bg);
+    color: var(--hv-text);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 6px;
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    overflow: hidden;
+    font-size: 12px;
+    user-select: none;
+}
+
+.ip-header {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    color: var(--hv-title);
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--hv-panel-border);
+    background: var(--hv-layers-header-bg);
+}
+
+.ip-chev {
+    display: inline-block;
+    width: 12px;
+    text-align: center;
+    color: var(--hv-dim);
+}
+
+.ip-title {
+    flex: 1 1 auto;
+}
+
+.ip-body {
+    padding: 4px 8px 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    line-height: 1.5;
+}
+
+.ip-counts {
+    color: var(--hv-dim);
+}
+
+.ip-breadcrumb {
+    color: var(--hv-strong);
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.ip-detail {
+    display: flex;
+    gap: 6px;
+}
+
+.ip-detail-label {
+    color: var(--hv-dim);
+    min-width: 78px;
+}
+
+.ip-detail-value {
+    color: var(--hv-text);
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
 #debug {
     display: none;
     position: absolute;
@@ -859,13 +973,12 @@ canvas { display: block; width: 100%; height: 100%; }
 .dim { color: var(--hv-dim); }
 /* ---- Layers panel ---- */
 kigumi-layers-view {
-    position: absolute;
-    top: 64px;
-    bottom: 8px;
-    left: 8px;
-    width: 260px;
+    /* Takes the rail's remaining height. min-height lets it shrink rather
+       than push the info pane off the top when the list is long. */
+    flex: 1 1 auto;
+    min-height: 0;
+    width: 100%;
     max-height: none;
-    z-index: 50;
     pointer-events: auto;
 }
 .layers-panel {
@@ -888,6 +1001,7 @@ kigumi-layers-view {
     background: var(--hv-layers-collapsed-bg);
 }
 kigumi-layers-view:has(.layers-panel.is-collapsed) {
+    flex: 0 0 auto;
     width: 28px;
     max-height: 28px;
 }
@@ -1099,13 +1213,22 @@ kigumi-layers-view:has(.lp-collapsed) {
     flex: 1 1 auto;
     overflow: auto;
     padding: 4px 0;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
+    scrollbar-width: thin;
+    scrollbar-color: var(--hv-accent-border-strong) transparent;
 }
 
 .lp-tree::-webkit-scrollbar {
     width: 0;
-    height: 0;
+    height: 7px;
+}
+
+.lp-tree::-webkit-scrollbar-thumb {
+    background: var(--hv-accent-border-strong);
+    border-radius: 4px;
+}
+
+.lp-tree::-webkit-scrollbar-track {
+    background: transparent;
 }
 
 .lp-section {
@@ -1131,6 +1254,7 @@ kigumi-layers-view:has(.lp-collapsed) {
 
 .lp-section-body {
     padding: 0 0 2px;
+    min-width: max-content;
 }
 
 .lp-row {
@@ -1182,6 +1306,80 @@ kigumi-layers-view:has(.lp-collapsed) {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+
+/* CSG tree rows. Indentation is set inline from the node's depth, since the
+   tree is arbitrarily deep and the lp-depth-N classes only cover the fixed
+   member hierarchy above it. */
+.lp-row-csg {
+    gap: 3px;
+    font-size: 11px;
+    color: var(--hv-title);
+    /* Sizes to its content so long paths scroll rather than truncate. */
+    width: max-content;
+    min-width: 100%;
+    white-space: nowrap;
+}
+
+.lp-row-csg .lp-chev {
+    width: 11px;
+    flex: 0 0 auto;
+}
+
+/* The base type is the row's anchor: it says what the node actually is. */
+.lp-csg-kind {
+    color: var(--hv-title);
+    flex: 0 0 auto;
+}
+
+/* The tag, when the node has one, is the part worth reading first. */
+.lp-csg-label {
+    color: var(--hv-title);
+    font-weight: 600;
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+/* A subtracted node is removal, not another child; the minus says so. */
+.lp-csg-minus {
+    color: var(--hv-accent);
+    flex: 0 0 auto;
+    font-weight: 700;
+}
+
+.lp-csg-joint {
+    padding-left: 8px;
+    color: var(--hv-dim);
+    font-style: italic;
+    white-space: nowrap;
+    flex: 0 0 auto;
+}
+
+.lp-csg-features {
+    flex: 0 0 auto;
+    padding: 0 4px;
+    border-radius: 6px;
+    background: var(--hv-accent-border);
+    color: var(--hv-text);
+    font-size: 10px;
+    cursor: help;
+}
+
+.lp-csg-body .lp-csg-kind {
+    font-weight: 600;
+}
+
+/* A cut subtree is material being removed. The rule down its left edge makes
+   that readable at a glance in a deep tree, where a lone minus sign several
+   levels in is easy to miss. */
+.lp-csg-cut {
+    border-left: 2px solid var(--hv-accent-soft);
+}
+
+.lp-csg-placeholder {
+    color: var(--hv-dim);
+    font-style: italic;
+    font-size: 11px;
 }
 
 .lp-row-joint > .lp-label,

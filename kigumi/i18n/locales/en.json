@@ -140,6 +140,16 @@
   "viewer.layers.show.title": "Show",
   "viewer.layers.footer.showAll": "show all",
   "viewer.layers.footer.unlockAll": "unlock all",
+  "viewer.layers.resize.title": "Drag to resize",
+  "viewer.layers.csg.loading": "loading…",
+  "viewer.layers.csg.empty": "no CSG",
+  "viewer.layers.csg.cutOn": "{timber} · cut {cut}",
+
+  "viewer.selection.header": "Selection",
+  "viewer.selection.counts": "timbers ({selectedTimbers}/{timbers})  accessories ({selectedAccessories}/{accessories})",
+  "viewer.selection.featureType": "feature",
+  "viewer.selection.joint": "joint",
+  "viewer.selection.facesToward": "faces toward",
 
   "sidebar.kumikiDevMode": "Kumiki Dev Mode",
   "sidebar.kumikiDevMode.desc": "kumiki repo detected",

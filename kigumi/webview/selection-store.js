@@ -1,31 +1,49 @@
 (function (globalScope) {
-    // Layer node descriptor shapes:
-    //   { type: 'timber',    key }
-    //   { type: 'cutting',   timberKey, cuttingIdx }
-    //   { type: 'csgNode',   timberKey, path }
-    //   { type: 'joint',     jointId, timberKeys }
-    //   { type: 'accessory', key }
+    'use strict';
+    // What is selected in the viewer, in two independent pieces:
+    //
+    //   selectedTimbers  a set, because timbers multi-select
+    //   csgFocus         at most one, because the CSG trees single-select
+    //
+    // They coexist: several timbers can be selected while you drill into the
+    // CSG of exactly one of them. Focusing a CSG node pulls its timber into
+    // the selection but leaves the rest of the selection alone.
+    //
+    // csgFocus is:
+    //   { timberKey, path, featureLabel, cutIndex, context }
+    // where context records which of the two trees the focus lives in:
+    //   { section: 'timbers' }
+    //   { section: 'joints', jointId, cutIndex }
+    // The section matters because the same CSG node is shown in both places,
+    // and a pick should reveal itself where the user is already looking.
 
     class SelectionStore {
         constructor() {
             this.selectedTimbers = new Set();
-            this.selectedFeatures = [];
-            this.csgSelection = null;
-            this.selectedLayerNode = null;
+            this.csgFocus = null;
             this.listeners = new Set();
         }
 
+        // --- timbers -------------------------------------------------------
+
         selectTimber(name, addToSelection = false) {
-            this.clearLayerSelection();
             if (!addToSelection) {
                 this.selectedTimbers.clear();
+                this.clearCsgFocus({ silent: true });
             }
             this.selectedTimbers.add(name);
             this.emit({ type: 'timber-selected', timberName: name });
         }
 
         deselectTimber(name) {
-            this.selectedTimbers.delete(name);
+            if (!this.selectedTimbers.delete(name)) {
+                return;
+            }
+            // A focus on a timber that is no longer selected has nothing to
+            // point at, so it goes with it.
+            if (this.csgFocus && this.csgFocus.timberKey === name) {
+                this.clearCsgFocus({ silent: true });
+            }
             this.emit({ type: 'timber-deselected', timberName: name });
         }
 
@@ -38,11 +56,11 @@
         }
 
         clearTimberSelection() {
-            this.clearLayerSelection();
-            if (this.selectedTimbers.size === 0) {
+            if (this.selectedTimbers.size === 0 && !this.csgFocus) {
                 return;
             }
             this.selectedTimbers.clear();
+            this.clearCsgFocus({ silent: true });
             this.emit({ type: 'clear-timbers' });
         }
 
@@ -54,120 +72,75 @@
             return Array.from(this.selectedTimbers);
         }
 
-        selectFeature(timberName, featureId, addToSelection = false) {
+        // --- the one CSG focus ---------------------------------------------
+
+        /**
+         * Focus a node in one of the CSG trees. The timber joins the selection
+         * if it is not already in it; any other selected timbers stay, since
+         * you can have several selected and still drill into one.
+         */
+        setCsgFocus({ timberKey, path, featureLabel, cutIndex, context }) {
+            this.selectedTimbers.add(timberKey);
+            this.csgFocus = {
+                timberKey,
+                path: path || [],
+                featureLabel: featureLabel || null,
+                cutIndex: cutIndex === undefined ? null : cutIndex,
+                context: context || { section: 'timbers' },
+            };
+            this.emit({ type: 'csg-focus', csgFocus: this.csgFocus });
+        }
+
+        clearCsgFocus(options = {}) {
+            if (!this.csgFocus) {
+                return;
+            }
+            this.csgFocus = null;
+            if (!options.silent) {
+                this.emit({ type: 'clear-csg-focus' });
+            }
+        }
+
+        /** True if `nodeId` is the focused row of a rendered tree. */
+        isCsgNodeFocused(nodeId) {
+            return Boolean(this.csgFocus) && this.csgFocus.nodeId === nodeId;
+        }
+
+        /** Record which rendered row the focus corresponds to, for styling. */
+        setFocusedNodeId(nodeId) {
+            if (!this.csgFocus) {
+                return;
+            }
+            this.csgFocus.nodeId = nodeId || null;
+        }
+
+        // --- joints ---------------------------------------------------------
+
+        /** Selecting a joint selects the timbers it touches. */
+        selectJoint(jointId, timberKeys, addToSelection = false) {
             if (!addToSelection) {
-                this.selectedFeatures = [];
+                this.selectedTimbers.clear();
+                this.clearCsgFocus({ silent: true });
             }
-            this.addFeature(timberName, featureId);
+            for (const key of timberKeys || []) {
+                this.selectedTimbers.add(key);
+            }
+            this.emit({ type: 'joint-selected', jointId, timberKeys: timberKeys || [] });
         }
 
-        addFeature(timberName, featureId) {
-            const alreadySelected = this.selectedFeatures.some((feature) => (
-                feature.timberName === timberName && feature.featureId === featureId
-            ));
-            if (alreadySelected) {
+        // --- everything ------------------------------------------------------
+
+        clearAll() {
+            if (!this.hasSelection()) {
                 return;
             }
-            this.selectedFeatures.push({ timberName, featureId });
-            this.emit({ type: 'feature-selected', timberName, featureId });
-        }
-
-        clearFeatureSelection() {
-            if (this.selectedFeatures.length === 0) {
-                return;
-            }
-            this.selectedFeatures = [];
-            this.emit({ type: 'clear-features' });
-        }
-
-        selectCSG(timberKey, path, featureLabel) {
-            this.csgSelection = { timberKey, path: path || [], featureLabel: featureLabel || null };
-            this.emit({ type: 'csg-selected', csgSelection: this.csgSelection });
-        }
-
-        clearCSGSelection() {
-            if (!this.csgSelection) {
-                return;
-            }
-            this.csgSelection = null;
-            this.emit({ type: 'clear-csg' });
-        }
-
-        // --- Layer node selection ---
-
-        selectLayerNode(node, addToSelection = false) {
-            if (addToSelection) {
-                this.clearCSGSelection();
-                this.clearFeatureSelection();
-                this.clearLayerSelection();
-
-                if (node.type === 'timber') {
-                    this.toggleTimber(node.key);
-                } else if (node.type === 'cutting') {
-                    this.toggleTimber(node.timberKey);
-                } else if (node.type === 'accessory') {
-                    this.toggleTimber(node.key);
-                } else if (node.type === 'joint') {
-                    for (const key of (node.timberKeys || [])) {
-                        this.selectedTimbers.add(key);
-                    }
-                    this.emit({ type: 'joint-selected', jointId: node.jointId, timberKeys: node.timberKeys || [] });
-                } else {
-                    // CSG nodes don't support additive selection; fall back to single-select.
-                    addToSelection = false;
-                }
-
-                if (addToSelection) {
-                    return;
-                }
-            }
-
-            this.selectedLayerNode = node;
-
-            if (node.type === 'timber') {
-                this.clearCSGSelection();
-                this.clearFeatureSelection();
-                this.selectedTimbers.clear();
-                this.selectedTimbers.add(node.key);
-                this.emit({ type: 'timber-selected', timberName: node.key });
-            } else if (node.type === 'cutting') {
-                this.clearCSGSelection();
-                this.clearFeatureSelection();
-                this.selectedTimbers.clear();
-                this.selectedTimbers.add(node.timberKey);
-                this.emit({ type: 'timber-selected', timberName: node.timberKey });
-            } else if (node.type === 'csgNode') {
-                this.selectedTimbers.clear();
-                this.selectedTimbers.add(node.timberKey);
-                this.csgSelection = { timberKey: node.timberKey, path: node.path || [], featureLabel: null };
-                this.emit({ type: 'csg-selected', csgSelection: this.csgSelection });
-            } else if (node.type === 'joint') {
-                this.clearCSGSelection();
-                this.clearFeatureSelection();
-                this.selectedTimbers.clear();
-                for (const key of (node.timberKeys || [])) {
-                    this.selectedTimbers.add(key);
-                }
-                this.emit({ type: 'joint-selected', jointId: node.jointId, timberKeys: node.timberKeys || [] });
-            } else if (node.type === 'accessory') {
-                this.clearCSGSelection();
-                this.clearFeatureSelection();
-                this.selectedTimbers.clear();
-                this.selectedTimbers.add(node.key);
-                this.emit({ type: 'timber-selected', timberName: node.key });
-            }
-
-            this.emit({ type: 'layer-node-selected', node });
-        }
-
-        clearLayerSelection() {
-            if (!this.selectedLayerNode) return;
-            this.selectedLayerNode = null;
-            this.emit({ type: 'clear-layer-node' });
+            this.selectedTimbers.clear();
+            this.csgFocus = null;
+            this.emit({ type: 'clear-all' });
         }
 
         hasSelection() {
-            return this.selectedTimbers.size > 0 || this.selectedFeatures.length > 0 || this.csgSelection !== null || this.selectedLayerNode !== null;
+            return this.selectedTimbers.size > 0 || this.csgFocus !== null;
         }
 
         onSelectionChanged(callback) {
@@ -184,8 +157,39 @@
         }
     }
 
+    /**
+     * What a click in the 3D view should do, given every member the ray passes
+     * through (nearest first) and what is currently selected.
+     *
+     * While timbers are selected, a click drills into the CSG of the nearest
+     * *selected* timber along the ray -- even one sitting behind an unselected
+     * timber -- so a neighbour in front cannot steal the click while you are
+     * inspecting. Only when the ray misses every selected timber does a click
+     * select something new. Shift always means "change which timbers are
+     * selected", so it acts on the frontmost hit.
+     */
+    function choosePickAction({ hits, selectedTimbers, shiftKey }) {
+        const along = hits || [];
+        if (along.length === 0) {
+            return { action: 'clear' };
+        }
+        const selected = selectedTimbers instanceof Set
+            ? selectedTimbers
+            : new Set(selectedTimbers || []);
+        const nearest = along[0];
+        if (shiftKey) {
+            return { action: 'toggle', memberKey: nearest.memberKey, hit: nearest.hit };
+        }
+        const onSelected = along.find((entry) => selected.has(entry.memberKey));
+        if (onSelected) {
+            return { action: 'csg', memberKey: onSelected.memberKey, hit: onSelected.hit };
+        }
+        return { action: 'select', memberKey: nearest.memberKey, hit: nearest.hit };
+    }
+
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { SelectionStore };
+        module.exports = { SelectionStore, choosePickAction };
     }
     globalScope.SelectionStore = SelectionStore;
+    globalScope.choosePickAction = choosePickAction;
 })(typeof window !== 'undefined' ? window : globalThis);
