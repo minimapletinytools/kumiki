@@ -1,3 +1,38 @@
+:: 8/24/2026 left hand tree view P2
+
+The new view:
+-expandable info section at top shoiwng you informatino about selection but not the CSG tree
+  -does not auto expand, but can be manulaly expanded to show more info
+-below that is the timber list view section which contains 2 sections, by timbers, and by joints
+
+the CSG tree issues:
+-CSGs show up in 2 places
+  -timber list (reverse maps its list of all its cuttings)
+  -joint list (maps 1 joint to all its cuttings and timbers)
+-timber CSG is straight forward, the CutTimebr owns its entire CSG tree and displays it as such
+-joint section shows each cutting, which starts the CSG tree with the timber prism CSG
+  -this allows joint cutting to show plane plane intersections with the timer prism CSG
+-timber section starts with timebr prism CSG and shows each cutting negative CSG underneath it.
+
+
+the bidirectional selection issue:
+-selecting a CSG from viewer will focus you on the timber section in the list nad auto expand
+  -UNLESS you are already focused on the CSG tree for that cutting in the joint section
+-you can only select one thing in the CSG tree, no multi select
+-you can still select umltiple timbers but click into just 1 of the CSG trees
+-if you have timbers selected, raycasting on CSG takes precedence over selecting new timbers
+
+additional issues:
+-first tier of CSG tree nedes specila roganizing, as the main CSG is the timber body, and the difference children are cuttings associated with the joint
+-CSG tree labels need more clarity, their base type, and their tagged names
+-difference tree view has orig CSG (the one that gets cut from) at the top, and cut CSGs as children
+  -but this does not allow you to drill down into the orig CSG, so maybe you need something a little more bespoke here
+-solid union and interseciton have placeholder CSG at the top
+
+
+
+
+
 :: 8/23/2026 drawing details
 
 -improve footprint system
@@ -309,6 +344,14 @@ DONE-test on regular vscode on mac
 IGNORE-get vmware fusion and test on windows
 
 -continue fetaure impl --resume b9de226c-0f18-4592-b200-d230dd6f9902
+
+-selectino feedback
+  -name all the rest of your joints
+  -should show perfect.face not rough.face if rough == perfect?
+  -seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked
+  -maybe just allow clicking on unnamed features? it's a little werid cuz you can select them in the tree view and they don't select inthe viewer...
+  -selecting on face features visualy selects all faces that coincide with that one when extended to infinity, see if you can localize the visuall yselection...
+  
 
 -need some rule or test to ensure no confilcting feature names within a joint
   -or qualify by CSG tree (probbaly a bad ide,a tree topology may vary too)
