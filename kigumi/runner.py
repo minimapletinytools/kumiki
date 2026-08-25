@@ -22,7 +22,7 @@ import time
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, List, Tuple
+from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional, List, Tuple
 
 from kumiki.librarian import (
     RenderParameterDescriptor,
@@ -1140,7 +1140,7 @@ def _serialize_csg_node(
     csg: 'CutCSG',
     path: List[str],
     role: Optional[str],
-    joint_name: Optional[str],
+    attribution: _CutAttribution,
     cut_timber: 'CutTimber',
 ) -> Dict[str, Any]:
     """One CSG node and everything beneath it.
@@ -1161,33 +1161,36 @@ def _serialize_csg_node(
         "label": label,
         "path": list(node_path),
         "role": role,
-        "jointName": joint_name,
+        "jointName": attribution.joint_name,
+        "jointId": attribution.joint_id,
+        "cutIndex": attribution.cut_index,
         "features": [_serialize_feature(f) for f in csg.get_declared_features()],
         "children": [],
     }
 
-    def child(node_csg: 'CutCSG', child_role: str, child_joint: Optional[str]) -> None:
+    def child(node_csg: 'CutCSG', child_role: str, child_attribution: _CutAttribution) -> None:
         node["children"].append(
-            _serialize_csg_node(node_csg, node_path, child_role, child_joint, cut_timber))
+            _serialize_csg_node(node_csg, node_path, child_role, child_attribution, cut_timber))
 
     if isinstance(csg, Difference):
-        child(csg.base, "base", joint_name)
+        child(csg.base, "base", attribution)
         cuts = list(getattr(cut_timber, "cuts", []) or [])
         # Only the timber's own top-level Difference lines up with its cuts;
         # a nested one inside a joint's own geometry does not, so attribution
         # is inherited there rather than re-derived.
         aligned = len(csg.subtract) == len(cuts) and not path
+        joints_by_cutting = _joint_by_cutting_id(cut_timber) if aligned else {}
         for index, sub_csg in enumerate(csg.subtract):
-            sub_joint = joint_name
+            sub_attribution = attribution
             if aligned:
-                sub_joint = _joint_name_for_cutting(cut_timber, cuts[index])
-            child(sub_csg, "subtract", sub_joint)
+                sub_attribution = _cut_attribution(joints_by_cutting, cuts[index], index)
+            child(sub_csg, "subtract", sub_attribution)
     elif isinstance(csg, SolidUnion):
         for member in csg.children:
-            child(member, "child", joint_name)
+            child(member, "child", attribution)
     elif isinstance(csg, Intersection):
-        child(csg.left, "left", joint_name)
-        child(csg.right, "right", joint_name)
+        child(csg.left, "left", attribution)
+        child(csg.right, "right", attribution)
 
     return node
 
@@ -1200,7 +1203,7 @@ def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> Dict[str, Any]:
     not the thing on screen.
     """
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
-    return {"tree": _serialize_csg_node(local_csg, [], None, None, cut_timber)}
+    return {"tree": _serialize_csg_node(local_csg, [], None, NO_CUT_ATTRIBUTION, cut_timber)}
 
 
 def _module_file_path(module: Any) -> Optional[Path]:
@@ -1657,10 +1660,49 @@ def _joint_display_name(joint: 'Joint') -> str:
     return f"<unnamed joint - {ticket.kumiki_id}>"
 
 
+def _joint_for_cutting(cut_timber: 'CutTimber', cutting: 'Cutting') -> Optional['Joint']:
+    """The joint that owns *cutting*, or None if none does."""
+    return _joint_by_cutting_id(cut_timber).get(id(cutting))
+
+
 def _joint_name_for_cutting(cut_timber: 'CutTimber', cutting: 'Cutting') -> Optional[str]:
     """Display name of the joint that owns *cutting*, or None if it owns none."""
-    joint = _joint_by_cutting_id(cut_timber).get(id(cutting))
+    joint = _joint_for_cutting(cut_timber, cutting)
     return None if joint is None else _joint_display_name(joint)
+
+
+class _CutAttribution(NamedTuple):
+    """Which cutting -- and which joint -- a CSG node belongs to.
+
+    Inherited by the whole subtree under a cutting's negative CSG, so the
+    viewer can read attribution off any node instead of walking back up to the
+    top tier to find it. All three fields are None for the timber body.
+
+    joint_id is the joint ticket's kumiki_id as a string, matching the id the
+    layers payload uses, so the joint list can join against it directly.
+    """
+
+    joint_name: Optional[str] = None
+    joint_id: Optional[str] = None
+    cut_index: Optional[int] = None
+
+
+NO_CUT_ATTRIBUTION = _CutAttribution()
+
+
+def _cut_attribution(
+    joints_by_cutting: Dict[int, 'Joint'],
+    cutting: 'Cutting',
+    cut_index: int,
+) -> _CutAttribution:
+    """Attribution for one top-tier cutting, given a prebuilt joint lookup."""
+    joint = joints_by_cutting.get(id(cutting))
+    if joint is None:
+        # The cut is real and indexable even when no joint claims it.
+        return _CutAttribution(cut_index=cut_index)
+    ticket = getattr(joint, "ticket", None)
+    joint_id = None if ticket is None else str(ticket.kumiki_id)
+    return _CutAttribution(_joint_display_name(joint), joint_id, cut_index)
 
 
 def _joint_name_for_node(
@@ -2142,6 +2184,9 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     mesh_walk_ms = (time.monotonic() - t0) * 1000.0
 
     result: Dict[str, Any] = {
+        # Echoed back because the viewer can have several timbers selected at
+        # once, so it cannot infer which one a result belongs to.
+        "memberKey": member_key,
         "path": new_path,
         # featureLabel / featureType / jointName / facesToward; jointName is
         # None for the timber's own body, which no joint produced.
@@ -2225,6 +2270,7 @@ def _handle_find_csg_by_path(state: RunnerState, payload: Dict[str, Any], slot_s
             parent_hl = {"vertices": p_verts, "indices": p_idx}
 
     result: Dict[str, Any] = {
+        "memberKey": member_key,
         "path": path,
         "featureLabel": actual_feature_label,
         "highlightMesh": {

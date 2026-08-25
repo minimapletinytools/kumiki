@@ -169,6 +169,49 @@ class TestCSGTreeSerialization:
         assert cut["jointName"] is not None
         assert all(node["jointName"] == cut["jointName"] for node in self._walk(cut))
 
+    def test_cut_index_and_joint_id_flow_down_the_cut(self, mortise_and_tenon_frame):
+        """The viewer joins the joint list against these, so they travel with
+        jointName rather than being re-derived per node."""
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+
+        body = tree["children"][0]
+        assert body["cutIndex"] is None and body["jointId"] is None
+
+        cuts = [child for child in tree["children"] if child["role"] == "subtract"]
+        for expected_index, cut in enumerate(cuts):
+            assert cut["cutIndex"] == expected_index
+            assert cut["jointId"] is not None
+            # A joint id is only useful if it matches the one the layers
+            # payload publishes for the same joint.
+            assert all(
+                node["cutIndex"] == expected_index and node["jointId"] == cut["jointId"]
+                for node in self._walk(cut)
+            )
+
+    def test_joint_ids_match_the_layers_payload(self, mortise_and_tenon_frame):
+        layers = runner.serialize_layers(mortise_and_tenon_frame)
+        published = {str(joint["kumikiEphemeralId"]) for joint in layers["joints"]}
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        from_tree = {
+            node["jointId"] for node in self._walk(tree) if node["jointId"] is not None
+        }
+        assert from_tree and from_tree <= published
+
+    def test_a_cut_without_a_joint_still_gets_an_index(self, mortise_and_tenon_frame):
+        """Attribution degrades one field at a time: a hand-built CutTimber has
+        no joints to name, but its cuts are still indexable."""
+        from kumiki.timber import CutTimber
+
+        jointed = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
+        by_hand = CutTimber(jointed.timber, cuts=list(jointed.cuts))
+
+        tree = runner.serialize_cut_csg_tree(by_hand)["tree"]
+        cuts = [child for child in tree["children"] if child["role"] == "subtract"]
+        assert cuts, "the hand-built timber should still have its cuts"
+        for expected_index, cut in enumerate(cuts):
+            assert cut["cutIndex"] == expected_index
+            assert cut["jointId"] is None and cut["jointName"] is None
+
     def test_the_mortise_shows_up_on_the_receiving_timber(self, mortise_and_tenon_frame):
         tree = self._tree(mortise_and_tenon_frame, "receiving_timber")
         assert "mortise_hole" in self._by_label(tree)
