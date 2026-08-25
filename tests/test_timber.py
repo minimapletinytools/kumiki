@@ -2232,3 +2232,69 @@ class TestCutTimberJoints:
     def test_a_hand_built_cut_timber_has_none(self):
         """No joints to name, which is the honest answer rather than a guess."""
         assert CutTimber(self._timber("A"), cuts=[]).joints == []
+
+
+class TestTimberCSGLabels:
+    """Every shape a timber builds names itself in the CSG tree.
+
+    Without this the timber body is an unlabeled node: the viewer cannot
+    address it by path, so its faces are unreachable next to the cuts that
+    do have names.
+    """
+
+    def _timber(self, cls=Timber, **kwargs):
+        return cls(
+            length=scalar(100),
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            ticket=TimberTicket(path="t"),
+            **kwargs,
+        )
+
+    def test_the_name_comes_from_the_class(self):
+        assert Timber.csg_label_name() == "timber"
+        assert Board.csg_label_name() == "board"
+
+    def test_a_compound_class_name_reads_as_words(self):
+        assert RoundTimber.csg_label_name() == "round_timber"
+        assert RegularPolygonTimber.csg_label_name() == "regular_polygon_timber"
+
+    def test_qualifiers_are_spelled_out_after_the_name(self):
+        assert Board.csg_label("rough", "extended").name == "board (rough, extended)"
+
+    def test_no_qualifiers_is_just_the_name(self):
+        assert Board.csg_label().name == "board"
+
+    def test_each_shape_says_which_one_it_is(self):
+        timber = self._timber()
+        assert timber.get_perfect_timber_within_csg_local().label.name == "timber (perfect)"
+        assert timber.get_actual_csg_local().label.name == "timber (rough)"
+        assert timber.get_extended_perfect_csg_local(True, True).label.name == (
+            "timber (perfect, extended)")
+        assert timber.get_extended_actual_csg_local(True, True).label.name == (
+            "timber (rough, extended)")
+
+    def test_the_label_follows_the_derived_class(self):
+        # The whole reason csg_label is a classmethod: a Board's shapes must
+        # not report themselves as a plain timber.
+        board = self._timber(Board)
+        assert board.get_actual_csg_local().label.name == "board (rough)"
+        assert board.get_extended_actual_csg_local(True, True).label.name == (
+            "board (rough, extended)")
+
+    def test_non_prism_timbers_label_their_own_shapes_too(self):
+        # These build a Cylinder / ConvexPolygonExtrusion rather than going
+        # through the rectangular-prism helper.
+        log = self._timber(RoundTimber, diameter=scalar(4))
+        assert log.get_actual_csg_local().label.name == "round_timber (rough)"
+
+        pole = self._timber(RegularPolygonTimber, num_sides=6)
+        assert pole.get_extended_actual_csg_local(False, True).label.name == (
+            "regular_polygon_timber (rough, extended)")
+
+    def test_the_rendered_body_carries_the_label(self):
+        # What the viewer actually navigates: the body node of a cut timber.
+        timber = self._timber()
+        cut_timber = CutTimber(timber, cuts=[])
+        rendered = cut_timber.render_timber_with_cuts_csg_local()
+        assert rendered.label.name == "timber (rough, extended)"

@@ -325,17 +325,22 @@ def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
     non-perfect timbers (e.g. RoundTimber, RegularPolygonTimber, MeshTimber).
     """
     from kumiki.cutcsg import Difference
-    from kumiki.timber import _create_extended_rectangular_prism
+    from kumiki.timber import _create_extended_rectangular_prism, _ptw_face_tags
 
     timber = cut_timber.timber
     has_bottom_cut = any(c.get_maybe_bottom_end_cut() is not None for c in cut_timber.cuts)
     has_top_cut = any(c.get_maybe_top_end_cut() is not None for c in cut_timber.cuts)
 
+    # face_tags is required; omitting it raised TypeError, so this preview
+    # never rendered. It is the perfect-timber-within prism, so it carries the
+    # ptw faces and names itself the way the timber's own perfect shape does.
     base_prism = _create_extended_rectangular_prism(
+        face_tags=_ptw_face_tags(),
         size=timber.get_perfect_size(),
         length=timber.length,
         extend_bot=has_bottom_cut,
         extend_top=has_top_cut,
+        label=type(timber).csg_label("perfect", "extended"),
     )
 
     if not cut_timber.cuts:

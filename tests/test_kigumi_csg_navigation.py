@@ -260,8 +260,12 @@ class TestNavigateToLeaf:
         )
         assert {face for _, face in tenon_hits} >= {"tenon_top", "tenon_front"}
 
-    def test_uncut_timber_faces_stay_at_the_root(self, mortise_and_tenon_frame):
-        """Faces of the timber body report an empty path and a reserved rough name.
+    def test_uncut_timber_faces_resolve_to_the_body(self, mortise_and_tenon_frame):
+        """Faces of the timber body report the body's path and a rough name.
+
+        The body names itself after the timber type it came from, so a pick on
+        it resolves there rather than to an empty path -- which is what makes
+        the body addressable in the tree alongside the cuts.
 
         The rendered CSG is built from the timber's actual (as-sawn) body, so
         its faces are the ``rough.*`` set. The ``ptw.*`` set names the same six
@@ -270,13 +274,16 @@ class TestNavigateToLeaf:
         reference face from a rough one.
         """
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
+        body_path = (type(cut_timber.timber).csg_label("rough", "extended").name,)
+        assert body_path == ("timber (rough, extended)",)
+
         found = _navigate_every_surface_point(
             cut_timber.render_timber_with_cuts_csg_local()
         )
 
-        root_faces = {face for path, face in found if path == ()}
-        assert root_faces >= {"rough.left", "rough.right", "rough.front", "rough.back"}
-        assert not any(f.startswith("ptw.") for f in root_faces)
+        body_faces = {face for path, face in found if path == body_path}
+        assert body_faces >= {"rough.left", "rough.right", "rough.front", "rough.back"}
+        assert not any(f.startswith("ptw.") for f in body_faces)
 
     def test_mortise_hole_faces_resolve_to_a_labeled_path(
         self, mortise_and_tenon_frame

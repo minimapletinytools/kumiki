@@ -3,6 +3,9 @@ Kumiki - Timber types, enums, constants, and core classes
 Contains all core data structures and type definitions for the timber framing system
 """
 
+import re
+from dataclasses import replace as dataclass_replace
+
 from .rule import *
 from .footprint import *
 from .cutcsg import *
@@ -1024,7 +1027,28 @@ class PerfectTimberWithin(ABC):
             start_distance=scalar(0),
             end_distance=self.length,
             _features=_ptw_face_tags(),
+            label=self.csg_label("perfect"),
         )
+
+    @classmethod
+    def csg_label_name(cls) -> str:
+        """What this kind of timber is called in a CSG label.
+
+        Derived from the class name -- "board", "round_timber" -- so a new
+        timber type names itself without anyone remembering to add it here.
+        """
+        return re.sub(r"(?<!^)(?=[A-Z])", "_", cls.__name__).lower()
+
+    @classmethod
+    def csg_label(cls, *qualifiers: str) -> CutCSGLabel:
+        """Label for one of this timber's own CSG shapes.
+
+        A classmethod so the name follows the derived class -- a Board's rough
+        extended prism reads "board (rough, extended)", not "timber (...)".
+        """
+        if not qualifiers:
+            return CutCSGLabel(cls.csg_label_name())
+        return CutCSGLabel(f"{cls.csg_label_name()} ({', '.join(qualifiers)})")
 
     # TODO rename to get_rough_csg_local
     def get_actual_csg_local(self) -> CutCSG:
@@ -1037,7 +1061,12 @@ class PerfectTimberWithin(ABC):
         Returns:
             CutCSG representing the actual geometry in local coordinates
         """
-        return self.get_perfect_timber_within_csg_local()
+        # The base timber's rough shape is its perfect one, but it is still
+        # the rough CSG in the tree, so it is named as such.
+        return dataclass_replace(
+            self.get_perfect_timber_within_csg_local(),
+            label=self.csg_label("rough"),
+        )
 
     # TODO rename to get_extended_rough_csg_local
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
@@ -1059,7 +1088,8 @@ class PerfectTimberWithin(ABC):
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
-            extend_top=extend_top
+            extend_top=extend_top,
+            label=self.csg_label("rough", "extended"),
         )
 
     @final
@@ -1084,7 +1114,8 @@ class PerfectTimberWithin(ABC):
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
-            extend_top=extend_top
+            extend_top=extend_top,
+            label=self.csg_label("perfect", "extended"),
         )
 
     def is_face_perfect(self, face: TimberFace) -> bool:
@@ -1206,6 +1237,7 @@ class Timber(PerfectTimberWithin):
             start_distance=scalar(0),
             end_distance=self.length,
             _features=_rough_face_tags(),
+            label=self.csg_label("rough"),
         )
 
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
@@ -1229,6 +1261,7 @@ class Timber(PerfectTimberWithin):
             start_distance=None if extend_bot else scalar(0),
             end_distance=None if extend_top else self.length,
             _features=_rough_face_tags(),
+            label=self.csg_label("rough", "extended"),
         )
     
 
@@ -1278,7 +1311,8 @@ class Board(PerfectTimberWithin):
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
-            extend_top=extend_top
+            extend_top=extend_top,
+            label=self.csg_label("rough", "extended"),
         )
     
     # TODO: Add board-specific validation and methods
@@ -1350,7 +1384,8 @@ class RoundTimber(PerfectTimberWithin):
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Local Z-axis
             position=create_v3(scalar(0), scalar(0), scalar(0)),  # Origin in local coords
             start_distance=scalar(0),
-            end_distance=self.length
+            end_distance=self.length,
+            label=self.csg_label("rough"),
         )
     
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
@@ -1371,7 +1406,8 @@ class RoundTimber(PerfectTimberWithin):
             axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),  # Local Z-axis
             position=create_v3(scalar(0), scalar(0), scalar(0)),  # Origin in local coords
             start_distance=None if extend_bot else scalar(0),
-            end_distance=None if extend_top else self.length
+            end_distance=None if extend_top else self.length,
+            label=self.csg_label("rough", "extended"),
         )
 
 
@@ -1413,7 +1449,8 @@ class MeshTimber(PerfectTimberWithin):
             size=self.get_perfect_size(),
             length=self.length,
             extend_bot=extend_bot,
-            extend_top=extend_top
+            extend_top=extend_top,
+            label=self.csg_label("rough", "extended"),
         )
 
     # TODO: Add mesh_csg field and override get_actual_csg_local()
@@ -1482,7 +1519,8 @@ class RegularPolygonTimber(PerfectTimberWithin):
             points=self._compute_polygon_vertices(),
             transform=Transform.identity(),
             start_distance=scalar(0),
-            end_distance=self.length
+            end_distance=self.length,
+            label=self.csg_label("rough"),
         )
     
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
@@ -1502,7 +1540,8 @@ class RegularPolygonTimber(PerfectTimberWithin):
             points=self._compute_polygon_vertices(),
             transform=Transform.identity(),
             start_distance=None if extend_bot else scalar(0),
-            end_distance=None if extend_top else self.length
+            end_distance=None if extend_top else self.length,
+            label=self.csg_label("rough", "extended"),
         )
 
 
@@ -1731,7 +1770,8 @@ def _create_extended_rectangular_prism(
     size: V2,
     length: Numeric,
     extend_bot: bool,
-    extend_top: bool
+    extend_top: bool,
+    label: CutCSGLabel = CutCSGLabel.NoLabel(),
 ) -> 'RectangularPrism':
     """
     Helper to create an extended rectangular prism in local coordinates.
@@ -1741,6 +1781,8 @@ def _create_extended_rectangular_prism(
         length: Length of the prism
         extend_bot: If True, extend to -infinity at bottom
         extend_top: If True, extend to +infinity at top
+        label: What this shape is called in the CSG tree; callers building a
+            timber's own body pass PerfectTimberWithin.csg_label(...)
         
     Returns:
         RectangularPrism in local coordinates
@@ -1751,6 +1793,7 @@ def _create_extended_rectangular_prism(
         start_distance=None if extend_bot else scalar(0),
         end_distance=None if extend_top else length,
         _features=face_tags,
+        label=label,
     )
 
 
