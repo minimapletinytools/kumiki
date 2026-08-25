@@ -8,6 +8,7 @@ import pytest
 from kumiki.rule import Orientation, Transform, create_v3, radians, scalar, Matrix, simplify, sqrt, cos, sin, pi, safe_zero_test, safe_equality_test, safe_compare, Comparison
 from kumiki.geometry import Line, Plane, Point, intersect_planes, planes_are_parallel
 from kumiki.cutcsg import (
+    CutCSGLabel,
     HalfSpace,
     RectangularPrism,
     Cylinder,
@@ -1143,7 +1144,7 @@ class TestIntersectionNode:
             end_distance=scalar(10),
         )
 
-        node = Intersection(left=prism_a, right=prism_b, label="my_intersection")
+        node = Intersection(left=prism_a, right=prism_b, label=CutCSGLabel("my_intersection"))
 
         boundary_point = create_v3(scalar(5), scalar(0), scalar(5))
         interior_point = create_v3(scalar(3), scalar(0), scalar(5))
@@ -1152,7 +1153,7 @@ class TestIntersectionNode:
 
         adopted = adopt_csg(None, Transform.identity(), node)
         assert isinstance(adopted, Intersection)
-        assert adopted.label == "my_intersection"
+        assert adopted.label.name == "my_intersection"
     
     def test_difference_two_prisms_sharing_one_plane_no_overlap(self):
         """Test difference with two prisms that share one plane but don't overlap.
@@ -2633,12 +2634,12 @@ class TestCSGNaming:
     """Tests for the hierarchical name field on CutCSG subclasses."""
 
     def test_halfspace_name_field(self):
-        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0), label="shoulder")
-        assert hs.label == "shoulder"
+        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0), label=CutCSGLabel("shoulder"))
+        assert hs.label.name == "shoulder"
 
     def test_halfspace_name_default_none(self):
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0))
-        assert hs.label is None
+        assert hs.label.name is None
 
     def test_rectangular_prism_name_field(self):
         prism = RectangularPrism(
@@ -2646,14 +2647,14 @@ class TestCSGNaming:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            label="tenon",
+            label=CutCSGLabel("tenon"),
         )
-        assert prism.label == "tenon"
+        assert prism.label.name == "tenon"
 
     def test_solid_union_name_field(self):
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0))
-        union = SolidUnion(children=[hs], label="my_cut")
-        assert union.label == "my_cut"
+        union = SolidUnion(children=[hs], label=CutCSGLabel("my_cut"))
+        assert union.label.name == "my_cut"
 
     def test_difference_name_field(self):
         base = RectangularPrism(
@@ -2663,17 +2664,17 @@ class TestCSGNaming:
             end_distance=scalar(10),
         )
         cut = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(-1)]), offset=scalar(-5))
-        diff = Difference(base=base, subtract=[cut], label="tenon_cut")
-        assert diff.label == "tenon_cut"
+        diff = Difference(base=base, subtract=[cut], label=CutCSGLabel("tenon_cut"))
+        assert diff.label.name == "tenon_cut"
 
     def test_adopt_csg_preserves_name_on_solid_union(self):
         """adopt_csg should preserve the name field when transforming SolidUnion."""
-        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0), label="plane_a")
-        union = SolidUnion(children=[hs], label="my_joint")
+        hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(0), label=CutCSGLabel("plane_a"))
+        union = SolidUnion(children=[hs], label=CutCSGLabel("my_joint"))
         adopted = adopt_csg(None, Transform.identity(), union)
         assert isinstance(adopted, SolidUnion)
-        assert adopted.label == "my_joint"
-        assert adopted.children[0].label == "plane_a"
+        assert adopted.label.name == "my_joint"
+        assert adopted.children[0].label.name == "plane_a"
 
     def test_adopt_csg_preserves_name_on_difference(self):
         """adopt_csg should preserve the name field when transforming Difference."""
@@ -2682,15 +2683,15 @@ class TestCSGNaming:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            label="base_prism",
+            label=CutCSGLabel("base_prism"),
         )
-        cut = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(-1)]), offset=scalar(-5), label="cut_plane")
-        diff = Difference(base=base, subtract=[cut], label="my_diff")
+        cut = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(-1)]), offset=scalar(-5), label=CutCSGLabel("cut_plane"))
+        diff = Difference(base=base, subtract=[cut], label=CutCSGLabel("my_diff"))
         adopted = adopt_csg(None, Transform.identity(), diff)
         assert isinstance(adopted, Difference)
-        assert adopted.label == "my_diff"
-        assert adopted.base.label == "base_prism"
-        assert adopted.subtract[0].label == "cut_plane"
+        assert adopted.label.name == "my_diff"
+        assert adopted.base.label.name == "base_prism"
+        assert adopted.subtract[0].label.name == "cut_plane"
 
     def test_adopt_csg_preserves_name_on_primitives(self):
         """adopt_csg should preserve name on primitive types that use replace()."""
@@ -2699,10 +2700,10 @@ class TestCSGNaming:
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
-            label="my_prism",
+            label=CutCSGLabel("my_prism"),
         )
         adopted = adopt_csg(None, Transform.identity(), prism)
-        assert adopted.label == "my_prism"
+        assert adopted.label.name == "my_prism"
 
     def test_cutting_name_wraps_in_named_solid_union(self):
         """Cutting with a name wraps get_negative_csg_local() in a named SolidUnion."""
@@ -2715,13 +2716,17 @@ class TestCSGNaming:
             ticket=TimberTicket(path="test_timber"),
         )
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(50))
-        cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=hs.offset, label="my_joint")
+        cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=hs.offset, label=CutCSGLabel("my_joint"))
         result = cutting.get_negative_csg_local()
         assert isinstance(result, SolidUnion)
-        assert result.label == "my_joint"
+        assert result.label.name == "my_joint"
 
-    def test_cutting_no_name_returns_raw_csg(self):
-        """Cutting without a name returns the raw CSG, not wrapped."""
+    def test_cutting_without_a_name_still_wraps(self):
+        """An unnamed cutting still owns a SolidUnion of its own.
+
+        The wrapper is the cutting's node in the tree, so the shape is the same
+        whether or not anyone named it -- only the label differs.
+        """
         from kumiki.timber import Cutting, Timber
         from kumiki.ticket import TimberTicket
         timber = Timber(
@@ -2733,7 +2738,21 @@ class TestCSGNaming:
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(50))
         cutting = Cutting(timber=timber, maybe_top_end_cut_distance_from_bottom=hs.offset)
         result = cutting.get_negative_csg_local()
-        assert isinstance(result, HalfSpace)
+        assert isinstance(result, SolidUnion)
+        assert result.label == CutCSGLabel.NoLabel()
+        assert isinstance(result.children[0], HalfSpace)
+
+    def test_a_cutting_that_removes_nothing_has_no_csg(self):
+        """No node, and so no label: the timber is then just its own CSG."""
+        from kumiki.timber import Cutting, Timber
+        from kumiki.ticket import TimberTicket
+        timber = Timber(
+            size=Matrix([scalar(4), scalar(6)]),
+            length=scalar(100),
+            transform=Transform.identity(),
+            ticket=TimberTicket(path="test_timber"),
+        )
+        assert Cutting(timber=timber).get_negative_csg_local() is None
 
 
 
@@ -3984,3 +4003,47 @@ class TestBuriedFacesAreNotReported:
         on_arris = create_v3(scalar(2), scalar(3), scalar(5))
         names = {h.name for h in small.get_all_features(on_arris)}
         assert {"small.right", "small.front", "small.front×small.right"} <= names
+
+
+class TestCutCSGLabel:
+    """The name a CSG node carries.
+
+    A wrapper rather than a bare Optional[str], so that what a label holds can
+    grow later without revisiting every node that constructs one.
+    """
+
+    def test_an_unnamed_node_gets_no_label_rather_than_none(self):
+        # The field is never None, so reads never need a None check first.
+        assert HalfSpace(normal=create_v3(0, 0, 1)).label == CutCSGLabel.NoLabel()
+
+    def test_no_label_carries_no_name(self):
+        assert CutCSGLabel.NoLabel().name is None
+        assert CutCSGLabel.NoLabel().is_labeled() is False
+
+    def test_a_named_label_carries_its_name(self):
+        label = CutCSGLabel("tenon")
+        assert label.name == "tenon"
+        assert label.is_labeled() is True
+
+    def test_truthiness_distinguishes_named_from_unnamed(self):
+        # So `if csg.label:` keeps meaning "was this node named?" -- a plain
+        # object would be truthy either way.
+        assert not CutCSGLabel.NoLabel()
+        assert CutCSGLabel("tenon")
+
+    def test_an_explicitly_empty_name_still_counts_as_named(self):
+        # "" is a name someone chose; only None means nobody named it.
+        assert CutCSGLabel("").is_labeled() is True
+
+    def test_labels_compare_by_name(self):
+        assert CutCSGLabel("tenon") == CutCSGLabel("tenon")
+        assert CutCSGLabel("tenon") != CutCSGLabel("mortise")
+        assert CutCSGLabel.NoLabel() == CutCSGLabel.NoLabel()
+
+    def test_labels_are_immutable_like_the_nodes_that_hold_them(self):
+        with pytest.raises(Exception):
+            CutCSGLabel("tenon").name = "mortise"   # type: ignore[misc]
+
+    def test_repr_says_which_kind_it_is(self):
+        assert repr(CutCSGLabel.NoLabel()) == "NoLabel"
+        assert repr(CutCSGLabel("tenon")) == "CutCSGLabel('tenon')"

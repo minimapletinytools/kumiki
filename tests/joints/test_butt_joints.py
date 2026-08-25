@@ -68,7 +68,11 @@ class TestButtJoint:
         # Verify that the cut normal in global space is parallel or anti-parallel to timberB's length direction
         # For an end cut (butt joint), the cut plane is perpendicular to the timber's length axis,
         # so the normal is parallel/anti-parallel to the length direction
-        cut_csg_local = joint.cuttings["butt_timber"].get_negative_csg_local()
+        # A cutting wraps what it removes in a SolidUnion of its own; the end
+        # cut is the single plane inside it.
+        cut_csg = joint.cuttings["butt_timber"].get_negative_csg_local()
+        assert isinstance(cut_csg, SolidUnion)
+        cut_csg_local = cut_csg.children[0]
         assert isinstance(cut_csg_local, HalfSpace), "Expected cut to be a HalfSpace"
         cut_normal_local = cut_csg_local.normal
         cut_normal_global = timberB.orientation.matrix * cut_normal_local

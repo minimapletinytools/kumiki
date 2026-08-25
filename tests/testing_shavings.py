@@ -318,7 +318,9 @@ class MockCutting:
             self._maybe_bottom_end_cut = None
         self.origin = Matrix([0, 0, 0])
         self.orientation = Orientation()
-        self.negative_csg = None  # Mock CSG - not actually used
+        # Inert, but present: a Joint asserts that at least one of its cuttings
+        # removes something, and these mocks stand in for real cuttings.
+        self.negative_csg = EmptyCSG()
 
     def get_maybe_top_end_cut(self):
         return self._maybe_top_end_cut

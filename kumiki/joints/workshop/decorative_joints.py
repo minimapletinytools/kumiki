@@ -7,7 +7,7 @@ from typing import Dict, List, Optional, Tuple, Union
 
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
 from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation, Abs, Matrix
-from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg
+from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg, CutCSGLabel
 from kumiki.pathcsg import PathSegment, LineSegment, Path, PathExtrusion
 from kumiki.measuring import get_center_point_on_face_global
 
@@ -117,7 +117,7 @@ def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric
         end_distance=edge_length,
     )
 
-    return Difference(base=prism, subtract=[cylinder], label=f"roundover_{edge.name.lower()}")
+    return Difference(base=prism, subtract=[cylinder], label=CutCSGLabel(f"roundover_{edge.name.lower()}"))
 
 
 def cut_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge], radius: Numeric) -> Joint:
@@ -126,20 +126,22 @@ def cut_practice_roundover_decoration(timber: BlockLike, edges: List[TimberEdge]
     Short edges (edges on the timber ends) are at the declared length of the timber rather than the maybe_end_cut length (which is not known here).
     Note, this does not check if round radii overlap.
     """
+    # A joint has to remove something, so there is no joint to make for no
+    # edges -- the caller wanted nothing done.
+    assert edges, "cut_practice_roundover_decoration needs at least one edge to round over"
+
     edge_cuts_global = [_roundover_cut_for_edge(timber, edge, radius) for edge in edges]
 
-    negative_csg = None
-    if edge_cuts_global:
-        negative_csg = adopt_csg(
-            None,
-            timber.transform,
-            SolidUnion(children=edge_cuts_global, label="roundover_decoration"),
-        )
+    negative_csg = adopt_csg(
+        None,
+        timber.transform,
+        SolidUnion(children=edge_cuts_global, label=CutCSGLabel("roundover_decoration")),
+    )
 
     cutting = Cutting(
         timber=timber,
         negative_csg=negative_csg,
-        label="roundover_decoration",
+        label=CutCSGLabel("roundover_decoration"),
     )
     return Joint(
         cuttings={timber.ticket.path: cutting},
@@ -237,12 +239,12 @@ def cut_practice_rounded_end_decoration(
     negative_csg = adopt_csg(
         None,
         timber.transform,
-        Difference(base=prism, subtract=[cylinder], label="rounded_end_decoration"),
+        Difference(base=prism, subtract=[cylinder], label=CutCSGLabel("rounded_end_decoration")),
     )
     cutting = Cutting(
         timber=timber,
         negative_csg=negative_csg,
-        label="rounded_end_decoration",
+        label=CutCSGLabel("rounded_end_decoration"),
     )
     return Joint(
         cuttings={timber.ticket.path: cutting},
@@ -330,7 +332,7 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
     cutting = Cutting(
         timber=timber,
         negative_csg=negative_csg,
-        label="rafter_tail_scallop_decoration",
+        label=CutCSGLabel("rafter_tail_scallop_decoration"),
     )
     return Joint(
         cuttings={timber.ticket.path: cutting},
@@ -457,7 +459,7 @@ def cut_practice_path_extrusion_corner_end_decoration(
     cutting = Cutting(
         timber=timber,
         negative_csg=negative_csg,
-        label="path_extrusion_corner_end_decoration",
+        label=CutCSGLabel("path_extrusion_corner_end_decoration"),
     )
     return Joint(
         cuttings={timber.ticket.path: cutting},

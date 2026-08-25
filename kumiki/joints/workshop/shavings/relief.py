@@ -1630,11 +1630,7 @@ def chop_scribe_relief(
         timber_to_be_scribed.get_imperfect_fringe_csg_local(),
     )
 
-    timber_to_be_scribed_own_cuts_global = adopt_csg(
-        timber_to_be_scribed.transform,
-        None,
-        timber_to_be_scribed_cutting.get_negative_csg_local(),
-    )
+    scribed_own_cuts_local = timber_to_be_scribed_cutting.get_negative_csg_local()
 
     timber_to_be_cut_perfect_csg_global = adopt_csg(
         timber_to_be_cut.transform,
@@ -1656,9 +1652,18 @@ def chop_scribe_relief(
     # is handled by the subtraction below). Using only the imperfect fringe
     # here would leave timber_to_be_cut's imperfect material un-cut wherever it
     # overlaps timber_to_be_scribed's perfect-within region.
-    timber_to_be_scribed_actual_after_own_cuts_global = Difference(
-        base=timber_to_be_scribed_actual_csg_global,
-        subtract=[timber_to_be_scribed_own_cuts_global],
+    # A cutting that removes nothing leaves the scribed timber as it is.
+    timber_to_be_scribed_actual_after_own_cuts_global = (
+        timber_to_be_scribed_actual_csg_global
+        if scribed_own_cuts_local is None
+        else Difference(
+            base=timber_to_be_scribed_actual_csg_global,
+            subtract=[adopt_csg(
+                timber_to_be_scribed.transform,
+                None,
+                scribed_own_cuts_local,
+            )],
+        )
     )
 
     cut_relief_global = Difference(

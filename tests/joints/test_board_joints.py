@@ -70,8 +70,8 @@ class TestTongueAndGrooveJoint:
 
         tongue_cut = joint.cuttings[tongue_board.ticket.path]
         groove_cut = joint.cuttings[groove_board.ticket.path]
-        assert tongue_cut.label == "tongue_and_groove"
-        assert groove_cut.label == "tongue_and_groove"
+        assert tongue_cut.label.name == "tongue_and_groove"
+        assert groove_cut.label.name == "tongue_and_groove"
 
         # Tongue side has two prism subtractions (top/bottom remove).
         assert isinstance(tongue_cut.negative_csg, SolidUnion)
@@ -288,12 +288,12 @@ class TestBoardInGroovedRectangularFrameJoint:
 
         for key in expected_frame_keys:
             cutting = joint.cuttings[key]
-            assert cutting.label == "board_in_grooved_frame"
+            assert cutting.label.name == "board_in_grooved_frame"
             assert isinstance(cutting.negative_csg, RectangularPrism)
 
         for key in expected_board_keys:
             cutting = joint.cuttings[key]
-            assert cutting.label == "board_in_grooved_frame"
+            assert cutting.label.name == "board_in_grooved_frame"
             assert cutting.negative_csg is None
 
     def test_groove_thickness_matches_board(self):

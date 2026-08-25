@@ -884,7 +884,10 @@ class TestCutTimber:
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         assert len(csg.subtract) == 1
-        assert isinstance(csg.subtract[0], HalfSpace)
+        # Each cutting contributes its own SolidUnion, holding what it removes.
+        only_cut = csg.subtract[0]
+        assert isinstance(only_cut, SolidUnion)
+        assert isinstance(only_cut.children[0], HalfSpace)
     
     def test_render_timber_with_cuts_multiple_cuts(self):
         """Test render_timber_with_cuts_csg_local with multiple cuts."""
@@ -926,7 +929,10 @@ class TestCutTimber:
         assert isinstance(csg, Difference)
         assert isinstance(csg.base, RectangularPrism)
         assert len(csg.subtract) == 2
-        assert all(isinstance(sub, HalfSpace) for sub in csg.subtract)
+        # Each cutting contributes its own SolidUnion, holding what it removes.
+        for sub in csg.subtract:
+            assert isinstance(sub, SolidUnion)
+            assert isinstance(sub.children[0], HalfSpace)
     
     def test_render_timber_with_cuts_with_end_cuts(self):
         """Test render_timber_with_cuts_csg_local with end cuts."""
@@ -966,7 +972,10 @@ class TestCutTimber:
         
         # Should have one cut
         assert len(csg.subtract) == 1
-        assert isinstance(csg.subtract[0], HalfSpace)
+        # Each cutting contributes its own SolidUnion, holding what it removes.
+        only_cut = csg.subtract[0]
+        assert isinstance(only_cut, SolidUnion)
+        assert isinstance(only_cut.children[0], HalfSpace)
 
 
 class TestCutTimberFromJoints:
@@ -1010,8 +1019,8 @@ class TestCutTimberFromJoints:
             width_direction=TimberFace.RIGHT,
             ticket="Timber B"
         )
-        cut_for_timber = Cutting(timber=timber)
-        cut_for_other = Cutting(timber=other_timber)
+        cut_for_timber = Cutting(timber=timber, negative_csg=EmptyCSG())
+        cut_for_other = Cutting(timber=other_timber, negative_csg=EmptyCSG())
         joint = Joint(
             cuttings={"timberA": cut_for_timber, "timberB": cut_for_other},
             ticket=JointTicket(joint_type="j"),
@@ -1062,8 +1071,8 @@ class TestFrameFromJoints:
         )
         
         # Create cuts for each timber
-        cut1 = Cutting(timber=timber1)
-        cut2 = Cutting(timber=timber2)
+        cut1 = Cutting(timber=timber1, negative_csg=EmptyCSG())
+        cut2 = Cutting(timber=timber2, negative_csg=EmptyCSG())
         
         # Create a joint
         joint = Joint(
@@ -1098,9 +1107,9 @@ class TestFrameFromJoints:
         )
         
         # Create different cuts for the same timber
-        cut1 = Cutting(timber=timber)
-        cut2 = Cutting(timber=timber)
-        cut3 = Cutting(timber=timber)
+        cut1 = Cutting(timber=timber, negative_csg=EmptyCSG())
+        cut2 = Cutting(timber=timber, negative_csg=EmptyCSG())
+        cut3 = Cutting(timber=timber, negative_csg=EmptyCSG())
         
         # Create joints that all reference the same timber
         joint1 = Joint(
@@ -1171,13 +1180,13 @@ class TestFrameFromJoints:
         
         # Create joints with accessories
         joint1 = Joint(
-            cuttings={"timber": Cutting(timber=timber)},
+            cuttings={"timber": Cutting(timber=timber, negative_csg=EmptyCSG())},
             ticket=JointTicket(joint_type="test_accessories_peg"),
             jointAccessories={"peg": peg}
         )
         
         joint2 = Joint(
-            cuttings={"timber": Cutting(timber=timber)},
+            cuttings={"timber": Cutting(timber=timber, negative_csg=EmptyCSG())},
             ticket=JointTicket(joint_type="test_accessories_wedge"),
             jointAccessories={"wedge": wedge}
         )
@@ -1256,13 +1265,13 @@ class TestFrameFromJoints:
         
         # Create joints
         joint1 = Joint(
-            cuttings={"timber1": Cutting(timber=timber1)},
+            cuttings={"timber1": Cutting(timber=timber1, negative_csg=EmptyCSG())},
             ticket=JointTicket(joint_type="test_same_name_warn_1"),
             jointAccessories={}
         )
         
         joint2 = Joint(
-            cuttings={"timber2": Cutting(timber=timber2)},
+            cuttings={"timber2": Cutting(timber=timber2, negative_csg=EmptyCSG())},
             ticket=JointTicket(joint_type="test_same_name_warn_2"),
             jointAccessories={}
         )
@@ -1306,13 +1315,13 @@ class TestFrameFromJoints:
         
         # Create joints
         joint1 = Joint(
-            cuttings={"timber1": Cutting(timber=timber1)},
+            cuttings={"timber1": Cutting(timber=timber1, negative_csg=EmptyCSG())},
             ticket=JointTicket(joint_type="test_dup_data_1"),
             jointAccessories={}
         )
         
         joint2 = Joint(
-            cuttings={"timber2": Cutting(timber=timber2)},
+            cuttings={"timber2": Cutting(timber=timber2, negative_csg=EmptyCSG())},
             ticket=JointTicket(joint_type="test_dup_data_2"),
             jointAccessories={}
         )
@@ -2020,11 +2029,13 @@ class TestJointAssembly:
                     timber=timber_a,
                     assembly_freedom=AssemblyFreedom.translation(create_v3(0, 0, 1), freed_after=scalar(4)) if freedoms else None,
                     assembly_ordering=Ordering(0, cutting_suborder),
+                    negative_csg=EmptyCSG(),
                 ),
                 "b": Cutting(
                     timber=timber_b,
                     assembly_freedom=AssemblyFreedom.translation(create_v3(0, 0, -1), freed_after=scalar(4)) if freedoms else None,
                     assembly_ordering=Ordering(0, cutting_suborder),
+                    negative_csg=EmptyCSG(),
                 ),
             },
             ticket=JointTicket(path=f"{ticket_a}_{ticket_b}", joint_type="test_joint"),
@@ -2129,9 +2140,9 @@ class TestJointAssembly:
         freedom_x = AssemblyFreedom.translation(create_v3(1, 0, 0), freed_after=scalar(2))
         compound = Joint(
             cuttings={
-                "a": Cutting(timber=timber_a, assembly_freedom=freedom_up, assembly_ordering=Ordering(2, 0)),
-                "a_2": Cutting(timber=timber_a, assembly_freedom=freedom_x, assembly_ordering=Ordering(1, 0)),
-                "b": Cutting(timber=timber_b),
+                "a": Cutting(timber=timber_a, assembly_freedom=freedom_up, assembly_ordering=Ordering(2, 0), negative_csg=EmptyCSG()),
+                "a_2": Cutting(timber=timber_a, assembly_freedom=freedom_x, assembly_ordering=Ordering(1, 0), negative_csg=EmptyCSG()),
+                "b": Cutting(timber=timber_b, negative_csg=EmptyCSG()),
             },
             ticket=joint.ticket,
             jointAccessories={},
@@ -2168,9 +2179,9 @@ class TestCutTimberJoints:
 
     def test_from_joints_records_the_joints_that_cut_the_timber(self):
         timber = self._timber("A")
-        joint1 = Joint(cuttings={"a": Cutting(timber=timber)},
+        joint1 = Joint(cuttings={"a": Cutting(timber=timber, negative_csg=EmptyCSG())},
                        ticket=JointTicket(path="joints/one"), jointAccessories={})
-        joint2 = Joint(cuttings={"a": Cutting(timber=timber)},
+        joint2 = Joint(cuttings={"a": Cutting(timber=timber, negative_csg=EmptyCSG())},
                        ticket=JointTicket(path="joints/two"), jointAccessories={})
 
         cut_timber = CutTimber.from_joints(timber, [joint1, joint2])
@@ -2179,9 +2190,9 @@ class TestCutTimberJoints:
     def test_joints_that_do_not_touch_the_timber_are_excluded(self):
         timber = self._timber("A")
         other = self._timber("B")
-        mine = Joint(cuttings={"a": Cutting(timber=timber)},
+        mine = Joint(cuttings={"a": Cutting(timber=timber, negative_csg=EmptyCSG())},
                      ticket=JointTicket(path="joints/mine"), jointAccessories={})
-        theirs = Joint(cuttings={"b": Cutting(timber=other)},
+        theirs = Joint(cuttings={"b": Cutting(timber=other, negative_csg=EmptyCSG())},
                        ticket=JointTicket(path="joints/theirs"), jointAccessories={})
 
         cut_timber = CutTimber.from_joints(timber, [mine, theirs])
@@ -2191,7 +2202,7 @@ class TestCutTimberJoints:
         """Deduplicated by joint, not counted per cutting."""
         timber = self._timber("A")
         joint = Joint(
-            cuttings={"a": Cutting(timber=timber), "b": Cutting(timber=timber)},
+            cuttings={"a": Cutting(timber=timber, negative_csg=EmptyCSG()), "b": Cutting(timber=timber, negative_csg=EmptyCSG())},
             ticket=JointTicket(path="joints/one"),
             jointAccessories={},
         )
@@ -2201,7 +2212,7 @@ class TestCutTimberJoints:
 
     def test_frame_from_joints_populates_it_too(self):
         timber = self._timber("A")
-        joint = Joint(cuttings={"a": Cutting(timber=timber)},
+        joint = Joint(cuttings={"a": Cutting(timber=timber, negative_csg=EmptyCSG())},
                       ticket=JointTicket(path="joints/one"), jointAccessories={})
 
         frame = Frame.from_joints([joint])
@@ -2211,7 +2222,7 @@ class TestCutTimberJoints:
     def test_an_unjointed_timber_has_none(self):
         jointed = self._timber("A")
         unjointed = self._timber("B")
-        joint = Joint(cuttings={"a": Cutting(timber=jointed)},
+        joint = Joint(cuttings={"a": Cutting(timber=jointed, negative_csg=EmptyCSG())},
                       ticket=JointTicket(path="joints/one"), jointAccessories={})
 
         frame = Frame.from_joints([joint], additional_unjointed_timbers=[unjointed])

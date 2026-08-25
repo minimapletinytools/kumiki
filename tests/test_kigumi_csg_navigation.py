@@ -21,9 +21,12 @@ import pytest
 
 from kumiki.cutcsg import (
     ConvexPolygonExtrusion,
+    EmptyCSG,
     CutCSG,
+    CutCSGLabel,
     Cylinder,
     Difference,
+    HalfSpace,
     HalfSpaceFeature,
     SimpleRectangularPrismFeature,
     PrismFace,
@@ -105,6 +108,23 @@ def test_cutcsg_label_field_is_named_label():
         "CSG tree by reading it (_walk_labeled_csg, _resolve_csg_at_path, "
         "_navigate_csg_one_level); update those reads to match."
     )
+
+
+def test_cutcsg_label_name_is_reachable_as_name():
+    """The name lives at ``csg.label.name``, and kigumi reads it through a
+    getattr chain -- so renaming it degrades silently too, exactly like
+    renaming the field itself."""
+    labeled = HalfSpace(normal=create_v3(0, 0, 1), label=CutCSGLabel("shoulder"))
+    assert labeled.label.name == "shoulder"
+    assert runner._label_name(labeled) == "shoulder"
+
+
+def test_an_unlabeled_csg_reports_no_name():
+    """NoLabel() is not None, so a naive truth test on csg.label would call
+    every node labelled. kigumi must see None here."""
+    unlabeled = HalfSpace(normal=create_v3(0, 0, 1))
+    assert unlabeled.label == CutCSGLabel.NoLabel()
+    assert runner._label_name(unlabeled) is None
 
 
 class TestCSGTreeSerialization:
@@ -281,7 +301,7 @@ class TestResolveCSGAtPath:
             local_csg, ["mortise_and_tenon", "tenon"], None, PICK_EPS
         )
         assert resolved is not local_csg
-        assert getattr(resolved, "label", None) == "tenon"
+        assert resolved.label.name == "tenon"
 
 
 class TestSerializeCuttingSummary:
@@ -329,7 +349,7 @@ class TestNonPrismPrimitivesArePickable:
             transform=Transform.identity(),
             start_distance=scalar(10),
             end_distance=scalar(20),
-            label="dovetail_housing",
+            label=CutCSGLabel("dovetail_housing"),
         )
         # On the extrusion's x=2 wall, inside the timber body.
         point = [2.0, 0.0, 15.0]
@@ -347,7 +367,7 @@ class TestNonPrismPrimitivesArePickable:
                 transform=Transform.identity(),
                 start_distance=scalar(10),
                 end_distance=scalar(20),
-                label="dovetail_housing",
+                label=CutCSGLabel("dovetail_housing"),
             ),
         ])
         path, target, _face = runner._navigate_csg_to_leaf(csg, [2.0, 0.0, 15.0], PICK_EPS)
@@ -362,7 +382,7 @@ class TestNonPrismPrimitivesArePickable:
                 position=create_v3(scalar(0), scalar(-5), scalar(50)),
                 start_distance=scalar(0),
                 end_distance=scalar(10),
-                label="peg_hole",
+                label=CutCSGLabel("peg_hole"),
             ),
         ])
         # On the bore wall, one radius off the axis.
@@ -633,7 +653,7 @@ class TestJointDisplayName:
 
         timber = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0)).butt_timber
         return Joint(
-            cuttings={"a": Cutting(timber=timber)},
+            cuttings={"a": Cutting(timber=timber, negative_csg=EmptyCSG())},
             ticket=ticket if ticket is not None else JointTicket(),
             jointAccessories={},
         )

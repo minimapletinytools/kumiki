@@ -23,6 +23,7 @@ from kumiki.rule import (
     safe_equality_test,
 )
 from kumiki.cutcsg import (
+    CutCSGLabel,
     RectangularPrism,
     ConvexPolygonExtrusion,
     SolidUnion,
@@ -170,7 +171,7 @@ def cut_tongue_and_groove_joint(
         ),
         start_distance=scalar(0),
         end_distance=tongue_board.length,
-        label="tongue_top_remove",
+        label=CutCSGLabel("tongue_top_remove"),
     )
 
     # Bottom negative cut: mirror of top.
@@ -187,18 +188,18 @@ def cut_tongue_and_groove_joint(
         ),
         start_distance=scalar(0),
         end_distance=tongue_board.length,
-        label="tongue_bottom_remove",
+        label=CutCSGLabel("tongue_bottom_remove"),
     )
 
     tongue_neg_csg = SolidUnion(
         children=[top_neg_prism, bot_neg_prism],
-        label="tongue_and_groove",
+        label=CutCSGLabel("tongue_and_groove"),
     )
 
     tongue_cutting = Cutting(
         timber=tongue_board,
         negative_csg=tongue_neg_csg,
-        label="tongue_and_groove",
+        label=CutCSGLabel("tongue_and_groove"),
     )
 
     # --- Cut groove on the groove board ---
@@ -235,7 +236,7 @@ def cut_tongue_and_groove_joint(
         ),
         start_distance=scalar(0),
         end_distance=groove_board.length,
-        label="groove",
+        label=CutCSGLabel("groove"),
     )
 
     # Trim the overhanging lip of the groove board: cut full thickness and full
@@ -258,18 +259,18 @@ def cut_tongue_and_groove_joint(
         ),
         start_distance=scalar(0),
         end_distance=groove_board.length,
-        label="groove_excess_trim",
+        label=CutCSGLabel("groove_excess_trim"),
     )
 
     groove_neg_csg = SolidUnion(
         children=[groove_prism, trim_prism],
-        label="tongue_and_groove",
+        label=CutCSGLabel("tongue_and_groove"),
     )
 
     groove_cutting = Cutting(
         timber=groove_board,
         negative_csg=groove_neg_csg,
-        label="tongue_and_groove",
+        label=CutCSGLabel("tongue_and_groove"),
     )
 
     # Assembly: the boards part along the mating axis (tongue pulls out of the
@@ -378,7 +379,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
         ),
         start_distance=scalar(0),
         end_distance=z_span,
-        label="board_groove",
+        label=CutCSGLabel("board_groove"),
     )
 
     # Re-express the groove prism in each frame timber's local coordinate frame
@@ -391,7 +392,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
         cuttings[timber.ticket.path] = Cutting(
             timber=timber,
             negative_csg=groove_in_timber_local,
-            label="board_in_grooved_frame",
+            label=CutCSGLabel("board_in_grooved_frame"),
         )
 
     # Include boards as uncut members so the returned joint can form a complete frame.
@@ -399,7 +400,7 @@ def cut_practice_board_in_grooved_rectangular_frame_joint_on_face_aligned_timber
         cuttings[board.ticket.path] = Cutting(
             timber=board,
             negative_csg=None,
-            label="board_in_grooved_frame",
+            label=CutCSGLabel("board_in_grooved_frame"),
         )
 
     # Assembly: no freedoms are set — a panel captured in a 4-sided grooved
@@ -639,7 +640,7 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
             transform=profile_transform,
             start_distance=s_start,
             end_distance=s_end,
-            label=label,
+            label=CutCSGLabel(label),
         )
         assert extrusion.is_valid(), f"dovetail trapezoid profile is not a valid convex polygon (label={label})"
         return _taper_intersection(extrusion)
@@ -657,7 +658,7 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
             transform=transform,
             start_distance=s_start,
             end_distance=s_end,
-            label=label,
+            label=CutCSGLabel(label),
         )
 
     # --- butt_timber's cut: remove everything except the tongue ---
@@ -688,12 +689,12 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         tongue_cuts.append(_full_depth_box(s_butt_back, s_tongue_back, "dovetail_length_clearance"))
 
     assert tongue_cuts, "shorten_dovetail_by/dovetail_length leaves no material for butt_timber's own actual depth extent to cut"
-    butt_negative_csg = SolidUnion(children=tongue_cuts, label="sliding_dovetail") if len(tongue_cuts) > 1 else tongue_cuts[0]
+    butt_negative_csg = SolidUnion(children=tongue_cuts, label=CutCSGLabel("sliding_dovetail")) if len(tongue_cuts) > 1 else tongue_cuts[0]
 
     butt_cutting = Cutting(
         timber=butt_timber,
         negative_csg=adopt_csg(None, butt_timber.transform, butt_negative_csg),
-        label="sliding_dovetail",
+        label=CutCSGLabel("sliding_dovetail"),
     )
 
     # --- receiving_timber's cut: the dovetail-shaped housing groove ---
@@ -704,7 +705,7 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
     receiving_cutting = Cutting(
         timber=receiving_timber,
         negative_csg=adopt_csg(None, receiving_timber.transform, housing_csg),
-        label="sliding_dovetail",
+        label=CutCSGLabel("sliding_dovetail"),
     )
 
     # Assembly: the tongue slides free of the housing by withdrawing along

@@ -133,10 +133,13 @@ def cut_free_house_joint(
             # Collect and prune each cut's negative CSG, transformed to housing_timber's local space
             relevant_cuts = []
             for cut in housed_timber.cuts:
+                cut_csg = cut.get_negative_csg_local()
+                if cut_csg is None:
+                    continue
                 neg_in_housing = adopt_csg(
                     housed_timber.timber.transform,
                     housing_timber.transform,
-                    cut.get_negative_csg_local(),
+                    cut_csg,
                 )
                 pruned = _prune_csg(neg_in_housing)
                 if pruned is not None:

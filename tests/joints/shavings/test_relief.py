@@ -4,7 +4,7 @@ Tests for the shoulder-notch and relief-cut helpers in kumiki.joints.workshop.re
 
 from dataclasses import replace
 
-from kumiki.cutcsg import ConvexPolygonSimpleLoft, Difference, Intersection
+from kumiki.cutcsg import ConvexPolygonSimpleLoft, Difference, EmptyCSG, Intersection
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.shavings.relief import (
@@ -771,8 +771,8 @@ class TestChopScribeRelief:
         )
 
         scribed_overlap_csg_local, scribe_relief_csg_local = chop_scribe_relief(
-            timber_to_be_scribed_cutting=Cutting(timber=timber_to_be_scribed),
-            timber_to_be_cut_cutting=Cutting(timber=timber_to_be_cut),
+            timber_to_be_scribed_cutting=Cutting(timber=timber_to_be_scribed, negative_csg=EmptyCSG()),
+            timber_to_be_cut_cutting=Cutting(timber=timber_to_be_cut, negative_csg=EmptyCSG()),
         )
 
         assert isinstance(scribed_overlap_csg_local, Intersection)

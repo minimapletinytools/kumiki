@@ -964,7 +964,7 @@ class TestMortiseAndTenonCSGHierarchy:
         assert len(csg.subtract) == 1
         mt_union = csg.subtract[0]
         assert isinstance(mt_union, SolidUnion)
-        assert mt_union.label == "mortise_and_tenon"
+        assert mt_union.label.name == "mortise_and_tenon"
 
         # Inside the SolidUnion: a Difference (shoulder - tenon) + a redundant end HalfSpace
         assert len(mt_union.children) == 2
@@ -973,10 +973,10 @@ class TestMortiseAndTenonCSGHierarchy:
 
         assert isinstance(cut_diff, Difference)
         assert isinstance(cut_diff.base, HalfSpace)
-        assert cut_diff.base.label == "shoulder"
+        assert cut_diff.base.label.name == "shoulder"
         assert len(cut_diff.subtract) == 1
         assert isinstance(cut_diff.subtract[0], RectangularPrism)
-        assert cut_diff.subtract[0].label == "tenon"
+        assert cut_diff.subtract[0].label.name == "tenon"
 
         assert isinstance(redundant_end, HalfSpace)
 
@@ -1006,13 +1006,13 @@ class TestMortiseAndTenonCSGHierarchy:
         assert len(csg.subtract) == 1
         mt_union = csg.subtract[0]
         assert isinstance(mt_union, SolidUnion)
-        assert mt_union.label == "mortise_and_tenon"
+        assert mt_union.label.name == "mortise_and_tenon"
 
         # Inside: just the mortise_hole RectangularPrism (wrapped in SolidUnion by Cutting.label)
         assert len(mt_union.children) == 1
         mortise_hole = mt_union.children[0]
         assert isinstance(mortise_hole, RectangularPrism)
-        assert mortise_hole.label == "mortise_hole"
+        assert mortise_hole.label.name == "mortise_hole"
 
 # ============================================================================
 # Tests for Wedged Half-Dovetail Mortise and Tenon Joint
@@ -1093,8 +1093,8 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         assert tenon_ct.get_maybe_top_end_cut() is None
         assert mortise_ct.get_maybe_top_end_cut() is None
         assert mortise_ct.get_maybe_bottom_end_cut() is None
-        assert tenon_ct.label == "wedged_half_dovetail_mortise_and_tenon"
-        assert mortise_ct.label == "wedged_half_dovetail_mortise_and_tenon"
+        assert tenon_ct.label.name == "wedged_half_dovetail_mortise_and_tenon"
+        assert mortise_ct.label.name == "wedged_half_dovetail_mortise_and_tenon"
 
         # ---- walk points along the tenon centerline (x=0, y=0, varying z) ----
         tenon_csg = _render_cutting(tenon_ct)

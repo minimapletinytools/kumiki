@@ -50,8 +50,13 @@ class TestSpliceJoint:
         
         # Verify the cut planes are perpendicular to the timber axis (X axis)
         # In global coordinates, the plane normal should be ±(1, 0, 0)
-        cutA_csg_local = cutA.get_negative_csg_local()
-        cutB_csg_local = cutB.get_negative_csg_local()
+        # A cutting wraps what it removes in a SolidUnion of its own; the end
+        # cut is the single plane inside it.
+        cutA_csg = cutA.get_negative_csg_local()
+        cutB_csg = cutB.get_negative_csg_local()
+        assert isinstance(cutA_csg, SolidUnion) and isinstance(cutB_csg, SolidUnion)
+        cutA_csg_local = cutA_csg.children[0]
+        cutB_csg_local = cutB_csg.children[0]
         assert isinstance(cutA_csg_local, HalfSpace), "Expected cutA to be a HalfSpace"
         assert isinstance(cutB_csg_local, HalfSpace), "Expected cutB to be a HalfSpace"
         global_normalA = timberA.orientation.matrix * cutA_csg_local.normal

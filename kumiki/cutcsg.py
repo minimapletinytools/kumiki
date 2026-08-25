@@ -903,9 +903,40 @@ class OwnedFeatureHit:
 
 
 @dataclass(frozen=True)
+class CutCSGLabel:
+    """The name a CSG node carries, if anyone gave it one.
+
+    A wrapper rather than a bare Optional[str] so that what a label carries can
+    grow -- provenance, namespacing, whatever naming turns out to need -- without
+    revisiting every node that constructs one.
+
+    An unnamed node gets NoLabel() rather than None, so `csg.label` is always a
+    CutCSGLabel and reading it never needs a None check first. Test for a name
+    with the label's truthiness or is_labeled(); read it with `.name`.
+    """
+
+    name: Optional[str] = None
+
+    @staticmethod
+    def NoLabel() -> 'CutCSGLabel':
+        """The label of a node nobody named. The default for CutCSG.label."""
+        return CutCSGLabel()
+
+    def is_labeled(self) -> bool:
+        """True if this node was given a name."""
+        return self.name is not None
+
+    def __bool__(self) -> bool:
+        return self.is_labeled()
+
+    def __repr__(self) -> str:
+        return f"CutCSGLabel({self.name!r})" if self.name is not None else "NoLabel"
+
+
+@dataclass(frozen=True)
 class CutCSG(ABC):
     """Base class for all CSG operations."""
-    label: Optional[str] = field(default=None, kw_only=True)
+    label: CutCSGLabel = field(default_factory=CutCSGLabel.NoLabel, kw_only=True)
 
     @abstractmethod
     def __repr__(self) -> str:

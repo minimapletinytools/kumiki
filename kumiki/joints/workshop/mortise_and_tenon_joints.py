@@ -29,7 +29,7 @@ from kumiki.measuring import (
     Space,
 )
 from kumiki.timber_shavings import are_timbers_plane_aligned
-from kumiki.cutcsg import CutCSG, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder, SimpleRectangularPrismFeature
+from kumiki.cutcsg import CutCSG, CutCSGLabel, RectangularPrism, HalfSpace, Difference, SolidUnion, adopt_csg, PrismFace, Cylinder, SimpleRectangularPrismFeature
 from .shavings.build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
     locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
@@ -324,7 +324,7 @@ def cut_mortise_and_tenon_joint(
             position=marking_space.transform.position,
             start_distance=-back_extension,
             end_distance=tenon_length,
-            label="tenon",
+            label=CutCSGLabel("tenon"),
         )
     else:
         tenon_prism_global = RectangularPrism(
@@ -339,7 +339,7 @@ def cut_mortise_and_tenon_joint(
                 SimpleRectangularPrismFeature("tenon_back", face=PrismFace.BACK),
                 SimpleRectangularPrismFeature(tenon_tip_name, face=PrismFace.TOP),
             ],
-            label="tenon",
+            label=CutCSGLabel("tenon"),
         )
 
     tenon_prism_cropping_csgs: Optional[List[CutCSG]] = None
@@ -382,7 +382,7 @@ def cut_mortise_and_tenon_joint(
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
-        label="shoulder",
+        label=CutCSGLabel("shoulder"),
     )
 
     tenon_prism_cropped = (
@@ -412,7 +412,7 @@ def cut_mortise_and_tenon_joint(
                 position=marking_space.transform.position,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                label="mortise_hole",
+                label=CutCSGLabel("mortise_hole"),
             )
         else:
             opp_index = 1 if joint_angle_axis_index == 0 else 0
@@ -436,7 +436,7 @@ def cut_mortise_and_tenon_joint(
                 transform=mortise_hole_transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                label="mortise_hole",
+                label=CutCSGLabel("mortise_hole"),
             )
     else:
         if use_round_tenon:
@@ -449,7 +449,7 @@ def cut_mortise_and_tenon_joint(
                 position=marking_space.transform.position,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                label="mortise_hole",
+                label=CutCSGLabel("mortise_hole"),
             )
         else:
             mortise_hole_prism_global = RectangularPrism(
@@ -457,7 +457,7 @@ def cut_mortise_and_tenon_joint(
                 transform=marking_space.transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
-                label="mortise_hole",
+                label=CutCSGLabel("mortise_hole"),
             )
 
     # -------------------------------------------------------------------------
@@ -577,7 +577,7 @@ def cut_mortise_and_tenon_joint(
     mortise_cut = Cutting(
         timber=mortise_timber,
         negative_csg=mortise_negative_csg,
-        label="mortise_and_tenon",
+        label=CutCSGLabel("mortise_and_tenon"),
     )
 
     tenon_length_direction_global = tenon_timber.get_face_direction_global(tenon_end)
@@ -590,7 +590,7 @@ def cut_mortise_and_tenon_joint(
         maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
         negative_csg=tenon_cut_csg,
-        label="mortise_and_tenon",
+        label=CutCSGLabel("mortise_and_tenon"),
     )
 
     joint_accessories = {}
@@ -616,7 +616,7 @@ def cut_mortise_and_tenon_joint(
                     position=center_global,
                     start_distance=scalar(0),
                     end_distance=depth,
-                    label=label,
+                    label=CutCSGLabel(label),
                 )
             return RectangularPrism(
                 size=Matrix([peg_size, peg_size]),
@@ -626,7 +626,7 @@ def cut_mortise_and_tenon_joint(
                 ),
                 start_distance=scalar(0),
                 end_distance=depth,
-                label=label,
+                label=CutCSGLabel(label),
             )
 
         for peg_idx, peg_result in enumerate(peg_results):
@@ -676,14 +676,14 @@ def cut_mortise_and_tenon_joint(
                 maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
                 maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
                 negative_csg=tenon_cut_with_pegs_csg,
-                label="mortise_and_tenon",
+                label=CutCSGLabel("mortise_and_tenon"),
             )
         if peg_holes_in_mortise_local:
             mortise_cut_with_pegs_csg = CSGUnion(children=[mortise_negative_csg] + peg_holes_in_mortise_local)
             mortise_cut = Cutting(
                 timber=mortise_timber,
                 negative_csg=mortise_cut_with_pegs_csg,
-                label="mortise_and_tenon",
+                label=CutCSGLabel("mortise_and_tenon"),
             )
 
     tenon_cut_no_relief, mortise_cut_no_relief = tenon_cut, mortise_cut
@@ -1671,7 +1671,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.BOTTOM else None,
         negative_csg=tenon_negative_local,
-        label="wedged_half_dovetail_mortise_and_tenon",
+        label=CutCSGLabel("wedged_half_dovetail_mortise_and_tenon"),
         assembly_freedom=AssemblyFreedom.translation(tenon_disassembly_dir, freed_after=freed_dist),
         assembly_ordering=Ordering(0, timber_suborder),
     )
@@ -1679,7 +1679,7 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     mortise_cut_no_relief = Cutting(
         timber=mortise_timber,
         negative_csg=mortise_negative_local,
-        label="wedged_half_dovetail_mortise_and_tenon",
+        label=CutCSGLabel("wedged_half_dovetail_mortise_and_tenon"),
         assembly_freedom=AssemblyFreedom.translation(mortise_disassembly_dir, freed_after=freed_dist),
         assembly_ordering=Ordering(0, timber_suborder),
     )

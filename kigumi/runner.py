@@ -340,7 +340,14 @@ def _build_perfect_timber_within_csg_local(cut_timber: Any) -> Any:
 
     if not cut_timber.cuts:
         return base_prism
-    negs = [c.get_negative_csg_local() for c in cut_timber.cuts]
+    # A cut that removes nothing contributes no node, exactly as in
+    # render_timber_with_cuts_csg_local.
+    negs = [
+        csg for csg in (c.get_negative_csg_local() for c in cut_timber.cuts)
+        if csg is not None
+    ]
+    if not negs:
+        return base_prism
     return Difference(base_prism, negs)
 
 
@@ -856,7 +863,7 @@ def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
     cuts_meta: List[Dict[str, Any]] = []
     cuts = list(getattr(cut_timber, "cuts", []) or [])
     for idx, cut in enumerate(cuts):
-        label = getattr(cut, "label", None)
+        label = _label_name(cut)
         has_csg = getattr(cut, "negative_csg", None) is not None
         has_top = getattr(cut, "maybe_top_end_cut_distance_from_bottom", None) is not None
         has_bot = getattr(cut, "maybe_bottom_end_cut_distance_from_bottom", None) is not None
@@ -1153,7 +1160,7 @@ def _serialize_csg_node(
     """
     from kumiki.cutcsg import Difference, Intersection, SolidUnion
 
-    label = getattr(csg, "label", None)
+    label = _label_name(csg)
     node_path = path + [label] if label else path
 
     node: Dict[str, Any] = {
@@ -1717,6 +1724,18 @@ def _joint_name_for_node(
     return _joint_name_for_cutting(cut_timber, cutting)
 
 
+def _label_name(labeled: Any) -> Optional[str]:
+    """The name a CSG node or a Cutting carries, or None if nobody named it.
+
+    Both hold a CutCSGLabel, never a bare string and never None, so the name
+    lives one level in. Kept in one place because the runner reads it from a
+    dozen spots while navigating -- and because a CutCSGLabel that reaches the
+    payload unwrapped would serialize as an object where the viewer expects a
+    string.
+    """
+    return getattr(getattr(labeled, "label", None), "name", None)
+
+
 def _declared_feature_names(csg: Any) -> List[str]:
     """Names of the features *csg* declares, in declaration order."""
     names: List[str] = []
@@ -1936,7 +1955,7 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
         if isinstance(node, Difference):
             children = list(node.subtract)
             # Also check base
-            base_label = getattr(node.base, "label", None)
+            base_label = _label_name(node.base)
             if base_label == label_name:
                 results.append(node.base)
             elif isinstance(node.base, (SolidUnion, Difference)) and base_label is None:
@@ -1944,7 +1963,7 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
         elif isinstance(node, SolidUnion):
             children = list(node.children)
         for ch in children:
-            ch_label = getattr(ch, "label", None)
+            ch_label = _label_name(ch)
             if ch_label == label_name:
                 results.append(ch)
             elif isinstance(ch, (SolidUnion, Difference)) and ch_label is None:
@@ -1987,7 +2006,7 @@ def _navigate_csg_one_level(
         # Check which subtract child the point lies on
         for sub in node.subtract:
             if _csg_point_on_boundary(sub, local_pt, eps):
-                sub_label = getattr(sub, "label", None)
+                sub_label = _label_name(sub)
                 if sub_label:
                     return (current_path + [sub_label], sub, None)
                 # Unlabeled compound → drill through transparently
@@ -1995,7 +2014,7 @@ def _navigate_csg_one_level(
                     return _navigate_csg_one_level(sub, local_pt, current_path, eps)
                 return (current_path, sub, _detect_face_label(sub, local_pt, eps))
         # Point is on the base surface
-        base_label = getattr(node.base, "label", None)
+        base_label = _label_name(node.base)
         if base_label:
             return (current_path + [base_label], node.base, None)
         if isinstance(node.base, (SolidUnion, Difference)):
@@ -2005,7 +2024,7 @@ def _navigate_csg_one_level(
     if isinstance(node, SolidUnion):
         for ch in node.children:
             if _csg_point_on_boundary(ch, local_pt, eps):
-                ch_label = getattr(ch, "label", None)
+                ch_label = _label_name(ch)
                 if ch_label:
                     return (current_path + [ch_label], ch, None)
                 # Unlabeled compound → drill through transparently

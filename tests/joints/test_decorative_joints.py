@@ -59,14 +59,15 @@ class TestRoundoverDecoration:
         assert joint.is_decorative()
         assert set(joint.cuttings.keys()) == {"timber"}
         cutting = joint.cuttings["timber"]
-        assert cutting.label == "roundover_decoration"
+        assert cutting.label.name == "roundover_decoration"
         assert cutting.negative_csg is not None
 
-    def test_no_edges_is_a_no_op(self):
+    def test_no_edges_is_rejected(self):
+        # A joint has to remove something, so rounding over no edges is not a
+        # no-op joint -- there is no joint to make.
         timber = _make_timber()
-        joint = cut_practice_roundover_decoration(timber, [], RADIUS)
-
-        assert joint.cuttings["timber"].negative_csg is None
+        with pytest.raises(AssertionError, match="at least one edge"):
+            cut_practice_roundover_decoration(timber, [], RADIUS)
 
     def test_single_long_edge_removes_expected_volume(self):
         # Cylinder CSGs triangulate as a 32-sided polygon (not a true circle),
@@ -213,7 +214,7 @@ class TestRoundedEndDecoration:
         assert joint.ticket.joint_type == "rounded_end_decoration"
         assert joint.is_decorative()
         assert set(joint.cuttings.keys()) == {"timber"}
-        assert cutting.label == "rounded_end_decoration"
+        assert cutting.label.name == "rounded_end_decoration"
         assert cutting.negative_csg is not None
 
     def test_watertight(self):

@@ -1543,10 +1543,9 @@ class Cutting:
     # Does NOT include the end cuts (those are stored separately above)
     negative_csg: Optional[CutCSG] = None
 
-    # Optional label for this cutting in the CSG hierarchy (e.g. "mortise_and_tenon").
-    # When set, get_negative_csg_local() wraps the result in a labeled SolidUnion grouping
-    # node so that the viewer can navigate the CSG tree by label.
-    label: Optional[str] = None
+    # Label for this cutting's node in the CSG hierarchy (e.g. "mortise_and_tenon").
+    # The cutting owns that node, so it owns the label for it.
+    label: CutCSGLabel = field(default_factory=CutCSGLabel.NoLabel)
 
     # Assembly freedom of this timber within this joint (global space).
     # None means unspecified: the assembly solver treats the connection as rigid.
@@ -1575,12 +1574,12 @@ class Cutting:
             )
         return None
 
-    def get_negative_csg_local(self) -> CutCSG:
+    def get_negative_csg_local(self) -> Optional[CutCSG]:
         """
         Get the complete negative CSG including end cuts.
 
-        Returns the union of negative_csg with any end cuts that are defined.
-        If self.label is set, wraps the result in a labeled SolidUnion grouping node.
+        Returns the union of negative_csg with any end cuts that are defined,
+        or None when this cutting removes nothing at all.
         """
         csg_components = []
 
@@ -1604,17 +1603,15 @@ class Cutting:
         if bottom_end_cut is not None:
             _append_component(bottom_end_cut)
 
+        # A cutting that removes nothing has no node and no label; the timber
+        # is then just its own CSG. Returning EmptyCSG instead would put a
+        # subtract-nothing node in every such tree.
         if len(csg_components) == 0:
-            return EmptyCSG()
+            return None
 
-        elif len(csg_components) == 1:
-            result = csg_components[0]
-            if self.label is not None:
-                result = SolidUnion([result], label=self.label)
-        else:
-            result = SolidUnion(csg_components, label=self.label)
-
-        return result
+        # Always one SolidUnion, named or not, one piece or several: the
+        # cutting owns this node, so the tree has the same shape either way.
+        return SolidUnion(csg_components, label=self.label)
 
     @staticmethod
     def make_end_cut(timber: PerfectTimberWithin, end: TimberEnd, distance_from_end_to_cut: Numeric) -> HalfSpace:
@@ -1958,8 +1955,14 @@ class CutTimber:
         if not self.cuts:
             return starting_csg
         
-        # Collect all the negative CSGs (volumes to be removed) from the cuts
-        negative_csgs = [cut.get_negative_csg_local() for cut in self.cuts]
+        # Collect all the negative CSGs (volumes to be removed) from the cuts.
+        # A cut that removes nothing contributes no node.
+        negative_csgs = [
+            csg for csg in (cut.get_negative_csg_local() for cut in self.cuts)
+            if csg is not None
+        ]
+        if not negative_csgs:
+            return starting_csg
         
         # Return the difference: timber - all cuts
         return Difference(starting_csg, negative_csgs)
@@ -2119,31 +2122,39 @@ class CutTimber:
         can_use_analytical = True
         for cut in self.cuts:
             csg = cut.get_negative_csg_local()
+            if csg is None:
+                continue
             
-            # Check if it's a simple HalfSpace or a Difference with HalfSpaces
-            if isinstance(csg, HalfSpace):
-                half_space = csg
+            # A cutting always wraps what it removes in a SolidUnion of its
+            # own, so look through that to the pieces doing the removing.
+            components = list(csg.children) if isinstance(csg, SolidUnion) else [csg]
+
+            for half_space in components:
+                # Check if it's a simple HalfSpace
+                if not isinstance(half_space, HalfSpace):
+                    # Complex CSG - need sampling
+                    can_use_analytical = False
+                    break
+
                 dot_product = safe_dot_product(half_space.normal, length_direction_local)
-                
-                if safe_equality_test(Abs(dot_product), 1):
-                    # HalfSpace aligned with length direction
-                    # HalfSpace contains points where (p · normal) >= offset
-                    # When subtracted, remaining points are where (p · normal) < offset
-                    if safe_compare(dot_product, 0, Comparison.GT):
-                        # Normal points in +Z direction
-                        # Subtraction removes points with Z >= offset
-                        max_z = Min(max_z, half_space.offset)
-                    else:
-                        # Normal points in -Z direction
-                        # Subtraction removes points with Z <= -offset
-                        min_z = Max(min_z, -half_space.offset)
-                else:
+                if not safe_equality_test(Abs(dot_product), 1):
                     # HalfSpace not aligned with length - need sampling
                     can_use_analytical = False
                     break
-            else:
-                # Complex CSG - need sampling
-                can_use_analytical = False
+
+                # HalfSpace aligned with length direction.
+                # HalfSpace contains points where (p · normal) >= offset
+                # When subtracted, remaining points are where (p · normal) < offset
+                if safe_compare(dot_product, 0, Comparison.GT):
+                    # Normal points in +Z direction
+                    # Subtraction removes points with Z >= offset
+                    max_z = Min(max_z, half_space.offset)
+                else:
+                    # Normal points in -Z direction
+                    # Subtraction removes points with Z <= -offset
+                    min_z = Max(min_z, -half_space.offset)
+
+            if not can_use_analytical:
                 break
         
         if can_use_analytical:
@@ -2484,6 +2495,14 @@ class Joint:
     cuttings: Dict[str, Cutting]
     ticket: JointTicket
     jointAccessories: Dict[str, Accessory] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # A cutting that removes nothing contributes no CSG node, so a joint
+        # whose cuttings all remove nothing would cut no timber at all.
+        assert any(
+            cutting.get_negative_csg_local() is not None
+            for cutting in self.cuttings.values()
+        ), f"Joint '{self.ticket.path}' has no cutting that removes anything"
 
     def is_decorative(self) -> bool:
         return len(self.cuttings) == 1
