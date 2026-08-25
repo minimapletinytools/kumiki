@@ -351,7 +351,10 @@ IGNORE-get vmware fusion and test on windows
   -seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked
   -maybe just allow clicking on unnamed features? it's a little werid cuz you can select them in the tree view and they don't select inthe viewer...
   -selecting on face features visualy selects all faces that coincide with that one when extended to infinity, see if you can localize the visuall yselection...
-  
+  -the first level shows "rectangular prism (presumably the timber itself) rather than difference
+    -probably just show difference for now...
+  -set labels in all the get csg function in timber.py
+
 
 -need some rule or test to ensure no confilcting feature names within a joint
   -or qualify by CSG tree (probbaly a bad ide,a tree topology may vary too)

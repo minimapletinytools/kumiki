@@ -1025,7 +1025,8 @@ class PerfectTimberWithin(ABC):
             end_distance=self.length,
             _features=_ptw_face_tags(),
         )
-    
+
+    # TODO rename to get_rough_csg_local
     def get_actual_csg_local(self) -> CutCSG:
         """
         Returns the actual CSG geometry for this timber.
@@ -1038,6 +1039,7 @@ class PerfectTimberWithin(ABC):
         """
         return self.get_perfect_timber_within_csg_local()
 
+    # TODO rename to get_extended_rough_csg_local
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
@@ -1256,7 +1258,8 @@ class Board(PerfectTimberWithin):
         w_half = self.size[0] / scalar(2)
         h_half = self.size[1] / scalar(2)
         return (create_v2(w_half, w_half), create_v2(h_half, h_half))
-    
+
+    # TODO rename to get_extended_rough_csg_local
     def get_extended_actual_csg_local(self, extend_bot: bool, extend_top: bool) -> CutCSG:
         """
         Returns the actual CSG geometry extended to infinity at specified ends.
@@ -1754,6 +1757,7 @@ def _create_extended_rectangular_prism(
     )
 
 
+# TODO DELETE, just combine with _extended_timber_without_cuts_csg_local
 def _create_timber_prism_csg_local(
     timber: PerfectTimberWithin, 
     cuts: list
