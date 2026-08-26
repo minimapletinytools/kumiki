@@ -126,6 +126,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         maybe_bottom_end_cut_distance_from_bottom=distance_A_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=None,
         assembly_freedom=AssemblyFreedom.translation(-endA_direction, freed_after=scalar(0)),
+        label=CutCSGLabel("splice_cross_cut"),
     )
 
     cutB = Cutting(
@@ -134,6 +135,7 @@ def cut_plain_butt_splice_joint_on_aligned_timbers(arrangement: SpliceJointTimbe
         maybe_bottom_end_cut_distance_from_bottom=distance_B_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=None,
         assembly_freedom=AssemblyFreedom.translation(-endB_direction, freed_after=scalar(0)),
+        label=CutCSGLabel("splice_cross_cut"),
     )
 
     # Create CutTimbers with cuts passed at construction
@@ -242,6 +244,7 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
         maybe_bottom_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=top_lap_prism,
         assembly_freedom=AssemblyFreedom.translation(lap_face_normal_global, freed_after=lap_thickness),
+        label=CutCSGLabel("lap_cut"),
     )
 
     cut_bottom = Cutting(
@@ -250,6 +253,7 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
         maybe_bottom_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=bottom_lap_prism,
         assembly_freedom=AssemblyFreedom.translation(-lap_face_normal_global, freed_after=lap_thickness),
+        label=CutCSGLabel("lap_cut"),
     )
 
     # Create CutTimbers

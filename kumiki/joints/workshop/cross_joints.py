@@ -253,7 +253,8 @@ def cut_plain_cross_lap_joint(
             size=timberB.size,
             transform=transform_B_in_A,
             start_distance=None,  # Infinite
-            end_distance=None     # Infinite
+            end_distance=None,    # Infinite,
+            label=CutCSGLabel("crossing_timber"),
         )
 
         # Transform cutting plane to timberA's local coordinates
@@ -261,27 +262,23 @@ def cut_plain_cross_lap_joint(
         cutting_plane_position_in_A = safe_transform_vector(timberA.orientation.matrix.T, cutting_plane_position - timberA.get_bottom_position_global())
         cutting_plane_offset_in_A = safe_dot_product(cutting_plane_normal_in_A, cutting_plane_position_in_A)
 
-        # Create HalfSpace that keeps the region on the positive side of the plane
-        # (toward timberB from the cutting plane)
-        half_plane_A = HalfSpace(
-            normal=cutting_plane_normal_in_A,
-            offset=cutting_plane_offset_in_A
-        )
-
         inverse_half_plane_A = HalfSpace(
             normal=-cutting_plane_normal_in_A,
-            offset=-cutting_plane_offset_in_A
+            offset=-cutting_plane_offset_in_A,
+            label=CutCSGLabel("lap_depth_plane"),
         )
 
         # Subtract the portion of timberB that's on the positive side of cutting plane
         negative_csg_A = Difference(
             base=timberB_prism_in_A,
-            subtract=[inverse_half_plane_A]  # Remove the negative side, keeping positive side
+            subtract=[inverse_half_plane_A],  # Remove the negative side, keeping positive side,
+            label=CutCSGLabel("lap_waste"),
         )
 
         cut_A = Cutting(
             timber=timberA,
-            negative_csg=negative_csg_A
+            negative_csg=negative_csg_A,
+            label=CutCSGLabel("lap_cut"),
         )
         cuts_A.append(cut_A)
 
@@ -297,7 +294,8 @@ def cut_plain_cross_lap_joint(
             size=timberA.size,
             transform=transform_A_in_B,
             start_distance=None,  # Infinite
-            end_distance=None     # Infinite
+            end_distance=None,    # Infinite,
+            label=CutCSGLabel("crossing_timber"),
         )
 
         # Transform cutting plane to timberB's local coordinates
@@ -309,18 +307,21 @@ def cut_plain_cross_lap_joint(
         # So we use the inverse half plane (keeps normal·P <= offset, the negative side)
         half_plane_B = HalfSpace(
             normal=cutting_plane_normal_in_B,
-            offset=cutting_plane_offset_in_B
+            offset=cutting_plane_offset_in_B,
+            label=CutCSGLabel("lap_depth_plane"),
         )
 
         # Subtract the portion of timberA that's on the negative side of cutting plane
         negative_csg_B = Difference(
             base=timberA_prism_in_B,
-            subtract=[half_plane_B]  # Remove the positive side, keeping negative side
+            subtract=[half_plane_B],  # Remove the positive side, keeping negative side,
+            label=CutCSGLabel("lap_waste"),
         )
 
         cut_B = Cutting(
             timber=timberB,
-            negative_csg=negative_csg_B
+            negative_csg=negative_csg_B,
+            label=CutCSGLabel("lap_cut"),
         )
         cuts_B.append(cut_B)
 

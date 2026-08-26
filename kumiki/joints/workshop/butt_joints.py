@@ -193,6 +193,7 @@ def cut_plain_butt_joint(
         maybe_top_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=end_cut_distance_from_bottom if butt_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut,
+        label=CutCSGLabel("butt_cross_cut"),
     )
     receiving_cut_no_relief = Cutting(timber=receiving_timber)
 

@@ -263,6 +263,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
         maybe_bottom_end_cut_distance_from_bottom=end_cut_A_distance_from_bottom if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_A,
         assembly_freedom=AssemblyFreedom.translation(-directionA, freed_after=scalar(0)),
+        label=CutCSGLabel("miter_cut"),
     )
 
     cutB = Cutting(
@@ -271,6 +272,7 @@ def cut_plain_miter_joint(arrangement: CornerJointTimberArrangement) -> Joint:
         maybe_bottom_end_cut_distance_from_bottom=end_cut_B_distance_from_bottom if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=end_cut_B,
         assembly_freedom=AssemblyFreedom.translation(-directionB, freed_after=scalar(0)),
+        label=CutCSGLabel("miter_cut"),
     )
 
     # Create CutTimbers with cuts passed at construction
