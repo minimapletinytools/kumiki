@@ -1656,35 +1656,6 @@ class Cutting:
         return SolidUnion(csg_components, label=self.label)
 
     @staticmethod
-    def make_end_cut(timber: PerfectTimberWithin, end: TimberEnd, distance_from_end_to_cut: Numeric) -> HalfSpace:
-        """
-        Create a HalfSpace for an end cut at the specified distance from the end.
-        
-        Args:
-            timber: The timber being cut
-            end: Which end (TOP or BOTTOM)
-            distance_from_end_to_cut: Distance from the end to the cut plane
-            
-        Returns:
-            HalfSpace representing the end cut in local coordinates
-        """
-        assert isinstance(end, TimberEnd), f"expected TimberEnd, got {type(end).__name__}"
-        # Named per end: an end cut is the one node in a cutting whose meaning
-        # you cannot recover from the shape, since both ends are half-spaces.
-        if end == TimberEnd.TOP:
-            return HalfSpace(
-                normal=create_v3(scalar(0), scalar(0), scalar(1)),
-                offset=timber.length - distance_from_end_to_cut,
-                label=CutCSGLabel("top_end_cut"),
-            )
-        else:
-            return HalfSpace(
-                normal=create_v3(scalar(0), scalar(0), scalar(-1)),
-                offset=-distance_from_end_to_cut,
-                label=CutCSGLabel("bottom_end_cut"),
-            )
-
-    @staticmethod
     def make_end_cut_distance_from_bottom(
         timber: PerfectTimberWithin,
         end: TimberEnd,

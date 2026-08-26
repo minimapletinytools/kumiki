@@ -326,7 +326,12 @@ def chop_timber_end_with_prism(timber: TimberLike, end: TimberEnd, distance_from
     )
 
 
-def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberEnd, distance_from_end_to_cut: Numeric) -> HalfSpace:
+def chop_timber_end_with_half_plane(
+    timber: TimberLike,
+    end: TimberEnd,
+    distance_from_end_to_cut: Numeric,
+    label: CutCSGLabel = CutCSGLabel.NoLabel(),
+) -> HalfSpace:
     """
     Create a HalfSpace CSG for chopping off material from a timber end (in local coordinates).
     
@@ -341,6 +346,10 @@ def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberEnd, distance
         timber: The timber to create a chop half-plane for
         end: Which end to chop from (TOP or BOTTOM)
         distance_from_end_to_cut: Distance from the end where the cut plane is positioned
+        label: What the resulting plane is called in the CSG tree. Left to the
+            caller because an end-chop means something different in every joint
+            that makes one; the top_end_cut / bottom_end_cut names belong to a
+            Cutting's own maybe-end-cuts, not to every plane of this shape.
     
     Returns:
         HalfSpace: A half-plane in local coordinates that removes material beyond 
@@ -380,7 +389,7 @@ def chop_timber_end_with_half_plane(timber: TimberLike, end: TimberEnd, distance
         normal = create_v3(0, 0, -1)
         offset = -distance_from_end_to_cut
     
-    return HalfSpace(normal=normal, offset=offset)
+    return HalfSpace(normal=normal, offset=offset, label=label)
 
 def chop_lap_on_timber_end(
     lap_timber: TimberLike,

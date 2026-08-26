@@ -297,7 +297,7 @@ class TestTongueAndForkJoint:
             fork_opposite_face_center - tongue_timber.get_bottom_position_global(),
             tongue_timber.get_length_direction_global(),
         )
-        expected_tongue_end_cut = Cutting.make_end_cut(
+        expected_tongue_end_cut = chop_timber_end_with_half_plane(
             tongue_timber,
             TimberEnd.BOTTOM,
             tongue_distance_from_bottom,
@@ -311,7 +311,7 @@ class TestTongueAndForkJoint:
             tongue_opposite_face_center - fork_timber.get_bottom_position_global(),
             fork_timber.get_length_direction_global(),
         )
-        expected_fork_end_cut = Cutting.make_end_cut(
+        expected_fork_end_cut = chop_timber_end_with_half_plane(
             fork_timber,
             TimberEnd.BOTTOM,
             fork_distance_from_bottom,
@@ -436,8 +436,8 @@ class TestCornerLapJoint:
             timberB.get_length_direction_global(),
         )
 
-        expected_A_end_cut = Cutting.make_end_cut(timberA, TimberEnd.BOTTOM, expected_A_distance)
-        expected_B_end_cut = Cutting.make_end_cut(timberB, TimberEnd.BOTTOM, expected_B_distance)
+        expected_A_end_cut = chop_timber_end_with_half_plane(timberA, TimberEnd.BOTTOM, expected_A_distance)
+        expected_B_end_cut = chop_timber_end_with_half_plane(timberB, TimberEnd.BOTTOM, expected_B_distance)
 
         actual_A_end_cut = cutA.get_maybe_bottom_end_cut()
         actual_B_end_cut = cutB.get_maybe_bottom_end_cut()

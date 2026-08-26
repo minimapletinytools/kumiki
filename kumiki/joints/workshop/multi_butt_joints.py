@@ -179,7 +179,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
         assert safe_compare(timber.length - distance_from_end, 0, Comparison.GE), (
             "shoulder cut distance from end exceeds timber length"
         )
-        return Cutting.make_end_cut(timber, timber_end, distance_from_end)
+        return chop_timber_end_with_half_plane(timber, timber_end, distance_from_end)
 
     butt_1_shoulder_end_cut = _make_shoulder_end_cut(butt_timber_1, arrangement.butt_timber_1_end)
     butt_2_shoulder_end_cut = _make_shoulder_end_cut(butt_timber_2, arrangement.butt_timber_2_end)
