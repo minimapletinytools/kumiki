@@ -436,7 +436,7 @@
 
             const kind = document.createElement('span');
             kind.className = 'lp-csg-kind';
-            kind.textContent = node.kind;
+            kind.textContent = node.displayName || node.kind;
             row.appendChild(kind);
 
             if (node.label) {

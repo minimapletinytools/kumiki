@@ -147,6 +147,9 @@
 
   "viewer.selection.header": "選択",
   "viewer.selection.counts": "材 ({selectedTimbers}/{timbers})  金物 ({selectedAccessories}/{accessories})",
+  "viewer.selection.kind.face": "面",
+  "viewer.selection.kind.edge": "稜",
+  "viewer.selection.kind.point": "点",
   "viewer.selection.featureType": "フィーチャー",
   "viewer.selection.joint": "接合",
   "viewer.selection.facesToward": "向き",

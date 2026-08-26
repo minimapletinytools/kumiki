@@ -275,6 +275,14 @@ function createTheme(theme) {
     });
 }
 
+// What each kind of feature is called in the breadcrumb. A function rather
+// than a constant so the strings follow the active language.
+const FEATURE_TYPE_NOUNS = () => ({
+    FACE: t('viewer.selection.kind.face'),
+    EDGE: t('viewer.selection.kind.edge'),
+    POINT: t('viewer.selection.kind.point'),
+});
+
 // Rail width limits: wide enough for a deep CSG row to be readable, narrow
 // enough that the rail never takes over the viewport.
 const RAIL_MIN_WIDTH_PX = 180;
@@ -2680,6 +2688,9 @@ class KigumiViewerApp extends LitElement {
             featureType: message.featureType || null,
             jointName: message.jointName || null,
             facesToward: message.facesToward || null,
+            nodeKind: message.nodeKind || null,
+            nodeDisplayName: message.nodeDisplayName || null,
+            nodeLabel: message.nodeLabel || null,
         };
         const hlMesh = message.highlightMesh;
         const parentHlMesh = message.parentHighlightMesh || null;
@@ -4296,12 +4307,19 @@ class KigumiViewerApp extends LitElement {
         }
 
         const focus = this.selectionManager.csgFocus;
+        const detail = this.lastPickDetail;
         let breadcrumb = selectedSingleName;
         if (focus) {
             const focused = this.memberMetadataByKey.get(focus.timberKey);
             const parts = [(focused && focused.name) || focus.timberKey].concat(focus.path);
-            if (focus.featureLabel) {
-                parts.push('face (' + focus.featureLabel + ')');
+            const tail = CsgTreeView.describePickTail({
+                featureLabel: focus.featureLabel,
+                featureType: detail && detail.featureType,
+                nodeKind: detail && detail.nodeKind,
+                nodeDisplayName: detail && detail.nodeDisplayName,
+            }, FEATURE_TYPE_NOUNS());
+            if (tail) {
+                parts.push(tail);
             }
             breadcrumb = parts.join(' \u203a ');
         }

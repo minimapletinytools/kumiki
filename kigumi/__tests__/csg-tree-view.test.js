@@ -357,15 +357,74 @@ describe('revealTarget', () => {
 
 describe('describeNode', () => {
     test('shows the base type and the tag together', () => {
-        expect(CsgTreeView.describeNode({ kind: 'RectangularPrism', label: 'tenon' }))
-            .toBe('RectangularPrism · tenon');
+        expect(CsgTreeView.describeNode(
+            { kind: 'RectangularPrism', displayName: 'prism', label: 'tenon' },
+        )).toBe('prism · tenon');
     });
 
     test('an untagged node shows just its type', () => {
+        expect(CsgTreeView.describeNode(
+            { kind: 'HalfSpace', displayName: 'half-space', label: null },
+        )).toBe('half-space');
+    });
+
+    test('falls back to the class name when no display name came through', () => {
         expect(CsgTreeView.describeNode({ kind: 'HalfSpace', label: null })).toBe('HalfSpace');
     });
 
     test('a missing node describes as empty rather than throwing', () => {
         expect(CsgTreeView.describeNode(null)).toBe('');
+    });
+});
+
+describe('describePickTail', () => {
+    const NOUNS = { FACE: 'face', EDGE: 'edge', POINT: 'point' };
+
+    test('a picked face names itself as a face', () => {
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: 'tenon_back', featureType: 'FACE', nodeKind: 'RectangularPrism' },
+            NOUNS,
+        )).toBe('face (tenon_back)');
+    });
+
+    test('a picked edge is an edge, not a face', () => {
+        // The wording used to be hardcoded, so an arris read as a face.
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: 'rough.front×rough.right', featureType: 'EDGE', nodeKind: 'RectangularPrism' },
+            NOUNS,
+        )).toBe('edge (rough.front×rough.right)');
+    });
+
+    test('a whole node says what it is instead of naming a face', () => {
+        // Regression: an ordinary click descends one level at a time and
+        // selects compounds on the way down. Those reported a descendant's
+        // face while the highlight lit the entire union.
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: null, featureType: null, nodeKind: 'SolidUnion',
+              nodeDisplayName: 'union' },
+            NOUNS,
+        )).toBe('union');
+    });
+
+    test('an older runner without a display name still reads as something', () => {
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: null, nodeKind: 'SolidUnion' }, NOUNS,
+        )).toBe('SolidUnion');
+    });
+
+    test('an unknown feature type still reads as something', () => {
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: 'x', featureType: 'WHAT', nodeKind: 'Cylinder' }, NOUNS,
+        )).toBe('feature (x)');
+    });
+
+    test('the nouns are optional', () => {
+        expect(CsgTreeView.describePickTail({ featureLabel: 'x', featureType: 'FACE' }))
+            .toBe('feature (x)');
+    });
+
+    test('nothing picked describes as nothing', () => {
+        expect(CsgTreeView.describePickTail(null, NOUNS)).toBeNull();
+        expect(CsgTreeView.describePickTail({}, NOUNS)).toBeNull();
     });
 });

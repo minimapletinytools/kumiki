@@ -18,6 +18,7 @@ analytic surface it stands for, and how far a click lands from an edge or a
 point it cannot hit exactly. See FeatureTestTolerances.
 """
 
+import re
 from typing import Callable, List, Optional, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
@@ -948,6 +949,20 @@ class CutCSG(ABC):
         """String representation for debugging."""
         pass
 
+    @classmethod
+    def display_name(cls) -> str:
+        """What this kind of CSG is called where a person reads it.
+
+        Derived from the class name -- "path extrusion" -- so a new CSG type
+        names itself; subclasses override where a shorter word is the one
+        people actually use ("union", not "solid union").
+
+        Distinct from the class name, which stays the machine-readable kind:
+        the viewer keys structural decisions off that and must not follow
+        wording changes.
+        """
+        return re.sub(r"(?<!^)(?=[A-Z])", " ", cls.__name__).lower()
+
     def get_declared_features(self) -> List[CSGFeature]:
         """Features this node names on its own boundary, whether or not any
         point lies on them.
@@ -1123,6 +1138,10 @@ def csg_children(csg: CutCSG) -> List[CutCSG]:
 class EmptyCSG(CutCSG):
     """Represents an empty solid (contains no points)."""
 
+    @classmethod
+    def display_name(cls) -> str:
+        return "empty"
+
     def __repr__(self) -> str:
         return "EmptyCSG()"
 
@@ -1160,6 +1179,10 @@ class HalfSpace(CutCSG):
         normal: Normal vector pointing into the half-space (3x1 Matrix)
         offset: Distance from origin along normal direction where plane is located (default: 0)
     """
+
+    @classmethod
+    def display_name(cls) -> str:
+        return "half-space"
     normal: Direction3D
     offset: Numeric = scalar(0)
     # Features this primitive names on its own boundary. Private: read it
@@ -1253,6 +1276,10 @@ class RectangularPrism(CutCSG):
         -infinite)
         end_distance: Distance from position along Z-axis to end of prism (None = infinite)
     """
+
+    @classmethod
+    def display_name(cls) -> str:
+        return "prism"
     size: V2
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None  # starting distance of the prism in the direction of the +Z axis. None means infinite in negative direction
@@ -1756,6 +1783,10 @@ class SolidUnion(CutCSG):
     Args:
         children: List of CSG objects to union together
     """
+
+    @classmethod
+    def display_name(cls) -> str:
+        return "union"
     children: List[CutCSG]
 
     def __repr__(self) -> str:
@@ -2229,6 +2260,10 @@ class ConvexPolygonExtrusion(CutCSG):
         start_distance: Distance from position along Z-axis to start of extrusion (None = -infinite)
         end_distance: Distance from position along Z-axis to end of extrusion (None = infinite)
     """
+
+    @classmethod
+    def display_name(cls) -> str:
+        return "extrusion"
     points: Profile
     transform: Transform = field(default_factory=Transform.identity)
     start_distance: Optional[Numeric] = None  # starting distance in the direction of the -Z axis. None means infinite in negative direction
@@ -2608,6 +2643,10 @@ class ConvexPolygonSimpleLoft(CutCSG):
         end_distance: distance from position along Z-axis to top_points
         transform: Transform (position and orientation) in global coordinates (default: identity)
     """
+
+    @classmethod
+    def display_name(cls) -> str:
+        return "loft"
     bottom_points: Profile
     top_points: Profile
     start_distance: Numeric

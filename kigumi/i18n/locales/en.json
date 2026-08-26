@@ -147,6 +147,9 @@
 
   "viewer.selection.header": "Selection",
   "viewer.selection.counts": "timbers ({selectedTimbers}/{timbers})  accessories ({selectedAccessories}/{accessories})",
+  "viewer.selection.kind.face": "face",
+  "viewer.selection.kind.edge": "edge",
+  "viewer.selection.kind.point": "point",
   "viewer.selection.featureType": "feature",
   "viewer.selection.joint": "joint",
   "viewer.selection.facesToward": "faces toward",

@@ -1169,7 +1169,10 @@ def _serialize_csg_node(
     node_path = path + [label] if label else path
 
     node: Dict[str, Any] = {
+        # kind is the class name and stays machine-readable -- the viewer keys
+        # structural decisions off it. displayName is the word people read.
         "kind": type(csg).__name__,
+        "displayName": type(csg).display_name(),
         "label": label,
         "path": list(node_path),
         "role": role,
@@ -1855,6 +1858,7 @@ def _describe_pick(
     cut_timber: 'CutTimber',
     local_pt: List[float],
     eps: float,
+    feature_label: Optional[str],
 ) -> Dict[str, Any]:
     """Everything the selection display wants to say about one click.
 
@@ -1865,10 +1869,10 @@ def _describe_pick(
     confuse, so, concretely:
 
     Args:
-        target: the LEAF primitive the click resolved to -- a RectangularPrism,
-            a Cylinder, a HalfSpace -- as returned by _navigate_csg_to_leaf.
-            This is the thing whose surface was actually hit, and the thing
-            whose feature gets named.
+        target: the node the click resolved to. An ordinary click descends one
+            level at a time, so this is often a compound -- a SolidUnion or a
+            Difference selected whole -- and only a ctrl-click drills straight
+            to a leaf primitive.
         local_csg: the ROOT of the tree `target` sits in, i.e.
             ``cut_timber.render_timber_with_cuts_csg_local()``. Needed because
             two of the four answers are about where `target` sits in the tree
@@ -1882,22 +1886,36 @@ def _describe_pick(
             `local_csg` and `target`, not global. The caller converts.
         eps: surface tolerance for the hit, covering the gap between the
             analytic face and the triangulated mesh the ray struck.
+        feature_label: the feature navigation actually resolved to, or None when
+            the click selected `target` as a whole. Passed in rather than
+            re-derived: asking `target` what lies under the point finds a face
+            on a descendant even when no feature was selected, which made the
+            display name a face while the highlight lit a whole union.
 
     Returns:
-        featureLabel, featureType, jointName and facesToward. jointName is None
-        for the timber's own body, which no joint produced; featureType and
-        facesToward are None when nothing could be determined.
+        nodeKind and nodeLabel, which always describe `target` itself;
+        featureLabel, featureType and facesToward, which are None unless a
+        feature was selected; and jointName, which is None for the timber's own
+        body, since no joint produced that.
     """
     from kumiki.cutcsg import CSGFeatureType, FeatureTestTolerances
 
+    described: Dict[str, Any] = {
+        "nodeKind": type(target).__name__,
+        "nodeDisplayName": type(target).display_name(),
+        "nodeLabel": _label_name(target),
+        "jointName": _joint_name_for_node(local_csg, cut_timber, target),
+    }
+
+    if feature_label is None:
+        return {**described, "featureLabel": None, "featureType": None, "facesToward": None}
+
     point = _to_v3(local_pt)
     hit = target.find_feature(point, FeatureTestTolerances(face=eps))
-
-    feature_type = hit.feature_type().name if hit is not None else None
     return {
-        "featureLabel": _detect_face_label(target, local_pt, eps),
-        "featureType": feature_type,
-        "jointName": _joint_name_for_node(local_csg, cut_timber, target),
+        **described,
+        "featureLabel": feature_label,
+        "featureType": hit.feature_type().name if hit is not None else None,
         "facesToward": _faces_toward(target, local_csg, local_pt, eps),
     }
 
@@ -2213,9 +2231,11 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         # once, so it cannot infer which one a result belongs to.
         "memberKey": member_key,
         "path": new_path,
-        # featureLabel / featureType / jointName / facesToward; jointName is
-        # None for the timber's own body, which no joint produced.
-        **_describe_pick(target_csg, local_csg, cut_timber, local_pt, eps),
+        # What was selected, and the feature within it if navigation resolved
+        # one. feature_label is None while a click is still drilling down
+        # through compounds, and the display has to say so rather than name a
+        # face belonging to something further in.
+        **_describe_pick(target_csg, local_csg, cut_timber, local_pt, eps, feature_label),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,
@@ -2298,6 +2318,11 @@ def _handle_find_csg_by_path(state: RunnerState, payload: Dict[str, Any], slot_s
         "memberKey": member_key,
         "path": path,
         "featureLabel": actual_feature_label,
+        # Same two fields _describe_pick reports, so the display reads the same
+        # whether a node was picked in 3D or clicked in the tree.
+        "nodeKind": type(target_csg).__name__,
+        "nodeDisplayName": type(target_csg).display_name(),
+        "nodeLabel": _label_name(target_csg),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,

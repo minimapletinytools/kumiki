@@ -72,6 +72,7 @@
         const node = {
             id: nodeId(prefix, indexPath),
             kind: payloadNode.kind,
+            displayName: payloadNode.displayName || payloadNode.kind,
             label: payloadNode.label || null,
             path: payloadNode.path || [],
             role: displayRole(payloadNode.role),
@@ -148,6 +149,7 @@
                 id: node.id,
                 depth,
                 kind: node.kind,
+                displayName: node.displayName,
                 label: node.label,
                 role: node.role,
                 path: node.path,
@@ -261,15 +263,39 @@
         return { section: 'timbers', timberKey: pick.timberKey };
     }
 
+    /**
+     * How to describe what a selection landed on: the tail of the breadcrumb.
+     *
+     * A pick that resolved to a feature names it by kind -- face, edge, point.
+     * A pick that selected a node whole says what that node *is* instead: an
+     * ordinary click descends one level at a time, so it selects unions and
+     * differences on the way down, and the highlight lights the whole of them.
+     * Calling every one of those a "face" contradicted what was on screen.
+     *
+     * `nouns` maps a feature type to its display word, so the wording can be
+     * translated without this having to know about i18n.
+     */
+    function describePickTail(pick, nouns) {
+        if (!pick) {
+            return null;
+        }
+        if (pick.featureLabel) {
+            const noun = (nouns && nouns[pick.featureType]) || 'feature';
+            return noun + ' (' + pick.featureLabel + ')';
+        }
+        return pick.nodeDisplayName || pick.nodeKind || null;
+    }
+
     /** Row text: the base type, plus the tag it was given. */
     function describeNode(node) {
         if (!node) {
             return '';
         }
+        const kind = node.displayName || node.kind;
         if (node.label) {
-            return node.kind + ' · ' + node.label;
+            return kind + ' · ' + node.label;
         }
-        return node.kind;
+        return kind;
     }
 
     const CsgTreeView = {
@@ -285,6 +311,7 @@
         ancestorIds,
         revealTarget,
         describeNode,
+        describePickTail,
     };
 
     if (typeof module !== 'undefined' && module.exports) {

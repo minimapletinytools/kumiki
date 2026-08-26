@@ -573,8 +573,8 @@ class TestPickDescription:
     def _describe(self, frame, name, point):
         cut_timber = _cut_timber_by_name(frame, name)
         csg = cut_timber.render_timber_with_cuts_csg_local()
-        _path, target, _label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
-        return runner._describe_pick(target, csg, cut_timber, point, PICK_EPS)
+        _path, target, label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
+        return runner._describe_pick(target, csg, cut_timber, point, PICK_EPS, label)
 
     def _point_on(self, frame, name, predicate):
         """A surface point whose feature label satisfies *predicate*."""
@@ -588,6 +588,40 @@ class TestPickDescription:
             if predicate(label):
                 return centroid
         raise AssertionError("no matching surface point found")
+
+    def test_a_whole_node_names_itself_rather_than_a_face_inside_it(
+        self, mortise_and_tenon_frame,
+    ):
+        """An ordinary click descends one level at a time, so it selects
+        compounds on the way down. Those must not report a feature: the
+        highlight lights the whole node, and naming a descendant's face made
+        the display contradict it."""
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        point = self._point_on(mortise_and_tenon_frame, "butt_timber",
+                               lambda label: label is not None and label.startswith("tenon_"))
+
+        # What the first click on that point selects.
+        path, target, label = runner._navigate_csg_one_level(csg, point, [], PICK_EPS)
+        assert path == ["mortise_and_tenon"] and label is None
+        described = runner._describe_pick(target, csg, cut_timber, point, PICK_EPS, label)
+
+        assert described["featureLabel"] is None
+        assert described["featureType"] is None
+        assert described["facesToward"] is None
+        # It says what it is instead.
+        assert described["nodeKind"] == "SolidUnion"
+        assert described["nodeDisplayName"] == "union"
+        assert described["nodeLabel"] == "mortise_and_tenon"
+
+    def test_a_node_identifies_itself_even_when_a_feature_is_selected(
+        self, mortise_and_tenon_frame,
+    ):
+        point = self._point_on(mortise_and_tenon_frame, "butt_timber",
+                               lambda label: label == "rough.right")
+        described = self._describe(mortise_and_tenon_frame, "butt_timber", point)
+        assert described["nodeKind"] == "RectangularPrism"
+        assert described["nodeLabel"] == "timber (rough, extended)"
 
     def test_a_timber_face_describes_itself(self, mortise_and_tenon_frame):
         point = self._point_on(mortise_and_tenon_frame, "butt_timber",
