@@ -1190,3 +1190,110 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
         expected_slot_x_base = min(-back_extra, receiving_perfect_boundary)
 
         assert min(wedge_slot_x_values) == expected_slot_x_base
+
+
+class TestMortiseAndTenonCSGNaming:
+    """Every node a mortise and tenon puts in the tree carries a name.
+
+    An unlabeled node cannot be addressed by path, so it is invisible to the
+    viewer's navigation and to anything that wants to name features on it.
+    """
+
+    def _rendered(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber,
+                butt_timber=tenon_timber,
+                butt_timber_end=TimberEnd.BOTTOM,
+            ),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(1),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(3),
+        )
+        frame = Frame.from_joints([joint])
+        return {ct.timber.ticket.path: ct.render_timber_with_cuts_csg_local()
+                for ct in frame.cut_timbers}
+
+    def _unlabeled_below_root(self, root):
+        """Every unlabeled node except the root, which is the rendered
+        Difference wrapping body and cuts -- structure, not geometry."""
+        from kumiki.cutcsg import csg_children
+
+        found = []
+
+        def walk(node, is_root):
+            if not is_root and not node.label.is_labeled():
+                found.append(type(node).__name__)
+            for child in csg_children(node):
+                walk(child, False)
+
+        walk(root, True)
+        return found
+
+    def test_nothing_in_either_timber_is_unlabeled(self, simple_T_configuration):
+        for name, rendered in self._rendered(simple_T_configuration).items():
+            assert self._unlabeled_below_root(rendered) == [], (
+                f"{name} has unlabeled CSG nodes")
+
+    def test_the_tenon_side_names_what_it_removes(self, simple_T_configuration):
+        rendered = self._rendered(simple_T_configuration)
+        labels = set()
+
+        def walk(node):
+            from kumiki.cutcsg import csg_children
+            if node.label.is_labeled():
+                labels.add(node.label.name)
+            for child in csg_children(node):
+                walk(child)
+
+        for tree in rendered.values():
+            walk(tree)
+
+        assert {"mortise_and_tenon", "tenon_waste", "shoulder", "tenon",
+                "mortise_hole"} <= labels
+        # The end cut says which end it is; both are half-spaces, so the shape
+        # alone cannot tell you.
+        assert labels & {"top_end_cut", "bottom_end_cut"}
+
+
+class TestUnionIntoCut:
+    """_union_into_cut keeps one node per cutting rather than nesting."""
+
+    def _piece(self, offset):
+        from kumiki.cutcsg import HalfSpace
+        return HalfSpace(normal=create_v3(0, 0, 1), offset=scalar(offset))
+
+    def test_the_first_addition_wraps_what_was_there(self):
+        from kumiki.cutcsg import SolidUnion
+        from kumiki.joints.workshop.mortise_and_tenon_joints import (
+            _union_into_cut, TENON_CUT_LABEL)
+
+        result = _union_into_cut(self._piece(1), [self._piece(2)], TENON_CUT_LABEL)
+        assert isinstance(result, SolidUnion)
+        assert result.label == TENON_CUT_LABEL
+        assert len(result.children) == 2
+
+    def test_a_second_addition_extends_rather_than_nests(self):
+        # A cutting that gains both a relief and peg holes must still read as
+        # one tenon_cut, not tenon_cut inside tenon_cut.
+        from kumiki.joints.workshop.mortise_and_tenon_joints import (
+            _union_into_cut, TENON_CUT_LABEL)
+
+        once = _union_into_cut(self._piece(1), [self._piece(2)], TENON_CUT_LABEL)
+        twice = _union_into_cut(once, [self._piece(3)], TENON_CUT_LABEL)
+
+        assert len(twice.children) == 3
+        assert not any(child.label == TENON_CUT_LABEL for child in twice.children)
+
+    def test_a_different_side_is_not_flattened_into_this_one(self):
+        from kumiki.joints.workshop.mortise_and_tenon_joints import (
+            _union_into_cut, TENON_CUT_LABEL, MORTISE_CUT_LABEL)
+
+        tenon = _union_into_cut(self._piece(1), [self._piece(2)], TENON_CUT_LABEL)
+        mortise = _union_into_cut(tenon, [self._piece(3)], MORTISE_CUT_LABEL)
+
+        assert mortise.label == MORTISE_CUT_LABEL
+        assert len(mortise.children) == 2
+        assert mortise.children[0].label == TENON_CUT_LABEL

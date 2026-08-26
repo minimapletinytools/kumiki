@@ -59,6 +59,27 @@ from .butt_joints import (
 )
 
 
+# Everything this joint removes from one timber lives under a single node named
+# for the side of the joint that timber plays. Both cuttings carry the same
+# "mortise_and_tenon" label from the Cutting itself, so this is what tells the
+# two apart in the tree.
+TENON_CUT_LABEL = CutCSGLabel("tenon_cut")
+MORTISE_CUT_LABEL = CutCSGLabel("mortise_cut")
+
+
+def _union_into_cut(existing: CutCSG, additions: List[CutCSG], label: CutCSGLabel) -> SolidUnion:
+    """Add more removed material to a timber's cut, as one labelled union.
+
+    Extends the union when one is already there rather than nesting a second
+    node with the same label inside it: a cutting that gains both a shoulder
+    relief and peg holes should still read as one `tenon_cut`, not as
+    `tenon_cut` within `tenon_cut`.
+    """
+    if isinstance(existing, SolidUnion) and existing.label == label:
+        return SolidUnion(children=list(existing.children) + list(additions), label=label)
+    return SolidUnion(children=[existing] + list(additions), label=label)
+
+
 @dataclass(frozen=True)
 class WedgeParameters:
     """
@@ -367,6 +388,7 @@ def cut_mortise_and_tenon_joint(
         mortise_hole_end_crop_global = HalfSpace(
             normal=mortise_hole_length_oblique_direction,
             offset=end_crop_distance + safe_dot_product(mortise_hole_length_oblique_direction, shoulder_point_global),
+            label=CutCSGLabel("tenon_crop_to_mortise_length"),
         )
 
         # Crop 2: depth of tenon — plane parallel to the mortise face surface,
@@ -374,6 +396,7 @@ def cut_mortise_and_tenon_joint(
         mortise_depth_crop_global = HalfSpace(
             normal=-mortise_face_direction,
             offset=mortise_depth - safe_dot_product(mortise_face_direction, get_center_point_on_face_global(mortise_face, mortise_timber)),
+            label=CutCSGLabel("tenon_crop_to_mortise_depth"),
         )
 
         tenon_prism_cropping_csgs = [mortise_hole_end_crop_global, mortise_depth_crop_global]
@@ -388,7 +411,11 @@ def cut_mortise_and_tenon_joint(
     tenon_prism_cropped = (
         tenon_prism_global
         if tenon_prism_cropping_csgs is None
-        else Difference(base=tenon_prism_global, subtract=tenon_prism_cropping_csgs)
+        else Difference(
+            base=tenon_prism_global,
+            subtract=tenon_prism_cropping_csgs,
+            label=CutCSGLabel("tenon_cropped"),
+        )
     )
 
     # Convert from global to tenon timber local (orig_timber=None => CSG is in global space)
@@ -520,6 +547,7 @@ def cut_mortise_and_tenon_joint(
         scribe_csg_global = Difference(
             base=tenon_timber_csg_global,
             subtract=[shoulder_half_space_global],
+            label=CutCSGLabel("shoulder_scribe_relief"),
         )
         scribe_csg_mortise_local = adopt_csg(None, mortise_timber.transform, scribe_csg_global)
         shoulder_notch_relief_geom = ShoulderReliefCSGGeometry(
@@ -554,6 +582,7 @@ def cut_mortise_and_tenon_joint(
     tenon_cut_csg = Difference(
         base=shoulder_half_space_local,
         subtract=[tenon_prism_local],
+        label=CutCSGLabel("tenon_waste"),
     )
     if shoulder_notch_relief_geom is not None and shoulder_notch_relief_geom.butting_timber_relief_negative_CSG is not None:
         # The relief CSG occupies its own depth range (from the shoulder outward, toward
@@ -561,15 +590,19 @@ def cut_mortise_and_tenon_joint(
         # shoulder_half_space_local's domain (behind the shoulder) -- it's an ADDITIONAL
         # region of material to remove, not something to subtract from that half-space
         # (which would have no effect, since they don't overlap).
-        tenon_cut_csg = CSGUnion(
-            children=[tenon_cut_csg, shoulder_notch_relief_geom.butting_timber_relief_negative_CSG]
+        tenon_cut_csg = _union_into_cut(
+            tenon_cut_csg,
+            [shoulder_notch_relief_geom.butting_timber_relief_negative_CSG],
+            TENON_CUT_LABEL,
         )
 
     mortise_hole_prism_local = adopt_csg(None, mortise_timber.transform, mortise_hole_prism_global)
 
     if shoulder_notch_relief_geom is not None:
-        mortise_negative_csg = CSGUnion(
-            children=[mortise_hole_prism_local, shoulder_notch_relief_geom.receiving_timber_notch_negative_CSG]
+        mortise_negative_csg = _union_into_cut(
+            mortise_hole_prism_local,
+            [shoulder_notch_relief_geom.receiving_timber_notch_negative_CSG],
+            MORTISE_CUT_LABEL,
         )
     else:
         mortise_negative_csg = mortise_hole_prism_local
@@ -670,7 +703,8 @@ def cut_mortise_and_tenon_joint(
             joint_accessories[f"peg_{peg_idx}"] = peg_accessory
 
         if peg_holes_in_tenon_local:
-            tenon_cut_with_pegs_csg = CSGUnion(children=[tenon_cut_csg] + peg_holes_in_tenon_local)
+            tenon_cut_with_pegs_csg = _union_into_cut(
+                tenon_cut_csg, peg_holes_in_tenon_local, TENON_CUT_LABEL)
             tenon_cut = Cutting(
                 timber=tenon_timber,
                 maybe_top_end_cut_distance_from_bottom=tip_z_local if tenon_end == TimberEnd.TOP else None,
@@ -679,7 +713,8 @@ def cut_mortise_and_tenon_joint(
                 label=CutCSGLabel("mortise_and_tenon"),
             )
         if peg_holes_in_mortise_local:
-            mortise_cut_with_pegs_csg = CSGUnion(children=[mortise_negative_csg] + peg_holes_in_mortise_local)
+            mortise_cut_with_pegs_csg = _union_into_cut(
+                mortise_negative_csg, peg_holes_in_mortise_local, MORTISE_CUT_LABEL)
             mortise_cut = Cutting(
                 timber=mortise_timber,
                 negative_csg=mortise_cut_with_pegs_csg,
@@ -960,12 +995,20 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             updated_cuttings = dict(joint.cuttings)
             updated_cuttings[mortise_key] = replace(
                 mortise_cutting,
-                negative_csg=CSGUnion([mortise_cutting.negative_csg, geom.receiving_timber_notch_negative_CSG]),
+                negative_csg=_union_into_cut(
+                    mortise_cutting.negative_csg,
+                    [geom.receiving_timber_notch_negative_CSG],
+                    MORTISE_CUT_LABEL,
+                ),
             )
             if geom.butting_timber_relief_negative_CSG is not None:
                 updated_cuttings[tenon_key] = replace(
                     tenon_cutting,
-                    negative_csg=CSGUnion([tenon_cutting.negative_csg, geom.butting_timber_relief_negative_CSG]),
+                    negative_csg=_union_into_cut(
+                        tenon_cutting.negative_csg,
+                        [geom.butting_timber_relief_negative_CSG],
+                        TENON_CUT_LABEL,
+                    ),
                 )
             joint = replace(joint, cuttings=updated_cuttings)
 
@@ -1001,7 +1044,11 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
                         **joint.cuttings,
                         tenon_key: replace(
                             tenon_cutting,
-                            negative_csg=CSGUnion([tenon_cutting.negative_csg, rough_relief_tenon_local]),
+                            negative_csg=_union_into_cut(
+                                tenon_cutting.negative_csg,
+                                [rough_relief_tenon_local],
+                                TENON_CUT_LABEL,
+                            ),
                         ),
                     },
                 )
@@ -1489,13 +1536,15 @@ def cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(
 
     tenon_cut = replace(
         tenon_cut,
-        negative_csg=CSGUnion(children=[tenon_cut.negative_csg, tenon_hole_local]),
+        negative_csg=_union_into_cut(
+            tenon_cut.negative_csg, [tenon_hole_local], TENON_CUT_LABEL),
     )
     if tusk_geo.mortise_clearance_negative_csg is not None:
         mortise_clearance_local = adopt_csg(None, mortise_timber.transform, tusk_geo.mortise_clearance_negative_csg)
         mortise_cut = replace(
             mortise_cut,
-            negative_csg=CSGUnion(children=[mortise_cut.negative_csg, mortise_clearance_local]),
+            negative_csg=_union_into_cut(
+                mortise_cut.negative_csg, [mortise_clearance_local], MORTISE_CUT_LABEL),
         )
 
     joint_accessories = dict(base_joint.jointAccessories)
@@ -1627,20 +1676,18 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
         notch_wall_min_relief_cut_angle=degrees(45),
     )
     if relief_geom is not None:
-        mortise_negative_local = CSGUnion(
-            children=[
-                mortise_negative_local,
-                relief_geom.receiving_timber_notch_negative_CSG,
-            ]
+        mortise_negative_local = _union_into_cut(
+            mortise_negative_local,
+            [relief_geom.receiving_timber_notch_negative_CSG],
+            MORTISE_CUT_LABEL,
         )
         if relief_geom.butting_timber_relief_negative_CSG is not None:
             # Add the relief volume to the tenon negative CSG so the butting timber
             # gets carved away against the receiving timber's notch walls.
-            tenon_negative_local = CSGUnion(
-                children=[
-                    tenon_negative_local,
-                    relief_geom.butting_timber_relief_negative_CSG,
-                ]
+            tenon_negative_local = _union_into_cut(
+                tenon_negative_local,
+                [relief_geom.butting_timber_relief_negative_CSG],
+                TENON_CUT_LABEL,
             )
 
     tenon_tip_position_global = (

@@ -45,6 +45,10 @@ from kumiki.triangles import triangulate_cutcsg
 # raycast epsilon.
 PICK_EPS = 5e-4
 
+# Where the tenon sits in a mortise-and-tenon tree: the joint's node, the waste
+# removed around the tenon, then the tenon prism subtracted back out of it.
+TENON_PATH = ["mortise_and_tenon", "tenon_waste", "tenon"]
+
 
 def _load_runner():
     """Import kigumi/runner.py by path -- kigumi is not an installed package."""
@@ -163,7 +167,8 @@ class TestCSGTreeSerialization:
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
         labelled = self._by_label(tree)
         assert labelled["mortise_and_tenon"]["path"] == ["mortise_and_tenon"]
-        assert labelled["tenon"]["path"] == ["mortise_and_tenon", "tenon"]
+        assert labelled["tenon_waste"]["path"] == ["mortise_and_tenon", "tenon_waste"]
+        assert labelled["tenon"]["path"] == TENON_PATH
 
     def test_features_carry_their_metadata(self, mortise_and_tenon_frame):
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
@@ -252,7 +257,7 @@ class TestNavigateToLeaf:
         tenon_hits = {
             (path, face): count
             for (path, face), count in found.items()
-            if path == ("mortise_and_tenon", "tenon")
+            if path == tuple(TENON_PATH)
         }
         assert tenon_hits, (
             "no surface point resolved to the tenon; paths found were "
@@ -305,7 +310,7 @@ class TestResolveCSGAtPath:
         local_csg = cut_timber.render_timber_with_cuts_csg_local()
 
         resolved = runner._resolve_csg_at_path(
-            local_csg, ["mortise_and_tenon", "tenon"], None, PICK_EPS
+            local_csg, TENON_PATH, None, PICK_EPS
         )
         assert resolved is not local_csg
         assert resolved.label.name == "tenon"
