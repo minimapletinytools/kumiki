@@ -1845,6 +1845,7 @@ def _detect_face_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> st
     if isinstance(csg, Cylinder) and are_vectors_perpendicular(normal, csg.axis_direction):
         return "cylindrical_surface"
 
+    # TODO this needs to know face parity
     return _nearest_timber_local_face_name(normal)
 
 

@@ -49,6 +49,7 @@ def _numeric_max(*vals):
     return result
 
 
+# TODO rename to AxisAlignedBoundingBox
 @dataclass(frozen=True)
 class BoundingBox:
     """
@@ -272,8 +273,12 @@ class FeatureProperties:
         priority: lower wins when several features claim the same point.
     """
     group: FeatureGroup = FeatureGroup.A
+    # TODO move after priority
     real: bool = True
     priority: int = 0
+    marking_override: FeatureMarking = FeatureMarking.OPTIONAL
+    purpose: FeaturePurpose =  FeaturePurpose.NOT_SPECIFIED
+
 
 
 def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:

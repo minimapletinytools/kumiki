@@ -341,32 +341,53 @@ DONE-maybe get rid of snap_eps, or create a feature eps hierarch (generic, face_
 DONE-probbaly get rid of _features in CSGFeature base class as difference/union/interseciton does not need/want this, maybe in the future we cach efeatuers but that should be adifferent var
 DONE-float_epsilon should just be generic_epsilon in rule.py
 DONE-test on regular vscode on mac
-IGNORE-get vmware fusion and test on windows
-
--continue fetaure impl --resume b9de226c-0f18-4592-b200-d230dd6f9902
-
-  
--refine CSG label
+IGNORE-get vmware fusion and test on windows  
+DONE-refine CSG label
   -create CSGLabl class
   -Cutting CSG label setting logic is a little weird, change it to as follows
-    -cutting owns the CSG lable for the joint
+    -Cuttings create an solidunion node representing the negative csg of the joint and owns the label for it
+    -so change the label in cutting class to CSGLabel
     -always do the `result = SolidUnion([result], label=CutCSGLabel(self.label))` thing, even if no label I tihnk, just more consistent
-  -Cutting should not create EmptyCSG if no cuttings
-
--next, look at all calls to _create_extended_rectangular_prism, and set the label accordingly, so if it is a board
+    -leave a SHORT comment explainig this
+  -Except whene there are no cuts, ni that case Cutting should not create EmptyCSG if no cuttings, in this case, there si no CSG/label, the CSG is just the timber CSG.
+    -this technically requires joints to have at least one cutting in it, so add an post init assert to joint to assert that it has at least noe negative CSG object in it.
+      -levae a SHORT c omment explaining this
+DONE-next, look at all calls to _create_extended_rectangular_prism, and set the label accordingly, so if it is a board
   set it to "board", also do the same to get_actual_csg_local and get_extended_actual_csg_local  so it should say
   "board (rough, extended)" in the case of extende_actual_csg...  you will need to change those to clas methods so
   we know what the derived class is to set the label correctly.
 
--selectino feedback
+
+-test edge selection and in particular face face intersecting edges
+
+
+
+-selection feedback
+  DONE-set labels in all the get csg function in timber.py
+
+  -BUG clicking on entire csg chunks (e.g. the entire tenon csg assembly) will sasy "face (tenon_top)" in the info view e.g., it should not say "face", it should say union or something
+  -you seem to be able to click on unnamed faces and it will say "face (top)" 
+    -this is from _detect_face_label in runner.py, it will fall through to generic labels
+    -BUG where top must be local to the prism? because it's not aligned with the timber space (se ethe stretcher in double sawhores example)
+      -this is because when it tries `_nearest_timber_local_face_name` it doesn't know the parity of the face
+    -BUG? also selecting these features will not highlight the child CSG tree feature it belongs to
+
+
   -name all the rest of your joints
   -should show perfect.face not rough.face if rough == perfect?
-  -seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked
+  -seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked, (is this fixed now?)
   -maybe just allow clicking on unnamed features? it's a little werid cuz you can select them in the tree view and they don't select inthe viewer...
   -selecting on face features visualy selects all faces that coincide with that one when extended to infinity, see if you can localize the visuall yselection...
   -the first level shows "rectangular prism (presumably the timber itself) rather than difference
     -probably just show difference for now...
-  -set labels in all the get csg function in timber.py
+  
+
+  -feature listing in tree weirdness:
+    -Derived edges still don't appear in the trees. I leaned toward omitting them, since they're computed per query from face pairs rather than declared on a node, so listing them per node would misrepresent them — but you never confirmed that.
+    -in general this is a weird thing where we know the CSGtree statically, but only its features are knowwn when you click nad raycast, I think that's fine. the name feature can still show up undernearth the CSG tree it's a part of but it disappears when you unselect it.
+    -so maybe remove regular features from CSG tree. I don't think they show anyways? Also ok just to show them. you can add get_known_features which may not return all fetaures or something like that. 
+    -note currently it doesnt' show fetaures in the tree, it does add a solid (5) indicating there are 5 named features
+    -you can maybe consider an edge a sub feature of a named face feature,
 
 
 
@@ -405,6 +426,8 @@ IGNORE-get vmware fusion and test on windows
 				-in general the one place we really need this is where the shoulder plane intersect the PTW faces of the timber, so PTW timber faces are kinda special in this sense
 	-review reference face/edge in kumiki
 
+DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a project?)
+-create halfspace decorative cut 
 -make parameters human readable
 -fix tusk failing from other direction bug
 -add N/S/E/W labels to the cube
