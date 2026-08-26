@@ -8,13 +8,14 @@ from kumiki.joints.workshop.shavings.shavings import (
     chop_timber_end_with_prism,
     chop_timber_end_with_half_plane,
     chop_lap_on_timber_end,
+    chop_profile_on_timber_face,
     scribe_face_plane_onto_centerline,
     scribe_centerline_onto_centerline
 )
 from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face
 from kumiki.timber import create_timber, TimberEnd, TimberFace, TimberLongFace
 from kumiki.rule import create_v3, create_v2, inches, are_vectors_parallel, scalar, safe_equality_test
-from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace
+from kumiki.cutcsg import SolidUnion, RectangularPrism, HalfSpace, CutCSGLabel
 from kumiki.measuring import mark_distance_from_end_along_centerline
 
 # TODO too many tests, just delete some lol... or combine into 1 test that varies only the timber length...
@@ -1128,3 +1129,75 @@ class TestFindProjectedIntersectionOnCenterlines:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+class TestChopHelperLabels:
+    """The chop helpers name the geometry they build.
+
+    Each has a default naming the kind of cut it makes, and takes a label so a
+    joint can say what the cut is for in its own terms. Without a name the
+    node is unreachable by path in the viewer, which is the whole point of
+    labelling.
+    """
+
+    def _timber(self):
+        return create_timber(
+            length=inches(48),
+            size=create_v2(inches(4), inches(4)),
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="test_timber",
+        )
+
+    def test_an_end_prism_names_itself_by_default(self):
+        prism = chop_timber_end_with_prism(self._timber(), TimberEnd.TOP, inches(24))
+        assert prism.label.name == "timber_end_prism_cut"
+
+    def test_an_end_prism_takes_the_name_a_joint_gives_it(self):
+        prism = chop_timber_end_with_prism(
+            self._timber(), TimberEnd.TOP, inches(24),
+            label=CutCSGLabel("dovetail_housing"),
+        )
+        assert prism.label.name == "dovetail_housing"
+
+    def test_an_end_plane_is_unnamed_unless_asked(self):
+        # Unlike the others: an end chop means something different in every
+        # joint that makes one, and the top_end_cut / bottom_end_cut names
+        # belong to a Cutting's own end cuts rather than to this shape.
+        plane = chop_timber_end_with_half_plane(self._timber(), TimberEnd.TOP, inches(24))
+        assert plane.label == CutCSGLabel.NoLabel()
+
+    def test_a_lap_names_itself_by_default(self):
+        lap_prism, _end_cut = chop_lap_on_timber_end(
+            self._timber(), TimberEnd.TOP, TimberFace.FRONT,
+            inches(6), inches(3), inches(2),
+        )
+        assert lap_prism.label.name == "lap_cut"
+
+    def test_a_lap_takes_the_name_a_joint_gives_it(self):
+        lap_prism, _end_cut = chop_lap_on_timber_end(
+            self._timber(), TimberEnd.TOP, TimberFace.FRONT,
+            inches(6), inches(3), inches(2), label=CutCSGLabel("gooseneck_lap"),
+        )
+        assert lap_prism.label.name == "gooseneck_lap"
+
+    def test_a_profile_names_itself_by_default(self):
+        profile = [create_v2(inches(-1), inches(0)), create_v2(inches(1), inches(0)),
+                   create_v2(inches(1), inches(2)), create_v2(inches(-1), inches(2))]
+        cut = chop_profile_on_timber_face(
+            self._timber(), TimberEnd.TOP, TimberFace.FRONT, profile, inches(1))
+        assert cut.label.name == "profile_cut"
+
+    def test_several_profiles_make_one_named_cut(self):
+        # The union is the cut; the pieces are parts of it, so the name is not
+        # repeated on each one -- that would nest the same label inside itself.
+        square = [create_v2(inches(-1), inches(0)), create_v2(inches(1), inches(0)),
+                  create_v2(inches(1), inches(2)), create_v2(inches(-1), inches(2))]
+        other = [create_v2(inches(-3), inches(0)), create_v2(inches(-2), inches(0)),
+                 create_v2(inches(-2), inches(2)), create_v2(inches(-3), inches(2))]
+        cut = chop_profile_on_timber_face(
+            self._timber(), TimberEnd.TOP, TimberFace.FRONT, [square, other], inches(1))
+        assert isinstance(cut, SolidUnion)
+        assert cut.label.name == "profile_cut"
+        assert all(child.label == CutCSGLabel.NoLabel() for child in cut.children)

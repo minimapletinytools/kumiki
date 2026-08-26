@@ -273,7 +273,12 @@ def check_timber_overlap_for_splice_joint_is_sensible(
 
 # TODO add rough dimension variant instead
 # TODO when you add actual dimensions on top of perfect timber within dimensions, you probably want a version that sizes to the actual dimensions...
-def chop_timber_end_with_prism(timber: TimberLike, end: TimberEnd, distance_from_end_to_cut: Numeric) -> RectangularPrism:
+def chop_timber_end_with_prism(
+    timber: TimberLike,
+    end: TimberEnd,
+    distance_from_end_to_cut: Numeric,
+    label: CutCSGLabel = CutCSGLabel("timber_end_prism_cut"),
+) -> RectangularPrism:
     """
     Create a RectangularPrism CSG for chopping off material from a timber end (in local coordinates).
     
@@ -322,7 +327,8 @@ def chop_timber_end_with_prism(timber: TimberLike, end: TimberEnd, distance_from
         size=timber.size,
         transform=Transform.identity(),
         start_distance=start_distance_local,
-        end_distance=end_distance_local
+        end_distance=end_distance_local,
+        label=label,
     )
 
 
@@ -397,7 +403,8 @@ def chop_lap_on_timber_end(
     lap_timber_face: TimberFace,
     lap_length: Numeric,
     lap_shoulder_position_from_lap_timber_end: Numeric,
-    lap_depth: Numeric
+    lap_depth: Numeric,
+    label: CutCSGLabel = CutCSGLabel("lap_cut"),
 ) -> Tuple[CutCSG, HalfSpace]:
     """
     Create CSG cuts for a lap joint between two timber ends.
@@ -502,7 +509,8 @@ def chop_lap_on_timber_end(
             size=create_v2(removal_width, lap_timber.size[1]),
             transform=Transform(position=create_v3(x_offset, 0, 0), orientation=Orientation.identity()),
             start_distance=prism_start,
-            end_distance=prism_end
+            end_distance=prism_end,
+            label=label,
         )
     else:  # FRONT or BACK
         # Lap is on a height face (Y-axis in local coords)
@@ -523,7 +531,8 @@ def chop_lap_on_timber_end(
             size=create_v2(lap_timber.size[0], removal_height),
             transform=Transform(position=create_v3(0, y_offset, 0), orientation=Orientation.identity()),
             start_distance=prism_start,
-            end_distance=prism_end
+            end_distance=prism_end,
+            label=label,
         )
     
     # Step 7: Return the lap prism and end cut separately
@@ -537,7 +546,8 @@ def chop_lap_on_timber_ends(
     top_lap_timber_face: TimberLongFace,
     lap_length: Numeric,
     top_lap_shoulder_position_from_top_lap_shoulder_timber_end: Numeric,
-    lap_depth: Numeric
+    lap_depth: Numeric,
+    label: CutCSGLabel = CutCSGLabel("lap_cut"),
 ) -> Tuple[Tuple[CutCSG, HalfSpace], Tuple[CutCSG, HalfSpace]]:
     """
     Create CSG cuts for a lap joint between two timber ends.
@@ -605,7 +615,7 @@ def chop_lap_on_timber_ends(
         f"{top_lap_timber.ticket.path} and {bottom_lap_timber.ticket.path} cross sections do not overlap."
 
     
-    top_lap_prism, top_end_cut = chop_lap_on_timber_end(top_lap_timber, top_lap_timber_end, top_lap_timber_face.to.face(), lap_length, top_lap_shoulder_position_from_top_lap_shoulder_timber_end, lap_depth)
+    top_lap_prism, top_end_cut = chop_lap_on_timber_end(top_lap_timber, top_lap_timber_end, top_lap_timber_face.to.face(), lap_length, top_lap_shoulder_position_from_top_lap_shoulder_timber_end, lap_depth, label=label)
     top_lap_csg = (top_lap_prism, top_end_cut)
 
     # Step 2: Find the corresponding face on the bottom lap timber
@@ -665,13 +675,21 @@ def chop_lap_on_timber_ends(
         # Measuring from bottom end
         bottom_lap_shoulder_position_from_bottom_timber_end = bottom_shoulder_from_bottom_timber_bottom
 
-    bottom_lap_prism, bottom_end_cut = chop_lap_on_timber_end(bottom_lap_timber, bottom_lap_timber_end, bottom_lap_timber_face, lap_length, bottom_lap_shoulder_position_from_bottom_timber_end, bottom_lap_depth)
+    bottom_lap_prism, bottom_end_cut = chop_lap_on_timber_end(bottom_lap_timber, bottom_lap_timber_end, bottom_lap_timber_face, lap_length, bottom_lap_shoulder_position_from_bottom_timber_end, bottom_lap_depth, label=label)
     bottom_lap_csg = (bottom_lap_prism, bottom_end_cut)
     return (top_lap_csg, bottom_lap_csg)
 
 
 # TODO I think this is cutting on the wrong face...
-def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: TimberFace, profile: Union[List[V2], List[List[V2]]], depth: Numeric, profile_y_offset_from_end: Numeric = scalar(0)) -> Union[SolidUnion, ConvexPolygonExtrusion]:
+def chop_profile_on_timber_face(
+    timber: TimberLike,
+    end: TimberEnd,
+    face: TimberFace,
+    profile: Union[List[V2], List[List[V2]]],
+    depth: Numeric,
+    profile_y_offset_from_end: Numeric = scalar(0),
+    label: CutCSGLabel = CutCSGLabel("profile_cut"),
+) -> Union[SolidUnion, ConvexPolygonExtrusion]:
     """
     Create a CSG extrusion of a profile (or multiple profiles) on a timber face.
     See the diagram below for understanding how to interpret the profile in the timber's local space based on the end and face arguments.
@@ -721,9 +739,12 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
         # Recursively call this function for each profile and union the results
         extrusions = []
         for single_profile in profile:
-            extrusion = chop_profile_on_timber_face(timber, end, face, cast(List[V2], single_profile), depth, profile_y_offset_from_end)
+            extrusion = chop_profile_on_timber_face(
+                timber, end, face, cast(List[V2], single_profile), depth,
+                profile_y_offset_from_end, label=CutCSGLabel.NoLabel(),
+            )
             extrusions.append(extrusion)
-        return SolidUnion(extrusions)
+        return SolidUnion(extrusions, label=label)
     
     # Single profile case - continue with original logic
     
@@ -818,6 +839,7 @@ def chop_profile_on_timber_face(timber: TimberLike, end: TimberEnd, face: Timber
         transform=profile_transform,
         start_distance=-depth,
         end_distance=scalar(0),
+        label=label,
     )
     
     return extrusion

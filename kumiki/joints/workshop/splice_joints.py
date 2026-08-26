@@ -244,7 +244,7 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
         maybe_bottom_end_cut_distance_from_bottom=top_end_cut_distance_from_bottom if top_lap_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=top_lap_prism,
         assembly_freedom=AssemblyFreedom.translation(lap_face_normal_global, freed_after=lap_thickness),
-        label=CutCSGLabel("lap_cut"),
+        label=CutCSGLabel("splice_lap_cut"),
     )
 
     cut_bottom = Cutting(
@@ -253,7 +253,7 @@ def cut_plain_splice_lap_joint_on_aligned_timbers(
         maybe_bottom_end_cut_distance_from_bottom=bottom_end_cut_distance_from_bottom if bottom_lap_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=bottom_lap_prism,
         assembly_freedom=AssemblyFreedom.translation(-lap_face_normal_global, freed_after=lap_thickness),
-        label=CutCSGLabel("lap_cut"),
+        label=CutCSGLabel("splice_lap_cut"),
     )
 
     # Create CutTimbers
