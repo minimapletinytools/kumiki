@@ -940,11 +940,8 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             continue
         
         joint_kumiki_id = int(getattr(joint_ticket, "kumiki_id", 0))
-        joint_name = getattr(joint_ticket, "name", None)
-        if joint_name and joint_name == "[no-name]":
-            joint_name = None
+        joint_name = _joint_display_name(joint)
         joint_type = getattr(joint_ticket, "joint_type", None)
-        joint_name = joint_name or (joint_type or "joint")
         joint_tags = _normalize_ticket_tags(joint_ticket)
         
         # Extract members (timbers) from cuttings
@@ -1656,13 +1653,18 @@ def _cutting_for_node(
 
 
 def _joint_display_name(joint: 'Joint') -> str:
-    """How to show *joint* in the selection display.
+    """How to show *joint* wherever a joint is named.
 
-    A joint whose ticket was never given a path falls back to its kumiki id
-    rather than to a shared placeholder: several unnamed joints can touch one
-    timber, and "which of these did I just click?" is the question the display
-    exists to answer. The id is runtime-only, which is fine here -- this string
-    is shown, never stored.
+    The one implementation of that rule, in name-then-type-then-id order:
+    the name its ticket was given, else the kind of joint it is, else its
+    kumiki id. The id rather than a shared placeholder because several
+    unnamed joints can touch one timber, and "which of these did I just
+    click?" is the question the display exists to answer. It is runtime-only,
+    which is fine here -- this string is shown, never stored.
+
+    The layers payload and the CSG tree both call this. They used to derive
+    it separately and disagree: a joint with a type but no name showed as its
+    type in the joint list and as an id everywhere else.
     """
     from kumiki.ticket import UNNAMED_TICKET_PATH
 
@@ -1672,6 +1674,9 @@ def _joint_display_name(joint: 'Joint') -> str:
     name = ticket.get_name()
     if name and name != UNNAMED_TICKET_PATH:
         return name
+    joint_type = getattr(ticket, "joint_type", None)
+    if joint_type:
+        return joint_type
     return f"<unnamed joint - {ticket.kumiki_id}>"
 
 

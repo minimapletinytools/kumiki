@@ -685,10 +685,13 @@ class TestPickDescription:
 
 
 class TestJointDisplayName:
-    """How a joint is named in the selection display.
+    """How a joint is named, wherever a joint is named.
 
-    A joint whose ticket was never given a path falls back to its kumiki id
-    rather than a shared placeholder: several unnamed joints can touch one
+    Name, then type, then id. The name its ticket was given says WHICH joint;
+    the joint_type says what KIND it is, which is a weaker answer but a far
+    better one than an id, since almost every joint in the library sets a type
+    and almost none set a path. A joint with neither falls back to its kumiki
+    id rather than a shared placeholder: several unnamed joints can touch one
     timber, and "which of these did I just click?" is the question the display
     exists to answer.
     """
@@ -720,12 +723,31 @@ class TestJointDisplayName:
         first, second = self._joint(), self._joint()
         assert runner._joint_display_name(first) != runner._joint_display_name(second)
 
-    def test_a_joint_type_does_not_count_as_a_name(self):
-        """joint_type says what kind of joint, not which one."""
+    def test_the_joint_type_stands_in_when_there_is_no_name(self):
+        """Weaker than a name -- it says what kind, not which one -- but the
+        library sets a type on nearly every joint and a path on nearly none."""
         from kumiki.ticket import JointTicket
 
         joint = self._joint(JointTicket(joint_type="mortise_and_tenon"))
-        assert runner._joint_display_name(joint).startswith("<unnamed joint - ")
+        assert runner._joint_display_name(joint) == "mortise_and_tenon"
+
+    def test_an_authored_name_outranks_the_type(self):
+        from kumiki.ticket import JointTicket
+
+        joint = self._joint(JointTicket(path="joints/corner_a", joint_type="plain_butt"))
+        assert runner._joint_display_name(joint) == "corner_a"
+
+    def test_the_joint_list_and_the_csg_tree_agree(self, mortise_and_tenon_frame):
+        """The divergence this rule exists to prevent: the layers payload used
+        to fall back to joint_type while the tree fell back to the id, so one
+        joint read two different ways depending on where you looked."""
+        listed = {
+            entry["kumikiEphemeralId"]: entry["name"]
+            for entry in runner.serialize_layers(mortise_and_tenon_frame)["joints"]
+        }
+        assert listed
+        for joint in mortise_and_tenon_frame.source_joints:
+            assert listed[joint.ticket.kumiki_id] == runner._joint_display_name(joint)
 
     def test_a_joint_with_no_ticket_at_all_has_no_id_to_show(self):
         class TicketlessJoint:
@@ -734,7 +756,8 @@ class TestJointDisplayName:
         assert runner._joint_display_name(TicketlessJoint()) == "<unnamed joint>"
 
     def test_it_reaches_the_pick_result(self, mortise_and_tenon_frame):
-        """The fixture's joint is unnamed, so a picked cut shows the fallback."""
+        """The fixture's joint has a type but no name, so a picked cut shows
+        the type."""
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
         csg = cut_timber.render_timber_with_cuts_csg_local()
         for triangle in triangulate_cutcsg(csg).mesh.triangles:
@@ -744,6 +767,6 @@ class TestJointDisplayName:
             _p, target, label = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
             if label.startswith("tenon"):
                 name = runner._joint_name_for_node(csg, cut_timber, target)
-                assert name is not None and name.startswith("<unnamed joint - ")
+                assert name == "mortise_and_tenon"
                 return
         raise AssertionError("no tenon face found to click on")
