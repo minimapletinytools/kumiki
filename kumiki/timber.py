@@ -28,6 +28,7 @@ from abc import ABC, abstractmethod
 from typing_extensions import deprecated
 import warnings
 
+# TODO DELETE ME
 # Aliases for backwards compatibility
 CSGUnion = SolidUnion
 CSGDifference = Difference
