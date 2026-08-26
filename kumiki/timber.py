@@ -1625,25 +1625,20 @@ class Cutting:
         """
         csg_components = []
 
-        def _append_component(component: CutCSG) -> None:
-            # Avoid duplicate HalfSpace planes when both negative_csg and
-            # end-cut metadata describe the same geometric cut.
-            if isinstance(component, HalfSpace):
-                for existing in csg_components:
-                    if isinstance(existing, HalfSpace):
-                        if existing.normal.equals(component.normal) and safe_equality_test(existing.offset, component.offset):
-                            return
-            csg_components.append(component)
-
+        # negative_csg and the end-cut metadata can describe the same plane.
+        # Both are kept: subtracting a plane twice removes the same material,
+        # and a search resolves to the first match -- so the joint's own cut,
+        # which goes in first, is the one that answers for the plane, and the
+        # generated end cut trails behind it.
         if self.negative_csg is not None:
-            _append_component(self.negative_csg)
+            csg_components.append(self.negative_csg)
 
         top_end_cut = self.get_maybe_top_end_cut()
         bottom_end_cut = self.get_maybe_bottom_end_cut()
         if top_end_cut is not None:
-            _append_component(top_end_cut)
+            csg_components.append(top_end_cut)
         if bottom_end_cut is not None:
-            _append_component(bottom_end_cut)
+            csg_components.append(bottom_end_cut)
 
         # A cutting that removes nothing has no node and no label; the timber
         # is then just its own CSG. Returning EmptyCSG instead would put a

@@ -2298,3 +2298,64 @@ class TestTimberCSGLabels:
         cut_timber = CutTimber(timber, cuts=[])
         rendered = cut_timber.render_timber_with_cuts_csg_local()
         assert rendered.label.name == "timber (rough, extended)"
+
+
+class TestDuplicatePlanes:
+    """A cutting can describe the same plane twice -- once as its negative_csg
+    and once as end-cut metadata. Both are kept: subtracting a plane twice
+    removes the same material, so there is nothing to reconcile, and order
+    decides which copy answers when something searches for that plane."""
+
+    def _plane(self, label=None, offset=90):
+        return HalfSpace(
+            normal=create_v3(scalar(0), scalar(0), scalar(1)),
+            offset=scalar(offset),
+            label=CutCSGLabel(label) if label else CutCSGLabel.NoLabel(),
+        )
+
+    def _timber(self):
+        return Timber(
+            length=scalar(100),
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            ticket=TimberTicket(path="t"),
+        )
+
+    def _rendered(self, negative_csg):
+        cutting = Cutting(
+            timber=self._timber(),
+            negative_csg=negative_csg,
+            maybe_top_end_cut_distance_from_bottom=scalar(90),
+        )
+        rendered = cutting.get_negative_csg_local()
+        assert isinstance(rendered, SolidUnion)
+        return rendered
+
+    def test_both_copies_of_a_plane_are_kept(self):
+        labels = [c.label.name for c in self._rendered(self._plane("miter_cut")).children]
+        assert labels == ["miter_cut", "top_end_cut"]
+
+    def test_the_joints_own_cut_comes_first_and_so_answers_for_the_plane(self):
+        # A search resolves to the first match, so the cut the joint authored
+        # is the one that names the plane; the generated end cut trails it.
+        first = self._rendered(self._plane("miter_cut")).children[0]
+        assert first.label.name == "miter_cut"
+
+    def test_duplicating_a_plane_removes_the_same_material(self):
+        cutting = Cutting(
+            timber=self._timber(),
+            negative_csg=self._plane("miter_cut"),
+            maybe_top_end_cut_distance_from_bottom=scalar(90),
+        )
+        once = Cutting(timber=self._timber(), negative_csg=self._plane("miter_cut"))
+        both = triangulate_cutcsg(
+            CutTimber(self._timber(), cuts=[cutting]).render_timber_with_cuts_csg_local()).mesh
+        single = triangulate_cutcsg(
+            CutTimber(self._timber(), cuts=[once]).render_timber_with_cuts_csg_local()).mesh
+        assert both.is_watertight and single.is_watertight
+        assert both.volume == pytest.approx(single.volume)
+
+    def test_a_different_plane_is_kept_alongside(self):
+        labels = [c.label.name for c in
+                  self._rendered(self._plane("somewhere_else", offset=50)).children]
+        assert set(labels) == {"somewhere_else", "top_end_cut"}
