@@ -4311,17 +4311,18 @@ class KigumiViewerApp extends LitElement {
         let breadcrumb = selectedSingleName;
         if (focus) {
             const focused = this.memberMetadataByKey.get(focus.timberKey);
-            const parts = [(focused && focused.name) || focus.timberKey].concat(focus.path);
-            const tail = CsgTreeView.describePickTail({
-                featureLabel: focus.featureLabel,
-                featureType: detail && detail.featureType,
-                nodeKind: detail && detail.nodeKind,
-                nodeDisplayName: detail && detail.nodeDisplayName,
-            }, FEATURE_TYPE_NOUNS());
-            if (tail) {
-                parts.push(tail);
-            }
-            breadcrumb = parts.join(' \u203a ');
+            breadcrumb = CsgTreeView.breadcrumbSegments(
+                (focused && focused.name) || focus.timberKey,
+                focus.path,
+                {
+                    featureLabel: focus.featureLabel,
+                    featureType: detail && detail.featureType,
+                    nodeKind: detail && detail.nodeKind,
+                    nodeDisplayName: detail && detail.nodeDisplayName,
+                    nodeLabel: detail && detail.nodeLabel,
+                },
+                FEATURE_TYPE_NOUNS(),
+            ).join(' \u203a ');
         }
 
         this._renderInfoPanel({

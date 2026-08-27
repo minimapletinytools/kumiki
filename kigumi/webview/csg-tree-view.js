@@ -283,7 +283,40 @@
             const noun = (nouns && nouns[pick.featureType]) || 'feature';
             return noun + ' (' + pick.featureLabel + ')';
         }
-        return pick.nodeDisplayName || pick.nodeKind || null;
+        const kind = pick.nodeDisplayName || pick.nodeKind;
+        if (!kind) {
+            return null;
+        }
+        return pick.nodeLabel ? kind + ' (' + pick.nodeLabel + ')' : kind;
+    }
+
+    /**
+     * The breadcrumb for a selection: the timber, the labelled nodes above
+     * what was selected, then what was selected.
+     *
+     * `path` is the chain of labels down to the selected node, so it already
+     * ends with that node's own label. Left in, the node appears twice -- once
+     * as a path segment and again as its kind -- reading as two levels when it
+     * is one, and making a node look like it vanished when the next click down
+     * replaced its kind with a deeper label. So the trailing duplicate is
+     * dropped and the label folded into the description instead.
+     *
+     * Not dropped when a feature is selected: the node is then a real ancestor
+     * of the thing picked, and popping it would lose it from the trail.
+     */
+    function breadcrumbSegments(timberName, path, pick, nouns) {
+        const trail = (path || []).slice();
+        const selectedTheNodeItself = Boolean(pick) && !pick.featureLabel && Boolean(pick.nodeLabel);
+        if (selectedTheNodeItself && trail.length && trail[trail.length - 1] === pick.nodeLabel) {
+            trail.pop();
+        }
+        const segments = timberName ? [timberName] : [];
+        segments.push(...trail);
+        const tail = describePickTail(pick, nouns);
+        if (tail) {
+            segments.push(tail);
+        }
+        return segments;
     }
 
     /** Row text: the base type, plus the tag it was given. */
@@ -312,6 +345,7 @@
         revealTarget,
         describeNode,
         describePickTail,
+        breadcrumbSegments,
     };
 
     if (typeof module !== 'undefined' && module.exports) {

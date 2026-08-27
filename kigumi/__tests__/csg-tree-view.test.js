@@ -406,6 +406,21 @@ describe('describePickTail', () => {
         )).toBe('union');
     });
 
+    test('a named node gives its kind and its name together', () => {
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: null, nodeDisplayName: 'difference', nodeLabel: 'tenon_waste' },
+            NOUNS,
+        )).toBe('difference (tenon_waste)');
+    });
+
+    test('a feature is named by the feature, not by the node it sits on', () => {
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: 'tenon_back', featureType: 'FACE',
+              nodeDisplayName: 'prism', nodeLabel: 'tenon' },
+            NOUNS,
+        )).toBe('face (tenon_back)');
+    });
+
     test('an older runner without a display name still reads as something', () => {
         expect(CsgTreeView.describePickTail(
             { featureLabel: null, nodeKind: 'SolidUnion' }, NOUNS,
@@ -426,5 +441,54 @@ describe('describePickTail', () => {
     test('nothing picked describes as nothing', () => {
         expect(CsgTreeView.describePickTail(null, NOUNS)).toBeNull();
         expect(CsgTreeView.describePickTail({}, NOUNS)).toBeNull();
+    });
+});
+
+describe('breadcrumbSegments', () => {
+    const NOUNS = { FACE: 'face', EDGE: 'edge', POINT: 'point' };
+
+    test('a selected node appears once, not as label then kind', () => {
+        // Regression: the path already ends with the node's own label, so
+        // appending its kind rendered one node as two levels --
+        // "mortise_and_tenon > union" for a single union.
+        expect(CsgTreeView.breadcrumbSegments('post', ['mortise_and_tenon'], {
+            featureLabel: null, nodeDisplayName: 'union', nodeLabel: 'mortise_and_tenon',
+        }, NOUNS)).toEqual(['post', 'union (mortise_and_tenon)']);
+    });
+
+    test('ancestors stay in the trail', () => {
+        expect(CsgTreeView.breadcrumbSegments(
+            'post', ['mortise_and_tenon', 'tenon_waste'],
+            { featureLabel: null, nodeDisplayName: 'difference', nodeLabel: 'tenon_waste' },
+            NOUNS,
+        )).toEqual(['post', 'mortise_and_tenon', 'difference (tenon_waste)']);
+    });
+
+    test('a picked feature keeps the node it sits on in the trail', () => {
+        // Folding here would lose the tenon entirely: the node is a real
+        // ancestor of the face, not the thing selected.
+        expect(CsgTreeView.breadcrumbSegments(
+            'post', ['mortise_and_tenon', 'tenon_waste', 'tenon'],
+            { featureLabel: 'tenon_back', featureType: 'FACE',
+              nodeDisplayName: 'prism', nodeLabel: 'tenon' },
+            NOUNS,
+        )).toEqual(['post', 'mortise_and_tenon', 'tenon_waste', 'tenon', 'face (tenon_back)']);
+    });
+
+    test('an unlabelled node leaves its parent trail alone', () => {
+        expect(CsgTreeView.breadcrumbSegments('post', ['miter_cut'], {
+            featureLabel: null, nodeDisplayName: 'half-space', nodeLabel: null,
+        }, NOUNS)).toEqual(['post', 'miter_cut', 'half-space']);
+    });
+
+    test('a label that matches an ancestor rather than the node is not dropped', () => {
+        // Only the LAST segment can be the selected node's own label.
+        expect(CsgTreeView.breadcrumbSegments('post', ['lap_cut', 'other'], {
+            featureLabel: null, nodeDisplayName: 'prism', nodeLabel: 'lap_cut',
+        }, NOUNS)).toEqual(['post', 'lap_cut', 'other', 'prism (lap_cut)']);
+    });
+
+    test('just the timber when nothing is picked', () => {
+        expect(CsgTreeView.breadcrumbSegments('post', [], null, NOUNS)).toEqual(['post']);
     });
 });
