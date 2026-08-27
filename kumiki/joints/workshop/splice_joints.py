@@ -923,21 +923,21 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
     timber1_freedom = AssemblyFreedom.translation(-disassembly_direction, freed_after=DD)
     timber2_freedom = AssemblyFreedom.translation(disassembly_direction, freed_after=DD)
 
-    timber1_test_cut = Cutting(
+    timber1_cut = Cutting(
         timber=timber1,
         maybe_top_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=left_boundary_distance_from_bottom if timber1_end == TimberEnd.BOTTOM else None,
         negative_csg=timber1_negative_csg_local,
-        label=CutCSGLabel("half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY"),
+        label=CutCSGLabel("scarf_cut"),
         assembly_freedom=timber1_freedom,
     )
 
-    timber2_test_cut = Cutting(
+    timber2_cut = Cutting(
         timber=timber2,
         maybe_top_end_cut_distance_from_bottom=right_boundary_distance_from_bottom if timber2_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=right_boundary_distance_from_bottom if timber2_end == TimberEnd.BOTTOM else None,
         negative_csg=timber2_negative_csg_local,
-        label=CutCSGLabel("half_blind_tenoned_dadoed_rabbeted_scarf_TEST_PROFILE_ONLY"),
+        label=CutCSGLabel("scarf_cut"),
         assembly_freedom=timber2_freedom,
     )
     front_face_dir = arrangement.timber1.get_face_direction_global(arrangement.front_face_on_timber1)
@@ -956,8 +956,8 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
 
     return Joint(
         cuttings={
-            timber1.ticket.path: timber1_test_cut,
-            timber2.ticket.path: timber2_test_cut,
+            timber1.ticket.path: timber1_cut,
+            timber2.ticket.path: timber2_cut,
         },
         ticket=JointTicket(joint_type="half_blind_tenoned_dadoed_rabbeted_scarf"),
         jointAccessories={"peg": peg},
