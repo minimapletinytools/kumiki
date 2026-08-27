@@ -152,6 +152,8 @@
   "viewer.selection.kind.point": "point",
   "viewer.selection.featureType": "feature",
   "viewer.selection.joint": "joint",
+  "viewer.selection.normal": "outward normal",
+  "viewer.selection.approximatelyFacing": "approximately facing {face}",
   "viewer.selection.facesToward": "faces toward",
 
   "sidebar.kumikiDevMode": "Kumiki Dev Mode",

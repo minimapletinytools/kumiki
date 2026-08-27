@@ -1340,11 +1340,20 @@ kigumi-layers-view:has(.lp-collapsed) {
     white-space: nowrap;
 }
 
-/* A subtracted node is removal, not another child; the minus says so. */
-.lp-csg-minus {
-    color: var(--hv-accent);
+/* A difference reads as arithmetic: minus for what comes off, plus for the
+   material it comes off of. */
+.lp-csg-minus,
+.lp-csg-plus {
     flex: 0 0 auto;
     font-weight: 700;
+}
+
+.lp-csg-minus {
+    color: var(--hv-accent);
+}
+
+.lp-csg-plus {
+    color: var(--hv-dim);
 }
 
 .lp-csg-joint {

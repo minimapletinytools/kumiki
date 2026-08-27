@@ -1151,6 +1151,7 @@ def _serialize_csg_node(
     role: Optional[str],
     attribution: _CutAttribution,
     cut_timber: 'CutTimber',
+    parity: 'CSGParity',
 ) -> Dict[str, Any]:
     """One CSG node and everything beneath it.
 
@@ -1160,7 +1161,17 @@ def _serialize_csg_node(
     gone wrong. `path` still carries labels only, since that is what
     find_csg_by_path navigates by.
     """
-    from kumiki.cutcsg import Difference, Intersection, SolidUnion
+    from kumiki.cutcsg import (
+        Difference, Intersection, SolidUnion, csg_children, csg_children_with_parity,
+    )
+
+    # role says which edge a child sits on; parity says what that edge means
+    # for the finished solid, and the two differ -- two subtract edges cancel.
+    # The rule itself lives in kumiki, stated once.
+    child_parity = {
+        id(child): child_par
+        for child, child_par in csg_children_with_parity(csg, parity)
+    }
 
     label = _label_name(csg)
     node_path = path + [label] if label else path
@@ -1173,6 +1184,7 @@ def _serialize_csg_node(
         "label": label,
         "path": list(node_path),
         "role": role,
+        "parity": parity.name,
         "jointName": attribution.joint_name,
         "jointId": attribution.joint_id,
         "cutIndex": attribution.cut_index,
@@ -1181,8 +1193,10 @@ def _serialize_csg_node(
     }
 
     def child(node_csg: 'CutCSG', child_role: str, child_attribution: _CutAttribution) -> None:
-        node["children"].append(
-            _serialize_csg_node(node_csg, node_path, child_role, child_attribution, cut_timber))
+        node["children"].append(_serialize_csg_node(
+            node_csg, node_path, child_role, child_attribution, cut_timber,
+            child_parity.get(id(node_csg), parity),
+        ))
 
     if isinstance(csg, Difference):
         child(csg.base, "base", attribution)
@@ -1214,8 +1228,11 @@ def serialize_cut_csg_tree(cut_timber: 'CutTimber') -> Dict[str, Any]:
     rather than one cutting's negative CSG, which is a piece of the input and
     not the thing on screen.
     """
+    from kumiki.cutcsg import CSGParity
+
     local_csg = cut_timber.render_timber_with_cuts_csg_local()
-    return {"tree": _serialize_csg_node(local_csg, [], None, NO_CUT_ATTRIBUTION, cut_timber)}
+    return {"tree": _serialize_csg_node(
+        local_csg, [], None, NO_CUT_ATTRIBUTION, cut_timber, CSGParity.ADDITIVE)}
 
 
 def _module_file_path(module: Any) -> Optional[Path]:
@@ -1913,58 +1930,89 @@ def _describe_pick(
     }
 
     if feature_label is None:
-        return {**described, "featureLabel": None, "featureType": None, "facesToward": None}
+        return {
+            **described,
+            "featureLabel": None,
+            "featureType": None,
+            "facesToward": None,
+            "outwardNormal": None,
+        }
 
     point = _to_v3(local_pt)
     hit = target.find_feature(point, FeatureTestTolerances(face=eps))
+    normal, faces_toward = _outward_normal_and_face(target, local_csg, local_pt, eps)
     return {
         **described,
+        # featureLabel is only a name when the primitive declared one. Without
+        # that it is _detect_face_label's geometric guess, which the display
+        # must not present as a name -- it is a direction, and one that has not
+        # been sign-corrected, unlike the normal below.
         "featureLabel": feature_label,
         "featureType": hit.feature_type().name if hit is not None else None,
-        "facesToward": _faces_toward(target, local_csg, local_pt, eps),
+        "facesToward": faces_toward,
+        "outwardNormal": normal,
     }
 
 
-def _faces_toward(
+def _outward_normal_and_face(
     target: 'CutCSG',
     local_csg: 'CutCSG',
     local_pt: List[float],
     eps: float,
-) -> Optional[str]:
-    """Which of the timber's own six faces the picked surface points along.
+) -> Tuple[Optional[List[float]], Optional[str]]:
+    """The outward normal at the pick, and which of the timber's own six faces
+    it points most nearly along.
 
     The tree is already in the timber's local frame, so the normal is matched
     against the six local directions directly -- going via
     get_closest_oriented_face_from_global_direction would convert to global and
     straight back.
 
-    The primitive supplies the direction and the composed solid supplies the
-    sign. A primitive's own normal points out of that primitive, which is not
-    always out of the finished timber: a mortise prism's points out of the hole
-    and into the material, so the wall you clicked faces the other way. Rather
-    than reason about that from the tree shape, ask the root -- Difference
-    already composes normals correctly, and it is the layer that owns the
-    question.
+    The primitive supplies the direction and its parity supplies the sign. A
+    primitive's own normal points out of that primitive, which is not always
+    out of the finished timber: a mortise prism's points out of the hole and
+    into the material, so the wall you clicked faces the other way. A
+    SUBTRACTIVE node bounds a void, so its surface faces the opposite way to
+    the solid.
+
+    Parity rather than the root's own normal at the point, which is what this
+    used to ask. That is a local geometric answer and it assumes the point is
+    on the composed boundary without rechecking: Difference returns the base's
+    normal without asking whether a subtract removed that point, and SolidUnion
+    averages whichever children contain it without asking whether the result is
+    on the union's surface. Both answer confidently for points that are not on
+    the boundary at all, and averaging at an edge gives a bisector rather than
+    a normal. Parity never consults the point, so none of that applies.
 
     Args:
         target: the leaf primitive that was hit, for the face direction.
-        local_csg: the root of the tree it sits in, for the sign.
+        local_csg: the root of the tree it sits in, for the parity.
         local_pt: the clicked point, in that tree's (timber-local) space.
         eps: surface tolerance for the normal lookup.
 
     Returns:
-        A face name ("right", "top", ...), or None if no normal is available.
+        (normal, face name) in timber-local space, or (None, None) if no normal
+        is available. The normal is the exact answer and the face name is the
+        nearest of six, so the display can show both rather than rounding
+        silently.
     """
-    from kumiki.rule import safe_dot_product
+    from kumiki.cutcsg import CSGParity, walk_csg_with_parity
 
     point = _to_v3(local_pt)
     normal = target.get_outward_normal(point, eps)
     if normal is None:
-        return None
-    composed = local_csg.get_outward_normal(point, eps)
-    if composed is not None and safe_dot_product(normal, composed) < 0:
+        return None, None
+    # First occurrence: parity belongs to a position, and navigation hands back
+    # the node rather than the path it took, so a subtree placed twice in one
+    # tree could not be told apart here anyway.
+    parity = next(
+        (p for node, p in walk_csg_with_parity(local_csg) if node is target),
+        None,
+    )
+    if parity is CSGParity.SUBTRACTIVE:
         normal = -normal
-    return _nearest_timber_local_face_name(normal)
+    as_floats = [float(normal[0]), float(normal[1]), float(normal[2])]
+    return as_floats, _nearest_timber_local_face_name(normal)
 
 
 def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[float]] = None, eps: float = 1e-4) -> Any:

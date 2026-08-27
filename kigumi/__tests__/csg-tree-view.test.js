@@ -492,3 +492,64 @@ describe('breadcrumbSegments', () => {
         expect(CsgTreeView.breadcrumbSegments('post', [], null, NOUNS)).toEqual(['post']);
     });
 });
+
+describe('describeOutwardNormal', () => {
+    const PHRASE = 'approximately facing {face}';
+
+    test('shows the exact normal and the face it approximates', () => {
+        expect(CsgTreeView.describeOutwardNormal([0, 0, 1], 'top', PHRASE))
+            .toBe('0.000, 0.000, 1.000 (approximately facing top)');
+    });
+
+    test('an off-axis normal shows how far off it is', () => {
+        // The whole reason both are shown: rounding to the nearest of six
+        // would hide that this is 45 degrees off either face.
+        expect(CsgTreeView.describeOutwardNormal([0, 0.7071, 0.7071], 'front', PHRASE))
+            .toBe('0.000, 0.707, 0.707 (approximately facing front)');
+    });
+
+    test('negative zero reads as zero', () => {
+        expect(CsgTreeView.describeOutwardNormal([-0, -1e-9, 1], 'top', PHRASE))
+            .toBe('0.000, 0.000, 1.000 (approximately facing top)');
+    });
+
+    test('a sign is kept when it is real', () => {
+        expect(CsgTreeView.describeOutwardNormal([-1, 0, 0], 'left', PHRASE))
+            .toBe('-1.000, 0.000, 0.000 (approximately facing left)');
+    });
+
+    test('without a face name it is just the vector', () => {
+        expect(CsgTreeView.describeOutwardNormal([0, 0, 1], null, PHRASE))
+            .toBe('0.000, 0.000, 1.000');
+    });
+
+    test('no normal describes as nothing', () => {
+        expect(CsgTreeView.describeOutwardNormal(null, 'top', PHRASE)).toBeNull();
+        expect(CsgTreeView.describeOutwardNormal([0, 1], 'top', PHRASE)).toBeNull();
+    });
+});
+
+describe('an undeclared feature is not given a name', () => {
+    const NOUNS = { FACE: 'face', EDGE: 'edge', POINT: 'point' };
+
+    test('a guessed direction is not printed as the feature name', () => {
+        // Regression: this read "feature (top)", where "top" was
+        // _detect_face_label's guess at the direction -- not a name, and not
+        // sign-corrected either, so it could name the opposite face.
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: 'top', featureType: null, nodeDisplayName: 'prism' }, NOUNS,
+        )).toBe('feature');
+    });
+
+    test('a declared feature still shows its name', () => {
+        expect(CsgTreeView.describePickTail(
+            { featureLabel: 'tenon_back', featureType: 'FACE', nodeDisplayName: 'prism' }, NOUNS,
+        )).toBe('face (tenon_back)');
+    });
+
+    test('the breadcrumb keeps the node trail either way', () => {
+        expect(CsgTreeView.breadcrumbSegments('post', ['lap_cut'], {
+            featureLabel: 'top', featureType: null, nodeDisplayName: 'prism', nodeLabel: 'lap_cut',
+        }, NOUNS)).toEqual(['post', 'lap_cut', 'feature']);
+    });
+});

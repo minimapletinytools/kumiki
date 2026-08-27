@@ -152,6 +152,8 @@
   "viewer.selection.kind.point": "点",
   "viewer.selection.featureType": "フィーチャー",
   "viewer.selection.joint": "接合",
+  "viewer.selection.normal": "外向き法線",
+  "viewer.selection.approximatelyFacing": "おおよそ {face} 向き",
   "viewer.selection.facesToward": "向き",
 
   "sidebar.kumikiDevMode": "Kumiki開発モード",

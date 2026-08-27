@@ -665,6 +665,12 @@ class TestPickDescription:
 
         This is the property the whole thing rests on, so it is checked over
         every surface point rather than a few chosen ones.
+
+        Two independent routes to the same answer, which is the point: the code
+        under test signs the leaf's normal by its structural parity and never
+        looks at the composed solid, while this asks the composed solid
+        directly. They agree here because the parity rule is right, not because
+        one is derived from the other.
         """
         from kumiki.rule import safe_dot_product
 
@@ -681,7 +687,83 @@ class TestPickDescription:
                     continue
                 expected = runner._nearest_timber_local_face_name(composed)
                 _p, target, _l = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
-                assert runner._faces_toward(target, csg, centroid, PICK_EPS) == expected
+                normal, faces_toward = runner._outward_normal_and_face(
+                    target, csg, centroid, PICK_EPS)
+                assert faces_toward == expected
+                # The exact normal is reported alongside the nearest-of-six
+                # name, so the display can show both rather than rounding
+                # silently.
+                assert normal is not None and len(normal) == 3
+                assert runner._nearest_timber_local_face_name(normal) == expected
+
+
+class TestSerializedParity:
+    """Every node in the payload says whether it adds material or removes it.
+
+    role says which edge a node sits on; parity says what that means for the
+    finished solid, and they differ -- two subtract edges cancel.
+    """
+
+    def _tree(self, frame, name):
+        return runner.serialize_cut_csg_tree(_cut_timber_by_name(frame, name))["tree"]
+
+    def _walk(self, node):
+        yield node
+        for child in node["children"]:
+            yield from self._walk(child)
+
+    def test_the_timber_body_adds_and_its_cuts_remove(self, mortise_and_tenon_frame):
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        assert tree["parity"] == "ADDITIVE"
+        body, cut = tree["children"][0], tree["children"][1]
+        assert body["parity"] == "ADDITIVE"
+        assert cut["parity"] == "SUBTRACTIVE"
+
+    def test_the_tenon_is_additive_though_it_sits_inside_a_cut(self, mortise_and_tenon_frame):
+        """The case role alone gets wrong: the tenon is two subtract edges
+        down, so the material it describes is left standing."""
+        tree = self._tree(mortise_and_tenon_frame, "butt_timber")
+        tenon = next(n for n in self._walk(tree) if n["label"] == "tenon")
+        assert tenon["role"] == "cut" or tenon["role"] == "subtract"
+        assert tenon["parity"] == "ADDITIVE"
+
+    def test_the_payload_agrees_with_kumikis_own_rule(self, mortise_and_tenon_frame):
+        """The guard against the two drifting apart: the serializer threads
+        parity as it recurses, so it must still match the walk."""
+        from kumiki.cutcsg import walk_csg_with_parity
+
+        for name in ("butt_timber", "receiving_timber"):
+            cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, name)
+            expected = [p.name for _n, p in
+                        walk_csg_with_parity(cut_timber.render_timber_with_cuts_csg_local())]
+            serialized = [n["parity"] for n in self._walk(self._tree(mortise_and_tenon_frame, name))]
+            assert serialized == expected
+
+    def test_parity_matches_which_way_the_surface_actually_faces(self, mortise_and_tenon_frame):
+        """Ground truth: a SUBTRACTIVE leaf's own normal opposes the finished
+        solid's, an ADDITIVE one agrees. Checked at every surface point."""
+        from kumiki.cutcsg import walk_csg_with_parity
+        from kumiki.rule import safe_dot_product
+
+        for name in ("butt_timber", "receiving_timber"):
+            cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, name)
+            csg = cut_timber.render_timber_with_cuts_csg_local()
+            parity_by_id = {id(n): p for n, p in walk_csg_with_parity(csg)}
+            checked = 0
+            for triangle in triangulate_cutcsg(csg).mesh.triangles:
+                centroid = [
+                    (triangle[0][i] + triangle[1][i] + triangle[2][i]) / 3.0 for i in range(3)
+                ]
+                _p, target, _l = runner._navigate_csg_to_leaf(csg, centroid, PICK_EPS)
+                point = runner._to_v3(centroid)
+                own = target.get_outward_normal(point, PICK_EPS)
+                composed = csg.get_outward_normal(point, PICK_EPS)
+                if own is None or composed is None:
+                    continue
+                opposed = safe_dot_product(own, composed) < 0
+                assert opposed == (parity_by_id[id(target)].name == "SUBTRACTIVE")
+                checked += 1
+            assert checked > 0
 
 
 class TestJointDisplayName:

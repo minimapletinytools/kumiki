@@ -19,7 +19,7 @@ point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 import re
-from typing import Callable, List, Optional, Tuple, Union, cast
+from typing import Callable, Iterator, List, Optional, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum
@@ -1132,6 +1132,59 @@ def csg_children(csg: CutCSG) -> List[CutCSG]:
     if isinstance(csg, Difference):
         return [csg.base, *csg.subtract]
     return []
+
+
+class CSGParity(Enum):
+    """Whether a node adds material to the finished solid or takes it away.
+
+    ADDITIVE means growing that node grows the result; SUBTRACTIVE means
+    growing it shrinks the result.
+    """
+
+    ADDITIVE = 0
+    SUBTRACTIVE = 1
+
+    def flipped(self) -> 'CSGParity':
+        return CSGParity.SUBTRACTIVE if self is CSGParity.ADDITIVE else CSGParity.ADDITIVE
+
+
+def csg_children_with_parity(
+    csg: CutCSG,
+    parity: CSGParity = CSGParity.ADDITIVE,
+) -> List[Tuple[CutCSG, CSGParity]]:
+    """The nodes directly beneath *csg*, each with its own parity.
+
+    The one statement of the rule: a Difference's subtract children invert,
+    and nothing else does. A union's children are each monotone-increasing in
+    the union, an intersection's operands in the intersection, and a
+    Difference's base in the difference -- so those all inherit.
+
+    Children come back in csg_children order.
+    """
+    if isinstance(csg, Difference):
+        flipped = parity.flipped()
+        return [(csg.base, parity), *((sub, flipped) for sub in csg.subtract)]
+    return [(child, parity) for child in csg_children(csg)]
+
+
+def walk_csg_with_parity(
+    root: CutCSG,
+    parity: CSGParity = CSGParity.ADDITIVE,
+) -> Iterator[Tuple[CutCSG, CSGParity]]:
+    """Every node beneath *root*, including *root*, with its parity.
+
+    Parity belongs to a node's POSITION, not to the node: a node has no parent
+    pointer and cannot answer on its own, and the same subtree placed twice in
+    one tree can have a different answer each time. So this yields one entry
+    per occurrence and always starts from a root -- there is no way to ask a
+    node about itself.
+
+    Two subtract edges cancel: in ``A - (B - C)`` the C is ADDITIVE, and
+    indeed C restores material that B removed.
+    """
+    yield root, parity
+    for child, child_parity in csg_children_with_parity(root, parity):
+        yield from walk_csg_with_parity(child, child_parity)
 
 
 @dataclass(frozen=True)

@@ -2691,6 +2691,7 @@ class KigumiViewerApp extends LitElement {
             nodeKind: message.nodeKind || null,
             nodeDisplayName: message.nodeDisplayName || null,
             nodeLabel: message.nodeLabel || null,
+            outwardNormal: Array.isArray(message.outwardNormal) ? message.outwardNormal : null,
         };
         const hlMesh = message.highlightMesh;
         const parentHlMesh = message.parentHighlightMesh || null;
@@ -4388,10 +4389,15 @@ class KigumiViewerApp extends LitElement {
         // Detail lines are the reward for expanding, so they stay behind it.
         const detail = this.lastPickDetail;
         if (this.infoPanelExpanded && detail && this.selectionManager.csgFocus) {
+            const normalText = CsgTreeView.describeOutwardNormal(
+                detail.outwardNormal,
+                detail.facesToward,
+                t('viewer.selection.approximatelyFacing'),
+            );
             for (const [key, value] of [
                 ['viewer.selection.featureType', detail.featureType],
                 ['viewer.selection.joint', detail.jointName],
-                ['viewer.selection.facesToward', detail.facesToward],
+                ['viewer.selection.normal', normalText],
             ]) {
                 if (!value) {
                     continue;

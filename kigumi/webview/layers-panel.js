@@ -410,7 +410,8 @@
             const row = document.createElement('div');
             const depth = baseDepth + node.depth;
             row.className = 'lp-row lp-row-csg lp-selectable'
-                + (node.role === 'cut' ? ' lp-csg-cut' : '');
+                + (node.role === 'cut' ? ' lp-csg-cut' : '')
+                + (node.role === 'base' ? ' lp-csg-base' : '');
             row.dataset.nodeId = node.id;
             row.style.paddingLeft = csgIndentPx(depth) + 'px';
 
@@ -425,13 +426,15 @@
             }
             row.appendChild(chev);
 
-            // A subtracted node reads as removal, so it is marked as such
-            // rather than being left to look like just another child.
-            if (node.role === 'cut') {
-                const minus = document.createElement('span');
-                minus.className = 'lp-csg-minus';
-                minus.textContent = '\u2212';
-                row.appendChild(minus);
+            // A difference reads as arithmetic: the base is the material you
+            // start with and the cuts come off it, so both sides are signed
+            // rather than leaving the positive one to look like any other child.
+            if (node.role === 'cut' || node.role === 'base') {
+                const sign = document.createElement('span');
+                const isCut = node.role === 'cut';
+                sign.className = isCut ? 'lp-csg-minus' : 'lp-csg-plus';
+                sign.textContent = isCut ? '\u2212' : '+';
+                row.appendChild(sign);
             }
 
             const kind = document.createElement('span');

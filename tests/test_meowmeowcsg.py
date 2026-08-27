@@ -14,6 +14,9 @@ from kumiki.cutcsg import (
     Cylinder,
     SolidUnion,
     Intersection,
+    CSGParity,
+    walk_csg_with_parity,
+    csg_children,
     Difference,
     ConvexPolygonExtrusion,
     ConvexPolygonSimpleLoft,
@@ -4047,3 +4050,97 @@ class TestCutCSGLabel:
     def test_repr_says_which_kind_it_is(self):
         assert repr(CutCSGLabel.NoLabel()) == "NoLabel"
         assert repr(CutCSGLabel("tenon")) == "CutCSGLabel('tenon')"
+
+
+class TestCSGParity:
+    """Whether a node adds material to the finished solid or takes it away.
+
+    A structural property of a node's POSITION, so every query starts from a
+    root: a node has no parent pointer and cannot answer on its own.
+    """
+
+    def _box(self, size):
+        return RectangularPrism(
+            size=create_v2(scalar(size), scalar(size)),
+            transform=Transform.identity(),
+            start_distance=scalar(-size),
+            end_distance=scalar(size),
+        )
+
+    def _parity_of(self, root, node):
+        return next(p for n, p in walk_csg_with_parity(root) if n is node)
+
+    def test_a_lone_node_is_additive(self):
+        box = self._box(4)
+        assert list(walk_csg_with_parity(box)) == [(box, CSGParity.ADDITIVE)]
+
+    def test_a_difference_inverts_only_what_it_subtracts(self):
+        base, cut = self._box(10), self._box(4)
+        root = Difference(base, [cut])
+        assert self._parity_of(root, base) is CSGParity.ADDITIVE
+        assert self._parity_of(root, cut) is CSGParity.SUBTRACTIVE
+
+    def test_a_union_passes_its_parity_to_every_child(self):
+        a, b = self._box(4), self._box(6)
+        root = Difference(self._box(10), [SolidUnion([a, b])])
+        assert self._parity_of(root, a) is CSGParity.SUBTRACTIVE
+        assert self._parity_of(root, b) is CSGParity.SUBTRACTIVE
+
+    def test_an_intersection_passes_its_parity_to_both_operands(self):
+        left, right = self._box(4), self._box(6)
+        root = Intersection(left, right)
+        assert self._parity_of(root, left) is CSGParity.ADDITIVE
+        assert self._parity_of(root, right) is CSGParity.ADDITIVE
+
+    def test_two_subtract_edges_cancel(self):
+        # A - (B - C): C restores material B removed, so it is ADDITIVE. Any
+        # rule along the lines of "inside a cut means subtractive" gets this
+        # wrong, and it is the shape a tenon actually has.
+        a, b, c = self._box(10), self._box(6), self._box(3)
+        root = Difference(a, [Difference(b, [c])])
+        assert self._parity_of(root, a) is CSGParity.ADDITIVE
+        assert self._parity_of(root, b) is CSGParity.SUBTRACTIVE
+        assert self._parity_of(root, c) is CSGParity.ADDITIVE
+
+    def test_the_structural_answer_matches_the_geometry(self):
+        """C being ADDITIVE means a point inside it survives into the result."""
+        a, b, c = self._box(10), self._box(6), self._box(3)
+        root = Difference(a, [Difference(b, [c])])
+        inside_c = create_v3(scalar(0), scalar(0), scalar(0))
+        in_b_outside_c = create_v3(scalar(2.2), scalar(0), scalar(0))
+        assert root.contains_point(inside_c, 1e-6)
+        assert not root.contains_point(in_b_outside_c, 1e-6)
+
+    def test_the_same_subtree_placed_twice_answers_per_occurrence(self):
+        # Why the walk yields occurrences rather than returning a per-node map.
+        shared = self._box(4)
+        root = Difference(shared, [shared])
+        parities = [p for n, p in walk_csg_with_parity(root) if n is shared]
+        assert parities == [CSGParity.ADDITIVE, CSGParity.SUBTRACTIVE]
+
+    def test_every_node_of_a_real_joint_is_reached_once(self):
+        from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+        from kumiki.joints.workshop.mortise_and_tenon_joints import (
+            cut_mortise_and_tenon_joint_on_face_aligned_timbers,
+        )
+        from kumiki.rule import inches
+        from kumiki.timber import Frame
+
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0)),
+            tenon_width_relative_to_joint=inches(3),
+            tenon_height_relative_to_joint=inches(1),
+            tenon_length=inches(3),
+            mortise_depth=inches(7, 2),
+        )
+        for cut_timber in Frame.from_joints([joint]).cut_timbers:
+            root = cut_timber.render_timber_with_cuts_csg_local()
+            walked = list(walk_csg_with_parity(root))
+            assert walked[0] == (root, CSGParity.ADDITIVE)
+            assert len(walked) == len(list(_all_nodes(root)))
+
+
+def _all_nodes(root):
+    yield root
+    for child in csg_children(root):
+        yield from _all_nodes(child)

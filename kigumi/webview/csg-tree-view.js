@@ -280,6 +280,13 @@
             return null;
         }
         if (pick.featureLabel) {
+            // Only a declared feature has a name worth printing. Without a
+            // featureType the label is a geometric guess at the direction the
+            // surface faces, which is not a name and is not even sign-corrected
+            // -- the info pane shows the real normal instead.
+            if (!pick.featureType) {
+                return 'feature';
+            }
             const noun = (nouns && nouns[pick.featureType]) || 'feature';
             return noun + ' (' + pick.featureLabel + ')';
         }
@@ -319,6 +326,25 @@
         return segments;
     }
 
+    /**
+     * The outward normal at a pick, written for a person: the exact vector,
+     * then the timber face it most nearly points along. Both, because the face
+     * name is the nearest of six and rounding to it silently would hide how
+     * far off the real direction is.
+     */
+    function describeOutwardNormal(normal, facesToward, approximately) {
+        if (!Array.isArray(normal) || normal.length !== 3) {
+            return null;
+        }
+        const vector = normal.map((n) => (Math.abs(n) < 5e-4 ? 0 : n).toFixed(3)).join(', ');
+        if (!facesToward) {
+            return vector;
+        }
+        const phrase = (approximately || 'approximately facing {face}')
+            .replace('{face}', facesToward);
+        return vector + ' (' + phrase + ')';
+    }
+
     /** Row text: the base type, plus the tag it was given. */
     function describeNode(node) {
         if (!node) {
@@ -346,6 +372,7 @@
         describeNode,
         describePickTail,
         breadcrumbSegments,
+        describeOutwardNormal,
     };
 
     if (typeof module !== 'undefined' && module.exports) {
