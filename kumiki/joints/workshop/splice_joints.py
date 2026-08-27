@@ -445,7 +445,8 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
             lap_timber_face=receiving_timber_lap_face,
             lap_length=lap_length,
             lap_shoulder_position_from_lap_timber_end=receiving_timber_shoulder_from_end,
-            lap_depth=receiving_timber_lap_depth
+            lap_depth=receiving_timber_lap_depth,
+            label=CutCSGLabel("gooseneck_lap"),
         )
     else:
         receiving_timber_end_cut = None
@@ -473,7 +474,8 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
         lap_timber_face=TimberFace(gooseneck_timber_face.value),
         lap_length=lap_length+gooseneck_length,
         lap_shoulder_position_from_lap_timber_end=gooseneck_timber_lap_shoulder_from_end,
-        lap_depth=gooseneck_depth
+        lap_depth=gooseneck_depth,
+        label=CutCSGLabel("gooseneck_lap"),
     )
 
     # ========================================================================
@@ -498,7 +500,8 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
         face=gooseneck_timber_face.to.face(),
         profile=gooseneck_shape,
         depth=gooseneck_depth,
-        profile_y_offset_from_end=-gooseneck_profile_y_position
+        profile_y_offset_from_end=-gooseneck_profile_y_position,
+        label=CutCSGLabel("gooseneck"),
     )
 
     # Use chop_timber_end_with_prism to create the end-side volume for the profile cut.
@@ -511,11 +514,15 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
     gooseneck_profile_prism = chop_timber_end_with_prism(
         timber=gooseneck_timber,
         end=gooseneck_timber_end,
-        distance_from_end_to_cut=-(gooseneck_profile_y_position)
+        distance_from_end_to_cut=-(gooseneck_profile_y_position),
+        label=CutCSGLabel("gooseneck_shoulder"),
     )
 
     # difference the gooseneck profile prism with the gooseneck profile csg
-    gooseneck_profile_difference_csg = Difference(gooseneck_profile_prism, [gooseneck_profile_csg])
+    gooseneck_profile_difference_csg = Difference(
+        gooseneck_profile_prism, [gooseneck_profile_csg],
+        label=CutCSGLabel("gooseneck_waste"),
+    )
 
     # Union the gooseneck profile cut with the lap cut
     # Both cuts need to be applied to the gooseneck timber
@@ -571,6 +578,7 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=receiving_end_cut_local_z if receiving_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=receiving_timber_negative_csg,
+        label=CutCSGLabel("gooseneck_socket_cut"),
         assembly_freedom=receiving_timber_freedom,
     )
     gooseneck_timber_cut_obj = Cutting(
@@ -578,6 +586,7 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=gooseneck_end_cut_local_z if gooseneck_timber_end == TimberEnd.BOTTOM else None,
         negative_csg=gooseneck_timber_combined_csg,
+        label=CutCSGLabel("gooseneck_cut"),
         assembly_freedom=gooseneck_timber_freedom,
     )
 
@@ -806,7 +815,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         )
     ]
 
-    timber1_profile_csg_global = SolidUnion(convex_pieces)
+    timber1_profile_csg_global = SolidUnion(convex_pieces, label=CutCSGLabel("scarf_profile"))
 
     
     def reflect(p: Tuple[Numeric, Numeric]) -> Tuple[Numeric, Numeric]:
@@ -840,7 +849,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         )
     ]
 
-    timber2_profile_csg_global = SolidUnion(convex_pieces_2)
+    timber2_profile_csg_global = SolidUnion(convex_pieces_2, label=CutCSGLabel("scarf_profile"))
 
 
 
@@ -854,6 +863,7 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         start_distance = 0,
         end_distance = v_face_size / scalar(2) - dado_depth,
         size = create_v2(stub_tenon_width, dado_depth),
+        label=CutCSGLabel("stub_tenon"),
     )
 
     def reflect_about_joint_center(point : V3):
@@ -866,13 +876,26 @@ def cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers(
         start_distance = 0,
         end_distance = v_face_size / scalar(2) - dado_depth,
         size = create_v2(stub_tenon_width, dado_depth),
+        label=CutCSGLabel("stub_tenon"),
     )
 
 
-    timber1_with_stubs_global = SolidUnion([Difference(timber1_profile_csg_global, [timber1_stub_tenon_prism]), timber2_stub_tenon_prism])
+    timber1_with_stubs_global = SolidUnion([
+        Difference(
+            timber1_profile_csg_global, [timber1_stub_tenon_prism],
+            label=CutCSGLabel("scarf_waste"),
+        ),
+        timber2_stub_tenon_prism,
+    ])
     timber1_negative_csg_local = adopt_csg(None, timber1.transform, timber1_with_stubs_global)
 
-    timber2_with_stubs_global = SolidUnion([Difference(timber2_profile_csg_global, [timber2_stub_tenon_prism]), timber1_stub_tenon_prism])
+    timber2_with_stubs_global = SolidUnion([
+        Difference(
+            timber2_profile_csg_global, [timber2_stub_tenon_prism],
+            label=CutCSGLabel("scarf_waste"),
+        ),
+        timber1_stub_tenon_prism,
+    ])
     timber2_negative_csg_local = adopt_csg(None, timber2.transform, timber2_with_stubs_global)
 
     left_boundary_global = scarf_joint_center_global + u_dir * left_boundary_u
