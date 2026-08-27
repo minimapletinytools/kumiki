@@ -362,15 +362,16 @@ DONE-next, look at all calls to _create_extended_rectangular_prism, and set the 
 
 -selection feedback
   DONE-set labels in all the get csg function in timber.py
-  -test edge selection and in particular face face intersecting edges (doesn't seem to work)
-  -BUG clicking on entire csg chunks (e.g. the entire tenon csg assembly) will sasy "face (tenon_top)" in the info view e.g., it should not say "face", it should say union or something
-  -you seem to be able to click on unnamed faces and it will say "face (top)" 
+  DONE-BUG clicking on entire csg chunks (e.g. the entire tenon csg assembly) will sasy "face (tenon_top)" in the info view e.g., it should not say "face", it should say union or something
+  DONE-you seem to be able to click on unnamed faces and it will say "face (top)" 
     -this is from _detect_face_label in runner.py, it will fall through to generic labels
-    -BUG where top must be local to the prism? because it's not aligned with the timber space (se ethe stretcher in double sawhores example)
+    DONE-BUG where top must be local to the prism? because it's not aligned with the timber space (se ethe stretcher in double sawhores example)
       -this is because when it tries `_nearest_timber_local_face_name` it doesn't know the parity of the face
-    -BUG? also selecting these features will not highlight the child CSG tree feature it belongs to
+    DONE-BUG? also selecting these features will not highlight the child CSG tree feature it belongs to
 
-
+  -test edge selection and in particular face face intersecting edges (doesn't seem to work)
+  -there are some redundant solid unions (only 1 element contained) that could be ad-hdoc skipped when click drilling into a timber
+    -also consider disabling the 1 step at a time drilling into a feature, it's not really all that necessary.
   -name all the rest of your joints
   -should show perfect.face not rough.face if rough == perfect?
   -seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked, (is this fixed now?)
