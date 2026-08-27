@@ -625,17 +625,23 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         # Generously large so the clip is a no-op at s_receiving_back and only
         # narrows the shape further toward the front.
         clip_half_width = lateral_dimension
+        walls = []
         for sign in (scalar(1), scalar(-1)):
             outward_normal = safe_normalize_vector(lateral_dir * sign + slide_dir * taper_k)
             point_on_boundary = marking_origin + lateral_dir * (sign * clip_half_width) + slide_dir * s_receiving_back
             inward_normal = -outward_normal
             offset = safe_dot_product(inward_normal, point_on_boundary)
-            csg = Intersection(
-                csg,
-                HalfSpace(normal=inward_normal, offset=offset,
-                          label=CutCSGLabel("dovetail_taper_wall")),
-            )
-        return csg
+            walls.append(HalfSpace(normal=inward_normal, offset=offset,
+                                   label=CutCSGLabel("dovetail_taper_wall")))
+        # Intersection is binary, so clipping both walls nests. Only the
+        # outermost carries the name: it is the tapered shape. Naming both
+        # would repeat the segment in the path, and naming neither would leave
+        # two unlabeled nodes sharing one path.
+        return Intersection(
+            Intersection(csg, walls[0]),
+            walls[1],
+            label=CutCSGLabel("dovetail_tapered"),
+        )
 
     def _trapezoid_extrusion(s_start: Numeric, s_end: Numeric, label: str):
         points = _dovetail_trapezoid_points(dovetail_small_width, dovetail_depth, dovetail_angle, lateral_offset)
