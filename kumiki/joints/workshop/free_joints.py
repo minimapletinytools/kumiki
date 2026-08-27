@@ -146,7 +146,10 @@ def cut_free_house_joint(
                     relevant_cuts.append(pruned)
 
             # negative_csg = housed_prism minus the relevant cuts = the actual body of the housed_timber
-            return Difference(housed_prism_in_housing, relevant_cuts) if relevant_cuts else housed_prism_in_housing
+            return Difference(
+                housed_prism_in_housing, relevant_cuts,
+                label=CutCSGLabel("housed_timber_body"),
+            ) if relevant_cuts else housed_prism_in_housing
 
         # if housed_timber is a TimberLike, use its actual CSG as the negative_csg for the housing timber's cut
         return adopt_csg(
@@ -156,8 +159,15 @@ def cut_free_house_joint(
         )
 
     housed_negative_csgs = [_compute_housed_body_in_housing_local(housed_timber) for housed_timber in housed_timbers]
-    housing_negative_csg = housed_negative_csgs[0] if len(housed_negative_csgs) == 1 else SolidUnion(children=housed_negative_csgs)
-    cut_housing = Cutting(timber=housing_timber, negative_csg=housing_negative_csg)
+    housing_negative_csg = (
+        housed_negative_csgs[0] if len(housed_negative_csgs) == 1
+        else SolidUnion(children=housed_negative_csgs, label=CutCSGLabel("housed_timbers"))
+    )
+    cut_housing = Cutting(
+        timber=housing_timber,
+        negative_csg=housing_negative_csg,
+        label=CutCSGLabel("housing_cut"),
+    )
 
     cuttings: dict[str, Cutting] = {"housing_timber": cut_housing}
     for i, housed_timber in enumerate(housed_timbers, start=1):

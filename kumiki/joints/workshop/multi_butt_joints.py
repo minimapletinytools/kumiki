@@ -148,6 +148,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
         transform=slot_marking_transform_global,
         start_distance=-(slot_length / scalar(2)),
         end_distance=slot_length / scalar(2),
+        label=CutCSGLabel("spline_slot"),
     )
 
     extended_slot_negative_csg_global = RectangularPrism(
@@ -158,6 +159,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
         ),
         start_distance=-(slot_length / scalar(2)),
         end_distance=slot_length / scalar(2),
+        label=CutCSGLabel("spline_slot"),
     )
 
     def _make_shoulder_end_cut(timber: TimberLike, timber_end: TimberEnd) -> HalfSpace:
@@ -239,18 +241,21 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
     receiving_cut = Cutting(
         timber=receiving_timber,
         negative_csg=receiving_negative_csg_local,
+        label=CutCSGLabel("spline_socket_cut"),
     )
     butt_1_cut = Cutting(
         timber=butt_timber_1,
         maybe_top_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=butt_1_shoulder_distance_from_bottom if arrangement.butt_timber_1_end == TimberEnd.BOTTOM else None,
         negative_csg=butt_1_slot_negative_csg_local,
+        label=CutCSGLabel("spline_slot_cut"),
     )
     butt_2_cut = Cutting(
         timber=butt_timber_2,
         maybe_top_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=butt_2_shoulder_distance_from_bottom if arrangement.butt_timber_2_end == TimberEnd.BOTTOM else None,
         negative_csg=butt_2_slot_negative_csg_local,
+        label=CutCSGLabel("spline_slot_cut"),
     )
 
     spline_transform = Transform(
@@ -382,6 +387,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
                     ),
                     start_distance=scalar(0),
                     end_distance=actual_depth,
+                    label=CutCSGLabel("peg_hole"),
                 )
                 butt_negative_parts.append(
                     adopt_csg(None, butt_timber.transform, peg_hole_in_butt_global)
@@ -397,6 +403,7 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
                     ),
                     start_distance=scalar(0),
                     end_distance=actual_depth,
+                    label=CutCSGLabel("peg_hole"),
                 )
                 peg_holes_in_spline_local.append(
                     adopt_csg(None, spline_transform, peg_hole_in_spline_global)
@@ -453,12 +460,14 @@ def cut_splined_opposing_double_butt_joint_on_face_aligned_timbers(arrangement: 
         transform=Transform.identity(),
         start_distance=-(spline_length / scalar(2)),
         end_distance=spline_length / scalar(2),
+        label=CutCSGLabel("spline"),
     )
 
     if peg_holes_in_spline_local:
         spline_positive_csg = Difference(
             base=spline_positive_csg,
             subtract=peg_holes_in_spline_local,
+            label=CutCSGLabel("spline_drilled"),
         )
 
     # Assembly: each butt timber pulls back along its own axis, sliding off

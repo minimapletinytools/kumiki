@@ -630,7 +630,11 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
             point_on_boundary = marking_origin + lateral_dir * (sign * clip_half_width) + slide_dir * s_receiving_back
             inward_normal = -outward_normal
             offset = safe_dot_product(inward_normal, point_on_boundary)
-            csg = Intersection(csg, HalfSpace(normal=inward_normal, offset=offset))
+            csg = Intersection(
+                csg,
+                HalfSpace(normal=inward_normal, offset=offset,
+                          label=CutCSGLabel("dovetail_taper_wall")),
+            )
         return csg
 
     def _trapezoid_extrusion(s_start: Numeric, s_end: Numeric, label: str):
@@ -669,7 +673,10 @@ def cut_practice_sliding_dovetail_joint_on_orthogonal_boards(arrangement: ButtJo
         # sticking out, wings removed.
         box_prism = _full_depth_box(s_tongue_back, s_tongue_front, "dovetail_wings")
         trapezoid_for_tongue = _trapezoid_extrusion(s_tongue_back, s_tongue_front, "dovetail_tongue_profile")
-        tongue_cuts.append(Difference(base=box_prism, subtract=[trapezoid_for_tongue]))
+        tongue_cuts.append(Difference(
+            base=box_prism, subtract=[trapezoid_for_tongue],
+            label=CutCSGLabel("dovetail_wings_waste"),
+        ))
 
     # Near-front clearance cut: for the shortened segment (butt_timber's own
     # front face back to where the tongue starts), no tongue exists at all, so

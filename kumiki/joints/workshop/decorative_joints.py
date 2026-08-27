@@ -93,6 +93,7 @@ def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric
         position=perfect_corner_start - dir_a * radius - dir_b * radius,
         start_distance=scalar(0),
         end_distance=edge_length,
+        label=CutCSGLabel("roundover_fillet"),
     )
 
     excess_a = _rough_excess_in_face_normal_axis(timber, face_a)
@@ -115,6 +116,7 @@ def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric
         ),
         start_distance=scalar(0),
         end_distance=edge_length,
+        label=CutCSGLabel("roundover_corner_waste"),
     )
 
     return Difference(base=prism, subtract=[cylinder], label=CutCSGLabel(f"roundover_{edge.name.lower()}"))
@@ -212,6 +214,7 @@ def cut_practice_rounded_end_decoration(
         position=cylinder_center,
         start_distance=-timber.get_half_rough_size_in_face_normal_axis(rounded_face.get_opposite_face()),
         end_distance=timber.get_half_rough_size_in_face_normal_axis(rounded_face),
+        label=CutCSGLabel("rounded_end_arc"),
     )
 
     # A generously-oversized prism covering the corner region -- from exactly
@@ -234,6 +237,7 @@ def cut_practice_rounded_end_decoration(
         transform=Transform(position=end_reference, orientation=prism_orientation),
         start_distance=-distance_from_end,
         end_distance=radius,
+        label=CutCSGLabel("rounded_end_waste"),
     )
 
     negative_csg = adopt_csg(
@@ -326,6 +330,7 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
         position=center,
         start_distance=-timber.get_half_rough_size_in_face_normal_axis(perp_face_opposite),
         end_distance=timber.get_half_rough_size_in_face_normal_axis(perp_face),
+        label=CutCSGLabel("scallop_arc"),
     )
 
     negative_csg = adopt_csg(None, timber.transform, cylinder)
@@ -453,6 +458,7 @@ def cut_practice_path_extrusion_corner_end_decoration(
         transform=Transform(position=origin, orientation=orientation),
         start_distance=-timber.get_half_rough_size_in_face_normal_axis(perp_face_opposite),
         end_distance=timber.get_half_rough_size_in_face_normal_axis(perp_face),
+        label=CutCSGLabel("path_extrusion_decoration"),
     )
 
     negative_csg = adopt_csg(None, timber.transform, extrusion)

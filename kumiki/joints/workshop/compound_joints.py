@@ -141,13 +141,19 @@ def cut_multi_cross_lap_joint_on_plane_aligned_timbers(timbers : List[TimberLike
       # axis_direction expressed in source's local coordinate frame
       local_axis = safe_transform_vector(R.T, axis_direction)
       # Prism of source cropped to start-side: Difference(prism, above-cut-half-space)
-      above_hs = _HalfSpace(normal=local_axis, offset=cut_coord - t_dot_axis)
-      source_prism_below = Difference(source.get_actual_csg_local(), [above_hs])
+      above_hs = _HalfSpace(
+          normal=local_axis, offset=cut_coord - t_dot_axis,
+          label=CutCSGLabel("lap_boundary"))
+      source_prism_below = Difference(
+          source.get_actual_csg_local(), [above_hs],
+          label=CutCSGLabel("crossing_board"))
       for target_idx in range(n + 2, len(timbers)):
           target = timbers[target_idx]
           neg_csg = adopt_csg(source.transform, target.transform, source_prism_below)
           joints.append(Joint(
-              cuttings={f"fill_fwd_{n}_{target_idx}": Cutting(timber=target, negative_csg=neg_csg)},
+              cuttings={f"fill_fwd_{n}_{target_idx}": Cutting(
+                  timber=target, negative_csg=neg_csg,
+                  label=CutCSGLabel("lap_fill_cut"))},
               ticket=JointTicket(joint_type="multi_cross_lap_fill"),
               jointAccessories={},
           ))
@@ -161,13 +167,19 @@ def cut_multi_cross_lap_joint_on_plane_aligned_timbers(timbers : List[TimberLike
       t_dot_axis = safe_dot_product(source.transform.position, axis_direction)
       local_axis = safe_transform_vector(R.T, axis_direction)
       # Prism of source cropped to finish-side: Difference(prism, below-cut-half-space)
-      below_hs = _HalfSpace(normal=-local_axis, offset=t_dot_axis - cut_coord)
-      source_prism_above = Difference(source.get_actual_csg_local(), [below_hs])
+      below_hs = _HalfSpace(
+          normal=-local_axis, offset=t_dot_axis - cut_coord,
+          label=CutCSGLabel("lap_boundary"))
+      source_prism_above = Difference(
+          source.get_actual_csg_local(), [below_hs],
+          label=CutCSGLabel("crossing_board"))
       for target_idx in range(0, n):
           target = timbers[target_idx]
           neg_csg = adopt_csg(source.transform, target.transform, source_prism_above)
           joints.append(Joint(
-              cuttings={f"fill_bwd_{n}_{target_idx}": Cutting(timber=target, negative_csg=neg_csg)},
+              cuttings={f"fill_bwd_{n}_{target_idx}": Cutting(
+                  timber=target, negative_csg=neg_csg,
+                  label=CutCSGLabel("lap_fill_cut"))},
               ticket=JointTicket(joint_type="multi_cross_lap_fill"),
               jointAccessories={},
           ))
