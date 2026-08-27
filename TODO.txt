@@ -356,11 +356,7 @@ DONE-next, look at all calls to _create_extended_rectangular_prism, and set the 
   set it to "board", also do the same to get_actual_csg_local and get_extended_actual_csg_local  so it should say
   "board (rough, extended)" in the case of extende_actual_csg...  you will need to change those to clas methods so
   we know what the derived class is to set the label correctly.
-
-
--add cutcsglables to everything
-
--selection feedback
+DONE-selection feedback
   DONE-set labels in all the get csg function in timber.py
   DONE-BUG clicking on entire csg chunks (e.g. the entire tenon csg assembly) will sasy "face (tenon_top)" in the info view e.g., it should not say "face", it should say union or something
   DONE-you seem to be able to click on unnamed faces and it will say "face (top)" 
@@ -368,40 +364,40 @@ DONE-next, look at all calls to _create_extended_rectangular_prism, and set the 
     DONE-BUG where top must be local to the prism? because it's not aligned with the timber space (se ethe stretcher in double sawhores example)
       -this is because when it tries `_nearest_timber_local_face_name` it doesn't know the parity of the face
     DONE-BUG? also selecting these features will not highlight the child CSG tree feature it belongs to
+  DONE/IGNORE-seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked, (is this fixed now?)
+  DONE/IGNORE-maybe just allow clicking on unnamed features? it's a little werid cuz you can select them in the tree view and they don't select inthe viewer...
+  DONE-difference display in the tree list view should show + for the positive part
+  DONE-when clickingon unnamed features, right now it says "feature (top)" where "top" is the direction it's facing. Remove the (<dircetion>) part
+    -instead in the selection wie in kigumi, print its outward facing normal and then say (approximately facing left/right/top/bot/front/back)
+  DONE-the first level shows "rectangular prism (presumably the timber itself) rather than difference
+    -probably just show difference for now...
+IGNORE??-need some rule or test to ensure no confilcting feature names within a joint???
+  -or qualify by CSG tree (probbaly a bad ide,a tree topology may vary too)
+  -better just ensure no confilcts and require joint sto prefix all their cuts
+  -conflicting names across joints allowed, they get qualified by the joint itself
+    -but yo ustil need a way to distinguish 2 different joints on a imber
+DONE-improve fetaure selection display, it should be multi lined  
+  -feature type
+  -joint the feature came from
+  -maybe show the feature highlighted within the CSG tree (expandable)
+  -which local face on the timber it most points towards
 
+
+-more selection related things
+  -add cutcsglables to everything
   -test edge selection and in particular face face intersecting edges (doesn't seem to work)
   -there are some redundant solid unions (only 1 element contained) that could be ad-hdoc skipped when click drilling into a timber
     -also consider disabling the 1 step at a time drilling into a feature, it's not really all that necessary.
   -name all the rest of your joints
   -should show perfect.face not rough.face if rough == perfect?
-  -seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked, (is this fixed now?)
-  -maybe just allow clicking on unnamed features? it's a little werid cuz you can select them in the tree view and they don't select inthe viewer...
   -selecting on face features visualy selects all faces that coincide with that one when extended to infinity, see if you can localize the visuall yselection...
-  -the first level shows "rectangular prism (presumably the timber itself) rather than difference
-    -probably just show difference for now...
   
-
-  -feature listing in tree weirdness:
-    -Derived edges still don't appear in the trees. I leaned toward omitting them, since they're computed per query from face pairs rather than declared on a node, so listing them per node would misrepresent them — but you never confirmed that.
-    -in general this is a weird thing where we know the CSGtree statically, but only its features are knowwn when you click nad raycast, I think that's fine. the name feature can still show up undernearth the CSG tree it's a part of but it disappears when you unselect it.
-    -so maybe remove regular features from CSG tree. I don't think they show anyways? Also ok just to show them. you can add get_known_features which may not return all fetaures or something like that. 
-    -note currently it doesnt' show fetaures in the tree, it does add a solid (5) indicating there are 5 named features
-    -you can maybe consider an edge a sub feature of a named face feature,
-
-
-
--need some rule or test to ensure no confilcting feature names within a joint
-  -or qualify by CSG tree (probbaly a bad ide,a tree topology may vary too)
-  -better just ensure no confilcts and require joint sto prefix all their cuts
-  -conflicting names across joints allowed, they get qualified by the joint itself
-    -but yo ustil need a way to distinguish 2 different joints on a imber
-
-
--improve fetaure selection display, it should be multi lined  
-  -feature type
-  -joint the feature came from
-  -maybe show the feature highlighted within the CSG tree (expandable)
-  -which local face on the timber it most points towards
+-feature listing in tree weirdness to sort out:
+  -Derived edges still don't appear in the trees. I leaned toward omitting them, since they're computed per query from face pairs rather than declared on a node, so listing them per node would misrepresent them — but you never confirmed that.
+  -in general this is a weird thing where we know the CSGtree statically, but only its features are knowwn when you click nad raycast, I think that's fine. the name feature can still show up undernearth the CSG tree it's a part of but it disappears when you unselect it.
+  -so maybe remove regular features from CSG tree. I don't think they show anyways? Also ok just to show them. you can add get_known_features which may not return all fetaures or something like that. 
+  -note currently it doesnt' show fetaures in the tree, it does add a solid (5) indicating there are 5 named features
+  -you can maybe consider an edge a sub feature of a named face feature,
 
 
 -drawing time prep
