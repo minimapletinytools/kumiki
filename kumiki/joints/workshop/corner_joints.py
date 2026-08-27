@@ -433,12 +433,14 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         transform=marking_space.transform,
         start_distance=-tongue_back_extension,
         end_distance=tongue_timber.length,
+        label=CutCSGLabel("tongue"),
     )
 
     # Shoulder half-space: normal = -shoulder_plane.normal (points from fork toward tongue end)
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
+        label=CutCSGLabel("shoulder"),
     )
 
     tongue_prism_local = adopt_csg(None, tongue_timber.transform, tongue_prism_global)
@@ -447,6 +449,7 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
     tongue_negative_csg = Difference(
         base=shoulder_half_space_local,
         subtract=[tongue_prism_local],
+        label=CutCSGLabel("tongue_waste"),
     )
 
     # -------------------------------------------------------------------------
@@ -474,6 +477,7 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         transform=marking_space.transform,
         start_distance=-fork_slot_back_extension,
         end_distance=fork_slot_depth,
+        label=CutCSGLabel("fork_slot"),
     )
     fork_negative_csg = adopt_csg(None, fork_timber.transform, fork_slot_prism_global)
 
@@ -501,7 +505,11 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         safe_dot_product(tongue_end_hs_normal_global, fork_far_face_point_global)
         - safe_dot_product(tongue_end_hs_normal_global, tongue_timber.get_bottom_position_global())
     )
-    tongue_end_cut = HalfSpace(normal=tongue_end_cut_local_normal, offset=tongue_end_cut_local_offset)
+    tongue_end_cut = HalfSpace(
+        normal=tongue_end_cut_local_normal,
+        offset=tongue_end_cut_local_offset,
+        label=CutCSGLabel("tongue_end_cut"),
+    )
 
     # Fork end cut — aligns with the tongue face opposite the entry face
     tongue_entry_long_face = tongue_timber.get_closest_oriented_long_face_from_global_direction(-fork_end_direction)
@@ -521,7 +529,11 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         safe_dot_product(fork_end_hs_normal_global, tongue_far_face_point_global)
         - safe_dot_product(fork_end_hs_normal_global, fork_timber.get_bottom_position_global())
     )
-    fork_end_cut = HalfSpace(normal=fork_end_cut_local_normal, offset=fork_end_cut_local_offset)
+    fork_end_cut = HalfSpace(
+        normal=fork_end_cut_local_normal,
+        offset=fork_end_cut_local_offset,
+        label=CutCSGLabel("fork_end_cut"),
+    )
 
     tongue_end_cut_distance_from_bottom = safe_dot_product(
         fork_far_face_point_global - tongue_timber.get_bottom_position_global(),
@@ -543,6 +555,7 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=tongue_end_cut_distance_from_bottom if tongue_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=tongue_negative_parts),
+        label=CutCSGLabel("tongue_cut"),
         # Assembly: the tongue withdraws out of the fork slot along its axis;
         # it engages the fork's full thickness in that direction.
         assembly_freedom=AssemblyFreedom.combine(
@@ -562,6 +575,7 @@ def cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.BOTTOM else None,
         negative_csg=CSGUnion(children=fork_negative_parts),
+        label=CutCSGLabel("fork_cut"),
         assembly_freedom=AssemblyFreedom.combine(
             AssemblyFreedom.translation(
                 tongue_end_direction,
@@ -1032,7 +1046,8 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
             size=finger_size,
             transform=finger_transform_global,
             start_distance=scalar(0),
-            end_distance=finger_length
+            end_distance=finger_length,
+            label=CutCSGLabel("lap_finger"),
         )
 
         all_fingers_global.append((finger_prism_global, is_timber_a))
@@ -1073,10 +1088,18 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
         # Convert to HalfSpace in local coordinates
         crop_offset_local = safe_dot_product(crop_point_local, crop_normal_local)
         # Use negative normal to represent the "too far into opposing timber" side
-        crop_halfspace_local = HalfSpace(normal=-crop_normal_local, offset=-crop_offset_local)
+        crop_halfspace_local = HalfSpace(
+            normal=-crop_normal_local,
+            offset=-crop_offset_local,
+            label=CutCSGLabel("finger_crop"),
+        )
 
         # Crop the finger by subtracting everything beyond the half space
-        finger_local = Difference(base=finger_local, subtract=[crop_halfspace_local])
+        finger_local = Difference(
+            base=finger_local,
+            subtract=[crop_halfspace_local],
+            label=CutCSGLabel("lap_finger_cropped"),
+        )
 
         return finger_local
 
@@ -1152,7 +1175,8 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
             size=key_size,
             transform=key_transform_global,
             start_distance=-key_depth,
-            end_distance=key_depth
+            end_distance=key_depth,
+            label=CutCSGLabel("key_slot"),
         )
 
         # Convert to timberA's local space using replace
@@ -1245,8 +1269,10 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     local_normalB = safe_transform_vector(timberB.orientation.matrix.T, normalB)
     local_offsetB = safe_dot_product(intersection_point, normalB) - safe_dot_product(normalB, timberB.get_bottom_position_global())
 
-    miter_half_plane_A = HalfSpace(normal=local_normalA, offset=local_offsetA)
-    miter_half_plane_B = HalfSpace(normal=local_normalB, offset=local_offsetB)
+    miter_half_plane_A = HalfSpace(
+        normal=local_normalA, offset=local_offsetA, label=CutCSGLabel("miter_plane"))
+    miter_half_plane_B = HalfSpace(
+        normal=local_normalB, offset=local_offsetB, label=CutCSGLabel("miter_plane"))
 
     # ========================================================================
     # Step 9: Combine cuts and return Joint
@@ -1262,7 +1288,8 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     # - Add keys (they create voids)
     if A_fingers_in_timberA:
         # A fingers subtract from half plane
-        miter_cut_A_with_fingers = Difference(miter_half_plane_A, A_fingers_in_timberA)
+        miter_cut_A_with_fingers = Difference(
+            miter_half_plane_A, A_fingers_in_timberA, label=CutCSGLabel("miter_waste"))
     else:
         miter_cut_A_with_fingers = miter_half_plane_A
 
@@ -1285,7 +1312,8 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
     # - Add keys (they create voids)
     if B_fingers_in_timberB:
         # B fingers subtract from half plane
-        miter_cut_B_with_fingers = Difference(miter_half_plane_B, B_fingers_in_timberB)
+        miter_cut_B_with_fingers = Difference(
+            miter_half_plane_B, B_fingers_in_timberB, label=CutCSGLabel("miter_waste"))
     else:
         miter_cut_B_with_fingers = miter_half_plane_B
 
@@ -1320,6 +1348,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
         maybe_top_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_A_z if timberA_end == TimberEnd.BOTTOM else None,
         negative_csg=negative_csg_A,
+        label=CutCSGLabel("mitered_lap_cut"),
         assembly_freedom=AssemblyFreedom.translation(
             -directionA, freed_after=timberB.get_size_in_direction_3d(directionA)
         ),
@@ -1331,6 +1360,7 @@ def cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers(arrangement: Corner
         maybe_top_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=rough_end_cut_B_z if timberB_end == TimberEnd.BOTTOM else None,
         negative_csg=negative_csg_B,
+        label=CutCSGLabel("mitered_lap_cut"),
         assembly_freedom=AssemblyFreedom.translation(
             -directionB, freed_after=timberA.get_size_in_direction_3d(directionB)
         ),
