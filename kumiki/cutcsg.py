@@ -261,25 +261,58 @@ def feature_groups_intersect(a: FeatureGroup, b: FeatureGroup) -> bool:
     return b in FEATURE_GROUP_PAIRS[a]
 
 
+
+class FeatureMarkingStatus(Enum):
+    """Whether a feature has to appear on a drawing."""
+
+    OPTIONAL = 0
+    ALWAYS_MARK = 1
+    NEVER_MARK = 2
+
+
+@dataclass(frozen=True)
+class FeatureMarkingSpec:
+    """How a feature should be marked, when that differs from the default.
+
+    mark_relative_to names the feature a dimension should be measured from,
+    which is how a drawing says "38mm from the shoulder" rather than giving an
+    absolute position. None leaves that to whatever generates the drawing.
+    """
+
+    mark: FeatureMarkingStatus = FeatureMarkingStatus.OPTIONAL
+    mark_relative_to: Optional[str] = None
+
+
+class FeaturePurpose(Enum):
+    """What purpose the feature serves."""
+
+    NOT_SPECIFIED = 0
+    ROUGH_RELIEF = 1
+
+
 @dataclass(frozen=True)
 class FeatureProperties:
     """Metadata every feature carries, independent of how it is identified.
 
     Args:
         group: which other features this one may form an edge with.
+        priority: lower wins when several features claim the same point.
         real: False for a feature that names no actual surface (a bore's centre
             axis, a reference plane). Real features can be cropped away by the
             CSG tree and so are tested against the triangulated result first;
             non-real ones are unaffected by boolean operations.
-        priority: lower wins when several features claim the same point.
+        marking_override: how to mark this feature on a drawing, when the
+            default for its kind is not what is wanted. None means the default.
+        purpose: what the feature is for, where that is worth recording --
+            relief geometry is not a feature of the joint the way a tenon
+            cheek is.
     """
-    group: FeatureGroup = FeatureGroup.A
-    # TODO move after priority
-    real: bool = True
-    priority: int = 0
-    marking_override: FeatureMarking = FeatureMarking.OPTIONAL
-    purpose: FeaturePurpose =  FeaturePurpose.NOT_SPECIFIED
 
+    group: FeatureGroup = FeatureGroup.A
+    priority: int = 0
+    real: bool = True
+    marking_override: Optional[FeatureMarkingSpec] = None
+    purpose: FeaturePurpose = FeaturePurpose.NOT_SPECIFIED
 
 
 def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
