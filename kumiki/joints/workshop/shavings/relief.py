@@ -15,6 +15,7 @@ from kumiki.construction import ButtJointTimberArrangement, ArrangementNames
 from kumiki.cutcsg import (
     ConvexPolygonSimpleLoft,
     CutCSG,
+    CutCSGLabel,
     Difference,
     HalfSpace,
     Intersection,
@@ -627,6 +628,7 @@ def chop_shoulder_notch_on_timber_face(
     notch_width: Numeric,
     notch_depth: Numeric,
     notch_wall_relief_cut_angle: Numeric = scalar(0),
+    label: CutCSGLabel = CutCSGLabel("shoulder_notch"),
 ) -> Union[RectangularPrism, SolidUnion]:
     """
     Create a rectangular shoulder notch on a timber face with optional angled walls.
@@ -733,6 +735,7 @@ def chop_shoulder_notch_on_timber_face(
         transform=Transform(position=position, orientation=orientation),
         start_distance=scalar(0),
         end_distance=notch_depth + notch_additional_depth,
+        label=label if notch_wall_relief_cut_angle == 0 else CutCSGLabel.NoLabel(),
     )
 
     if notch_wall_relief_cut_angle == 0:
@@ -755,15 +758,17 @@ def chop_shoulder_notch_on_timber_face(
         transform=notch_prism.transform.rotate_around_axis(axis_1, radians(angle_rad)),
         start_distance=notch_prism.start_distance,
         end_distance=extended_end_distance,
+        label=CutCSGLabel("notch_wall_relief"),
     )
     right_wall_prism = RectangularPrism(
         size=notch_prism.size,
         transform=notch_prism.transform.rotate_around_axis(axis_2, radians(-angle_rad)),
         start_distance=notch_prism.start_distance,
         end_distance=extended_end_distance,
+        label=CutCSGLabel("notch_wall_relief"),
     )
 
-    return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
+    return SolidUnion([notch_prism, left_wall_prism, right_wall_prism], label=label)
 
 
 def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(

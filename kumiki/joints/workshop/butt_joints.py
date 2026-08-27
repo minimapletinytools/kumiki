@@ -415,6 +415,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
+        label=CutCSGLabel("shoulder"),
     )
     shoulder_half_space_local = adopt_csg(None, fork_timber.transform, shoulder_half_space_global)
 
@@ -426,11 +427,13 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         transform=marking_space.transform,
         start_distance=-fork_slot_back_extension,
         end_distance=fork_slot_depth + fork_slot_end_overshoot,
+        label=CutCSGLabel("fork_slot"),
     )
     fork_slot_prism_local = adopt_csg(None, fork_timber.transform, fork_slot_prism_global)
     fork_slot_csg_local = Intersection(
         left=shoulder_half_space_local,
         right=fork_slot_prism_local,
+        label=CutCSGLabel("fork_slot_waste"),
     )
 
     fork_end_hs_normal_global = (
@@ -445,7 +448,11 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         safe_dot_product(fork_end_hs_normal_global, fork_far_face_point_global)
         - safe_dot_product(fork_end_hs_normal_global, fork_timber.get_bottom_position_global())
     )
-    fork_end_cut = HalfSpace(normal=fork_end_cut_local_normal, offset=fork_end_cut_local_offset)
+    fork_end_cut = HalfSpace(
+        normal=fork_end_cut_local_normal,
+        offset=fork_end_cut_local_offset,
+        label=CutCSGLabel("fork_end_cut"),
+    )
     # Calculate local z coordinates of the 4 cross-section corners on fork_end_cut plane
     sx = fork_timber.size[0] / scalar(2)
     sy = fork_timber.size[1] / scalar(2)
@@ -473,6 +480,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     shoulder_half_space_tongue_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, shoulder_point_global),
+        label=CutCSGLabel("shoulder"),
     )
     shoulder_half_space_tongue_local = adopt_csg(None, tongue_timber.transform, shoulder_half_space_tongue_global)
 
@@ -482,6 +490,7 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         transform=marking_space.transform,
         start_distance=-overshoot,
         end_distance=fork_slot_depth + overshoot,
+        label=CutCSGLabel("tongue_cheeks"),
     )
     tongue_cheek_box_local = adopt_csg(None, tongue_timber.transform, tongue_cheek_box_global)
 
@@ -498,11 +507,13 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
     tongue_preserved_local = Intersection(
         left=shoulder_half_space_tongue_local,
         right=tongue_central_prism_local,
+        label=CutCSGLabel("tongue"),
     )
 
     tongue_negative_csg_local = Difference(
         base=tongue_cheek_box_local,
         subtract=[tongue_preserved_local],
+        label=CutCSGLabel("tongue_waste"),
     )
 
     # -------------------------------------------------------------------------
@@ -514,12 +525,14 @@ def cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers(
         maybe_top_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=fork_end_cut_distance_from_bottom if fork_end == TimberEnd.BOTTOM else None,
         negative_csg=fork_negative_csg,
+        label=CutCSGLabel("fork_cut"),
         assembly_freedom=AssemblyFreedom.translation(-fork_end_direction, freed_after=fork_engagement),
     )
 
     tongue_cut_no_relief = Cutting(
         timber=tongue_timber,
         negative_csg=tongue_negative_csg_local,
+        label=CutCSGLabel("tongue_cut"),
         assembly_freedom=AssemblyFreedom.translation(fork_end_direction, freed_after=fork_engagement),
     )
 
@@ -726,14 +739,16 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         face=dovetail_timber_face.to.face(),
         profile=dovetail_profile,
         depth=dovetail_depth,
-        profile_y_offset_from_end=shoulder_distance_from_end
+        profile_y_offset_from_end=shoulder_distance_from_end,
+        label=CutCSGLabel("dovetail"),
     )
 
     # dovetail housing prism
     dovetail_housing_prism = chop_timber_end_with_prism(
         timber=dovetail_timber,
         end=dovetail_timber_end,
-        distance_from_end_to_cut=shoulder_distance_from_end
+        distance_from_end_to_cut=shoulder_distance_from_end,
+        label=CutCSGLabel("dovetail_housing"),
     )
 
     # ========================================================================
@@ -782,12 +797,10 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         # For TOP end: shoulder is at (timber.length - shoulder_distance_from_end)
         # Dovetail extends toward +Z for dovetail_length
         dovetail_end_local_z = dovetail_timber.length - shoulder_distance_from_end + dovetail_length
-        dovetail_timber_end_cut = HalfSpace(normal=create_v3(0, 0, 1), offset=dovetail_end_local_z)
     else:  # BOTTOM
         # For BOTTOM end: shoulder is at shoulder_distance_from_end
         # Dovetail extends toward -Z for dovetail_length
         dovetail_end_local_z = shoulder_distance_from_end - dovetail_length
-        dovetail_timber_end_cut = HalfSpace(normal=create_v3(0, 0, -1), offset=-dovetail_end_local_z)
 
     # Assembly: the dovetail taper blocks axial pull, so the ONLY escape is
     # lifting back out of the socket along the profile-face normal — a strictly
@@ -797,7 +810,11 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
         timber=dovetail_timber,
         maybe_top_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=dovetail_end_local_z if dovetail_timber_end == TimberEnd.BOTTOM else None,
-        negative_csg=Difference(dovetail_housing_prism, [dovetail_profile_csg]),
+        negative_csg=Difference(
+            dovetail_housing_prism, [dovetail_profile_csg],
+            label=CutCSGLabel("dovetail_waste"),
+        ),
+        label=CutCSGLabel("dovetail_cut"),
         assembly_freedom=AssemblyFreedom.translation(dovetail_lift_direction_global, freed_after=dovetail_depth),
     )
 
@@ -810,6 +827,7 @@ def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     receiving_timber_cut_obj = Cutting(
         timber=receiving_timber,
         negative_csg=receiving_timber_negative_csg,
+        label=CutCSGLabel("dovetail_socket_cut"),
         assembly_freedom=AssemblyFreedom.translation(-dovetail_lift_direction_global, freed_after=dovetail_depth),
     )
 
@@ -917,14 +935,16 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         face=housed_timber_face.to.face(),
         profile=housing_profile,
         depth=housing_depth,
-        profile_y_offset_from_end=shoulder_distance_from_end
+        profile_y_offset_from_end=shoulder_distance_from_end,
+        label=CutCSGLabel("housing"),
     )
 
     # Housing prism
     housing_housing_prism = chop_timber_end_with_prism(
         timber=housed_timber,
         end=housed_timber_end,
-        distance_from_end_to_cut=shoulder_distance_from_end
+        distance_from_end_to_cut=shoulder_distance_from_end,
+        label=CutCSGLabel("housing_shoulder"),
     )
 
     # Calculate where along the receiving timber the shoulder should be
@@ -958,7 +978,11 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
         timber=housed_timber,
         maybe_top_end_cut_distance_from_bottom=housing_end_local_z if housed_timber_end == TimberEnd.TOP else None,
         maybe_bottom_end_cut_distance_from_bottom=housing_end_local_z if housed_timber_end == TimberEnd.BOTTOM else None,
-        negative_csg=Difference(housing_housing_prism, [housing_profile_csg]),
+        negative_csg=Difference(
+            housing_housing_prism, [housing_profile_csg],
+            label=CutCSGLabel("housing_waste"),
+        ),
+        label=CutCSGLabel("housed_cut"),
         assembly_freedom=AssemblyFreedom.translation(housed_lift_direction_global, freed_after=housing_depth),
     )
 
@@ -971,6 +995,7 @@ def cut_dropin_housed_butt_joint_on_face_aligned_timbers(
     receiving_timber_cut_obj = Cutting(
         timber=receiving_timber,
         negative_csg=receiving_timber_negative_csg,
+        label=CutCSGLabel("housing_socket_cut"),
         assembly_freedom=AssemblyFreedom.translation(-housed_lift_direction_global, freed_after=housing_depth),
     )
 

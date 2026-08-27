@@ -535,12 +535,10 @@ def cut_lapped_gooseneck_joint_on_aligned_timbers(
     if gooseneck_timber_end == TimberEnd.TOP:
         # End cut at distance from top
         gooseneck_end_cut_local_z = gooseneck_timber.length - gooseneck_end_position_from_timber_end
-        gooseneck_timber_end_cut = HalfSpace(normal=create_v3(0, 0, 1), offset=gooseneck_end_cut_local_z)
     else:  # BOTTOM
         # End cut at distance from bottom
         # TODO this case seems to be broken?
         gooseneck_end_cut_local_z = gooseneck_end_position_from_timber_end
-        gooseneck_timber_end_cut = HalfSpace(normal=create_v3(0, 0, -1), offset=-gooseneck_end_cut_local_z)
 
     receiving_end_cut_local_z = None
     if receiving_timber_end_cut is not None:
