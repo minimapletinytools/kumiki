@@ -1034,6 +1034,7 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
         start_distance=scalar(0),
         end_distance=loft_depth,
         transform=loft_transform,
+        label=CutCSGLabel("shoulder_notch"),
     )
 
     receiving_timber_notch_negative_csg_local = adopt_csg(
@@ -1047,16 +1048,19 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
     near_plane_global = HalfSpace(
         normal=n_depth,
         offset=safe_dot_product(n_depth, shoulder_plane.point),
+        label=CutCSGLabel("shoulder"),
     )
     far_plane_point_global = shoulder_plane.point + n_depth * loft_depth
     far_plane_global = HalfSpace(
         normal=n_depth,
         offset=safe_dot_product(n_depth, far_plane_point_global),
+        label=CutCSGLabel("relief_far_bound"),
     )
     loft_in_butt_local = adopt_csg(None, butt_timber.transform, loft_global)
     butting_timber_relief_negative_csg_local = Difference(
         base=adopt_csg(None, butt_timber.transform, near_plane_global),
         subtract=[loft_in_butt_local, adopt_csg(None, butt_timber.transform, far_plane_global)],
+        label=CutCSGLabel("shoulder_relief"),
     )
 
     return ShoulderReliefCSGGeometry(
@@ -1064,7 +1068,7 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
         butting_timber_relief_negative_CSG=butting_timber_relief_negative_csg_local,
     )
 
-
+# TODO rewrite comments for this function better xplaining what it does and come up with a better name fro it...
 def chop_rough_relief_on_long_faces_beyond_shoulder_plane(
     arrangement: ButtJointTimberArrangement,
     long_faces: List[TimberLongFace],
@@ -1375,6 +1379,7 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
         start_distance=scalar(0),
         end_distance=loft_depth,
         transform=loft_transform,
+        label=CutCSGLabel("shoulder_notch"),
     )
     
     receiving_timber_notch_negative_csg_local = adopt_csg(
@@ -1401,16 +1406,19 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
     near_plane_global = HalfSpace(
         normal=n_depth,
         offset=safe_dot_product(n_depth, shoulder_plane.point),
+        label=CutCSGLabel("shoulder"),
     )
     far_plane_point_global = shoulder_plane.point + n_depth * loft_depth
     far_plane_global = HalfSpace(
         normal=n_depth,
         offset=safe_dot_product(n_depth, far_plane_point_global),
+        label=CutCSGLabel("relief_far_bound"),
     )
     loft_in_butt_local = adopt_csg(None, butt_timber.transform, loft_global)
     butting_timber_relief_negative_csg_local = Difference(
         base=adopt_csg(None, butt_timber.transform, near_plane_global),
         subtract=[loft_in_butt_local, adopt_csg(None, butt_timber.transform, far_plane_global)],
+        label=CutCSGLabel("shoulder_relief"),
     )
     
     return ShoulderReliefCSGGeometry(
