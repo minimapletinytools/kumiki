@@ -130,13 +130,15 @@ describe('Kigumi initialization workflow', () => {
 
         const hasFramesRoot = snapshot.roots.some((root) => typeof root.label === 'string' && root.label.startsWith('Frames'));
         const hasPatternsRoot = snapshot.roots.some((root) => typeof root.label === 'string' && root.label.startsWith('Patterns'));
-        const hasNoProjectStatusLine = snapshot.roots.every((root) => root.type !== 'projectStatusAction');
-        return hasNoProjectStatusLine && hasFramesRoot && hasPatternsRoot ? snapshot : null;
+        // The project-status row is always shown; what init changes is which
+        // variant it is, from the initialize/initializing action to this one.
+        const hasInitializedStatus = snapshot.roots.some((root) => root.key === 'project-status-initialized');
+        return hasInitializedStatus && hasFramesRoot && hasPatternsRoot ? snapshot : null;
       }, 120000, 500);
 
       assert.ok(
-        afterInitSidebar.roots.every((root) => root.type !== 'projectStatusAction'),
-        'Expected sidebar to hide project-status row after project is detected'
+        afterInitSidebar.roots.some((root) => root.key === 'project-status-initialized'),
+        'Expected sidebar project-status row to report the project as initialized after setup'
       );
 
       const gitignorePath = path.join(tempWorkspaceRoot, '.gitignore');
@@ -178,10 +180,14 @@ describe('Kigumi initialization workflow', () => {
             'import kumiki',
             'index_path = Path(kumiki.__file__).resolve().parent / "_pattern_index.json"',
             'result = {"exists": index_path.exists(), "count": 0}',
+            // Index schema v1: {"entries": {<relative path>: {"patternbook": {"patterns": [...]}}}}
             'if result["exists"]:\n'
               + '    payload = json.loads(index_path.read_text(encoding="utf8"))\n'
-              + '    patterns = payload.get("patterns") if isinstance(payload, dict) else None\n'
-              + '    result["count"] = len(patterns) if isinstance(patterns, list) else 0',
+              + '    entries = payload.get("entries") if isinstance(payload, dict) else None\n'
+              + '    for entry in (entries or {}).values():\n'
+              + '        patternbook = entry.get("patternbook") if isinstance(entry, dict) else None\n'
+              + '        patterns = patternbook.get("patterns") if isinstance(patternbook, dict) else None\n'
+              + '        result["count"] += len(patterns) if isinstance(patterns, list) else 0',
             'print(json.dumps(result))',
           ].join('\n'),
         ],

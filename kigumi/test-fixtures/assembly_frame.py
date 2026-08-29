@@ -31,7 +31,10 @@ def build_frame():
 
     joint = Joint(
         cuttings={
-            "a": Cutting(timber=timber_a),
+            # The end cut is what makes this a joint at all: Joint rejects
+            # cuttings that between them remove nothing. The assembly
+            # annotations below are what this fixture is really here for.
+            "a": Cutting(timber=timber_a, maybe_top_end_cut_distance_from_bottom=mm(900)),
             "b": Cutting(
                 timber=timber_b,
                 assembly_freedom=AssemblyFreedom.translation(create_v3(0, 0, 1), mm(200)),

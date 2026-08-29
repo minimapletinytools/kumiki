@@ -1,3 +1,5 @@
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { runTests } = require('@vscode/test-electron');
 
@@ -56,6 +58,15 @@ async function main() {
     KIGUMI_EXT_TEST_GREP: grep,
   };
 
+  // Every run gets its own VS Code user-data dir. On the shared default one,
+  // VS Code restores whatever windows the previous run left open -- the
+  // initialization-workflow suite swaps the workspace folder to a temp project,
+  // which sticks -- and each restored window runs this same suite again against
+  // that temp workspace. Those workspaces have a released kumiki in their .venv,
+  // where the runner's newer calls fail and geometry comes back empty, so the
+  // initial suite failed on a window it never meant to test.
+  const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-vscode-user-data-'));
+
   try {
     await runTests({
       extensionDevelopmentPath,
@@ -64,11 +75,16 @@ async function main() {
       launchArgs: [
         path.resolve(extensionDevelopmentPath, '..'),
         '--disable-extensions',
+        '--disable-workspace-trust',
+        '--user-data-dir',
+        userDataDir,
       ],
     });
   } catch (error) {
     console.error('Extension host tests failed:', error);
     process.exit(1);
+  } finally {
+    fs.rmSync(userDataDir, { recursive: true, force: true });
   }
 }
 
