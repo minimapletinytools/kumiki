@@ -93,7 +93,7 @@ class ButtJointScribeReliefConfig:
 
 class NotchFrom(Enum):
     """Which reference plane a ButtJointNotchReliefConfig notch is anchored to."""
-    # TODO rename to FacePlane
+    # TODO rename to PerfectFacePlane
     Face = 0
     # TODO rename to ShoulderPlane
     Shoulder = 1
@@ -1084,11 +1084,9 @@ def chop_rough_relief_on_long_faces_beyond_shoulder_plane(
     side chop_butt_joint_shoulder_notch_relief_4sided /
     _on_plane_aligned_timbers_2sided's own scribe/notch geometry occupies.
 
-    Use this alongside a ShoulderReliefStyle.PerfectOnly housing scribe (see
-    cut_mortise_and_tenon_joint): that scribe cuts a TIGHT pocket into the mortise, sized to
-    the tenon's PERFECT footprint only, so for the joint to actually fit, the tenon's own
-    rough excess in that same region must be trimmed off the tenon instead -- not relieved
-    by enlarging the mortise pocket, which would defeat the point of PerfectOnly.
+    Use this alongside cut_mortise_and_tenon_joint's housing scribe, which cuts a pocket
+    sized to the tenon's PERFECT footprint. The tenon's own rough excess in that region has
+    to come off the tenon rather than by enlarging the pocket.
 
     Formula, per requested face: Intersection(Difference(rough, PTW), half-space beyond
     that face's own PTW boundary) -- isolates just that face's own imperfect sliver of the
