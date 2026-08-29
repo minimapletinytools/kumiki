@@ -1,36 +1,19 @@
-:: 8/24/2026 left hand tree view P2
+:: 8/28/2026 view focus scope
 
-The new view:
--expandable info section at top shoiwng you informatino about selection but not the CSG tree
-  -does not auto expand, but can be manulaly expanded to show more info
--below that is the timber list view section which contains 2 sections, by timbers, and by joints
+we want to support multiple views for planning and drawing in the same window
 
-the CSG tree issues:
--CSGs show up in 2 places
-  -timber list (reverse maps its list of all its cuttings)
-  -joint list (maps 1 joint to all its cuttings and timbers)
--timber CSG is straight forward, the CutTimebr owns its entire CSG tree and displays it as such
--joint section shows each cutting, which starts the CSG tree with the timber prism CSG
-  -this allows joint cutting to show plane plane intersections with the timer prism CSG
--timber section starts with timebr prism CSG and shows each cutting negative CSG underneath it.
+To enter focus mode on a set of timbers:
+-hide all timbers not in the set from the timber list in the LHS
+-joints containing set timbers are shown, the rest are hidden
+  -CutTimbers underneath joints that contain set tmibers can be greyed out or hidden
+-hide all stuff not in the set
 
-
-the bidirectional selection issue:
--selecting a CSG from viewer will focus you on the timber section in the list nad auto expand
-  -UNLESS you are already focused on the CSG tree for that cutting in the joint section
--you can only select one thing in the CSG tree, no multi select
--you can still select umltiple timbers but click into just 1 of the CSG trees
--if you have timbers selected, raycasting on CSG takes precedence over selecting new timbers
-
-additional issues:
--first tier of CSG tree nedes specila roganizing, as the main CSG is the timber body, and the difference children are cuttings associated with the joint
--CSG tree labels need more clarity, their base type, and their tagged names
--difference tree view has orig CSG (the one that gets cut from) at the top, and cut CSGs as children
-  -but this does not allow you to drill down into the orig CSG, so maybe you need something a little more bespoke here
--solid union and interseciton have placeholder CSG at the top
-
-
-
+focus mode may come with a blueprint camera angle lock:
+-locks camera angle
+-panning is still allowed
+-I guess zoom is allowed too to change the camera cone (rather than move camera in/out, or is this not what zoom is already doing?)
+-a blueprint camera angle lot consists of a +x and +y vector, and a look at direction that must be orthogonal
+  -measurement marks are placed relative to the blueprint camera angle
 
 
 :: 8/23/2026 drawing details
@@ -170,61 +153,6 @@ To help inform the above, here are the user facing features we ultimately want t
 
 
 
-:: 8/7/2026 short shed script
-
-
-
-"I'm maple, and this is how I used kumiki and AI to create this 16x12 shed design (text overlay: it's the one from the learn to timber frame book)
-
-First, I ask the agent to establish the footprint of the building creating the sills and joists using mortise and tenon joinery for the corners and drop in joints for the joists.
-
-On each corner and side I have the agent place larger posts, capping each longer side with a beefy top plate (maybe show a cute cow graphic here)
-The shorter sides are joined together with a wedged half dovetail joint.
-
-Next we'll need girts to support the posts, and lets not forgot to add room for a door. (uhm, this was really quite a few prompts to get here, maybe show a sequence of shots as the girts and doors get added, or just show the final show after everything is added , I tihnk that's fine too.)
-
-I got a little eager here and prompted the agent too much at once so the braces are a mess, (show the clip with the bad braces) but it was easy enough to fix with a few clarifications.
-
-Lastly, I ask the agent add rafters aligning the second to last ones flush with the outside face of the structure.
-
-Amazing that's all it took. If you like to see more content like this please like, subscribe and stay tuned :O
-
-
-
-:: 8/8/2026 table script
-
-A while back I made this cute little coffee table, lets model it today in kumiki.
-
-let's build a cute coffe table, begin by establishing a footprint that is 18"x32".
-On the inside corners, create table "legs" that are 1.5" square and 18" tall.
-
-connect the legs together with four 3/4" stretchers. don't use any joints yet.
-the 2 stretchers running along the long side should have their tops flush with the tops of legs, and the 2 short stertchers should have their top side 3/8" above the tops of the legs so we can cut sliding dovetail joints on the excess later.
-the bottoms of all stretchres should be 3" below the top of the legs.
-
-now joint the stretchers to the legs using tusked mortise and tenon joints, the tenon pairs at each corner need to be offset so that they don't intersect each other. the tenons sholud be 3/4" wide and 3/4" in height. the tusk should enter horizontally.
-
-BTW you don't have to use AI, you can certainly write the code yourself if you want, and it's not that complicated. Let's take a look at the basic structure.
-You can see first we create the feet of our coffee table on our "footprint" using "create vertical timber on footprint"
-Next we create stretchers by connecting the feet using the "attach_face_algined_timber" function. Face aligned just means that all faces on all timbers are either parallel or perpendicular.
-BTW the long list of parameters here may look scary but really each of them is straight forward to understand and are intended to give you full control over exactly how your timbers are positioned relative to the timber its being attached to. You don't really need to care about this,most of these parameters have sensible defaults you can just let the agent figure it out for you instead.
-then we join the stretchers to the to feet using tusked mortise and tenon joints. We're not using them here, but all joints have "basic" versions that choose sensible defaults for most of the parameters..
-
-let's proceed with the rest of the build
-
-Add 2 boards to form a table top such that they sit on top of the 4 legs. the boards should be 44" long and 12" wide. The boards are placed running along the long side of the table with one on each side of the centerline in this axis.
-
-join each board to each short stretcher using a sliding dovetail joint. The dovetails enter from the center of the boards so that there is no visible mark along the outside edge
-
-now cut the ends of each board into a "bun shape". There should be a 3' radius arc tangent to the middle edge of each board at each end. You will need to make a custom joint to do this. 
-BTW I'm really proud of this cute detail on the table. I wanted to highlight that the top is split in two and joined without glue or fasteners, so I picked a profile you couldn't easily cut on a single board. It also looks like a butt crack.
-
-Ok we're almost done, you'll see on the actual table there are these poplar stretchers at the bottoms as well. They're simply housed into the legs with no joinery holding them in place? Why? well my housemate said they wanted to weave a bottom tray to the table yet there seems to be no tray in sight :(.
-
-Join the the legs 2" from the bottom with 1"x2" stretchers. To prevent the stretchers from intersecting each other, first cut plain miter joints on each of the 4 corners. Then roundover each long edge of the stretcher and finally use a house joint to attach them to the legs (the stretcher is the housed timber). 
-
-
-I hope you enjoyed this video. I started adding more and more furniture joints so I thought this might be a fun design to demo them. If you enjoyed this video please like and subscribe and let me know in the comments what you'd like to see more of.
 
 
 
@@ -269,122 +197,15 @@ DONE-sliding dovetail (maybe you want tapered variants)
 -rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
 
 
-:: 6/28 CONTENT PLAN
-
--do the butt crack table 
-
-- do fill_with_boards helper function
-
-def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1: TimberLike, vert_side2: TimberLike,  orientation : Literal["horizontal", "vertical"] = "horizontal", depth : Tuple[Number,Number,Number,Number] = (0,0,0,0), overlap : Number = 0, lateral_offset_from_hor_side1) : List[Board]
-  # assert that hor_side1/2 have parallel length axis, and perpendicular to vert_side1/2
-  # assert all timbers are face aligned
-  # first determine the gap between hor/vert_side1/2 to determine which timbers form the frame
-  # assert that there is >=0 gap between the side pairs
-  # next based on the above, determine which timbers form which sides of the frame
-  # next determine the inside rectangle of the frame
-  # position boards in the inside rectangle of the frame, if horizontal, then top end points to hor_side1 else points to vert_side1, sticking beyond the frame by depth, and overlapping each other by overlap
-  # offset into the normal plane of the frame by lateral_offset_from_hor_side1, specifically, determine the normal plane using the coordinate axis of hor_side1 that is perpendicular to the plane
-
--quick video converting n-legged stool top into a round top
-
-- outdoor shower
-  - 4x3 footprint, door on fornt 4' side, lean top awning with taller side on front side
-  -BONUS can you do slats instead of tongue and groove
-
--finish cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon
-
-- separate video explaining square rule / perfect timber within (update learn to timber frame)
-  The book goes into good length explaining the "square rule" measuring system, and to to emphasize this, timbers intentionally rendered larger than their "perfect timber within" dimension from which all joints are marked from, creating little notch and relief cuts throughout the design. This can be modeled in kumiki!
-
-  I'll explain this better witha diagram
-  this square represents the "perfect timber within", which is represted in kumiki code as PerfectTimberWithin class
-  this larger square represents the acutal dimnison of the timebr whichi s >= the PTW on all sides, which is representd in kumiki code as the Timber class
-  since w're doing the square rule, 2 sides of the actual square match up with the 2 sides of the perfect timber within square. This edge of the timber is referred to as the reference edge, because all measurements are taken from this edge.
-  all joints must be cut to the perfect timber within when using the square rule, but since timbersa re oversized, extra wood needs to be removed for the jointt to fit tgoether preoperly. These are referred to as relief cuts in kumiki
-
-
--quick video adding boards to oscar shed
-
-
-
-
-- tusked morties and tenon joint
-class TuskParameters()
-  tusk_entry_face_on_tenon_timber : TimberLongFace,
-  tusk_width : Numeric,
-  tusk_height: Numeric,
-  tusk_tip_extra_length: Numeric,
-  tusk_base_extra_length: Numeric,
-def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement : ButtJointTimberArrangement, tenon_size : V2, tenon_position : V2 = 0, tenon_stickout_amount : Optional[Numeric] = None, tusk_params : Optional[TuskParameters] = None, shoulder_inset : Numeric = 0)
-  # assert plane alignment
-  # if tusk_params is None, set tusk_entry_face_on_tenon_timber to be face in direction of cross product of arrangement, set tusk width (thickness) to 1/3 the width of the tenon size from the entry face direction, set its smol height to 1.5 the width of the tenon, set its angle to 10degrees, set the tip/base extra width to 0.7x the height of the tenon (the size of the adjacent face of the entry face on the tenon)
-  # tenon_stickout_amount measured from centerline of tenon, if None, set to 2.5x the tusk height + cos (joint angle) * tenon height (height being in the axis parallel to the arrangement plane)
-  # assert that tusk_entry_face_on_tenon_timber is perpendicular to the adjacent long face of the entry face of the receiving timber, if not error "angled side entry tusks not supported"
-  # check that the tenon exit long face on the receiving timber is a perfect face, if not output a warning and say a relief cut is added
-  # use build a butt joint helpers to establish the shoulder and notch on the netry face
-  # on the exit face, use special relief algorith to cut relief surface for tusk entry, this is just the usual notching algorithm except we set width to be the tusk length*2 (tenon height + extra lengths)
-  # create the tusk shape (wedge shape)
-  
--make the awful thuma bed video
-
-
-
-
 
 
 
 :: TODO
 
-DONE-Fix tag → label in runner.py
-DONE-Give the kumiki feature API a tolerance, then delete the float shadow, tolerance parmeter defaults to a new feature_test_epsilon or osemtihing that's a little bigger than the generi cone
-DONE-maybe get rid of snap_eps, or create a feature eps hierarch (generic, face_eps, line_eps, point_eps) or just use 1 eps for everything and keep it simple...
-DONE-probbaly get rid of _features in CSGFeature base class as difference/union/interseciton does not need/want this, maybe in the future we cach efeatuers but that should be adifferent var
-DONE-float_epsilon should just be generic_epsilon in rule.py
-DONE-test on regular vscode on mac
-IGNORE-get vmware fusion and test on windows  
-DONE-refine CSG label
-  -create CSGLabl class
-  -Cutting CSG label setting logic is a little weird, change it to as follows
-    -Cuttings create an solidunion node representing the negative csg of the joint and owns the label for it
-    -so change the label in cutting class to CSGLabel
-    -always do the `result = SolidUnion([result], label=CutCSGLabel(self.label))` thing, even if no label I tihnk, just more consistent
-    -leave a SHORT comment explainig this
-  -Except whene there are no cuts, ni that case Cutting should not create EmptyCSG if no cuttings, in this case, there si no CSG/label, the CSG is just the timber CSG.
-    -this technically requires joints to have at least one cutting in it, so add an post init assert to joint to assert that it has at least noe negative CSG object in it.
-      -levae a SHORT c omment explaining this
-DONE-next, look at all calls to _create_extended_rectangular_prism, and set the label accordingly, so if it is a board
-  set it to "board", also do the same to get_actual_csg_local and get_extended_actual_csg_local  so it should say
-  "board (rough, extended)" in the case of extende_actual_csg...  you will need to change those to clas methods so
-  we know what the derived class is to set the label correctly.
-DONE-selection feedback
-  DONE-set labels in all the get csg function in timber.py
-  DONE-BUG clicking on entire csg chunks (e.g. the entire tenon csg assembly) will sasy "face (tenon_top)" in the info view e.g., it should not say "face", it should say union or something
-  DONE-you seem to be able to click on unnamed faces and it will say "face (top)" 
-    -this is from _detect_face_label in runner.py, it will fall through to generic labels
-    DONE-BUG where top must be local to the prism? because it's not aligned with the timber space (se ethe stretcher in double sawhores example)
-      -this is because when it tries `_nearest_timber_local_face_name` it doesn't know the parity of the face
-    DONE-BUG? also selecting these features will not highlight the child CSG tree feature it belongs to
-  DONE/IGNORE-seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked, (is this fixed now?)
-  DONE/IGNORE-maybe just allow clicking on unnamed features? it's a little werid cuz you can select them in the tree view and they don't select inthe viewer...
-  DONE-difference display in the tree list view should show + for the positive part
-  DONE-when clickingon unnamed features, right now it says "feature (top)" where "top" is the direction it's facing. Remove the (<dircetion>) part
-    -instead in the selection wie in kigumi, print its outward facing normal and then say (approximately facing left/right/top/bot/front/back)
-  DONE-the first level shows "rectangular prism (presumably the timber itself) rather than difference
-    -probably just show difference for now...
-IGNORE??-need some rule or test to ensure no confilcting feature names within a joint???
-  -or qualify by CSG tree (probbaly a bad ide,a tree topology may vary too)
-  -better just ensure no confilcts and require joint sto prefix all their cuts
-  -conflicting names across joints allowed, they get qualified by the joint itself
-    -but yo ustil need a way to distinguish 2 different joints on a imber
-DONE-improve fetaure selection display, it should be multi lined  
-  -feature type
-  -joint the feature came from
-  -maybe show the feature highlighted within the CSG tree (expandable)
-  -which local face on the timber it most points towards
-
 
 -more selection related things
-  -add cutcsglables to everything
+  DONE-add cutcsglables to everything
+  -add cutcsglabels to build a butt and relief.py
   -test edge selection and in particular face face intersecting edges (doesn't seem to work)
   -there are some redundant solid unions (only 1 element contained) that could be ad-hdoc skipped when click drilling into a timber
     -also consider disabling the 1 step at a time drilling into a feature, it's not really all that necessary.
@@ -551,6 +372,54 @@ DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a 
 
 
 :: TODONE 
+
+DONE-Fix tag → label in runner.py
+DONE-Give the kumiki feature API a tolerance, then delete the float shadow, tolerance parmeter defaults to a new feature_test_epsilon or osemtihing that's a little bigger than the generi cone
+DONE-maybe get rid of snap_eps, or create a feature eps hierarch (generic, face_eps, line_eps, point_eps) or just use 1 eps for everything and keep it simple...
+DONE-probbaly get rid of _features in CSGFeature base class as difference/union/interseciton does not need/want this, maybe in the future we cach efeatuers but that should be adifferent var
+DONE-float_epsilon should just be generic_epsilon in rule.py
+DONE-test on regular vscode on mac
+IGNORE-get vmware fusion and test on windows  
+DONE-refine CSG label
+  -create CSGLabl class
+  -Cutting CSG label setting logic is a little weird, change it to as follows
+    -Cuttings create an solidunion node representing the negative csg of the joint and owns the label for it
+    -so change the label in cutting class to CSGLabel
+    -always do the `result = SolidUnion([result], label=CutCSGLabel(self.label))` thing, even if no label I tihnk, just more consistent
+    -leave a SHORT comment explainig this
+  -Except whene there are no cuts, ni that case Cutting should not create EmptyCSG if no cuttings, in this case, there si no CSG/label, the CSG is just the timber CSG.
+    -this technically requires joints to have at least one cutting in it, so add an post init assert to joint to assert that it has at least noe negative CSG object in it.
+      -levae a SHORT c omment explaining this
+DONE-next, look at all calls to _create_extended_rectangular_prism, and set the label accordingly, so if it is a board
+  set it to "board", also do the same to get_actual_csg_local and get_extended_actual_csg_local  so it should say
+  "board (rough, extended)" in the case of extende_actual_csg...  you will need to change those to clas methods so
+  we know what the derived class is to set the label correctly.
+DONE-selection feedback
+  DONE-set labels in all the get csg function in timber.py
+  DONE-BUG clicking on entire csg chunks (e.g. the entire tenon csg assembly) will sasy "face (tenon_top)" in the info view e.g., it should not say "face", it should say union or something
+  DONE-you seem to be able to click on unnamed faces and it will say "face (top)" 
+    -this is from _detect_face_label in runner.py, it will fall through to generic labels
+    DONE-BUG where top must be local to the prism? because it's not aligned with the timber space (se ethe stretcher in double sawhores example)
+      -this is because when it tries `_nearest_timber_local_face_name` it doesn't know the parity of the face
+    DONE-BUG? also selecting these features will not highlight the child CSG tree feature it belongs to
+  DONE/IGNORE-seems that you should only be bale to click on named features but I can cilkc on random artifacts which Ithink resolve to the main faces (or some otherf etauer) but highlights is still random triangle artifacts on the unnamedfeature I clicked, (is this fixed now?)
+  DONE/IGNORE-maybe just allow clicking on unnamed features? it's a little werid cuz you can select them in the tree view and they don't select inthe viewer...
+  DONE-difference display in the tree list view should show + for the positive part
+  DONE-when clickingon unnamed features, right now it says "feature (top)" where "top" is the direction it's facing. Remove the (<dircetion>) part
+    -instead in the selection wie in kigumi, print its outward facing normal and then say (approximately facing left/right/top/bot/front/back)
+  DONE-the first level shows "rectangular prism (presumably the timber itself) rather than difference
+    -probably just show difference for now...
+IGNORE??-need some rule or test to ensure no confilcting feature names within a joint???
+  -or qualify by CSG tree (probbaly a bad ide,a tree topology may vary too)
+  -better just ensure no confilcts and require joint sto prefix all their cuts
+  -conflicting names across joints allowed, they get qualified by the joint itself
+    -but yo ustil need a way to distinguish 2 different joints on a imber
+DONE-improve fetaure selection display, it should be multi lined  
+  -feature type
+  -joint the feature came from
+  -maybe show the feature highlighted within the CSG tree (expandable)
+  -which local face on the timber it most points towards
+
 DONE-give the footprint  rendering a color and amke it turn on/offable (or have swatches to change its collor or transparent)
 DONE-update agent insturctions on orientation conventions
 DONE/IGNORE-try and run a full loop agent test on this to see if it all works
@@ -1666,6 +1535,159 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: END TODONE
+
+
+
+:: 6/28 CONTENT PLAN
+
+-do the butt crack table 
+
+- do fill_with_boards helper function
+
+def fill_with_boards(hor_side1 : TimberLike, hor_side2 : TimberLike, vert_side1: TimberLike, vert_side2: TimberLike,  orientation : Literal["horizontal", "vertical"] = "horizontal", depth : Tuple[Number,Number,Number,Number] = (0,0,0,0), overlap : Number = 0, lateral_offset_from_hor_side1) : List[Board]
+  # assert that hor_side1/2 have parallel length axis, and perpendicular to vert_side1/2
+  # assert all timbers are face aligned
+  # first determine the gap between hor/vert_side1/2 to determine which timbers form the frame
+  # assert that there is >=0 gap between the side pairs
+  # next based on the above, determine which timbers form which sides of the frame
+  # next determine the inside rectangle of the frame
+  # position boards in the inside rectangle of the frame, if horizontal, then top end points to hor_side1 else points to vert_side1, sticking beyond the frame by depth, and overlapping each other by overlap
+  # offset into the normal plane of the frame by lateral_offset_from_hor_side1, specifically, determine the normal plane using the coordinate axis of hor_side1 that is perpendicular to the plane
+
+-quick video converting n-legged stool top into a round top
+
+- outdoor shower
+  - 4x3 footprint, door on fornt 4' side, lean top awning with taller side on front side
+  -BONUS can you do slats instead of tongue and groove
+
+-finish cut_cross_lap_beam_assembly_on_post_with_stepped_mortise_and_tenon
+
+- separate video explaining square rule / perfect timber within (update learn to timber frame)
+  The book goes into good length explaining the "square rule" measuring system, and to to emphasize this, timbers intentionally rendered larger than their "perfect timber within" dimension from which all joints are marked from, creating little notch and relief cuts throughout the design. This can be modeled in kumiki!
+
+  I'll explain this better witha diagram
+  this square represents the "perfect timber within", which is represted in kumiki code as PerfectTimberWithin class
+  this larger square represents the acutal dimnison of the timebr whichi s >= the PTW on all sides, which is representd in kumiki code as the Timber class
+  since w're doing the square rule, 2 sides of the actual square match up with the 2 sides of the perfect timber within square. This edge of the timber is referred to as the reference edge, because all measurements are taken from this edge.
+  all joints must be cut to the perfect timber within when using the square rule, but since timbersa re oversized, extra wood needs to be removed for the jointt to fit tgoether preoperly. These are referred to as relief cuts in kumiki
+
+
+-quick video adding boards to oscar shed
+
+
+
+
+- tusked morties and tenon joint
+class TuskParameters()
+  tusk_entry_face_on_tenon_timber : TimberLongFace,
+  tusk_width : Numeric,
+  tusk_height: Numeric,
+  tusk_tip_extra_length: Numeric,
+  tusk_base_extra_length: Numeric,
+def cut_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement : ButtJointTimberArrangement, tenon_size : V2, tenon_position : V2 = 0, tenon_stickout_amount : Optional[Numeric] = None, tusk_params : Optional[TuskParameters] = None, shoulder_inset : Numeric = 0)
+  # assert plane alignment
+  # if tusk_params is None, set tusk_entry_face_on_tenon_timber to be face in direction of cross product of arrangement, set tusk width (thickness) to 1/3 the width of the tenon size from the entry face direction, set its smol height to 1.5 the width of the tenon, set its angle to 10degrees, set the tip/base extra width to 0.7x the height of the tenon (the size of the adjacent face of the entry face on the tenon)
+  # tenon_stickout_amount measured from centerline of tenon, if None, set to 2.5x the tusk height + cos (joint angle) * tenon height (height being in the axis parallel to the arrangement plane)
+  # assert that tusk_entry_face_on_tenon_timber is perpendicular to the adjacent long face of the entry face of the receiving timber, if not error "angled side entry tusks not supported"
+  # check that the tenon exit long face on the receiving timber is a perfect face, if not output a warning and say a relief cut is added
+  # use build a butt joint helpers to establish the shoulder and notch on the netry face
+  # on the exit face, use special relief algorith to cut relief surface for tusk entry, this is just the usual notching algorithm except we set width to be the tusk length*2 (tenon height + extra lengths)
+  # create the tusk shape (wedge shape)
+  
+-make the awful thuma bed video
+
+
+
+
+
+
+:: 8/24/2026 left hand tree view P2
+
+The new view:
+-expandable info section at top shoiwng you informatino about selection but not the CSG tree
+  -does not auto expand, but can be manulaly expanded to show more info
+-below that is the timber list view section which contains 2 sections, by timbers, and by joints
+
+the CSG tree issues:
+-CSGs show up in 2 places
+  -timber list (reverse maps its list of all its cuttings)
+  -joint list (maps 1 joint to all its cuttings and timbers)
+-timber CSG is straight forward, the CutTimebr owns its entire CSG tree and displays it as such
+-joint section shows each cutting, which starts the CSG tree with the timber prism CSG
+  -this allows joint cutting to show plane plane intersections with the timer prism CSG
+-timber section starts with timebr prism CSG and shows each cutting negative CSG underneath it.
+
+
+the bidirectional selection issue:
+-selecting a CSG from viewer will focus you on the timber section in the list nad auto expand
+  -UNLESS you are already focused on the CSG tree for that cutting in the joint section
+-you can only select one thing in the CSG tree, no multi select
+-you can still select umltiple timbers but click into just 1 of the CSG trees
+-if you have timbers selected, raycasting on CSG takes precedence over selecting new timbers
+
+additional issues:
+-first tier of CSG tree nedes specila roganizing, as the main CSG is the timber body, and the difference children are cuttings associated with the joint
+-CSG tree labels need more clarity, their base type, and their tagged names
+-difference tree view has orig CSG (the one that gets cut from) at the top, and cut CSGs as children
+  -but this does not allow you to drill down into the orig CSG, so maybe you need something a little more bespoke here
+-solid union and interseciton have placeholder CSG at the top
+
+:: 8/8/2026 table script
+
+A while back I made this cute little coffee table, lets model it today in kumiki.
+
+let's build a cute coffe table, begin by establishing a footprint that is 18"x32".
+On the inside corners, create table "legs" that are 1.5" square and 18" tall.
+
+connect the legs together with four 3/4" stretchers. don't use any joints yet.
+the 2 stretchers running along the long side should have their tops flush with the tops of legs, and the 2 short stertchers should have their top side 3/8" above the tops of the legs so we can cut sliding dovetail joints on the excess later.
+the bottoms of all stretchres should be 3" below the top of the legs.
+
+now joint the stretchers to the legs using tusked mortise and tenon joints, the tenon pairs at each corner need to be offset so that they don't intersect each other. the tenons sholud be 3/4" wide and 3/4" in height. the tusk should enter horizontally.
+
+BTW you don't have to use AI, you can certainly write the code yourself if you want, and it's not that complicated. Let's take a look at the basic structure.
+You can see first we create the feet of our coffee table on our "footprint" using "create vertical timber on footprint"
+Next we create stretchers by connecting the feet using the "attach_face_algined_timber" function. Face aligned just means that all faces on all timbers are either parallel or perpendicular.
+BTW the long list of parameters here may look scary but really each of them is straight forward to understand and are intended to give you full control over exactly how your timbers are positioned relative to the timber its being attached to. You don't really need to care about this,most of these parameters have sensible defaults you can just let the agent figure it out for you instead.
+then we join the stretchers to the to feet using tusked mortise and tenon joints. We're not using them here, but all joints have "basic" versions that choose sensible defaults for most of the parameters..
+
+let's proceed with the rest of the build
+
+Add 2 boards to form a table top such that they sit on top of the 4 legs. the boards should be 44" long and 12" wide. The boards are placed running along the long side of the table with one on each side of the centerline in this axis.
+
+join each board to each short stretcher using a sliding dovetail joint. The dovetails enter from the center of the boards so that there is no visible mark along the outside edge
+
+now cut the ends of each board into a "bun shape". There should be a 3' radius arc tangent to the middle edge of each board at each end. You will need to make a custom joint to do this. 
+BTW I'm really proud of this cute detail on the table. I wanted to highlight that the top is split in two and joined without glue or fasteners, so I picked a profile you couldn't easily cut on a single board. It also looks like a butt crack.
+
+Ok we're almost done, you'll see on the actual table there are these poplar stretchers at the bottoms as well. They're simply housed into the legs with no joinery holding them in place? Why? well my housemate said they wanted to weave a bottom tray to the table yet there seems to be no tray in sight :(.
+
+Join the the legs 2" from the bottom with 1"x2" stretchers. To prevent the stretchers from intersecting each other, first cut plain miter joints on each of the 4 corners. Then roundover each long edge of the stretcher and finally use a house joint to attach them to the legs (the stretcher is the housed timber). 
+
+
+I hope you enjoyed this video. I started adding more and more furniture joints so I thought this might be a fun design to demo them. If you enjoyed this video please like and subscribe and let me know in the comments what you'd like to see more of.
+
+
+
+:: 8/7/2026 short shed script
+
+
+
+"I'm maple, and this is how I used kumiki and AI to create this 16x12 shed design (text overlay: it's the one from the learn to timber frame book)
+
+First, I ask the agent to establish the footprint of the building creating the sills and joists using mortise and tenon joinery for the corners and drop in joints for the joists.
+
+On each corner and side I have the agent place larger posts, capping each longer side with a beefy top plate (maybe show a cute cow graphic here)
+The shorter sides are joined together with a wedged half dovetail joint.
+
+Next we'll need girts to support the posts, and lets not forgot to add room for a door. (uhm, this was really quite a few prompts to get here, maybe show a sequence of shots as the girts and doors get added, or just show the final show after everything is added , I tihnk that's fine too.)
+
+I got a little eager here and prompted the agent too much at once so the braces are a mess, (show the clip with the bad braces) but it was easy enough to fix with a few clarifications.
+
+Lastly, I ask the agent add rafters aligning the second to last ones flush with the outside face of the structure.
+
+Amazing that's all it took. If you like to see more content like this please like, subscribe and stay tuned :O
+
 
 
 :: 7/2026 learn to timber frame script
