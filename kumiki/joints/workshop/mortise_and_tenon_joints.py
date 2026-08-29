@@ -1013,17 +1013,6 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
             joint = replace(joint, cuttings=updated_cuttings)
 
             if notch_from_face:
-                # shoulder_relief_style=PerfectOnly above cut a TIGHT pocket into the
-                # mortise (sized to the tenon's PERFECT footprint only); the 2-sided
-                # notch's flared Q-axis walls (see
-                # chop_rough_relief_on_long_faces_beyond_shoulder_plane's docstring) only
-                # cover the tenon's PERFECT footprint too. So on the 2 long faces NOT
-                # parallel to the joint plane, the tenon's own ROUGH-beyond-PERFECT
-                # material near the REAL (inset) shoulder is still uncleared -- since the
-                # mortise pocket there is deliberately tight (not relieved), this excess
-                # must be trimmed off the TENON itself instead. Uses the REAL shoulder
-                # (not the face-anchored one the notch itself uses), matching where the
-                # tenon timber's body actually needs to fit within that pocket.
                 joint_normal_axis = arrangement.compute_normalized_timber_cross_product()
                 p_face = arrangement.butt_timber.get_closest_oriented_long_face_from_global_direction(
                     joint_normal_axis
@@ -1033,6 +1022,7 @@ def cut_mortise_and_tenon_joint_on_plane_aligned_timbers(
                     if p_face in (TimberLongFace.RIGHT, TimberLongFace.LEFT)
                     else [TimberLongFace.RIGHT, TimberLongFace.LEFT]
                 )
+                # TODO figure out what this is???
                 rough_relief_tenon_local = chop_rough_relief_on_long_faces_beyond_shoulder_plane(
                     arrangement, q_faces, mortise_shoulder_distance_from_centerline_or_centerplane,
                 )

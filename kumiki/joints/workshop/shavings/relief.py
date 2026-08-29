@@ -93,7 +93,9 @@ class ButtJointScribeReliefConfig:
 
 class NotchFrom(Enum):
     """Which reference plane a ButtJointNotchReliefConfig notch is anchored to."""
+    # TODO rename to FacePlane
     Face = 0
+    # TODO rename to ShoulderPlane
     Shoulder = 1
 
 
