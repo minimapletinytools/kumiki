@@ -1044,6 +1044,45 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
             top_face_on_butt_timber=TimberLongFace.RIGHT,
         )
 
+    def test_an_inset_shoulder_notches_the_mortise_timber(self, simple_T_configuration):
+        """With the shoulder set back from the entry face, the mortise timber
+        gets a notch so the tenon's shoulder has somewhere to sit.
+
+        Every other test of this joint leaves mortise_shoulder_inset at 0,
+        where the relief function returns None and no notch is built at all --
+        so nothing else here covers the notched path.
+        """
+        from kumiki.cutcsg import csg_children
+
+        joint = cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=self._make_arrangement(simple_T_configuration),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_depth=scalar(4),
+            dovetail_depth=scalar(1),
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+                wedge_angle=_degrees(8),
+                wedge_back_extra_length=scalar(1, 2),
+            ),
+            mortise_shoulder_inset=scalar(1),
+        )
+
+        def labels(node):
+            found = {node.label.name} if node.label.is_labeled() else set()
+            for child in csg_children(node):
+                found |= labels(child)
+            return found
+
+        mortise_ct = joint.cuttings["mortise_timber"]
+        assert mortise_ct.negative_csg is not None
+        assert "shoulder_notch" in labels(mortise_ct.negative_csg)
+
+        # The notch removes material, and the result is still a closed solid.
+        cut_timber = CutTimber(mortise_ct.timber, cuts=[mortise_ct])
+        notched = triangulate_cutcsg(cut_timber.render_timber_with_cuts_csg_local()).mesh
+        assert notched.is_watertight
+        uncut = triangulate_cutcsg(mortise_ct.timber.get_actual_csg_local()).mesh
+        assert notched.volume < uncut.volume
+
     def test_general_wedged_half_dovetail_mortise_and_tenon(self, simple_T_configuration):
         """
         Build the joint and walk points along the tenon centerline.

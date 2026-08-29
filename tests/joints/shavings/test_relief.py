@@ -17,7 +17,6 @@ from kumiki.joints.workshop.shavings.relief import (
     TripleButtJointScribeReliefConfig,
     chop_butt_joint_shoulder_notch_relief_4sided,
     chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided,
-    chop_relief_for_butt_joint_arrangement,
     chop_scribe_relief,
     chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
@@ -121,57 +120,6 @@ class TestShoulderNotchingDecision:
 
         assert not are_timbers_plane_aligned(non_plane_mortise, non_plane_tenon)
         assert does_shoulder_plane_need_notching(non_plane_arrangement, scalar(100))
-
-
-class TestChopReliefForButtJointArrangement:
-    """Tests for chop_relief_for_butt_joint_arrangement."""
-
-    def test_returns_geometry_for_inset_shoulder(self, simple_T_configuration):
-        """
-        For a simple T-arrangement with the shoulder inset from the entry face,
-        the helper returns geometry for BOTH the receiving timber notch and the
-        butting timber relief cut. When the shoulder is at or past the entry
-        face, the helper returns None.
-        """
-        from kumiki.cutcsg import Difference, RectangularPrism, SolidUnion
-
-        tenon_timber, mortise_timber = simple_T_configuration
-        arrangement = ButtJointTimberArrangement(
-            receiving_timber=mortise_timber,
-            butt_timber=tenon_timber,
-            butt_timber_end=TimberEnd.BOTTOM,
-        )
-
-        # Mortise is 6x6, so rough entry face half-size = 3.
-        # An inset shoulder at distance 2 from the centerline (< 3) requires notching.
-        inset_distance = scalar(2)
-        geom = chop_relief_for_butt_joint_arrangement(
-            arrangement, inset_distance
-        )
-        assert geom is not None
-        assert isinstance(geom, ShoulderReliefCSGGeometry)
-        # The receiving timber notch should be a prism or union of prisms.
-        assert isinstance(
-            geom.receiving_timber_notch_negative_CSG, (RectangularPrism, SolidUnion)
-        )
-        # The butting timber relief CSG is built via Difference for any non-trivial joint.
-        assert geom.butting_timber_relief_negative_CSG is not None
-        assert isinstance(geom.butting_timber_relief_negative_CSG, Difference)
-
-        # A flush shoulder (distance equal to rough half-size) needs no notch.
-        tenon_end_direction = tenon_timber.get_face_direction_global(
-            TimberFace.BOTTOM
-        )
-        entry_face = mortise_timber.get_closest_oriented_long_face_from_global_direction(
-            -tenon_end_direction
-        ).to.face()
-        face_half_size = mortise_timber.get_half_rough_size_in_face_normal_axis(
-            entry_face
-        )
-        assert (
-            chop_relief_for_butt_joint_arrangement(arrangement, face_half_size)
-            is None
-        )
 
 
 class TestChopButtJointShoulderNotchRelief4Sided:

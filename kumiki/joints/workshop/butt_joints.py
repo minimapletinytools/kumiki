@@ -14,7 +14,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, chop_scribe_relief_and_apply_for_butt_joint_arrangement
+from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_shoulder_notch_aligned_with_timber, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, chop_scribe_relief_and_apply_for_butt_joint_arrangement
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,

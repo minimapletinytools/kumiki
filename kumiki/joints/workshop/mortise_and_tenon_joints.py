@@ -14,7 +14,7 @@ from kumiki.timber import *
 from kumiki.construction import *
 from kumiki.rule import *
 from .shavings import *
-from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_relief_for_butt_joint_arrangement, chop_shoulder_notch_aligned_with_timber, chop_butt_joint_shoulder_notch_relief_4sided, chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided, chop_rough_relief_on_long_faces_beyond_shoulder_plane, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig, NotchFrom, chop_scribe_relief_and_apply_for_butt_joint_arrangement
+from .shavings.relief import warn_if_arrangement_timbers_imperfect, chop_shoulder_notch_on_timber_face, ShoulderReliefCSGGeometry, chop_shoulder_notch_aligned_with_timber, chop_butt_joint_shoulder_notch_relief_4sided, chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided, chop_rough_relief_on_long_faces_beyond_shoulder_plane, does_shoulder_plane_need_notching, ButtJointScribeReliefConfig, ButtJointNotchReliefConfig, NotchFrom, chop_scribe_relief_and_apply_for_butt_joint_arrangement
 from kumiki.measuring import (
     locate_top_center_position,
     locate_bottom_center_position,
@@ -1660,10 +1660,15 @@ def cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
     # Shoulder notch on the receiving timber (and matching relief on the butting
     # timber) when the shoulder is inset from the entry face. For face-aligned
     # orthogonal arrangements the approach angle is pi/2 (no relief walls).
-    relief_geom = chop_relief_for_butt_joint_arrangement(
+    # This joint is face-aligned, so the arrangement is plane-aligned and the
+    # 2-sided notch applies: 2 walls flare, the other 2 run straight across the
+    # receiving timber's full width. notch_angle is the same minimum-flare
+    # parameter the older chop_relief_for_butt_joint_arrangement called
+    # notch_wall_min_relief_cut_angle.
+    relief_geom = chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
         arrangement,
         mortise_shoulder_distance_from_centerline_or_centerplane,
-        notch_wall_min_relief_cut_angle=degrees(45),
+        notch_angle=degrees(45),
     )
     if relief_geom is not None:
         mortise_negative_local = _union_into_cut(

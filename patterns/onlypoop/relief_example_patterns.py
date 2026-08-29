@@ -2,7 +2,7 @@
 Relief algorithm test patterns (DEVELOPMENT ONLY)
 
 These patterns exist to exercise the relief-cut algorithm (chop_scribe_relief /
-chop_relief_for_butt_joint_arrangement) across a range of butt-timber approach
+the shoulder notch relief functions) across a range of butt-timber approach
 angles. All tagged 'poop' -- hidden from the sidebar, not curated examples.
 """
 
