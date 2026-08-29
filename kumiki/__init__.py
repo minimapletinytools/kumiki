@@ -10,6 +10,20 @@ __version__ = "0.4.10"
 # Import everything from the organized modules
 from .rule import *
 from .cutcsg import *
+from .ticket import (
+    AccessoryTicket,
+    BoardTicket,
+    GenericTag,
+    JointTicket,
+    Member,
+    MemberTag,
+    SliceTag,
+    Ticket,
+    TimberTag,
+    TimberTicket,
+    as_timber_tag,
+    normalize_timber_tags,
+)
 from .timber import *
 from .footprint import *
 from .construction import *

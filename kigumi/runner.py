@@ -545,13 +545,13 @@ def _accessory_to_triangle_mesh_payload(
     dims = bounds[1] - bounds[0]
 
     accessory_kumiki_id = int(accessory.ticket.kumiki_id) if getattr(accessory, "ticket", None) is not None else 0
-    accessory_tags = _normalize_ticket_tags(getattr(accessory, "ticket", None))
     payload = _base_member_payload(
         name=accessory_name,
         member_type="accessory",
         member_key=accessory_key,
         kumiki_id=accessory_kumiki_id,
-        tags=accessory_tags,
+        # Only timbers carry tags; an accessory has no ticket field for them.
+        tags=[],
         vertices=vertices,
         indices=indices,
         prism_length=dims[2],
@@ -891,6 +891,12 @@ def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
 
 
 def _normalize_ticket_tags(ticket: Any) -> List[str]:
+    """Tag names off a timber ticket. Only TimberTicket carries tags.
+
+    Kumiki tags are TimberTag objects and the viewer still reads plain strings,
+    so this ships the names alone; the kind is dropped until the payload
+    becomes typed.
+    """
     raw_tags = getattr(ticket, "tags", ())
     if not isinstance(raw_tags, (list, tuple)):
         return []
@@ -898,9 +904,10 @@ def _normalize_ticket_tags(ticket: Any) -> List[str]:
     tags: List[str] = []
     seen: set[str] = set()
     for tag in raw_tags:
-        if not isinstance(tag, str):
+        name = tag if isinstance(tag, str) else getattr(tag, "name", None)
+        if not isinstance(name, str):
             continue
-        normalized = tag.strip()
+        normalized = name.strip()
         if not normalized or normalized in seen:
             continue
         seen.add(normalized)
@@ -942,7 +949,6 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
         joint_kumiki_id = int(getattr(joint_ticket, "kumiki_id", 0))
         joint_name = _joint_display_name(joint)
         joint_type = getattr(joint_ticket, "joint_type", None)
-        joint_tags = _normalize_ticket_tags(joint_ticket)
         
         # Extract members (timbers) from cuttings
         members_list: List[Dict[str, Any]] = []
@@ -989,7 +995,6 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
             "kumikiEphemeralId": joint_kumiki_id,
             "name": joint_name,
             "jointType": joint_type,
-            "tags": joint_tags,
             "members": members_list,
             "accessoryKumikiEphemeralIds": accessory_kumiki_ids,
         })

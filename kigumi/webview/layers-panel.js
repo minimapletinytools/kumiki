@@ -528,7 +528,7 @@
             for (const t of this.hierarchy.timbers) nameByKey[t.key] = t.name;
 
             for (const joint of (this.hierarchy.joints || [])) {
-                if (!this._matchesFilter(joint.name, joint.tags)) continue;
+                if (!this._matchesFilter(joint.name)) continue;
 
                 const jointNodeId = 'joint:' + joint.id;
                 const members = [...(joint.timberKeys || []), ...(joint.accessoryKeys || [])];
@@ -539,7 +539,6 @@
                     rowType: 'joint',
                     depth: 0,
                     label: joint.name,
-                    tags: joint.tags || [],
                     hasChildren,
                     selectNode: { type: 'joint', jointId: joint.id, timberKeys: joint.timberKeys || [] },
                 }));
@@ -904,7 +903,6 @@
             const hierarchyJoints = joints.map((j) => ({
                 id: String(j.kumikiEphemeralId != null ? j.kumikiEphemeralId : j.name || 'joint'),
                 name: j.name || 'joint',
-                tags: Array.isArray(j.tags) ? j.tags : [],
                 timberKeys: (Array.isArray(j.members) ? j.members : [])
                     .map((m) => timberKeyByKumikiEphemeralId.get(m.timberKumikiEphemeralId))
                     .filter((key) => typeof key === 'string'),
