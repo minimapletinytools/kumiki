@@ -309,7 +309,7 @@ def example_double_angled_mortise_and_tenon_with_notch_relief(position=None, use
     )
 
 
-def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None, notch_from=NotchFrom.Shoulder):
+def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None, notch_from=NotchFrom.Face):
     """
     Mortise and tenon on plane-aligned timbers, tenon approaching at 45 degrees (in the
     XY plane), with both timbers being Timber (not the PerfectTimberWithin base) with ROUGH
@@ -339,16 +339,21 @@ def example_mortise_and_tenon_joint_plane_aligned_notched_2sided(position=None, 
         create_v2(ptw_size[1] / scalar(2) + inches(1, 2), ptw_size[1] / scalar(2) + inches(1, 2)),
     )
 
+    mortise_ptw_size = ptw_size + create_v2(inches(2), inches(2))
+    mortise_rough_half_sizes = (
+        create_v2(mortise_ptw_size[0] / scalar(2) + inches(1, 2), mortise_ptw_size[0] / scalar(2) + inches(1, 2)),
+        create_v2(mortise_ptw_size[1] / scalar(2) + inches(1, 2), mortise_ptw_size[1] / scalar(2) + inches(1, 2)),
+    )
     # Receiving (mortise) timber: runs along +X, centered at position
     mortise_timber = Timber(
         length=timber_length,
-        size=ptw_size,
+        size=mortise_ptw_size,
         transform=Transform(
             position=position + create_v3(-timber_length / scalar(2), scalar(0), scalar(0)),
             orientation=compute_timber_orientation(create_v3(scalar(1), scalar(0), scalar(0)), create_v3(scalar(0), scalar(0), scalar(1))),
         ),
         ticket=TimberTicket("mortise"),
-        rough_half_sizes=rough_half_sizes,
+        rough_half_sizes=mortise_rough_half_sizes,
     )
 
     # Tenon timber: approaches from below at 45 degrees from the Y axis in the XY plane.

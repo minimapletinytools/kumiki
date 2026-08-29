@@ -812,7 +812,7 @@
         ]
       },
       "relative_path": "mortise_and_tenon_joints_patterns.py",
-      "sha256": "ef41ef5c5d27eff83f1da0cfd87fceb850b3a8bbb6d6a63d85027d67d16ee928",
+      "sha256": "f0e36770d6c898e4da1c7a7452d2321608640f35e477b9739eab1a407b547b19",
       "warnings": []
     },
     "patterns/multi_butt_joints_patterns.py": {
@@ -939,7 +939,7 @@
         ]
       },
       "relative_path": "onlypoop/relief_example_patterns.py",
-      "sha256": "d38b1648283f1326f1adc0b627a746877d214b81a302193fc852c49b468ce8b4",
+      "sha256": "c4295166f656ca021e300a3e5cd8885190e3ea16e826c2e367414d0e560d6dc8",
       "warnings": []
     },
     "patterns/onlypoop/simple_simultaneous_assembly.py": {
@@ -1325,7 +1325,7 @@
       "warnings": []
     }
   },
-  "generated_at": "2026-08-22T19:20:05.853723+00:00",
+  "generated_at": "2026-08-29T04:26:25.934081+00:00",
   "root_folder": "patterns",
   "schema_version": 1
 }

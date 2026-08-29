@@ -8,6 +8,21 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Changed
+
+- **Breaking:** `ShoulderReliefStyle` is now `InsetShoulderReliefStyle`, and `cut_mortise_and_tenon_joint`'s `shoulder_relief_style` is now `inset_shoulder_relief_style`. The parameter is no longer `Optional`: the old `None` ("skip this step") is now the `NoRelief` member.
+  **Migrate:** rename both, and pass `InsetShoulderReliefStyle.NoRelief` where you passed `None`.
+- The inset-shoulder relief now cuts the mortise timber only where the tenon's shank meets the mortise's PTW, leaving its rough fringe to `relief`. Previously the pocket ran on through the fringe.
+- `InsetShoulderReliefStyle.PerfectOnly` now takes the tenon's own rough excess off the tenon across all four long faces, so a pocket sized to the perfect shank still seats. This generalizes what `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` used to patch in afterwards for `NotchFrom.Face` on two faces only.
+- `cut_mortise_and_tenon_joint` now warns when `relief` is a `ButtJointNotchReliefConfig` and `inset_shoulder_relief_style` is anything but `NoRelief` -- the 4-sided notch is itself the inset-shoulder relief, so the style was silently ignored.
+
+#### Removed
+
+- **Breaking:** `chop_rough_relief_on_long_faces_beyond_shoulder_plane` (`relief.py`). Its one caller is gone; `InsetShoulderReliefStyle.PerfectOnly` now covers this, on all four faces rather than a caller-picked two.
+
+
 ## [kigumi 0.4.11] - 2026-08-23
 
 ### kigumi

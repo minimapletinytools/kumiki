@@ -18,11 +18,13 @@ from kumiki.timber import (
 )
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.timber_shavings import are_timbers_plane_aligned
+from kumiki.cutcsg import csg_children
 from kumiki.joints.workshop.shavings.build_a_butt import (
     SimplePegParameters,
     PegPositionSpace,
 )
 from kumiki.joints.workshop.mortise_and_tenon_joints import (
+    InsetShoulderReliefStyle,
     WedgeParameters,
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_mortise_and_tenon_joint_on_plane_aligned_timbers,
@@ -269,6 +271,7 @@ class TestMortiseAndTenonJointNotchReliefConfig:
             mortise_depth=scalar(2),
             mortise_shoulder_distance_from_centerline_or_centerplane=scalar(2),
             relief=ButtJointNotchReliefConfig(),
+            inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief,
         )
 
         tenon_csg_no_relief = joint_no_relief.cuttings["tenon_timber"].negative_csg
@@ -302,7 +305,7 @@ class TestMortiseAndTenonJointOnPlaneAlignedTimbersNotchReliefConfig:
     These wrappers know the arrangement is plane-aligned, so they should use
     chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided (2 flat walls,
     2 flared walls) themselves -- applying it directly and passing
-    shoulder_relief_style=None (NOT the ShoulderReliefStyle.Rough default) down to
+    inset_shoulder_relief_style=NoRelief (NOT the Rough default) down to
     cut_mortise_and_tenon_joint, so its default SCRIBE-based inset-shoulder housing cut is
     skipped entirely rather than redundantly unioned on top.
 
@@ -1336,3 +1339,130 @@ class TestUnionIntoCut:
         assert mortise.label == MORTISE_CUT_LABEL
         assert len(mortise.children) == 2
         assert mortise.children[0].label == TENON_CUT_LABEL
+
+
+class TestInsetShoulderReliefOnRoughStock:
+    """
+    Inset-shoulder relief on timbers that are actually rough.
+
+    Every other fixture in this file is a perfect timber, where rough and perfect
+    are the same shape and none of this can register.
+
+    Layout: the mortise runs along global X centered at the origin, 6x6 perfect
+    (PTW faces at z=+-3) but sawn to +-4, so z in (3, 4) is its rough fringe. The
+    tenon runs up +Z from the origin, 4x4 perfect (+-2) but sawn to +-2.5. The
+    shoulder sits at z=2, one inch below the mortise's PTW entry face, so the
+    tenon's shank is housed in z in (2, 3). relief=None throughout, to isolate
+    this step from the whole-body scribe that would otherwise cover the same
+    ground.
+    """
+
+    @staticmethod
+    def _arrangement():
+        tenon = replace(
+            create_standard_vertical_timber(height=100, size=(4, 4), position=(0, 0, 0), ticket="tenon_timber"),
+            rough_half_sizes=(create_v2(scalar(5, 2), scalar(5, 2)), create_v2(scalar(5, 2), scalar(5, 2))),
+        )
+        mortise = replace(
+            create_centered_horizontal_timber(direction='x', length=100, size=(6, 6), name="mortise_timber"),
+            rough_half_sizes=(create_v2(scalar(4), scalar(4)), create_v2(scalar(4), scalar(4))),
+        )
+        return ButtJointTimberArrangement(
+            receiving_timber=mortise, butt_timber=tenon, butt_timber_end=TimberEnd.BOTTOM,
+        )
+
+    @staticmethod
+    def _cut(arrangement, style, shoulder_distance=scalar(2)):
+        return cut_mortise_and_tenon_joint(
+            arrangement=arrangement,
+            tenon_size=create_v2(scalar(2), scalar(2)),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(2),
+            mortise_shoulder_distance_from_centerline_or_centerplane=shoulder_distance,
+            relief=None,
+            inset_shoulder_relief_style=style,
+        )
+
+    @staticmethod
+    def _cuts(joint, ticket, point_global):
+        cutting = joint.cuttings[ticket]
+        local = cutting.timber.transform.global_to_local(create_v3(*[scalar(v) for v in point_global]))
+        return bool(cutting.negative_csg.contains_point(local))
+
+    def test_pocket_stops_at_the_mortises_ptw(self):
+        """The pocket reaches the PTW entry face and no further -- the rough fringe
+        beyond it belongs to `relief`, not to this step."""
+        joint = self._cut(self._arrangement(), InsetShoulderReliefStyle.Rough)
+        # (0, 1.5, z): clear of the 2x2 mortise hole, inside the tenon's footprint.
+        assert self._cuts(joint, "mortise_timber", (0, 1.5, 2.5))
+        assert not self._cuts(joint, "mortise_timber", (0, 1.5, 3.5))
+
+    def test_shoulder_landing_in_the_rough_fringe_emits_no_pocket(self):
+        """A shoulder at z=3.5 is proud of the PTW face but still buried in the rough
+        fringe, so there is nothing inside the PTW for this step to remove. The
+        pocket would be geometrically empty either way -- what the PTW-based
+        predicate buys is not building the node at all."""
+        def labels(csg):
+            found, stack = [], [csg]
+            while stack:
+                node = stack.pop()
+                if node.label and node.label.name:
+                    found.append(node.label.name)
+                stack.extend(csg_children(node))
+            return found
+
+        inset = self._cut(self._arrangement(), InsetShoulderReliefStyle.Rough)
+        assert "shoulder_scribe_relief" in labels(inset.cuttings["mortise_timber"].negative_csg)
+
+        in_fringe = self._cut(self._arrangement(), InsetShoulderReliefStyle.Rough, shoulder_distance=scalar(7, 2))
+        assert "shoulder_scribe_relief" not in labels(in_fringe.cuttings["mortise_timber"].negative_csg)
+        assert not self._cuts(in_fringe, "mortise_timber", (0, 1.5, 3.75))
+
+    def test_perfect_only_takes_the_tenons_rough_excess_off_the_tenon(self):
+        """PerfectOnly cuts a pocket sized to the perfect shank, so the tenon's own
+        rough excess has to come off the tenon or the joint will not seat."""
+        joint = self._cut(self._arrangement(), InsetShoulderReliefStyle.PerfectOnly)
+        # y=2.25 is rough excess (perfect stops at 2); y=1.0 is body that must survive.
+        assert self._cuts(joint, "tenon_timber", (0, 2.25, 2.5))
+        assert not self._cuts(joint, "tenon_timber", (0, 1.0, 2.5))
+        # Rough fits the rough shank instead, so it leaves the tenon alone.
+        rough_joint = self._cut(self._arrangement(), InsetShoulderReliefStyle.Rough)
+        assert not self._cuts(rough_joint, "tenon_timber", (0, 2.25, 2.5))
+
+    def test_perfect_only_clears_the_whole_housed_rough_shell(self):
+        """All four faces, not just the two the old face-anchored helper covered."""
+        joint = self._cut(self._arrangement(), InsetShoulderReliefStyle.PerfectOnly)
+        left_behind = [
+            (x / 4, y / 4, z)
+            for x in range(-10, 11)
+            for y in range(-10, 11)
+            for z in (scalar(9, 4), scalar(5, 2), scalar(11, 4))
+            if max(abs(x / 4), abs(y / 4)) > 2  # in the rough shell, outside the perfect body
+            and not self._cuts(joint, "tenon_timber", (x / 4, y / 4, z))
+        ]
+        assert left_behind == []
+
+    def test_notch_relief_config_warns_that_the_style_is_ignored(self):
+        with pytest.warns(UserWarning, match="inset_shoulder_relief_style is ignored"):
+            cut_mortise_and_tenon_joint(
+                arrangement=self._arrangement(),
+                tenon_size=create_v2(scalar(2), scalar(2)),
+                tenon_length=scalar(3),
+                mortise_depth=scalar(2),
+                mortise_shoulder_distance_from_centerline_or_centerplane=scalar(2),
+                relief=ButtJointNotchReliefConfig(),
+                inset_shoulder_relief_style=InsetShoulderReliefStyle.Rough,
+            )
+
+    def test_no_relief_style_does_not_warn(self):
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", UserWarning)
+            cut_mortise_and_tenon_joint(
+                arrangement=self._arrangement(),
+                tenon_size=create_v2(scalar(2), scalar(2)),
+                tenon_length=scalar(3),
+                mortise_depth=scalar(2),
+                mortise_shoulder_distance_from_centerline_or_centerplane=scalar(2),
+                relief=ButtJointNotchReliefConfig(),
+                inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief,
+            )

@@ -21,7 +21,10 @@ from kumiki.joints.workshop.shavings.relief import (
     chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
 )
-from kumiki.joints.workshop.mortise_and_tenon_joints import cut_mortise_and_tenon_joint
+from kumiki.joints.workshop.mortise_and_tenon_joints import (
+    InsetShoulderReliefStyle,
+    cut_mortise_and_tenon_joint,
+)
 from kumiki.rule import (
     Matrix,
     Orientation,
@@ -346,6 +349,7 @@ class TestChopButtJointShoulderNotchRelief4Sided:
             mortise_depth=scalar(2),
             mortise_shoulder_distance_from_centerline_or_centerplane=scalar(1),
             relief=ButtJointNotchReliefConfig(),
+            inset_shoulder_relief_style=InsetShoulderReliefStyle.NoRelief,
         )
         tenon_cutting = joint.cuttings["raking_tenon"]
         cut_timber = CutTimber(timber=imperfect_tenon, cuts=[tenon_cutting])
