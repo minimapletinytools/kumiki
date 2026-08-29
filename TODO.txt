@@ -1,19 +1,28 @@
-:: 8/28/2026 view focus scope
+:: 8/28/2026 drawing mode
 
 we want to support multiple views for planning and drawing in the same window
 
-To enter focus mode on a set of timbers:
+To enter drawing mode on a set of timbers:
 -hide all timbers not in the set from the timber list in the LHS
 -joints containing set timbers are shown, the rest are hidden
   -CutTimbers underneath joints that contain set tmibers can be greyed out or hidden
 -hide all stuff not in the set
 
-focus mode may come with a blueprint camera angle lock:
--locks camera angle
--panning is still allowed
--I guess zoom is allowed too to change the camera cone (rather than move camera in/out, or is this not what zoom is already doing?)
+drawing mode may come with a blueprint camera angle lock:
+-clicking and dragging does rotate camera by a bit but it snaps back when you release
+-panning and zoom is still allowed (note zoom is change view frustum not moving camera in/out, I'm not sure how zoom is currently implemented)
 -a blueprint camera angle lot consists of a +x and +y vector, and a look at direction that must be orthogonal
   -measurement marks are placed relative to the blueprint camera angle
+
+in drawing mode, there should be a button somewhere that says "leave drawing" to return out of it
+
+eventually we will add a concept of "measurements" which are a set of fetaures that have measurements for them being rendered
+upon entering drawing mode, we will likely change to a different set of measurements being displayed
+so there should be a concept of a measurement set taht's being rendered (and the user can modify) that may change when you change focus.
+note that the non drawing scene can also render measurements, but in drawing mode measurements can reference the blueprint camera angle
+
+
+to enter drawing mode, for now, we can convert a selection into drawing mode (just for testing)
 
 
 :: 8/23/2026 drawing details
@@ -26,6 +35,8 @@ focus mode may come with a blueprint camera angle lock:
     -slice: user defined slice sections, although there should maybe be a slice creation function that creates a slice from a slicing plane. (these need to get passed into the final frame too) 
     -member: enum type that takes values mudsill, post, joist, girt, brace, rafter, tie_beam, etc. These will have their own default marking instructions in the drawing system
     -generic: for user space stuff
+  -for now, there sholud be > in the tree view that expands a list of tags (different ypes have different colors, but they all have a string name that's displa1yed). click selects everything with that tag, shift click adds tagged stuff to selection.
+    -in the other direction, if a tag is partially selected, highlight it and put a * in it. Or just auto collapse the tag section if we do our own selection if computing the reverse is too annoying. 
 
 -plan generator: plans are for positioning multiple timbers in a frame
   -plans are generated based on slices
@@ -202,11 +213,13 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 :: TODO
 
+-cleanup notching code lol...
+
 
 -more selection related things
   DONE-add cutcsglables to everything
-  -add cutcsglabels to build a butt and relief.py
   -test edge selection and in particular face face intersecting edges (doesn't seem to work)
+  -add cutcsglabels to build a butt and relief.py
   -there are some redundant solid unions (only 1 element contained) that could be ad-hdoc skipped when click drilling into a timber
     -also consider disabling the 1 step at a time drilling into a feature, it's not really all that necessary.
   -name all the rest of your joints
