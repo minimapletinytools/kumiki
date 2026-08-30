@@ -4,6 +4,9 @@
 
   "viewer.options.ariaLabel": "ビューアーオプション",
   "viewer.options.centerGizmo": "中心ギズモ",
+  "viewer.options.units.label": "単位",
+  "viewer.options.units.metric": "メートル法（mm）",
+  "viewer.options.units.imperial": "ヤード・ポンド法（in）",
   "viewer.options.edges.label": "エッジ",
   "viewer.options.edges.none": "エッジなし",
   "viewer.options.edges.overlay": "オーバーレイ",

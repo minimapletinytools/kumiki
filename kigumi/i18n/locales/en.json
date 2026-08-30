@@ -4,6 +4,9 @@
 
   "viewer.options.ariaLabel": "Viewer options",
   "viewer.options.centerGizmo": "center gizmo",
+  "viewer.options.units.label": "units",
+  "viewer.options.units.metric": "metric (mm)",
+  "viewer.options.units.imperial": "imperial (in)",
   "viewer.options.edges.label": "edges",
   "viewer.options.edges.none": "no edges",
   "viewer.options.edges.overlay": "overlay",

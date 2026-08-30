@@ -421,6 +421,22 @@ def _base_member_payload(
     }
 
 
+def _cut_length(cut_timber: Any) -> Optional[float]:
+    """How long the timber is once its end cuts are made.
+
+    A timber with an end joint is not cut to length first -- the joint decides
+    where its end lands, so `timber.length` is the stock it was cut from rather
+    than the piece that comes out. The bounding prism is already cropped to the
+    end cuts, so its extent along the length axis is the finished piece.
+    """
+    try:
+        prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
+        return round(float(prism.end_distance - prism.start_distance), 6)
+    except Exception as exc:
+        log_stderr(f"Warning: could not measure cut length: {exc}")
+        return None
+
+
 def _cut_timber_to_triangle_mesh_payload(
     cut_timber: Any,
     local_csg: Any,
@@ -470,6 +486,7 @@ def _cut_timber_to_triangle_mesh_payload(
         "csg_features": csg_features,
         "timberClass": timber_class,
         "isPerfectTimber": is_perfect,
+        "cut_length": _cut_length(cut_timber),
     })
 
     # For non-rectangular-actual timbers, also triangulate the perfect-AABB CSG
@@ -634,6 +651,7 @@ def _cut_timber_to_bbox_mesh_payload(
         "timberClass": timber_class,
         "isPerfectTimber": is_perfect,
         "hasActualGeometryDifferentFromPerfect": False,
+        "cut_length": _cut_length(cut_timber),
     })
     return payload
 

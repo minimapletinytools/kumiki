@@ -130,6 +130,7 @@ const SelectionStore = window.SelectionStore;
 const CameraController = window.CameraController;
 const GeometryMode = window.GeometryMode;
 const KigumiTags = window.KigumiTags;
+const KigumiUnits = window.KigumiUnits;
 const TagIndex = window.TagIndex;
 const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
@@ -163,6 +164,9 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 // needs a width of its own -- several times the timbers' own edge lines, or the
 // selection does not read as thicker than the geometry it sits on.
 const CSG_HIGHLIGHT_EDGE_WIDTH_PX = 5;
+
+// Metric stays the default, which is what the viewer always displayed.
+const { UNIT_SYSTEMS, DEFAULT_UNIT_SYSTEM } = window.KigumiUnits;
 
 const SELECTION_VISUAL_STATES = Object.freeze({
     NOTHING_SELECTED: 'nothing_selected',
@@ -635,6 +639,13 @@ class ViewerSettingsPanel {
                     ${t('viewer.options.centerGizmo')}
                 </label>
                 <label>
+                    ${t('viewer.options.units.label')}
+                    <select id="units-select" .value=${this.app.units || 'metric'}>
+                        <option value="metric">${t('viewer.options.units.metric')}</option>
+                        <option value="imperial">${t('viewer.options.units.imperial')}</option>
+                    </select>
+                </label>
+                <label>
                     ${t('viewer.options.edges.label')}
                     <select id="edge-mode-select" .value=${this.app.edgeMode || 'noOverlay'}>
                         <option value="none">${t('viewer.options.edges.none')}</option>
@@ -824,6 +835,11 @@ class ViewerSettingsPanel {
         const app = this.app;
         return [
             { id: 'center-gizmo-toggle', on: 'change', apply: (el) => app.setCenterGizmoEnabled(el.checked) },
+            {
+                id: 'units-select', on: 'change',
+                apply: (el) => app.setUnits(el.value),
+                sync: (el) => { el.value = app.units || DEFAULT_UNIT_SYSTEM; },
+            },
             {
                 id: 'edge-mode-select', on: 'change',
                 apply: (el) => app.setEdgeMode(el.value),
@@ -1157,6 +1173,7 @@ class KigumiViewerApp extends LitElement {
         this.showCenterGizmo = true;
         this.edgeMode = 'noOverlay';
         this.edgeLineThicknessPx = 1.5;
+        this.units = DEFAULT_UNIT_SYSTEM;
         this.shadowsEnabled = false;
         this.reflectionsEnabled = true;
         this.footprintColor = DEFAULT_FOOTPRINT_COLOR;
@@ -1885,6 +1902,7 @@ class KigumiViewerApp extends LitElement {
                 edgeMode: String(this.edgeMode || 'noOverlay'),
                 edgeLineVisibilityPercent: Number(this.edgeLineVisibilityPercent),
                 edgeLineThicknessPx: Number(this.edgeLineThicknessPx),
+                units: String(this.units || DEFAULT_UNIT_SYSTEM),
                 shadowsEnabled: Boolean(this.shadowsEnabled),
                 reflectionsEnabled: Boolean(this.reflectionsEnabled),
                 footprintColor: String(this.footprintColor || DEFAULT_FOOTPRINT_COLOR),
@@ -1940,6 +1958,9 @@ class KigumiViewerApp extends LitElement {
         }
         if (Number.isFinite(ui.edgeLineThicknessPx)) {
             this.setEdgeLineThicknessPx(Number(ui.edgeLineThicknessPx));
+        }
+        if (typeof ui.units === 'string') {
+            this.setUnits(ui.units);
         }
         if (typeof ui.shadowsEnabled === 'boolean') {
             this.setShadowsEnabled(ui.shadowsEnabled);
@@ -2989,8 +3010,19 @@ class KigumiViewerApp extends LitElement {
         this.lightDialDragging = false;
     }
 
+    /** A length in metres, in whichever units the viewer is set to. */
     fmt(value) {
-        return (value * 1000).toFixed(1) + ' mm';
+        return KigumiUnits.formatLength(value, this.units);
+    }
+
+    setUnits(units) {
+        const next = UNIT_SYSTEMS.includes(units) ? units : DEFAULT_UNIT_SYSTEM;
+        if (this.units === next) {
+            return;
+        }
+        this.units = next;
+        this._refreshMemberList();
+        this.updateInfo(this.currentFrameData);
     }
 
     clampPhi(value) {
@@ -4338,12 +4370,11 @@ class KigumiViewerApp extends LitElement {
     }
 
     _formatMemberLength(mesh) {
-        if (mesh.prism_length === undefined) {
-            return '—';
-        }
-
-        const exactLengthM = Number(mesh.prism_length);
-        if (!Number.isFinite(exactLengthM)) {
+        // The finished piece rather than the stock it was cut from: a timber
+        // with an end joint is never cut to length first, so its declared
+        // length is not a dimension anyone meant (see docs/concepts.md).
+        const exactLengthM = KigumiUnits.memberLengthMeters(mesh);
+        if (exactLengthM === null) {
             return '—';
         }
 
@@ -4418,6 +4449,11 @@ class KigumiViewerApp extends LitElement {
         }
 
         const selectedTags = this._selectedTags(selectedMembers);
+        // Only with exactly one member selected: two sets of dimensions in one
+        // line would read as one member's.
+        const selectedSize = selectedKnownCount === 1
+            ? this._describeMemberSize(this.memberMetadataByKey.get(selectedMembers[0]))
+            : null;
 
         const focus = this.selectionManager.csgFocus;
         const detail = this.lastPickDetail;
@@ -4445,7 +4481,33 @@ class KigumiViewerApp extends LitElement {
             selectedAccessoryCount,
             breadcrumb,
             tags: selectedTags,
+            size: selectedSize,
         });
+    }
+
+    /**
+     * One selected member as stock: its cross-section and its finished length,
+     * e.g. 4" x 4" - 120".
+     *
+     * The length is what the timber measures once its end cuts are made, not
+     * the stock it was cut from -- a timber with an end joint is never cut to
+     * length first, so the two differ for most of a frame.
+     */
+    _describeMemberSize(metadata) {
+        const mesh = metadata && metadata.mesh;
+        if (!mesh || metadata.type === 'accessory') {
+            return null;
+        }
+        const width = this._formatMemberCrossSection(mesh, 'width');
+        const height = this._formatMemberCrossSection(mesh, 'height');
+        // cut_length is absent on an older runner; the uncut length is the
+        // honest fallback, and it is what the member list shows anyway.
+        const lengthMeters = KigumiUnits.memberLengthMeters(mesh);
+        const lengthValue = lengthMeters === null ? '—' : this.fmt(lengthMeters);
+        if (width === '—' || height === '—' || lengthValue === '—') {
+            return null;
+        }
+        return `${width} x ${height} - ${lengthValue}`;
     }
 
     /**
@@ -4511,6 +4573,16 @@ class KigumiViewerApp extends LitElement {
             accessories: summary.accessoriesCount,
         });
         body.appendChild(counts);
+
+        if (summary.size) {
+            // No member name here: the breadcrumb underneath already carries it,
+            // and the room is better spent on the dimensions.
+            const size = document.createElement('div');
+            size.className = 'ip-size';
+            size.textContent = summary.size;
+            size.title = summary.size;
+            body.appendChild(size);
+        }
 
         if (summary.breadcrumb) {
             const crumb = document.createElement('div');
@@ -4893,7 +4965,12 @@ class KigumiViewerApp extends LitElement {
             this.scene.add(edgeMesh);
             this.scene.add(reflectionMesh);
             this.meshKeyMap.set(solidMesh, key);
-            this.memberMetadataByKey.set(key, { name: memberName, type: memberType, tags: KigumiTags.coerceTags(mesh.tags) });
+            this.memberMetadataByKey.set(key, {
+                name: memberName,
+                type: memberType,
+                tags: KigumiTags.coerceTags(mesh.tags),
+                mesh,
+            });
             this.meshObjectsByKey.set(key, {
                 memberType,
                 profileId: materialSet.profileId,

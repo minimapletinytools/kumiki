@@ -1410,6 +1410,15 @@ kigumi-layers-view:has(.lp-collapsed) {
     color: var(--hv-dim);
 }
 
+/* The selected member as stock: name, cross-section, finished length. */
+.ip-size {
+    font-variant-numeric: tabular-nums;
+    color: var(--hv-strong);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .ip-chips {
     display: inline-flex;
     flex-wrap: wrap;
