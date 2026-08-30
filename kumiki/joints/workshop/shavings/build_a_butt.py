@@ -589,96 +589,97 @@ def dovetail_tenon_geometry(
 
     wedge_accessory_csg = None
     wedge_slot_in_mortise_csg = None
-    if True:
-        wedge_extra_height = getattr(wedge_accessory_parameters, "wedge_extra_height", 0)
-        wedge_small_height_value = dovetail_depth + wedge_extra_height
-        wedge_angle = wedge_accessory_parameters.wedge_angle
-        wedge_back_extra = wedge_accessory_parameters.wedge_back_extra_length
-        wedge_tip_stickout = wedge_accessory_parameters.wedge_tip_stickout
 
-        tan_wedge_angle = _sym_tan(wedge_angle)
 
-        # Thicknesses at the base (large) and tip (small) ends.
-        # The small_height reference is wedge_tip_stickout away from the tip end (toward base),
-        # so distance from base to small_height ref = wedge_back_extra + tenon_depth.
-        h_base = wedge_small_height_value + (wedge_back_extra + tenon_depth) * tan_wedge_angle
-        h_tip = wedge_small_height_value - wedge_tip_stickout * tan_wedge_angle
+    wedge_extra_height = getattr(wedge_accessory_parameters, "wedge_extra_height", 0)
+    wedge_small_height_value = dovetail_depth + wedge_extra_height
+    wedge_angle = wedge_accessory_parameters.wedge_angle
+    wedge_back_extra = wedge_accessory_parameters.wedge_back_extra_length
+    wedge_tip_stickout = wedge_accessory_parameters.wedge_tip_stickout
 
-        if not wedge_accessory_parameters.wedge_from_receiving_timber_side:
-            # (0,0) at shoulder; base back, tip forward.
-            x_base = -wedge_back_extra
-            x_tip = tenon_depth + wedge_tip_stickout
+    tan_wedge_angle = _sym_tan(wedge_angle)
 
-            # Only the mortise slot is extended: grow from the base side until
-            # the perfect receiving-timber boundary in this axis.
-            receiving_perfect_boundary = -arrangement.receiving_timber.get_size_in_direction_3d(
-                into_mortise_dir
-            )
-            x_base_slot = min(x_base, receiving_perfect_boundary)
-        else:
-            # (0,0) at the receiving timber's far face. The wedge points back toward the butt
-            # timber. The earlier wedge-fit assertion guarantees this case is only used when the
-            # mortise is at least as deep as the receiving timber, so the wedge clears.
-            receiving_axis_width = arrangement.receiving_timber.get_size_in_face_normal_axis(
-                dovetail_top_side_on_butt_timber.to.face()
-            )
-            x_base = receiving_axis_width + wedge_back_extra
-            x_tip = -wedge_tip_stickout
-            x_base_slot = max(x_base, receiving_axis_width)
+    # Thicknesses at the base (large) and tip (small) ends.
+    # The small_height reference is wedge_tip_stickout away from the tip end (toward base),
+    # so distance from base to small_height ref = wedge_back_extra + tenon_depth.
+    h_base = wedge_small_height_value + (wedge_back_extra + tenon_depth) * tan_wedge_angle
+    h_tip = wedge_small_height_value - wedge_tip_stickout * tan_wedge_angle
 
-        # Profile points (CW in math orientation) in the extrusion frame X-Y plane.
-        wedge_profile_points = [
-            create_v2(x_base, scalar(0)),
-            create_v2(x_base, h_base),
-            create_v2(x_tip, h_tip),
-            create_v2(x_tip, scalar(0)),
-        ]
+    if not wedge_accessory_parameters.wedge_from_receiving_timber_side:
+        # (0,0) at shoulder; base back, tip forward.
+        x_base = -wedge_back_extra
+        x_tip = tenon_depth + wedge_tip_stickout
 
-        # Hold flat at h_base from x_base_slot to x_base (clearance room the wedge itself never
-        # occupies), then taper from (x_base, h_base) to (x_tip, h_tip) -- the same two points
-        # that define the wedge accessory's own edge, so the slot's taper angle matches the
-        # wedge's taper angle exactly instead of being averaged over the longer x_base_slot..x_tip run.
-        wedge_slot_profile_points = [
-            create_v2(x_base_slot, scalar(0)),
-            create_v2(x_base_slot, h_base),
-            create_v2(x_base, h_base),
-            create_v2(x_tip, h_tip),
-            create_v2(x_tip, scalar(0)),
-        ]
-
-        # Accessory geometry is rendered in its own local frame; the CSGAccessory.transform
-        # places it globally. We keep the wedge polygon in the extrusion frame's coordinates,
-        # so the accessory transform IS the extrusion transform.
-        wedge_positive_csg = ConvexPolygonExtrusion(
-            points=wedge_profile_points,
-            transform=Transform.identity(),
-            start_distance=-half_lateral,
-            end_distance=half_lateral,
+        # Only the mortise slot is extended: grow from the base side until
+        # the perfect receiving-timber boundary in this axis.
+        receiving_perfect_boundary = -arrangement.receiving_timber.get_size_in_direction_3d(
+            into_mortise_dir
         )
-        # Assembly: the wedge backs out opposite its drive direction. It locks
-        # the joint, so it pops at suborder 0 before the tenon slides.
-        wedge_drive_direction = (
-            -into_mortise_dir
-            if wedge_accessory_parameters.wedge_from_receiving_timber_side
-            else into_mortise_dir
+        x_base_slot = min(x_base, receiving_perfect_boundary)
+    else:
+        # (0,0) at the receiving timber's far face. The wedge points back toward the butt
+        # timber. The earlier wedge-fit assertion guarantees this case is only used when the
+        # mortise is at least as deep as the receiving timber, so the wedge clears.
+        receiving_axis_width = arrangement.receiving_timber.get_size_in_face_normal_axis(
+            dovetail_top_side_on_butt_timber.to.face()
         )
-        wedge_length = wedge_back_extra + tenon_depth + wedge_tip_stickout
-        wedge_accessory_csg = CSGAccessory(
-            transform=extrusion_transform,
-            positive_csg=wedge_positive_csg,
-            assembly_freedom=AssemblyFreedom.translation(-wedge_drive_direction, freed_after=wedge_length),
-            assembly_ordering=Ordering(0, -1),
-        )
+        x_base = receiving_axis_width + wedge_back_extra
+        x_tip = -wedge_tip_stickout
+        x_base_slot = max(x_base, receiving_axis_width)
 
-        # The mortise cavity must also include the wedge's slot (above Y=0), so the wedge can
-        # actually sit in the receiving timber. Use the same profile in the extrusion frame.
-        wedge_slot_in_mortise_csg = ConvexPolygonExtrusion(
-            points=wedge_slot_profile_points,
-            transform=extrusion_transform,
-            start_distance=-half_lateral,
-            end_distance=half_lateral,
-            label=CutCSGLabel("wedge_slot"),
-        )
+    # Profile points (CW in math orientation) in the extrusion frame X-Y plane.
+    wedge_profile_points = [
+        create_v2(x_base, scalar(0)),
+        create_v2(x_base, h_base),
+        create_v2(x_tip, h_tip),
+        create_v2(x_tip, scalar(0)),
+    ]
+
+    # Hold flat at h_base from x_base_slot to x_base (clearance room the wedge itself never
+    # occupies), then taper from (x_base, h_base) to (x_tip, h_tip) -- the same two points
+    # that define the wedge accessory's own edge, so the slot's taper angle matches the
+    # wedge's taper angle exactly instead of being averaged over the longer x_base_slot..x_tip run.
+    wedge_slot_profile_points = [
+        create_v2(x_base_slot, scalar(0)),
+        create_v2(x_base_slot, h_base),
+        create_v2(x_base, h_base),
+        create_v2(x_tip, h_tip),
+        create_v2(x_tip, scalar(0)),
+    ]
+
+    # Accessory geometry is rendered in its own local frame; the CSGAccessory.transform
+    # places it globally. We keep the wedge polygon in the extrusion frame's coordinates,
+    # so the accessory transform IS the extrusion transform.
+    wedge_positive_csg = ConvexPolygonExtrusion(
+        points=wedge_profile_points,
+        transform=Transform.identity(),
+        start_distance=-half_lateral,
+        end_distance=half_lateral,
+    )
+    # Assembly: the wedge backs out opposite its drive direction. It locks
+    # the joint, so it pops at suborder 0 before the tenon slides.
+    wedge_drive_direction = (
+        -into_mortise_dir
+        if wedge_accessory_parameters.wedge_from_receiving_timber_side
+        else into_mortise_dir
+    )
+    wedge_length = wedge_back_extra + tenon_depth + wedge_tip_stickout
+    wedge_accessory_csg = CSGAccessory(
+        transform=extrusion_transform,
+        positive_csg=wedge_positive_csg,
+        assembly_freedom=AssemblyFreedom.translation(-wedge_drive_direction, freed_after=wedge_length),
+        assembly_ordering=Ordering(0, -1),
+    )
+
+    # The mortise cavity must also include the wedge's slot (above Y=0), so the wedge can
+    # actually sit in the receiving timber. Use the same profile in the extrusion frame.
+    wedge_slot_in_mortise_csg = ConvexPolygonExtrusion(
+        points=wedge_slot_profile_points,
+        transform=extrusion_transform,
+        start_distance=-half_lateral,
+        end_distance=half_lateral,
+        label=CutCSGLabel("wedge_slot"),
+    )
 
     # ---- Mortise negative prism ----
     # Same dovetail plane (same bottom slope), but the prism is longer so the mortise cavity
