@@ -67,6 +67,21 @@ async function main() {
   // initial suite failed on a window it never meant to test.
   const userDataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'kigumi-vscode-user-data-'));
 
+  // A first-run profile opens the Welcome tab in front of everything, and a
+  // webview that is not visible gets no requestAnimationFrame -- which is what
+  // the screenshot automation waits on, so it waits forever. Seed the profile
+  // with the settings that keep the editor area clear.
+  fs.mkdirSync(path.join(userDataDir, 'User'), { recursive: true });
+  fs.writeFileSync(
+    path.join(userDataDir, 'User', 'settings.json'),
+    JSON.stringify({
+      'workbench.startupEditor': 'none',
+      'window.restoreWindows': 'none',
+      'workbench.tips.enabled': false,
+      'update.showReleaseNotes': false,
+    }, null, 2)
+  );
+
   try {
     await runTests({
       extensionDevelopmentPath,
