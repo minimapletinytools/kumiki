@@ -8,20 +8,58 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-08-30
+
 ### kumiki
+
+#### Added
+
+- Added a real feature model to the CSG primitives. A feature is now an object stored on the primitive it belongs to (`CSGFeature`, with `HalfSpaceFeature`, `SimpleRectangularPrismFeature`, `SimpleCylinderFeature`, `SimpleConvexPolygonExtrusionFeature`, `SimpleLoftFeature`, `DerivedEdgeFeature`, `ProgrammableCSGFeature`), rather than an opt-in name on two of them. Features say what type they are (`CSGFeatureType`), whether a point is on them, where they lie (`locate()` returns the unbounded plane/line/point in the owner's space, or `None` where no single one describes the surface -- a cylinder's barrel, a loft side, a curved extrusion side), and how far they run (`CSGFeatureExtent`). Read them with `get_declared_features()` / `get_all_features()` / `find_feature()`.
+- Added `FeatureProperties` alongside each feature, carrying how it should be treated when drawings are generated: `FeatureGroup`, `FeaturePurpose`, and a `FeatureMarkingSpec` / `FeatureMarkingStatus`.
+- Added derived edges: where two declared faces meet, the edge between them is now a feature in its own right rather than something a caller had to reconstruct.
+- Added typed tags on timbers. `TimberTicket.tags` holds `TimberTag` values in three kinds -- `GenericTag` for user space, `SliceTag` for slice sections, and `MemberTag` for the structural role -- and a bare string still works, becoming a `GenericTag`. Tags are stripped, deduped and ordered when the ticket is built. `TimberTicket.with_tags()` and `with_member()` return a retagged copy, preserving the ticket's `kumiki_id`.
+- Added `Member`, a closed enum of structural roles arranged as a tree: a corner post is a post, a summer beam is a beam, and a beam is horizontal. Ask with `Member.is_a()` / `MemberTag.is_a()`. A timber wears exactly one member role.
+- Added `safe_zero_test_sq`, which takes a *linear* tolerance for a *squared* value and squares it internally, so `eps` means a distance in model units at every call site. Passing a squared value to `safe_zero_test` compared it against a linear tolerance -- at `eps=5e-4` that treats any length below 22mm as zero, which had already been the shape of two real bugs here.
+- Added `CutTimber.joints`, so cut geometry can be attributed back to the joint that produced it.
 
 #### Changed
 
+- **Breaking:** `CutCSG.label` is now a `CutCSGLabel` rather than an `Optional[str]`, so what a label carries can grow without revisiting every node that builds one. An unnamed node holds `CutCSGLabel.NoLabel()` rather than `None`, so reads never need a `None` check first.
+  **Migrate:** read the string as `csg.label.name`; construct with `CutCSGLabel("shoulder")`. `if csg.label:` still answers what you expect -- the class defines its truthiness by whether it has a name.
+- **Breaking:** a `Cutting` that removes nothing now returns `None` from `get_negative_csg_local()` rather than an `EmptyCSG`, and a `Joint` whose cuttings between them remove nothing is rejected at construction -- it would cut no timber at all.
+  **Migrate:** a joint built only to carry assembly annotations needs a real cut on at least one cutting (an end cut counts).
+- **Breaking:** each cutting now always wraps what it removes in one `SolidUnion` of its own, named or not, so the CSG tree has the same shape whether or not anyone named the cut.
+- **Breaking:** `EPSILON_FLOAT` is gone; `EPSILON_GENERIC` (`1e-8`) is the single fallback tolerance. The two sat a hundred times apart with no rule for which applied where.
+  **Migrate:** replace `EPSILON_FLOAT` with `EPSILON_GENERIC`, or pass an explicit tolerance.
+- **Breaking:** `JointTicket` no longer has a `tags` field. Nothing set it, and joints are getting their own tagging system rather than sharing the timber one.
 - **Breaking:** `ShoulderReliefStyle` is now `InsetShoulderReliefStyle`, and `cut_mortise_and_tenon_joint`'s `shoulder_relief_style` is now `inset_shoulder_relief_style`. The parameter is no longer `Optional`: the old `None` ("skip this step") is now the `NoRelief` member.
   **Migrate:** rename both, and pass `InsetShoulderReliefStyle.NoRelief` where you passed `None`.
 - The inset-shoulder relief now cuts the mortise timber only where the tenon's shank meets the mortise's PTW, leaving its rough fringe to `relief`. Previously the pocket ran on through the fringe.
 - `InsetShoulderReliefStyle.PerfectOnly` now takes the tenon's own rough excess off the tenon across all four long faces, so a pocket sized to the perfect shank still seats. This generalizes what `cut_mortise_and_tenon_joint_on_plane_aligned_timbers` used to patch in afterwards for `NotchFrom.Face` on two faces only.
 - `cut_mortise_and_tenon_joint` now warns when `relief` is a `ButtJointNotchReliefConfig` and `inset_shoulder_relief_style` is anything but `NoRelief` -- the 4-sided notch is itself the inset-shoulder relief, so the style was silently ignored.
+- Identical half-space cuts are no longer deduplicated. A cutting can describe the same plane twice, once as its `negative_csg` and once as end-cut metadata; the dedup that reconciled them fired only when `negative_csg` was a bare `HalfSpace`, and when it did fire it silently discarded one of the two -- which is how a plain butt joint lost its `top_end_cut` name. Both copies are kept now: subtracting a plane twice removes the same material, and a search resolves to the cut the joint authored rather than the generated end cut trailing it.
 
 #### Removed
 
+- **Breaking:** `Cutting.make_end_cut`. It was a duplicate of `chop_timber_end_with_half_plane` in `shavings.py` -- same signature, same maths -- which now takes the label instead.
+  **Migrate:** call `chop_timber_end_with_half_plane(...)`, passing a `label` where the cut should be named.
+- **Breaking:** `chop_relief_for_butt_joint_arrangement` (`relief.py`). Its one production caller, the wedged half-dovetail mortise and tenon, is face-aligned and so plane-aligned, where the 2-sided notch applies.
+  **Migrate:** use the 2-sided notch; its `notch_angle` is the old minimum-flare parameter renamed. At the default `mortise_shoulder_inset` of 0 the geometry is unchanged; with the shoulder inset the mortise loses about 0.14% more material.
 - **Breaking:** `chop_rough_relief_on_long_faces_beyond_shoulder_plane` (`relief.py`). Its one caller is gone; `InsetShoulderReliefStyle.PerfectOnly` now covers this, on all four faces rather than a caller-picked two.
 
+### kigumi
+
+#### Added
+
+- The CSG trees moved into the timber list, and selection was rewritten around them. While timbers are selected a click drills into the CSG of the nearest *selected* timber along the ray -- even one sitting behind an unselected neighbour -- so nothing in front can steal the click while you inspect; shift-click always changes which timbers are selected.
+- Added a tags section at the top of the layers tree, closed until asked for. Each row is a kind-coloured pill, the tag name, and how many members wear it: clicking selects all of them, shift-clicking adds them. It reads in reverse too -- selecting timbers any other way lights up the tags they carry, fully when every member is selected and with a `*` when only some are.
+- The expanded selection pane now lists the tags across the selection as pills.
+
+#### Changed
+
+- Tags now cross the wire as `{kind, name}` rather than bare strings, so the viewer can tell a slice from a member. An unknown kind is shown as generic rather than dropped.
+- Member rows no longer carry tag pills -- they cost more horizontal room than they earned. Tags still match in the layers search box.
+- The selection breadcrumb shows each node once, and says what a click actually landed on.
 
 ## [kigumi 0.4.11] - 2026-08-23
 
