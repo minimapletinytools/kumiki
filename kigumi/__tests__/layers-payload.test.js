@@ -1,3 +1,6 @@
+// layers-panel captures KigumiTags at load, the way viewer.html loads tags.js
+// ahead of it, so the require order here matters.
+require('../webview/tags.js');
 const { KigumiLayersView } = require('../webview/layers-panel.js');
 
 // _convertRunnerPayload joins the runner's kumiki ids to viewer member keys.
@@ -9,7 +12,7 @@ function convert(payload) {
 }
 
 const TIMBERS = [
-    { kumikiEphemeralId: 1, memberKey: 'T1', name: 'post', tags: ['load'] },
+    { kumikiEphemeralId: 1, memberKey: 'T1', name: 'post', tags: [{ kind: 'member', name: 'king_post' }, 'load'] },
     { kumikiEphemeralId: 2, memberKey: 'T2', name: 'beam' },
 ];
 
@@ -17,7 +20,12 @@ describe('layers payload conversion', () => {
     test('timbers keep their key, name and tags', () => {
         const { timbers } = convert({ timbers: TIMBERS });
         expect(timbers).toEqual([
-            { key: 'T1', name: 'post', tags: ['load'] },
+            {
+                key: 'T1',
+                name: 'post',
+                // A bare string is coerced, so a hand-built payload still renders.
+                tags: [{ kind: 'member', name: 'king_post' }, { kind: 'generic', name: 'load' }],
+            },
             { key: 'T2', name: 'beam', tags: [] },
         ]);
     });

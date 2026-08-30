@@ -129,6 +129,7 @@ const VIEWER_APP_VERSION = '2026.03.17.4';
 const SelectionStore = window.SelectionStore;
 const CameraController = window.CameraController;
 const GeometryMode = window.GeometryMode;
+const KigumiTags = window.KigumiTags;
 const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
@@ -4188,10 +4189,8 @@ class KigumiViewerApp extends LitElement {
             const mesh = meshes[index];
             const typeLabel = mesh.memberType === 'accessory' ? 'Accessory' : 'Timber';
             const memberName = mesh.memberName || mesh.name || '?';
-            const tags = Array.isArray(mesh.tags)
-                ? mesh.tags.filter((tag) => typeof tag === 'string' && tag.trim().length > 0)
-                : [];
-            const tagsLabel = tags.length > 0 ? tags.join(', ') : '—';
+            const tags = KigumiTags.coerceTags(mesh.tags);
+            const tagsLabel = tags.length > 0 ? tags.map((tag) => tag.name).join(', ') : '—';
             const row = document.createElement('tr');
             const lengthValue = this._formatMemberLength(mesh);
             const widthValue = this._formatMemberCrossSection(mesh, 'width');

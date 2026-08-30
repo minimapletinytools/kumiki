@@ -12,6 +12,8 @@
     // this file; capturing it here makes that ordering a stated dependency
     // rather than something the rows happen to get away with at click time.
     const CsgTreeView = globalScope.CsgTreeView;
+    // Tags arrive as {kind, name}; viewer.html loads this ahead of us.
+    const KigumiTags = globalScope.KigumiTags;
 
     // CSG rows indent from where the member rows leave off (.lp-depth-0 is
     // 18px), one step per level. The old 10px step started shallower than the
@@ -121,7 +123,7 @@
             const q = this.filterText.trim().toLowerCase();
             if (!q) return true;
             if (name && name.toLowerCase().includes(q)) return true;
-            if (tags && tags.some(t => t.toLowerCase().includes(q))) return true;
+            if (tags && tags.some((tag) => tag.name.toLowerCase().includes(q))) return true;
             return false;
         }
 
@@ -271,7 +273,8 @@
                 for (const tag of tags) {
                     const chip = document.createElement('span');
                     chip.className = 'lp-chip';
-                    chip.textContent = tag;
+                    chip.dataset.tagKind = tag.kind;
+                    chip.textContent = tag.name;
                     chipsEl.appendChild(chip);
                 }
                 row.appendChild(chipsEl);
@@ -897,7 +900,7 @@
             const hierarchyTimbers = timbers.map((t) => ({
                 key: t.memberKey,
                 name: t.name || t.memberKey,
-                tags: Array.isArray(t.tags) ? t.tags : [],
+                tags: KigumiTags.coerceTags(t.tags),
             })).filter((t) => typeof t.key === 'string' && t.key.length > 0);
 
             const hierarchyJoints = joints.map((j) => ({

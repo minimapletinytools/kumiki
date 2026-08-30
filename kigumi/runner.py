@@ -432,7 +432,7 @@ def _cut_timber_to_triangle_mesh_payload(
     dims = actual["bounds"][1] - actual["bounds"][0]
 
     timber = cut_timber.timber
-    timber_tags = _normalize_ticket_tags(getattr(timber, "ticket", None))
+    timber_tags = _serialize_timber_tags(getattr(timber, "ticket", None))
     perfect_size = timber.get_perfect_size()
     nominal_size = timber.get_nominal_size()
     csg_nodes, csg_features = _count_csg_nodes_and_features(local_csg)
@@ -601,7 +601,7 @@ def _cut_timber_to_bbox_mesh_payload(
     haven't tried this, not sure how well it works, I guess the bbox might not be oriented correctly in this version...
     """
     timber = cut_timber.timber
-    timber_tags = _normalize_ticket_tags(getattr(timber, "ticket", None))
+    timber_tags = _serialize_timber_tags(getattr(timber, "ticket", None))
     perfect_size = timber.get_perfect_size()
     nominal_size = timber.get_nominal_size()
     prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
@@ -890,29 +890,50 @@ def _serialize_cutting_summary(cut_timber: Any) -> List[Dict[str, Any]]:
     return cuts_meta
 
 
-def _normalize_ticket_tags(ticket: Any) -> List[str]:
-    """Tag names off a timber ticket. Only TimberTicket carries tags.
+def _timber_tag_kinds() -> List[Tuple[type, str]]:
+    """The kumiki tag classes paired with their wire names, most specific first.
 
-    Kumiki tags are TimberTag objects and the viewer still reads plain strings,
-    so this ships the names alone; the kind is dropped until the payload
-    becomes typed.
+    Imported per call rather than at module scope: a reload purges and
+    re-imports kumiki, which would leave a module-level class object matching
+    nothing an isinstance check is ever handed.
+    """
+    from kumiki.ticket import GenericTag, MemberTag, SliceTag
+
+    return [(SliceTag, "slice"), (MemberTag, "member"), (GenericTag, "generic")]
+
+
+def _serialize_timber_tags(ticket: Any) -> List[Dict[str, str]]:
+    """Typed tags off a timber ticket, as {"kind", "name"} sorted by both.
+
+    Only TimberTicket carries tags. A tag class with no wire name is skipped
+    with a warning rather than raised on: this runs inside the per-timber
+    geometry build, where an exception costs the whole timber's mesh. The
+    kumiki-side test that every tag class is listed here is the loud half.
     """
     raw_tags = getattr(ticket, "tags", ())
     if not isinstance(raw_tags, (list, tuple)):
         return []
 
-    tags: List[str] = []
-    seen: set[str] = set()
+    kinds = _timber_tag_kinds()
+    tags: List[Dict[str, str]] = []
+    seen: set[Tuple[str, str]] = set()
     for tag in raw_tags:
-        name = tag if isinstance(tag, str) else getattr(tag, "name", None)
+        if isinstance(tag, str):
+            kind, name = "generic", tag
+        else:
+            kind = next((wire for cls, wire in kinds if isinstance(tag, cls)), "")
+            if not kind:
+                log_stderr(f"Warning: skipping tag of unknown kind {type(tag).__name__}")
+                continue
+            name = getattr(tag, "name", "")
         if not isinstance(name, str):
             continue
-        normalized = name.strip()
-        if not normalized or normalized in seen:
+        name = name.strip()
+        if not name or (kind, name) in seen:
             continue
-        seen.add(normalized)
-        tags.append(normalized)
-    tags.sort()
+        seen.add((kind, name))
+        tags.append({"kind": kind, "name": name})
+    tags.sort(key=lambda tag: (tag["kind"], tag["name"]))
     return tags
 
 
@@ -934,7 +955,7 @@ def serialize_layers(frame: Any) -> Dict[str, Any]:
     timber_tags_by_kumiki_id: Dict[int, List[str]] = {}
     for entry in timber_entries:
         timber_ticket = getattr(entry.get("timber"), "ticket", None)
-        timber_tags_by_kumiki_id[entry["kumikiEphemeralId"]] = _normalize_ticket_tags(timber_ticket)
+        timber_tags_by_kumiki_id[entry["kumikiEphemeralId"]] = _serialize_timber_tags(timber_ticket)
 
     # Extract joint records from source_joints
     source_joints = list(getattr(frame, "source_joints", ()) or ())
