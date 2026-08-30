@@ -23,9 +23,20 @@ upon entering drawing mode, we will likely change to a different set of measurem
 so there should be a concept of a measurement set taht's being rendered (and the user can modify) that may change when you change focus.
 note that the non drawing scene can also render measurements, but in drawing mode measurements can reference the blueprint camera angle
 
-
 to enter drawing mode, for now, we can convert a selection into drawing mode (just for testing)
 
+the tree view now has a measurement section showing all the measurements for the current drawing set
+
+drawing sets include:
+-the entire frame
+-slices
+-individual timbers
+-perhaps some new tag type for drawing sets that aren't slices
+-arbitary selections (for testing, but I guess the drawing generator may decide to group arbitarry selections into one drawing group)
+
+the measurement set is generated as follows
+-first check if python exported any measurements together with the frame (to be added)
+-next read some measurement spec file that matches the program file name to get any user added override spec for each drawing set.
 
 :: 8/23/2026 drawing details
 
@@ -232,11 +243,14 @@ DONE-add cutcsglables to everything
 IGNORE/DONE-name all the rest of your joints
 DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a project?)
 DONE-don't show accesories in timber list ivew.. tehy should only show under jonits
-
+DONE-add cutcsglabels to build a butt
+-finish cutcsg lables in relief.py
 -test edge selection and in particular face face intersecting edges (doesn't seem to work)
--add cutcsglabels to build a butt and relief.py
 -add proper reference face/edge support to timbers
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
+
+
+
 
 
 -more selection related things
