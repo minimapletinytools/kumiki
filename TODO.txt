@@ -1,3 +1,5 @@
+
+
 :: 8/28/2026 drawing mode
 
 we want to support multiple views for planning and drawing in the same window
@@ -30,7 +32,7 @@ to enter drawing mode, for now, we can convert a selection into drawing mode (ju
 -improve footprint system
   -allow adding slice lines from the footprint and also auto derive slice lines from the footprint boundary
   -slice lines are tagged with slice tag (see below)
--improve tagging system
+DONE-improve tagging system
   -tags become typed, if a vanilla string is passed in, it gets converted to arbitrary
     -slice: user defined slice sections, although there should maybe be a slice creation function that creates a slice from a slicing plane. (these need to get passed into the final frame too) 
     -member: enum type that takes values mudsill, post, joist, girt, brace, rafter, tie_beam, etc. These will have their own default marking instructions in the drawing system
@@ -229,13 +231,12 @@ DONE-think about how to reverse map selected face into feature (already works I 
 DONE-add cutcsglables to everything
 IGNORE/DONE-name all the rest of your joints
 DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a project?)
+DONE-don't show accesories in timber list ivew.. tehy should only show under jonits
 
-
--don't show accesories in timber list ivew.. tehy should only show under jonits
 -test edge selection and in particular face face intersecting edges (doesn't seem to work)
 -add cutcsglabels to build a butt and relief.py
 -add proper reference face/edge support to timbers
-
+-maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
 
 
 -more selection related things
@@ -259,7 +260,9 @@ DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a 
 -create halfspace decorative cut 
 -make parameters human readable
 -fix tusk failing from other direction bug
+-label the gizmo lol
 -add N/S/E/W labels to the cube
+-show rough mesaurements in selectino view when eselecting single elemnts
 -create helper method for building cut timber from list of joints
 -house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
 
@@ -1544,6 +1547,37 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 :: END TODONE
 
+:: 8/29/2026 tag hierarchy
+vertical
+  post
+    corner post
+    queen post
+    king post
+  stud
+
+horizontal
+  sill
+    mudsill
+  joist
+    rim joist
+    floor joist
+  girder
+  beam
+    summer beam
+    tie beam
+    ridge beam
+  plate
+    top plate
+  collar tie
+  girt
+  purlin
+
+rafter
+  principle rafter
+  common rafter
+
+brace
+  knee brace
 
 
 :: 6/28 CONTENT PLAN
