@@ -140,13 +140,26 @@ const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAY
 // -Z. The compass line follows kumiki's own convention (see rule.py): +X points
 // east and +Y points north, which puts north on the BACK of the cube.
 const GIZMO_FACES = Object.freeze([
-    { lines: ['right', 'east'], background: '#c9d6ea' },
-    { lines: ['left', 'west'], background: '#bfcee4' },
-    { lines: ['back', 'north'], background: '#d6deee' },
-    { lines: ['front', 'south'], background: '#c4d2e8' },
-    { lines: ['top'], background: '#bccbe2' },
-    { lines: ['bottom'], background: '#b6c6df' },
+    { lines: ['right', 'east', '+x'], background: '#c9d6ea' },
+    { lines: ['left', 'west', '-x'], background: '#bfcee4' },
+    { lines: ['back', 'north', '+y'], background: '#d6deee' },
+    { lines: ['front', 'south', '-y'], background: '#c4d2e8' },
+    { lines: ['top', '+z'], background: '#bccbe2' },
+    { lines: ['bottom', '-z'], background: '#b6c6df' },
 ]);
+
+// Where the orbit gizmo's axis labels sit and what they look like. The colours
+// are its rings': each ring turns about one axis, so the label on that axis
+// reads as the ring's own.
+const ORBIT_GIZMO_AXIS_LABELS = Object.freeze([
+    { text: '+x', direction: [1, 0, 0], color: '#ff8fa3' },
+    { text: '+y', direction: [0, 1, 0], color: '#7fc8f8' },
+    { text: '+z', direction: [0, 0, 1], color: '#95d5b2' },
+]);
+// Just clear of the rings (radius 1.85 + tube 0.12), in the gizmo's own units.
+const ORBIT_GIZMO_LABEL_DISTANCE = 2.5;
+const ORBIT_GIZMO_LABEL_SCALE = 1.2;
+const ORBIT_GIZMO_LABEL_TEXTURE_PX = 128;
 
 const GIZMO_FACE_TEXTURE_PX = 256;
 // The stroked frame, and the gap kept between it and the text.
@@ -1506,6 +1519,11 @@ class KigumiViewerApp extends LitElement {
                     child.geometry.dispose();
                 }
                 if (child.material && typeof child.material.dispose === 'function') {
+                    // A material does not dispose its own textures, and each
+                    // axis label carries a canvas one.
+                    if (child.material.map && typeof child.material.map.dispose === 'function') {
+                        child.material.map.dispose();
+                    }
                     child.material.dispose();
                 }
             });
@@ -3416,9 +3434,53 @@ class KigumiViewerApp extends LitElement {
             group.add(ring);
         }
 
+        for (const axis of ORBIT_GIZMO_AXIS_LABELS) {
+            const label = this._makeOrbitAxisLabel(axis.text, axis.color);
+            label.position.set(
+                axis.direction[0] * ORBIT_GIZMO_LABEL_DISTANCE,
+                axis.direction[1] * ORBIT_GIZMO_LABEL_DISTANCE,
+                axis.direction[2] * ORBIT_GIZMO_LABEL_DISTANCE,
+            );
+            group.add(label);
+        }
+
         group.visible = this.showCenterGizmo;
         this.orbitCenterGizmo = group;
         this.scene.add(group);
+    }
+
+    /**
+     * One axis label for the orbit gizmo.
+     *
+     * A sprite rather than a mesh: it turns to face the camera on its own, so
+     * a label stays readable from wherever the frame is being viewed. Depth
+     * tested like everything else, so a label behind a timber stays behind it
+     * rather than floating on top of the frame.
+     */
+    _makeOrbitAxisLabel(text, color) {
+        const canvas = document.createElement('canvas');
+        canvas.width = ORBIT_GIZMO_LABEL_TEXTURE_PX;
+        canvas.height = ORBIT_GIZMO_LABEL_TEXTURE_PX;
+        const context = canvas.getContext('2d');
+
+        context.textAlign = 'center';
+        context.textBaseline = 'middle';
+        context.font = `700 ${Math.round(canvas.height * 0.6)}px Segoe UI`;
+        // An outline first, so the label holds up against timber or sky alike.
+        context.lineWidth = Math.round(canvas.height * 0.14);
+        context.strokeStyle = 'rgba(30, 36, 52, 0.85)';
+        context.strokeText(text, canvas.width / 2, canvas.height / 2);
+        context.fillStyle = color;
+        context.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const material = new THREE.SpriteMaterial({
+            map: new THREE.CanvasTexture(canvas),
+            transparent: true,
+            depthTest: true,
+        });
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.setScalar(ORBIT_GIZMO_LABEL_SCALE);
+        return sprite;
     }
 
     updateOrbitCenterGizmo() {
