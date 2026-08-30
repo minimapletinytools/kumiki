@@ -55,6 +55,23 @@
             this.selectTimber(name, true);
         }
 
+        /**
+         * Select several timbers at once, as clicking a tag does. One event for
+         * the whole batch: a tag covering forty members should not make the
+         * panel and the canvas re-render forty times.
+         */
+        selectTimbers(names, addToSelection = false) {
+            const keys = Array.from(names || []);
+            if (!addToSelection) {
+                this.selectedTimbers.clear();
+                this.clearCsgFocus({ silent: true });
+            }
+            for (const key of keys) {
+                this.selectedTimbers.add(key);
+            }
+            this.emit({ type: 'timbers-selected', timberNames: keys });
+        }
+
         clearTimberSelection() {
             if (this.selectedTimbers.size === 0 && !this.csgFocus) {
                 return;

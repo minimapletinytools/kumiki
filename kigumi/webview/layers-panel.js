@@ -12,8 +12,9 @@
     // this file; capturing it here makes that ordering a stated dependency
     // rather than something the rows happen to get away with at click time.
     const CsgTreeView = globalScope.CsgTreeView;
-    // Tags arrive as {kind, name}; viewer.html loads this ahead of us.
+    // Tags arrive as {kind, name}; viewer.html loads these ahead of us.
     const KigumiTags = globalScope.KigumiTags;
+    const TagIndex = globalScope.TagIndex;
 
     // CSG rows indent from where the member rows leave off (.lp-depth-0 is
     // 18px), one step per level. The old 10px step started shallower than the
@@ -42,7 +43,8 @@
             this._pendingReveal = null;
             this._focusedCsgNodeId = null;
             this.filterText = '';
-            this.showTagPills = true;
+            this.tagIndex = [];
+            this.tagEntriesById = new Map();
             this.el = null;
             this.viewport = null;
             this._unsubSelection = null;
@@ -71,6 +73,8 @@
 
         setHierarchy(hierarchy) {
             this.hierarchy = hierarchy || { timbers: [], joints: [] };
+            this.tagIndex = TagIndex.buildTagIndex(this.hierarchy);
+            this.tagEntriesById = new Map(this.tagIndex.map((entry) => [entry.id, entry]));
             // New frame data means the cached CSG could be stale -- an edit to
             // the source is exactly when the tree changes shape -- so it is
             // dropped and refetched on the next expand rather than shown as if
@@ -83,11 +87,6 @@
             ];
             this.layerStateStore.pruneKeys(allKeys);
             this._render();
-        }
-
-        setShowTagPills(show) {
-            this.showTagPills = !!show;
-            this._renderTree();
         }
 
         destroy() {
@@ -190,6 +189,7 @@
         _renderTree() {
             if (!this._treeEl) return;
             this._treeEl.innerHTML = '';
+            this._renderSection(this._treeEl, 'tags', t('viewer.layers.section.tags'), () => this._buildTagRows());
             this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
             this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
             this._syncHighlight();
@@ -229,7 +229,7 @@
         }
 
         _makeRow(opts) {
-            const { nodeId, rowType, depth, label, tags, hasChildren, selectNode, memberKey } = opts;
+            const { nodeId, rowType, depth, label, hasChildren, selectNode, memberKey } = opts;
             const expanded = hasChildren && this.expandedNodes.has(nodeId);
 
             const row = document.createElement('div');
@@ -265,20 +265,6 @@
             labelEl.className = 'lp-label';
             labelEl.textContent = label;
             row.appendChild(labelEl);
-
-            // Tag pills (shown only when showTagPills is enabled)
-            if (this.showTagPills && tags && tags.length > 0) {
-                const chipsEl = document.createElement('span');
-                chipsEl.className = 'lp-chips';
-                for (const tag of tags) {
-                    const chip = document.createElement('span');
-                    chip.className = 'lp-chip';
-                    chip.dataset.tagKind = tag.kind;
-                    chip.textContent = tag.name;
-                    chipsEl.appendChild(chip);
-                }
-                row.appendChild(chipsEl);
-            }
 
             // Lock / hide icon buttons (only for member-level rows)
             if (memberKey) {
@@ -336,7 +322,56 @@
             }
             if (node.type === 'joint') {
                 selection.selectJoint(node.jointId, node.timberKeys || [], additive);
+                return;
             }
+            if (node.type === 'tag') {
+                selection.selectTimbers(node.memberKeys || [], additive);
+            }
+        }
+
+        _buildTagRows() {
+            return this.tagIndex
+                .filter((entry) => this._matchesFilter(entry.name))
+                .map((entry) => this._makeTagRow(entry));
+        }
+
+        /** One tag: its kind as a colour, its name, and how many wear it. */
+        _makeTagRow(entry) {
+            const row = document.createElement('div');
+            row.className = 'lp-row lp-row-tag lp-depth-0 lp-selectable';
+            row.dataset.nodeId = 'tag:' + entry.id;
+            row.dataset.tagId = entry.id;
+            row.title = t('viewer.layers.tag.select.title', { count: entry.memberKeys.length });
+
+            const chev = document.createElement('span');
+            chev.className = 'lp-chev lp-leaf';
+            row.appendChild(chev);
+
+            const chip = document.createElement('span');
+            chip.className = 'tag-chip';
+            chip.dataset.tagKind = entry.kind;
+            chip.textContent = entry.name;
+            row.appendChild(chip);
+
+            // Shown only while the tag is partly selected, so a tag you reached
+            // some other way still reads as involved without pretending it is
+            // fully selected.
+            const partialMark = document.createElement('span');
+            partialMark.className = 'lp-tag-partial-mark';
+            partialMark.textContent = '*';
+            partialMark.title = t('viewer.layers.tag.partial.title');
+            row.appendChild(partialMark);
+
+            const count = document.createElement('span');
+            count.className = 'lp-tag-count';
+            count.textContent = String(entry.memberKeys.length);
+            row.appendChild(count);
+
+            row.addEventListener('click', (event) => {
+                this._applySelection({ type: 'tag', memberKeys: entry.memberKeys }, !!event.shiftKey);
+            });
+
+            return row;
         }
 
         _buildTimberRows() {
@@ -351,7 +386,6 @@
                     rowType: 'timber',
                     depth: 0,
                     label: timber.name,
-                    tags: timber.tags || [],
                     // Every timber has a CSG tree, even an uncut one -- it is
                     // still a body with faces worth naming.
                     hasChildren: true,
@@ -573,7 +607,6 @@
                         rowType: 'jointMember',
                         depth: 1,
                         label,
-                        tags: [],
                         hasChildren: true,
                         memberKey: timberKey,
                         selectNode: { type: 'timber', key: timberKey },
@@ -594,7 +627,6 @@
                         rowType: 'jointMember',
                         depth: 1,
                         label: accKey.replace(/^accessory:[^:]+:/, '').replace(/^accessory:/, ''),
-                        tags: [],
                         hasChildren: false,
                         selectNode: { type: 'accessory', key: accKey },
                     }));
@@ -613,6 +645,8 @@
             for (const row of this.el.querySelectorAll('.lp-row.lp-selected')) {
                 row.classList.remove('lp-selected');
             }
+
+            this._syncTagHighlight();
 
             const selectedTimbers = this.selectionManager.selectedTimbers;
 
@@ -715,6 +749,17 @@
             }
         }
 
+        /** Paint each tag row with how much of it the selection covers. */
+        _syncTagHighlight() {
+            const selected = this.selectionManager.selectedTimbers;
+            for (const row of this.el.querySelectorAll('.lp-row-tag')) {
+                const entry = this.tagEntriesById.get(row.dataset.tagId);
+                const state = entry ? TagIndex.tagSelectionState(entry, selected) : 'none';
+                row.classList.toggle('lp-selected', state === 'all');
+                row.classList.toggle('lp-tag-partial', state === 'partial');
+            }
+        }
+
         _updateStateIcons() {
             if (!this.el) return;
             for (const row of this.el.querySelectorAll('.lp-row[data-member-key]')) {
@@ -756,7 +801,6 @@
             this._selectionManager = null;
             this._layerStateStore = null;
             this._panel = null;
-            this._showTagPills = true;
             this._hierarchy = { timbers: [], joints: [] };
             this._unsubLayerState = null;
         }
@@ -772,13 +816,6 @@
         attach(selectionManager, _vscode) {
             this._selectionManager = selectionManager;
             this._ensureMounted();
-        }
-
-        setShowTagPills(show) {
-            this._showTagPills = Boolean(show);
-            if (this._panel && typeof this._panel.setShowTagPills === 'function') {
-                this._panel.setShowTagPills(this._showTagPills);
-            }
         }
 
         /** Hand a fetched CSG tree to the panel. */
@@ -800,7 +837,6 @@
             this._ensureMounted();
             if (this._panel) {
                 this._panel.setHierarchy(this._hierarchy);
-                this._panel.setShowTagPills(this._showTagPills);
             }
             this._emitLayerStateSync();
         }
@@ -826,7 +862,6 @@
             });
             this._panel = new LayersPanel(this._selectionManager, this._layerStateStore);
             this._panel.mount(this);
-            this._panel.setShowTagPills(this._showTagPills);
             this._panel.setHierarchy(this._hierarchy);
             this._emitLayerStateSync();
         }

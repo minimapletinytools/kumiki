@@ -44,6 +44,9 @@
     --hv-layers-hover-bg: rgba(140, 164, 207, 0.18);
     --hv-layers-selected-bg: rgba(140, 164, 207, 0.32);
     --hv-chip-bg: rgba(255, 255, 255, 0.8);
+    --hv-tag-member: #5f78b4;
+    --hv-tag-slice: #8a6aa8;
+    --hv-tag-generic: #6e7691;
     display: block;
     min-height: 100vh;
     background: linear-gradient(180deg, var(--hv-bg-top) 0%, var(--hv-bg-bottom) 100%);
@@ -1396,13 +1399,8 @@ kigumi-layers-view:has(.lp-collapsed) {
     color: var(--hv-dim);
 }
 
-.lp-chips {
-    display: inline-flex;
-    gap: 4px;
-    margin-right: 4px;
-}
-
-.lp-chip {
+/* One pill, wherever tags are shown: the tags section and the selection pane. */
+.tag-chip {
     display: inline-block;
     padding: 0 5px;
     border-radius: 10px;
@@ -1410,6 +1408,59 @@ kigumi-layers-view:has(.lp-collapsed) {
     background: var(--hv-chip-bg);
     font-size: 10px;
     color: var(--hv-dim);
+}
+
+.ip-chips {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+.ip-tags {
+    align-items: flex-start;
+}
+
+/* A tag's kind reads as its colour, in the tags section and on the pills the
+   timber and joint rows carry. */
+.tag-chip[data-tag-kind="member"] {
+    border-color: var(--hv-tag-member);
+    color: var(--hv-tag-member);
+}
+
+.tag-chip[data-tag-kind="slice"] {
+    border-color: var(--hv-tag-slice);
+    color: var(--hv-tag-slice);
+}
+
+.tag-chip[data-tag-kind="generic"] {
+    border-color: var(--hv-tag-generic);
+    color: var(--hv-tag-generic);
+}
+
+.lp-row-tag > .tag-chip {
+    font-size: 11px;
+}
+
+.lp-tag-count {
+    margin-left: auto;
+    padding-left: 6px;
+    font-size: 10px;
+    color: var(--hv-dim);
+}
+
+/* The partial marker only earns its space while the tag is partly selected. */
+.lp-tag-partial-mark {
+    display: none;
+    padding-left: 3px;
+    color: var(--hv-strong);
+}
+
+.lp-row-tag.lp-tag-partial > .lp-tag-partial-mark {
+    display: inline;
+}
+
+.lp-row-tag.lp-tag-partial {
+    background: var(--hv-layers-hover-bg);
 }
 
 .lp-icons {

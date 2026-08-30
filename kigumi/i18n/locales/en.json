@@ -134,6 +134,9 @@
   "viewer.layers.search.placeholder": "Search…",
   "viewer.layers.section.timbers": "Timbers",
   "viewer.layers.section.joints": "Joints",
+  "viewer.layers.section.tags": "Tags",
+  "viewer.layers.tag.select.title": "Select these {count} timbers (shift-click to add)",
+  "viewer.layers.tag.partial.title": "Some of these timbers are selected",
   "viewer.layers.lock.title": "Lock",
   "viewer.layers.unlock.title": "Unlock",
   "viewer.layers.hide.title": "Hide",
@@ -146,6 +149,7 @@
   "viewer.layers.csg.cutOn": "{timber} · cut {cut}",
 
   "viewer.selection.header": "Selection",
+  "viewer.selection.tags": "tags",
   "viewer.selection.counts": "timbers ({selectedTimbers}/{timbers})  accessories ({selectedAccessories}/{accessories})",
   "viewer.selection.kind.face": "face",
   "viewer.selection.kind.edge": "edge",

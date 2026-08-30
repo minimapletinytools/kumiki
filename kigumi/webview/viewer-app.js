@@ -130,6 +130,7 @@ const SelectionStore = window.SelectionStore;
 const CameraController = window.CameraController;
 const GeometryMode = window.GeometryMode;
 const KigumiTags = window.KigumiTags;
+const TagIndex = window.TagIndex;
 const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
@@ -254,6 +255,9 @@ const DEFAULT_THEME_UI = Object.freeze({
     layersHoverBg: 'rgba(140, 164, 207, 0.18)',
     layersSelectedBg: 'rgba(140, 164, 207, 0.32)',
     chipBg: 'rgba(255, 255, 255, 0.8)',
+    tagMember: '#5f78b4',
+    tagSlice: '#8a6aa8',
+    tagGeneric: '#6e7691',
 });
 
 // Fades an 'rgba(r, g, b, a)' color to fully transparent at the same r/g/b,
@@ -427,6 +431,9 @@ const THEMES = Object.freeze({
             layersHoverBg: 'rgba(130, 163, 222, 0.2)',
             layersSelectedBg: 'rgba(130, 163, 222, 0.3)',
             chipBg: 'rgba(40, 50, 75, 0.9)',
+            tagMember: '#93aee6',
+            tagSlice: '#bb9fdc',
+            tagGeneric: '#9aa8c4',
         },
     }),
 });
@@ -1378,7 +1385,7 @@ class KigumiViewerApp extends LitElement {
         
         // Setup selection listener
         this.selectionManager.onSelectionChanged((event) => {
-            if (event.type === 'clear-timbers' || event.type === 'timber-selected') {
+            if (event.type === 'clear-timbers' || event.type === 'timber-selected' || event.type === 'timbers-selected') {
                 // Only clear CSG when the timber change is a "fresh" user
                 // action (not caused by layers-view setting CSG first, which
                 // also selects the timber for opacity purposes).
@@ -3123,6 +3130,9 @@ class KigumiViewerApp extends LitElement {
             '--hv-layers-hover-bg': ui.layersHoverBg,
             '--hv-layers-selected-bg': ui.layersSelectedBg,
             '--hv-chip-bg': ui.chipBg,
+            '--hv-tag-member': ui.tagMember,
+            '--hv-tag-slice': ui.tagSlice,
+            '--hv-tag-generic': ui.tagGeneric,
         };
         for (const [cssVar, value] of Object.entries(tokenMap)) {
             this.style.setProperty(cssVar, value);
@@ -4306,6 +4316,8 @@ class KigumiViewerApp extends LitElement {
             selectedSingleName = '';
         }
 
+        const selectedTags = this._selectedTags(selectedMembers);
+
         const focus = this.selectionManager.csgFocus;
         const detail = this.lastPickDetail;
         let breadcrumb = selectedSingleName;
@@ -4331,7 +4343,29 @@ class KigumiViewerApp extends LitElement {
             selectedTimberCount,
             selectedAccessoryCount,
             breadcrumb,
+            tags: selectedTags,
         });
+    }
+
+    /**
+     * Every tag worn by anything in the selection, deduped, ordered the way the
+     * layers panel's tags section orders them.
+     */
+    _selectedTags(selectedMembers) {
+        const byId = new Map();
+        for (const key of selectedMembers) {
+            const metadata = this.memberMetadataByKey.get(key);
+            for (const tag of (metadata && metadata.tags) || []) {
+                byId.set(tag.kind + ':' + tag.name, tag);
+            }
+        }
+        const kindRank = (kind) => {
+            const rank = TagIndex.KIND_ORDER.indexOf(kind);
+            return rank === -1 ? TagIndex.KIND_ORDER.length : rank;
+        };
+        return Array.from(byId.values()).sort((a, b) => (
+            kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name)
+        ));
     }
 
     /**
@@ -4383,6 +4417,28 @@ class KigumiViewerApp extends LitElement {
             crumb.textContent = summary.breadcrumb;
             crumb.title = summary.breadcrumb;
             body.appendChild(crumb);
+        }
+
+        // The pills the member rows no longer carry: they live here, where
+        // there is room for them, and only for what is selected.
+        if (this.infoPanelExpanded && summary.tags && summary.tags.length > 0) {
+            const line = document.createElement('div');
+            line.className = 'ip-detail ip-tags';
+            const label = document.createElement('span');
+            label.className = 'ip-detail-label';
+            label.textContent = t('viewer.selection.tags');
+            line.appendChild(label);
+            const chips = document.createElement('span');
+            chips.className = 'ip-chips';
+            for (const tag of summary.tags) {
+                const chip = document.createElement('span');
+                chip.className = 'tag-chip';
+                chip.dataset.tagKind = tag.kind;
+                chip.textContent = tag.name;
+                chips.appendChild(chip);
+            }
+            line.appendChild(chips);
+            body.appendChild(line);
         }
 
         // Detail lines are the reward for expanding, so they stay behind it.
@@ -4736,7 +4792,7 @@ class KigumiViewerApp extends LitElement {
             this.scene.add(edgeMesh);
             this.scene.add(reflectionMesh);
             this.meshKeyMap.set(solidMesh, key);
-            this.memberMetadataByKey.set(key, { name: memberName, type: memberType });
+            this.memberMetadataByKey.set(key, { name: memberName, type: memberType, tags: KigumiTags.coerceTags(mesh.tags) });
             this.meshObjectsByKey.set(key, {
                 memberType,
                 profileId: materialSet.profileId,

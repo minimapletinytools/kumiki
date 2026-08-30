@@ -134,6 +134,9 @@
   "viewer.layers.search.placeholder": "検索…",
   "viewer.layers.section.timbers": "木材",
   "viewer.layers.section.joints": "仕口",
+  "viewer.layers.section.tags": "タグ",
+  "viewer.layers.tag.select.title": "この {count} 本を選択（Shift+クリックで追加）",
+  "viewer.layers.tag.partial.title": "一部の木材が選択されています",
   "viewer.layers.lock.title": "ロック",
   "viewer.layers.unlock.title": "ロック解除",
   "viewer.layers.hide.title": "非表示",
@@ -146,6 +149,7 @@
   "viewer.layers.csg.cutOn": "{timber} · 切断 {cut}",
 
   "viewer.selection.header": "選択",
+  "viewer.selection.tags": "タグ",
   "viewer.selection.counts": "材 ({selectedTimbers}/{timbers})  金物 ({selectedAccessories}/{accessories})",
   "viewer.selection.kind.face": "面",
   "viewer.selection.kind.edge": "稜",

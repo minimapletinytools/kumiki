@@ -237,6 +237,42 @@ describe('hasSelection', () => {
     });
 });
 
+describe('selectTimbers', () => {
+    test('a batch is one event, not one per timber', () => {
+        // Clicking a tag that covers forty members should not make every
+        // listener re-render forty times.
+        const store = new SelectionStore();
+        const events = [];
+        store.onSelectionChanged((event) => events.push(event));
+
+        store.selectTimbers(['A', 'B', 'C']);
+
+        expect(store.getSelectedTimbers()).toEqual(['A', 'B', 'C']);
+        expect(events).toEqual([{ type: 'timbers-selected', timberNames: ['A', 'B', 'C'] }]);
+    });
+
+    test('a plain batch replaces the selection', () => {
+        const store = new SelectionStore();
+        store.selectTimber('Z');
+        store.selectTimbers(['A', 'B']);
+        expect(store.getSelectedTimbers()).toEqual(['A', 'B']);
+    });
+
+    test('an additive batch keeps what was selected', () => {
+        const store = new SelectionStore();
+        store.selectTimber('Z');
+        store.selectTimbers(['A', 'Z'], true);
+        expect(store.getSelectedTimbers()).toEqual(['Z', 'A']);
+    });
+
+    test('a batch replacing the selection drops the CSG focus with it', () => {
+        const store = new SelectionStore();
+        store.setCsgFocus({ timberKey: 'Z', path: ['cut'] });
+        store.selectTimbers(['A']);
+        expect(store.csgFocus).toBeNull();
+    });
+});
+
 describe('choosePickAction', () => {
     const hit = (memberKey) => ({ memberKey, hit: { memberKey } });
 
