@@ -623,11 +623,9 @@ class TestEdgePicking:
         assert "shoulder" in result["featureLabel"]
         assert "\u00d7" in result["featureLabel"]   # the name of a pair
 
-    def test_the_edge_lights_something(self, mortise_and_tenon_frame):
-        """A selection that highlights nothing looks exactly like a click that
-        did not land, which is how this looked before: the feature resolved and
-        the mesh filter then matched no triangle at all, because no triangle's
-        centroid sits on a line."""
+    def test_the_edge_comes_back_as_a_line_to_draw(self, mortise_and_tenon_frame):
+        """The viewer draws a selected edge rather than shading triangles beside
+        it, so the pick returns the span the line should cover."""
         from kumiki.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
@@ -635,8 +633,68 @@ class TestEdgePicking:
             f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
 
         result = self._pick(slot, cut_timber, point)
+        segment = result["highlightEdge"]
+        assert len(segment["start"]) == 3 and len(segment["end"]) == 3
+        assert segment["start"] != segment["end"]
+
+    def test_the_clicked_point_lies_on_the_drawn_line(self, mortise_and_tenon_frame):
+        """A line somewhere else on the timber would look like a stray mark."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+        clicked = self._to_global(cut_timber, point)
+
+        segment = self._pick(slot, cut_timber, point)["highlightEdge"]
+        start, end = segment["start"], segment["end"]
+        span = [end[i] - start[i] for i in range(3)]
+        length_sq = sum(component * component for component in span)
+        # Distance from the clicked point to the segment's line.
+        offset = [clicked[i] - start[i] for i in range(3)]
+        along = sum(offset[i] * span[i] for i in range(3)) / length_sq
+        closest = [start[i] + span[i] * along for i in range(3)]
+        distance_sq = sum((clicked[i] - closest[i]) ** 2 for i in range(3))
+        assert distance_sq < (2e-3) ** 2
+        assert -0.001 <= along <= 1.001   # and within the span, not off its end
+
+    def test_an_edge_pick_does_not_shade_triangles(self, mortise_and_tenon_frame):
+        """The strip beside the edge was what read as a stray wedge; the line
+        replaces it rather than joining it."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        result = self._pick(slot, cut_timber, point)
+        assert result["stats"]["trianglesMatched"] == 0
+
+    def test_a_face_pick_draws_no_line(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.FACE and f.name == "shoulder"))
+
+        result = self._pick(slot, cut_timber, point)
+        assert "highlightEdge" not in result
         assert result["stats"]["trianglesMatched"] > 0
-        assert result["highlightMesh"]["vertices"]
+
+    def test_the_edge_shows_up_as_something(self, mortise_and_tenon_frame):
+        """A selection that shows nothing looks exactly like a click that did
+        not land, which is how this looked before: the feature resolved and the
+        mesh filter then matched no triangle at all, because no triangle's
+        centroid sits on a line. A line is the answer, with the triangle strip
+        left as the fallback when no span can be measured."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        result = self._pick(slot, cut_timber, point)
+        assert result.get("highlightEdge") or result["stats"]["trianglesMatched"] > 0
 
     def test_the_middle_of_a_face_still_selects_the_face(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType

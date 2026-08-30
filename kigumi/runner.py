@@ -1967,6 +1967,50 @@ def _edge_tolerance() -> Any:
     return FEATURE_EDGE_TOLERANCE
 
 
+def _edge_highlight_segment(
+    edge_feature: Any,
+    owner: 'CutCSG',
+    mesh_vertices: List[float],
+    timber_rot: List[List[float]],
+    timber_pos: List[float],
+) -> Optional[Dict[str, List[float]]]:
+    """The stretch of a derived edge the mesh actually shows, in global space.
+
+    An edge is a line, and a highlight built out of triangles can only ever
+    approximate one -- it lights the strip beside it, which reads as a stray
+    wedge rather than as the edge. The viewer draws a line instead, and this
+    says where that line runs: the mesher puts vertices on edges, so the
+    vertices lying on this one are the visible span, and its two extremes are
+    its ends.
+
+    Returns None when fewer than two vertices land on the edge, which leaves
+    the caller its triangle-strip fallback.
+    """
+    on_edge: List[List[float]] = []
+    tolerance = _edge_tolerance()
+    for index in range(0, len(mesh_vertices), 3):
+        vertex = [mesh_vertices[index], mesh_vertices[index + 1], mesh_vertices[index + 2]]
+        local = _inv_transform_point(timber_rot, timber_pos, vertex)
+        if edge_feature.test_point(owner, _to_v3(local), tolerance):
+            on_edge.append(vertex)
+
+    if len(on_edge) < 2:
+        return None
+
+    # The two furthest apart are the ends: everything on an edge is collinear,
+    # so no projection axis is needed to order them.
+    start, end, longest = on_edge[0], on_edge[1], -1.0
+    for i in range(len(on_edge)):
+        for j in range(i + 1, len(on_edge)):
+            span = sum((on_edge[i][axis] - on_edge[j][axis]) ** 2 for axis in range(3))
+            if span > longest:
+                start, end, longest = on_edge[i], on_edge[j], span
+
+    if longest <= 0:
+        return None
+    return {"start": start, "end": end}
+
+
 def _features_at_point(root: 'CutCSG', local_pt: List[float], eps: float) -> List[Any]:
     """Every feature the WHOLE tree sees at the click, best first.
 
@@ -2404,6 +2448,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     if new_path:
         parent_csg = _resolve_csg_at_path(local_csg, new_path, local_pt, eps)
 
+    highlight_edge = None
+    if edge is not None:
+        highlight_edge = _edge_highlight_segment(
+            edge, target_csg, mesh["vertices"], timber_rot, timber_pos,
+        )
+
     # Extract highlight mesh for the selected target
     hl_verts, hl_idx, matched, total = _extract_highlight_mesh(
         mesh["vertices"],
@@ -2416,7 +2466,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         selected_path=new_path,
         selected_ref=parent_csg if feature_label is not None else target_csg,
         feature_label=feature_label,
-        edge_feature=edge,
+        edge_feature=edge if highlight_edge is None else None,
     )
 
     # When a feature (face) is selected, also extract the parent labeled CSG mesh
@@ -2461,6 +2511,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     }
     if parent_hl is not None:
         result["parentHighlightMesh"] = parent_hl
+    if highlight_edge is not None:
+        result["highlightEdge"] = highlight_edge
     return result
 
 

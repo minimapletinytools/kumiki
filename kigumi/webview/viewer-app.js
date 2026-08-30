@@ -133,10 +133,17 @@ const KigumiTags = window.KigumiTags;
 const TagIndex = window.TagIndex;
 const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAYLOAD.i18n.strings);
 
+// Deep enough to read against pale timbers on the light themes, where the
+// paler blues these used to be washed out into the stock.
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
-    tagged: 0x4fc3f7,
-    feature: 0x80d8ff,
+    tagged: 0x29b6f6,
+    feature: 0x0288d1,
 });
+
+// A selected edge is drawn as a line rather than shaded like a face, so it
+// needs a width of its own -- several times the timbers' own edge lines, or the
+// selection does not read as thicker than the geometry it sits on.
+const CSG_HIGHLIGHT_EDGE_WIDTH_PX = 5;
 
 const SELECTION_VISUAL_STATES = Object.freeze({
     NOTHING_SELECTED: 'nothing_selected',
@@ -2537,6 +2544,9 @@ class KigumiViewerApp extends LitElement {
                 bundle.edges.material.resolution = resolution;
             }
         }
+        if (this._csgHighlightEdgeLine && this._csgHighlightEdgeLine.material) {
+            this._csgHighlightEdgeLine.material.resolution = resolution;
+        }
     }
 
     // Raycasts from a client (screen) point and returns every visible, unlocked
@@ -2736,6 +2746,14 @@ class KigumiViewerApp extends LitElement {
 
         // Build highlight geometry
         this.removeCSGHighlight();
+        const highlightEdge = message.highlightEdge || null;
+        if (highlightEdge && Array.isArray(highlightEdge.start) && Array.isArray(highlightEdge.end)) {
+            // An edge is a line: shading the triangles beside it lit a stray
+            // wedge that read as geometry rather than as a selection.
+            this._buildHighlightEdgeLine(
+                highlightEdge.start, highlightEdge.end, CSG_HIGHLIGHT_COLORS.feature,
+            );
+        }
         if (featureLabel && parentHlMesh && Array.isArray(parentHlMesh.vertices) && parentHlMesh.vertices.length > 0) {
             // Feature selected: parent CSG gets dim highlight, feature face gets bright highlight
             this._buildHighlightMesh(
@@ -2808,9 +2826,34 @@ class KigumiViewerApp extends LitElement {
         this[storeKey] = mesh;
     }
 
+    /** The fat line over a selected edge. */
+    _buildHighlightEdgeLine(start, end, color) {
+        const geometry = new THREE.LineSegmentsGeometry();
+        geometry.setPositions([...start, ...end]);
+
+        const material = new THREE.LineMaterial({
+            color,
+            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
+            // Pixel thickness is computed against this, so it tracks the canvas
+            // the same way the timbers' own edges do (see onWindowResize).
+            resolution: this._getRendererResolution(),
+            depthTest: false,
+            transparent: true,
+        });
+
+        const line = new THREE.LineSegments2(geometry, material);
+        line.computeLineDistances();
+        // Above the highlight meshes, which are already above the timbers: the
+        // point of selecting an edge is to see exactly which line it is.
+        line.renderOrder = 1000;
+        this.scene.add(line);
+        this._csgHighlightEdgeLine = line;
+    }
+
     removeCSGHighlight() {
         this._disposeHighlightMesh('_csgHighlightMesh');
         this._disposeHighlightMesh('_csgParentHighlightMesh');
+        this._disposeHighlightMesh('_csgHighlightEdgeLine');
     }
 
     _disposeHighlightMesh(storeKey) {
