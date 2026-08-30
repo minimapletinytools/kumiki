@@ -603,7 +603,7 @@ class TestEdgePicking:
                     return point
         raise AssertionError("no matching point found")
 
-    def _pick(self, slot, cut_timber, point, ctrl_click=True, path=None):
+    def _pick(self, slot, cut_timber, point, ctrl_click=False, path=None):
         return runner._handle_find_csg_at_point(None, {
             "memberKey": "m#0",
             "point": self._to_global(cut_timber, point),
@@ -720,20 +720,20 @@ class TestEdgePicking:
         assert result["path"][-1] == "shoulder"
         assert result["nodeLabel"] == "shoulder"
 
-    def test_a_click_still_descends_one_level_at_a_time(self, mortise_and_tenon_frame):
-        """An edge must not pull an ordinary click straight to the bottom:
-        the levels above it are selectable in their own right."""
+    def test_ctrl_holds_the_click_to_one_level(self, mortise_and_tenon_frame):
+        """Ctrl is the way down through the compounds, which are selectable in
+        their own right -- so the first one stops above the edge."""
         from kumiki.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
         point = self._point_where(local_csg, lambda f: (
             f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
 
-        first = self._pick(slot, cut_timber, point, ctrl_click=False)
+        first = self._pick(slot, cut_timber, point, ctrl_click=True)
         assert first["featureLabel"] is None
         assert first["path"] == ["mortise_and_tenon"]
 
-    def test_an_ordinary_click_reaches_the_edge_once_it_is_deep_enough(self, mortise_and_tenon_frame):
+    def test_ctrl_clicking_down_reaches_the_edge_once_it_is_deep_enough(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType
 
         slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
@@ -742,11 +742,22 @@ class TestEdgePicking:
 
         path: list = []
         for _step in range(6):
-            result = self._pick(slot, cut_timber, point, ctrl_click=False, path=path)
+            result = self._pick(slot, cut_timber, point, ctrl_click=True, path=path)
             if result["featureType"] == "EDGE":
                 return
             path = result["path"]
-        raise AssertionError("drilling never reached the edge")
+        raise AssertionError("ctrl-clicking down never reached the edge")
+
+    def test_a_plain_click_needs_no_drilling(self, mortise_and_tenon_frame):
+        """The whole point of the swap: one click on the line selects it."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        result = self._pick(slot, cut_timber, point, ctrl_click=False)
+        assert result["featureType"] == "EDGE"
 
 
 class TestPickDescription:

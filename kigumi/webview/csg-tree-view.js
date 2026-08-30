@@ -267,8 +267,8 @@
      * How to describe what a selection landed on: the tail of the breadcrumb.
      *
      * A pick that resolved to a feature names it by kind -- face, edge, point.
-     * A pick that selected a node whole says what that node *is* instead: an
-     * ordinary click descends one level at a time, so it selects unions and
+     * A pick that selected a node whole says what that node *is* instead: a
+     * ctrl-click descends one level at a time, so it selects unions and
      * differences on the way down, and the highlight lights the whole of them.
      * Calling every one of those a "face" contradicted what was on screen.
      *

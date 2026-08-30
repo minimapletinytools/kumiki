@@ -2054,10 +2054,10 @@ def _describe_pick(
     confuse, so, concretely:
 
     Args:
-        target: the node the click resolved to. An ordinary click descends one
-            level at a time, so this is often a compound -- a SolidUnion or a
-            Difference selected whole -- and only a ctrl-click drills straight
-            to a leaf primitive.
+        target: the node the click resolved to. An ordinary click drills
+            straight to a leaf primitive; a ctrl-click descends one level at a
+            time, so under ctrl this is often a compound -- a SolidUnion or a
+            Difference selected whole.
         local_csg: the ROOT of the tree `target` sits in, i.e.
             ``cut_timber.render_timber_with_cuts_csg_local()``. Needed because
             two of the four answers are about where `target` sits in the tree
@@ -2290,7 +2290,7 @@ def _navigate_csg_to_leaf(
     local_pt: List[float],
     eps: float = 1e-4,
 ) -> Tuple[List[str], Any, Optional[str]]:
-    """Ctrl+click: traverse from root to deepest labeled node, then report face."""
+    """A plain click: traverse from root to deepest labeled node, then report face."""
     from kumiki.cutcsg import SolidUnion, Difference
 
     path: List[str] = []
@@ -2414,7 +2414,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
 
     t0 = time.monotonic()
 
-    if ctrl_click:
+    # A plain click goes straight to the feature, which is what someone
+    # clicking a shoulder or an edge is after. Ctrl holds it back to one level
+    # per click, for walking down through the compounds on the way.
+    if not ctrl_click:
         new_path, target_csg, feature_label = _navigate_csg_to_leaf(local_csg, local_pt, eps)
     else:
         if current_path:
