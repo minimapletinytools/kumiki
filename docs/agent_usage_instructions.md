@@ -120,6 +120,24 @@ The basic variants of all joints provide sensible defaults for most parameters. 
     - cut_dropin_housed_butt_joint_on_face_aligned_timbers (simplest)
     - cut_dropin_dovetail_butt_joint_on_face_aligned_timbers (if joist needs to resist spreading forces)
 
+### user specified joints
+
+The user may ask for a specific joint. This joint may not exist by name in code because:
+
+1. it does exist but it's named something else
+2. it doesn't exist
+
+do your best to determine if the joint exists as a different name and use that. If you're uncertain or if you think the joint does not exist, check back in with the user and simply say that kumiki may not support the joint you asked for and provide some suggestions for alternative joints.
+
+#### custom joints
+
+Another option is to attempt to implement a custom joint for the user to meet their specific use case. Take a look at existing kumiki joint code to decide how to best implement a custom joint for them.
+It is best not to make custom joints have too many parameters and instead focus on meeting the users exact use case. When implementig, reference existing similar joints for implemnetation details.
+
+Implementing joints is NOT EASY especially on more complicated joints so AVOID this option unless the user really wants you to try. Please notify the user that your attempt is very likely to fail or require iteration to get right so as to set their expectations correctly.
+
+In addition, invite them to open up a feature request issue on kumiki https://github.com/minimapletinytools/kumiki/issues
+
 ## Combining everything into a Frame
 
 Your file should typically have some `example` function that returns a Frame. The function must be explicity typed to return type `Frame` in order for it be to picked up by the project scanner.
