@@ -207,16 +207,11 @@ board related joints
 DONE-sliding dovetail (maybe you want tapered variants)
   -the tricky thing about this is th edovetail can be on edge or end...
 -blind housed dovetail
-
 -splined miter joint
 -bridge joint(just tongue nad fork)
-
 -haunched tenon lol ugh
-
-
 -finger corner joint (or box joint)
 -finger splice joint 
-
 -make some placeholders for the 
 -rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
 
@@ -244,6 +239,13 @@ IGNORE/DONE-name all the rest of your joints
 DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a project?)
 DONE-don't show accesories in timber list ivew.. tehy should only show under jonits
 DONE-add cutcsglabels to build a butt
+
+
+-do notes for cross_lap_butt_joint
+  -make 1 prompt video of the coding of the joint
+  -make 1 prompt video to make the sawhorse with this joint
+
+
 -finish cutcsg lables in relief.py
 -test edge selection and in particular face face intersecting edges (doesn't seem to work)
 -add proper reference face/edge support to timbers
@@ -304,6 +306,8 @@ DONE-add cutcsglabels to build a butt
   -maybe get ird of folder + example support, examples are always leaf nodes?
 -do joint rename to match what's in your new book
 -add shouder to cross lap joint
+  -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
+  -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
 
 -update shed example to include panels
   -make a video about this maybe after you do some more edge joints

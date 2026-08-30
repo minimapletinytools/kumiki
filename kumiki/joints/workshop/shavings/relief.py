@@ -432,6 +432,7 @@ def chop_shoulder_notch_aligned_with_timber(
     distance_from_centerline: Numeric,
     notch_wall_relief_cut_angle_radians: Numeric = scalar(0),
     set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
+    label: CutCSGLabel = CutCSGLabel("shoulder_notch"),
 ) -> Union[RectangularPrism, SolidUnion]:
     """
     Create a shoulder notch on notch_timber at a given distance from its centerline,
@@ -577,6 +578,7 @@ def chop_shoulder_notch_aligned_with_timber(
     notch_prism = RectangularPrism(
         size=create_v2(notch_width, notch_span),
         transform=Transform(position=prism_position_local, orientation=prism_orientation),
+        label=CutCSGLabel("notch"),
         start_distance=scalar(0),
         end_distance=notch_depth,
     )
@@ -610,15 +612,17 @@ def chop_shoulder_notch_aligned_with_timber(
         transform=notch_prism.transform.rotate_around_axis(axis_1, angle_rad),
         start_distance=notch_prism.start_distance,
         end_distance=extended_end_distance,
+        label=CutCSGLabel("notch_wall_relief"),
     )
     right_wall_prism = RectangularPrism(
         size=notch_prism.size,
         transform=notch_prism.transform.rotate_around_axis(axis_2, -angle_rad),
         start_distance=notch_prism.start_distance,
         end_distance=extended_end_distance,
+        label=CutCSGLabel("notch_wall_relief"),
     )
 
-    return SolidUnion([notch_prism, left_wall_prism, right_wall_prism])
+    return SolidUnion([notch_prism, left_wall_prism, right_wall_prism], label=label)
 
 
 # TODO DEPRECATE ME mostly replaced by chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided
@@ -1336,6 +1340,8 @@ class ShoulderReliefCSGGeometry:
 def chop_scribe_relief(
     timber_to_be_scribed_cutting: Cutting,
     timber_to_be_cut_cutting: Cutting,
+    scribe_relief_label: CutCSGLabel = CutCSGLabel("scribe_relief"),
+    scribe_hollow_label: CutCSGLabel = CutCSGLabel("scribe_hollow"),
 ) -> tuple[CutCSG, CutCSG]:
     """
     scribes timber_to_be_scribed onto timber_to_be_cut such that the entirety of timber_to_be_scribed is cut out of timber_to_be_cut excluding the perfect timber within portion of timber_to_be_cut
@@ -1379,6 +1385,7 @@ def chop_scribe_relief(
     scribed_relief_global = Intersection(
         left=timber_to_be_scribed_imperfect_fringe_csg_global,
         right=timber_to_be_cut_perfect_csg_global,
+        label=scribe_relief_label,
     )
 
     # What actually remains of timber_to_be_scribed's full extent (perfect core
@@ -1400,12 +1407,14 @@ def chop_scribe_relief(
                 None,
                 scribed_own_cuts_local,
             )],
+            label=CutCSGLabel("scribed_remainder"),
         )
     )
 
     cut_relief_global = Difference(
         base=timber_to_be_scribed_actual_after_own_cuts_global,
         subtract=[timber_to_be_cut_perfect_csg_global],
+        label=scribe_hollow_label,
     )
 
 
@@ -1445,21 +1454,27 @@ def chop_scribe_relief_and_apply(
         timber_to_be_cut_cutting=timber_to_be_cut_cutting,
     )
 
-    def _union_into(existing: Optional[CutCSG], new: CutCSG) -> CutCSG:
+    def _union_into(existing: Optional[CutCSG], new: CutCSG, label: CutCSGLabel) -> CutCSG:
+        # Only a cutting that already removes something grows a node here; when
+        # it removes nothing the relief is the whole cut and keeps its own name.
         if existing is None:
             return new
-        return SolidUnion([existing, new])
+        return SolidUnion([existing, new], label=label)
 
     updated_scribed_cutting = replace(
         timber_to_be_scribed_cutting,
         negative_csg=_union_into(
-            timber_to_be_scribed_cutting.negative_csg, scribed_relief_csg_local
+            timber_to_be_scribed_cutting.negative_csg,
+            scribed_relief_csg_local,
+            CutCSGLabel("scribe_relief_cut"),
         ),
     )
     updated_cut_cutting = replace(
         timber_to_be_cut_cutting,
         negative_csg=_union_into(
-            timber_to_be_cut_cutting.negative_csg, cut_relief_csg_local
+            timber_to_be_cut_cutting.negative_csg,
+            cut_relief_csg_local,
+            CutCSGLabel("scribe_hollow_cut"),
         ),
     )
 

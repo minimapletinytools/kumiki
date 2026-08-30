@@ -4,7 +4,15 @@ Tests for the shoulder-notch and relief-cut helpers in kumiki.joints.workshop.re
 
 from dataclasses import replace
 
-from kumiki.cutcsg import ConvexPolygonSimpleLoft, Difference, EmptyCSG, Intersection
+from kumiki.cutcsg import (
+    ConvexPolygonSimpleLoft,
+    CutCSGLabel,
+    Difference,
+    EmptyCSG,
+    Intersection,
+    RectangularPrism,
+    SolidUnion,
+)
 from kumiki.construction import ArrangementNames, ButtJointTimberArrangement
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
 from kumiki.joints.workshop.shavings.relief import (
@@ -18,6 +26,7 @@ from kumiki.joints.workshop.shavings.relief import (
     chop_butt_joint_shoulder_notch_relief_4sided,
     chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided,
     chop_scribe_relief,
+    chop_scribe_relief_and_apply,
     chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
 )
@@ -731,6 +740,166 @@ class TestChopScribeRelief:
         assert isinstance(scribe_relief_csg_local, Difference)
         assert scribed_overlap_csg_local.contains_point(create_v3(scalar(1), scalar(5, 2), scalar(10)))
         assert scribe_relief_csg_local.contains_point(create_v3(scalar(5, 2), scalar(0), scalar(10)))
+
+
+class TestReliefCSGNaming:
+    """The relief geometry names what it removes.
+
+    An unnamed node cannot be addressed by path, so it is invisible to the
+    viewer's navigation and to anything that wants to mark features on it.
+    """
+
+    def _notch(self, **label_override):
+        arrangement = create_canonical_example_butt_joint_timbers(
+            create_v3(scalar(0), scalar(0), scalar(0))
+        )
+        return chop_shoulder_notch_aligned_with_timber(
+            notch_timber=arrangement.receiving_timber,
+            butting_timber=arrangement.butt_timber,
+            butting_timber_end=arrangement.butt_timber_end,
+            distance_from_centerline=inches(2),
+            notch_wall_relief_cut_angle_radians=degrees(30),
+            **label_override,
+        )
+
+    def _scribe(self, scribed_cutting=None, **label_overrides):
+        timber_to_be_cut = create_standard_vertical_timber(
+            height=scalar(20),
+            size=(scalar(4), scalar(6)),
+            position=(scalar(0), scalar(0), scalar(0)),
+            ticket="timber_to_be_cut",
+        )
+        timber_to_be_scribed = replace(
+            create_timber(
+                length=scalar(20),
+                size=create_v2(scalar(4), scalar(4)),
+                bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+                length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+                ticket="timber_to_be_scribed",
+            ),
+            rough_half_sizes=(
+                create_v2(scalar(3), scalar(3)),
+                create_v2(scalar(4), scalar(4)),
+            ),
+        )
+        return chop_scribe_relief(
+            timber_to_be_scribed_cutting=(
+                scribed_cutting
+                if scribed_cutting is not None
+                else Cutting(timber=timber_to_be_scribed, negative_csg=EmptyCSG())
+            ),
+            timber_to_be_cut_cutting=Cutting(timber=timber_to_be_cut, negative_csg=EmptyCSG()),
+            **label_overrides,
+        ), timber_to_be_scribed
+
+    def test_the_notch_names_its_main_prism_and_its_relief_walls(self):
+        notch = self._notch()
+        assert notch.label.name == "shoulder_notch"
+        assert [child.label.name for child in notch.children] == [
+            "notch", "notch_wall_relief", "notch_wall_relief",
+        ]
+
+    def test_a_caller_can_rename_the_notch(self):
+        assert self._notch(label=CutCSGLabel("housing_notch")).label.name == "housing_notch"
+
+    def test_both_notch_builders_use_the_same_word_for_a_relief_wall(self):
+        # The two builders cut the same shape from different references, so a
+        # wall is a wall whichever one made it.
+        from kumiki.joints.workshop.shavings.relief import chop_shoulder_notch_on_timber_face
+
+        face_aligned = chop_shoulder_notch_on_timber_face(
+            timber=create_standard_vertical_timber(
+                height=scalar(20),
+                size=(scalar(4), scalar(6)),
+                position=(scalar(0), scalar(0), scalar(0)),
+                ticket="notched",
+            ),
+            notch_face=TimberFace.FRONT,
+            distance_along_timber=scalar(10),
+            notch_width=scalar(2),
+            notch_depth=scalar(1),
+            notch_wall_relief_cut_angle=degrees(30),
+        )
+        # Both return a bare prism when there is no wall angle; with one, both
+        # return the union that holds the walls.
+        assert isinstance(face_aligned, SolidUnion)
+        aligned_with_timber = self._notch()
+        assert isinstance(aligned_with_timber, SolidUnion)
+
+        wall_names = {child.label.name for child in face_aligned.children if child.label.is_labeled()}
+        assert wall_names == {"notch_wall_relief"}
+        assert wall_names <= {child.label.name for child in aligned_with_timber.children}
+
+    def test_the_scribe_relief_and_hollow_are_named(self):
+        (scribe_relief, scribe_hollow), _ = self._scribe()
+        assert scribe_relief.label.name == "scribe_relief"
+        assert scribe_hollow.label.name == "scribe_hollow"
+
+    def test_a_caller_can_rename_what_scribing_returns(self):
+        (scribe_relief, scribe_hollow), _ = self._scribe(
+            scribe_relief_label=CutCSGLabel("brace_scribe"),
+            scribe_hollow_label=CutCSGLabel("brace_pocket"),
+        )
+        assert scribe_relief.label.name == "brace_scribe"
+        assert scribe_hollow.label.name == "brace_pocket"
+
+
+class TestScribeReliefAppliedNaming:
+    """chop_scribe_relief_and_apply folds relief into a cutting that may already
+    remove something, and the node it adds to do that is named."""
+
+    def _cuttings(self, scribed_already_cuts: bool):
+        timber_to_be_cut = create_standard_vertical_timber(
+            height=scalar(20),
+            size=(scalar(4), scalar(6)),
+            position=(scalar(0), scalar(0), scalar(0)),
+            ticket="timber_to_be_cut",
+        )
+        timber_to_be_scribed = replace(
+            create_timber(
+                length=scalar(20),
+                size=create_v2(scalar(4), scalar(4)),
+                bottom_position=create_v3(scalar(0), scalar(0), scalar(0)),
+                length_direction=create_v3(scalar(0), scalar(0), scalar(1)),
+                width_direction=create_v3(scalar(1), scalar(0), scalar(0)),
+                ticket="timber_to_be_scribed",
+            ),
+            rough_half_sizes=(
+                create_v2(scalar(3), scalar(3)),
+                create_v2(scalar(4), scalar(4)),
+            ),
+        )
+        existing = RectangularPrism(
+            size=create_v2(scalar(1), scalar(1)),
+            transform=Transform(
+                position=create_v3(scalar(0), scalar(0), scalar(10)),
+                orientation=Orientation.identity(),
+            ),
+            start_distance=scalar(0),
+            end_distance=scalar(1),
+            label=CutCSGLabel("existing_cut"),
+        ) if scribed_already_cuts else None
+
+        return chop_scribe_relief_and_apply(
+            timber_to_be_scribed_cutting=Cutting(
+                timber=timber_to_be_scribed, negative_csg=existing
+            ),
+            timber_to_be_cut_cutting=Cutting(timber=timber_to_be_cut, negative_csg=None),
+        )
+
+    def test_the_added_union_is_named_when_the_cutting_already_cut_something(self):
+        _, scribed_cutting = self._cuttings(scribed_already_cuts=True)
+        negative = scribed_cutting.negative_csg
+        assert negative.label.name == "scribe_relief_cut"
+        assert {child.label.name for child in negative.children} == {
+            "existing_cut", "scribe_relief",
+        }
+
+    def test_a_cutting_that_removed_nothing_keeps_the_reliefs_own_name(self):
+        # No union is added there, so nothing needs naming.
+        _, scribed_cutting = self._cuttings(scribed_already_cuts=False)
+        assert scribed_cutting.negative_csg.label.name == "scribe_relief"
 
 
 class TestMultiTimberScribeReliefConfig:
