@@ -1304,6 +1304,93 @@ class TestMortiseAndTenonCSGNaming:
         assert labels & {"top_end_cut", "bottom_end_cut"}
 
 
+class TestMortiseAndTenonFeatures:
+    """What a mortise and tenon declares, and the edges that fall out of it.
+
+    Edges are derived from pairs of declared faces, so geometry that declares
+    nothing has no edges -- which is why the shoulder line and the mortise
+    mouth were unselectable while the machinery for them worked fine.
+    """
+
+    def _rendered(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber,
+                butt_timber=tenon_timber,
+                butt_timber_end=TimberEnd.BOTTOM,
+            ),
+            tenon_width_relative_to_joint=scalar(2),
+            tenon_height_relative_to_joint=scalar(1),
+            tenon_length=scalar(3),
+            mortise_depth=scalar(3),
+        )
+        frame = Frame.from_joints([joint])
+        return {ct.timber.ticket.path: ct.render_timber_with_cuts_csg_local()
+                for ct in frame.cut_timbers}
+
+    def _picked(self, rendered, feature_type):
+        """Every feature of *feature_type* selectable anywhere on the surface.
+
+        Face centroids find faces; triangle-edge midpoints land on the creases
+        where two faces meet, which is where an edge is selectable.
+        """
+        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.triangles import triangulate_cutcsg
+
+        found = set()
+        for triangle in triangulate_cutcsg(rendered).mesh.triangles:
+            points = [
+                [(triangle[a][i] + triangle[b][i]) / 2 for i in range(3)]
+                for a, b in ((0, 1), (1, 2), (2, 0))
+            ]
+            points.append([sum(v[i] for v in triangle) / 3 for i in range(3)])
+            for point in points:
+                hit = rendered.find_feature(create_v3(*point))
+                if hit is not None and hit.feature.feature_type() == feature_type:
+                    found.add(hit.feature.name)
+        return found
+
+    def test_the_shoulder_is_selectable(self, simple_T_configuration):
+        from kumiki.cutcsg import CSGFeatureType
+
+        faces = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
+                             CSGFeatureType.FACE)
+        assert "shoulder" in faces
+
+    def test_the_shoulder_forms_the_line_you_knife_around_the_timber(self, simple_T_configuration):
+        from kumiki.cutcsg import CSGFeatureType
+
+        edges = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
+                             CSGFeatureType.EDGE)
+        # Where the shoulder plane meets the timber's own faces.
+        assert {edge for edge in edges if edge.startswith("shoulder\u00d7")}
+
+    def test_the_mortise_declares_its_walls_and_floor(self, simple_T_configuration):
+        from kumiki.cutcsg import CSGFeatureType
+
+        faces = self._picked(self._rendered(simple_T_configuration)["mortise_timber"],
+                             CSGFeatureType.FACE)
+        assert {"mortise_front", "mortise_back", "mortise_left", "mortise_right"} <= faces
+
+    def test_the_mortise_mouth_is_an_edge(self, simple_T_configuration):
+        from kumiki.cutcsg import CSGFeatureType
+
+        edges = self._picked(self._rendered(simple_T_configuration)["mortise_timber"],
+                             CSGFeatureType.EDGE)
+        # The outline you would mark on the face before chopping.
+        assert {edge for edge in edges if edge.startswith("mortise_")}
+
+    def test_the_timbers_own_arrises_still_derive(self, simple_T_configuration):
+        # These worked before any joint geometry declared anything; the new
+        # declarations must not crowd them out.
+        from kumiki.cutcsg import CSGFeatureType
+
+        edges = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
+                             CSGFeatureType.EDGE)
+        assert {edge for edge in edges if edge.count("rough.") == 2}
+
+
 class TestBuildAButtCSGNaming:
     """The geometry build_a_butt hands back carries names too.
 

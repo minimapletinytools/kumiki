@@ -29,7 +29,7 @@ from kumiki.measuring import (
     Space,
 )
 from kumiki.timber_shavings import are_timbers_plane_aligned
-from kumiki.cutcsg import CutCSG, CutCSGLabel, RectangularPrism, HalfSpace, Difference, Intersection, SolidUnion, adopt_csg, PrismFace, Cylinder, SimpleRectangularPrismFeature
+from kumiki.cutcsg import CutCSG, CutCSGLabel, RectangularPrism, HalfSpace, Difference, Intersection, SolidUnion, adopt_csg, PrismFace, Cylinder, HalfSpaceFeature, SimpleRectangularPrismFeature
 from .shavings.build_a_butt import (
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
     locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
@@ -386,6 +386,10 @@ def cut_mortise_and_tenon_joint(
     shoulder_half_space_global = HalfSpace(
         normal=-shoulder_plane.normal,
         offset=safe_dot_product(-shoulder_plane.normal, marking_space.transform.position),
+        # Declared so the shoulder can be selected and, more to the point, so it
+        # forms edges with the timber's own faces: shoulder x rough.front and
+        # its three siblings are the line you knife around the timber.
+        _features=[HalfSpaceFeature("shoulder")],
         label=CutCSGLabel("shoulder"),
     )
 
@@ -444,6 +448,14 @@ def cut_mortise_and_tenon_joint(
                 transform=mortise_hole_transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
+            _features=[
+                SimpleRectangularPrismFeature("mortise_right", face=PrismFace.RIGHT),
+                SimpleRectangularPrismFeature("mortise_left", face=PrismFace.LEFT),
+                SimpleRectangularPrismFeature("mortise_front", face=PrismFace.FRONT),
+                SimpleRectangularPrismFeature("mortise_back", face=PrismFace.BACK),
+                # The prism's TOP is the deep end of the pocket: its floor.
+                SimpleRectangularPrismFeature("mortise_bottom", face=PrismFace.TOP),
+            ],
                 label=CutCSGLabel("mortise_hole"),
             )
     else:
@@ -465,6 +477,14 @@ def cut_mortise_and_tenon_joint(
                 transform=marking_space.transform,
                 start_distance=-back_extension,
                 end_distance=mortise_depth,
+            _features=[
+                SimpleRectangularPrismFeature("mortise_right", face=PrismFace.RIGHT),
+                SimpleRectangularPrismFeature("mortise_left", face=PrismFace.LEFT),
+                SimpleRectangularPrismFeature("mortise_front", face=PrismFace.FRONT),
+                SimpleRectangularPrismFeature("mortise_back", face=PrismFace.BACK),
+                # The prism's TOP is the deep end of the pocket: its floor.
+                SimpleRectangularPrismFeature("mortise_bottom", face=PrismFace.TOP),
+            ],
                 label=CutCSGLabel("mortise_hole"),
             )
 

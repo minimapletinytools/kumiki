@@ -562,6 +562,135 @@ class TestJointAttribution:
         assert "joint_ticket" not in CutCSG.__dataclass_fields__
 
 
+class TestEdgePicking:
+    """Clicking a derived edge.
+
+    An edge comes from a face on each of two primitives, so it exists only
+    where both are in scope. Navigation lands on one leaf, and a leaf can never
+    see the pair -- which is why edges were unselectable while derivation
+    itself worked. The pick asks the root for them instead.
+    """
+
+    def _slot(self, frame, name):
+        import types
+
+        cut_timber = _cut_timber_by_name(frame, name)
+        local_csg = cut_timber.render_timber_with_cuts_csg_local()
+        mesh = runner._cut_timber_to_triangle_mesh_payload(cut_timber, local_csg, "m#0")
+        slot = types.SimpleNamespace(mesh_cache={"m#0": {
+            "mesh": mesh, "local_csg": local_csg, "cut_timber": cut_timber,
+        }})
+        return slot, cut_timber, local_csg
+
+    def _to_global(self, cut_timber, local_point):
+        transform = cut_timber.timber.transform
+        moved = transform.position + transform.orientation.matrix * runner._to_v3(local_point)
+        return [float(coordinate) for coordinate in moved]
+
+    def _point_where(self, local_csg, predicate):
+        """A surface point the whole tree resolves to a feature matching *predicate*."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        for triangle in triangulate_cutcsg(local_csg).mesh.triangles:
+            candidates = [
+                [(triangle[a][i] + triangle[b][i]) / 2 for i in range(3)]
+                for a, b in ((0, 1), (1, 2), (2, 0))
+            ]
+            candidates.append([sum(v[i] for v in triangle) / 3 for i in range(3)])
+            for point in candidates:
+                hit = local_csg.find_feature(runner._to_v3(point))
+                if hit is not None and predicate(hit.feature):
+                    return point
+        raise AssertionError("no matching point found")
+
+    def _pick(self, slot, cut_timber, point, ctrl_click=True, path=None):
+        return runner._handle_find_csg_at_point(None, {
+            "memberKey": "m#0",
+            "point": self._to_global(cut_timber, point),
+            "currentPath": path or [],
+            "ctrlClick": ctrl_click,
+        }, slot)
+
+    def test_a_click_on_the_shoulder_line_selects_the_edge(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        result = self._pick(slot, cut_timber, point)
+        assert result["featureType"] == "EDGE"
+        assert "shoulder" in result["featureLabel"]
+        assert "\u00d7" in result["featureLabel"]   # the name of a pair
+
+    def test_the_edge_lights_something(self, mortise_and_tenon_frame):
+        """A selection that highlights nothing looks exactly like a click that
+        did not land, which is how this looked before: the feature resolved and
+        the mesh filter then matched no triangle at all, because no triangle's
+        centroid sits on a line."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        result = self._pick(slot, cut_timber, point)
+        assert result["stats"]["trianglesMatched"] > 0
+        assert result["highlightMesh"]["vertices"]
+
+    def test_the_middle_of_a_face_still_selects_the_face(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.FACE and f.name == "shoulder"))
+
+        result = self._pick(slot, cut_timber, point)
+        assert result["featureType"] == "FACE"
+        assert result["featureLabel"] == "shoulder"
+
+    def test_the_edge_is_shown_under_the_deeper_of_its_two_parents(self, mortise_and_tenon_frame):
+        """The shoulder sits inside the joint; the timber body is a child of
+        the root. The rule puts the edge with the shoulder."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        result = self._pick(slot, cut_timber, point)
+        assert result["path"][-1] == "shoulder"
+        assert result["nodeLabel"] == "shoulder"
+
+    def test_a_click_still_descends_one_level_at_a_time(self, mortise_and_tenon_frame):
+        """An edge must not pull an ordinary click straight to the bottom:
+        the levels above it are selectable in their own right."""
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        first = self._pick(slot, cut_timber, point, ctrl_click=False)
+        assert first["featureLabel"] is None
+        assert first["path"] == ["mortise_and_tenon"]
+
+    def test_an_ordinary_click_reaches_the_edge_once_it_is_deep_enough(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        slot, cut_timber, local_csg = self._slot(mortise_and_tenon_frame, "butt_timber")
+        point = self._point_where(local_csg, lambda f: (
+            f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
+
+        path: list = []
+        for _step in range(6):
+            result = self._pick(slot, cut_timber, point, ctrl_click=False, path=path)
+            if result["featureType"] == "EDGE":
+                return
+            path = result["path"]
+        raise AssertionError("drilling never reached the edge")
+
+
 class TestPickDescription:
     """What the selection display gets from one click.
 
@@ -655,10 +784,27 @@ class TestPickDescription:
         the material; the surface someone clicked is the wall of the hole. The
         composed solid is what settles the sign.
         """
+        # The mortise declares its walls now, so a pick reports the declared
+        # mortise_back rather than the geometric guess "back" it fell back to
+        # before. Those names are not interchangeable -- a declared name is in
+        # the prism's own frame and the guess is in the timber's -- so the sign
+        # is asserted against the geometry rather than a fixed direction.
+        from kumiki.rule import safe_dot_product
+
         point = self._point_on(mortise_and_tenon_frame, "receiving_timber",
-                               lambda label: label == "back")
+                               lambda label: label == "mortise_back")
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        csg = cut_timber.render_timber_with_cuts_csg_local()
+        _path, target, _label = runner._navigate_csg_to_leaf(csg, point, PICK_EPS)
+
+        prism_normal = target.get_outward_normal(runner._to_v3(point), PICK_EPS)
+        composed_normal = csg.get_outward_normal(runner._to_v3(point), PICK_EPS)
+        # The prism's own normal points out of the hole and into the material;
+        # the wall someone clicked faces the other way.
+        assert safe_dot_product(prism_normal, composed_normal) < 0
+
         described = self._describe(mortise_and_tenon_frame, "receiving_timber", point)
-        assert described["facesToward"] == "front"   # opposite of the prism's own "back"
+        assert described["facesToward"] == runner._nearest_timber_local_face_name(composed_normal)
 
     def test_it_agrees_with_the_composed_solid_everywhere(self, mortise_and_tenon_frame):
         """The reported direction always matches the finished timber's own normal.

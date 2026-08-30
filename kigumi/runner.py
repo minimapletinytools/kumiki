@@ -1900,6 +1900,98 @@ def _detect_face_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> st
     return _nearest_timber_local_face_name(normal)
 
 
+def _node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
+    """Every node in *root* keyed by id, as (depth, document order, label path).
+
+    The label path is what the viewer navigates by, so unlabeled nodes
+    contribute nothing to it -- the same way navigation drills through them
+    transparently.
+    """
+    from kumiki.cutcsg import csg_children
+
+    positions: Dict[int, Tuple[int, int, List[str]]] = {}
+    order = 0
+
+    def walk(node: Any, depth: int, path: List[str]) -> None:
+        nonlocal order
+        label = _label_name(node)
+        node_path = path + [label] if label else path
+        positions[id(node)] = (depth, order, node_path)
+        order += 1
+        for child in csg_children(node):
+            walk(child, depth + 1, node_path)
+
+    walk(root, 0, [])
+    return positions
+
+
+def _edge_owner(root: 'CutCSG', edge: Any) -> Optional[Tuple[Any, List[str]]]:
+    """Which node a derived edge is shown under, and its path.
+
+    A plane-plane edge belongs to two CSGs at once -- the shoulder half-space
+    and the timber body, say -- and a tree can only show it in one place. The
+    rule is the deeper of its two parents, with document order breaking a tie.
+
+    That is sufficient for now: the edges worth marking are the ones where joint
+    geometry meets a timber face, and the timber body sits at the top of every
+    tree, so the joint side is always deeper and always wins. An edge between
+    two nodes at the same depth is not something the joint library produces
+    today; when it does, this is the rule to revisit.
+    """
+    parents = [hit for hit in (getattr(edge, "a", None), getattr(edge, "b", None))
+               if hit is not None]
+    if len(parents) != 2:
+        return None
+
+    positions = _node_positions(root)
+    ranked = []
+    for hit in parents:
+        position = positions.get(id(hit.owner))
+        if position is None:
+            return None
+        depth, order, path = position
+        ranked.append(((depth, order), hit.owner, path))
+
+    _rank, owner, path = max(ranked, key=lambda entry: entry[0])
+    return owner, path
+
+
+def _edge_tolerance() -> Any:
+    """How close a vertex must be to an edge to count as on it.
+
+    The same tolerance the edge was found with -- an edge is selected by
+    snapping to it, so the highlight has to be as forgiving as the pick was.
+    """
+    from kumiki.cutcsg import FEATURE_EDGE_TOLERANCE
+
+    return FEATURE_EDGE_TOLERANCE
+
+
+def _features_at_point(root: 'CutCSG', local_pt: List[float], eps: float) -> List[Any]:
+    """Every feature the WHOLE tree sees at the click, best first.
+
+    Asked of the root rather than the node navigation landed on: a derived edge
+    comes from a face on each of two different primitives, so it exists only
+    where both are in scope. A leaf can never see one, which is why edges were
+    unselectable from a click while the machinery for them worked.
+    """
+    from kumiki.cutcsg import FeatureTestTolerances
+
+    return root.get_all_features(_to_v3(local_pt), FeatureTestTolerances(face=eps))
+
+
+def _resolve_derived_edge(hits: List[Any]) -> Optional[Any]:
+    """The derived edge under the click, if one is the best answer there."""
+    from kumiki.cutcsg import CSGFeatureType
+
+    if not hits:
+        return None
+    best = hits[0]
+    if best.feature.feature_type() != CSGFeatureType.EDGE:
+        return None
+    return best.feature
+
+
 def _describe_pick(
     target: 'CutCSG',
     local_csg: 'CutCSG',
@@ -1907,6 +1999,7 @@ def _describe_pick(
     local_pt: List[float],
     eps: float,
     feature_label: Optional[str],
+    feature_type: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Everything the selection display wants to say about one click.
 
@@ -1939,6 +2032,10 @@ def _describe_pick(
             re-derived: asking `target` what lies under the point finds a face
             on a descendant even when no feature was selected, which made the
             display name a face while the highlight lit a whole union.
+        feature_type: the type of that feature, when the caller already knows
+            it. A derived edge has to be passed this way for the same reason
+            its label does -- it belongs to two primitives, so `target` alone
+            answers FACE for it. None means re-derive from `target`.
 
     Returns:
         nodeKind and nodeLabel, which always describe `target` itself;
@@ -1966,6 +2063,9 @@ def _describe_pick(
 
     point = _to_v3(local_pt)
     hit = target.find_feature(point, FeatureTestTolerances(face=eps))
+    resolved_type = feature_type
+    if resolved_type is None and hit is not None:
+        resolved_type = hit.feature_type().name
     normal, faces_toward = _outward_normal_and_face(target, local_csg, local_pt, eps)
     return {
         **described,
@@ -1974,7 +2074,7 @@ def _describe_pick(
         # must not present as a name -- it is a direction, and one that has not
         # been sign-corrected, unlike the normal below.
         "featureLabel": feature_label,
-        "featureType": hit.feature_type().name if hit is not None else None,
+        "featureType": resolved_type,
         "facesToward": faces_toward,
         "outwardNormal": normal,
     }
@@ -2174,6 +2274,7 @@ def _extract_highlight_mesh(
     selected_path: Optional[List[str]] = None,
     selected_ref: Optional[Any] = None,
     feature_label: Optional[str] = None,
+    edge_feature: Optional[Any] = None,
 ) -> Tuple[List[float], List[int], int, int]:
     """Extract triangles belonging to *target_csg* from the rendered mesh.
 
@@ -2207,7 +2308,25 @@ def _extract_highlight_mesh(
                 owner = _resolve_csg_at_path(root_csg, selected_path, local_c, eps)
                 if owner is not selected_ref:
                     continue
-            if feature_label is not None:
+            if edge_feature is not None:
+                # An edge is a line, and no triangle's centroid sits on one --
+                # matching the way a face does would light nothing at all. The
+                # mesher puts vertices on edges, so the strip along an edge is
+                # the triangles with two vertices on it.
+                on_edge = 0
+                for corner in (i0, i1, i2):
+                    corner_local = _inv_transform_point(timber_rot, timber_pos, [
+                        mesh_vertices[corner * 3],
+                        mesh_vertices[corner * 3 + 1],
+                        mesh_vertices[corner * 3 + 2],
+                    ])
+                    if edge_feature.test_point(
+                        target_csg, _to_v3(corner_local), _edge_tolerance()
+                    ):
+                        on_edge += 1
+                if on_edge < 2:
+                    continue
+            elif feature_label is not None:
                 tri_face_label = _detect_face_label(target_csg, local_c, eps)
                 if tri_face_label != feature_label:
                     continue
@@ -2267,6 +2386,20 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
             node, local_pt, current_path, eps,
         )
 
+    # A click that has drilled far enough to name a face can name an edge
+    # instead, when one is the better answer at that point. Only then: while a
+    # click is still descending through compounds it selects them whole, and
+    # jumping to an edge deep inside would skip the levels between.
+    feature_type = None
+    feature_hits = _features_at_point(local_csg, local_pt, eps)
+    edge = _resolve_derived_edge(feature_hits) if feature_label is not None else None
+    if edge is not None:
+        owned = _edge_owner(local_csg, edge)
+        if owned is not None:
+            target_csg, new_path = owned[0], owned[1]
+            feature_label = edge.name
+            feature_type = "EDGE"
+
     parent_csg = None
     if new_path:
         parent_csg = _resolve_csg_at_path(local_csg, new_path, local_pt, eps)
@@ -2283,6 +2416,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         selected_path=new_path,
         selected_ref=parent_csg if feature_label is not None else target_csg,
         feature_label=feature_label,
+        edge_feature=edge,
     )
 
     # When a feature (face) is selected, also extract the parent labeled CSG mesh
@@ -2314,7 +2448,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a
         # face belonging to something further in.
-        **_describe_pick(target_csg, local_csg, cut_timber, local_pt, eps, feature_label),
+        **_describe_pick(target_csg, local_csg, cut_timber, local_pt, eps, feature_label, feature_type),
         "highlightMesh": {
             "vertices": hl_verts,
             "indices": hl_idx,
