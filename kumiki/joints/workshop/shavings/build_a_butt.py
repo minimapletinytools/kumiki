@@ -30,7 +30,7 @@ from kumiki.measuring import (
 )
 from kumiki.construction import *
 from kumiki.rule import *
-from kumiki.cutcsg import CutCSG
+from kumiki.cutcsg import CutCSG, CutCSGLabel
 
 
 def _compute_plane_parallel_to_receiving_length_axis_partially_perpendicular_to_butt(
@@ -416,6 +416,8 @@ def dovetail_tenon_geometry(
     tenon_lateral_offset: Numeric = 0,
     # the extra depth for the mortise hole in the receiving timber
     receiving_timber_mortise_extra_depth: Numeric = 0,
+    tenon_waste_label: CutCSGLabel = CutCSGLabel("tenon_waste"),
+    mortise_label: CutCSGLabel = CutCSGLabel("mortise"),
 ) -> DovetailTenonGeometeryResult:
     """
     Build the tenon geometry for a dovetail shoulder. The "top" of dovetail tenon is always flush with dovetail_top_side_on_butt_timber face of the butt timber, however x/y sizing still aligns with the usual width/height axis of the butt timber.
@@ -553,6 +555,7 @@ def dovetail_tenon_geometry(
         transform=extrusion_transform,
         start_distance=-half_lateral,
         end_distance=half_lateral,
+        label=CutCSGLabel("tenon"),
     )
 
     # ---- HalfSpace covering everything beyond the shoulder plane (into the mortise) ----
@@ -562,11 +565,13 @@ def dovetail_tenon_geometry(
     shoulder_halfspace = HalfSpace(
         normal=into_mortise_dir,
         offset=shoulder_offset,
+        label=CutCSGLabel("shoulder"),
     )
 
     tenon_negative_csg = Difference(
         base=shoulder_halfspace,
         subtract=[positive_tenon],
+        label=tenon_waste_label,
     )
 
     # ---- Wedge accessory (optional) ----
@@ -672,6 +677,7 @@ def dovetail_tenon_geometry(
             transform=extrusion_transform,
             start_distance=-half_lateral,
             end_distance=half_lateral,
+            label=CutCSGLabel("wedge_slot"),
         )
 
     # ---- Mortise negative prism ----
@@ -694,11 +700,13 @@ def dovetail_tenon_geometry(
         transform=extrusion_transform,
         start_distance=-half_lateral,
         end_distance=half_lateral,
+        label=CutCSGLabel("mortise_hole"),
     )
 
     if wedge_slot_in_mortise_csg is not None:
         mortise_negative_csg = SolidUnion(
-            children=[mortise_dovetail_prism, wedge_slot_in_mortise_csg]
+            children=[mortise_dovetail_prism, wedge_slot_in_mortise_csg],
+            label=mortise_label,
         )
     else:
         mortise_negative_csg = mortise_dovetail_prism
@@ -739,6 +747,8 @@ def tusk_tenon_geometry(
     entry_axis_extent: Numeric,
     tusk_parameters: Any,
     rough_half_extent_past_opposite_shoulder: Numeric,
+    tusk_hole_label: CutCSGLabel = CutCSGLabel("tusk_hole"),
+    tusk_clearance_label: CutCSGLabel = CutCSGLabel("tusk_clearance"),
 ) -> TuskTenonGeometryResult:
     """
     Build the crosswise locking key ("tusk") for a through mortise-and-tenon joint, the hole
@@ -839,6 +849,7 @@ def tusk_tenon_geometry(
         transform=extrusion_transform,
         start_distance=-half_thickness,
         end_distance=half_thickness,
+        label=tusk_hole_label,
     )
 
     full_tusk_length = entry_axis_extent + tusk_tip_stickout + tusk_back_stickout
@@ -877,6 +888,7 @@ def tusk_tenon_geometry(
             transform=extrusion_transform,
             start_distance=-half_thickness,
             end_distance=half_thickness,
+            label=tusk_clearance_label,
         )
 
     return TuskTenonGeometryResult(

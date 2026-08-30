@@ -9,11 +9,16 @@ from kumiki.timber import (
     create_timber, create_v3
 )
 from kumiki.construction import ButtJointTimberArrangement
+from kumiki.cutcsg import CutCSGLabel
 from kumiki.joints.workshop.shavings.build_a_butt import (
+    DovetailTenonWedgeAccessoryParameters,
+    compute_butt_joint_shoulder,
+    dovetail_tenon_geometry,
     locate_mortise_timber_shoulder_plane_from_centerline_towards_tenon_timber,
     locate_mortise_timber_shoulder_plane_from_centerplane_towards_long_face,
     resolve_parallel_shoulder_face,
 )
+from kumiki.timber import TimberLongFace
 
 
 class TestMeasureMortiseShoulderPlane:
@@ -133,3 +138,62 @@ class TestMeasureMortiseShoulderPlane:
             arrangement, scalar(0), resolved_face_auto
         )
         assert plane_auto.normal is not None
+
+
+class TestDovetailTenonGeometryLabels:
+    """The two nodes this builder returns are named, and the caller can rename
+    them -- the same bargain the chop_* helpers in shavings.py make."""
+
+    def _geometry(self, **label_overrides):
+        from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+
+        arrangement = create_canonical_example_butt_joint_timbers()
+        shoulder_result = compute_butt_joint_shoulder(
+            arrangement=arrangement,
+            distance_from_centerline_or_centerplane=scalar(0),
+            up_direction=arrangement.butt_timber.get_height_direction_global(),
+        )
+        # The dovetail's top side has to face along the receiving timber's
+        # length, which is what the joint itself resolves before calling in.
+        receiving_length = arrangement.receiving_timber.get_length_direction_global()
+        dovetail_top_side = next(
+            face for face in TimberLongFace
+            if are_vectors_parallel(
+                arrangement.butt_timber.get_face_direction_global(face), receiving_length
+            )
+        )
+        return dovetail_tenon_geometry(
+            arrangement=arrangement,
+            shoulder_result=shoulder_result,
+            dovetail_top_side_on_butt_timber=dovetail_top_side,
+            tenon_size=create_v2(inches(2), inches(2)),
+            tenon_depth=inches(2),
+            dovetail_depth=inches(1, 2),
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(),
+            **label_overrides,
+        )
+
+    def test_the_returned_nodes_default_to_naming_what_they_are(self):
+        geometry = self._geometry()
+        assert geometry.tenon_negative_csg.label.name == "tenon_waste"
+        # The mortise cavity always comes back with the wedge's slot beside it,
+        # so the union is what is returned and the cavity itself sits inside.
+        assert geometry.mortise_negative_csg.label.name == "mortise"
+        assert [child.label.name for child in geometry.mortise_negative_csg.children] == [
+            "mortise_hole", "wedge_slot",
+        ]
+
+    def test_a_caller_can_rename_the_mortise(self):
+        geometry = self._geometry(mortise_label=CutCSGLabel("dovetail_socket"))
+        assert geometry.mortise_negative_csg.label.name == "dovetail_socket"
+
+    def test_a_caller_can_rename_the_waste(self):
+        geometry = self._geometry(tenon_waste_label=CutCSGLabel("dovetail_waste"))
+        assert geometry.tenon_negative_csg.label.name == "dovetail_waste"
+
+    def test_the_pieces_inside_keep_their_own_names(self):
+        # The caller names the node it owns; what the shape is made of is the
+        # builder's business.
+        geometry = self._geometry(tenon_waste_label=CutCSGLabel("dovetail_waste"))
+        assert geometry.tenon_negative_csg.base.label.name == "shoulder"
+        assert geometry.tenon_negative_csg.subtract[0].label.name == "tenon"

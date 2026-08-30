@@ -38,12 +38,6 @@ from .shavings.build_a_butt import (
     PegPositionSpace,
     SimplePegParameters,
     compute_peg_positions,
-    compute_butt_joint_shoulder,
-    dovetail_tenon_geometry,
-    DovetailTenonGeometeryResult,
-    DovetailTenonWedgeAccessoryParameters,
-    tusk_tenon_geometry,
-    TuskTenonGeometryResult,
 )
 
 

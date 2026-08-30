@@ -19,6 +19,10 @@ from kumiki.timber import (
 from kumiki.construction import ButtJointTimberArrangement
 from kumiki.timber_shavings import are_timbers_plane_aligned
 from kumiki.cutcsg import csg_children
+from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+from kumiki.joints.workshop.basic_joints import (
+    cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers,
+)
 from kumiki.joints.workshop.shavings.build_a_butt import (
     SimplePegParameters,
     PegPositionSpace,
@@ -1298,6 +1302,149 @@ class TestMortiseAndTenonCSGNaming:
         # The end cut says which end it is; both are half-spaces, so the shape
         # alone cannot tell you.
         assert labels & {"top_end_cut", "bottom_end_cut"}
+
+
+class TestBuildAButtCSGNaming:
+    """The geometry build_a_butt hands back carries names too.
+
+    Its two builders feed the dovetail and tusked joints, and both used to
+    return unnamed nodes -- including unnamed siblings under one parent, where
+    neither can be addressed by path and nothing tells the two apart.
+    """
+
+    def _labels(self, joint):
+        found = set()
+
+        def walk(node):
+            if node.label.is_labeled():
+                found.add(node.label.name)
+            for child in csg_children(node):
+                walk(child)
+
+        for cutting in joint.cuttings.values():
+            negative = cutting.get_negative_csg_local()
+            if negative is not None:
+                walk(negative)
+        return found
+
+    def _unlabeled(self, joint):
+        found = []
+
+        def walk(node):
+            if not node.label.is_labeled():
+                found.append(type(node).__name__)
+            for child in csg_children(node):
+                walk(child)
+
+        for key, cutting in joint.cuttings.items():
+            negative = cutting.get_negative_csg_local()
+            if negative is not None:
+                walk(negative)
+        return found
+
+    def _dovetail_joint(self, simple_T_configuration):
+        tenon_timber, mortise_timber = simple_T_configuration
+        return cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=ButtJointTimberArrangement(
+                receiving_timber=mortise_timber,
+                butt_timber=tenon_timber,
+                butt_timber_end=TimberEnd.BOTTOM,
+                front_face_on_butt_timber=None,
+                top_face_on_butt_timber=TimberLongFace.RIGHT,
+            ),
+            tenon_size=Matrix([scalar(2), scalar(2)]),
+            tenon_depth=scalar(4),
+            dovetail_depth=scalar(1),
+            wedge_accessory_parameters=DovetailTenonWedgeAccessoryParameters(
+                wedge_angle=radians(0.14),
+                wedge_back_extra_length=scalar(1, 2),
+            ),
+        )
+
+    def test_the_dovetail_names_every_node_it_cuts(self, simple_T_configuration):
+        assert self._unlabeled(self._dovetail_joint(simple_T_configuration)) == []
+
+    def test_the_dovetail_shoulder_and_tenon_are_told_apart(self, simple_T_configuration):
+        # These two were siblings under one unnamed Difference, so neither could
+        # be addressed and the pair read identically.
+        labels = self._labels(self._dovetail_joint(simple_T_configuration))
+        assert {"tenon_waste", "shoulder", "tenon"} <= labels
+
+    def test_the_mortise_cavity_and_the_wedge_slot_are_told_apart(self, simple_T_configuration):
+        labels = self._labels(self._dovetail_joint(simple_T_configuration))
+        assert {"mortise", "mortise_hole", "wedge_slot"} <= labels
+
+    def test_the_dovetail_uses_the_same_words_as_a_plain_mortise_and_tenon(self, simple_T_configuration):
+        # A dovetail tenon is still a tenon: the joint label already records
+        # which joint this is, so the parts keep the family's vocabulary.
+        labels = self._labels(self._dovetail_joint(simple_T_configuration))
+        assert {"tenon", "tenon_waste", "shoulder", "mortise_hole"} <= labels
+
+
+class TestTuskedMortiseAndTenonCSGNaming:
+    """The tusk's own geometry, which had no tests of any kind before."""
+
+    def _tusked_joint(self, receiving_timber=None):
+        arrangement = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0))
+        if receiving_timber is not None:
+            arrangement = ButtJointTimberArrangement(
+                receiving_timber=receiving_timber,
+                butt_timber=arrangement.butt_timber,
+                butt_timber_end=arrangement.butt_timber_end,
+            )
+        return cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers(arrangement)
+
+    def _labels(self, joint):
+        found = set()
+
+        def walk(node):
+            if node.label.is_labeled():
+                found.add(node.label.name)
+            for child in csg_children(node):
+                walk(child)
+
+        for cutting in joint.cuttings.values():
+            negative = cutting.get_negative_csg_local()
+            if negative is not None:
+                walk(negative)
+        return found
+
+    def test_the_tusk_hole_is_named(self):
+        assert "tusk_hole" in self._labels(self._tusked_joint())
+
+    def test_nothing_the_tusked_joint_cuts_is_unnamed(self):
+        joint = self._tusked_joint()
+        unlabeled = []
+
+        def walk(node):
+            if not node.label.is_labeled():
+                unlabeled.append(type(node).__name__)
+            for child in csg_children(node):
+                walk(child)
+
+        for cutting in joint.cuttings.values():
+            negative = cutting.get_negative_csg_local()
+            if negative is not None:
+                walk(negative)
+        assert unlabeled == []
+
+    def test_the_tusk_clearance_is_named_when_rough_stock_makes_one(self):
+        """The clearance only exists when the receiving timber's rough stock
+        still surrounds the tenon at the tusk hole. On the canonical (perfect)
+        timbers it is never built, so a test that did not add rough material
+        would pass while saying nothing about this label."""
+        from dataclasses import replace
+
+        canonical = create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0))
+        perfect = canonical.receiving_timber
+        rough_half = create_v2(
+            perfect.size[0] / scalar(2) + inches(1),
+            perfect.size[1] / scalar(2) + inches(1),
+        )
+        rough_receiving = replace(perfect, rough_half_sizes=(rough_half, rough_half))
+
+        assert "tusk_clearance" not in self._labels(self._tusked_joint())
+        assert "tusk_clearance" in self._labels(self._tusked_joint(rough_receiving))
 
 
 class TestUnionIntoCut:
