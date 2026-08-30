@@ -135,6 +135,25 @@ const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAY
 
 // Deep enough to read against pale timbers on the light themes, where the
 // paler blues these used to be washed out into the stock.
+// The gizmo cube's faces in BoxGeometry's material order: +X, -X, +Y, -Y, +Z,
+// -Z. The compass line follows kumiki's own convention (see rule.py): +X points
+// east and +Y points north, which puts north on the BACK of the cube.
+const GIZMO_FACES = Object.freeze([
+    { lines: ['right', 'east'], background: '#c9d6ea' },
+    { lines: ['left', 'west'], background: '#bfcee4' },
+    { lines: ['back', 'north'], background: '#d6deee' },
+    { lines: ['front', 'south'], background: '#c4d2e8' },
+    { lines: ['top'], background: '#bccbe2' },
+    { lines: ['bottom'], background: '#b6c6df' },
+]);
+
+const GIZMO_FACE_TEXTURE_PX = 256;
+// The stroked frame, and the gap kept between it and the text.
+const GIZMO_FACE_BORDER_INSET_PX = 16;
+const GIZMO_FACE_BORDER_WIDTH_PX = 10;
+const GIZMO_FACE_TEXT_GAP_PX = 8;
+const GIZMO_FACE_LINE_HEIGHT = 1.12;
+
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
     tagged: 0x29b6f6,
     feature: 0x0288d1,
@@ -3875,24 +3894,65 @@ class KigumiViewerApp extends LitElement {
         this.applySelectionOpacity();
     }
 
-    createGizmoFaceMaterial(label, backgroundColor) {
+    /** How much room a face has for text, inside its frame. */
+    _gizmoFaceTextExtent() {
+        const inset = GIZMO_FACE_BORDER_INSET_PX
+            + GIZMO_FACE_BORDER_WIDTH_PX / 2
+            + GIZMO_FACE_TEXT_GAP_PX;
+        return GIZMO_FACE_TEXTURE_PX - inset * 2;
+    }
+
+    /**
+     * The largest size every face can share without touching its frame.
+     *
+     * Measured rather than hardcoded, so it stays right whichever font the
+     * webview actually resolves, and one size for all six faces rather than
+     * the biggest each could take alone -- 'top' would otherwise tower over
+     * the two-line faces and the cube would read as sloppy.
+     */
+    _fitGizmoFontSize(context, faces) {
+        const REFERENCE_PX = 100;
+        const available = this._gizmoFaceTextExtent();
+        let size = Infinity;
+        for (const face of faces) {
+            context.font = `600 ${REFERENCE_PX}px Segoe UI`;
+            const widest = Math.max(...face.lines.map((line) => context.measureText(line).width));
+            const byWidth = widest > 0 ? REFERENCE_PX * (available / widest) : REFERENCE_PX;
+            const byHeight = available / (face.lines.length * GIZMO_FACE_LINE_HEIGHT);
+            size = Math.min(size, byWidth, byHeight);
+        }
+        return Math.max(1, Math.floor(size));
+    }
+
+    createGizmoFaceMaterial(lines, backgroundColor, fontSizePx) {
         const canvas = document.createElement('canvas');
-        canvas.width = 256;
-        canvas.height = 256;
+        canvas.width = GIZMO_FACE_TEXTURE_PX;
+        canvas.height = GIZMO_FACE_TEXTURE_PX;
         const context = canvas.getContext('2d');
 
         context.fillStyle = backgroundColor;
         context.fillRect(0, 0, canvas.width, canvas.height);
 
         context.strokeStyle = 'rgba(93, 104, 130, 0.35)';
-        context.lineWidth = 10;
-        context.strokeRect(16, 16, canvas.width - 32, canvas.height - 32);
+        context.lineWidth = GIZMO_FACE_BORDER_WIDTH_PX;
+        context.strokeRect(
+            GIZMO_FACE_BORDER_INSET_PX,
+            GIZMO_FACE_BORDER_INSET_PX,
+            canvas.width - GIZMO_FACE_BORDER_INSET_PX * 2,
+            canvas.height - GIZMO_FACE_BORDER_INSET_PX * 2,
+        );
 
         context.fillStyle = '#39496e';
         context.textAlign = 'center';
         context.textBaseline = 'middle';
-        context.font = '600 42px Segoe UI';
-        context.fillText(label, canvas.width / 2, canvas.height / 2);
+        context.font = `600 ${fontSizePx}px Segoe UI`;
+
+        // Centred as a block, so one line sits in the middle and two straddle it.
+        const lineHeight = fontSizePx * GIZMO_FACE_LINE_HEIGHT;
+        const firstY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
+        lines.forEach((line, index) => {
+            context.fillText(line, canvas.width / 2, firstY + index * lineHeight);
+        });
 
         const texture = new THREE.CanvasTexture(canvas);
         texture.needsUpdate = true;
@@ -3963,14 +4023,12 @@ class KigumiViewerApp extends LitElement {
         light.position.set(2, 2, 3);
         this.gizmoScene.add(light);
 
-        const materials = [
-            this.createGizmoFaceMaterial('right', '#c9d6ea'),
-            this.createGizmoFaceMaterial('left', '#bfcee4'),
-            this.createGizmoFaceMaterial('back', '#d6deee'),
-            this.createGizmoFaceMaterial('front', '#c4d2e8'),
-            this.createGizmoFaceMaterial('top', '#bccbe2'),
-            this.createGizmoFaceMaterial('bottom', '#b6c6df'),
-        ];
+        const fontSizePx = this._fitGizmoFontSize(
+            document.createElement('canvas').getContext('2d'), GIZMO_FACES,
+        );
+        const materials = GIZMO_FACES.map(
+            (face) => this.createGizmoFaceMaterial(face.lines, face.background, fontSizePx),
+        );
         this.gizmoCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), materials);
         this.gizmoScene.add(this.gizmoCube);
         this.resizeGizmoRenderer();
