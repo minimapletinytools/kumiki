@@ -6,7 +6,7 @@ import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
-from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation, Abs, Matrix
+from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation, Abs, Matrix, degrees
 from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg, CutCSGLabel
 from kumiki.pathcsg import PathSegment, LineSegment, Path, PathExtrusion
 from kumiki.measuring import get_center_point_on_face_global
@@ -471,3 +471,32 @@ def cut_practice_path_extrusion_corner_end_decoration(
         cuttings={timber.ticket.path: cutting},
         ticket=JointTicket(joint_type="path_extrusion_corner_end_decoration"),
     )
+
+
+def cut_practice_straight_angled_end_cut_decoration(
+        timber: BlockLike, 
+        timber_end: TimberEnd, 
+        front_face: TimberFace, 
+        position_from_end: Numeric,
+        angle: Numeric = degrees(0),
+        angle_towards_face: Optional[TimberFace] = None
+    ) -> Joint:
+    """
+
+            angle_towards_face
+            v
+    ____________
+    front_face  \\      <-timber_end
+    _____________\\
+
+    Args:
+        timber: the timber to have the decoration cut on it
+        timber_end: the end of the timber the decoration is cut on
+        position_from_end: distance from timber_end along the timber's centerline where the angle cut plane lies 
+        angle: angle to make the cut, 0 is perpendicular, 
+        front_face: the face that the angle cut is visible from
+        angle_towards_face: the face that the cut angles towards, so when angle > 0, this face will have more cut away from it than the opposite face, by default this is either RIGHTo rFRONT (based on front_face)
+    """
+    # TODO assert  front_face and angle_towards_face are orthogonal
+    # TODO finish
+    pass
