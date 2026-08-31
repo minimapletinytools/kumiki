@@ -38,6 +38,104 @@
             && Math.abs(dot(camera.up, camera.look)) < ORTHOGONALITY_TOLERANCE;
     }
 
+    // A sheet is drawn a little smaller than the canvas so there is desk around
+    // it; without the margin the paper's edge sits flush against the window and
+    // stops reading as paper.
+    const PAGE_FIT_MARGIN = 0.94;
+
+    const MIN_PAGE_ZOOM = 0.05;
+    const MAX_PAGE_ZOOM = 40;
+
+    /**
+     * The sheet a drawing is laid out on, in metres, or null for "the canvas".
+     *
+     * A real size is what lets a view state its scale and what makes printing
+     * mean anything. null is the default 3D scene, which is one viewport filling
+     * whatever window it is given.
+     */
+    function normalizePage(spec) {
+        if (!spec || typeof spec !== 'object') {
+            return null;
+        }
+        const width = Number(spec.width);
+        const height = Number(spec.height);
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+            return null;
+        }
+        return { width, height };
+    }
+
+    /** Where the reader has moved and scaled the sheet. Never sent to python. */
+    function normalizePageView(view) {
+        const source = view && typeof view === 'object' ? view : {};
+        const zoom = Number(source.zoom);
+        const offsetX = Number(source.offsetX);
+        const offsetY = Number(source.offsetY);
+        return {
+            zoom: Number.isFinite(zoom) ? Math.min(MAX_PAGE_ZOOM, Math.max(MIN_PAGE_ZOOM, zoom)) : 1,
+            offsetX: Number.isFinite(offsetX) ? offsetX : 0,
+            offsetY: Number.isFinite(offsetY) ? offsetY : 0,
+        };
+    }
+
+    /**
+     * Where the sheet sits on the canvas, in pixels, top-left origin.
+     *
+     * The sheet has a fixed aspect and the window does not, so it letterboxes:
+     * the margin around the paper is the point, not a defect. Pan and zoom are
+     * applied here and nowhere else, which is what keeps them off the cameras.
+     *
+     * A null page *is* the canvas, and takes no pan or zoom -- the 3D scene
+     * moves its camera instead.
+     */
+    function pageScreenRect(page, canvasWidth, canvasHeight, view) {
+        if (!page) {
+            return { x: 0, y: 0, width: canvasWidth, height: canvasHeight };
+        }
+        const { zoom, offsetX, offsetY } = normalizePageView(view);
+        const fit = Math.min(canvasWidth / page.width, canvasHeight / page.height) * PAGE_FIT_MARGIN;
+        const scale = fit * zoom;
+        const width = page.width * scale;
+        const height = page.height * scale;
+        return {
+            x: (canvasWidth - width) / 2 + offsetX,
+            y: (canvasHeight - height) / 2 + offsetY,
+            width,
+            height,
+        };
+    }
+
+    /**
+     * The denominator of a viewport's drawing scale: 1:N.
+     *
+     * A viewport is `rect.height * page.height` metres tall on paper and shows
+     * `2 * extent` metres of world, so the scale is not stored anywhere -- it
+     * follows, and cannot disagree with what is drawn. null when there is no
+     * page, where scale means nothing.
+     */
+    function viewportScale(extent, rect, page) {
+        if (!page) {
+            return null;
+        }
+        const paperHeight = rect[3] * page.height;
+        if (!(paperHeight > 0)) {
+            return null;
+        }
+        return (2 * Number(extent)) / paperHeight;
+    }
+
+    /** The same relation run backwards: draw at 1:N, and let the extent follow. */
+    function extentForScale(denominator, rect, page) {
+        if (!page || !Number.isFinite(denominator) || denominator <= 0) {
+            return null;
+        }
+        const paperHeight = rect[3] * page.height;
+        if (!(paperHeight > 0)) {
+            return null;
+        }
+        return (denominator * paperHeight) / 2;
+    }
+
     function normalizeRect(rect) {
         if (!Array.isArray(rect) || rect.length !== 4 || rect.some((n) => !Number.isFinite(n))) {
             return [0, 0, 1, 1];
@@ -51,15 +149,28 @@
         ];
     }
 
-    function normalizeViewport(spec, index) {
+    function normalizeViewport(spec, index, page) {
         const source = spec && typeof spec === 'object' ? spec : {};
-        const camera = isOrthogonalFrame(source.camera) ? source.camera : null;
+        const rect = normalizeRect(source.rect);
+        let camera = isOrthogonalFrame(source.camera) ? source.camera : null;
+        // A camera may state a scale instead of an extent -- 1:20 is how a
+        // drawing is thought about, and the extent that satisfies it depends on
+        // the rect and the page. Resolve it here so nothing downstream has to
+        // know which of the two was written.
+        if (camera && camera.extent === undefined) {
+            const extent = extentForScale(Number(camera.scale), rect, page);
+            camera = extent === null ? camera : { ...camera, extent };
+        }
         return {
             id: typeof source.id === 'string' && source.id ? source.id : `viewport-${index}`,
-            rect: normalizeRect(source.rect),
+            rect,
             locked: Boolean(source.locked),
             projection: PROJECTIONS.includes(source.projection) ? source.projection : 'perspective',
             camera,
+            // What this viewport clears to. A drawing's viewports draw on
+            // nothing so they float over each other; the sheet beneath them is
+            // the page's business, not any camera's.
+            background: source.background === undefined ? null : source.background,
             // A scene knows every member; this says which ones it is about.
             // null means all of them, which is what the 3D scene wants.
             members: Array.isArray(source.members) ? source.members.slice() : null,
@@ -73,14 +184,17 @@
         const viewports = Array.isArray(source.viewports) && source.viewports.length > 0
             ? source.viewports
             : [{ id: 'main', rect: [0, 0, 1, 1] }];
+        const page = normalizePage(source.page);
         return {
             id: typeof source.id === 'string' && source.id ? source.id : DEFAULT_SCENE_ID,
+            // The sheet these viewports sit on, or null for "the canvas".
+            page,
             // Which camera controls this scene wants on screen. A drawing asks
             // for none; the 3D scene asks for all of them.
             cameraControls: Array.isArray(source.cameraControls)
                 ? source.cameraControls.filter((name) => CAMERA_CONTROLS.includes(name))
                 : [],
-            viewports: viewports.map(normalizeViewport),
+            viewports: viewports.map((viewport, index) => normalizeViewport(viewport, index, page)),
         };
     }
 
@@ -113,17 +227,25 @@
     /**
      * A viewport's rect in pixels, ready for setViewport/setScissor.
      *
+     * A rect is a fraction of the page, so it is placed within the page's own
+     * rect on the canvas rather than against the canvas directly. Pass the
+     * whole canvas as the page rect and this is the canvas-relative placement
+     * it was before, which is what a null page gives you.
+     *
      * Rects are written top-left down, the way a person describes a layout --
      * "the four elevations stacked on the left" -- while WebGL counts from the
      * bottom left. The flip happens here, once, rather than at each call.
      */
-    function pixelRect(rect, canvasWidth, canvasHeight) {
+    function pixelRect(rect, pageRect, canvasHeight) {
         const [x, y, width, height] = rect;
+        const left = pageRect.x + x * pageRect.width;
+        const top = pageRect.y + y * pageRect.height;
+        const pixelHeight = height * pageRect.height;
         return {
-            x: Math.round(x * canvasWidth),
-            y: Math.round((1 - y - height) * canvasHeight),
-            width: Math.max(1, Math.round(width * canvasWidth)),
-            height: Math.max(1, Math.round(height * canvasHeight)),
+            x: Math.round(left),
+            y: Math.round(canvasHeight - (top + pixelHeight)),
+            width: Math.max(1, Math.round(width * pageRect.width)),
+            height: Math.max(1, Math.round(pixelHeight)),
         };
     }
 
@@ -141,14 +263,21 @@
         return pixelHeight > 0 ? pixelWidth / pixelHeight : 1;
     }
 
-    /** Which viewport a point in canvas pixels falls in, or null. */
-    function viewportAtPoint(viewports, pointX, pointY, canvasWidth, canvasHeight) {
+    /**
+     * Which viewport a point in canvas pixels falls in, or null.
+     *
+     * Viewports may overlap, and the list is ordered: later is on top. So this
+     * walks it backwards and renderViewports walks it forwards, which is the
+     * pair that makes overlap behave -- the last one drawn is the first one
+     * picked. Neither direction is arbitrary.
+     */
+    function viewportAtPoint(viewports, pointX, pointY, pageRect) {
         for (let index = viewports.length - 1; index >= 0; index -= 1) {
             const [x, y, width, height] = viewports[index].rect;
-            const left = x * canvasWidth;
-            const top = y * canvasHeight;
-            if (pointX >= left && pointX <= left + width * canvasWidth
-                && pointY >= top && pointY <= top + height * canvasHeight) {
+            const left = pageRect.x + x * pageRect.width;
+            const top = pageRect.y + y * pageRect.height;
+            if (pointX >= left && pointX <= left + width * pageRect.width
+                && pointY >= top && pointY <= top + height * pageRect.height) {
                 return viewports[index];
             }
         }
@@ -227,6 +356,12 @@
         normalizeScene,
         isOrthogonalFrame,
         orbitDistanceForExtent,
+        normalizePage,
+        normalizePageView,
+        pageScreenRect,
+        viewportScale,
+        extentForScale,
+        PAGE_FIT_MARGIN,
         pixelRect,
         viewportAspect,
         viewportAtPoint,

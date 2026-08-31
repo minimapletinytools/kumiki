@@ -27,7 +27,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, pageScreenRect, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
 const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
@@ -65,8 +65,8 @@ class ViewerViewport {
     }
 
     /** This viewport's rect in pixels, ready for setViewport/setScissor. */
-    pixelRect(canvasWidth, canvasHeight) {
-        return viewportPixelRect(this.spec.rect, canvasWidth, canvasHeight);
+    pixelRect(pageRect, canvasHeight) {
+        return viewportPixelRect(this.spec.rect, pageRect, canvasHeight);
     }
 
     /**
@@ -1297,6 +1297,9 @@ class KigumiViewerApp extends LitElement {
         this.currentFrameData = {};
         // Testing scaffolding; see setDebugDrawingEnabled.
         this.debugDrawingEnabled = false;
+        // Where the reader has moved and scaled the sheet. Viewer-local: it is
+        // how you look at the drawing, not part of it, and never goes back.
+        this.pageView = { zoom: 1, offsetX: 0, offsetY: 0 };
         this.csgTreesByKey = new Map();  // memberKey -> { memberKey, tree }
         this.csgTreeRequests = new Set();// memberKeys already asked for
         this.lastPickDetail = null;      // featureType / jointName / facesToward
@@ -1816,12 +1819,13 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const size = this.renderer.getSize(new THREE.Vector2());
+        const pageRect = this.pageScreenRect(size.x, size.y);
         const several = this.viewports.length > 1;
         // Scissoring costs nothing to skip while one viewport covers the
         // canvas, which is the 3D scene and every session before drawings.
         this.renderer.setScissorTest(several);
         for (const viewport of this.viewports) {
-            const rect = viewport.pixelRect(size.x, size.y);
+            const rect = viewport.pixelRect(pageRect, size.y);
             this.renderer.setViewport(rect.x, rect.y, rect.width, rect.height);
             if (several) {
                 this.renderer.setScissor(rect.x, rect.y, rect.width, rect.height);
@@ -4934,7 +4938,29 @@ class KigumiViewerApp extends LitElement {
         camera.updateProjectionMatrix();
     }
 
-    /** A viewport's aspect: its share of the canvas, times the canvas's own. */
+    /**
+     * Where the active scene's sheet sits on the canvas, in pixels.
+     *
+     * A scene with no page is the canvas, so this is the whole of it and the
+     * 3D scene behaves exactly as it did.
+     */
+    pageScreenRect(canvasWidth, canvasHeight) {
+        return pageScreenRect(
+            this.sceneStore.activeScene().page,
+            canvasWidth,
+            canvasHeight,
+            this.pageView,
+        );
+    }
+
+    /**
+     * A viewport's aspect: its share of the page, times the page's own.
+     *
+     * Measured against the page rather than the canvas, so on a real sheet the
+     * window's shape does not enter into it and a resize cannot leave a camera
+     * holding a stale aspect. With no page the page is the canvas, which is the
+     * behaviour this had before.
+     */
     viewportAspect(viewport) {
         const element = this.renderRoot && this.renderRoot.querySelector
             ? this.renderRoot.querySelector('#viewport')
@@ -4942,7 +4968,8 @@ class KigumiViewerApp extends LitElement {
         if (!element || !element.offsetHeight) {
             return 1;
         }
-        return rectAspect(viewport.spec.rect, element.offsetWidth, element.offsetHeight);
+        const pageRect = this.pageScreenRect(element.offsetWidth, element.offsetHeight);
+        return rectAspect(viewport.spec.rect, pageRect.width, pageRect.height);
     }
 
     // Keeps both cameras' aspect/frustum in sync with the current viewport size --

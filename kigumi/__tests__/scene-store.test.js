@@ -1,6 +1,7 @@
 const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
     isOrthogonalFrame, orbitDistanceForExtent, pixelRect, viewportAspect, viewportAtPoint,
+    normalizePage, normalizePageView, pageScreenRect, viewportScale, extentForScale,
 } = require('../webview/scene-store.js');
 
 describe('the default 3D scene', () => {
@@ -74,22 +75,32 @@ describe('isOrthogonalFrame', () => {
     });
 });
 
+const CANVAS = { x: 0, y: 0, width: 800, height: 600 };
+
 describe('pixelRect', () => {
     test('a full-canvas rect covers the canvas', () => {
-        expect(pixelRect([0, 0, 1, 1], 800, 600)).toEqual({ x: 0, y: 0, width: 800, height: 600 });
+        expect(pixelRect([0, 0, 1, 1], CANVAS, 600)).toEqual({ x: 0, y: 0, width: 800, height: 600 });
     });
 
     test('rects are written top-down and flipped for WebGL', () => {
         // The top-left quarter is at the TOP of the canvas, so in GL's
         // bottom-left origin its y is the canvas height minus its own.
-        expect(pixelRect([0, 0, 0.5, 0.5], 800, 600))
+        expect(pixelRect([0, 0, 0.5, 0.5], CANVAS, 600))
             .toEqual({ x: 0, y: 300, width: 400, height: 300 });
-        expect(pixelRect([0, 0.5, 0.5, 0.5], 800, 600))
+        expect(pixelRect([0, 0.5, 0.5, 0.5], CANVAS, 600))
             .toEqual({ x: 0, y: 0, width: 400, height: 300 });
     });
 
+    test('a rect is placed within the page, not the canvas', () => {
+        // A sheet sits inset on the canvas, so the same rect lands somewhere
+        // else -- this is what stops pan and zoom having to touch a camera.
+        const sheet = { x: 100, y: 50, width: 400, height: 300 };
+        expect(pixelRect([0, 0, 0.5, 0.5], sheet, 600))
+            .toEqual({ x: 100, y: 400, width: 200, height: 150 });
+    });
+
     test('a sliver still gets a pixel, so nothing divides by zero', () => {
-        const rect = pixelRect([0, 0, 0.0001, 0.0001], 800, 600);
+        const rect = pixelRect([0, 0, 0.0001, 0.0001], CANVAS, 600);
         expect(rect.width).toBeGreaterThan(0);
         expect(rect.height).toBeGreaterThan(0);
     });
@@ -122,17 +133,17 @@ describe('viewportAtPoint', () => {
     ];
 
     test('finds the viewport under a canvas point', () => {
-        expect(viewportAtPoint(viewports, 100, 300, 800, 600).id).toBe('left');
-        expect(viewportAtPoint(viewports, 700, 300, 800, 600).id).toBe('right');
+        expect(viewportAtPoint(viewports, 100, 300, CANVAS).id).toBe('left');
+        expect(viewportAtPoint(viewports, 700, 300, CANVAS).id).toBe('right');
     });
 
     test('later viewports win where they overlap', () => {
         const stacked = [{ id: 'under', rect: [0, 0, 1, 1] }, { id: 'over', rect: [0, 0, 0.5, 1] }];
-        expect(viewportAtPoint(stacked, 100, 300, 800, 600).id).toBe('over');
+        expect(viewportAtPoint(stacked, 100, 300, CANVAS).id).toBe('over');
     });
 
     test('a point off the canvas belongs to no viewport', () => {
-        expect(viewportAtPoint(viewports, -5, 300, 800, 600)).toBeNull();
+        expect(viewportAtPoint(viewports, -5, 300, CANVAS)).toBeNull();
     });
 });
 
@@ -207,5 +218,153 @@ describe('orbitDistanceForExtent', () => {
     it('refuses a lens that has no angle', () => {
         expect(orbitDistanceForExtent(1, 0)).toBe(0);
         expect(orbitDistanceForExtent(1, undefined)).toBe(0);
+    });
+});
+
+describe('normalizePage', () => {
+    test('a sheet keeps its size in metres', () => {
+        expect(normalizePage({ width: 0.42, height: 0.297 })).toEqual({ width: 0.42, height: 0.297 });
+    });
+
+    test('no page means the canvas is the page', () => {
+        expect(normalizePage(null)).toBeNull();
+        expect(normalizePage(undefined)).toBeNull();
+    });
+
+    test('a sheet with no area is not a sheet', () => {
+        expect(normalizePage({ width: 0, height: 0.297 })).toBeNull();
+        expect(normalizePage({ width: -1, height: 0.297 })).toBeNull();
+        expect(normalizePage({ width: 'wide', height: 0.297 })).toBeNull();
+    });
+});
+
+describe('normalizePageView', () => {
+    test('the default view is the whole sheet, unmoved', () => {
+        expect(normalizePageView(undefined)).toEqual({ zoom: 1, offsetX: 0, offsetY: 0 });
+    });
+
+    test('zoom is clamped rather than allowed to invert or vanish', () => {
+        expect(normalizePageView({ zoom: 0 }).zoom).toBeGreaterThan(0);
+        expect(normalizePageView({ zoom: -3 }).zoom).toBeGreaterThan(0);
+        expect(normalizePageView({ zoom: 1e9 }).zoom).toBeLessThan(1e9);
+    });
+});
+
+describe('pageScreenRect', () => {
+    const page = { width: 0.42, height: 0.297 };
+
+    test('no page means the whole canvas', () => {
+        expect(pageScreenRect(null, 800, 600, { zoom: 4, offsetX: 90 }))
+            .toEqual({ x: 0, y: 0, width: 800, height: 600 });
+    });
+
+    test('a sheet keeps its own aspect, so it letterboxes', () => {
+        const rect = pageScreenRect(page, 800, 600, null);
+        expect(rect.width / rect.height).toBeCloseTo(page.width / page.height, 9);
+        expect(rect.width).toBeLessThanOrEqual(800);
+        expect(rect.height).toBeLessThanOrEqual(600);
+    });
+
+    test('the sheet is centred, and pan moves it', () => {
+        const centred = pageScreenRect(page, 800, 600, null);
+        expect(centred.x + centred.width / 2).toBeCloseTo(400, 9);
+        expect(centred.y + centred.height / 2).toBeCloseTo(300, 9);
+
+        const panned = pageScreenRect(page, 800, 600, { offsetX: 30, offsetY: -20 });
+        expect(panned.x).toBeCloseTo(centred.x + 30, 9);
+        expect(panned.y).toBeCloseTo(centred.y - 20, 9);
+    });
+
+    test('zoom scales the sheet and leaves its aspect alone', () => {
+        const once = pageScreenRect(page, 800, 600, { zoom: 1 });
+        const twice = pageScreenRect(page, 800, 600, { zoom: 2 });
+        expect(twice.width).toBeCloseTo(once.width * 2, 9);
+        expect(twice.height).toBeCloseTo(once.height * 2, 9);
+        expect(twice.width / twice.height).toBeCloseTo(once.width / once.height, 9);
+    });
+
+    test('a zoomed sheet leaves every viewport aspect untouched', () => {
+        // The property the whole design rests on: zooming the page is rect
+        // arithmetic, so no camera has to be told and none can drift.
+        const rect = [0.1, 0.1, 0.4, 0.35];
+        const at = (zoom) => {
+            const sheet = pageScreenRect(page, 800, 600, { zoom });
+            return viewportAspect(rect, sheet.width, sheet.height);
+        };
+        expect(at(3)).toBeCloseTo(at(1), 9);
+        expect(at(0.25)).toBeCloseTo(at(1), 9);
+    });
+});
+
+describe('viewportScale', () => {
+    // A3 landscape, a view filling the top-left quarter: 148.5mm of paper.
+    const page = { width: 0.42, height: 0.297 };
+    const rect = [0, 0, 0.5, 0.5];
+
+    test('scale follows from the extent, the rect and the page', () => {
+        // 1.485m of world in 0.1485m of paper is 1:10.
+        expect(viewportScale(0.7425, rect, page)).toBeCloseTo(10, 9);
+    });
+
+    test('it round-trips with the extent that satisfies it', () => {
+        const extent = extentForScale(20, rect, page);
+        expect(viewportScale(extent, rect, page)).toBeCloseTo(20, 9);
+    });
+
+    test('a bigger view on the same paper is a smaller scale', () => {
+        expect(viewportScale(1, rect, page)).toBeGreaterThan(viewportScale(0.5, rect, page));
+    });
+
+    test('scale means nothing without a sheet', () => {
+        expect(viewportScale(1, rect, null)).toBeNull();
+        expect(extentForScale(20, rect, null)).toBeNull();
+    });
+
+    test('a nonsense scale is refused rather than guessed at', () => {
+        expect(extentForScale(0, rect, page)).toBeNull();
+        expect(extentForScale(-5, rect, page)).toBeNull();
+        expect(extentForScale(NaN, rect, page)).toBeNull();
+    });
+});
+
+describe('a scene with a page', () => {
+    test('the page comes through normalization', () => {
+        const scene = normalizeScene({ id: 'd', page: { width: 0.42, height: 0.297 }, viewports: [] });
+        expect(scene.page).toEqual({ width: 0.42, height: 0.297 });
+    });
+
+    test('a viewport may state a scale instead of an extent', () => {
+        const scene = normalizeScene({
+            id: 'd',
+            page: { width: 0.42, height: 0.297 },
+            viewports: [{
+                id: 'front',
+                rect: [0, 0, 0.5, 0.5],
+                camera: { right: [1, 0, 0], up: [0, 0, 1], look: [0, 1, 0], target: [0, 0, 0], scale: 20 },
+            }],
+        });
+        expect(scene.viewports[0].camera.extent).toBeCloseTo(extentForScale(20, [0, 0, 0.5, 0.5], { width: 0.42, height: 0.297 }), 9);
+    });
+
+    test('a stated extent is left alone', () => {
+        const scene = normalizeScene({
+            id: 'd',
+            page: { width: 0.42, height: 0.297 },
+            viewports: [{
+                id: 'front',
+                rect: [0, 0, 0.5, 0.5],
+                camera: { right: [1, 0, 0], up: [0, 0, 1], look: [0, 1, 0], target: [0, 0, 0], extent: 2, scale: 20 },
+            }],
+        });
+        expect(scene.viewports[0].camera.extent).toBe(2);
+    });
+
+    test('a viewport draws on nothing unless it says otherwise', () => {
+        const scene = normalizeScene({ id: 'd', viewports: [{ id: 'a' }] });
+        expect(scene.viewports[0].background).toBeNull();
+    });
+
+    test('the default 3D scene has no page, so the canvas is the page', () => {
+        expect(defaultSceneSpec().page).toBeNull();
     });
 });
