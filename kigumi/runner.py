@@ -14,6 +14,7 @@ import contextlib
 import importlib
 import importlib.util
 import json
+import math
 import os
 import select
 import sys
@@ -1202,9 +1203,58 @@ def _members_world_bounds(entries: List[Dict[str, Any]]) -> Tuple[List[float], L
     )
 
 
-def _preview_viewport(rect: List[float]) -> Dict[str, Any]:
-    """The live 3D view beside the elevations. Free, so it can be looked around."""
-    return {"id": "preview", "rect": rect, "locked": False, "projection": "perspective"}
+def _normalize(vec: List[float]) -> List[float]:
+    length = math.sqrt(sum(component * component for component in vec))
+    return [component / length for component in vec] if length > 0 else [0.0, 0.0, 1.0]
+
+
+def _camera_frame_looking(look: List[float]) -> Dict[str, Any]:
+    """An orthonormal frame looking along `look`, kept as upright as it can be.
+
+    `up` is world Z with the part along the view direction taken out, which is
+    what stops a three-quarter view from arriving on its side. right x up ==
+    -look, the frame of a camera looking down its own -Z.
+    """
+    forward = _normalize(look)
+    world_up = [0.0, 0.0, 1.0]
+    along = sum(world_up[i] * forward[i] for i in range(3))
+    up = _normalize([world_up[i] - along * forward[i] for i in range(3)])
+    return {"right": _normalize(_cross(forward, up)), "up": up, "look": forward}
+
+
+# Looking from the south-east and above, the angle a frame is usually drawn
+# from. The preview is free, so this is only where it starts.
+_PREVIEW_LOOK = [-1.0, 1.0, -0.75]
+
+# A perspective view wants more room around the piece than an elevation does.
+_PREVIEW_EXTENT_PADDING = 1.6
+
+
+def _preview_viewport(
+    rect: List[float],
+    centre: List[float],
+    half_size: List[float],
+    page: Dict[str, Any],
+) -> Dict[str, Any]:
+    """The live 3D view beside the elevations. Free, so it can be looked around.
+
+    It still arrives pointed at what is being drawn. Left to itself the viewer
+    builds a camera at the origin looking at nothing in particular, which for a
+    piece standing away from the origin means an empty preview.
+    """
+    frame = _camera_frame_looking(_PREVIEW_LOOK)
+    radius = math.sqrt(sum(component * component for component in half_size))
+    return {
+        "id": "preview",
+        "rect": rect,
+        "locked": False,
+        "projection": "perspective",
+        "camera": {
+            **frame,
+            "target": centre,
+            "extent": max(0.001, radius * _PREVIEW_EXTENT_PADDING),
+        },
+    }
 
 
 def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1280,6 +1330,9 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     by_key = {entry["memberKey"]: entry for entry in timber_entries}
     entries = [by_key[key] for key in wanted if key in by_key]
 
+    drawn = entries or timber_entries
+    centre, half_size = _members_world_bounds(drawn)
+
     if len(entries) == 1:
         viewports = _long_face_viewports(entries[0], page)
         preview_rect = _LONG_FACE_RECTS["preview"]
@@ -1294,7 +1347,7 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
         viewport["members"] = members or None
         viewport["ghostOthers"] = True
         viewport["measurements"] = []
-    viewports.append(_preview_viewport(preview_rect))
+    viewports.append(_preview_viewport(preview_rect, centre, half_size, page))
 
     return {
         "id": SELECTION_DRAWING_ID,

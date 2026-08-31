@@ -709,10 +709,8 @@ class ViewerSettingsPanel {
             : t(`viewer.options.footprint.color.${colorId}`));
         return html`
             <section id="render-controls" aria-label=${t('viewer.options.ariaLabel')}>
-                <label>
-                    <input id="center-gizmo-toggle" type="checkbox" ?checked=${this.app.showCenterGizmo}>
-                    ${t('viewer.options.centerGizmo')}
-                </label>
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.common')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.section.common')}</div>
                 <label>
                     ${t('viewer.options.units.label')}
                     <select id="units-select" .value=${this.app.units || 'metric'}>
@@ -749,6 +747,67 @@ class ViewerSettingsPanel {
                         .value=${String(this.app.edgeLineThicknessPx)}>
                 </label>
                 <label>
+                    ${t('viewer.options.geometry.label')}
+                    <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
+                        <option value="actual">${t('viewer.options.geometry.actual')}</option>
+                        <option value="perfectTimberWithin">${t('viewer.options.geometry.perfectTimberWithin')}</option>
+                        <option value="perfectBoxNoJoints">${t('viewer.options.geometry.perfectBoxNoJoints')}</option>
+                        <option value="roughBoxNoJoints">${t('viewer.options.geometry.roughBoxNoJoints')}</option>
+                    </select>
+                </label>
+                <label>
+                    ${t('viewer.options.unselectedVisibility.label', { percent: 100 - this.app.unselectedTransparencyPercent })}
+                    <input
+                        id="unselected-transparency-slider"
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        .value=${String(100 - this.app.unselectedTransparencyPercent)}>
+                </label>
+                <label>
+                    ${t('viewer.options.selectedVisibility.label', { percent: 100 - this.app.selectedTransparencyPercent })}
+                    <input
+                        id="selected-transparency-slider"
+                        type="range"
+                        min="5"
+                        max="100"
+                        step="5"
+                        .value=${String(100 - this.app.selectedTransparencyPercent)}>
+                </label>
+                <label>
+                    <input id="left-click-rotate-toggle" type="checkbox" ?checked=${this.app.leftClickDragRotatesCamera}>
+                    ${t('viewer.options.leftClickRotate')}
+                </label>
+                <label>
+                    ${t('viewer.options.theme.label')}
+                    <select id="theme-select" .value=${this.app.activeTheme}>
+                        ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${t(theme.labelKey)}</option>`)}
+                    </select>
+                </label>
+                <label>
+                    <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
+                    ${t('viewer.options.debugInfo')}
+                </label>
+                <button
+                    id="save-settings-btn"
+                    type="button"
+                    title=${t('viewer.options.saveSettings.title')}
+                    @click=${() => {
+                        if (vscode) {
+                            vscode.postMessage({
+                                type: 'requestSaveViewerSettings',
+                                settings: this.app.collectViewerSettingsPayload(),
+                            });
+                        }
+                    }}>${t('viewer.options.saveSettings')}</button>
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.threeD')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.section.threeD')}</div>
+                <label>
+                    <input id="center-gizmo-toggle" type="checkbox" ?checked=${this.app.showCenterGizmo}>
+                    ${t('viewer.options.centerGizmo')}
+                </label>
+                <label>
                     <input id="shadows-toggle" type="checkbox" ?checked=${this.app.shadowsEnabled}>
                     ${t('viewer.options.shadows')}
                 </label>
@@ -783,65 +842,17 @@ class ViewerSettingsPanel {
                         step="0.1"
                         .value=${String(this.app.disassemblyMultiplier)}>
                 </label>` : ''}
+                <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.drawing')}></div>
+                <div class="viewer-settings-subtitle">${t('viewer.options.section.drawing')}</div>
                 <label>
-                    <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
-                    ${t('viewer.options.debugInfo')}
+                    <input id="drawing-ghosts-toggle" type="checkbox" ?checked=${this.app.showDrawingGhosts}>
+                    ${t('viewer.options.drawingGhosts')}
                 </label>
                 <label>
                     <input id="debug-drawing-toggle" type="checkbox" ?checked=${this.app.debugDrawingEnabled}>
                     ${t('viewer.options.debugDrawing')}
                 </label>
-                <label>
-                    <input id="left-click-rotate-toggle" type="checkbox" ?checked=${this.app.leftClickDragRotatesCamera}>
-                    ${t('viewer.options.leftClickRotate')}
-                </label>
-                <label>
-                    ${t('viewer.options.geometry.label')}
-                    <select id="geometry-mode-select" .value=${this.app.viewerOptions && this.app.viewerOptions.geometryMode || 'actual'}>
-                        <option value="actual">${t('viewer.options.geometry.actual')}</option>
-                        <option value="perfectTimberWithin">${t('viewer.options.geometry.perfectTimberWithin')}</option>
-                        <option value="perfectBoxNoJoints">${t('viewer.options.geometry.perfectBoxNoJoints')}</option>
-                        <option value="roughBoxNoJoints">${t('viewer.options.geometry.roughBoxNoJoints')}</option>
-                    </select>
-                </label>
-                <label>
-                    ${t('viewer.options.unselectedVisibility.label', { percent: 100 - this.app.unselectedTransparencyPercent })}
-                    <input
-                        id="unselected-transparency-slider"
-                        type="range"
-                        min="5"
-                        max="100"
-                        step="5"
-                        .value=${String(100 - this.app.unselectedTransparencyPercent)}>
-                </label>
-                <label>
-                    ${t('viewer.options.selectedVisibility.label', { percent: 100 - this.app.selectedTransparencyPercent })}
-                    <input
-                        id="selected-transparency-slider"
-                        type="range"
-                        min="5"
-                        max="100"
-                        step="5"
-                        .value=${String(100 - this.app.selectedTransparencyPercent)}>
-                </label>
-                <label>
-                    ${t('viewer.options.theme.label')}
-                    <select id="theme-select" .value=${this.app.activeTheme}>
-                        ${Object.entries(THEMES).map(([themeId, theme]) => html`<option value=${themeId}>${t(theme.labelKey)}</option>`)}
-                    </select>
-                </label>
-                <button
-                    id="save-settings-btn"
-                    type="button"
-                    title=${t('viewer.options.saveSettings.title')}
-                    @click=${() => {
-                        if (vscode) {
-                            vscode.postMessage({
-                                type: 'requestSaveViewerSettings',
-                                settings: this.app.collectViewerSettingsPayload(),
-                            });
-                        }
-                    }}>${t('viewer.options.saveSettings')}</button>
+
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
                 <label>
@@ -941,6 +952,11 @@ class ViewerSettingsPanel {
                         debugEl.style.display = app.debugEnabled ? 'block' : 'none';
                     }
                 },
+            },
+            {
+                id: 'drawing-ghosts-toggle', on: 'change',
+                apply: (el) => app.setDrawingGhostsVisible(el.checked),
+                sync: (el) => { el.checked = app.showDrawingGhosts; },
             },
             {
                 id: 'debug-drawing-toggle', on: 'change',
@@ -1634,7 +1650,11 @@ class KigumiViewerApp extends LitElement {
             // This makes zoom speed feel consistent across all scales
             const adaptiveZoomFactor = this.getAdaptiveZoomFactor(event.deltaY > 0);
             if (this.activePage) {
-                this.zoomPageToward(event.clientX, event.clientY, adaptiveZoomFactor);
+                // Inverted on purpose: the factor scales an orbit distance,
+                // where bigger means further away, and a page scale, where
+                // bigger means closer. Passing it straight through is what made
+                // the wheel work backwards on a sheet.
+                this.zoomPageToward(event.clientX, event.clientY, 1 / adaptiveZoomFactor);
                 return;
             }
             this.zoomTowardPointer(event.clientX, event.clientY, adaptiveZoomFactor);
@@ -1940,7 +1960,9 @@ class KigumiViewerApp extends LitElement {
             const theme = THEMES[this.displayOptions.get('activeTheme')] || Object.values(THEMES)[0];
             this._sheetColors = {
                 paper: new THREE.Color(theme.gradientTop),
-                desk: new THREE.Color(theme.gradientBottom).multiplyScalar(0.72),
+                // Light enough to sit behind the paper rather than frame it,
+                // while still leaving the sheet's edge visible.
+                desk: new THREE.Color(theme.gradientBottom).multiplyScalar(0.94),
             };
         }
         return this._sheetColors;
@@ -3192,7 +3214,7 @@ class KigumiViewerApp extends LitElement {
         const drawnMembers = this.activeSceneMembers;
         const isDrawingContext = name !== 'hidden' && Boolean(drawnMembers) && !drawnMembers.has(memberKey);
         if (isDrawingContext) {
-            name = 'ghost';
+            name = this.showDrawingGhosts ? 'ghost' : 'hidden';
             opacity = Math.min(opacity, DRAWING_CONTEXT_OPACITY);
         }
 
@@ -5272,6 +5294,20 @@ class KigumiViewerApp extends LitElement {
             type: 'requestDrawingFromSelection',
             memberKeys: this.selectionManager.getSelectedTimbers(),
         });
+    }
+
+    /**
+     * Whether a drawing shows the timbers it is not about.
+     *
+     * On, they sit far back so the piece can be placed among its neighbours;
+     * off, the sheet holds only what is drawn.
+     */
+    setDrawingGhostsVisible(enabled) {
+        if (!this.displayOptions.set('showDrawingGhosts', Boolean(enabled))) {
+            return;
+        }
+        this.applySelectionOpacity();
+        this.requestUpdate();
     }
 
     /** Back to the 3D scene, leaving the drawing where it was. */

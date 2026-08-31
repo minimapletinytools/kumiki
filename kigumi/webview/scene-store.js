@@ -321,10 +321,12 @@
      * alone leaves the rest of a drawing on the placeholder range they were
      * built with.
      *
-     * A locked viewport is framed by the drawing -- its angle, target and
-     * extent were declared -- so fitting it to the model quietly replaces the
-     * elevation that was asked for with a general view of everything. Only the
-     * viewports with nothing better to point at get framed.
+     * A viewport that declares a camera is framed by the drawing already --
+     * angle, target and extent -- so fitting it to the model quietly replaces
+     * the view that was asked for with a general view of everything. That
+     * covers a locked elevation and equally a drawing's free preview, which is
+     * pointed at the piece to begin with and only free afterwards. Framing is
+     * for the viewports with nothing better to point at.
      *
      * Returns one entry per viewport, in order, with `frame` null where the
      * camera is to be left alone.
@@ -341,7 +343,9 @@
             id: viewport && viewport.id,
             near,
             far,
-            frame: viewport && viewport.locked ? null : { center, orbitDist },
+            frame: viewport && (viewport.locked || viewport.camera)
+                ? null
+                : { center, orbitDist },
         }));
     }
 

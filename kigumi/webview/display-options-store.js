@@ -49,6 +49,9 @@
     function optionSpecs(themeIds) {
         return {
             activeTheme: { value: 'forest', normalize: oneOfOrReject(themeIds) },
+            // Whether a drawing shows the timbers it is not about, faintly, to
+            // place the piece among its neighbours.
+            showDrawingGhosts: { value: true, normalize: (value) => (typeof value === 'boolean' ? value : undefined) },
             edgeMode: { value: 'noOverlay', normalize: oneOf(EDGE_MODES, 'noOverlay') },
             edgeLineVisibilityPercent: { value: 100, normalize: percent(0, 100, 5, 100) },
             edgeLineThicknessPx: { value: 1.5, normalize: range(0.5, 6, 1.5) },

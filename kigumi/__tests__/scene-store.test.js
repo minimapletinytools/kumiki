@@ -388,6 +388,13 @@ describe('firstLoadCameraPlan', () => {
         expect(plan[1].frame).toBeNull();
     });
 
+    it('leaves a viewport that already declares a camera', () => {
+        // A drawing's preview is free to be orbited but still arrives pointed
+        // at the piece; framing it on the whole model undoes that.
+        const withCamera = [{ id: 'preview', locked: false, camera: { target: [1, 2, 3] } }];
+        expect(firstLoadCameraPlan(withCamera, bounds)[0].frame).toBeNull();
+    });
+
     it('frames the viewports that have nothing better to point at', () => {
         const preview = firstLoadCameraPlan(drawing, bounds)[2];
         expect(preview.frame).not.toBeNull();
