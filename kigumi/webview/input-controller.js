@@ -15,12 +15,12 @@
      * Not within the canvas: a click halfway across a quarter-width viewport is
      * at its centre, however far across the window it is.
      */
-    function viewportNdc(rect, pointX, pointY, canvasWidth, canvasHeight) {
+    function viewportNdc(rect, pointX, pointY, pageRect) {
         const [x, y, width, height] = rect;
-        const left = x * canvasWidth;
-        const top = y * canvasHeight;
-        const pixelWidth = Math.max(1, width * canvasWidth);
-        const pixelHeight = Math.max(1, height * canvasHeight);
+        const left = pageRect.x + x * pageRect.width;
+        const top = pageRect.y + y * pageRect.height;
+        const pixelWidth = Math.max(1, width * pageRect.width);
+        const pixelHeight = Math.max(1, height * pageRect.height);
         return {
             x: ((pointX - left) / pixelWidth) * 2 - 1,
             // Measured up from the bottom rather than negating the distance
@@ -30,33 +30,43 @@
     }
 
     /** Whether a point is inside a viewport's rect, in canvas pixels. */
-    function rectContains(rect, pointX, pointY, canvasWidth, canvasHeight) {
+    function rectContains(rect, pointX, pointY, pageRect) {
         const [x, y, width, height] = rect;
-        const left = x * canvasWidth;
-        const top = y * canvasHeight;
-        return pointX >= left && pointX <= left + width * canvasWidth
-            && pointY >= top && pointY <= top + height * canvasHeight;
+        const left = pageRect.x + x * pageRect.width;
+        const top = pageRect.y + y * pageRect.height;
+        return pointX >= left && pointX <= left + width * pageRect.width
+            && pointY >= top && pointY <= top + height * pageRect.height;
     }
 
     /**
-     * Which viewport a canvas point is in, and where within it.
+     * Every viewport a canvas point falls in, topmost first.
      *
-     * Later viewports win where they overlap, matching what is drawn last.
-     * Returns null for a point outside every viewport, which a caller should
-     * treat as a miss rather than as the first one.
+     * Usually one. It is a list because viewports may overlap and a drawing's
+     * viewports draw on nothing, so where the one on top is empty the thing
+     * under the cursor belongs to the one beneath -- the caller decides by
+     * asking each in turn what it actually hit. Empty for a point outside every
+     * viewport, which is a miss rather than the first one.
      */
-    function resolvePointer(viewports, pointX, pointY, canvasWidth, canvasHeight) {
+    function resolvePointers(viewports, pointX, pointY, pageRect) {
+        const found = [];
         for (let index = viewports.length - 1; index >= 0; index -= 1) {
             const viewport = viewports[index];
             const rect = viewport.spec ? viewport.spec.rect : viewport.rect;
-            if (rectContains(rect, pointX, pointY, canvasWidth, canvasHeight)) {
-                return {
-                    viewport,
-                    ndc: viewportNdc(rect, pointX, pointY, canvasWidth, canvasHeight),
-                };
+            if (rectContains(rect, pointX, pointY, pageRect)) {
+                found.push({ viewport, ndc: viewportNdc(rect, pointX, pointY, pageRect) });
             }
         }
-        return null;
+        return found;
+    }
+
+    /**
+     * The topmost viewport a canvas point is in, and where within it.
+     *
+     * What the camera controls act on, where "what is under the cursor" is the
+     * rect and not its contents. Picking wants resolvePointers instead.
+     */
+    function resolvePointer(viewports, pointX, pointY, pageRect) {
+        return resolvePointers(viewports, pointX, pointY, pageRect)[0] || null;
     }
 
     /** What holding a mouse button down means for the camera, or nothing. */
@@ -142,6 +152,7 @@
         viewportNdc,
         rectContains,
         resolvePointer,
+        resolvePointers,
         actionForButton,
         PointerDrag,
         DRAG_SLOP_PX,

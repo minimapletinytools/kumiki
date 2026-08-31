@@ -32,7 +32,7 @@ const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPla
 const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
-const { PointerDrag, actionForButton, resolvePointer } = window.KigumiInput;
+const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -2731,23 +2731,27 @@ class KigumiViewerApp extends LitElement {
      * Null when the point is off the canvas, or in a gap between viewports.
      */
     _resolvePointer(clientX, clientY) {
+        return this._resolvePointers(clientX, clientY)[0] || null;
+    }
+
+    /** Every viewport under a screen point, topmost first. */
+    _resolvePointers(clientX, clientY) {
         const canvas = this.renderRoot && this.renderRoot.querySelector
             ? this.renderRoot.querySelector('#c')
             : null;
         if (!canvas) {
-            return null;
+            return [];
         }
         const rect = canvas.getBoundingClientRect();
         if (clientX < rect.left || clientX > rect.right
             || clientY < rect.top || clientY > rect.bottom) {
-            return null;
+            return [];
         }
-        return resolvePointer(
+        return resolvePointers(
             this.viewports,
             clientX - rect.left,
             clientY - rect.top,
-            rect.width,
-            rect.height,
+            this.pageScreenRect(rect.width, rect.height),
         );
     }
 
@@ -2761,21 +2765,23 @@ class KigumiViewerApp extends LitElement {
     }
 
     _findMembersAlongRay(clientX, clientY) {
-        const resolved = this._resolvePointer(clientX, clientY);
-        if (!resolved) {
-            return [];
+        const isPickable = (memberKey) => !this.isMemberHidden(memberKey)
+            && !this.isMemberLocked(memberKey);
+        // Ask each viewport under the pointer in turn, topmost first, and take
+        // the first that actually hits something. A drawing's viewports draw on
+        // nothing, so where the one on top is empty you are looking straight
+        // through it at the one beneath, and that is what the click means.
+        for (const resolved of this._resolvePointers(clientX, clientY)) {
+            // Through that viewport's own camera: the same screen point means
+            // different things in each of a drawing's views.
+            this.navigationPointer.set(resolved.ndc.x, resolved.ndc.y);
+            this.navigationRaycaster.setFromCamera(this.navigationPointer, resolved.viewport.camera);
+            const hits = this.sceneManager.memberAtRay(this.navigationRaycaster, { isPickable });
+            if (hits.length > 0) {
+                return hits;
+            }
         }
-
-        // Through the camera of the viewport the pointer is actually in: the
-        // same screen point means different things in each of a drawing's
-        // views.
-        this.navigationPointer.set(resolved.ndc.x, resolved.ndc.y);
-        this.navigationRaycaster.setFromCamera(this.navigationPointer, resolved.viewport.camera);
-
-        return this.sceneManager.memberAtRay(this.navigationRaycaster, {
-            isPickable: (memberKey) => !this.isMemberHidden(memberKey)
-                && !this.isMemberLocked(memberKey),
-        });
+        return [];
     }
 
     // The closest visible, unlocked member hit, or null. Used where only the
