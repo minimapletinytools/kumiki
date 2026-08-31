@@ -27,7 +27,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, pageScreenRect, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
 const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
@@ -4958,26 +4958,34 @@ class KigumiViewerApp extends LitElement {
         const dy = bounds.maxY - bounds.minY;
         const dz = bounds.maxZ - bounds.minZ;
         const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) / 2 || 5;
-        const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
-        if (!hadExistingScene) {
-            // Frame every viewport that has nothing better to point at. A
-            // locked one has: its angle, target and extent are the drawing's,
-            // and fitting it to the model would quietly undo the elevation the
-            // drawing asked for. This ran on the active viewport alone, which
-            // is how a drawing's first viewport lost its declared framing.
-            for (const viewport of this.viewports) {
-                if (viewport.spec.locked) {
-                    continue;
-                }
-                const controller = viewport.cameraController;
-                controller.cx = this.focusedCx;
-                controller.cy = this.focusedCy;
-                controller.cz = this.focusedCz;
-                controller.orbitDist = radius / Math.sin(fovRad / 2) * 1.3;
+        // Who gets framed, and to what -- see firstLoadCameraPlan for the two
+        // rules it encodes. Kept out of here because both were broken in ways
+        // only a measured render showed.
+        const plan = firstLoadCameraPlan(this.viewports.map((viewport) => viewport.spec), {
+            center: { x: this.focusedCx, y: this.focusedCy, z: this.focusedCz },
+            radius,
+            fovDegrees: this.perspectiveCamera.fov,
+        });
+        this.viewports.forEach((viewport, index) => {
+            const entry = plan[index];
+            if (!entry) {
+                return;
             }
-        }
+            for (const camera of [viewport.perspectiveCamera, viewport.orthographicCamera]) {
+                camera.near = entry.near;
+                camera.far = entry.far;
+                camera.updateProjectionMatrix();
+            }
+            if (!entry.frame || hadExistingScene) {
+                return;
+            }
+            const controller = viewport.cameraController;
+            controller.cx = entry.frame.center.x;
+            controller.cy = entry.frame.center.y;
+            controller.cz = entry.frame.center.z;
+            controller.orbitDist = entry.frame.orbitDist;
+        });
         this.lightDistance = Math.max(12, radius * 4);
-        this.setCameraNearFar(Math.max(0.1, radius * 0.03), Math.max(200, radius * 20));
         this.updateCamera();
         this.updateLightFromAngles();
         this.drawLightDial();
@@ -5081,23 +5089,6 @@ class KigumiViewerApp extends LitElement {
             viewport.perspectiveCamera.updateProjectionMatrix();
         }
         this.updateOrthographicFrustum();
-    }
-
-    /**
-     * Applies near/far to every camera of every viewport.
-     *
-     * Both projections, so the inactive one is still right if it is toggled
-     * to; and every viewport, not just the active one, or the rest of a
-     * drawing keeps the placeholder range it was built with.
-     */
-    setCameraNearFar(near, far) {
-        for (const viewport of this.viewports) {
-            for (const camera of [viewport.perspectiveCamera, viewport.orthographicCamera]) {
-                camera.near = near;
-                camera.far = far;
-                camera.updateProjectionMatrix();
-            }
-        }
     }
 
     /** Switch scenes: new viewports, and whatever camera controls it asks for. */

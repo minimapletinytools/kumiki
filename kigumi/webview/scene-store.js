@@ -225,6 +225,40 @@
     }
 
     /**
+     * What first-load framing should do to each viewport.
+     *
+     * Two rules, both learned the hard way, and both invisible until something
+     * measured the render:
+     *
+     * Near and far belong to *every* viewport. Applying them to the active one
+     * alone leaves the rest of a drawing on the placeholder range they were
+     * built with.
+     *
+     * A locked viewport is framed by the drawing -- its angle, target and
+     * extent were declared -- so fitting it to the model quietly replaces the
+     * elevation that was asked for with a general view of everything. Only the
+     * viewports with nothing better to point at get framed.
+     *
+     * Returns one entry per viewport, in order, with `frame` null where the
+     * camera is to be left alone.
+     */
+    function firstLoadCameraPlan(viewports, bounds) {
+        const source = bounds && typeof bounds === 'object' ? bounds : {};
+        const radius = Number(source.radius) > 0 ? Number(source.radius) : 5;
+        const fovDegrees = Number(source.fovDegrees) > 0 ? Number(source.fovDegrees) : 45;
+        const center = source.center || { x: 0, y: 0, z: 0 };
+        const near = Math.max(0.1, radius * 0.03);
+        const far = Math.max(200, radius * 20);
+        const orbitDist = (radius / Math.sin((fovDegrees * Math.PI) / 360)) * 1.3;
+        return (viewports || []).map((viewport) => ({
+            id: viewport && viewport.id,
+            near,
+            far,
+            frame: viewport && viewport.locked ? null : { center, orbitDist },
+        }));
+    }
+
+    /**
      * A viewport's rect in pixels, ready for setViewport/setScissor.
      *
      * A rect is a fraction of the page, so it is placed within the page's own
@@ -356,6 +390,7 @@
         normalizeScene,
         isOrthogonalFrame,
         orbitDistanceForExtent,
+        firstLoadCameraPlan,
         normalizePage,
         normalizePageView,
         pageScreenRect,

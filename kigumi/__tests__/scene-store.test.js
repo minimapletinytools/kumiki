@@ -1,6 +1,6 @@
 const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
-    isOrthogonalFrame, orbitDistanceForExtent, pixelRect, viewportAspect, viewportAtPoint,
+    isOrthogonalFrame, orbitDistanceForExtent, firstLoadCameraPlan, pixelRect, viewportAspect, viewportAtPoint,
     normalizePage, normalizePageView, pageScreenRect, viewportScale, extentForScale,
 } = require('../webview/scene-store.js');
 
@@ -366,5 +366,69 @@ describe('a scene with a page', () => {
 
     test('the default 3D scene has no page, so the canvas is the page', () => {
         expect(defaultSceneSpec().page).toBeNull();
+    });
+});
+
+describe('firstLoadCameraPlan', () => {
+    // Both rules here were shipped broken and only showed up when a rendered
+    // sheet was measured against where its cameras said the model should be.
+    const bounds = { center: { x: 1, y: 2, z: 3 }, radius: 4, fovDegrees: 45 };
+    const drawing = [
+        { id: 'front', locked: true },
+        { id: 'top', locked: true },
+        { id: 'preview', locked: false },
+    ];
+
+    it('leaves a locked viewport where the drawing put it', () => {
+        // Fitting an elevation to the model replaces the view that was asked
+        // for with a general view of everything, at the wrong scale.
+        const plan = firstLoadCameraPlan(drawing, bounds);
+        expect(plan[0].frame).toBeNull();
+        expect(plan[1].frame).toBeNull();
+    });
+
+    it('frames the viewports that have nothing better to point at', () => {
+        const preview = firstLoadCameraPlan(drawing, bounds)[2];
+        expect(preview.frame).not.toBeNull();
+        expect(preview.frame.center).toEqual({ x: 1, y: 2, z: 3 });
+        expect(preview.frame.orbitDist).toBeGreaterThan(0);
+    });
+
+    it('gives near and far to every viewport, locked or not', () => {
+        // Applying these to the active viewport alone leaves the rest of a
+        // drawing on the placeholder range they were constructed with.
+        const plan = firstLoadCameraPlan(drawing, bounds);
+        expect(plan).toHaveLength(3);
+        for (const entry of plan) {
+            expect(entry.near).toBeGreaterThan(0);
+            expect(entry.far).toBeGreaterThan(entry.near);
+        }
+        expect(new Set(plan.map((entry) => entry.near)).size).toBe(1);
+        expect(new Set(plan.map((entry) => entry.far)).size).toBe(1);
+    });
+
+    it('keeps the order it was given, so entries pair with viewports', () => {
+        expect(firstLoadCameraPlan(drawing, bounds).map((entry) => entry.id))
+            .toEqual(['front', 'top', 'preview']);
+    });
+
+    it('frames the single viewport of the 3D scene', () => {
+        const plan = firstLoadCameraPlan([{ id: 'main', locked: false }], bounds);
+        expect(plan[0].frame.orbitDist).toBeGreaterThan(bounds.radius);
+    });
+
+    it('pushes the camera back further for a bigger model', () => {
+        const near = firstLoadCameraPlan([{ id: 'main' }], { ...bounds, radius: 1 })[0];
+        const far = firstLoadCameraPlan([{ id: 'main' }], { ...bounds, radius: 10 })[0];
+        expect(far.frame.orbitDist).toBeGreaterThan(near.frame.orbitDist);
+        expect(far.far).toBeGreaterThanOrEqual(near.far);
+    });
+
+    it('survives a frame with no size and an empty scene', () => {
+        expect(firstLoadCameraPlan([], bounds)).toEqual([]);
+        expect(firstLoadCameraPlan(null, bounds)).toEqual([]);
+        const degenerate = firstLoadCameraPlan([{ id: 'main' }], { radius: 0 })[0];
+        expect(degenerate.frame.orbitDist).toBeGreaterThan(0);
+        expect(degenerate.near).toBeGreaterThan(0);
     });
 });
