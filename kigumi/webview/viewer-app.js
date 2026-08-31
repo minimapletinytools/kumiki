@@ -27,7 +27,9 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-const { SceneStore, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+// Matches the id build_default_drawing_for_debugging ships in runner.py.
+const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointer } = window.KigumiInput;
@@ -67,7 +69,28 @@ class ViewerViewport {
         return viewportPixelRect(this.spec.rect, canvasWidth, canvasHeight);
     }
 
-
+    /**
+     * Point the camera the way the scene spec asks.
+     *
+     * The spec gives an orientation and an extent, not a position: the camera
+     * sits back along -look from the target, far enough that the orthographic
+     * frustum -- which updateViewportOrthographicFrustum derives from the orbit
+     * distance and the perspective FOV -- comes out `extent` high. Going through
+     * the orbit distance rather than setting the frustum directly means a
+     * locked viewport zooms, and toggles projection, on the same path as a free
+     * one, and pan/zoom deltas ride on top of the angle rather than replacing it.
+     */
+    applySpecCamera() {
+        const camera = this.spec.camera;
+        if (!camera) {
+            return;
+        }
+        const controller = this.cameraController;
+        controller.setCenter(camera.target[0], camera.target[1], camera.target[2]);
+        controller.cameraOffsetDir.set(-camera.look[0], -camera.look[1], -camera.look[2]).normalize();
+        controller.cameraUpVector.set(camera.up[0], camera.up[1], camera.up[2]).normalize();
+        controller.orbitDist = orbitDistanceForExtent(camera.extent, this.perspectiveCamera.fov);
+    }
 }
 const DEFAULT_FOOTPRINT_COLOR = 'orange';
 
@@ -740,6 +763,10 @@ class ViewerSettingsPanel {
                     ${t('viewer.options.debugInfo')}
                 </label>
                 <label>
+                    <input id="debug-drawing-toggle" type="checkbox" ?checked=${this.app.debugDrawingEnabled}>
+                    ${t('viewer.options.debugDrawing')}
+                </label>
+                <label>
                     <input id="left-click-rotate-toggle" type="checkbox" ?checked=${this.app.leftClickDragRotatesCamera}>
                     ${t('viewer.options.leftClickRotate')}
                 </label>
@@ -889,6 +916,10 @@ class ViewerSettingsPanel {
                         debugEl.style.display = app.debugEnabled ? 'block' : 'none';
                     }
                 },
+            },
+            {
+                id: 'debug-drawing-toggle', on: 'change',
+                apply: (el) => app.setDebugDrawingEnabled(el.checked),
             },
             {
                 id: 'left-click-rotate-toggle', on: 'change',
@@ -1259,6 +1290,8 @@ class KigumiViewerApp extends LitElement {
         this.animationHandle = null;
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
+        // Testing scaffolding; see setDebugDrawingEnabled.
+        this.debugDrawingEnabled = false;
         this.csgTreesByKey = new Map();  // memberKey -> { memberKey, tree }
         this.csgTreeRequests = new Set();// memberKeys already asked for
         this.lastPickDetail = null;      // featureType / jointName / facesToward
@@ -1708,6 +1741,20 @@ class KigumiViewerApp extends LitElement {
         return viewport ? viewport.cameraController : null;
     }
 
+    /**
+     * Orbit the active viewport, unless the scene has locked its angle.
+     *
+     * A locked elevation is only an elevation while it points where the scene
+     * says; pan and zoom still ride on top of it, but the angle is fixed.
+     */
+    orbitActiveViewport(dx, dy) {
+        const viewport = this.activeViewport;
+        if (!viewport || viewport.spec.locked) {
+            return;
+        }
+        viewport.cameraController.applyOrbitDelta(dx, dy);
+    }
+
     get camera() {
         const viewport = this.activeViewport;
         return viewport ? viewport.camera : null;
@@ -1736,10 +1783,17 @@ class KigumiViewerApp extends LitElement {
      */
     rebuildViewports() {
         const previous = new Map(this.viewports.map((viewport) => [viewport.id, viewport.cameraController]));
-        this.viewports = this.sceneStore.activeViewports().map((spec) => new ViewerViewport(
-            spec,
-            previous.get(spec.id) || new CameraController({ THREE }),
-        ));
+        this.viewports = this.sceneStore.activeViewports().map((spec) => {
+            const reused = previous.get(spec.id);
+            const viewport = new ViewerViewport(spec, reused || new CameraController({ THREE }));
+            // Only a fresh controller takes the spec's angle. Re-pointing a
+            // reused one would throw away the pan and zoom the user has since
+            // applied, every time the viewports are rebuilt.
+            if (!reused) {
+                viewport.applySpecCamera();
+            }
+            return viewport;
+        });
         if (!this.viewports.some((viewport) => viewport.id === this.activeViewportId)) {
             this.activeViewportId = this.viewports.length > 0 ? this.viewports[0].id : null;
         }
@@ -2244,6 +2298,16 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'scenes') {
+            const ids = this.sceneStore.setScenes(message.payload && message.payload.scenes);
+            // Requested only by the debug drawing toggle, so switch to what
+            // came back rather than making the user pick from a list of one.
+            if (this.debugDrawingEnabled && ids.length > 0) {
+                this.setActiveScene(ids[0]);
+            }
+            return;
+        }
+
         if (message.type === 'assemblyData') {
             this.assemblySolving = false;
             this.setAssemblyData(ASSEMBLY_PREVIEW_ENABLED
@@ -2512,7 +2576,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         if (drag.action === 'orbit') {
-            this.cameraController.applyOrbitDelta(drag.dx, drag.dy);
+            this.orbitActiveViewport(drag.dx, drag.dy);
         } else if (drag.action === 'pan') {
             this.panCameraInViewPlane(drag.fromX, drag.fromY, drag.toX, drag.toY);
         }
@@ -2987,7 +3051,7 @@ class KigumiViewerApp extends LitElement {
         if (Math.abs(dx) + Math.abs(dy) > 1) {
             this.gizmoMoved = true;
         }
-        this.cameraController.applyOrbitDelta(dx, dy);
+        this.orbitActiveViewport(dx, dy);
         this.gizmoLastX = event.clientX;
         this.gizmoLastY = event.clientY;
         this.cameraController.cancelAnimation();
@@ -4860,10 +4924,42 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    /** Switch scenes: new viewports, and whatever camera controls it asks for. */
+    setActiveScene(sceneId) {
+        if (!this.sceneStore.setActiveScene(sceneId)) {
+            return;
+        }
+        this.rebuildViewports();
+        this.updateCamera();
+        this.requestUpdate();
+    }
+
+    /**
+     * Testing scaffolding: swap between the 3D scene and the four-viewport
+     * drawing python builds (get_default_drawing_for_debugging), so the
+     * multi-viewport path has something to render until real drawings arrive.
+     */
+    setDebugDrawingEnabled(enabled) {
+        this.debugDrawingEnabled = Boolean(enabled);
+        if (!this.debugDrawingEnabled) {
+            this.setActiveScene(DEFAULT_SCENE_ID);
+            return;
+        }
+        if (this.sceneStore.sceneIds().includes(DEBUG_DRAWING_SCENE_ID)) {
+            this.setActiveScene(DEBUG_DRAWING_SCENE_ID);
+            return;
+        }
+        if (vscode) {
+            vscode.postMessage({ type: 'requestDebugDrawing' });
+        }
+    }
+
     setProjectionMode(isOrthographic) {
         const viewport = this.activeViewport;
         const next = Boolean(isOrthographic);
-        if (!viewport || viewport.isOrthographic === next) {
+        // A locked viewport is orthographic by declaration; a drawing hides the
+        // projection control, and this keeps a stray call from undoing it.
+        if (!viewport || viewport.spec.locked || viewport.isOrthographic === next) {
             return;
         }
         // The projection belongs to the viewport, not the viewer: a drawing

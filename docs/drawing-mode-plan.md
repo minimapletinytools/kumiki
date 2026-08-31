@@ -1,6 +1,7 @@
 # Drawing mode — refactor plan
 
-Status: agreed, not yet started. Phase 1 is the first code change.
+Status: phases 1-7 landed on `drawing-mode-refactor`. The refactor is done; what
+remains is the feature work listed under Phases.
 
 Kigumi needs to render the same frame several ways at once: a drawing is a set of
 locked orthographic viewports over a subset of timbers, next to a live
@@ -82,6 +83,11 @@ Each lands green on its own and changes nothing you can see.
    until real drawing sets arrive. Separate from the frame payload so a drawing
    never re-serializes geometry.
    Done when it renders four viewports and the 3D scene is untouched.
+
+   Landed. The viewer reaches it through a "debug drawing" checkbox in the
+   options panel, which asks python for the scene on first use. Verified against
+   a capture: each elevation frames the model exactly where its declared camera
+   says it should, to within a pixel.
 
 Entering a drawing from a selection, the filtered layers panel, the leave button
 and measurements sit on top of this and are not part of the refactor.

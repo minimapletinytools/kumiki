@@ -307,6 +307,12 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'requestDebugDrawing') {
+                this._handleRequestDebugDrawing().catch((err) => {
+                    this.log(`[drawing] requestDebugDrawing error: ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestCSGTree') {
                 this._handleRequestCSGTree(message).catch((err) => {
                     this.log(`[layers] requestCSGTree error: ${err.message || err}`);
@@ -971,6 +977,28 @@ class FrameViewSession {
     // first (the webview shows a "figuring out how to disassemble…" state
     // until the result lands). A generation counter drops results made stale
     // by a newer refresh.
+    /**
+     * Fetch the scaffolding drawing (see build_default_drawing_for_debugging in
+     * runner.py) and hand it to the viewer.
+     *
+     * Asked for on demand rather than fetched with the frame: it exists to
+     * exercise the multi-viewport path, and the normal load should not pay a
+     * round trip for it.
+     */
+    async _handleRequestDebugDrawing() {
+        if (!this.runnerSession || this.isDisposed) {
+            return;
+        }
+        const result = await this.runnerSession.slotRequest('get_default_drawing_for_debugging', this.slotName);
+        if (this.isDisposed) {
+            return;
+        }
+        this._postToWebview({
+            type: 'scenes',
+            payload: { scenes: (result && result.scenes) || [] },
+        });
+    }
+
     _fetchAssemblyInBackground(layersPayload) {
         if (!layersPayload || !layersPayload.assembly || layersPayload.assembly.pending !== true) {
             return;

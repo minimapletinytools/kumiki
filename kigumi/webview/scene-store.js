@@ -94,6 +94,23 @@
     }
 
     /**
+     * How far back a camera must sit for an orthographic view `extent` high.
+     *
+     * A spec gives an orientation and an extent, never a position. The viewer
+     * sizes orthographic frustums from the orbit distance and the perspective
+     * FOV, so that both projections frame alike; converting here means a locked
+     * viewport joins that path instead of setting frustum bounds of its own.
+     */
+    function orbitDistanceForExtent(extent, fovDegrees) {
+        const halfFov = (Number(fovDegrees) || 0) * Math.PI / 360;
+        const tan = Math.tan(halfFov);
+        if (!Number.isFinite(tan) || tan <= 0) {
+            return 0;
+        }
+        return Math.max(0.001, Number(extent) || 0) / tan;
+    }
+
+    /**
      * A viewport's rect in pixels, ready for setViewport/setScissor.
      *
      * Rects are written top-left down, the way a person describes a layout --
@@ -209,6 +226,7 @@
         defaultSceneSpec,
         normalizeScene,
         isOrthogonalFrame,
+        orbitDistanceForExtent,
         pixelRect,
         viewportAspect,
         viewportAtPoint,

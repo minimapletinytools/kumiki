@@ -955,6 +955,138 @@ def _serialize_timber_tags(ticket: Any) -> List[Dict[str, str]]:
     return tags
 
 
+# --- drawings ---------------------------------------------------------------
+#
+# TESTING SCAFFOLDING. This builds one hard-coded drawing so the viewer's
+# multi-viewport path has something to render before real drawing sets exist.
+# Nothing in kumiki produces or stores it, no UI creates it, and it is expected
+# to be deleted once drawings are authored for real.
+
+
+# Camera frames, in kumiki world axes (Z up, +Y north, +X east). `look` is the
+# direction the camera faces; the viewer derives the position back along it, so
+# a frame is purely an orientation. right x up == -look, matching a camera that
+# looks down its own -Z.
+_DEBUG_DRAWING_VIEWS: List[Tuple[str, List[float], List[float], List[float]]] = [
+    # id        right          up             look
+    ("front", [1.0, 0.0, 0.0], [0.0, 0.0, 1.0], [0.0, 1.0, 0.0]),
+    ("top", [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, -1.0]),
+    ("right", [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]),
+]
+
+# Quadrants, as normalized [x, y, width, height] with a top-left origin.
+_DEBUG_DRAWING_RECTS: Dict[str, List[float]] = {
+    "front": [0.0, 0.0, 0.5, 0.5],
+    "top": [0.5, 0.0, 0.5, 0.5],
+    "right": [0.0, 0.5, 0.5, 0.5],
+    "preview": [0.5, 0.5, 0.5, 0.5],
+}
+
+# Leaves a margin around the model rather than framing it edge to edge.
+_DEBUG_DRAWING_EXTENT_PADDING = 1.15
+
+
+def _timber_world_corners(cut_timber: Any) -> List[List[float]]:
+    """The 8 corners of a timber's uncut stock, in world space."""
+    timber = cut_timber.timber
+    origin = _vector3_to_floats(timber.get_bottom_position_global())
+    along = _vector3_to_floats(timber.get_length_direction_global())
+    across = _vector3_to_floats(timber.get_width_direction_global())
+    up = _vector3_to_floats(timber.get_height_direction_global())
+    length = float(timber.length)
+    half_width = float(timber.size[0]) / 2.0
+    half_height = float(timber.size[1]) / 2.0
+
+    corners: List[List[float]] = []
+    for distance in (0.0, length):
+        for width_sign in (-half_width, half_width):
+            for height_sign in (-half_height, half_height):
+                corners.append([
+                    origin[axis]
+                    + along[axis] * distance
+                    + across[axis] * width_sign
+                    + up[axis] * height_sign
+                    for axis in range(3)
+                ])
+    return corners
+
+
+def _frame_world_bounds(frame: Any) -> Tuple[List[float], List[float]]:
+    """(centre, half_size) of everything in the frame; a unit box if it is empty."""
+    lows = [float("inf")] * 3
+    highs = [float("-inf")] * 3
+    for cut_timber in frame.cut_timbers:
+        for corner in _timber_world_corners(cut_timber):
+            for axis in range(3):
+                lows[axis] = min(lows[axis], corner[axis])
+                highs[axis] = max(highs[axis], corner[axis])
+
+    if any(low == float("inf") for low in lows):
+        return [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
+
+    centre = [(lows[axis] + highs[axis]) / 2.0 for axis in range(3)]
+    half_size = [(highs[axis] - lows[axis]) / 2.0 for axis in range(3)]
+    return centre, half_size
+
+
+def _view_extent(half_size: List[float], right: List[float], up: List[float]) -> float:
+    """Half-height that fits the model in a view with these screen axes.
+
+    Both axes are measured against the box and the larger wins, so a viewport
+    narrower than the model still shows all of it; the viewer widens the
+    frustum by the aspect from here.
+    """
+    def projected(axis: List[float]) -> float:
+        return sum(abs(axis[i]) * half_size[i] for i in range(3))
+
+    return max(0.001, max(projected(right), projected(up)) * _DEBUG_DRAWING_EXTENT_PADDING)
+
+
+def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
+    """A four-viewport scene over the whole frame: three elevations and a preview.
+
+    Testing scaffolding -- see the note at the top of this section. The three
+    orthographic viewports are locked, so the viewer holds their angle and only
+    lets pan/zoom deltas ride on top; the perspective one is left free and is
+    the same kind of viewport the default 3D scene uses.
+    """
+    centre, half_size = _frame_world_bounds(frame)
+    viewports: List[Dict[str, Any]] = []
+    for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
+        viewports.append({
+            "id": view_id,
+            "rect": _DEBUG_DRAWING_RECTS[view_id],
+            "locked": True,
+            "projection": "orthographic",
+            "camera": {
+                "right": right,
+                "up": up,
+                "look": look,
+                "target": centre,
+                "extent": _view_extent(half_size, right, up),
+            },
+            # Every timber, which is also what a scene defaults to; spelled out
+            # because a real drawing is the interesting case and would not.
+            "members": None,
+            "ghostOthers": True,
+            "measurements": [],
+        })
+
+    viewports.append({
+        "id": "preview",
+        "rect": _DEBUG_DRAWING_RECTS["preview"],
+        "locked": False,
+        "projection": "perspective",
+    })
+
+    return {
+        "id": "debug-default-drawing",
+        # A drawing shows no camera gizmos.
+        "cameraControls": [],
+        "viewports": viewports,
+    }
+
+
 def serialize_layers(frame: Any) -> Dict[str, Any]:
     """Build the data payload consumed by the viewer's Layers panel.
 
@@ -1583,6 +1715,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "ping", "reload_example", "get_frame", "get_geometry",
             "get_member", "find_csg_at_point", "find_csg_by_path",
             "get_layers_tree", "get_csg_tree",
+            "get_default_drawing_for_debugging",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
             "shutdown",
@@ -2861,6 +2994,13 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         frame_payload = serialize_frame(ss.frame)
         frame_payload["renderParameters"] = _serialize_render_parameters_for_slot(ss)
         return state, make_success_response(request_id, command, frame_payload), False
+
+    if command == "get_default_drawing_for_debugging":
+        # Testing scaffolding; see build_default_drawing_for_debugging. Kept out
+        # of the frame payload so a drawing never re-serializes geometry.
+        ss = _resolve_slot(state, payload)
+        drawing = build_default_drawing_for_debugging(ss.frame)
+        return state, make_success_response(request_id, command, {"scenes": [drawing]}), False
 
     if command == "get_layers_tree":
         ss = _resolve_slot(state, payload)

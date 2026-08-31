@@ -1,6 +1,6 @@
 const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
-    isOrthogonalFrame, pixelRect, viewportAspect, viewportAtPoint,
+    isOrthogonalFrame, orbitDistanceForExtent, pixelRect, viewportAspect, viewportAtPoint,
 } = require('../webview/scene-store.js');
 
 describe('the default 3D scene', () => {
@@ -179,5 +179,33 @@ describe('the store', () => {
         store.setScenes([{ id: 'post_A' }]);
         store.setActiveScene('post_A');
         expect(store.wantsCameraControl('cube')).toBe(false);
+    });
+});
+
+describe('orbitDistanceForExtent', () => {
+    // The viewer sizes an orthographic frustum as orbitDist * tan(fov/2), so
+    // this has to invert that exactly or a locked elevation frames the model
+    // at the wrong scale.
+    it('inverts the frustum sizing the viewer applies', () => {
+        const distance = orbitDistanceForExtent(0.609, 45);
+        expect(distance * Math.tan((45 * Math.PI) / 360)).toBeCloseTo(0.609, 9);
+    });
+
+    it('is further back for a taller view', () => {
+        expect(orbitDistanceForExtent(2, 45)).toBeGreaterThan(orbitDistanceForExtent(1, 45));
+    });
+
+    it('is further back for a narrower lens', () => {
+        expect(orbitDistanceForExtent(1, 20)).toBeGreaterThan(orbitDistanceForExtent(1, 45));
+    });
+
+    it('keeps a degenerate extent off the camera plane', () => {
+        expect(orbitDistanceForExtent(0, 45)).toBeGreaterThan(0);
+        expect(orbitDistanceForExtent(-5, 45)).toBeGreaterThan(0);
+    });
+
+    it('refuses a lens that has no angle', () => {
+        expect(orbitDistanceForExtent(1, 0)).toBe(0);
+        expect(orbitDistanceForExtent(1, undefined)).toBe(0);
     });
 });
