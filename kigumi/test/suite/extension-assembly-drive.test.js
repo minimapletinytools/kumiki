@@ -55,7 +55,7 @@ describe('Assembly timeline drive', () => {
       outputDir: artifactDir,
       namePrefix: `assembly-drive-${Date.now()}`,
       preRefresh: false,
-      timeoutMs: 0,
+      timeoutMs: 20000,
     });
     assert.ok(screenshotResult && screenshotResult.ok, `Expected screenshot to succeed: ${JSON.stringify(screenshotResult)}`);
     assert.ok(fs.existsSync(screenshotResult.screenshotPath), 'Expected screenshot artifact to be written');

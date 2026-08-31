@@ -92,6 +92,11 @@ class ViewerViewport {
         controller.orbitDist = orbitDistanceForExtent(camera.extent, this.perspectiveCamera.fov);
     }
 }
+// How long to wait for a paint before going ahead without one. Comfortably
+// longer than a healthy frame, so it only takes effect when paints have
+// actually stopped.
+const PAINT_WAIT_FALLBACK_MS = 100;
+
 const DEFAULT_FOOTPRINT_COLOR = 'orange';
 
 function normalizeV3RenderParameterValue(value) {
@@ -2379,7 +2384,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+        await this.waitForNextPaint();
 
         try {
             if (this.renderer && this.scene && this.camera) {
@@ -4763,11 +4768,31 @@ class KigumiViewerApp extends LitElement {
         return refreshToken !== this.activeRefreshToken;
     }
 
+    /**
+     * Yield until the next paint, or until a short timer fires -- whichever
+     * comes first.
+     *
+     * requestAnimationFrame stops firing while the window is unfocused or the
+     * panel is hidden, and this is awaited in a loop while geometry is applied
+     * and again before a screenshot, so waiting on a frame alone lets an
+     * unfocused window stall a frame load or a capture indefinitely. The timer
+     * yields to the event loop the same way, without waiting for a paint that
+     * may never come; when paints are happening it always wins the race.
+     */
     waitForNextPaint() {
         return new Promise((resolve) => {
+            let settled = false;
+            const finish = () => {
+                if (settled) {
+                    return;
+                }
+                settled = true;
+                resolve();
+            };
             requestAnimationFrame(() => {
-                requestAnimationFrame(() => resolve());
+                requestAnimationFrame(finish);
             });
+            setTimeout(finish, PAINT_WAIT_FALLBACK_MS);
         });
     }
 

@@ -159,14 +159,12 @@ describe('Kigumi automation flow', () => {
     const thetaDelta = Math.abs(Number(cameraAfter.payload.orbit.theta) - Number(cameraBefore.payload.orbit.theta));
     assert.ok(thetaDelta > 0.001, 'Expected camera theta to change after automation set');
 
-    // captureScreenshot awaits a webview requestAnimationFrame round trip, which
-    // browsers/VS Code suspend while the panel isn't visible/focused. The panel
-    // reveal()s itself before capturing, but if the OS focus is yanked away from
-    // this extension-host window while the suite is running (e.g. alt-tabbing to
-    // another app), rAF can still stall and this step will hang/time out. If this
-    // test is flaky only when run interactively, try leaving the test window
-    // focused/foregrounded for the duration of the run before treating it as a
-    // product bug.
+    // captureScreenshot waits for a paint before reading the canvas, and rAF
+    // stops firing while this window is unfocused -- alt-tabbing away mid-run
+    // used to hang this step until mocha gave up 120s later. The viewer now
+    // falls back to a timer (waitForNextPaint), so a capture still lands; the
+    // timeout below is a real one so that a capture that genuinely never
+    // returns fails here, with a message, rather than stalling the suite.
     const artifactDir = path.resolve(__dirname, '..', '..', '.artifacts', 'automation');
     const screenshotResult = await vscode.commands.executeCommand('kigumi.captureScreenshot', {
       filePath: fixturePath,
@@ -174,7 +172,7 @@ describe('Kigumi automation flow', () => {
       namePrefix: `automation-${Date.now()}`,
       preRefresh: true,
       preRefreshDirtyOnce: false,
-      timeoutMs: 0,
+      timeoutMs: 20000,
     });
 
     assert.ok(screenshotResult && screenshotResult.ok, 'Expected screenshot command to succeed');
