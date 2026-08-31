@@ -140,6 +140,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const template = fs.readFileSync(templatePath, 'utf8');
 
     const appJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer-app.js'))).toString();
+    const bootDiagnosticsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'boot-diagnostics.js'))).toString();
     const i18nJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'i18n.js'))).toString();
     const selectionStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-store.js'))).toString();
     const layerStateStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layer-state-store.js'))).toString();
@@ -185,6 +186,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace(/__NONCE__/g, nonce)
         .replace('__LOCALE__', locale)
         .replace('__INITIAL_PAYLOAD_JSON__', payloadJson)
+        .replace('__BOOT_DIAGNOSTICS_JS_URI__', bootDiagnosticsJsUri)
         .replace('__I18N_JS_URI__', i18nJsUri)
         .replace('__SELECTION_STORE_JS_URI__', selectionStoreJsUri)
         .replace('__LAYER_STATE_STORE_JS_URI__', layerStateStoreJsUri)

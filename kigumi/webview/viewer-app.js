@@ -162,7 +162,10 @@ const INITIAL_PAYLOAD = window.__KIGUMI_INITIAL_PAYLOAD__ || {
     viewerOptions: {},
     viewerSettings: null,
 };
-const vscode = typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null;
+// Acquired by boot-diagnostics.js, which runs first so it can catch a module
+// that throws on evaluation. acquireVsCodeApi() may only be called once.
+const vscode = window.__kigumiVsCode
+    || (typeof acquireVsCodeApi === 'function' ? acquireVsCodeApi() : null);
 const VIEWER_APP_VERSION = '2026.03.17.4';
 const SelectionStore = window.SelectionStore;
 const CameraController = window.CameraController;
