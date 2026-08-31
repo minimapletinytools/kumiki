@@ -1259,7 +1259,7 @@ class KigumiViewerApp extends LitElement {
         this.gizmoMoved = false;
         this.gizmoLastX = 0;
         this.gizmoLastY = 0;
-        // Built by setupCameraControls, and only when the scene asks for them.
+        // Built by syncCameraControls, and only when the scene asks for them.
         this.cameraCube = null;
         this.orbitGizmo = null;
         this.gizmoRaycaster = new THREE.Raycaster();
@@ -1706,7 +1706,7 @@ class KigumiViewerApp extends LitElement {
         this.scene.add(fill);
 
         this.createOrUpdateShadowCatcher(this.lastBounds);
-        this.setupCameraControls();
+        this.syncCameraControls();
         this.syncLightAnglesFromSun();
         this.drawLightDial();
         this.setCenterGizmoEnabled(this.showCenterGizmo);
@@ -3697,22 +3697,49 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Build the camera controls this scene asks for.
+     * Build the camera controls this scene asks for, and tear down the ones it
+     * does not.
      *
-     * A drawing asks for none, so nothing is built and nothing has to be hidden
-     * afterwards. The 3D scene asks for all of them, which is what it had.
+     * Re-run whenever the active scene changes, not just at setup: the orbit
+     * gizmo lives in the scene graph, so one built for the 3D view would go on
+     * drawing its crosshair over a drawing's elevations.
      */
-    setupCameraControls() {
-        if (this.sceneStore.wantsCameraControl('orbitGizmo')) {
+    syncCameraControls() {
+        const wantsOrbitGizmo = this.sceneStore.wantsCameraControl('orbitGizmo');
+        if (wantsOrbitGizmo && !this.orbitGizmo && this.scene) {
             this.orbitGizmo = new OrbitCenterGizmo({ THREE });
             this.orbitCenterGizmo = this.orbitGizmo.object3d;
             this.scene.add(this.orbitCenterGizmo);
+        } else if (!wantsOrbitGizmo && this.orbitGizmo) {
+            if (this.scene) {
+                this.scene.remove(this.orbitCenterGizmo);
+            }
+            this.orbitGizmo.dispose();
+            this.orbitGizmo = null;
+            this.orbitCenterGizmo = null;
         }
+
+        // The cube's canvas stays mounted either way -- its pointer handlers
+        // are bound once at startup and would not survive being unmounted and
+        // brought back. Hiding the panel is what makes it go away.
         const canvas = this.renderRoot && this.renderRoot.querySelector
             ? this.renderRoot.querySelector('#gizmo-cube-c')
             : null;
-        if (canvas && this.sceneStore.wantsCameraControl('cube')) {
+        const wantsCube = Boolean(canvas) && this.sceneStore.wantsCameraControl('cube');
+        if (wantsCube && !this.cameraCube) {
             this.cameraCube = new CameraCubeGizmo({ THREE, canvas });
+        } else if (!wantsCube && this.cameraCube) {
+            this.cameraCube.dispose();
+            this.cameraCube = null;
+        }
+
+        const panel = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#gizmo-panel')
+            : null;
+        if (panel) {
+            const wantsAny = ['cube', 'orbitGizmo', 'projection', 'focus']
+                .some((name) => this.sceneStore.wantsCameraControl(name));
+            panel.style.display = wantsAny ? '' : 'none';
         }
     }
 
@@ -4930,6 +4957,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this.rebuildViewports();
+        this.syncCameraControls();
         this.updateCamera();
         this.requestUpdate();
     }
