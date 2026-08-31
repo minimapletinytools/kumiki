@@ -149,6 +149,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const featureFlagsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'feature-flags.js'))).toString();
     const cameraControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'camera-controller.js'))).toString();
     const cameraControlsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'camera-controls.js'))).toString();
+    const sceneManagerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'scene-manager.js'))).toString();
     const geometryModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'geometry-mode.js'))).toString();
     const csgTreeViewJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'csg-tree-view.js'))).toString();
     const tagsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'tags.js'))).toString();
@@ -196,6 +197,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__FEATURE_FLAGS_JS_URI__', featureFlagsJsUri)
         .replace('__CAMERA_CONTROLLER_JS_URI__', cameraControllerJsUri)
         .replace('__CAMERA_CONTROLS_JS_URI__', cameraControlsJsUri)
+        .replace('__SCENE_MANAGER_JS_URI__', sceneManagerJsUri)
         .replace('__GEOMETRY_MODE_JS_URI__', geometryModeJsUri)
         .replace('__CSG_TREE_VIEW_JS_URI__', csgTreeViewJsUri)
         .replace('__TAGS_JS_URI__', tagsJsUri)

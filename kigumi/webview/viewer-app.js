@@ -27,6 +27,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
 const { SceneStore, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
+const { SceneManager } = window.KigumiSceneManager;
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -1161,7 +1162,9 @@ class ViewerParameterPanel {
 class KigumiViewerApp extends LitElement {
     constructor() {
         super();
-        this.meshObjectsByKey = new Map();
+        // Members on screen, and the only thing that knows what draws them.
+        // The scene arrives in setupScene; until then it registers nothing.
+        this.sceneManager = new SceneManager({ THREE, scene: null });
         this.lastBounds = { minX: -1, minY: -1, minZ: -1, maxX: 1, maxY: 1, maxZ: 1 };
 
         this.focusedCx = 0;
@@ -1253,7 +1256,6 @@ class KigumiViewerApp extends LitElement {
         this.selectionManager = new SelectionStore();
         this._csgHighlightMesh = null;
         this._csgParentHighlightMesh = null;
-        this.meshKeyMap = new Map(); // mesh object -> member key
         this.memberMetadataByKey = new Map(); // member key -> { name, type }
         this.layerStatesByKey = new Map(); // member key -> { locked, hidden, fixed }
         this.renderProfiles = RENDER_PROFILES;
@@ -1526,11 +1528,7 @@ class KigumiViewerApp extends LitElement {
             this.orbitGizmo = null;
             this.orbitCenterGizmo = null;
         }
-        for (const bundle of this.meshObjectsByKey.values()) {
-            this.disposeMeshBundle(bundle);
-        }
-        this.meshObjectsByKey.clear();
-        this.meshKeyMap.clear();
+        this.sceneManager.disposeAll();
         this.memberMetadataByKey.clear();
     }
 
@@ -1732,6 +1730,7 @@ class KigumiViewerApp extends LitElement {
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         this.scene = new THREE.Scene();
+        this.sceneManager.setScene(this.scene);
         this.setTheme(this.activeTheme);
 
         this.rebuildViewports();
@@ -2647,7 +2646,7 @@ class KigumiViewerApp extends LitElement {
         // this resolution uniform -- keep it in sync or edges get thinner or
         // thicker than their configured linewidth as the viewport resizes.
         const resolution = this._getRendererResolution();
-        for (const bundle of this.meshObjectsByKey.values()) {
+        for (const bundle of this.sceneManager.bundles()) {
             if (bundle.edges && bundle.edges.material) {
                 bundle.edges.material.resolution = resolution;
             }
@@ -2679,22 +2678,10 @@ class KigumiViewerApp extends LitElement {
         this.navigationPointer.set(normalizedX, normalizedY);
         this.navigationRaycaster.setFromCamera(this.navigationPointer, this.camera);
 
-        const targetMeshes = [];
-        for (const [memberKey, bundle] of this.meshObjectsByKey.entries()) {
-            if (this.isMemberHidden(memberKey) || this.isMemberLocked(memberKey)) {
-                continue;
-            }
-            targetMeshes.push(bundle.mesh);
-        }
-        const intersects = this.navigationRaycaster.intersectObjects(targetMeshes, false);
-        const hits = [];
-        for (const hit of intersects) {
-            const memberKey = this.meshKeyMap.get(hit.object);
-            if (memberKey) {
-                hits.push({ memberKey, hit });
-            }
-        }
-        return hits;
+        return this.sceneManager.memberAtRay(this.navigationRaycaster, {
+            isPickable: (memberKey) => !this.isMemberHidden(memberKey)
+                && !this.isMemberLocked(memberKey),
+        });
     }
 
     // The closest visible, unlocked member hit, or null. Used where only the
@@ -2995,45 +2982,58 @@ class KigumiViewerApp extends LitElement {
         const visualContext = this._getSelectionVisualContext();
         const policy = this._getSelectionVisualPolicy(visualContext.state, baseUnselectedOpacity);
 
-        for (const [name, bundle] of this.meshObjectsByKey) {
-            const isHidden = this.isMemberHidden(name);
-            // Nothing selected behaves like "everything selected" for the
-            // selected-visibility slider -- it's the default appearance, so
-            // it should respect the slider too, not silently stay at 1.0.
-            let opacity = baseSelectedOpacity;
-
-            if (visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
-                opacity = visualContext.selectedTimberSet.has(name) ? baseSelectedOpacity : policy.dimmedOpacity;
-            } else if (visualContext.hasSubselection) {
-                const isSubselectionTarget = visualContext.subselectionTimberKey === name;
-                opacity = isSubselectionTarget ? policy.selectedTimberOpacity : policy.dimmedOpacity;
-            }
-
-            const isTransparent = opacity < 1.0;
-            bundle.mesh.visible = !isHidden;
-            bundle.mesh.material.transparent = isTransparent;
-            bundle.mesh.material.opacity = opacity;
-            // Transparent unselected timbers should not cast shadows
-            bundle.mesh.castShadow = !isHidden && !isTransparent;
-            // Edge opacity is independent of face opacity: a member with
-            // transparent faces (selected or unselected) keeps fully-opaque
-            // (relative to edgeLineVisibilityPercent) edge lines.
-            if (bundle.edges && bundle.edges.material) {
-                const profile = this.resolveRenderProfile(bundle.profileId);
-                const baseEdgeOpacity = profile
-                    ? profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100)
-                    : (this.edgeLineVisibilityPercent / 100);
-                bundle.edges.material.opacity = baseEdgeOpacity;
-                bundle.edges.visible = !isHidden && this.edgeMode !== 'none';
-            }
-            // Reflections fade together with face opacity.
-            if (bundle.reflection && bundle.reflection.material) {
-                const profile = this.resolveRenderProfile(bundle.profileId);
-                const baseReflectionOpacity = profile ? profile.reflectionOpacity : 0.14;
-                bundle.reflection.material.opacity = baseReflectionOpacity * opacity;
-                bundle.reflection.visible = !isHidden && this.reflectionsEnabled;
-            }
+        for (const [name, bundle] of this.sceneManager.entries()) {
+            this.sceneManager.setMemberAppearance(name, this._memberAppearance(name, bundle, {
+                baseSelectedOpacity,
+                visualContext,
+                policy,
+            }));
         }
+    }
+
+    /**
+     * Which appearance class a member is in, and what that resolves to.
+     *
+     * The class is the useful half: it is what an implementation sharing one
+     * material per class would group on. The numbers depend on what else is
+     * selected, so they are computed per pass rather than stored.
+     */
+    _memberAppearance(memberKey, bundle, { baseSelectedOpacity, visualContext, policy }) {
+        // Nothing selected behaves like "everything selected" for the
+        // selected-visibility slider -- it's the default appearance, so it
+        // should respect the slider too, not silently stay at 1.0.
+        let name = 'normal';
+        let opacity = baseSelectedOpacity;
+
+        if (this.isMemberHidden(memberKey)) {
+            name = 'hidden';
+        } else if (visualContext.state === SELECTION_VISUAL_STATES.TIMBER_SELECTED_NO_SUB) {
+            const selected = visualContext.selectedTimberSet.has(memberKey);
+            name = selected ? 'selected' : 'ghost';
+            opacity = selected ? baseSelectedOpacity : policy.dimmedOpacity;
+        } else if (visualContext.hasSubselection) {
+            const selected = visualContext.subselectionTimberKey === memberKey;
+            name = selected ? 'selected' : 'ghost';
+            opacity = selected ? policy.selectedTimberOpacity : policy.dimmedOpacity;
+        }
+
+        const profile = this.resolveRenderProfile(bundle.profileId);
+        // Edge opacity is independent of face opacity: a member with
+        // transparent faces keeps its edge lines at full strength, relative to
+        // the edge visibility slider.
+        const edgeOpacity = profile
+            ? profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100)
+            : (this.edgeLineVisibilityPercent / 100);
+
+        return {
+            name,
+            opacity,
+            edgeOpacity,
+            edgesVisible: this.edgeMode !== 'none',
+            // Reflections fade together with face opacity.
+            reflectionOpacity: (profile ? profile.reflectionOpacity : 0.14) * opacity,
+            reflectionsVisible: this.reflectionsEnabled,
+        };
     }
 
     onGizmoPointerMove(event) {
@@ -3121,7 +3121,7 @@ class KigumiViewerApp extends LitElement {
 
         const acc = createBoundsAccumulator();
         for (const key of selected) {
-            const bundle = this.meshObjectsByKey.get(key);
+            const bundle = this.sceneManager.get(key);
             if (!bundle || !bundle.mesh || !bundle.mesh.geometry) {
                 continue;
             }
@@ -3471,7 +3471,7 @@ class KigumiViewerApp extends LitElement {
 
     updateReflectionTransforms() {
         const reflectionOffsetZ = this.groundZ * 2 - 0.001;
-        for (const [memberKey, bundle] of this.meshObjectsByKey.entries()) {
+        for (const [memberKey, bundle] of this.sceneManager.entries()) {
             if (!bundle.reflection) {
                 continue;
             }
@@ -3545,7 +3545,7 @@ class KigumiViewerApp extends LitElement {
             ? AssemblyTimeline.computeAssemblyOffsets(
                 this.assemblyData.steps, this.assemblyScrubValue, this.disassemblyMultiplier)
             : new Map();
-        for (const [memberKey, bundle] of this.meshObjectsByKey.entries()) {
+        for (const [memberKey, bundle] of this.sceneManager.entries()) {
             const offset = this._assemblyOffsetsByKey.get(memberKey) || [0, 0, 0];
             if (bundle.mesh) {
                 bundle.mesh.position.set(offset[0], offset[1], offset[2]);
@@ -3742,7 +3742,7 @@ class KigumiViewerApp extends LitElement {
         // 'noOverlay' is properly depth-tested/occluded) -- update existing
         // materials in place rather than rebuilding meshes.
         const depthTested = next === 'noOverlay';
-        for (const bundle of this.meshObjectsByKey.values()) {
+        for (const bundle of this.sceneManager.bundles()) {
             if (bundle.edges && bundle.edges.material) {
                 bundle.edges.material.depthTest = depthTested;
                 bundle.edges.material.depthWrite = depthTested;
@@ -3758,7 +3758,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const normalized = this.edgeLineThicknessPx;
-        for (const bundle of this.meshObjectsByKey.values()) {
+        for (const bundle of this.sceneManager.bundles()) {
             if (bundle.edges && bundle.edges.material) {
                 bundle.edges.material.linewidth = normalized;
             }
@@ -3995,7 +3995,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     applyRenderProfilesToScene() {
-        for (const [memberKey, bundle] of this.meshObjectsByKey.entries()) {
+        for (const [memberKey, bundle] of this.sceneManager.entries()) {
             const metadata = this.memberMetadataByKey.get(memberKey) || { type: 'timber' };
             const profileId = this.resolveRenderProfileIdForMemberType(metadata.type);
             this.applyRenderProfileToBundle(bundle, profileId);
@@ -4183,33 +4183,6 @@ class KigumiViewerApp extends LitElement {
         this.drawLightDial();
     }
 
-    disposeMeshBundle(bundle) {
-        if (!bundle) {
-            return;
-        }
-        this.scene.remove(bundle.mesh);
-        this.scene.remove(bundle.edges);
-        if (bundle.reflection) {
-            this.scene.remove(bundle.reflection);
-        }
-        bundle.mesh.geometry.dispose();
-        if (bundle.mesh.material && typeof bundle.mesh.material.dispose === 'function') {
-            bundle.mesh.material.dispose();
-        }
-        bundle.edges.geometry.dispose();
-        if (bundle.edges.material && typeof bundle.edges.material.dispose === 'function') {
-            bundle.edges.material.dispose();
-        }
-        if (bundle.reflection && bundle.reflection.material && typeof bundle.reflection.material.dispose === 'function') {
-            bundle.reflection.material.dispose();
-        }
-        // cylinderSilhouette.line is a child of bundle.edges (removed above) and
-        // shares bundle.edges.material (disposed above) -- only its own geometry
-        // needs disposing here.
-        if (bundle.cylinderSilhouette) {
-            bundle.cylinderSilhouette.line.geometry.dispose();
-        }
-    }
 
     // The true silhouette of a cylinder viewed by a point camera is exactly
     // two straight lines parallel to its axis (this holds exactly, not just
@@ -4265,7 +4238,7 @@ class KigumiViewerApp extends LitElement {
     // silhouette lines for every round accessory (see cylinderAxis / the
     // creation site in updateMeshScene).
     updateCylinderSilhouettes() {
-        for (const bundle of this.meshObjectsByKey.values()) {
+        for (const bundle of this.sceneManager.bundles()) {
             const cyl = bundle.cylinderSilhouette;
             if (!cyl) {
                 continue;
@@ -4844,12 +4817,9 @@ class KigumiViewerApp extends LitElement {
             const memberName = mesh.memberName || mesh.name || key;
             nextKeys.add(key);
 
-            const existing = this.meshObjectsByKey.get(key);
-            if (existing) {
-                this.meshKeyMap.delete(existing.mesh);
+            if (this.sceneManager.has(key)) {
                 this.memberMetadataByKey.delete(key);
-                this.disposeMeshBundle(existing);
-                this.meshObjectsByKey.delete(key);
+                this.sceneManager.disposeMember(key);
             }
 
             const meshT0 = performance.now();
@@ -4918,14 +4888,13 @@ class KigumiViewerApp extends LitElement {
             this.scene.add(solidMesh);
             this.scene.add(edgeMesh);
             this.scene.add(reflectionMesh);
-            this.meshKeyMap.set(solidMesh, key);
             this.memberMetadataByKey.set(key, {
                 name: memberName,
                 type: memberType,
                 tags: KigumiTags.coerceTags(mesh.tags),
                 mesh,
             });
-            this.meshObjectsByKey.set(key, {
+            this.sceneManager.register(key, {
                 memberType,
                 profileId: materialSet.profileId,
                 mesh: solidMesh,
@@ -4944,13 +4913,10 @@ class KigumiViewerApp extends LitElement {
             }
         }
 
-        for (const existingKey of Array.from(this.meshObjectsByKey.keys())) {
+        for (const existingKey of Array.from(this.sceneManager.keys())) {
             if (!nextKeys.has(existingKey)) {
-                const bundle = this.meshObjectsByKey.get(existingKey);
-                this.meshKeyMap.delete(bundle.mesh);
                 this.memberMetadataByKey.delete(existingKey);
-                this.disposeMeshBundle(bundle);
-                this.meshObjectsByKey.delete(existingKey);
+                this.sceneManager.disposeMember(existingKey);
             }
         }
 
@@ -5070,7 +5036,7 @@ class KigumiViewerApp extends LitElement {
 
     getSceneBounds() {
         const acc = createBoundsAccumulator();
-        this.meshObjectsByKey.forEach((bundle) => {
+        this.sceneManager.bundles().forEach((bundle) => {
             accumulateBounds(acc, bundle.mesh.geometry.getAttribute('position').array);
         });
 
@@ -5086,7 +5052,7 @@ class KigumiViewerApp extends LitElement {
         const geometryData = payload.geometry || { meshes: [] };
         const profiling = payload.profiling || null;
         const uiState = this.normalizeUiState(payload.uiState || null);
-        const hadExistingScene = this.meshObjectsByKey.size > 0;
+        const hadExistingScene = this.sceneManager.size > 0;
 
         this.setRenderParametersFromFrame(frameData);
 
