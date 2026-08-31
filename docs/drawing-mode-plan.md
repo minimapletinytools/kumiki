@@ -153,7 +153,7 @@ immovable: a bounded tilt rides on top of the declared angle and springs back to
 it. `orbitActiveViewport` refuses outright on a locked viewport today, which is
 where that becomes a tilt.
 
-### Overlap
+### Overlap, and what a viewport draws on
 
 Viewports may overlap, so that a detail can sit over the corner of an elevation
 rather than claiming its own column. The list is ordered and later means on top.
@@ -165,10 +165,41 @@ first. Forward draw with reverse hit-test is exactly the convention overlap
 needs. It is undocumented and untested, and the reverse loop reads as arbitrary
 -- worth stating and pinning before anything relies on it.
 
-What overlap does need is a decision the code makes silently today: three.js
-clears each scissor region before drawing, so an overlapping viewport erases
-what is beneath it where they meet. That is right for an opaque inset and wrong
-for one meant to float over its neighbour, so a viewport has to say which it is.
+**In a drawing a viewport draws on nothing.** It contributes its geometry and
+leaves every other pixel alone, so an overlapping viewport floats over its
+neighbour instead of punching a hole in it. The sheet itself -- paper colour,
+and a texture, border or title block later -- is a **page-space layer drawn
+beneath**, once, not something any camera renders. Same mechanism serves
+annotations later, on top.
+
+So a drawing composites in three layers: page beneath, viewports over it,
+annotations above. `background` stays in a viewport's render settings and is
+always none for a drawing, which leaves it meaning what it already means for the
+3D scene's single viewport.
+
+Two things make that harder than "skip the clear", and both are worth knowing
+before it is attempted:
+
+**Colour must not be cleared, but depth must.** Leaving `autoClearColor` on
+erases the neighbour underneath; turning `autoClearDepth` off is worse, because
+each viewport then depth-tests against the last one's buffer and geometry
+vanishes behind a neighbour it has no spatial relationship to. Disjoint scissor
+regions hide this today -- their depth ranges never meet -- so it is precisely
+overlap that exposes it.
+
+**`scene.background` defeats all of it.** It currently holds the theme's
+gradient texture, and three.js paints a scene background as a full pass inside
+the active viewport, whatever the clear flags say. Every viewport would repaint
+the gradient over its neighbours. The background has to be null while drawing
+viewports render, with the page layer supplying the paper instead -- which is
+the right home for it anyway, and where a per-drawing paper override would go.
+
+**Floating changes picking, too.** Where a floating viewport is empty, what you
+see is the viewport beneath, so a click there belongs to it and not to the empty
+rect on top. Picking should walk the viewports top-down and take the first that
+actually *hits* something, falling back to the topmost rect only when nothing
+does. Rect-topmost-wins is right for an opaque inset and misleading for a
+floating one.
 
 ### Consequences worth remembering
 
