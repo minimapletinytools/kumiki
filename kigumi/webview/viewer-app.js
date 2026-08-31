@@ -1,4 +1,6 @@
 import { LitElement, html } from 'lit';
+import { MemberListPanel } from './member-list-panel.js';
+import { SelectionPanel } from './selection-panel.js';
 
 const ViewerPhase = Object.freeze({
     BOOTING: 'booting',
@@ -1213,13 +1215,6 @@ class KigumiViewerApp extends LitElement {
         this.assemblyScrubValue = 0;
         this._assemblyOffsetsByKey = new Map();
         this.logFilterText = '';
-        this.memberListRoughLengthAllowanceMm = 30;
-        this.memberListOptions = {
-            showRoughLength: false,
-            showNominalSizes: true,
-            showCsgFeatureCount: true,
-            showTags: true,
-        };
 
         this.lightAzimuth = 0;
         this.lightElevation = 0.8;
@@ -1264,9 +1259,6 @@ class KigumiViewerApp extends LitElement {
         this.animationHandle = null;
         this.viewState = createInitialViewState();
         this.currentFrameData = {};
-        // Info pane. Collapsed by default and never auto-expands: it is a
-        // glance, not a workspace, and the CSG trees live in the layers panel.
-        this.infoPanelExpanded = false;
         this.csgTreesByKey = new Map();  // memberKey -> { memberKey, tree }
         this.csgTreeRequests = new Set();// memberKeys already asked for
         this.lastPickDetail = null;      // featureType / jointName / facesToward
@@ -1286,6 +1278,12 @@ class KigumiViewerApp extends LitElement {
         this.exportAccessoriesEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
         this.parameterPanel = new ViewerParameterPanel(this);
+        this.memberListPanel = new MemberListPanel(this, { t });
+        this.selectionPanel = new SelectionPanel(this, {
+            t,
+            csgTreeView: CsgTreeView,
+            featureTypeNouns: FEATURE_TYPE_NOUNS,
+        });
         this.activeRefreshToken = 0;
         this.onWindowMessage = this.onWindowMessage.bind(this);
         this.onWindowScroll = this.onWindowScroll.bind(this);
@@ -1337,7 +1335,7 @@ class KigumiViewerApp extends LitElement {
                     <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
                 </div>
                 <div id="left-rail">
-                    <div id="info-panel" class="ip-panel"></div>
+                    ${this.selectionPanel.render()}
                     <kigumi-layers-view id="layers-view"></kigumi-layers-view>
                     <div id="rail-resize" title=${t('viewer.layers.resize.title')}
                          @pointerdown=${this.onRailResizeStart}></div>
@@ -1373,50 +1371,7 @@ class KigumiViewerApp extends LitElement {
                 ${this.parameterPanel.render()}
             </div>
             <div id="panels">
-                <div class="panel-box">
-                    <div class="panel-title">${t('viewer.memberList.title')}</div>
-                    <div id="member-list-options" aria-label=${t('viewer.memberList.ariaLabel')}>
-                        <label>
-                            <input id="member-opt-rough-length" type="checkbox" ?checked=${this.memberListOptions.showRoughLength}>
-                            ${t('viewer.memberList.opt.roughLength', { allowance: this.memberListRoughLengthAllowanceMm })}
-                        </label>
-                        <label>
-                            <input id="member-opt-sizes" type="checkbox" ?checked=${this.memberListOptions.showNominalSizes}>
-                            ${t('viewer.memberList.opt.sizes')}
-                        </label>
-                        <label>
-                            <input id="member-opt-csg" type="checkbox" ?checked=${this.memberListOptions.showCsgFeatureCount}>
-                            ${t('viewer.memberList.opt.csg')}
-                        </label>
-                        <label>
-                            <input id="member-opt-tags" type="checkbox" ?checked=${this.memberListOptions.showTags}>
-                            ${t('viewer.memberList.opt.tags')}
-                        </label>
-                    </div>
-                    <details id="member-list-legend" open>
-                        <summary>${t('viewer.memberList.legend.summary')}</summary>
-                        <div class="member-list-legend-body">
-                            <p><strong>${t('viewer.memberList.legend.length.term')}</strong>: ${t('viewer.memberList.legend.length.desc')}</p>
-                            <p><strong>${t('viewer.memberList.legend.sizeToggle.term')}</strong>: ${t('viewer.memberList.legend.sizeToggle.desc')}</p>
-                            <p><strong>${t('viewer.memberList.legend.csg.term')}</strong>: ${t('viewer.memberList.legend.csg.desc')}</p>
-                            <p><strong>${t('viewer.memberList.legend.features.term')}</strong>: ${t('viewer.memberList.legend.features.desc')}</p>
-                            <p><strong>${t('viewer.memberList.legend.tags.term')}</strong>: ${t('viewer.memberList.legend.tags.desc')}</p>
-                        </div>
-                    </details>
-                    <div id="timber-panel">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>#</th><th>${t('viewer.memberList.table.type')}</th><th>${t('viewer.memberList.table.name')}</th>
-                                    <th data-col="tags">${t('viewer.memberList.table.tags')}</th>
-                                    <th data-col="length">${t('viewer.memberList.table.length')}</th><th data-col="width">${t('viewer.memberList.table.width')}</th><th data-col="height">${t('viewer.memberList.table.height')}</th>
-                                    <th data-col="csg">${t('viewer.memberList.legend.csg.term')}</th><th data-col="feature">${t('viewer.memberList.legend.features.term')}</th>
-                                </tr>
-                            </thead>
-                            <tbody id="timber-rows"></tbody>
-                        </table>
-                    </div>
-                </div>
+                ${this.memberListPanel.render()}
                 <div id="log-panel-box" class="panel-box">
                     <div class="panel-title">
                         ${t('viewer.log.title')}
@@ -1456,7 +1411,7 @@ class KigumiViewerApp extends LitElement {
                 }
             }
             this.applySelectionOpacity();
-            this.updateInfo(this.currentFrameData);
+            this.selectionPanel.updateInfo(this.currentFrameData);
         });
 
         // Attach Layers panel to selection store + extension messaging.
@@ -1669,37 +1624,8 @@ class KigumiViewerApp extends LitElement {
             if (vscode) { vscode.postMessage({ type: 'openOutputChannel' }); }
         });
 
-        const memberOptRoughLength = this.renderRoot.querySelector('#member-opt-rough-length');
-        const memberOptSizes = this.renderRoot.querySelector('#member-opt-sizes');
-        const memberOptCsg = this.renderRoot.querySelector('#member-opt-csg');
-        const memberOptTags = this.renderRoot.querySelector('#member-opt-tags');
-
-        if (memberOptRoughLength) {
-            memberOptRoughLength.addEventListener('change', (event) => {
-                this.memberListOptions.showRoughLength = Boolean(event.target.checked);
-                this._refreshMemberList();
-            });
-        }
-        if (memberOptSizes) {
-            memberOptSizes.addEventListener('change', (event) => {
-                this.memberListOptions.showNominalSizes = Boolean(event.target.checked);
-                this._refreshMemberList();
-            });
-        }
-        if (memberOptCsg) {
-            memberOptCsg.addEventListener('change', (event) => {
-                this.memberListOptions.showCsgFeatureCount = Boolean(event.target.checked);
-                this._applyMemberListOptionVisibility();
-            });
-        }
-        if (memberOptTags) {
-            memberOptTags.addEventListener('change', (event) => {
-                this.memberListOptions.showTags = Boolean(event.target.checked);
-                this._applyMemberListOptionVisibility();
-            });
-        }
-
-        this._applyMemberListOptionVisibility();
+        this.memberListPanel.bindEvents(this.renderRoot);
+        this.memberListPanel.applyOptionVisibility();
 
         window.addEventListener('scroll', this.onWindowScroll);
         window.addEventListener('mouseup', this.onWindowMouseUp);
@@ -2331,7 +2257,7 @@ class KigumiViewerApp extends LitElement {
             if (payload.tree) {
                 this.onCsgTreeArrived(payload);
             }
-            this.updateInfo(this.currentFrameData);
+            this.selectionPanel.updateInfo(this.currentFrameData);
             return;
         }
 
@@ -2904,7 +2830,7 @@ class KigumiViewerApp extends LitElement {
             });
         }
 
-        this.updateInfo(this.currentFrameData);
+        this.selectionPanel.updateInfo(this.currentFrameData);
     }
 
     _escapeHtml(str) {
@@ -3103,8 +3029,8 @@ class KigumiViewerApp extends LitElement {
         if (!this.displayOptions.set('units', units)) {
             return;
         }
-        this._refreshMemberList();
-        this.updateInfo(this.currentFrameData);
+        this.memberListPanel.refresh();
+        this.selectionPanel.updateInfo(this.currentFrameData);
     }
 
     clampPhi(value) {
@@ -4268,165 +4194,11 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    rebuildTimberTable(meshes) {
-        const tbody = this.renderRoot.querySelector('#timber-rows');
-        tbody.textContent = '';
-        for (let index = 0; index < meshes.length; index += 1) {
-            const mesh = meshes[index];
-            const typeLabel = mesh.memberType === 'accessory' ? 'Accessory' : 'Timber';
-            const memberName = mesh.memberName || mesh.name || '?';
-            const tags = KigumiTags.coerceTags(mesh.tags);
-            const tagsLabel = tags.length > 0 ? tags.map((tag) => tag.name).join(', ') : '—';
-            const row = document.createElement('tr');
-            const lengthValue = this._formatMemberLength(mesh);
-            const widthValue = this._formatMemberCrossSection(mesh, 'width');
-            const heightValue = this._formatMemberCrossSection(mesh, 'height');
-            row.innerHTML = '<td>' + (index + 1) + '</td>' +
-                '<td>' + this._escapeHtml(typeLabel) + '</td>' +
-                '<td>' + this._escapeHtml(memberName) + '</td>' +
-                '<td data-col="tags" class="dim">' + this._escapeHtml(tagsLabel) + '</td>' +
-                '<td data-col="length" class="dim">' + lengthValue + '</td>' +
-                '<td data-col="width" class="dim">' + widthValue + '</td>' +
-                '<td data-col="height" class="dim">' + heightValue + '</td>' +
-                '<td data-col="csg" class="dim">' + (mesh.csg_nodes !== undefined ? mesh.csg_nodes : '—') + '</td>' +
-                '<td data-col="feature" class="dim">' + (mesh.csg_features !== undefined ? mesh.csg_features : '—') + '</td>';
-            tbody.appendChild(row);
-        }
-        this._applyMemberListOptionVisibility();
-    }
 
-    _formatMemberCrossSection(mesh, axis) {
-        const nominalKey = axis === 'width' ? 'nominal_width' : 'nominal_height';
-        const perfectKey = axis === 'width' ? 'perfect_width' : 'perfect_height';
-        const legacyKey = axis === 'width' ? 'prism_width' : 'prism_height';
 
-        const selectedValue = this.memberListOptions.showNominalSizes
-            ? mesh[nominalKey]
-            : mesh[perfectKey];
-        const fallbackValue = mesh[legacyKey];
-        const value = selectedValue !== undefined ? selectedValue : fallbackValue;
 
-        if (value === undefined) {
-            return '—';
-        }
-        return this.fmt(value);
-    }
 
-    _formatMemberLength(mesh) {
-        // The finished piece rather than the stock it was cut from: a timber
-        // with an end joint is never cut to length first, so its declared
-        // length is not a dimension anyone meant (see docs/concepts.md).
-        const exactLengthM = KigumiUnits.memberLengthMeters(mesh);
-        if (exactLengthM === null) {
-            return '—';
-        }
 
-        if (this.memberListOptions.showRoughLength) {
-            const roughLengthM = exactLengthM + (this.memberListRoughLengthAllowanceMm / 1000);
-            return this.fmt(roughLengthM);
-        }
-
-        return this.fmt(exactLengthM);
-    }
-
-    _refreshMemberList() {
-        const meshes = (this._lastGeometryData && this._lastGeometryData.meshes) ? this._lastGeometryData.meshes : [];
-        this.rebuildTimberTable(meshes);
-    }
-
-    _applyMemberListOptionVisibility() {
-        const table = this.renderRoot && this.renderRoot.querySelector
-            ? this.renderRoot.querySelector('#timber-panel table')
-            : null;
-        if (!table) {
-            return;
-        }
-
-        table.classList.toggle('member-hide-tags', !this.memberListOptions.showTags);
-        table.classList.toggle('member-hide-csg', !this.memberListOptions.showCsgFeatureCount);
-
-        const lengthHeader = table.querySelector('th[data-col="length"]');
-        if (lengthHeader) {
-            lengthHeader.textContent = this.memberListOptions.showRoughLength ? 'Length (Rough)' : 'Length (Exact)';
-        }
-
-        const widthHeader = table.querySelector('th[data-col="width"]');
-        if (widthHeader) {
-            widthHeader.textContent = this.memberListOptions.showNominalSizes ? 'Width (Nominal)' : 'Width (Perfect)';
-        }
-
-        const heightHeader = table.querySelector('th[data-col="height"]');
-        if (heightHeader) {
-            heightHeader.textContent = this.memberListOptions.showNominalSizes ? 'Height (Nominal)' : 'Height (Perfect)';
-        }
-    }
-
-    updateInfo(frameData) {
-        this.currentFrameData = frameData || {};
-        const timberCount = frameData && frameData.timber_count ? frameData.timber_count : 0;
-        const accessoriesCount = frameData && frameData.accessories_count ? frameData.accessories_count : 0;
-        const selectedMembers = this.selectionManager.getSelectedTimbers();
-        let selectedTimberCount = 0;
-        let selectedAccessoryCount = 0;
-        let selectedSingleName = '';
-        let selectedKnownCount = 0;
-
-        for (const selectedKey of selectedMembers) {
-            const metadata = this.memberMetadataByKey.get(selectedKey);
-            if (!metadata) {
-                continue;
-            }
-            selectedKnownCount += 1;
-            if (metadata.type === 'accessory') {
-                selectedAccessoryCount += 1;
-            } else {
-                selectedTimberCount += 1;
-            }
-            if (selectedKnownCount === 1) {
-                selectedSingleName = metadata.name || '';
-            }
-        }
-
-        if (selectedKnownCount !== 1) {
-            selectedSingleName = '';
-        }
-
-        const selectedTags = this._selectedTags(selectedMembers);
-        // Only with exactly one member selected: two sets of dimensions in one
-        // line would read as one member's.
-        const selectedSize = selectedKnownCount === 1
-            ? this._describeMemberSize(this.memberMetadataByKey.get(selectedMembers[0]))
-            : null;
-
-        const focus = this.selectionManager.csgFocus;
-        const detail = this.lastPickDetail;
-        let breadcrumb = selectedSingleName;
-        if (focus) {
-            const focused = this.memberMetadataByKey.get(focus.timberKey);
-            breadcrumb = CsgTreeView.breadcrumbSegments(
-                (focused && focused.name) || focus.timberKey,
-                focus.path,
-                {
-                    featureLabel: focus.featureLabel,
-                    featureType: detail && detail.featureType,
-                    nodeKind: detail && detail.nodeKind,
-                    nodeDisplayName: detail && detail.nodeDisplayName,
-                    nodeLabel: detail && detail.nodeLabel,
-                },
-                FEATURE_TYPE_NOUNS(),
-            ).join(' \u203a ');
-        }
-
-        this._renderInfoPanel({
-            timberCount,
-            accessoriesCount,
-            selectedTimberCount,
-            selectedAccessoryCount,
-            breadcrumb,
-            tags: selectedTags,
-            size: selectedSize,
-        });
-    }
 
     /**
      * One selected member as stock: its cross-section and its finished length,
@@ -4436,159 +4208,17 @@ class KigumiViewerApp extends LitElement {
      * the stock it was cut from -- a timber with an end joint is never cut to
      * length first, so the two differ for most of a frame.
      */
-    _describeMemberSize(metadata) {
-        const mesh = metadata && metadata.mesh;
-        if (!mesh || metadata.type === 'accessory') {
-            return null;
-        }
-        const width = this._formatMemberCrossSection(mesh, 'width');
-        const height = this._formatMemberCrossSection(mesh, 'height');
-        // cut_length is absent on an older runner; the uncut length is the
-        // honest fallback, and it is what the member list shows anyway.
-        const lengthMeters = KigumiUnits.memberLengthMeters(mesh);
-        const lengthValue = lengthMeters === null ? '—' : this.fmt(lengthMeters);
-        if (width === '—' || height === '—' || lengthValue === '—') {
-            return null;
-        }
-        return `${width} x ${height} - ${lengthValue}`;
-    }
 
     /**
      * Every tag worn by anything in the selection, deduped, ordered the way the
      * layers panel's tags section orders them.
      */
-    _selectedTags(selectedMembers) {
-        const byId = new Map();
-        for (const key of selectedMembers) {
-            const metadata = this.memberMetadataByKey.get(key);
-            for (const tag of (metadata && metadata.tags) || []) {
-                byId.set(tag.kind + ':' + tag.name, tag);
-            }
-        }
-        const kindRank = (kind) => {
-            const rank = TagIndex.KIND_ORDER.indexOf(kind);
-            return rank === -1 ? TagIndex.KIND_ORDER.length : rank;
-        };
-        return Array.from(byId.values()).sort((a, b) => (
-            kindRank(a.kind) - kindRank(b.kind) || a.name.localeCompare(b.name)
-        ));
-    }
 
     /**
      * The info pane: a glance at what is selected. It never expands itself --
      * expanding is the user's choice, and the CSG trees live in the layers
      * panel below rather than here.
      */
-    _renderInfoPanel(summary) {
-        const panel = this.renderRoot.querySelector('#info-panel');
-        if (!panel) {
-            return;
-        }
-
-        panel.className = 'ip-panel';
-        panel.innerHTML = '';
-
-        const header = document.createElement('div');
-        header.className = 'ip-header';
-        const chev = document.createElement('span');
-        chev.className = 'ip-chev';
-        chev.textContent = this.infoPanelExpanded ? '\u25be' : '\u25b8';
-        header.appendChild(chev);
-        const headerTitle = document.createElement('span');
-        headerTitle.className = 'ip-title';
-        headerTitle.textContent = t('viewer.selection.header');
-        header.appendChild(headerTitle);
-        header.addEventListener('click', () => {
-            this.infoPanelExpanded = !this.infoPanelExpanded;
-            this.updateInfo(this.currentFrameData);
-        });
-        panel.appendChild(header);
-
-        const body = document.createElement('div');
-        body.className = 'ip-body';
-
-        const counts = document.createElement('div');
-        counts.className = 'ip-counts';
-        counts.textContent = t('viewer.selection.counts', {
-            selectedTimbers: summary.selectedTimberCount,
-            timbers: summary.timberCount,
-            selectedAccessories: summary.selectedAccessoryCount,
-            accessories: summary.accessoriesCount,
-        });
-        body.appendChild(counts);
-
-        if (summary.size) {
-            // No member name here: the breadcrumb underneath already carries it,
-            // and the room is better spent on the dimensions.
-            const size = document.createElement('div');
-            size.className = 'ip-size';
-            size.textContent = summary.size;
-            size.title = summary.size;
-            body.appendChild(size);
-        }
-
-        if (summary.breadcrumb) {
-            const crumb = document.createElement('div');
-            crumb.className = 'ip-breadcrumb';
-            crumb.textContent = summary.breadcrumb;
-            crumb.title = summary.breadcrumb;
-            body.appendChild(crumb);
-        }
-
-        // The pills the member rows no longer carry: they live here, where
-        // there is room for them, and only for what is selected.
-        if (this.infoPanelExpanded && summary.tags && summary.tags.length > 0) {
-            const line = document.createElement('div');
-            line.className = 'ip-detail ip-tags';
-            const label = document.createElement('span');
-            label.className = 'ip-detail-label';
-            label.textContent = t('viewer.selection.tags');
-            line.appendChild(label);
-            const chips = document.createElement('span');
-            chips.className = 'ip-chips';
-            for (const tag of summary.tags) {
-                const chip = document.createElement('span');
-                chip.className = 'tag-chip';
-                chip.dataset.tagKind = tag.kind;
-                chip.textContent = tag.name;
-                chips.appendChild(chip);
-            }
-            line.appendChild(chips);
-            body.appendChild(line);
-        }
-
-        // Detail lines are the reward for expanding, so they stay behind it.
-        const detail = this.lastPickDetail;
-        if (this.infoPanelExpanded && detail && this.selectionManager.csgFocus) {
-            const normalText = CsgTreeView.describeOutwardNormal(
-                detail.outwardNormal,
-                detail.facesToward,
-                t('viewer.selection.approximatelyFacing'),
-            );
-            for (const [key, value] of [
-                ['viewer.selection.featureType', detail.featureType],
-                ['viewer.selection.joint', detail.jointName],
-                ['viewer.selection.normal', normalText],
-            ]) {
-                if (!value) {
-                    continue;
-                }
-                const line = document.createElement('div');
-                line.className = 'ip-detail';
-                const label = document.createElement('span');
-                label.className = 'ip-detail-label';
-                label.textContent = t(key);
-                const val = document.createElement('span');
-                val.className = 'ip-detail-value';
-                val.textContent = String(value).toLowerCase();
-                line.appendChild(label);
-                line.appendChild(val);
-                body.appendChild(line);
-            }
-        }
-
-        panel.appendChild(body);
-    }
 
     // ------------------------------------------------------------------
     // CSG trees: fetched here (the vscode channel lives in this component),
@@ -4937,7 +4567,7 @@ class KigumiViewerApp extends LitElement {
         }
 
         this.rebuildFootprints(geometryData && geometryData.footprints);
-        this.rebuildTimberTable(meshes);
+        this.memberListPanel.rebuild(meshes);
         this.updateReflectionTransforms();
         this.applySelectionOpacity();
         // Rebuilt meshes come in at the origin; re-seat them at the current
@@ -5074,7 +4704,7 @@ class KigumiViewerApp extends LitElement {
 
         if (uiState.keepLoading) {
             this.setViewPhase(uiState.phase, uiState.loadingText, { refreshToken, error: uiState.error });
-            this.updateInfo(frameData);
+            this.selectionPanel.updateInfo(frameData);
             this.updateDebug(geometryData, profiling);
             this.renderRoot.querySelector('#raw-output').textContent = JSON.stringify({
                 frame: frameData,
@@ -5092,7 +4722,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        this.updateInfo(frameData);
+        this.selectionPanel.updateInfo(frameData);
         const applyStartMs = performance.now();
         const completed = await this.updateMeshScene(geometryData, refreshToken, (processed, total) => {
             this.setViewPhase(ViewerPhase.APPLYING_GEOMETRY, t('viewer.chrome.loading.cuttingJoints', { processed, total }), {
