@@ -182,6 +182,26 @@ canvas { display: block; width: 100%; height: 100%; }
     user-select: none;
 }
 
+/* Sits at the right end of the selection header, where it stays reachable
+   whether or not the panel is expanded. */
+.ip-action {
+    margin-left: auto;
+    font: inherit;
+    font-size: 0.9em;
+    text-transform: lowercase;
+    letter-spacing: 0.04em;
+    color: var(--hv-title);
+    background: transparent;
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 3px;
+    padding: 1px 7px;
+    cursor: pointer;
+}
+
+.ip-action:hover {
+    background: var(--hv-panel-border);
+}
+
 .ip-header {
     display: flex;
     align-items: center;

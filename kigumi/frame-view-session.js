@@ -307,6 +307,12 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'requestDrawingFromSelection') {
+                this._handleRequestDrawingFromSelection(message).catch((err) => {
+                    this.log(`[drawing] requestDrawingFromSelection error: ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestDebugDrawing') {
                 this._handleRequestDebugDrawing().catch((err) => {
                     this.log(`[drawing] requestDebugDrawing error: ${err.message || err}`);
@@ -977,6 +983,32 @@ class FrameViewSession {
     // first (the webview shows a "figuring out how to disassemble…" state
     // until the result lands). A generation counter drops results made stale
     // by a newer refresh.
+    /**
+     * Build a drawing of the selected members and hand it to the viewer.
+     *
+     * The layout is python's to decide -- it knows the timber's own axes, which
+     * is what the four-long-sides sheet is arranged around -- so the viewer
+     * sends the selection and renders whatever comes back.
+     */
+    async _handleRequestDrawingFromSelection(message) {
+        if (!this.runnerSession || this.isDisposed) {
+            return;
+        }
+        const memberKeys = Array.isArray(message.memberKeys) ? message.memberKeys : [];
+        const result = await this.runnerSession.slotRequest(
+            'create_drawing_from_selection',
+            this.slotName,
+            { member_keys: memberKeys },
+        );
+        if (this.isDisposed) {
+            return;
+        }
+        this._postToWebview({
+            type: 'scenes',
+            payload: { scenes: (result && result.scenes) || [], enter: true },
+        });
+    }
+
     /**
      * Fetch the scaffolding drawing (see build_default_drawing_for_debugging in
      * runner.py) and hand it to the viewer.

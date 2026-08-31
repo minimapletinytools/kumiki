@@ -988,11 +988,29 @@ _DEBUG_DRAWING_RECTS: Dict[str, List[float]] = {
 }
 
 # Leaves a margin around the model rather than framing it edge to edge.
-_DEBUG_DRAWING_EXTENT_PADDING = 1.15
+_DRAWING_EXTENT_PADDING = 1.15
+
+
+def _cut_extent(cut_timber: Any, stock_length: float) -> Tuple[float, float]:
+    """Where the finished piece starts and ends along its own length.
+
+    The same distinction the member list draws (see _cut_length): a timber with
+    an end joint is not cut to length first, so its stock is not the piece that
+    gets drawn. Framing a view on the stock leaves the piece sitting off centre
+    by whatever the joint took off.
+    """
+    try:
+        prism = cut_timber.get_perfect_timber_within_bounding_box_prism()
+        start = float(prism.start_distance) if prism.start_distance is not None else 0.0
+        end = float(prism.end_distance) if prism.end_distance is not None else stock_length
+        return start, end
+    except Exception as exc:
+        log_stderr(f"Warning: could not measure cut extent: {exc}")
+        return 0.0, stock_length
 
 
 def _timber_world_corners(cut_timber: Any) -> List[List[float]]:
-    """The 8 corners of a timber's uncut stock, in world space."""
+    """The 8 corners of a timber's finished piece, in world space."""
     timber = cut_timber.timber
     origin = _vector3_to_floats(timber.get_bottom_position_global())
     along = _vector3_to_floats(timber.get_length_direction_global())
@@ -1003,7 +1021,7 @@ def _timber_world_corners(cut_timber: Any) -> List[List[float]]:
     half_height = float(timber.size[1]) / 2.0
 
     corners: List[List[float]] = []
-    for distance in (0.0, length):
+    for distance in _cut_extent(cut_timber, length):
         for width_sign in (-half_width, half_width):
             for height_sign in (-half_height, half_height):
                 corners.append([
@@ -1034,17 +1052,53 @@ def _frame_world_bounds(frame: Any) -> Tuple[List[float], List[float]]:
     return centre, half_size
 
 
-def _view_extent(half_size: List[float], right: List[float], up: List[float]) -> float:
+def _view_extent(
+    half_size: List[float],
+    right: List[float],
+    up: List[float],
+    aspect: float = 1.0,
+) -> float:
     """Half-height that fits the model in a view with these screen axes.
 
-    Both axes are measured against the box and the larger wins, so a viewport
-    narrower than the model still shows all of it; the viewer widens the
-    frustum by the aspect from here.
+    The viewer widens the frustum from the half-height by the viewport's aspect,
+    so the width the model needs has to be divided by that aspect before the two
+    are compared. Skipping that is only harmless while viewports are square; a
+    long timber drawn across a wide strip needs far less height than its length.
     """
     def projected(axis: List[float]) -> float:
         return sum(abs(axis[i]) * half_size[i] for i in range(3))
 
-    return max(0.001, max(projected(right), projected(up)) * _DEBUG_DRAWING_EXTENT_PADDING)
+    safe_aspect = aspect if aspect > 0 else 1.0
+    needed = max(projected(up), projected(right) / safe_aspect)
+    return max(0.001, needed * _DRAWING_EXTENT_PADDING)
+
+
+def _viewport_aspect(rect: List[float], page: Dict[str, float]) -> float:
+    """A viewport's aspect: its share of the sheet, times the sheet's own."""
+    height = rect[3] * page["height"]
+    return (rect[2] * page["width"]) / height if height > 0 else 1.0
+
+
+def _cross(a: List[float], b: List[float]) -> List[float]:
+    return [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+
+
+def _camera_looking_at_face(normal: List[float], along: List[float]) -> Dict[str, Any]:
+    """A camera frame square-on to a face, with the timber's length across screen.
+
+    The camera sits outside the face along its outward normal and looks back at
+    it. `up` is chosen so right x up == -look, the frame of a camera looking down
+    its own -Z, which is what keeps the view from coming out mirrored.
+    """
+    return {
+        "right": list(along),
+        "up": _cross(normal, along),
+        "look": [-component for component in normal],
+    }
 
 
 def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
@@ -1058,9 +1112,10 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
     centre, half_size = _frame_world_bounds(frame)
     viewports: List[Dict[str, Any]] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
+        rect = _DEBUG_DRAWING_RECTS[view_id]
         viewports.append({
             "id": view_id,
-            "rect": _DEBUG_DRAWING_RECTS[view_id],
+            "rect": rect,
             "locked": True,
             "projection": "orthographic",
             "camera": {
@@ -1068,7 +1123,7 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
                 "up": up,
                 "look": look,
                 "target": centre,
-                "extent": _view_extent(half_size, right, up),
+                "extent": _view_extent(half_size, right, up, _viewport_aspect(rect, _DEBUG_DRAWING_PAGE)),
             },
             # Every timber, which is also what a scene defaults to; spelled out
             # because a real drawing is the interesting case and would not.
@@ -1089,6 +1144,161 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
         # The sheet these sit on. Rects above are fractions of it, so the four
         # views tile an A3 page rather than the window.
         "page": dict(_DEBUG_DRAWING_PAGE),
+        # A drawing shows no camera gizmos.
+        "cameraControls": [],
+        "viewports": viewports,
+    }
+
+
+# A3 landscape, in metres. Fixed for now; the page is meant to be the drawing's
+# to choose, and this is where that choice will arrive from.
+_SELECTION_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
+
+SELECTION_DRAWING_ID = "selection-drawing"
+
+# One timber gets its four long faces rolled out down the left of the sheet,
+# with a live preview beside them -- the shop drawing for a single piece. Which
+# face each view looks at, in the timber's own frame, going around it.
+_LONG_FACE_VIEWS: List[Tuple[str, str, int]] = [
+    # id       axis      sign
+    ("front", "height", 1),
+    ("right", "width", 1),
+    ("back", "height", -1),
+    ("left", "width", -1),
+]
+
+_LONG_FACE_RECTS: Dict[str, List[float]] = {
+    "front": [0.0, 0.0, 0.5, 0.25],
+    "right": [0.0, 0.25, 0.5, 0.25],
+    "back": [0.0, 0.5, 0.5, 0.25],
+    "left": [0.0, 0.75, 0.5, 0.25],
+    "preview": [0.5, 0.0, 0.5, 1.0],
+}
+
+# Several members are drawn as world elevations instead: there is no single
+# piece whose faces the sheet could be about.
+_SELECTION_QUADRANTS: Dict[str, List[float]] = {
+    "front": [0.0, 0.0, 0.5, 0.5],
+    "top": [0.5, 0.0, 0.5, 0.5],
+    "right": [0.0, 0.5, 0.5, 0.5],
+    "preview": [0.5, 0.5, 0.5, 0.5],
+}
+
+
+def _members_world_bounds(entries: List[Dict[str, Any]]) -> Tuple[List[float], List[float]]:
+    """(centre, half_size) over the given timber entries."""
+    lows = [float("inf")] * 3
+    highs = [float("-inf")] * 3
+    for entry in entries:
+        for corner in _timber_world_corners(entry["cutTimber"]):
+            for axis in range(3):
+                lows[axis] = min(lows[axis], corner[axis])
+                highs[axis] = max(highs[axis], corner[axis])
+    if any(low == float("inf") for low in lows):
+        return [0.0, 0.0, 0.0], [1.0, 1.0, 1.0]
+    return (
+        [(lows[axis] + highs[axis]) / 2.0 for axis in range(3)],
+        [(highs[axis] - lows[axis]) / 2.0 for axis in range(3)],
+    )
+
+
+def _preview_viewport(rect: List[float]) -> Dict[str, Any]:
+    """The live 3D view beside the elevations. Free, so it can be looked around."""
+    return {"id": "preview", "rect": rect, "locked": False, "projection": "perspective"}
+
+
+def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The four long sides of one timber, stacked, each square-on to its face."""
+    timber = entry["timber"]
+    along = _vector3_to_floats(timber.get_length_direction_global())
+    axes = {
+        "width": _vector3_to_floats(timber.get_width_direction_global()),
+        "height": _vector3_to_floats(timber.get_height_direction_global()),
+    }
+    centre, half_size = _members_world_bounds([entry])
+
+    viewports: List[Dict[str, Any]] = []
+    for view_id, axis_name, sign in _LONG_FACE_VIEWS:
+        normal = [component * sign for component in axes[axis_name]]
+        frame = _camera_looking_at_face(normal, along)
+        rect = _LONG_FACE_RECTS[view_id]
+        viewports.append({
+            "id": view_id,
+            "rect": rect,
+            "locked": True,
+            "projection": "orthographic",
+            "camera": {
+                **frame,
+                "target": centre,
+                "extent": _view_extent(
+                    half_size, frame["right"], frame["up"], _viewport_aspect(rect, page),
+                ),
+            },
+        })
+    return viewports
+
+
+def _world_elevation_viewports(
+    entries: List[Dict[str, Any]], page: Dict[str, Any],
+) -> List[Dict[str, Any]]:
+    """Front, top and right elevations in world axes, for a group of members."""
+    centre, half_size = _members_world_bounds(entries)
+    viewports: List[Dict[str, Any]] = []
+    for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
+        rect = _SELECTION_QUADRANTS[view_id]
+        viewports.append({
+            "id": view_id,
+            "rect": rect,
+            "locked": True,
+            "projection": "orthographic",
+            "camera": {
+                "right": right,
+                "up": up,
+                "look": look,
+                "target": centre,
+                "extent": _view_extent(half_size, right, up, _viewport_aspect(rect, page)),
+            },
+        })
+    return viewports
+
+
+def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[str, Any]:
+    """A drawing of the selected members, on a sheet.
+
+    One timber is drawn the way a piece is drawn for the shop: its four long
+    faces rolled out down the sheet with a live preview beside them, each view
+    square-on to a face and with the length running across the page. Several
+    members have no single piece whose faces the drawing could be about, so they
+    get world elevations instead.
+
+    The drawing names its members. The scene still holds every timber -- the
+    rest are ghosted, present for context and not part of what is drawn.
+    """
+    page = dict(_SELECTION_DRAWING_PAGE)
+    timber_entries, _ = _assign_member_keys(frame)
+    wanted = list(member_keys or [])
+    by_key = {entry["memberKey"]: entry for entry in timber_entries}
+    entries = [by_key[key] for key in wanted if key in by_key]
+
+    if len(entries) == 1:
+        viewports = _long_face_viewports(entries[0], page)
+        preview_rect = _LONG_FACE_RECTS["preview"]
+    else:
+        # No selection is treated as the whole frame, so asking for a drawing
+        # before selecting anything gives you something rather than nothing.
+        viewports = _world_elevation_viewports(entries or timber_entries, page)
+        preview_rect = _SELECTION_QUADRANTS["preview"]
+
+    members = [entry["memberKey"] for entry in entries]
+    for viewport in viewports:
+        viewport["members"] = members or None
+        viewport["ghostOthers"] = True
+        viewport["measurements"] = []
+    viewports.append(_preview_viewport(preview_rect))
+
+    return {
+        "id": SELECTION_DRAWING_ID,
+        "page": page,
         # A drawing shows no camera gizmos.
         "cameraControls": [],
         "viewports": viewports,
@@ -1724,6 +1934,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_member", "find_csg_at_point", "find_csg_by_path",
             "get_layers_tree", "get_csg_tree",
             "get_default_drawing_for_debugging",
+            "create_drawing_from_selection",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
             "shutdown",
@@ -3002,6 +3213,11 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         frame_payload = serialize_frame(ss.frame)
         frame_payload["renderParameters"] = _serialize_render_parameters_for_slot(ss)
         return state, make_success_response(request_id, command, frame_payload), False
+
+    if command == "create_drawing_from_selection":
+        ss = _resolve_slot(state, payload)
+        drawing = create_drawing_from_selection(ss.frame, payload.get("member_keys") or [])
+        return state, make_success_response(request_id, command, {"scenes": [drawing]}), False
 
     if command == "get_default_drawing_for_debugging":
         # Testing scaffolding; see build_default_drawing_for_debugging. Kept out

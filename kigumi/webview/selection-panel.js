@@ -149,6 +149,31 @@ export class SelectionPanel {
             this.expanded = !this.expanded;
             this.updateInfo(this.app.currentFrameData);
         });
+
+        // Getting into and out of a drawing lives in the header rather than the
+        // body: the body is collapsed by default, and a way out of a drawing
+        // that can be collapsed is a trap.
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'ip-action';
+        const inDrawing = this.app.isInDrawing;
+        action.textContent = inDrawing
+            ? this.t('viewer.selection.leaveDrawing')
+            : this.t('viewer.selection.drawSelection');
+        action.title = inDrawing
+            ? this.t('viewer.selection.leaveDrawing.title')
+            : this.t('viewer.selection.drawSelection.title');
+        // Drawing nothing means drawing the whole frame, which is a reasonable
+        // thing to ask for, so this stays enabled with an empty selection.
+        action.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (inDrawing) {
+                this.app.leaveDrawing();
+            } else {
+                this.app.drawSelection();
+            }
+        });
+        header.appendChild(action);
         panel.appendChild(header);
 
         const body = document.createElement('div');

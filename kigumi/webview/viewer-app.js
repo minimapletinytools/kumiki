@@ -27,7 +27,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, tiltExceeded, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, tiltExceeded, sceneMembers, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
 const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
@@ -2428,10 +2428,12 @@ class KigumiViewerApp extends LitElement {
         }
 
         if (message.type === 'scenes') {
-            const ids = this.sceneStore.setScenes(message.payload && message.payload.scenes);
-            // Requested only by the debug drawing toggle, so switch to what
-            // came back rather than making the user pick from a list of one.
-            if (this.debugDrawingEnabled && ids.length > 0) {
+            const payload = message.payload || {};
+            const ids = this.sceneStore.setScenes(payload.scenes);
+            // Scenes are only ever asked for in order to be entered -- by the
+            // draw-selection button or the debug toggle -- so go to what came
+            // back rather than making the user pick from a list of one.
+            if (ids.length > 0 && (payload.enter || this.debugDrawingEnabled)) {
                 this.setActiveScene(ids[0]);
             }
             return;
@@ -3165,6 +3167,15 @@ class KigumiViewerApp extends LitElement {
             const selected = visualContext.subselectionTimberKey === memberKey;
             name = selected ? 'selected' : 'ghost';
             opacity = selected ? policy.selectedTimberOpacity : policy.dimmedOpacity;
+        }
+
+        // A drawing is about the members it names; the rest of the frame is
+        // there for context and is ghosted whatever the selection says. The
+        // 3D scene names nobody, so this does nothing there.
+        const drawnMembers = this.activeSceneMembers;
+        if (name !== 'hidden' && drawnMembers && !drawnMembers.has(memberKey)) {
+            name = 'ghost';
+            opacity = policy.dimmedOpacity;
         }
 
         const profile = this.resolveRenderProfile(bundle.profileId);
@@ -5094,6 +5105,11 @@ class KigumiViewerApp extends LitElement {
         camera.updateProjectionMatrix();
     }
 
+    /** The members this scene is about, or null when it is about all of them. */
+    get activeSceneMembers() {
+        return sceneMembers(this.sceneStore.activeScene());
+    }
+
     /** The sheet this scene is laid out on, or null when the canvas is it. */
     get activePage() {
         return this.sceneStore.activeScene().page;
@@ -5207,8 +5223,39 @@ class KigumiViewerApp extends LitElement {
         this.rebuildViewports();
         this.syncCameraControls();
         this.applySceneBackground();
+        // What is ghosted follows the scene: a drawing dims everything it is
+        // not about, and leaving one puts the frame back.
+        this.applySelectionOpacity();
         this.updateCamera();
         this.requestUpdate();
+    }
+
+    /**
+     * Draw the current selection: ask python for a sheet and go to it.
+     *
+     * The layout is python's to decide -- one timber becomes its four long
+     * faces, which needs the timber's own axes -- so this sends the selection
+     * and renders whatever comes back.
+     */
+    drawSelection() {
+        if (!vscode) {
+            return;
+        }
+        vscode.postMessage({
+            type: 'requestDrawingFromSelection',
+            memberKeys: this.selectionManager.getSelectedTimbers(),
+        });
+    }
+
+    /** Back to the 3D scene, leaving the drawing where it was. */
+    leaveDrawing() {
+        this.debugDrawingEnabled = false;
+        this.setActiveScene(DEFAULT_SCENE_ID);
+    }
+
+    /** Whether the viewer is currently looking at a drawing rather than the model. */
+    get isInDrawing() {
+        return this.sceneStore.activeSceneId !== DEFAULT_SCENE_ID;
     }
 
     /**

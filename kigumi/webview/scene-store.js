@@ -279,6 +279,30 @@
         };
     }
 
+    /**
+     * Every member the scene is *about*, or null when that is all of them.
+     *
+     * A scene holds every timber either way. The ones outside this set are
+     * context: drawn, ghosted, and not what the drawing is of. Viewports that
+     * name nobody are ignored rather than counted as "everyone", or a drawing's
+     * free preview would quietly widen the sheet to the whole frame.
+     */
+    function sceneMembers(scene) {
+        const named = ((scene && scene.viewports) || [])
+            .map((viewport) => viewport.members)
+            .filter((members) => Array.isArray(members));
+        if (named.length === 0) {
+            return null;
+        }
+        const all = new Set();
+        for (const list of named) {
+            for (const key of list) {
+                all.add(key);
+            }
+        }
+        return all;
+    }
+
     /** The scene the viewer starts in: one full-canvas viewport, free camera. */
     function defaultSceneSpec() {
         return normalizeScene({
@@ -469,6 +493,7 @@
         PROJECTIONS,
         defaultSceneSpec,
         normalizeScene,
+        sceneMembers,
         isOrthogonalFrame,
         orbitDistanceForExtent,
         firstLoadCameraPlan,

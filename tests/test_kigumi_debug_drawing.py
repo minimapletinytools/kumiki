@@ -151,16 +151,42 @@ class TestDefaultDebugDrawing:
             assert abs(target[2] - 0.5) < 1e-9
 
     def test_the_extent_covers_the_model_on_both_screen_axes(self):
-        # A frame far wider than it is tall: the plan view's extent has to come
-        # from the width, or half the frame falls outside the viewport.
+        # A frame far wider than it is tall. The extent is a half-*height* and
+        # the viewer widens the frustum by the viewport's aspect, so what has to
+        # hold is that the model fits once that widening is applied -- asserting
+        # the height alone covers the width would demand a view 1.4x too tall.
         drawing = _drawing(
             _post(create_v3(mm(0), mm(0), mm(0))),
             _post(create_v3(mm(4000), mm(0), mm(0))),
         )
+        page = drawing["page"]
 
-        by_id = {viewport["id"]: viewport["camera"] for viewport in _orthographic_viewports(drawing)}
-        assert by_id["top"]["extent"] >= 2.05  # half of 4100mm
-        assert by_id["front"]["extent"] >= 2.05
+        # The model's half-extents: x spans -50..4050mm, y -50..50, z 0..1000.
+        half = (2.05, 0.05, 0.5)
+
+        def reaches(axis):
+            """How far the model reaches along a screen axis."""
+            return sum(abs(axis[i]) * half[i] for i in range(3))
+
+        for viewport in _orthographic_viewports(drawing):
+            camera = viewport["camera"]
+            aspect = (viewport["rect"][2] * page["width"]) / (viewport["rect"][3] * page["height"])
+            # Whatever the model reaches across the screen must fit the width,
+            # and what it reaches up the screen must fit the height. The third
+            # axis is depth and does not have to fit anything.
+            assert camera["extent"] * aspect >= reaches(camera["right"])
+            assert camera["extent"] >= reaches(camera["up"])
+
+    def test_a_wide_model_is_not_framed_as_if_it_were_tall(self):
+        # The bug the aspect fixes: a 4m-wide, 1m-tall frame in a landscape
+        # viewport needs no more height than the model has.
+        drawing = _drawing(
+            _post(create_v3(mm(0), mm(0), mm(0))),
+            _post(create_v3(mm(4000), mm(0), mm(0))),
+        )
+        front = next(v for v in _orthographic_viewports(drawing) if v["id"] == "front")
+
+        assert front["camera"]["extent"] < 2.0
 
     def test_the_extent_leaves_a_margin(self):
         drawing = _drawing(_post(create_v3(mm(0), mm(0), mm(0))))
@@ -181,3 +207,143 @@ class TestDefaultDebugDrawing:
 
         for viewport in _orthographic_viewports(drawing):
             assert viewport["members"] is None
+
+
+def _beam(bottom_position, length=mm(2400), size=create_v2(mm(100), mm(200))):
+    """A timber lying along +X, so its own axes differ from the world's."""
+    return create_timber(
+        bottom_position=bottom_position,
+        length=length,
+        size=size,
+        length_direction=create_v3(1, 0, 0),
+        width_direction=create_v3(0, 1, 0),
+        ticket="beam",
+    )
+
+
+def _selection(timbers, keys):
+    return runner.create_drawing_from_selection(_frame(*timbers), keys)
+
+
+class TestDrawingFromSelection:
+    def test_one_timber_gets_its_four_long_faces_and_a_preview(self):
+        # The shop drawing for a single piece: every long side, rolled out.
+        drawing = _selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"])
+
+        assert [v["id"] for v in drawing["viewports"]] == ["front", "right", "back", "left", "preview"]
+
+    def test_the_four_faces_look_at_four_different_sides(self):
+        drawing = _selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"])
+
+        looks = [tuple(v["camera"]["look"]) for v in _orthographic_viewports(drawing)]
+        assert len(set(looks)) == 4
+        # Opposite faces, so the four directions cancel out.
+        for axis in range(3):
+            assert abs(sum(look[axis] for look in looks)) < 1e-9
+
+    def test_each_face_view_runs_the_length_across_the_page(self):
+        # A piece is drawn lying down, not standing up: its length is the
+        # screen's horizontal, whatever the timber's orientation in the world.
+        beam = _beam(create_v3(mm(0), mm(0), mm(0)))
+        drawing = _selection([beam], ["beam#0"])
+
+        for viewport in _orthographic_viewports(drawing):
+            assert viewport["camera"]["right"] == [1.0, 0.0, 0.0]
+
+    def test_the_face_views_are_square_on_to_their_face(self):
+        # Looking along the face normal, so the face is drawn true and not
+        # foreshortened -- otherwise a measurement off it means nothing.
+        drawing = _selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"])
+
+        for viewport in _orthographic_viewports(drawing):
+            camera = viewport["camera"]
+            assert abs(_dot(camera["look"], camera["right"])) < 1e-9
+            expected = [-component for component in camera["look"]]
+            assert all(
+                abs(a - b) < 1e-9
+                for a, b in zip(_cross(camera["right"], camera["up"]), expected)
+            )
+
+    def test_a_long_piece_is_framed_by_its_length_not_squashed(self):
+        # The strips are much wider than they are tall, so the extent has to
+        # come from the length divided by that aspect. Ignoring the aspect
+        # frames a 2.4m beam as though it needed 2.4m of height.
+        beam = _beam(create_v3(mm(0), mm(0), mm(0)))
+        drawing = _selection([beam], ["beam#0"])
+        page = drawing["page"]
+
+        for viewport in _orthographic_viewports(drawing):
+            rect = viewport["rect"]
+            aspect = (rect[2] * page["width"]) / (rect[3] * page["height"])
+            half_width = viewport["camera"]["extent"] * aspect
+            assert half_width >= 1.2, "the beam's half length must fit across"
+            assert viewport["camera"]["extent"] < 0.5, "and not be framed as if it were tall"
+
+    def test_several_members_are_drawn_as_world_elevations(self):
+        # No single piece for the sheet to be about, so it falls back to the
+        # views that describe an assembly.
+        timbers = [_beam(create_v3(mm(0), mm(0), mm(0))), _post(create_v3(mm(0), mm(0), mm(0)))]
+        drawing = _selection(timbers, ["beam#0", "post#0"])
+
+        assert [v["id"] for v in drawing["viewports"]] == ["front", "top", "right", "preview"]
+
+    def test_the_drawing_names_the_members_it_is_about(self):
+        timbers = [_beam(create_v3(mm(0), mm(0), mm(0))), _post(create_v3(mm(0), mm(0), mm(0)))]
+        drawing = _selection(timbers, ["post#0"])
+
+        for viewport in _orthographic_viewports(drawing):
+            assert viewport["members"] == ["post#0"]
+            assert viewport["ghostOthers"] is True
+
+    def test_it_frames_only_the_selection_not_the_whole_frame(self):
+        # The far timber must not drag the view out to include it.
+        near = _post(create_v3(mm(0), mm(0), mm(0)))
+        far = _post(create_v3(mm(20000), mm(0), mm(0)))
+        drawing = _selection([near, far], ["post#0"])
+
+        for viewport in _orthographic_viewports(drawing):
+            assert viewport["camera"]["target"][0] < 1.0
+
+    def test_an_unknown_member_key_is_ignored_rather_than_fatal(self):
+        drawing = _selection([_post(create_v3(mm(0), mm(0), mm(0)))], ["post#0", "ghost#7"])
+
+        assert [v["members"] for v in _orthographic_viewports(drawing)][0] == ["post#0"]
+
+    def test_no_selection_draws_the_whole_frame(self):
+        # Asking for a drawing before selecting anything gives something.
+        drawing = _selection([_post(create_v3(mm(0), mm(0), mm(0)))], [])
+
+        assert len(_orthographic_viewports(drawing)) == 3
+        assert _orthographic_viewports(drawing)[0]["members"] is None
+
+    def test_it_is_laid_out_on_a_sheet_with_a_free_preview(self):
+        drawing = _selection([_post(create_v3(mm(0), mm(0), mm(0)))], ["post#0"])
+        preview = drawing["viewports"][-1]
+
+        assert drawing["page"]["width"] > 0
+        assert preview["id"] == "preview"
+        assert preview["locked"] is False
+        assert preview["projection"] == "perspective"
+
+    def test_a_drawing_shows_no_camera_gizmos(self):
+        assert _selection([_post(create_v3(mm(0), mm(0), mm(0)))], ["post#0"])["cameraControls"] == []
+
+    def test_it_frames_the_finished_piece_not_the_stock(self):
+        # A timber with an end joint is not cut to length first, so centring a
+        # view on its stock leaves the piece off centre by whatever the joint
+        # took off. The assembly fixture's post is 1000mm of stock cut at 900.
+        import importlib.util as _ilu
+
+        spec = _ilu.spec_from_file_location(
+            "assembly_fixture",
+            Path(__file__).resolve().parent.parent / "kigumi" / "test-fixtures" / "assembly_frame.py",
+        )
+        module = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        frame = module.build_frame()
+
+        drawing = runner.create_drawing_from_selection(frame, ["A#0"])
+
+        # The post runs 0..900mm in z once cut, so the views centre on 450mm.
+        for viewport in _orthographic_viewports(drawing):
+            assert abs(viewport["camera"]["target"][2] - 0.45) < 1e-6
