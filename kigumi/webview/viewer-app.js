@@ -1368,7 +1368,7 @@ class KigumiViewerApp extends LitElement {
                         </button>`
                     : ''}
                 <canvas id="c"></canvas>
-                <div id="loading-overlay" class=${this.isOverlayVisible() ? 'visible' : ''}>
+                <div id="loading-overlay" class=${this.overlayClasses()}>
                     <div id="loading-text">${this.viewState.loadingText}</div>
                     <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
                 </div>
@@ -4719,29 +4719,24 @@ class KigumiViewerApp extends LitElement {
         return this.viewState.phase !== ViewerPhase.READY;
     }
 
+    overlayClasses() {
+        return [
+            this.isOverlayVisible() ? 'visible' : '',
+            this.viewState.phase === ViewerPhase.ERROR ? 'error' : '',
+        ].filter(Boolean).join(' ');
+    }
+
     setViewState(nextPartial) {
         this.viewState = {
             ...this.viewState,
             ...nextPartial,
         };
-
-        const overlay = this.renderRoot && this.renderRoot.querySelector
-            ? this.renderRoot.querySelector('#loading-overlay')
-            : null;
-        if (overlay) {
-            const textEl = overlay.querySelector('#loading-text');
-            if (textEl) {
-                textEl.textContent = this.viewState.loadingText;
-            } else {
-                overlay.textContent = this.viewState.loadingText;
-            }
-            overlay.classList.toggle('visible', this.isOverlayVisible());
-            overlay.classList.toggle('error', this.viewState.phase === ViewerPhase.ERROR);
-            const btn = overlay.querySelector('#output-btn');
-            if (btn) {
-                btn.style.display = this.viewState.showOutputLink ? 'block' : 'none';
-            }
-        }
+        // The overlay is bound in the template. viewState is a plain field, so
+        // it schedules nothing on its own -- ask for a render rather than
+        // pushing the values into the DOM by hand. Writing textContent over a
+        // binding removes the markers Lit updates through, and every later
+        // render of that part throws on the detached node.
+        this.requestUpdate();
     }
 
     setViewPhase(phase, loadingText = null, extra = {}) {

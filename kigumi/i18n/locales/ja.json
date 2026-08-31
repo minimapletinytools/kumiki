@@ -1,7 +1,6 @@
 {
   "common.enabled": "有効",
   "common.disabled": "無効",
-
   "viewer.options.ariaLabel": "ビューアーオプション",
   "viewer.options.centerGizmo": "中心ギズモ",
   "viewer.options.units.label": "単位",
@@ -36,7 +35,6 @@
   "viewer.options.theme.label": "テーマ",
   "viewer.options.saveSettings": "設定を保存",
   "viewer.options.saveSettings.title": "現在のビューアーオプションを .kigumi/kigumi-settings.json に保存します",
-
   "viewer.options.export.ariaLabel": "エクスポートオプション",
   "viewer.options.export.subtitle": "エクスポートオプション",
   "viewer.options.export.stl": "stl",
@@ -51,7 +49,6 @@
   "viewer.options.export.installCadquery": "STEPエクスポート用にcadqueryをインストール",
   "viewer.options.export.installingCadquery": "cadqueryをインストール中...",
   "viewer.options.export.installCadquery.title": "STEPエクスポート用に cadquery-ocp をインストールします",
-
   "viewer.themes.cream": "クリーム",
   "viewer.themes.sky": "スカイ",
   "viewer.themes.forestMist": "フォレストミスト",
@@ -61,7 +58,6 @@
   "viewer.themes.tide": "タイド",
   "viewer.themes.sunbeam": "サンビーム",
   "viewer.themes.slateNight": "スレートナイト",
-
   "viewer.frameParams.ariaLabel": "フレームパラメーター",
   "viewer.frameParams.title": "フレームパラメーター",
   "viewer.frameParams.changesDetected": "変更が検出されました",
@@ -69,7 +65,6 @@
   "viewer.frameParams.refresh.title": "現在のパラメーター値で更新します",
   "viewer.frameParams.empty": "このフレームまたはパターンで公開されているパラメーターはありません。",
   "viewer.frameParams.optionalDisabledValue": "なし",
-
   "viewer.chrome.toV3d": "3Dビューへ戻る",
   "viewer.chrome.toV3d.title": "先頭へスクロールして戻る",
   "viewer.chrome.loading.startingViewer": "ビューアーを起動中",
@@ -94,7 +89,6 @@
   "viewer.contextMenu.exportStep": "STEPとしてエクスポート",
   "viewer.chrome.navHint.leftClick": "左/右ドラッグで回転 • 中ドラッグでパン • スクロールでズーム • Fでフォーカス",
   "viewer.chrome.navHint.rightClick": "右ドラッグで回転 • 中ドラッグでパン • スクロールでズーム • Fでフォーカス",
-
   "viewer.memberList.title": "部材リスト",
   "viewer.memberList.ariaLabel": "部材リストオプション",
   "viewer.memberList.opt.roughLength": "概算長さを表示 (実寸 + {allowance})",
@@ -115,22 +109,21 @@
   "viewer.memberList.table.type": "種類",
   "viewer.memberList.table.name": "名前",
   "viewer.memberList.table.tags": "タグ",
-  "viewer.memberList.table.length": "長さ(実寸)",
-  "viewer.memberList.table.width": "幅",
-  "viewer.memberList.table.height": "高さ",
-
+  "viewer.memberList.table.lengthExact": "長さ(実寸)",
+  "viewer.memberList.table.lengthRough": "長さ(粗取り)",
+  "viewer.memberList.table.widthPerfect": "幅(仕上)",
+  "viewer.memberList.table.widthNominal": "幅(呼び)",
+  "viewer.memberList.table.heightPerfect": "高さ(仕上)",
+  "viewer.memberList.table.heightNominal": "高さ(呼び)",
   "viewer.log.title": "ログ出力",
   "viewer.log.filter.placeholder": "フィルター…",
   "viewer.log.clear": "クリア",
   "viewer.log.openOutput": "VS Codeの出力を開く",
-
   "viewer.rawOutput.title": "Python生出力",
-
   "viewer.assembly.ariaLabel": "組み立てプレビュータイムライン",
   "viewer.assembly.solving": "分解方法を計算中…",
   "viewer.assembly.assembled": "組み立て済み",
   "viewer.assembly.disassembled": "分解済み",
-
   "viewer.layers.expand.title": "レイヤーを展開",
   "viewer.layers.collapse.title": "レイヤーを折りたたむ",
   "viewer.layers.toggleLabel": "部材リスト",
@@ -151,7 +144,6 @@
   "viewer.layers.csg.loading": "読み込み中…",
   "viewer.layers.csg.empty": "CSG なし",
   "viewer.layers.csg.cutOn": "{timber} · 切断 {cut}",
-
   "viewer.selection.header": "選択",
   "viewer.selection.tags": "タグ",
   "viewer.selection.counts": "材 ({selectedTimbers}/{timbers})  金物 ({selectedAccessories}/{accessories})",
@@ -163,7 +155,6 @@
   "viewer.selection.normal": "外向き法線",
   "viewer.selection.approximatelyFacing": "おおよそ {face} 向き",
   "viewer.selection.facesToward": "向き",
-
   "sidebar.kumikiDevMode": "Kumiki開発モード",
   "sidebar.kumikiDevMode.desc": "kumikiリポジトリを検出しました",
   "sidebar.initializingProject": "プロジェクトを初期化中...",
@@ -207,7 +198,6 @@
   "sidebar.mainBadge": "main",
   "sidebar.patternCount.singular": "{count} 件のパターン",
   "sidebar.patternCount.plural": "{count} 件のパターン",
-
   "message.kigumiError": "Kigumiエラー: {error}",
   "message.openCurrentFileFailed": "現在のファイルを開けませんでした: {error}",
   "message.autoRefreshToggled": "ファイル変更時の自動更新を{state}にしました。",
@@ -248,7 +238,6 @@
   "message.currentFileNotPython": "現在のファイルはPythonファイルではありません!",
   "message.noFilePathProvided": "ファイルパスが指定されていません。",
   "message.runnerNotRunning": "Kigumiランナーが実行されていません。",
-
   "message.selectExportFormat": "少なくとも1つのエクスポート形式を選択してください。",
   "message.enableExportMode": "結合ファイルまたは個別ファイルの出力を有効にしてください。",
   "message.cadqueryInstalled": "STEPエクスポート用にcadquery-ocpをインストールしました。",

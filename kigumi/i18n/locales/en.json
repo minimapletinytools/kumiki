@@ -1,7 +1,6 @@
 {
   "common.enabled": "enabled",
   "common.disabled": "disabled",
-
   "viewer.options.ariaLabel": "Viewer options",
   "viewer.options.centerGizmo": "center gizmo",
   "viewer.options.units.label": "units",
@@ -36,7 +35,6 @@
   "viewer.options.theme.label": "theme",
   "viewer.options.saveSettings": "save settings",
   "viewer.options.saveSettings.title": "Save current viewer options to .kigumi/kigumi-settings.json",
-
   "viewer.options.export.ariaLabel": "Export options",
   "viewer.options.export.subtitle": "export options",
   "viewer.options.export.stl": "stl",
@@ -51,7 +49,6 @@
   "viewer.options.export.installCadquery": "install cadquery for step export",
   "viewer.options.export.installingCadquery": "installing cadquery...",
   "viewer.options.export.installCadquery.title": "Install cadquery-ocp for STEP export",
-
   "viewer.themes.cream": "Cream",
   "viewer.themes.sky": "Sky",
   "viewer.themes.forestMist": "Forest Mist",
@@ -61,7 +58,6 @@
   "viewer.themes.tide": "Tide",
   "viewer.themes.sunbeam": "Sunbeam",
   "viewer.themes.slateNight": "Slate Night",
-
   "viewer.frameParams.ariaLabel": "Frame parameters",
   "viewer.frameParams.title": "frame parameters",
   "viewer.frameParams.changesDetected": "changes detected",
@@ -69,7 +65,6 @@
   "viewer.frameParams.refresh.title": "Refresh using current parameter values",
   "viewer.frameParams.empty": "No parameters exposed by this frame or pattern.",
   "viewer.frameParams.optionalDisabledValue": "none",
-
   "viewer.chrome.toV3d": "to v3d view",
   "viewer.chrome.toV3d.title": "Scroll back to top",
   "viewer.chrome.loading.startingViewer": "starting viewer",
@@ -94,7 +89,6 @@
   "viewer.contextMenu.exportStep": "export as step",
   "viewer.chrome.navHint.leftClick": "left/right drag orbit • middle drag pan • scroll zoom • F focus",
   "viewer.chrome.navHint.rightClick": "right drag orbit • middle drag pan • scroll zoom • F focus",
-
   "viewer.memberList.title": "Member List",
   "viewer.memberList.ariaLabel": "Member list options",
   "viewer.memberList.opt.roughLength": "show rough length (exact + {allowance})",
@@ -115,22 +109,21 @@
   "viewer.memberList.table.type": "Type",
   "viewer.memberList.table.name": "Name",
   "viewer.memberList.table.tags": "Tags",
-  "viewer.memberList.table.length": "Length (Exact)",
-  "viewer.memberList.table.width": "Width",
-  "viewer.memberList.table.height": "Height",
-
+  "viewer.memberList.table.lengthExact": "Length (Exact)",
+  "viewer.memberList.table.lengthRough": "Length (Rough)",
+  "viewer.memberList.table.widthPerfect": "Width (Perfect)",
+  "viewer.memberList.table.widthNominal": "Width (Nominal)",
+  "viewer.memberList.table.heightPerfect": "Height (Perfect)",
+  "viewer.memberList.table.heightNominal": "Height (Nominal)",
   "viewer.log.title": "Log Output",
   "viewer.log.filter.placeholder": "filter…",
   "viewer.log.clear": "clear",
   "viewer.log.openOutput": "open VS Code output",
-
   "viewer.rawOutput.title": "Raw Python Output",
-
   "viewer.assembly.ariaLabel": "Assembly preview timeline",
   "viewer.assembly.solving": "figuring out how to disassemble…",
   "viewer.assembly.assembled": "assembled",
   "viewer.assembly.disassembled": "disassembled",
-
   "viewer.layers.expand.title": "Expand layers",
   "viewer.layers.collapse.title": "Collapse layers",
   "viewer.layers.toggleLabel": "timber list",
@@ -151,7 +144,6 @@
   "viewer.layers.csg.loading": "loading…",
   "viewer.layers.csg.empty": "no CSG",
   "viewer.layers.csg.cutOn": "{timber} · cut {cut}",
-
   "viewer.selection.header": "Selection",
   "viewer.selection.tags": "tags",
   "viewer.selection.counts": "timbers ({selectedTimbers}/{timbers})  accessories ({selectedAccessories}/{accessories})",
@@ -163,7 +155,6 @@
   "viewer.selection.normal": "outward normal",
   "viewer.selection.approximatelyFacing": "approximately facing {face}",
   "viewer.selection.facesToward": "faces toward",
-
   "sidebar.kumikiDevMode": "Kumiki Dev Mode",
   "sidebar.kumikiDevMode.desc": "kumiki repo detected",
   "sidebar.initializingProject": "Initializing project...",
@@ -207,7 +198,6 @@
   "sidebar.mainBadge": "main",
   "sidebar.patternCount.singular": "{count} pattern",
   "sidebar.patternCount.plural": "{count} patterns",
-
   "message.kigumiError": "Kigumi error: {error}",
   "message.openCurrentFileFailed": "Open current file failed: {error}",
   "message.autoRefreshToggled": "Kigumi auto refresh on file change {state}.",
@@ -248,7 +238,6 @@
   "message.currentFileNotPython": "Current file is not a Python file!",
   "message.noFilePathProvided": "No file path provided.",
   "message.runnerNotRunning": "Kigumi runner is not running.",
-
   "message.selectExportFormat": "Select at least one export format.",
   "message.enableExportMode": "Enable combined and/or individual export.",
   "message.cadqueryInstalled": "Kigumi installed cadquery-ocp for STEP export.",

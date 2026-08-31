@@ -66,7 +66,7 @@ export class MemberListPanel {
                             <tr>
                                 <th>#</th><th>${t('viewer.memberList.table.type')}</th><th>${t('viewer.memberList.table.name')}</th>
                                 <th data-col="tags">${t('viewer.memberList.table.tags')}</th>
-                                <th data-col="length">${t('viewer.memberList.table.length')}</th><th data-col="width">${t('viewer.memberList.table.width')}</th><th data-col="height">${t('viewer.memberList.table.height')}</th>
+                                <th data-col="length">${t(this.options.showRoughLength ? 'viewer.memberList.table.lengthRough' : 'viewer.memberList.table.lengthExact')}</th><th data-col="width">${t(this.options.showNominalSizes ? 'viewer.memberList.table.widthNominal' : 'viewer.memberList.table.widthPerfect')}</th><th data-col="height">${t(this.options.showNominalSizes ? 'viewer.memberList.table.heightNominal' : 'viewer.memberList.table.heightPerfect')}</th>
                                 <th data-col="csg">${t('viewer.memberList.legend.csg.term')}</th><th data-col="feature">${t('viewer.memberList.legend.features.term')}</th>
                             </tr>
                         </thead>
@@ -91,6 +91,9 @@ export class MemberListPanel {
             }
             element.addEventListener('change', (event) => {
                 this.options[option] = Boolean(event.target.checked);
+                // The headings follow the options, so the template has to run
+                // again; the rows are ours to rebuild.
+                this.app.requestUpdate();
                 this.refresh();
             });
         }
@@ -178,23 +181,11 @@ export class MemberListPanel {
             return;
         }
 
+        // Which heading each column carries is a binding, not something to
+        // write here: setting textContent on a th would remove the markers Lit
+        // updates that heading through, and it was hardcoded English besides.
         table.classList.toggle('member-hide-tags', !this.options.showTags);
         table.classList.toggle('member-hide-csg', !this.options.showCsgFeatureCount);
-
-        const lengthHeader = table.querySelector('th[data-col="length"]');
-        if (lengthHeader) {
-            lengthHeader.textContent = this.options.showRoughLength ? 'Length (Rough)' : 'Length (Exact)';
-        }
-
-        const widthHeader = table.querySelector('th[data-col="width"]');
-        if (widthHeader) {
-            widthHeader.textContent = this.options.showNominalSizes ? 'Width (Nominal)' : 'Width (Perfect)';
-        }
-
-        const heightHeader = table.querySelector('th[data-col="height"]');
-        if (heightHeader) {
-            heightHeader.textContent = this.options.showNominalSizes ? 'Height (Nominal)' : 'Height (Perfect)';
-        }
     }
 }
 
