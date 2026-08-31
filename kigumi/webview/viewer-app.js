@@ -28,6 +28,7 @@ const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.Ki
 const { SceneStore, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
+const { PointerDrag, actionForButton, resolvePointer } = window.KigumiInput;
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -1198,12 +1199,7 @@ class KigumiViewerApp extends LitElement {
         }
 
 
-        this.mouseAction = null;
-        this.lastX = 0;
-        this.lastY = 0;
-        this.mouseDownButton = null;
-        this.mouseDownTarget = null;
-        this.mouseActionMoved = false;
+        this.pointerDrag = new PointerDrag();
 
         this.showCenterGizmo = true;
         this.footprintObjects = [];
@@ -1588,20 +1584,24 @@ class KigumiViewerApp extends LitElement {
         });
 
         canvas.addEventListener('mousedown', (event) => {
-            if (event.button === 2 || (event.button === 0 && this.leftClickDragRotatesCamera)) {
-                this.mouseAction = 'orbit';
-                this.cameraController.captureOrbitDragFrame();
-            } else if (event.button === 1) {
-                this.mouseAction = 'pan';
-            } else {
+            const action = actionForButton(event.button, this.leftClickDragRotatesCamera);
+            if (!action) {
                 return;
             }
+            // Dragging acts on the viewport it started in, so a press makes
+            // that one active before the camera moves.
+            this.focusViewportAt(event.clientX, event.clientY);
+            if (action === 'orbit') {
+                this.cameraController.captureOrbitDragFrame();
+            }
             event.preventDefault();
-            this.lastX = event.clientX;
-            this.lastY = event.clientY;
-            this.mouseDownButton = event.button;
-            this.mouseDownTarget = event.target;
-            this.mouseActionMoved = false;
+            this.pointerDrag.begin({
+                action,
+                button: event.button,
+                target: event.target,
+                x: event.clientX,
+                y: event.clientY,
+            });
             this.cameraController.cancelAnimation();
         });
 
@@ -2544,14 +2544,11 @@ class KigumiViewerApp extends LitElement {
     }
 
     onWindowMouseUp(event) {
-        const activeMouseAction = this.mouseAction;
-        const mouseDownButton = this.mouseDownButton;
-        const mouseDownTarget = this.mouseDownTarget;
-        const mouseActionMoved = this.mouseActionMoved;
-        this.mouseAction = null;
-        this.mouseDownButton = null;
-        this.mouseDownTarget = null;
-        this.mouseActionMoved = false;
+        const finished = this.pointerDrag.end();
+        const activeMouseAction = finished.action;
+        const mouseDownButton = finished.button;
+        const mouseDownTarget = finished.target;
+        const mouseActionMoved = finished.moved;
         const canvas = this.renderRoot && this.renderRoot.querySelector ? this.renderRoot.querySelector('#c') : null;
         if (!activeMouseAction && canvas && event.target === canvas) {
             this.handleCanvasClick(event);
@@ -2584,24 +2581,15 @@ class KigumiViewerApp extends LitElement {
     }
 
     onWindowMouseMove(event) {
-        if (!this.mouseAction) {
+        const drag = this.pointerDrag.move({ x: event.clientX, y: event.clientY });
+        if (!drag) {
             return;
         }
-        const dx = event.clientX - this.lastX;
-        const dy = event.clientY - this.lastY;
-        if (Math.abs(dx) + Math.abs(dy) > 2) {
-            this.mouseActionMoved = true;
+        if (drag.action === 'orbit') {
+            this.cameraController.applyOrbitDelta(drag.dx, drag.dy);
+        } else if (drag.action === 'pan') {
+            this.panCameraInViewPlane(drag.fromX, drag.fromY, drag.toX, drag.toY);
         }
-        if (this.mouseAction === 'orbit') {
-            this.cameraController.applyOrbitDelta(
-                dx,
-                dy,
-            );
-        } else if (this.mouseAction === 'pan') {
-            this.panCameraInViewPlane(this.lastX, this.lastY, event.clientX, event.clientY);
-        }
-        this.lastX = event.clientX;
-        this.lastY = event.clientY;
         this.cameraController.cancelAnimation();
         this.updateCamera();
     }
@@ -2659,24 +2647,52 @@ class KigumiViewerApp extends LitElement {
     // Raycasts from a client (screen) point and returns every visible, unlocked
     // member hit, nearest first. Shared by left-click selection and the
     // right-click context menu so both use identical hit-testing.
-    _findMembersAlongRay(clientX, clientY) {
-        const canvas = this.renderRoot.querySelector('#c');
+    /**
+     * The viewport a screen point is over, and where it is within it.
+     *
+     * Null when the point is off the canvas, or in a gap between viewports.
+     */
+    _resolvePointer(clientX, clientY) {
+        const canvas = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#c')
+            : null;
         if (!canvas) {
-            return [];
+            return null;
         }
         const rect = canvas.getBoundingClientRect();
-        if (
-            clientX < rect.left || clientX > rect.right ||
-            clientY < rect.top || clientY > rect.bottom
-        ) {
+        if (clientX < rect.left || clientX > rect.right
+            || clientY < rect.top || clientY > rect.bottom) {
+            return null;
+        }
+        return resolvePointer(
+            this.viewports,
+            clientX - rect.left,
+            clientY - rect.top,
+            rect.width,
+            rect.height,
+        );
+    }
+
+    /** Make the viewport under a point the one the camera controls act on. */
+    focusViewportAt(clientX, clientY) {
+        const resolved = this._resolvePointer(clientX, clientY);
+        if (resolved) {
+            this.activeViewportId = resolved.viewport.id;
+        }
+        return resolved;
+    }
+
+    _findMembersAlongRay(clientX, clientY) {
+        const resolved = this._resolvePointer(clientX, clientY);
+        if (!resolved) {
             return [];
         }
 
-        const normalizedX = ((clientX - rect.left) / rect.width) * 2 - 1;
-        const normalizedY = -(((clientY - rect.top) / rect.height) * 2 - 1);
-
-        this.navigationPointer.set(normalizedX, normalizedY);
-        this.navigationRaycaster.setFromCamera(this.navigationPointer, this.camera);
+        // Through the camera of the viewport the pointer is actually in: the
+        // same screen point means different things in each of a drawing's
+        // views.
+        this.navigationPointer.set(resolved.ndc.x, resolved.ndc.y);
+        this.navigationRaycaster.setFromCamera(this.navigationPointer, resolved.viewport.camera);
 
         return this.sceneManager.memberAtRay(this.navigationRaycaster, {
             isPickable: (memberKey) => !this.isMemberHidden(memberKey)
