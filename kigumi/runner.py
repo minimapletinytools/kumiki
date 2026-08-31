@@ -974,7 +974,12 @@ _DEBUG_DRAWING_VIEWS: List[Tuple[str, List[float], List[float], List[float]]] = 
     ("right", [0.0, 1.0, 0.0], [0.0, 0.0, 1.0], [-1.0, 0.0, 0.0]),
 ]
 
-# Quadrants, as normalized [x, y, width, height] with a top-left origin.
+# A3 landscape, in metres. Customizable per drawing in the real thing; this one
+# is scaffolding, so it just picks a common sheet.
+_DEBUG_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
+
+# Quadrants of the page, as normalized [x, y, width, height] with a top-left
+# origin.
 _DEBUG_DRAWING_RECTS: Dict[str, List[float]] = {
     "front": [0.0, 0.0, 0.5, 0.5],
     "top": [0.5, 0.0, 0.5, 0.5],
@@ -1081,6 +1086,9 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
 
     return {
         "id": "debug-default-drawing",
+        # The sheet these sit on. Rects above are fractions of it, so the four
+        # views tile an A3 page rather than the window.
+        "page": dict(_DEBUG_DRAWING_PAGE),
         # A drawing shows no camera gizmos.
         "cameraControls": [],
         "viewports": viewports,

@@ -1813,25 +1813,104 @@ class KigumiViewerApp extends LitElement {
         this.updateCamera();
     }
 
-    /** Draw every viewport of the active scene. */
+    /**
+     * Draw every viewport of the active scene.
+     *
+     * On a sheet this composites: the page underneath, then each viewport over
+     * it contributing only its geometry. Off a sheet -- the 3D scene -- it is
+     * the single full-canvas render it always was.
+     */
     renderViewports() {
         if (!this.renderer || !this.scene) {
             return;
         }
         const size = this.renderer.getSize(new THREE.Vector2());
         const pageRect = this.pageScreenRect(size.x, size.y);
-        const several = this.viewports.length > 1;
+        const onPaper = Boolean(this.sceneStore.activeScene().page);
+        if (onPaper) {
+            this.paintSheet(pageRect, size.y);
+        }
+        // A viewport on a sheet draws on nothing: clearing colour would erase
+        // the paper and any neighbour it overlaps, which is exactly what
+        // floating means. Depth is a different matter and must still go, or a
+        // viewport depth-tests against whatever the last one left and loses
+        // geometry behind a neighbour it has no spatial relationship to.
+        this.renderer.autoClear = !onPaper;
         // Scissoring costs nothing to skip while one viewport covers the
         // canvas, which is the 3D scene and every session before drawings.
-        this.renderer.setScissorTest(several);
+        const scissored = onPaper || this.viewports.length > 1;
+        this.renderer.setScissorTest(scissored);
         for (const viewport of this.viewports) {
             const rect = viewport.pixelRect(pageRect, size.y);
             this.renderer.setViewport(rect.x, rect.y, rect.width, rect.height);
-            if (several) {
+            if (scissored) {
                 this.renderer.setScissor(rect.x, rect.y, rect.width, rect.height);
+            }
+            if (onPaper) {
+                this.renderer.clearDepth();
             }
             this.renderer.render(this.scene, viewport.camera);
         }
+        this.renderer.autoClear = true;
+    }
+
+    /**
+     * The sheet, and the desk it lies on.
+     *
+     * Two scissored clears rather than any geometry: the page is a layer
+     * beneath the viewports, not something a camera renders. A paper texture,
+     * border or title block would go here, still beneath, still not a camera's
+     * business.
+     */
+    paintSheet(pageRect, canvasHeight) {
+        const colors = this.sheetColors();
+        this.renderer.setScissorTest(false);
+        this.renderer.setClearColor(colors.desk, 1);
+        this.renderer.clear(true, true, false);
+
+        this.renderer.setScissorTest(true);
+        this.renderer.setScissor(
+            Math.round(pageRect.x),
+            Math.round(canvasHeight - (pageRect.y + pageRect.height)),
+            Math.max(1, Math.round(pageRect.width)),
+            Math.max(1, Math.round(pageRect.height)),
+        );
+        this.renderer.setClearColor(colors.paper, 1);
+        this.renderer.clear(true, true, false);
+    }
+
+    /**
+     * Paper and the desk under it, following the theme for now.
+     *
+     * The plan expects per-drawing overrides eventually, and this is where they
+     * would land -- the sheet's appearance belongs to the page.
+     */
+    sheetColors() {
+        if (!this._sheetColors) {
+            const theme = THEMES[this.displayOptions.get('activeTheme')] || Object.values(THEMES)[0];
+            this._sheetColors = {
+                paper: new THREE.Color(theme.gradientTop),
+                desk: new THREE.Color(theme.gradientBottom).multiplyScalar(0.72),
+            };
+        }
+        return this._sheetColors;
+    }
+
+    /**
+     * Give the scene the background it should have.
+     *
+     * three paints a scene background as a full pass inside the active
+     * viewport, whatever the clear flags say, so on a sheet it would repaint
+     * the gradient over every neighbour and nothing would float. The page
+     * paints the paper there instead.
+     */
+    applySceneBackground() {
+        if (!this.scene) {
+            return;
+        }
+        this.scene.background = this.sceneStore.activeScene().page
+            ? null
+            : (this._themeBackground || null);
     }
 
     emitViewerLog(eventName, details = {}) {
@@ -3163,10 +3242,12 @@ class KigumiViewerApp extends LitElement {
         this.applyThemeUiTokens(theme);
         if (this.scene) {
             const tex = this._buildBackgroundTexture(theme);
-            if (this.scene.background && this.scene.background.isTexture) {
-                this.scene.background.dispose();
+            if (this._themeBackground && this._themeBackground.isTexture) {
+                this._themeBackground.dispose();
             }
-            this.scene.background = tex;
+            this._themeBackground = tex;
+            this._sheetColors = null;
+            this.applySceneBackground();
         }
         this.style.background = this._buildCssBg(theme);
         this.applyRenderProfilesToScene();
@@ -4879,10 +4960,21 @@ class KigumiViewerApp extends LitElement {
         const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) / 2 || 5;
         const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
         if (!hadExistingScene) {
-            this.cameraController.cx = this.focusedCx;
-            this.cameraController.cy = this.focusedCy;
-            this.cameraController.cz = this.focusedCz;
-            this.cameraController.orbitDist = radius / Math.sin(fovRad / 2) * 1.3;
+            // Frame every viewport that has nothing better to point at. A
+            // locked one has: its angle, target and extent are the drawing's,
+            // and fitting it to the model would quietly undo the elevation the
+            // drawing asked for. This ran on the active viewport alone, which
+            // is how a drawing's first viewport lost its declared framing.
+            for (const viewport of this.viewports) {
+                if (viewport.spec.locked) {
+                    continue;
+                }
+                const controller = viewport.cameraController;
+                controller.cx = this.focusedCx;
+                controller.cy = this.focusedCy;
+                controller.cz = this.focusedCz;
+                controller.orbitDist = radius / Math.sin(fovRad / 2) * 1.3;
+            }
         }
         this.lightDistance = Math.max(12, radius * 4);
         this.setCameraNearFar(Math.max(0.1, radius * 0.03), Math.max(200, radius * 20));
@@ -4991,18 +5083,20 @@ class KigumiViewerApp extends LitElement {
         this.updateOrthographicFrustum();
     }
 
-    // Applies near/far to both cameras (not just the active one) so the inactive
-    // projection is still correctly configured if the user toggles to it later.
+    /**
+     * Applies near/far to every camera of every viewport.
+     *
+     * Both projections, so the inactive one is still right if it is toggled
+     * to; and every viewport, not just the active one, or the rest of a
+     * drawing keeps the placeholder range it was built with.
+     */
     setCameraNearFar(near, far) {
-        if (this.perspectiveCamera) {
-            this.perspectiveCamera.near = near;
-            this.perspectiveCamera.far = far;
-            this.perspectiveCamera.updateProjectionMatrix();
-        }
-        if (this.orthographicCamera) {
-            this.orthographicCamera.near = near;
-            this.orthographicCamera.far = far;
-            this.orthographicCamera.updateProjectionMatrix();
+        for (const viewport of this.viewports) {
+            for (const camera of [viewport.perspectiveCamera, viewport.orthographicCamera]) {
+                camera.near = near;
+                camera.far = far;
+                camera.updateProjectionMatrix();
+            }
         }
     }
 
@@ -5013,6 +5107,7 @@ class KigumiViewerApp extends LitElement {
         }
         this.rebuildViewports();
         this.syncCameraControls();
+        this.applySceneBackground();
         this.updateCamera();
         this.requestUpdate();
     }

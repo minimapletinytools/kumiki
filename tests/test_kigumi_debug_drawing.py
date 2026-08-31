@@ -81,7 +81,14 @@ class TestDefaultDebugDrawing:
     def test_a_drawing_asks_for_no_camera_gizmos(self):
         assert _drawing(_post(create_v3(mm(0), mm(0), mm(0))))["cameraControls"] == []
 
-    def test_the_quadrants_tile_the_canvas(self):
+    def test_it_is_laid_out_on_a_sheet(self):
+        # A page with a real size is what lets a view state its scale.
+        page = _drawing(_post(create_v3(mm(0), mm(0), mm(0))))["page"]
+
+        assert page["width"] > 0 and page["height"] > 0
+        assert page["width"] > page["height"], "expected a landscape sheet"
+
+    def test_the_quadrants_tile_the_page(self):
         drawing = _drawing(_post(create_v3(mm(0), mm(0), mm(0))))
 
         rects = sorted(tuple(viewport["rect"]) for viewport in drawing["viewports"])
