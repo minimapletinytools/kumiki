@@ -1,7 +1,8 @@
 # Drawing mode — refactor plan
 
-Status: phases 1-7 landed on `drawing-mode-refactor`. The refactor is done; what
-remains is the feature work listed under Phases.
+Status: done and merged to main. All seven phases landed, plus the two defects
+they turned up (see Fixed along the way). What remains is the feature work
+listed at the end of Phases.
 
 Kigumi needs to render the same frame several ways at once: a drawing is a set of
 locked orthographic viewports over a subset of timbers, next to a live
@@ -137,32 +138,54 @@ not re-render — it raises the refresh-scene button — but a spurious button o
 every measurement edit is still wrong, and it would be a real 167 ms reload for
 anyone who turns auto-refresh on.
 
-## Known, not caused by the refactor
+## Fixed along the way
 
-The webview raises an unhandled rejection on every session:
+Two defects the refactor surfaced rather than caused. Both predate it; neither
+was visible until something started watching.
+
+**Writing over the text Lit renders.** boot-diagnostics.js caught an unhandled
+rejection on every session, six times a run:
 
 ```
-TypeError: Cannot set properties of null (setting 'data')   at o._ (viewer-app.js)
+TypeError: Cannot set properties of null (setting 'data')
 ```
 
-It surfaced the moment boot-diagnostics.js started listening, and it is not new:
-the same rejection appears six times per run without the phase 3 changes and
-three times with them. Nothing downstream notices -- the viewer boots, and every
-suite passes -- so it is left alone for now.
+That is Lit's `_commitText`, which updates a text binding by writing to the node
+after the part's start marker, and reads null when the marker has left the
+document. Two places wrote text into an element that held a binding, destroying
+the markers Lit updates through: `setViewState` pushed the loading overlay into
+the DOM by hand because `viewState` is a plain field that schedules no render,
+and the member list rewrote its column headings on every option change. The
+second was a live bug as well as noise -- the headings were hardcoded English,
+so a Japanese reader lost the translated string the moment the table drew. Both
+are bindings now. Six a run to none.
 
-The shape (setting `.data` on a null node, from minified Lit internals) reads
-like a part committing to a node that has already gone, which would make it an
-update racing teardown. Worth chasing when something depends on it, or when the
-panel extraction in phase 6 changes who owns those nodes.
+**An unfocused window stopping the viewer.** `waitForNextPaint` was awaited in a
+loop while geometry is applied and again before a screenshot, and
+requestAnimationFrame does not fire while the window is in the background. So
+alt-tabbing away mid-run did not slow the viewer down, it stopped it: the frame
+never finished loading and the capture never returned. Two tests asked for a
+screenshot with no timeout and sat there until mocha gave up 120s later, which
+read as a flaky suite for a long time. The wait now races the paint against a
+short timer, and those tests pass a real timeout.
 
-## Risks
+## Risks, and how they went
 
-Phase 2 is the dangerous one. Removing the camera forwarding shim touches around
-thirty call sites, and `updateCamera`, `onWindowResize`, `applySelectionOpacity`
-and `updateInfo` all assume a single camera. It is early on purpose: everything
-after it is easier once the camera belongs to a viewport.
+Phase 2 was called the dangerous one -- around thirty call sites, with
+`updateCamera`, `onWindowResize`, `applySelectionOpacity` and `updateInfo` all
+assuming a single camera -- and it was, though not where expected. The call
+sites were mechanical. What broke was framing: cameras were built with a
+placeholder aspect and only corrected on resize, so the first render came out
+stretched. The aspect maths moved into `scene-store` and got tested there.
 
-"No visible change" is also hard to prove. The extension suites catch a throw,
-not a subtly wrong render. Viewport count and active scene id go into the panel
-snapshot, and phase 2 lands as its own commit to be looked at before anything
-builds on it.
+"No visible change" being hard to prove was the accurate worry. The extension
+suites catch a throw, not a subtly wrong render, and three phases in a row
+booted to a blank webview with nothing in the log to say why. That is what
+boot-diagnostics.js is for; it earned itself back immediately, and every later
+failure named itself in the session log instead of presenting as a timeout.
+
+The lesson worth keeping: for anything about what is on screen, check the
+numbers rather than the picture. Phase 7 was verified by predicting where each
+elevation should place the model and measuring the capture against it, which is
+what showed the framing was exact -- and, earlier, what showed a suspected
+regression was a thresholding artifact in my own measurement.
