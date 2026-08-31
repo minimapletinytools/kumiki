@@ -260,6 +260,7 @@ DONE-add N/S/E/W labels to the cube
 DONE-show rough mesaurements in selectino view when eselecting single elemnts
 
 
+-zoom is backwards in drawing view
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
