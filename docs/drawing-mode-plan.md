@@ -131,6 +131,24 @@ not re-render — it raises the refresh-scene button — but a spurious button o
 every measurement edit is still wrong, and it would be a real 167 ms reload for
 anyone who turns auto-refresh on.
 
+## Known, not caused by the refactor
+
+The webview raises an unhandled rejection on every session:
+
+```
+TypeError: Cannot set properties of null (setting 'data')   at o._ (viewer-app.js)
+```
+
+It surfaced the moment boot-diagnostics.js started listening, and it is not new:
+the same rejection appears six times per run without the phase 3 changes and
+three times with them. Nothing downstream notices -- the viewer boots, and every
+suite passes -- so it is left alone for now.
+
+The shape (setting `.data` on a null node, from minified Lit internals) reads
+like a part committing to a node that has already gone, which would make it an
+update racing teardown. Worth chasing when something depends on it, or when the
+panel extraction in phase 6 changes who owns those nodes.
+
 ## Risks
 
 Phase 2 is the dangerous one. Removing the camera forwarding shim touches around
