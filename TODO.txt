@@ -1,6 +1,14 @@
 
-
 :: 8/28/2026 drawing mode
+
+lets focus in a it on where this is all leading too now hich is creating a drawing mode. 
+
+In drawing mode, there is a subset of timbers being renderd from multiple camera angles usually in orthographic mode (e.g. front/left/back/right orthogonal view + perspective preview) so we want to look into refactoring kigumi mode in preparation for this support. 
+
+Thus kigumi will need to support distinct views of the same data with distinct scene view states and esaily be able to switch between them. So this is at the core of the refactor we need to do. Don't be shy about refactoring code. the current code is rather carelessly written so be bold about proposing changes or just cleanin gup the existing code in general as the kigumi state is getting icreasingly big where better organizaiton is needed. Here are the notes for drawing mode, do some research to understand the problem better, ask me many questions, and we'll build a plan togethe.
+
+
+
 
 we want to support multiple views for planning and drawing in the same window
 
@@ -239,20 +247,28 @@ IGNORE/DONE-name all the rest of your joints
 DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a project?)
 DONE-don't show accesories in timber list ivew.. tehy should only show under jonits
 DONE-add cutcsglabels to build a butt
+IGNORE-feature listing in tree weirdness to sort out:
+DONE-finish cutcsg lables in relief.py
+DONE-test edge selection and in particular face face intersecting edges (doesn't seem to work)
+  -Derived edges still don't appear in the trees. I leaned toward omitting them, since they're computed per query from face pairs rather than declared on a node, so listing them per node would misrepresent them — but you never confirmed that.
+    -so maybe remove regular features from CSG tree. I don't think they show anyways? Also ok just to show them. you can add get_known_features which may not return all fetaures or something like that. 
+    -they never show up anyways right now, so this is moot
+  -in general this is a weird thing where we know the CSGtree statically, but only its features are knowwn when you click nad raycast, I think that's fine. the name feature can still show up undernearth the CSG tree it's a part of but it disappears when you unselect it.
+  -you can maybe consider an edge a sub feature of a named face feature,
+  -which feature does the edge belong to? what to show selected in the tree? (maybe just pick the deepest node, but show both trees in the selectino view)
+DONE-make select all the way down to feature the default behavior, and then ctrl clikc to select one level at a time (opposite of what it is right now)
+DONE-add N/S/E/W labels to the cube
+DONE-show rough mesaurements in selectino view when eselecting single elemnts
 
 
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
 
-
--finish cutcsg lables in relief.py
--test edge selection and in particular face face intersecting edges (doesn't seem to work)
 -add proper reference face/edge support to timbers
+  # TODO consider replacing with a list of reference long features taken in order of priority, with the first one being the main one that gets rendered as a red line?
+    reference_faces: Optional[tuple[str, ...]] = None
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
-
-
-
 
 
 -more selection related things
@@ -260,25 +276,12 @@ DONE-add cutcsglabels to build a butt
   -there are some redundant solid unions (only 1 element contained) that could be ad-hdoc skipped when click drilling into a timber
     -also consider disabling the 1 step at a time drilling into a feature, it's not really all that necessary.
   -should show perfect.face not rough.face if rough == perfect?
-  
-  
--feature listing in tree weirdness to sort out:
-  -Derived edges still don't appear in the trees. I leaned toward omitting them, since they're computed per query from face pairs rather than declared on a node, so listing them per node would misrepresent them — but you never confirmed that.
-  -in general this is a weird thing where we know the CSGtree statically, but only its features are knowwn when you click nad raycast, I think that's fine. the name feature can still show up undernearth the CSG tree it's a part of but it disappears when you unselect it.
-  -so maybe remove regular features from CSG tree. I don't think they show anyways? Also ok just to show them. you can add get_known_features which may not return all fetaures or something like that. 
-  -note currently it doesnt' show fetaures in the tree, it does add a solid (5) indicating there are 5 named features
-  -you can maybe consider an edge a sub feature of a named face feature,
-  -which feature does the edge belong to? what to show selected in the tree? (maybe just pick the deepest node, but show both trees in the selectino view)
-
-
--consider donig measurement mode (select 1 feature to enter measurement mode)
 
 -create halfspace decorative cut 
+  
 -make parameters human readable
 -fix tusk failing from other direction bug
 -label the gizmo lol
--add N/S/E/W labels to the cube
--show rough mesaurements in selectino view when eselecting single elemnts
 -create helper method for building cut timber from list of joints
 -house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
 

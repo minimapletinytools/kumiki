@@ -245,7 +245,11 @@ class TimberTicket(Ticket):
     """Ticket metadata for physical timber members."""
 
     material: Optional[str] = None
+
+    # TODO consider replacing with a list of reference long features taken in order of priority, with the first one being the main one that gets rendered as a red line?
     reference_faces: Optional[tuple[str, ...]] = None
+
+
     # Strings are coerced to GenericTag, the same way Timber's factories take
     # either a TimberTicket or a bare name.
     tags: tuple[TimberTag, ...] = ()
