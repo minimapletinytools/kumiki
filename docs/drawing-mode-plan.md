@@ -20,8 +20,8 @@ component, so this is a refactor before it is a feature.
   orbit gizmo and the rest; a drawing shows none.
 - A scene knows about **all** timbers. Its member list decides what is
   measurable; everything else is **ghosted by default**.
-- The 3D scene is a one-viewport unlocked scene, so it runs the same path as a
-  drawing rather than being a special case in the code.
+- The 3D scene is one unlocked viewport on a page that is the canvas, so it runs
+  the same path as a drawing rather than being a special case in the code.
 
 Layouts come from python. The viewer renders what it is told.
 
@@ -65,6 +65,20 @@ them is the whole change: a rect becomes a fraction of the **page**, and a
 viewer-local page transform (offset and scale) maps the page onto the canvas.
 Normalized fractions stay normalized, so the format is unchanged.
 
+A page has a real size, because drawings get printed, and that size is the
+drawing's to choose rather than a fixed menu of paper names:
+
+```json
+{ "page": { "width": 0.420, "height": 0.297 } }
+```
+
+Metres, the same unit as everything else on the wire; the viewer shows mm or
+inches per the units setting, and kumiki can offer A3/Letter/Arch-C as presets
+without the format knowing about them. `page: null` means "the canvas", which is
+what the default 3D scene wants -- one viewport filling whatever window it is
+given. So a scene is a page holding viewports either way, and the 3D scene stops
+being a special case in the code as well as in the prose.
+
 **Pan and zoom move the page, not a camera.** This is what makes the sheet feel
 like a sheet: zooming in enlarges the whole layout while every view keeps its
 drawing scale, exactly as moving your head closer to paper does not change what
@@ -75,6 +89,50 @@ projection depends on `extent` and aspect; a uniform page zoom preserves aspect,
 so no projection matrix changes and no camera moves. Page zoom is rect
 arithmetic and nothing else. A test that zooms the page and asserts every camera
 is untouched is the one worth writing, because it pins that property.
+
+### Scale is a consequence of a physical page
+
+Once the page has a size, the scale of a view is not something to store and keep
+consistent -- it is arithmetic. A viewport is `rect.height * page.height` metres
+tall on paper and shows `2 * extent` metres of world, so
+
+```
+scale = 2 * extent / (rect.height * page.height)
+```
+
+which means the viewer can label an elevation "1:20" without being told, and a
+drawing whose extent no longer matches its stated scale is not a state that can
+exist.
+
+It is worth having the relation run the other way too, because it matches how
+the drawing is actually thought about: nobody chooses 0.609 metres of extent,
+they choose 1:20 and let the view be what it is. So a viewport should be able to
+declare *either*
+
+- `extent` — fit this much of the model, whatever scale that lands on, which is
+  what a preview or the debug drawing wants; or
+- `scale` — draw at 1:20, and derive `extent` from the rect and the page.
+
+Both reduce to an extent before rendering, so nothing downstream cares which was
+written.
+
+### Aspect stops depending on the window
+
+A viewport's aspect follows from the page, not the canvas:
+
+```
+aspect = (rect.width * page.width) / (rect.height * page.height)
+```
+
+No canvas term. Resizing the window moves and scales the sheet, and changes
+nothing about any camera -- so for drawings the entire class of bug that phase 2
+hit, where a camera holds a stale aspect until the next resize, cannot happen.
+The canvas-relative form stays for `page: null`, where the window genuinely is
+the page.
+
+A sheet also has a fixed aspect while the window does not, so the page transform
+letterboxes: there is margin around the paper. That is correct, and it is what
+tells you at a glance that you are looking at a sheet rather than a viewport.
 
 ### Three kinds of movement, and only one is an edit
 
