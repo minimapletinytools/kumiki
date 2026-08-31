@@ -12,7 +12,10 @@ component, so this is a refactor before it is a feature.
 ## Terminology
 
 - **Scene** — one view of the data. Either the default 3D scene or a drawing.
-- **Viewport** — a rect within a scene, with its own camera. A scene has one or many.
+- **Page** — the sheet a drawing is laid out on. Viewports are rectangles on it.
+  The 3D scene is a page holding one viewport that fills it.
+- **Viewport** — a rect on the page, with its own camera. A scene has one or many,
+  and they may overlap.
 - A scene declares which **camera controls** exist. The 3D scene shows the cube,
   orbit gizmo and the rest; a drawing shows none.
 - A scene knows about **all** timbers. Its member list decides what is
@@ -42,6 +45,83 @@ needs, and measurement marks can be placed against those axes directly.
 
 Pan, zoom and drag-nudge live as viewer-local **deltas** on top of the locked
 angle. They are never sent back to python.
+
+## The page
+
+Proposed, not yet built. Nothing below changes the serialized format.
+
+A drawing is a sheet with views arranged on it, so there are four coordinate
+spaces and we currently name three:
+
+| space | what it is | owned by |
+|---|---|---|
+| world | the timbers, in metres | kumiki |
+| view | what one viewport's camera sees: orientation, target, `extent` | the drawing |
+| **page** | the sheet; viewports are rectangles on it | the drawing |
+| canvas | screen pixels | the viewer |
+
+`rect` is normalized to the *canvas* today, which fuses the last two. Separating
+them is the whole change: a rect becomes a fraction of the **page**, and a
+viewer-local page transform (offset and scale) maps the page onto the canvas.
+Normalized fractions stay normalized, so the format is unchanged.
+
+**Pan and zoom move the page, not a camera.** This is what makes the sheet feel
+like a sheet: zooming in enlarges the whole layout while every view keeps its
+drawing scale, exactly as moving your head closer to paper does not change what
+1:20 means.
+
+That falls out for free rather than needing to be arranged. An orthographic
+projection depends on `extent` and aspect; a uniform page zoom preserves aspect,
+so no projection matrix changes and no camera moves. Page zoom is rect
+arithmetic and nothing else. A test that zooms the page and asserts every camera
+is untouched is the one worth writing, because it pins that property.
+
+### Three kinds of movement, and only one is an edit
+
+| gesture | acts on | scope | goes back to python |
+|---|---|---|---|
+| pan, zoom | the page transform | whole sheet | no, viewer-local |
+| drag | tilt of the viewport under the cursor | one viewport, bounded | no, ephemeral |
+| reposition contents (later) | that viewport's `camera.target` | one viewport | **yes, it edits the drawing** |
+
+The last row is the one to keep separate. The first two are looking; the third
+changes what the drawing *is*, and belongs with the round-trip discipline
+described under Measurement round trips -- a small command against the loaded
+module, committed on release.
+
+This revises the hard lock. Locked means the declared angle is authoritative and
+that panning or zooming the page cannot disturb it, not that the camera is
+immovable: a bounded tilt rides on top of the declared angle and springs back to
+it. `orbitActiveViewport` refuses outright on a locked viewport today, which is
+where that becomes a tilt.
+
+### Overlap
+
+Viewports may overlap, so that a detail can sit over the corner of an elevation
+rather than claiming its own column. The list is ordered and later means on top.
+
+Both halves of that already hold, by accident rather than intent:
+`renderViewports` draws the list forward, so a later viewport paints over an
+earlier one, and `viewportAtPoint` walks it in reverse, so the topmost is picked
+first. Forward draw with reverse hit-test is exactly the convention overlap
+needs. It is undocumented and untested, and the reverse loop reads as arbitrary
+-- worth stating and pinning before anything relies on it.
+
+What overlap does need is a decision the code makes silently today: three.js
+clears each scissor region before drawing, so an overlapping viewport erases
+what is beneath it where they meet. That is right for an opaque inset and wrong
+for one meant to float over its neighbour, so a viewport has to say which it is.
+
+### Consequences worth remembering
+
+**Line weight becomes a property of the paper.** `LineMaterial` works in pixels,
+so edge lines currently stay a constant thickness on screen. On a sheet they
+should stay constant relative to the page and thicken as it is zoomed, or the
+drawing's line weights mean nothing.
+
+**Annotations live in page space.** A measurement attaches to a model feature
+but is drawn on the sheet, so its text and witness lines are page-space objects
+positioned from a world-space anchor. It is not a third camera.
 
 ## Modules
 
@@ -91,7 +171,9 @@ Each lands green on its own and changes nothing you can see.
    says it should, to within a pixel.
 
 Entering a drawing from a selection, the filtered layers panel, the leave button
-and measurements sit on top of this and are not part of the refactor.
+and measurements sit on top of this and are not part of the refactor. The page
+(see above) comes before them: pan and zoom belong to it, so building them
+against viewport cameras first would only have to be undone.
 
 ## Seams for what we are not building yet
 
