@@ -4775,9 +4775,17 @@ class KigumiViewerApp extends LitElement {
      * requestAnimationFrame stops firing while the window is unfocused or the
      * panel is hidden, and this is awaited in a loop while geometry is applied
      * and again before a screenshot, so waiting on a frame alone lets an
-     * unfocused window stall a frame load or a capture indefinitely. The timer
-     * yields to the event loop the same way, without waiting for a paint that
-     * may never come; when paints are happening it always wins the race.
+     * unfocused window stall a frame load or a capture indefinitely.
+     *
+     * Concretely, this is what lets you alt-tab away from the extension-host
+     * window while the automation tests run. Without the fallback those tests
+     * hang for as long as the window is in the background -- the frame never
+     * finishes loading and the capture never returns -- which reads as a flaky
+     * suite rather than as the suspended-paint problem it is.
+     *
+     * The timer yields to the event loop the same way, without waiting for a
+     * paint that may never come; when paints are happening it always wins the
+     * race, so the healthy path is unchanged.
      */
     waitForNextPaint() {
         return new Promise((resolve) => {
