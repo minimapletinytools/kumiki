@@ -48,7 +48,10 @@ angle. They are never sent back to python.
 
 ## The page
 
-Proposed, not yet built. Nothing below changes the serialized format.
+Built. The sheet renders, viewports float on it, pan and zoom move the page
+and a drag tilts a locked view within a bounded cone. What is not built yet:
+line weight still works in pixels rather than scaling with the paper, and
+nothing declares an overlapping viewport, so overlap is tested but unused.
 
 A drawing is a sheet with views arranged on it, so there are four coordinate
 spaces and we currently name three:
