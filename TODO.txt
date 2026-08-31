@@ -228,7 +228,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
-
 DONE-review feature referencing in kumiki
   DONE-create feature enum point/edge/face and support them
   DONE-CSGfeature class should return more info about the feature
@@ -273,6 +272,7 @@ DONE-show rough mesaurements in selectino view when eselecting single elemnts
 
 -more selection related things
   -selecting on face features visualy selects all faces that coincide with that one when extended to infinity, see if you can localize the visuall yselection...
+    -this also happens with edges (try selecting an edge on one of the plates in tinyhous120)
   -there are some redundant solid unions (only 1 element contained) that could be ad-hdoc skipped when click drilling into a timber
     -also consider disabling the 1 step at a time drilling into a feature, it's not really all that necessary.
   -should show perfect.face not rough.face if rough == perfect?
