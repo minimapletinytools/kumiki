@@ -26,6 +26,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
 const { SceneStore, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -177,38 +178,6 @@ const t = window.KigumiI18n.createTranslator(INITIAL_PAYLOAD.i18n && INITIAL_PAY
 
 // Deep enough to read against pale timbers on the light themes, where the
 // paler blues these used to be washed out into the stock.
-// The gizmo cube's faces in BoxGeometry's material order: +X, -X, +Y, -Y, +Z,
-// -Z. The compass line follows kumiki's own convention (see rule.py): +X points
-// east and +Y points north, which puts north on the BACK of the cube.
-const GIZMO_FACES = Object.freeze([
-    { lines: ['right', 'east', '+x'], background: '#c9d6ea' },
-    { lines: ['left', 'west', '-x'], background: '#bfcee4' },
-    { lines: ['back', 'north', '+y'], background: '#d6deee' },
-    { lines: ['front', 'south', '-y'], background: '#c4d2e8' },
-    { lines: ['top', '+z'], background: '#bccbe2' },
-    { lines: ['bottom', '-z'], background: '#b6c6df' },
-]);
-
-// Where the orbit gizmo's axis labels sit and what they look like. The colours
-// are its rings': each ring turns about one axis, so the label on that axis
-// reads as the ring's own.
-const ORBIT_GIZMO_AXIS_LABELS = Object.freeze([
-    { text: '+x', direction: [1, 0, 0], color: '#ff8fa3' },
-    { text: '+y', direction: [0, 1, 0], color: '#7fc8f8' },
-    { text: '+z', direction: [0, 0, 1], color: '#95d5b2' },
-]);
-// Just clear of the rings (radius 1.85 + tube 0.12), in the gizmo's own units.
-const ORBIT_GIZMO_LABEL_DISTANCE = 2.5;
-const ORBIT_GIZMO_LABEL_SCALE = 1.2;
-const ORBIT_GIZMO_LABEL_TEXTURE_PX = 128;
-
-const GIZMO_FACE_TEXTURE_PX = 256;
-// The stroked frame, and the gap kept between it and the text.
-const GIZMO_FACE_BORDER_INSET_PX = 16;
-const GIZMO_FACE_BORDER_WIDTH_PX = 10;
-const GIZMO_FACE_TEXT_GAP_PX = 8;
-const GIZMO_FACE_LINE_HEIGHT = 1.12;
-
 const CSG_HIGHLIGHT_COLORS = Object.freeze({
     tagged: 0x29b6f6,
     feature: 0x0288d1,
@@ -1265,10 +1234,9 @@ class KigumiViewerApp extends LitElement {
         this.gizmoMoved = false;
         this.gizmoLastX = 0;
         this.gizmoLastY = 0;
-        this.gizmoRenderer = null;
-        this.gizmoScene = null;
-        this.gizmoCamera = null;
-        this.gizmoCube = null;
+        // Built by setupCameraControls, and only when the scene asks for them.
+        this.cameraCube = null;
+        this.orbitGizmo = null;
         this.gizmoRaycaster = new THREE.Raycaster();
         this.gizmoPointer = new THREE.Vector2();
         this.navigationRaycaster = new THREE.Raycaster();
@@ -1542,9 +1510,9 @@ class KigumiViewerApp extends LitElement {
             this._layersView.removeEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
             this._layersView.removeEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
         }
-        if (this.gizmoRenderer) {
-            this.gizmoRenderer.dispose();
-            this.gizmoRenderer = null;
+        if (this.cameraCube) {
+            this.cameraCube.dispose();
+            this.cameraCube = null;
         }
         if (this.shadowCatcher) {
             this.scene.remove(this.shadowCatcher);
@@ -1552,21 +1520,10 @@ class KigumiViewerApp extends LitElement {
             this.shadowCatcher.material.dispose();
             this.shadowCatcher = null;
         }
-        if (this.orbitCenterGizmo) {
-            this.scene.remove(this.orbitCenterGizmo);
-            this.orbitCenterGizmo.traverse((child) => {
-                if (child.geometry) {
-                    child.geometry.dispose();
-                }
-                if (child.material && typeof child.material.dispose === 'function') {
-                    // A material does not dispose its own textures, and each
-                    // axis label carries a canvas one.
-                    if (child.material.map && typeof child.material.map.dispose === 'function') {
-                        child.material.map.dispose();
-                    }
-                    child.material.dispose();
-                }
-            });
+        if (this.orbitGizmo) {
+            this.scene.remove(this.orbitGizmo.object3d);
+            this.orbitGizmo.dispose();
+            this.orbitGizmo = null;
             this.orbitCenterGizmo = null;
         }
         for (const bundle of this.meshObjectsByKey.values()) {
@@ -1791,8 +1748,7 @@ class KigumiViewerApp extends LitElement {
         this.scene.add(fill);
 
         this.createOrUpdateShadowCatcher(this.lastBounds);
-        this.createOrbitCenterGizmo();
-        this.setupCameraGizmoScene();
+        this.setupCameraControls();
         this.syncLightAnglesFromSun();
         this.drawLightDial();
         this.setCenterGizmoEnabled(this.showCenterGizmo);
@@ -1804,7 +1760,7 @@ class KigumiViewerApp extends LitElement {
         const animate = () => {
             this.animationHandle = requestAnimationFrame(animate);
             this.stepCameraAnimation();
-            this.renderCameraGizmo();
+            this.renderCameraControls();
             this.updateCylinderSilhouettes();
             this.renderViewports();
         };
@@ -2683,7 +2639,9 @@ class KigumiViewerApp extends LitElement {
         const height = viewport.offsetHeight;
         this.syncCameraProjection();
         this.renderer.setSize(width, height, false);
-        this.resizeGizmoRenderer();
+        if (this.cameraCube) {
+            this.cameraCube.resize();
+        }
         this.drawLightDial();
         // Fat-line (LineMaterial) edges compute their pixel thickness from
         // this resolution uniform -- keep it in sync or edges get thinner or
@@ -3500,44 +3458,6 @@ class KigumiViewerApp extends LitElement {
         );
     }
 
-    createOrbitCenterGizmo() {
-        const group = new THREE.Group();
-
-        const orb = new THREE.Mesh(
-            new THREE.SphereGeometry(1, 20, 20),
-            new THREE.MeshBasicMaterial({ color: 0xffd8a8, transparent: true, opacity: 0.96 })
-        );
-        group.add(orb);
-
-        const ringConfigs = [
-            { color: 0xff8fa3, rotation: [0, Math.PI / 2, 0] },
-            { color: 0x7fc8f8, rotation: [Math.PI / 2, 0, 0] },
-            { color: 0x95d5b2, rotation: [0, 0, 0] },
-        ];
-
-        for (const config of ringConfigs) {
-            const ring = new THREE.Mesh(
-                new THREE.TorusGeometry(1.85, 0.12, 12, 48),
-                new THREE.MeshBasicMaterial({ color: config.color, transparent: true, opacity: 0.52 })
-            );
-            ring.rotation.set(config.rotation[0], config.rotation[1], config.rotation[2]);
-            group.add(ring);
-        }
-
-        for (const axis of ORBIT_GIZMO_AXIS_LABELS) {
-            const label = this._makeOrbitAxisLabel(axis.text, axis.color);
-            label.position.set(
-                axis.direction[0] * ORBIT_GIZMO_LABEL_DISTANCE,
-                axis.direction[1] * ORBIT_GIZMO_LABEL_DISTANCE,
-                axis.direction[2] * ORBIT_GIZMO_LABEL_DISTANCE,
-            );
-            group.add(label);
-        }
-
-        group.visible = this.showCenterGizmo;
-        this.orbitCenterGizmo = group;
-        this.scene.add(group);
-    }
 
     /**
      * One axis label for the orbit gizmo.
@@ -3547,41 +3467,7 @@ class KigumiViewerApp extends LitElement {
      * tested like everything else, so a label behind a timber stays behind it
      * rather than floating on top of the frame.
      */
-    _makeOrbitAxisLabel(text, color) {
-        const canvas = document.createElement('canvas');
-        canvas.width = ORBIT_GIZMO_LABEL_TEXTURE_PX;
-        canvas.height = ORBIT_GIZMO_LABEL_TEXTURE_PX;
-        const context = canvas.getContext('2d');
 
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.font = `700 ${Math.round(canvas.height * 0.6)}px Segoe UI`;
-        // An outline first, so the label holds up against timber or sky alike.
-        context.lineWidth = Math.round(canvas.height * 0.14);
-        context.strokeStyle = 'rgba(30, 36, 52, 0.85)';
-        context.strokeText(text, canvas.width / 2, canvas.height / 2);
-        context.fillStyle = color;
-        context.fillText(text, canvas.width / 2, canvas.height / 2);
-
-        const material = new THREE.SpriteMaterial({
-            map: new THREE.CanvasTexture(canvas),
-            transparent: true,
-            depthTest: true,
-        });
-        const sprite = new THREE.Sprite(material);
-        sprite.scale.setScalar(ORBIT_GIZMO_LABEL_SCALE);
-        return sprite;
-    }
-
-    updateOrbitCenterGizmo() {
-        if (!this.orbitCenterGizmo) {
-            return;
-        }
-        const gizmoScale = Math.max(0.02, this.cameraController.orbitDist * 0.00875);
-        this.orbitCenterGizmo.visible = this.showCenterGizmo;
-        this.orbitCenterGizmo.position.set(this.cameraController.cx, this.cameraController.cy, this.cameraController.cz);
-        this.orbitCenterGizmo.scale.setScalar(gizmoScale);
-    }
 
     updateReflectionTransforms() {
         const reflectionOffsetZ = this.groundZ * 2 - 0.001;
@@ -3802,6 +3688,49 @@ class KigumiViewerApp extends LitElement {
     setCenterGizmoEnabled(enabled) {
         this.showCenterGizmo = enabled;
         this.updateOrbitCenterGizmo();
+    }
+
+    /**
+     * Build the camera controls this scene asks for.
+     *
+     * A drawing asks for none, so nothing is built and nothing has to be hidden
+     * afterwards. The 3D scene asks for all of them, which is what it had.
+     */
+    setupCameraControls() {
+        if (this.sceneStore.wantsCameraControl('orbitGizmo')) {
+            this.orbitGizmo = new OrbitCenterGizmo({ THREE });
+            this.orbitCenterGizmo = this.orbitGizmo.object3d;
+            this.scene.add(this.orbitCenterGizmo);
+        }
+        const canvas = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#gizmo-cube-c')
+            : null;
+        if (canvas && this.sceneStore.wantsCameraControl('cube')) {
+            this.cameraCube = new CameraCubeGizmo({ THREE, canvas });
+        }
+    }
+
+    renderCameraControls() {
+        if (!this.cameraCube || !this.camera) {
+            return;
+        }
+        const controller = this.cameraController;
+        this.cameraCube.render(
+            this.camera.position,
+            { x: controller.cx, y: controller.cy, z: controller.cz },
+        );
+    }
+
+    updateOrbitCenterGizmo() {
+        if (!this.orbitGizmo) {
+            return;
+        }
+        const controller = this.cameraController;
+        this.orbitGizmo.update({
+            center: { x: controller.cx, y: controller.cy, z: controller.cz },
+            orbitDist: controller.orbitDist,
+            visible: this.showCenterGizmo,
+        });
     }
 
     setEdgeMode(mode) {
@@ -4075,12 +4004,6 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** How much room a face has for text, inside its frame. */
-    _gizmoFaceTextExtent() {
-        const inset = GIZMO_FACE_BORDER_INSET_PX
-            + GIZMO_FACE_BORDER_WIDTH_PX / 2
-            + GIZMO_FACE_TEXT_GAP_PX;
-        return GIZMO_FACE_TEXTURE_PX - inset * 2;
-    }
 
     /**
      * The largest size every face can share without touching its frame.
@@ -4090,54 +4013,7 @@ class KigumiViewerApp extends LitElement {
      * the biggest each could take alone -- 'top' would otherwise tower over
      * the two-line faces and the cube would read as sloppy.
      */
-    _fitGizmoFontSize(context, faces) {
-        const REFERENCE_PX = 100;
-        const available = this._gizmoFaceTextExtent();
-        let size = Infinity;
-        for (const face of faces) {
-            context.font = `600 ${REFERENCE_PX}px Segoe UI`;
-            const widest = Math.max(...face.lines.map((line) => context.measureText(line).width));
-            const byWidth = widest > 0 ? REFERENCE_PX * (available / widest) : REFERENCE_PX;
-            const byHeight = available / (face.lines.length * GIZMO_FACE_LINE_HEIGHT);
-            size = Math.min(size, byWidth, byHeight);
-        }
-        return Math.max(1, Math.floor(size));
-    }
 
-    createGizmoFaceMaterial(lines, backgroundColor, fontSizePx) {
-        const canvas = document.createElement('canvas');
-        canvas.width = GIZMO_FACE_TEXTURE_PX;
-        canvas.height = GIZMO_FACE_TEXTURE_PX;
-        const context = canvas.getContext('2d');
-
-        context.fillStyle = backgroundColor;
-        context.fillRect(0, 0, canvas.width, canvas.height);
-
-        context.strokeStyle = 'rgba(93, 104, 130, 0.35)';
-        context.lineWidth = GIZMO_FACE_BORDER_WIDTH_PX;
-        context.strokeRect(
-            GIZMO_FACE_BORDER_INSET_PX,
-            GIZMO_FACE_BORDER_INSET_PX,
-            canvas.width - GIZMO_FACE_BORDER_INSET_PX * 2,
-            canvas.height - GIZMO_FACE_BORDER_INSET_PX * 2,
-        );
-
-        context.fillStyle = '#39496e';
-        context.textAlign = 'center';
-        context.textBaseline = 'middle';
-        context.font = `600 ${fontSizePx}px Segoe UI`;
-
-        // Centred as a block, so one line sits in the middle and two straddle it.
-        const lineHeight = fontSizePx * GIZMO_FACE_LINE_HEIGHT;
-        const firstY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
-        lines.forEach((line, index) => {
-            context.fillText(line, canvas.width / 2, firstY + index * lineHeight);
-        });
-
-        const texture = new THREE.CanvasTexture(canvas);
-        texture.needsUpdate = true;
-        return new THREE.MeshStandardMaterial({ color: 0xffffff, map: texture });
-    }
 
     createOrUpdateShadowCatcher(bounds) {
         const dx = bounds.maxX - bounds.minX;
@@ -4190,91 +4066,21 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    setupCameraGizmoScene() {
-        const canvas = this.renderRoot.querySelector('#gizmo-cube-c');
-        this.gizmoRenderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-        this.gizmoRenderer.setClearColor(0x000000, 0);
-
-        this.gizmoScene = new THREE.Scene();
-        this.gizmoCamera = new THREE.PerspectiveCamera(35, 1, 0.1, 20);
-
-        this.gizmoScene.add(new THREE.AmbientLight(0xffffff, 0.82));
-        const light = new THREE.DirectionalLight(0xffffff, 0.65);
-        light.position.set(2, 2, 3);
-        this.gizmoScene.add(light);
-
-        const fontSizePx = this._fitGizmoFontSize(
-            document.createElement('canvas').getContext('2d'), GIZMO_FACES,
-        );
-        const materials = GIZMO_FACES.map(
-            (face) => this.createGizmoFaceMaterial(face.lines, face.background, fontSizePx),
-        );
-        this.gizmoCube = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), materials);
-        this.gizmoScene.add(this.gizmoCube);
-        this.resizeGizmoRenderer();
-    }
 
     getCameraSnapForDirection(direction) {
         return this.cameraController.getCameraSnapForDirection(direction);
     }
 
-    resizeGizmoRenderer() {
-        if (!this.gizmoRenderer || !this.gizmoCamera) {
-            return;
-        }
-        const canvas = this.renderRoot.querySelector('#gizmo-cube-c');
-        const width = Math.max(1, canvas.clientWidth);
-        const height = Math.max(1, canvas.clientHeight);
-        this.gizmoRenderer.setPixelRatio(window.devicePixelRatio || 1);
-        this.gizmoRenderer.setSize(width, height, false);
-        this.gizmoCamera.aspect = width / height;
-        this.gizmoCamera.updateProjectionMatrix();
-    }
 
-    renderCameraGizmo() {
-        if (!this.gizmoRenderer || !this.gizmoCamera || !this.camera) {
-            return;
-        }
-        const dx = this.camera.position.x - this.cameraController.cx;
-        const dy = this.camera.position.y - this.cameraController.cy;
-        const dz = this.camera.position.z - this.cameraController.cz;
-        const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-        this.gizmoCamera.position.set((dx / length) * 2.8, (dy / length) * 2.8, (dz / length) * 2.8);
-        this.gizmoCamera.up.set(0, 0, 1);
-        this.gizmoCamera.lookAt(0, 0, 0);
-        this.gizmoRenderer.render(this.gizmoScene, this.gizmoCamera);
-    }
 
     snapCameraFromGizmoFace(localX, localY) {
-        if (!this.gizmoCube || !this.gizmoCamera) {
+        if (!this.cameraCube) {
             return;
         }
-        const canvas = this.renderRoot.querySelector('#gizmo-cube-c');
-        const width = canvas.clientWidth || 1;
-        const height = canvas.clientHeight || 1;
-
-        this.gizmoPointer.x = (localX / width) * 2 - 1;
-        this.gizmoPointer.y = -((localY / height) * 2 - 1);
-        this.gizmoRaycaster.setFromCamera(this.gizmoPointer, this.gizmoCamera);
-        const hits = this.gizmoRaycaster.intersectObject(this.gizmoCube, false);
-        if (!hits.length || !hits[0].face) {
+        const direction = this.cameraCube.axisAtPoint(localX, localY);
+        if (!direction) {
             return;
         }
-
-        const normal = hits[0].face.normal;
-        const ax = Math.abs(normal.x);
-        const ay = Math.abs(normal.y);
-        const az = Math.abs(normal.z);
-        let direction;
-
-        if (ax >= ay && ax >= az) {
-            direction = { x: Math.sign(normal.x), y: 0, z: 0 };
-        } else if (ay >= ax && ay >= az) {
-            direction = { x: 0, y: Math.sign(normal.y), z: 0 };
-        } else {
-            direction = { x: 0, y: 0, z: Math.sign(normal.z) };
-        }
-
         const snap = this.getCameraSnapForDirection(direction);
         this.animateCameraTo(snap.offsetDir, this.cameraController.orbitDist, 260, snap.upVector);
     }
