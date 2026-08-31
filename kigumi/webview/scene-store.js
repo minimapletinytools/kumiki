@@ -168,24 +168,6 @@
     // read as depth, not enough for an elevation to stop being one.
     const MAX_TILT_RADIANS = 0.18;
 
-    /** Whether a candidate direction has strayed past the tilt a lock allows. */
-    function tiltExceeded(candidate, declared, maxRadians = MAX_TILT_RADIANS) {
-        if (!candidate || !declared) {
-            return false;
-        }
-        const dotted = dot(
-            [candidate.x, candidate.y, candidate.z],
-            [declared.x, declared.y, declared.z],
-        );
-        const lengths = Math.sqrt(dot([candidate.x, candidate.y, candidate.z], [candidate.x, candidate.y, candidate.z]))
-            * Math.sqrt(dot([declared.x, declared.y, declared.z], [declared.x, declared.y, declared.z]));
-        if (!(lengths > 0)) {
-            return false;
-        }
-        const cosine = Math.min(1, Math.max(-1, dotted / lengths));
-        return Math.acos(cosine) > maxRadians;
-    }
-
     /**
      * The denominator of a viewport's drawing scale: 1:N.
      *
@@ -502,7 +484,6 @@
         pageScreenRect,
         panPage,
         zoomPageAt,
-        tiltExceeded,
         MAX_TILT_RADIANS,
         viewportScale,
         extentForScale,

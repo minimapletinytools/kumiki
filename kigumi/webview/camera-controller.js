@@ -161,6 +161,38 @@
             this.cameraUpVector.applyQuaternion(rot).normalize();
         }
 
+        /**
+         * Turn the camera, but refuse to leave a cone around a declared angle.
+         *
+         * What a locked viewport does with a drag: enough movement to read the
+         * depth of what is drawn, never enough to stop being the view that was
+         * declared. Returns whether the nudge was taken.
+         *
+         * Both vectors go back when it is refused. A free-mode orbit turns the
+         * up vector by the same rotation as the direction, so restoring only
+         * the direction leaves the up turned -- and once the edge of the cone
+         * is reached every further nudge is refused, so the view rolls away
+         * while appearing to be held still.
+         */
+        nudgeWithinCone(dx, dy, speed, declaredDir, maxRadians) {
+            if (!declaredDir) {
+                this.applyOrbitDelta(dx, dy, speed);
+                return true;
+            }
+            const beforeDir = this.cameraOffsetDir.clone();
+            const beforeUp = this.cameraUpVector.clone();
+            this.applyOrbitDelta(dx, dy, speed);
+            const cosine = Math.min(1, Math.max(-1,
+                this.cameraOffsetDir.dot(declaredDir)
+                / (this.cameraOffsetDir.length() * declaredDir.length())));
+            if (Math.acos(cosine) > maxRadians) {
+                this.cameraOffsetDir.copy(beforeDir);
+                this.cameraUpVector.copy(beforeUp);
+                return false;
+            }
+            return true;
+        }
+
         getAdaptiveZoomFactor(isZoomingOut) {
             const baseZoomFactor = isZoomingOut ? 0.8 : 1.2;
             if (this.orbitDist <= 0) {

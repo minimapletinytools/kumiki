@@ -567,3 +567,76 @@ describe('CameraController', () => {
         });
     });
 });
+
+describe('nudgeWithinCone', () => {
+    // What a locked drawing viewport does with a drag. The declared angle is
+    // the view the drawing asked for, and the cone is how far it may be
+    // wobbled without becoming a different view.
+    const declared = new V3(0, -1, 0);
+
+    function freeController() {
+        const controller = new CameraController({ THREE });
+        controller.setCameraMode('free', { snapUp: false });
+        controller.cameraOffsetDir.set(0, -1, 0);
+        controller.cameraUpVector.set(0, 0, 1);
+        controller.captureOrbitDragFrame();
+        return controller;
+    }
+
+    function angleBetween(a, b) {
+        return Math.acos(Math.min(1, Math.max(-1, a.dot(b) / (a.length() * b.length()))));
+    }
+
+    test('takes a small nudge', () => {
+        const controller = freeController();
+        expect(controller.nudgeWithinCone(10, 0, 0.0016, declared, 0.18)).toBe(true);
+        expect(angleBetween(controller.cameraOffsetDir, declared)).toBeGreaterThan(0);
+    });
+
+    test('refuses one that would leave the cone', () => {
+        const controller = freeController();
+        expect(controller.nudgeWithinCone(5000, 0, 0.0016, declared, 0.18)).toBe(false);
+        expect(angleBetween(controller.cameraOffsetDir, declared)).toBe(0);
+    });
+
+    test('a refused nudge leaves the up vector alone too', () => {
+        // The bug this exists for: a free orbit turns up and direction
+        // together, so restoring only the direction leaves up turned. Every
+        // nudge past the edge of the cone is refused, so the view rolls away
+        // while looking like it is being held still.
+        const controller = freeController();
+        const upBefore = controller.cameraUpVector.clone();
+
+        controller.nudgeWithinCone(5000, 5000, 0.0016, declared, 0.18);
+
+        expect(angleBetween(controller.cameraUpVector, upBefore)).toBeCloseTo(0, 9);
+    });
+
+    test('holds the view still when leant on', () => {
+        const controller = freeController();
+        const upBefore = controller.cameraUpVector.clone();
+        for (let i = 0; i < 60; i += 1) {
+            controller.nudgeWithinCone(40, 30, 0.0016, declared, 0.18);
+        }
+
+        expect(angleBetween(controller.cameraOffsetDir, declared)).toBeLessThanOrEqual(0.18 + 1e-9);
+        // And the roll stays bounded rather than accumulating with every
+        // refusal, which is what made a locked view look flipped after a drag.
+        expect(angleBetween(controller.cameraUpVector, upBefore)).toBeLessThan(0.18);
+    });
+
+    test('the frame stays square, so nothing can flip', () => {
+        const controller = freeController();
+        for (let i = 0; i < 30; i += 1) {
+            controller.nudgeWithinCone(35, -20, 0.0016, declared, 0.18);
+        }
+
+        expect(controller.cameraOffsetDir.dot(controller.cameraUpVector)).toBeCloseTo(0, 6);
+    });
+
+    test('without a declared angle it is an ordinary orbit', () => {
+        const controller = freeController();
+        expect(controller.nudgeWithinCone(400, 0, 0.0016, null, 0.18)).toBe(true);
+        expect(angleBetween(controller.cameraOffsetDir, declared)).toBeGreaterThan(0.18);
+    });
+});

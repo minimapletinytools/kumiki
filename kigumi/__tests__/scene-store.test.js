@@ -2,7 +2,7 @@ const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
     isOrthogonalFrame, orbitDistanceForExtent, firstLoadCameraPlan, pixelRect, viewportAspect, viewportAtPoint,
     normalizePage, normalizePageView, pageScreenRect, viewportScale, extentForScale,
-    panPage, zoomPageAt, tiltExceeded, MAX_TILT_RADIANS,
+    panPage, zoomPageAt, MAX_TILT_RADIANS,
 } = require('../webview/scene-store.js');
 
 describe('the default 3D scene', () => {
@@ -497,39 +497,5 @@ describe('panPage', () => {
 
     it('does nothing without a sheet', () => {
         expect(panPage(null, { offsetX: 5 }, 800, 600, 40, 40).offsetX).toBe(5);
-    });
-});
-
-describe('tiltExceeded', () => {
-    const declared = { x: 0, y: -1, z: 0 };
-
-    it('allows a nudge, which is what the tilt is for', () => {
-        const nudged = { x: 0.05, y: -0.998, z: 0.02 };
-        expect(tiltExceeded(nudged, declared)).toBe(false);
-    });
-
-    it('stops an elevation being turned into a different view', () => {
-        expect(tiltExceeded({ x: 1, y: 0, z: 0 }, declared)).toBe(true);
-        expect(tiltExceeded({ x: 0, y: 1, z: 0 }, declared)).toBe(true);
-    });
-
-    it('measures the angle, not the length', () => {
-        expect(tiltExceeded({ x: 0, y: -7, z: 0 }, declared)).toBe(false);
-    });
-
-    it('takes the limit it is given', () => {
-        const half = { x: 0.7071, y: -0.7071, z: 0 };
-        expect(tiltExceeded(half, declared, Math.PI / 2)).toBe(false);
-        expect(tiltExceeded(half, declared, 0.1)).toBe(true);
-    });
-
-    it('has nothing to say about an unlocked viewport', () => {
-        expect(tiltExceeded(null, declared)).toBe(false);
-        expect(tiltExceeded(declared, null)).toBe(false);
-    });
-
-    it('allows less than a right angle, or the lock means nothing', () => {
-        expect(MAX_TILT_RADIANS).toBeGreaterThan(0);
-        expect(MAX_TILT_RADIANS).toBeLessThan(Math.PI / 4);
     });
 });

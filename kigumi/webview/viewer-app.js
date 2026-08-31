@@ -27,7 +27,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, tiltExceeded, sceneMembers, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, MAX_TILT_RADIANS, sceneMembers, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
 const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
@@ -94,9 +94,20 @@ class ViewerViewport {
         // happened to start.
         this.declaredOffsetDir = controller.cameraOffsetDir.clone();
         this.declaredUpVector = controller.cameraUpVector.clone();
+        // Free mode, always. The standard mode orbits about world Z and resets
+        // the camera's up to it, which is fine for a view of a frame and wrong
+        // for a declared one: a plan view's up is +Y, and forcing it to +Z puts
+        // it along the line of sight, where lookAt flips. A face view of a post
+        // has a horizontal up and would snap a quarter turn. Free mode turns
+        // the up vector with the camera, so a tilt stays a tilt.
+        controller.setCameraMode('free', { snapUp: false });
         controller.orbitDist = orbitDistanceForExtent(camera.extent, this.perspectiveCamera.fov);
     }
 }
+// How much of a timber a drawing is not about still shows. Enough to place the
+// piece among its neighbours, not enough to be mistaken for part of the sheet.
+const DRAWING_CONTEXT_OPACITY = 0.05;
+
 // A drag on a locked viewport turns more slowly than a free orbit -- it is a
 // nudge within a small cone, so the same hand movement should cover less of it.
 const TILT_ORBIT_SPEED = 0.0016;
@@ -1780,11 +1791,9 @@ class KigumiViewerApp extends LitElement {
             controller.applyOrbitDelta(dx, dy);
             return;
         }
-        const before = controller.cameraOffsetDir.clone();
-        controller.applyOrbitDelta(dx, dy, TILT_ORBIT_SPEED);
-        if (tiltExceeded(controller.cameraOffsetDir, viewport.declaredOffsetDir)) {
-            controller.cameraOffsetDir.copy(before);
-        }
+        controller.nudgeWithinCone(
+            dx, dy, TILT_ORBIT_SPEED, viewport.declaredOffsetDir, MAX_TILT_RADIANS,
+        );
     }
 
     /** Return a tilted viewport to the angle its drawing declared. */
@@ -2817,8 +2826,13 @@ class KigumiViewerApp extends LitElement {
     }
 
     _findMembersAlongRay(clientX, clientY) {
+        // A drawing's context timbers are not pickable: they are there to place
+        // the piece, and clicking through to one would select something the
+        // sheet is not about and cannot measure.
+        const drawnMembers = this.activeSceneMembers;
         const isPickable = (memberKey) => !this.isMemberHidden(memberKey)
-            && !this.isMemberLocked(memberKey);
+            && !this.isMemberLocked(memberKey)
+            && (!drawnMembers || drawnMembers.has(memberKey));
         // Ask each viewport under the pointer in turn, topmost first, and take
         // the first that actually hits something. A drawing's viewports draw on
         // nothing, so where the one on top is empty you are looking straight
@@ -3170,21 +3184,28 @@ class KigumiViewerApp extends LitElement {
         }
 
         // A drawing is about the members it names; the rest of the frame is
-        // there for context and is ghosted whatever the selection says. The
-        // 3D scene names nobody, so this does nothing there.
+        // there for context and is ghosted whatever the selection says. Far
+        // fainter than a ghost in the 3D scene -- there it is one of several
+        // things you are looking at, here it is the wrong piece on a sheet, and
+        // it should barely register. The 3D scene names nobody, so this does
+        // nothing there.
         const drawnMembers = this.activeSceneMembers;
-        if (name !== 'hidden' && drawnMembers && !drawnMembers.has(memberKey)) {
+        const isDrawingContext = name !== 'hidden' && Boolean(drawnMembers) && !drawnMembers.has(memberKey);
+        if (isDrawingContext) {
             name = 'ghost';
-            opacity = policy.dimmedOpacity;
+            opacity = Math.min(opacity, DRAWING_CONTEXT_OPACITY);
         }
 
         const profile = this.resolveRenderProfile(bundle.profileId);
         // Edge opacity is independent of face opacity: a member with
         // transparent faces keeps its edge lines at full strength, relative to
-        // the edge visibility slider.
-        const edgeOpacity = profile
+        // the edge visibility slider. Context in a drawing is the exception --
+        // faded faces behind crisp outlines would read as another piece of the
+        // drawing rather than as something behind it.
+        const edgeOpacity = (profile
             ? profile.edgeOpacity * (this.edgeLineVisibilityPercent / 100)
-            : (this.edgeLineVisibilityPercent / 100);
+            : (this.edgeLineVisibilityPercent / 100))
+            * (isDrawingContext ? DRAWING_CONTEXT_OPACITY : 1);
 
         return {
             name,
@@ -3382,6 +3403,12 @@ class KigumiViewerApp extends LitElement {
     }
 
     setCameraMode(mode) {
+        // A locked viewport is free-mode by construction (see applySpecCamera):
+        // standard mode would snap its up back to world Z and flip the view.
+        const active = this.activeViewport;
+        if (active && active.spec.locked) {
+            return;
+        }
         const currentMode = this.cameraController.getCameraMode();
         const nextMode = mode === 'free' ? 'free' : 'standard';
         const shouldAnimateToStandard = currentMode === 'free' && nextMode === 'standard';
