@@ -153,6 +153,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const tagIndexJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'tag-index.js'))).toString();
     const unitsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'units.js'))).toString();
     const displayOptionsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'display-options-store.js'))).toString();
+    const sceneStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'scene-store.js'))).toString();
     const stylesCssUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer.css'))).toString();
     const threeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'three.min.js'))).toString();
     const reflectorJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'vendor', 'Reflector.js'))).toString();
@@ -197,6 +198,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__TAG_INDEX_JS_URI__', tagIndexJsUri)
         .replace('__UNITS_JS_URI__', unitsJsUri)
         .replace('__DISPLAY_OPTIONS_JS_URI__', displayOptionsJsUri)
+        .replace('__SCENE_STORE_JS_URI__', sceneStoreJsUri)
         .replace('__APP_JS_URI__', appJsUri)
         .replace('__STYLES_CSS_URI__', stylesCssUri)
         .replace('__THREE_JS_URI__', threeJsUri)

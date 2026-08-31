@@ -25,6 +25,48 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
+const { SceneStore, pixelRect: viewportPixelRect } = window.KigumiScenes;
+
+/**
+ * What a viewport spec becomes at runtime: a rect with its own cameras.
+ *
+ * Both projections are built per viewport rather than shared, because a drawing
+ * holds several viewports at once and each frames the model its own way -- an
+ * elevation and the preview beside it cannot take turns with one camera.
+ */
+class ViewerViewport {
+    constructor(spec, cameraController) {
+        this.spec = spec;
+        this.cameraController = cameraController;
+        this.isOrthographic = spec.projection === 'orthographic';
+
+        this.perspectiveCamera = new THREE.PerspectiveCamera(45, 1, 0.01, 10000);
+        this.perspectiveCamera.up.set(0, 0, 1);
+        // Frustum bounds are placeholders; updateOrthographicFrustum() sizes
+        // them from the current orbitDist before every use, so the two
+        // projections keep the same apparent framing when toggled.
+        this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
+        this.orthographicCamera.up.set(0, 0, 1);
+    }
+
+    get id() {
+        return this.spec.id;
+    }
+
+    get camera() {
+        return this.isOrthographic ? this.orthographicCamera : this.perspectiveCamera;
+    }
+
+    /** This viewport's rect in pixels, ready for setViewport/setScissor. */
+    pixelRect(canvasWidth, canvasHeight) {
+        return viewportPixelRect(this.spec.rect, canvasWidth, canvasHeight);
+    }
+
+    get aspect() {
+        const [, , width, height] = this.spec.rect;
+        return height > 0 ? width / height : 1;
+    }
+}
 const DEFAULT_FOOTPRINT_COLOR = 'orange';
 
 function normalizeV3RenderParameterValue(value) {
@@ -1156,7 +1198,16 @@ class KigumiViewerApp extends LitElement {
         this.focusedCx = 0;
         this.focusedCy = 0;
         this.focusedCz = 0;
-        this.cameraController = new CameraController({ THREE });
+        // A scene owns its viewports, and a viewport owns its camera. The 3D
+        // view is the scene the viewer starts in: one full-canvas viewport
+        // with a free camera, so it runs the same path a drawing will.
+        this.sceneStore = new SceneStore();
+        this.viewports = [];
+        this.activeViewportId = null;
+        // Built here rather than in setupScene: a viewport is cameras and data,
+        // and the template reads the active one's camera controller on its
+        // first render, which happens before the scene exists.
+        this.rebuildViewports();
 
         // How the frame is drawn. The store owns the values and the rules for
         // taking them; the setters below keep the half that applies one to the
@@ -1174,22 +1225,6 @@ class KigumiViewerApp extends LitElement {
             });
         }
 
-        // Forward orbit-camera state from this.cameraController onto this for
-        // backwards compatibility with the rest of the viewer-app code that still
-        // reads/writes things like this.cx, this.orbitDist, etc.
-        const FORWARDED_CAMERA_FIELDS = [
-            'cx', 'cy', 'cz',
-            'orbitDist',
-            'cameraOffsetDir', 'cameraUpVector',
-        ];
-        for (const field of FORWARDED_CAMERA_FIELDS) {
-            Object.defineProperty(this, field, {
-                get() { return this.cameraController[field]; },
-                set(value) { this.cameraController[field] = value; },
-                configurable: true,
-                enumerable: true,
-            });
-        }
 
         this.mouseAction = null;
         this.lastX = 0;
@@ -1202,7 +1237,6 @@ class KigumiViewerApp extends LitElement {
         this.footprintObjects = [];
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
-        this.isOrthographic = false;
         this.contextMenuState = null; // { memberKey, x, y } | null
         this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
@@ -1743,14 +1777,7 @@ class KigumiViewerApp extends LitElement {
         this.scene = new THREE.Scene();
         this.setTheme(this.activeTheme);
 
-        this.perspectiveCamera = new THREE.PerspectiveCamera(45, viewport.offsetWidth / viewport.offsetHeight, 0.01, 10000);
-        this.perspectiveCamera.up.set(0, 0, 1);
-        // Frustum bounds are placeholders here; updateOrthographicFrustum() (called from
-        // updateCamera()) sizes them from the current orbitDist before every use, so the
-        // two projections stay visually consistent (same apparent framing) when toggled.
-        this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10000);
-        this.orthographicCamera.up.set(0, 0, 1);
-        this.camera = this.isOrthographic ? this.orthographicCamera : this.perspectiveCamera;
+        this.rebuildViewports();
 
         this.scene.add(new THREE.AmbientLight(0xffffff, 0.61));
         this.sun = new THREE.DirectionalLight(0xffffff, 0.62);
@@ -1779,9 +1806,83 @@ class KigumiViewerApp extends LitElement {
             this.stepCameraAnimation();
             this.renderCameraGizmo();
             this.updateCylinderSilhouettes();
-            this.renderer.render(this.scene, this.camera);
+            this.renderViewports();
         };
         animate();
+    }
+
+    // The viewport the camera controls act on. With one viewport this is the
+    // only one; with several it is the one last interacted with, which is what
+    // the cube and the orbit gizmo describe.
+    get activeViewport() {
+        if (this.viewports.length === 0) {
+            return null;
+        }
+        return this.viewports.find((viewport) => viewport.id === this.activeViewportId)
+            || this.viewports[0];
+    }
+
+    get cameraController() {
+        const viewport = this.activeViewport;
+        return viewport ? viewport.cameraController : null;
+    }
+
+    get camera() {
+        const viewport = this.activeViewport;
+        return viewport ? viewport.camera : null;
+    }
+
+    get perspectiveCamera() {
+        const viewport = this.activeViewport;
+        return viewport ? viewport.perspectiveCamera : null;
+    }
+
+    get orthographicCamera() {
+        const viewport = this.activeViewport;
+        return viewport ? viewport.orthographicCamera : null;
+    }
+
+    get isOrthographic() {
+        const viewport = this.activeViewport;
+        return viewport ? viewport.isOrthographic : false;
+    }
+
+    /**
+     * Build the runtime viewports for the active scene.
+     *
+     * Camera state is carried across by viewport id where the ids match, so
+     * switching scenes and back does not throw away where you were looking.
+     */
+    rebuildViewports() {
+        const previous = new Map(this.viewports.map((viewport) => [viewport.id, viewport.cameraController]));
+        this.viewports = this.sceneStore.activeViewports().map((spec) => new ViewerViewport(
+            spec,
+            previous.get(spec.id) || new CameraController({ THREE }),
+        ));
+        if (!this.viewports.some((viewport) => viewport.id === this.activeViewportId)) {
+            this.activeViewportId = this.viewports.length > 0 ? this.viewports[0].id : null;
+        }
+        this.updateCamera();
+    }
+
+    /** Draw every viewport of the active scene. */
+    renderViewports() {
+        if (!this.renderer || !this.scene) {
+            return;
+        }
+        const size = this.renderer.getSize(new THREE.Vector2());
+        const several = this.viewports.length > 1;
+        // Scissoring costs nothing to skip while one viewport covers the
+        // canvas, which is the 3D scene and every session before drawings.
+        this.renderer.setScissorTest(several);
+        for (const viewport of this.viewports) {
+            const rect = viewport.pixelRect(size.x, size.y);
+            this.renderer.setViewport(rect.x, rect.y, rect.width, rect.height);
+            if (several) {
+                this.renderer.setScissor(rect.x, rect.y, rect.width, rect.height);
+            }
+            this.renderer.render(this.scene, viewport.camera);
+        }
     }
 
     emitViewerLog(eventName, details = {}) {
@@ -2332,7 +2433,7 @@ class KigumiViewerApp extends LitElement {
 
         try {
             if (this.renderer && this.scene && this.camera) {
-                this.renderer.render(this.scene, this.camera);
+                this.renderViewports();
             }
             const dataUrl = canvas.toDataURL('image/png');
             vscode.postMessage({
@@ -3325,7 +3426,7 @@ class KigumiViewerApp extends LitElement {
 
     getCameraCenterVector(target = null) {
         const out = target || new THREE.Vector3();
-        return out.set(this.cx, this.cy, this.cz);
+        return out.set(this.cameraController.cx, this.cameraController.cy, this.cameraController.cz);
     }
 
     projectPointerToFocalPlane(clientX, clientY, planeCenter = null) {
@@ -3360,9 +3461,9 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const delta = fromPoint.sub(toPoint);
-        this.cx += delta.x;
-        this.cy += delta.y;
-        this.cz += delta.z;
+        this.cameraController.cx += delta.x;
+        this.cameraController.cy += delta.y;
+        this.cameraController.cz += delta.z;
     }
 
     getAdaptiveZoomFactor(isZoomingOut) {
@@ -3370,26 +3471,26 @@ class KigumiViewerApp extends LitElement {
     }
 
     zoomTowardPointer(clientX, clientY, zoomFactor) {
-        const oldDist = Math.max(0.01, this.orbitDist);
+        const oldDist = Math.max(0.01, this.cameraController.orbitDist);
         const nextDist = Math.max(0.01, oldDist * zoomFactor);
         const planeCenter = this.getCameraCenterVector(this.tempOrbitCenter);
         const focalPoint = this.projectPointerToFocalPlane(clientX, clientY, planeCenter);
-        let targetCenter = { x: this.cx, y: this.cy, z: this.cz };
+        let targetCenter = { x: this.cameraController.cx, y: this.cameraController.cy, z: this.cameraController.cz };
 
         if (focalPoint) {
             const ratio = nextDist / oldDist;
             targetCenter = {
-                x: this.cx + (focalPoint.x - planeCenter.x) * (1 - ratio),
-                y: this.cy + (focalPoint.y - planeCenter.y) * (1 - ratio),
-                z: this.cz + (focalPoint.z - planeCenter.z) * (1 - ratio),
+                x: this.cameraController.cx + (focalPoint.x - planeCenter.x) * (1 - ratio),
+                y: this.cameraController.cy + (focalPoint.y - planeCenter.y) * (1 - ratio),
+                z: this.cameraController.cz + (focalPoint.z - planeCenter.z) * (1 - ratio),
             };
         }
 
         this.animateCameraTo(
-            { x: this.cameraOffsetDir.x, y: this.cameraOffsetDir.y, z: this.cameraOffsetDir.z },
+            { x: this.cameraController.cameraOffsetDir.x, y: this.cameraController.cameraOffsetDir.y, z: this.cameraController.cameraOffsetDir.z },
             nextDist,
             140,
-            { x: this.cameraUpVector.x, y: this.cameraUpVector.y, z: this.cameraUpVector.z },
+            { x: this.cameraController.cameraUpVector.x, y: this.cameraController.cameraUpVector.y, z: this.cameraController.cameraUpVector.z },
             targetCenter,
         );
     }
@@ -3471,9 +3572,9 @@ class KigumiViewerApp extends LitElement {
         if (!this.orbitCenterGizmo) {
             return;
         }
-        const gizmoScale = Math.max(0.02, this.orbitDist * 0.00875);
+        const gizmoScale = Math.max(0.02, this.cameraController.orbitDist * 0.00875);
         this.orbitCenterGizmo.visible = this.showCenterGizmo;
-        this.orbitCenterGizmo.position.set(this.cx, this.cy, this.cz);
+        this.orbitCenterGizmo.position.set(this.cameraController.cx, this.cameraController.cy, this.cameraController.cz);
         this.orbitCenterGizmo.scale.setScalar(gizmoScale);
     }
 
@@ -4129,9 +4230,9 @@ class KigumiViewerApp extends LitElement {
         if (!this.gizmoRenderer || !this.gizmoCamera || !this.camera) {
             return;
         }
-        const dx = this.camera.position.x - this.cx;
-        const dy = this.camera.position.y - this.cy;
-        const dz = this.camera.position.z - this.cz;
+        const dx = this.camera.position.x - this.cameraController.cx;
+        const dy = this.camera.position.y - this.cameraController.cy;
+        const dz = this.camera.position.z - this.cameraController.cz;
         const length = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
         this.gizmoCamera.position.set((dx / length) * 2.8, (dy / length) * 2.8, (dz / length) * 2.8);
         this.gizmoCamera.up.set(0, 0, 1);
@@ -4170,7 +4271,7 @@ class KigumiViewerApp extends LitElement {
         }
 
         const snap = this.getCameraSnapForDirection(direction);
-        this.animateCameraTo(snap.offsetDir, this.orbitDist, 260, snap.upVector);
+        this.animateCameraTo(snap.offsetDir, this.cameraController.orbitDist, 260, snap.upVector);
     }
 
     syncLightAnglesFromSun() {
@@ -5232,10 +5333,10 @@ class KigumiViewerApp extends LitElement {
         const radius = Math.sqrt(dx * dx + dy * dy + dz * dz) / 2 || 5;
         const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
         if (!hadExistingScene) {
-            this.cx = this.focusedCx;
-            this.cy = this.focusedCy;
-            this.cz = this.focusedCz;
-            this.orbitDist = radius / Math.sin(fovRad / 2) * 1.3;
+            this.cameraController.cx = this.focusedCx;
+            this.cameraController.cy = this.focusedCy;
+            this.cameraController.cz = this.focusedCz;
+            this.cameraController.orbitDist = radius / Math.sin(fovRad / 2) * 1.3;
         }
         this.lightDistance = Math.max(12, radius * 4);
         this.setCameraNearFar(Math.max(0.1, radius * 0.03), Math.max(200, radius * 20));
@@ -5249,13 +5350,14 @@ class KigumiViewerApp extends LitElement {
     }
 
     updateCamera() {
-        if (!this.camera) {
-            return;
+        // Every viewport, not just the active one: the others are on screen at
+        // the same time and would otherwise never be positioned.
+        for (const viewport of this.viewports) {
+            if (viewport.isOrthographic) {
+                this.updateViewportOrthographicFrustum(viewport);
+            }
+            viewport.cameraController.applyToCamera(viewport.camera);
         }
-        if (this.isOrthographic) {
-            this.updateOrthographicFrustum();
-        }
-        this.cameraController.applyToCamera(this.camera);
         this.updateOrbitCenterGizmo();
     }
 
@@ -5265,34 +5367,53 @@ class KigumiViewerApp extends LitElement {
     // from updateCamera() before every use rather than only on resize/toggle, since
     // orbitDist changes continuously during zoom/animation.
     updateOrthographicFrustum() {
-        if (!this.orthographicCamera || !this.perspectiveCamera) {
-            return;
+        for (const viewport of this.viewports) {
+            this.updateViewportOrthographicFrustum(viewport);
         }
-        const viewport = this.renderRoot.querySelector('#viewport');
-        const aspect = (viewport && viewport.offsetHeight)
-            ? viewport.offsetWidth / viewport.offsetHeight
-            : 1;
-        const fovRad = this.perspectiveCamera.fov * Math.PI / 180;
-        const halfHeight = Math.max(0.001, this.orbitDist) * Math.tan(fovRad / 2);
-        const halfWidth = halfHeight * aspect;
-        this.orthographicCamera.left = -halfWidth;
-        this.orthographicCamera.right = halfWidth;
-        this.orthographicCamera.top = halfHeight;
-        this.orthographicCamera.bottom = -halfHeight;
-        this.orthographicCamera.updateProjectionMatrix();
+    }
+
+    /**
+     * Size one viewport's orthographic frustum from its own orbit distance and
+     * the perspective FOV, so switching projections -- or zooming while
+     * orthographic -- keeps the framing a perspective camera would show.
+     *
+     * The aspect is the viewport's, not the canvas's: an elevation occupying a
+     * quarter of the width is a different shape from the window around it.
+     */
+    updateViewportOrthographicFrustum(viewport) {
+        const fovRad = viewport.perspectiveCamera.fov * Math.PI / 180;
+        const halfHeight = Math.max(0.001, viewport.cameraController.orbitDist) * Math.tan(fovRad / 2);
+        const halfWidth = halfHeight * this.viewportAspect(viewport);
+        const camera = viewport.orthographicCamera;
+        camera.left = -halfWidth;
+        camera.right = halfWidth;
+        camera.top = halfHeight;
+        camera.bottom = -halfHeight;
+        camera.updateProjectionMatrix();
+    }
+
+    /** A viewport's aspect: its share of the canvas, times the canvas's own. */
+    viewportAspect(viewport) {
+        const element = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#viewport')
+            : null;
+        if (!element || !element.offsetHeight) {
+            return 1;
+        }
+        return (element.offsetWidth / element.offsetHeight) * viewport.aspect;
     }
 
     // Keeps both cameras' aspect/frustum in sync with the current viewport size --
     // called on resize and when toggling projection mode (the camera that just became
     // inactive should still be correctly sized if the viewport changes while it's idle).
     syncCameraProjection() {
-        const viewport = this.renderRoot.querySelector('#viewport');
-        if (!viewport || !viewport.offsetHeight) {
+        const element = this.renderRoot.querySelector('#viewport');
+        if (!element || !element.offsetHeight) {
             return;
         }
-        if (this.perspectiveCamera) {
-            this.perspectiveCamera.aspect = viewport.offsetWidth / viewport.offsetHeight;
-            this.perspectiveCamera.updateProjectionMatrix();
+        for (const viewport of this.viewports) {
+            viewport.perspectiveCamera.aspect = this.viewportAspect(viewport);
+            viewport.perspectiveCamera.updateProjectionMatrix();
         }
         this.updateOrthographicFrustum();
     }
@@ -5313,12 +5434,14 @@ class KigumiViewerApp extends LitElement {
     }
 
     setProjectionMode(isOrthographic) {
+        const viewport = this.activeViewport;
         const next = Boolean(isOrthographic);
-        if (this.isOrthographic === next) {
+        if (!viewport || viewport.isOrthographic === next) {
             return;
         }
-        this.isOrthographic = next;
-        this.camera = next ? this.orthographicCamera : this.perspectiveCamera;
+        // The projection belongs to the viewport, not the viewer: a drawing
+        // holds locked orthographic elevations beside a perspective preview.
+        viewport.isOrthographic = next;
         this.syncCameraProjection();
         this.updateCamera();
         this.requestUpdate();
