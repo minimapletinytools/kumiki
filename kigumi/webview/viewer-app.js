@@ -15,7 +15,6 @@ const ViewerPhase = Object.freeze({
 // 'noOverlay': edge lines depth-tested against other geometry (unlike
 //   'overlay', which never occludes) -- solid faces stay visible in both
 //   modes, only the edges' depth behavior differs.
-const VALID_EDGE_MODES = new Set(['none', 'overlay', 'noOverlay']);
 
 // Footprint render color swatches. 'transparent' has no fill/edge entry --
 // it means "don't render the footprint at all" (group.visible = false)
@@ -25,7 +24,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
     moss: { fill: 0x9dc8a0, edge: 0x2f5233 },
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
-const FOOTPRINT_COLOR_IDS = ['slate', 'moss', 'orange', 'transparent'];
+const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
 const DEFAULT_FOOTPRINT_COLOR = 'orange';
 
 function normalizeV3RenderParameterValue(value) {
@@ -179,7 +178,7 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 const CSG_HIGHLIGHT_EDGE_WIDTH_PX = 5;
 
 // Metric stays the default, which is what the viewer always displayed.
-const { UNIT_SYSTEMS, DEFAULT_UNIT_SYSTEM } = window.KigumiUnits;
+const { DEFAULT_UNIT_SYSTEM } = window.KigumiUnits;
 
 const SELECTION_VISUAL_STATES = Object.freeze({
     NOTHING_SELECTED: 'nothing_selected',
@@ -1159,6 +1158,22 @@ class KigumiViewerApp extends LitElement {
         this.focusedCz = 0;
         this.cameraController = new CameraController({ THREE });
 
+        // How the frame is drawn. The store owns the values and the rules for
+        // taking them; the setters below keep the half that applies one to the
+        // scene. Read through the forwarding properties defined further down.
+        this.displayOptions = new DisplayOptionsStore({ themeIds: Object.keys(THEMES) });
+
+        // Read display options off the store by their old names, so templates
+        // and the hundred readers of this.edgeMode stay as they are. Getters
+        // only: every write goes through a setter, which is what keeps the
+        // store the one place a value can come from.
+        for (const key of this.displayOptions.keys()) {
+            Object.defineProperty(this, key, {
+                get() { return this.displayOptions.get(key); },
+                configurable: true,
+            });
+        }
+
         // Forward orbit-camera state from this.cameraController onto this for
         // backwards compatibility with the rest of the viewer-app code that still
         // reads/writes things like this.cx, this.orbitDist, etc.
@@ -1184,12 +1199,6 @@ class KigumiViewerApp extends LitElement {
         this.mouseActionMoved = false;
 
         this.showCenterGizmo = true;
-        this.edgeMode = 'noOverlay';
-        this.edgeLineThicknessPx = 1.5;
-        this.units = DEFAULT_UNIT_SYSTEM;
-        this.shadowsEnabled = false;
-        this.reflectionsEnabled = true;
-        this.footprintColor = DEFAULT_FOOTPRINT_COLOR;
         this.footprintObjects = [];
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
@@ -1250,10 +1259,7 @@ class KigumiViewerApp extends LitElement {
             timber: 'timber-default',
             accessory: 'accessory-cute',
         };
-        this.edgeLineVisibilityPercent = 100;
-        this.unselectedTransparencyPercent = 70;
-        this.selectedTransparencyPercent = 0;
-        this.activeTheme = 'forest';
+
 
         this.animationHandle = null;
         this.viewState = createInitialViewState();
@@ -1843,37 +1849,25 @@ class KigumiViewerApp extends LitElement {
     }
 
     setUnselectedTransparencyPercent(nextPercent) {
-        const normalizedPercent = Number.isFinite(nextPercent)
-            ? Math.max(0, Math.min(95, Math.round(nextPercent / 5) * 5))
-            : 70;
-        if (this.unselectedTransparencyPercent === normalizedPercent) {
+        if (!this.displayOptions.set('unselectedTransparencyPercent', nextPercent)) {
             return;
         }
-        this.unselectedTransparencyPercent = normalizedPercent;
         this.requestUpdate();
         this.applySelectionOpacity();
     }
 
     setSelectedTransparencyPercent(nextPercent) {
-        const normalizedPercent = Number.isFinite(nextPercent)
-            ? Math.max(0, Math.min(95, Math.round(nextPercent / 5) * 5))
-            : 0;
-        if (this.selectedTransparencyPercent === normalizedPercent) {
+        if (!this.displayOptions.set('selectedTransparencyPercent', nextPercent)) {
             return;
         }
-        this.selectedTransparencyPercent = normalizedPercent;
         this.requestUpdate();
         this.applySelectionOpacity();
     }
 
     setEdgeLineVisibilityPercent(nextPercent) {
-        const normalizedPercent = Number.isFinite(nextPercent)
-            ? Math.max(0, Math.min(100, Math.round(nextPercent / 5) * 5))
-            : 100;
-        if (this.edgeLineVisibilityPercent === normalizedPercent) {
+        if (!this.displayOptions.set('edgeLineVisibilityPercent', nextPercent)) {
             return;
         }
-        this.edgeLineVisibilityPercent = normalizedPercent;
         this.requestUpdate();
         this.applySelectionOpacity();
     }
@@ -1916,21 +1910,13 @@ class KigumiViewerApp extends LitElement {
             version: 1,
             viewerOptions: { ...this.viewerOptions },
             ui: {
+                // Everything the display options store owns, by its own account.
+                ...this.displayOptions.toPayload(),
                 showCenterGizmo: Boolean(this.showCenterGizmo),
-                edgeMode: String(this.edgeMode || 'noOverlay'),
-                edgeLineVisibilityPercent: Number(this.edgeLineVisibilityPercent),
-                edgeLineThicknessPx: Number(this.edgeLineThicknessPx),
-                units: String(this.units || DEFAULT_UNIT_SYSTEM),
-                shadowsEnabled: Boolean(this.shadowsEnabled),
-                reflectionsEnabled: Boolean(this.reflectionsEnabled),
-                footprintColor: String(this.footprintColor || DEFAULT_FOOTPRINT_COLOR),
                 showAssemblyTimeline: Boolean(this.showAssemblyTimeline),
                 disassemblyMultiplier: Number(this.disassemblyMultiplier),
                 debugEnabled: Boolean(this.debugEnabled),
                 leftClickDragRotatesCamera: Boolean(this.leftClickDragRotatesCamera),
-                unselectedTransparencyPercent: Number(this.unselectedTransparencyPercent),
-                selectedTransparencyPercent: Number(this.selectedTransparencyPercent),
-                activeTheme: String(this.activeTheme || 'forest'),
                 exportFormatStlEnabled: Boolean(this.exportFormatStlEnabled),
                 exportFormat3mfEnabled: Boolean(this.exportFormat3mfEnabled),
                 exportFormatObjEnabled: Boolean(this.exportFormatObjEnabled),
@@ -3034,11 +3020,9 @@ class KigumiViewerApp extends LitElement {
     }
 
     setUnits(units) {
-        const next = UNIT_SYSTEMS.includes(units) ? units : DEFAULT_UNIT_SYSTEM;
-        if (this.units === next) {
+        if (!this.displayOptions.set('units', units)) {
             return;
         }
-        this.units = next;
         this._refreshMemberList();
         this.updateInfo(this.currentFrameData);
     }
@@ -3092,7 +3076,7 @@ class KigumiViewerApp extends LitElement {
         if (!theme) {
             return;
         }
-        this.activeTheme = id;
+        this.displayOptions.set('activeTheme', id);
         this.memberRenderProfileByType = {
             timber: theme.timberProfileId,
             accessory: theme.accessoryProfileId,
@@ -3715,11 +3699,10 @@ class KigumiViewerApp extends LitElement {
     }
 
     setEdgeMode(mode) {
-        const next = VALID_EDGE_MODES.has(mode) ? mode : 'noOverlay';
-        if (this.edgeMode === next) {
+        if (!this.displayOptions.set('edgeMode', mode)) {
             return;
         }
-        this.edgeMode = next;
+        const next = this.edgeMode;
         // depthTest/depthWrite differ by mode ('overlay' always draws on top;
         // 'noOverlay' is properly depth-tested/occluded) -- update existing
         // materials in place rather than rebuilding meshes.
@@ -3736,13 +3719,10 @@ class KigumiViewerApp extends LitElement {
     }
 
     setEdgeLineThicknessPx(nextThickness) {
-        const normalized = Number.isFinite(nextThickness)
-            ? Math.max(0.5, Math.min(6, nextThickness))
-            : 1.5;
-        if (this.edgeLineThicknessPx === normalized) {
+        if (!this.displayOptions.set('edgeLineThicknessPx', nextThickness)) {
             return;
         }
-        this.edgeLineThicknessPx = normalized;
+        const normalized = this.edgeLineThicknessPx;
         for (const bundle of this.meshObjectsByKey.values()) {
             if (bundle.edges && bundle.edges.material) {
                 bundle.edges.material.linewidth = normalized;
@@ -3752,29 +3732,29 @@ class KigumiViewerApp extends LitElement {
     }
 
     setShadowsEnabled(enabled) {
-        this.shadowsEnabled = enabled;
+        this.displayOptions.set('shadowsEnabled', enabled);
+        const on = this.shadowsEnabled;
         if (this.renderer) {
-            this.renderer.shadowMap.enabled = enabled;
+            this.renderer.shadowMap.enabled = on;
         }
         if (this.sun) {
-            this.sun.castShadow = enabled;
+            this.sun.castShadow = on;
         }
         if (this.shadowCatcher) {
-            this.shadowCatcher.visible = enabled;
+            this.shadowCatcher.visible = on;
         }
     }
 
     setReflectionsEnabled(enabled) {
-        this.reflectionsEnabled = enabled;
+        this.displayOptions.set('reflectionsEnabled', enabled);
         this.updateReflectionTransforms();
     }
 
     setFootprintColor(color) {
-        const next = FOOTPRINT_COLOR_IDS.includes(color) ? color : DEFAULT_FOOTPRINT_COLOR;
-        if (this.footprintColor === next) {
+        if (!this.displayOptions.set('footprintColor', color)) {
             return;
         }
-        this.footprintColor = next;
+        const next = this.footprintColor;
         const visible = next !== 'transparent';
         const swatch = FOOTPRINT_COLOR_SWATCHES[next];
         if (Array.isArray(this.footprintObjects)) {
