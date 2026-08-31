@@ -2,6 +2,7 @@ const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
     isOrthogonalFrame, orbitDistanceForExtent, firstLoadCameraPlan, pixelRect, viewportAspect, viewportAtPoint,
     normalizePage, normalizePageView, pageScreenRect, viewportScale, extentForScale,
+    panPage, zoomPageAt, tiltExceeded, MAX_TILT_RADIANS,
 } = require('../webview/scene-store.js');
 
 describe('the default 3D scene', () => {
@@ -430,5 +431,105 @@ describe('firstLoadCameraPlan', () => {
         const degenerate = firstLoadCameraPlan([{ id: 'main' }], { radius: 0 })[0];
         expect(degenerate.frame.orbitDist).toBeGreaterThan(0);
         expect(degenerate.near).toBeGreaterThan(0);
+    });
+});
+
+describe('zoomPageAt', () => {
+    const page = { width: 0.42, height: 0.297 };
+
+    it('leaves whatever is under the cursor under the cursor', () => {
+        // The whole point of zooming toward a pointer, and the thing that is
+        // fiddly in world space and arithmetic here.
+        const before = pageScreenRect(page, 800, 600, null);
+        const pointX = before.x + before.width * 0.3;
+        const pointY = before.y + before.height * 0.8;
+        const after = pageScreenRect(page, 800, 600, zoomPageAt(page, null, 800, 600, pointX, pointY, 2));
+        expect(after.x + after.width * 0.3).toBeCloseTo(pointX, 6);
+        expect(after.y + after.height * 0.8).toBeCloseTo(pointY, 6);
+    });
+
+    it('zooms in and out about the same point consistently', () => {
+        const view = zoomPageAt(page, null, 800, 600, 400, 300, 2.5);
+        expect(view.zoom).toBeCloseTo(2.5, 9);
+        const back = zoomPageAt(page, view, 800, 600, 400, 300, 1 / 2.5);
+        expect(back.zoom).toBeCloseTo(1, 9);
+    });
+
+    it('refuses a nonsense factor rather than losing the sheet', () => {
+        expect(zoomPageAt(page, null, 800, 600, 400, 300, 0).zoom).toBe(1);
+        expect(zoomPageAt(page, null, 800, 600, 400, 300, -2).zoom).toBe(1);
+        expect(zoomPageAt(page, null, 800, 600, 400, 300, NaN).zoom).toBe(1);
+    });
+
+    it('does nothing without a sheet, where the camera zooms instead', () => {
+        expect(zoomPageAt(null, { zoom: 3 }, 800, 600, 400, 300, 2).zoom).toBe(3);
+    });
+});
+
+describe('panPage', () => {
+    const page = { width: 0.42, height: 0.297 };
+
+    it('moves the sheet by the drag', () => {
+        const view = panPage(page, null, 800, 600, 40, -25);
+        const moved = pageScreenRect(page, 800, 600, view);
+        const still = pageScreenRect(page, 800, 600, null);
+        expect(moved.x).toBeCloseTo(still.x + 40, 6);
+        expect(moved.y).toBeCloseTo(still.y - 25, 6);
+    });
+
+    it('keeps some of the sheet on the canvas, however hard it is thrown', () => {
+        // Panning the paper out of the window with no way back is the one
+        // outcome worth making impossible.
+        let view = null;
+        for (let i = 0; i < 40; i += 1) {
+            view = panPage(page, view, 800, 600, 500, 500);
+        }
+        const rect = pageScreenRect(page, 800, 600, view);
+        expect(rect.x).toBeLessThan(800);
+        expect(rect.y).toBeLessThan(600);
+        expect(rect.x + rect.width).toBeGreaterThan(0);
+        expect(rect.y + rect.height).toBeGreaterThan(0);
+    });
+
+    it('leaves the zoom alone', () => {
+        expect(panPage(page, { zoom: 2.5 }, 800, 600, 10, 10).zoom).toBeCloseTo(2.5, 9);
+    });
+
+    it('does nothing without a sheet', () => {
+        expect(panPage(null, { offsetX: 5 }, 800, 600, 40, 40).offsetX).toBe(5);
+    });
+});
+
+describe('tiltExceeded', () => {
+    const declared = { x: 0, y: -1, z: 0 };
+
+    it('allows a nudge, which is what the tilt is for', () => {
+        const nudged = { x: 0.05, y: -0.998, z: 0.02 };
+        expect(tiltExceeded(nudged, declared)).toBe(false);
+    });
+
+    it('stops an elevation being turned into a different view', () => {
+        expect(tiltExceeded({ x: 1, y: 0, z: 0 }, declared)).toBe(true);
+        expect(tiltExceeded({ x: 0, y: 1, z: 0 }, declared)).toBe(true);
+    });
+
+    it('measures the angle, not the length', () => {
+        expect(tiltExceeded({ x: 0, y: -7, z: 0 }, declared)).toBe(false);
+    });
+
+    it('takes the limit it is given', () => {
+        const half = { x: 0.7071, y: -0.7071, z: 0 };
+        expect(tiltExceeded(half, declared, Math.PI / 2)).toBe(false);
+        expect(tiltExceeded(half, declared, 0.1)).toBe(true);
+    });
+
+    it('has nothing to say about an unlocked viewport', () => {
+        expect(tiltExceeded(null, declared)).toBe(false);
+        expect(tiltExceeded(declared, null)).toBe(false);
+    });
+
+    it('allows less than a right angle, or the lock means nothing', () => {
+        expect(MAX_TILT_RADIANS).toBeGreaterThan(0);
+        expect(MAX_TILT_RADIANS).toBeLessThan(Math.PI / 4);
     });
 });

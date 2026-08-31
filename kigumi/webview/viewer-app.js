@@ -27,7 +27,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
+const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, tiltExceeded, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
 const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
@@ -89,9 +89,18 @@ class ViewerViewport {
         controller.setCenter(camera.target[0], camera.target[1], camera.target[2]);
         controller.cameraOffsetDir.set(-camera.look[0], -camera.look[1], -camera.look[2]).normalize();
         controller.cameraUpVector.set(camera.up[0], camera.up[1], camera.up[2]).normalize();
+        // Kept so a tilt has a rest position to be measured against and to
+        // return to. Without it the declared angle is only wherever the camera
+        // happened to start.
+        this.declaredOffsetDir = controller.cameraOffsetDir.clone();
+        this.declaredUpVector = controller.cameraUpVector.clone();
         controller.orbitDist = orbitDistanceForExtent(camera.extent, this.perspectiveCamera.fov);
     }
 }
+// A drag on a locked viewport turns more slowly than a free orbit -- it is a
+// nudge within a small cone, so the same hand movement should cover less of it.
+const TILT_ORBIT_SPEED = 0.0016;
+
 // How long to wait for a paint before going ahead without one. Comfortably
 // longer than a healthy frame, so it only takes effect when paints have
 // actually stopped.
@@ -1613,6 +1622,10 @@ class KigumiViewerApp extends LitElement {
             // Calculate adaptive zoom factor based on current distance
             // This makes zoom speed feel consistent across all scales
             const adaptiveZoomFactor = this.getAdaptiveZoomFactor(event.deltaY > 0);
+            if (this.activePage) {
+                this.zoomPageToward(event.clientX, event.clientY, adaptiveZoomFactor);
+                return;
+            }
             this.zoomTowardPointer(event.clientX, event.clientY, adaptiveZoomFactor);
         }, { passive: false });
 
@@ -1750,17 +1763,45 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Orbit the active viewport, unless the scene has locked its angle.
+     * Orbit the active viewport, or tilt it if the scene locked its angle.
      *
-     * A locked elevation is only an elevation while it points where the scene
-     * says; pan and zoom still ride on top of it, but the angle is fixed.
+     * A locked elevation is only an elevation while it points where the drawing
+     * says, so a drag there is a bounded nudge rather than a free orbit: enough
+     * to read the depth of what is drawn, not enough to become a different
+     * view, and it springs back to the declared angle on release.
      */
     orbitActiveViewport(dx, dy) {
         const viewport = this.activeViewport;
-        if (!viewport || viewport.spec.locked) {
+        if (!viewport) {
             return;
         }
-        viewport.cameraController.applyOrbitDelta(dx, dy);
+        const controller = viewport.cameraController;
+        if (!viewport.spec.locked) {
+            controller.applyOrbitDelta(dx, dy);
+            return;
+        }
+        const before = controller.cameraOffsetDir.clone();
+        controller.applyOrbitDelta(dx, dy, TILT_ORBIT_SPEED);
+        if (tiltExceeded(controller.cameraOffsetDir, viewport.declaredOffsetDir)) {
+            controller.cameraOffsetDir.copy(before);
+        }
+    }
+
+    /** Return a tilted viewport to the angle its drawing declared. */
+    releaseTilt() {
+        const viewport = this.activeViewport;
+        if (!viewport || !viewport.spec.locked || !viewport.declaredOffsetDir) {
+            return;
+        }
+        if (viewport.cameraController.cameraOffsetDir.equals(viewport.declaredOffsetDir)) {
+            return;
+        }
+        this.animateCameraTo(
+            viewport.declaredOffsetDir.clone(),
+            viewport.cameraController.orbitDist,
+            220,
+            viewport.declaredUpVector ? viewport.declaredUpVector.clone() : null,
+        );
     }
 
     get camera() {
@@ -2628,6 +2669,11 @@ class KigumiViewerApp extends LitElement {
         const mouseDownTarget = finished.target;
         const mouseActionMoved = finished.moved;
         const canvas = this.renderRoot && this.renderRoot.querySelector ? this.renderRoot.querySelector('#c') : null;
+        if (activeMouseAction === 'orbit' && mouseActionMoved) {
+            // A tilted elevation goes back to its declared angle; a free orbit
+            // stays where it was let go.
+            this.releaseTilt();
+        }
         if (!activeMouseAction && canvas && event.target === canvas) {
             this.handleCanvasClick(event);
             return;
@@ -2666,7 +2712,11 @@ class KigumiViewerApp extends LitElement {
         if (drag.action === 'orbit') {
             this.orbitActiveViewport(drag.dx, drag.dy);
         } else if (drag.action === 'pan') {
-            this.panCameraInViewPlane(drag.fromX, drag.fromY, drag.toX, drag.toY);
+            if (this.activePage) {
+                this.panPageBy(drag.toX - drag.fromX, drag.toY - drag.fromY);
+            } else {
+                this.panCameraInViewPlane(drag.fromX, drag.fromY, drag.toX, drag.toY);
+            }
         }
         this.cameraController.cancelAnimation();
         this.updateCamera();
@@ -5042,6 +5092,58 @@ class KigumiViewerApp extends LitElement {
         camera.top = halfHeight;
         camera.bottom = -halfHeight;
         camera.updateProjectionMatrix();
+    }
+
+    /** The sheet this scene is laid out on, or null when the canvas is it. */
+    get activePage() {
+        return this.sceneStore.activeScene().page;
+    }
+
+    /** The canvas size the page transform is computed against. */
+    _canvasSize() {
+        const element = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#viewport')
+            : null;
+        return element && element.offsetHeight
+            ? { width: element.offsetWidth, height: element.offsetHeight }
+            : null;
+    }
+
+    /**
+     * Move the sheet under the cursor.
+     *
+     * Pan and zoom belong to the page, not to a camera: a drawing's views each
+     * hold a declared scale, and zooming one of them would change what 1:20
+     * means rather than bringing the reader closer to the paper.
+     */
+    panPageBy(dx, dy) {
+        const size = this._canvasSize();
+        if (!this.activePage || !size) {
+            return;
+        }
+        this.pageView = panPage(this.activePage, this.pageView, size.width, size.height, dx, dy);
+        this.requestUpdate();
+    }
+
+    zoomPageToward(clientX, clientY, factor) {
+        const size = this._canvasSize();
+        const canvas = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#c')
+            : null;
+        if (!this.activePage || !size || !canvas) {
+            return;
+        }
+        const bounds = canvas.getBoundingClientRect();
+        this.pageView = zoomPageAt(
+            this.activePage,
+            this.pageView,
+            size.width,
+            size.height,
+            clientX - bounds.left,
+            clientY - bounds.top,
+            factor,
+        );
+        this.requestUpdate();
     }
 
     /**

@@ -105,6 +105,87 @@
         };
     }
 
+    // How much of the sheet has to stay on the canvas. Panning it entirely out
+    // of view, with no way to find it again, is a state worth making impossible
+    // rather than recoverable.
+    const PAGE_PAN_KEEP = 0.15;
+
+    /** Move the sheet, keeping enough of it on the canvas to grab again. */
+    function panPage(page, view, canvasWidth, canvasHeight, dx, dy) {
+        const current = normalizePageView(view);
+        if (!page) {
+            return current;
+        }
+        const rect = pageScreenRect(page, canvasWidth, canvasHeight, {
+            ...current,
+            offsetX: current.offsetX + dx,
+            offsetY: current.offsetY + dy,
+        });
+        const marginX = rect.width * PAGE_PAN_KEEP;
+        const marginY = rect.height * PAGE_PAN_KEEP;
+        const centred = pageScreenRect(page, canvasWidth, canvasHeight, { ...current, offsetX: 0, offsetY: 0 });
+        const minX = marginX - rect.width;
+        const maxX = canvasWidth - marginX;
+        const minY = marginY - rect.height;
+        const maxY = canvasHeight - marginY;
+        const clampedX = Math.min(maxX, Math.max(minX, rect.x));
+        const clampedY = Math.min(maxY, Math.max(minY, rect.y));
+        return {
+            zoom: current.zoom,
+            offsetX: clampedX - centred.x,
+            offsetY: clampedY - centred.y,
+        };
+    }
+
+    /**
+     * Zoom the sheet about a point, leaving whatever is under that point there.
+     *
+     * The page equivalent of zooming toward the cursor, and simpler than the
+     * world-space version it stands in for: the point is a fraction of the
+     * sheet, and the fraction is what has to survive the zoom.
+     */
+    function zoomPageAt(page, view, canvasWidth, canvasHeight, pointX, pointY, factor) {
+        const current = normalizePageView(view);
+        if (!page || !Number.isFinite(factor) || factor <= 0) {
+            return current;
+        }
+        const before = pageScreenRect(page, canvasWidth, canvasHeight, current);
+        const zoomed = normalizePageView({ ...current, zoom: current.zoom * factor });
+        const after = pageScreenRect(page, canvasWidth, canvasHeight, { ...zoomed, offsetX: 0, offsetY: 0 });
+        // Where the point sits on the sheet, as a fraction of it.
+        const u = before.width > 0 ? (pointX - before.x) / before.width : 0.5;
+        const v = before.height > 0 ? (pointY - before.y) / before.height : 0.5;
+        const wantedX = pointX - u * after.width;
+        const wantedY = pointY - v * after.height;
+        return {
+            zoom: zoomed.zoom,
+            offsetX: wantedX - after.x,
+            offsetY: wantedY - after.y,
+        };
+    }
+
+    // How far a locked viewport may be nudged off its declared angle. Enough to
+    // read as depth, not enough for an elevation to stop being one.
+    const MAX_TILT_RADIANS = 0.18;
+
+    /** Whether a candidate direction has strayed past the tilt a lock allows. */
+    function tiltExceeded(candidate, declared, maxRadians = MAX_TILT_RADIANS) {
+        if (!candidate || !declared) {
+            return false;
+        }
+        const dotted = dot(
+            [candidate.x, candidate.y, candidate.z],
+            [declared.x, declared.y, declared.z],
+        );
+        const lengths = Math.sqrt(dot([candidate.x, candidate.y, candidate.z], [candidate.x, candidate.y, candidate.z]))
+            * Math.sqrt(dot([declared.x, declared.y, declared.z], [declared.x, declared.y, declared.z]));
+        if (!(lengths > 0)) {
+            return false;
+        }
+        const cosine = Math.min(1, Math.max(-1, dotted / lengths));
+        return Math.acos(cosine) > maxRadians;
+    }
+
     /**
      * The denominator of a viewport's drawing scale: 1:N.
      *
@@ -394,6 +475,10 @@
         normalizePage,
         normalizePageView,
         pageScreenRect,
+        panPage,
+        zoomPageAt,
+        tiltExceeded,
+        MAX_TILT_RADIANS,
         viewportScale,
         extentForScale,
         PAGE_FIT_MARGIN,
