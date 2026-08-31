@@ -1,6 +1,6 @@
 const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
-    isOrthogonalFrame, pixelRect, viewportAtPoint,
+    isOrthogonalFrame, pixelRect, viewportAspect, viewportAtPoint,
 } = require('../webview/scene-store.js');
 
 describe('the default 3D scene', () => {
@@ -92,6 +92,26 @@ describe('pixelRect', () => {
         const rect = pixelRect([0, 0, 0.0001, 0.0001], 800, 600);
         expect(rect.width).toBeGreaterThan(0);
         expect(rect.height).toBeGreaterThan(0);
+    });
+});
+
+describe('viewportAspect', () => {
+    test('a full-canvas viewport takes the canvas aspect', () => {
+        expect(viewportAspect([0, 0, 1, 1], 800, 400)).toBe(2);
+    });
+
+    test('a half-width viewport is half as wide as the canvas, not as wide', () => {
+        // Giving a camera the canvas aspect here is what renders a frame
+        // stretched across its viewport.
+        expect(viewportAspect([0, 0, 0.5, 1], 800, 400)).toBe(1);
+    });
+
+    test('a stacked elevation is taller than it is wide', () => {
+        expect(viewportAspect([0, 0, 0.5, 0.25], 800, 400)).toBe(4);
+    });
+
+    test('a viewport with no height does not divide by zero', () => {
+        expect(viewportAspect([0, 0, 1, 0], 800, 400)).toBe(1);
     });
 });
 

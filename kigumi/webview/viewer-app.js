@@ -25,7 +25,7 @@ const FOOTPRINT_COLOR_SWATCHES = {
     orange: { fill: 0xe8a35c, edge: 0x8a4a1c },
 };
 const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.KigumiDisplayOptions;
-const { SceneStore, pixelRect: viewportPixelRect } = window.KigumiScenes;
+const { SceneStore, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -62,10 +62,7 @@ class ViewerViewport {
         return viewportPixelRect(this.spec.rect, canvasWidth, canvasHeight);
     }
 
-    get aspect() {
-        const [, , width, height] = this.spec.rect;
-        return height > 0 ? width / height : 1;
-    }
+
 }
 const DEFAULT_FOOTPRINT_COLOR = 'orange';
 
@@ -1862,6 +1859,11 @@ class KigumiViewerApp extends LitElement {
         if (!this.viewports.some((viewport) => viewport.id === this.activeViewportId)) {
             this.activeViewportId = this.viewports.length > 0 ? this.viewports[0].id : null;
         }
+        // Cameras are built with a placeholder aspect, since a viewport can be
+        // rebuilt before there is a canvas to measure. Give them the real one
+        // now if there is; without this they keep 1 until the first resize and
+        // the frame renders stretched to the canvas.
+        this.syncCameraProjection();
         this.updateCamera();
     }
 
@@ -5400,14 +5402,18 @@ class KigumiViewerApp extends LitElement {
         if (!element || !element.offsetHeight) {
             return 1;
         }
-        return (element.offsetWidth / element.offsetHeight) * viewport.aspect;
+        return rectAspect(viewport.spec.rect, element.offsetWidth, element.offsetHeight);
     }
 
     // Keeps both cameras' aspect/frustum in sync with the current viewport size --
     // called on resize and when toggling projection mode (the camera that just became
     // inactive should still be correctly sized if the viewport changes while it's idle).
     syncCameraProjection() {
-        const element = this.renderRoot.querySelector('#viewport');
+        // Reached from rebuildViewports, which runs in the constructor, so
+        // there is not always a DOM to measure yet.
+        const element = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#viewport')
+            : null;
         if (!element || !element.offsetHeight) {
             return;
         }

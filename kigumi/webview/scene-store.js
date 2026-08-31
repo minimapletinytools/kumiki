@@ -110,6 +110,20 @@
         };
     }
 
+    /**
+     * A viewport's aspect ratio: its share of the canvas, times the canvas's own.
+     *
+     * Not the canvas's aspect -- an elevation occupying a quarter of the width
+     * is a different shape from the window around it, and a camera given the
+     * wrong one renders the frame stretched.
+     */
+    function viewportAspect(rect, canvasWidth, canvasHeight) {
+        const [, , width, height] = rect;
+        const pixelWidth = width * canvasWidth;
+        const pixelHeight = height * canvasHeight;
+        return pixelHeight > 0 ? pixelWidth / pixelHeight : 1;
+    }
+
     /** Which viewport a point in canvas pixels falls in, or null. */
     function viewportAtPoint(viewports, pointX, pointY, canvasWidth, canvasHeight) {
         for (let index = viewports.length - 1; index >= 0; index -= 1) {
@@ -196,6 +210,7 @@
         normalizeScene,
         isOrthogonalFrame,
         pixelRect,
+        viewportAspect,
         viewportAtPoint,
     };
 
