@@ -1134,7 +1134,8 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
         })
 
     viewports.append(_preview_viewport(
-        _DEBUG_DRAWING_RECTS["preview"], centre, half_size, _DEBUG_DRAWING_PAGE, {"mode": "free"},
+        _DEBUG_DRAWING_RECTS["preview"], _world_box(centre, half_size), _DEBUG_DRAWING_PAGE,
+        {"mode": "free"}, orient_by_search,
     ))
 
     return {
@@ -1206,7 +1207,7 @@ def _normalize(vec: List[float]) -> List[float]:
 
 
 def _camera_frame_looking(look: List[float]) -> Dict[str, Any]:
-    """An orthonormal frame looking along `look`, kept as upright as it can be.
+    """An orthonormal frame looking along `look`, kept upright.
 
     `up` is world Z with the part along the view direction taken out, which is
     what stops a three-quarter view from arriving on its side. right x up ==
@@ -1219,29 +1220,103 @@ def _camera_frame_looking(look: List[float]) -> Dict[str, Any]:
     return {"right": _normalize(_cross(forward, up)), "up": up, "look": forward}
 
 
+# --- preview orientation strategies -----------------------------------------
+#
+# Where the preview looks from. Two strategies, because what makes a good angle
+# depends on what is being drawn, and neither is obviously the last word --
+# `orient_by_search` in particular is a guess-and-check and may not survive, so
+# it is kept behind the same seam as the other and can be dropped without
+# touching anything that calls it.
+#
+# Both take an OrientedBox and the viewport's aspect, and return a camera frame.
+
+
+class OrientedBox(NamedTuple):
+    """A box in the world: where it is, which way it lies, and how big it is.
+
+    Not an axis-aligned bounding box. A single timber has its own axes and is
+    usually not square to the world, and orienting a view around its true box
+    rather than the world box it happens to occupy is the difference between
+    seeing the piece and seeing the space it takes up.
+    """
+
+    centre: List[float]
+    axes: Tuple[List[float], List[float], List[float]]
+    half_sizes: Tuple[float, float, float]
+
+    def reach(self, direction: List[float]) -> float:
+        """How far the box extends along a direction, from its centre."""
+        return sum(
+            abs(sum(direction[i] * self.axes[axis][i] for i in range(3))) * self.half_sizes[axis]
+            for axis in range(3)
+        )
+
+    def silhouette_area(self, look: List[float]) -> float:
+        """How much of the box a viewer sees, looking along `look`.
+
+        Exact for a box: each face pair contributes its area scaled by how
+        squarely it faces the camera.
+        """
+        a, b, c = self.half_sizes
+        faces = ((a, 4 * b * c), (b, 4 * a * c), (c, 4 * a * b))
+        return sum(
+            abs(sum(look[i] * self.axes[axis][i] for i in range(3))) * area
+            for axis, (_, area) in enumerate(faces)
+        )
+
+    @property
+    def longest_axis(self) -> int:
+        return max(range(3), key=lambda axis: self.half_sizes[axis])
+
+
+def _world_box(centre: List[float], half_size: List[float]) -> OrientedBox:
+    """The world-aligned box a group of members occupies."""
+    return OrientedBox(
+        centre=centre,
+        axes=([1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]),
+        half_sizes=(half_size[0], half_size[1], half_size[2]),
+    )
+
+
+def _timber_box(entry: Dict[str, Any]) -> OrientedBox:
+    """One timber's own box: its axes, its section, and its cut extent.
+
+    The cut extent rather than the stock, for the same reason the elevations use
+    it -- a timber with an end joint is not cut to length first, so its stock is
+    not the piece anyone is looking at.
+    """
+    timber = entry["timber"]
+    along = _vector3_to_floats(timber.get_length_direction_global())
+    across = _vector3_to_floats(timber.get_width_direction_global())
+    up = _vector3_to_floats(timber.get_height_direction_global())
+    origin = _vector3_to_floats(timber.get_bottom_position_global())
+    start, finish = _cut_extent(entry["cutTimber"], float(timber.length))
+    middle = (start + finish) / 2.0
+    return OrientedBox(
+        centre=[origin[i] + along[i] * middle for i in range(3)],
+        axes=(along, across, up),
+        half_sizes=(
+            (finish - start) / 2.0,
+            float(timber.size[0]) / 2.0,
+            float(timber.size[1]) / 2.0,
+        ),
+    )
+
+
+def _preview_extent(box: OrientedBox, frame: Dict[str, Any], aspect: float) -> float:
+    """How much of the world the preview has to hold, at this angle."""
+    needed = max(box.reach(frame["up"]), box.reach(frame["right"]) / aspect)
+    return max(0.001, needed * _PREVIEW_EXTENT_PADDING)
+
+
 # A perspective view wants more room around the piece than an elevation does.
 _PREVIEW_EXTENT_PADDING = 1.6
 
-# Where the preview may look from. Every compass direction, and a few heights
+# Where the search may look from. Every compass direction, and a few heights
 # above the horizon -- never level with it or straight down, where an upright
 # camera has no up left to speak of.
 _PREVIEW_AZIMUTH_STEPS = 24
 _PREVIEW_ELEVATIONS_DEG = (20.0, 35.0, 50.0)
-
-
-def _box_silhouette_area(half_size: List[float], look: List[float]) -> float:
-    """How much of a box a viewer sees, looking along `look`.
-
-    Exact for a box: the silhouette is the sum of each face pair's area scaled
-    by how squarely it faces the camera. This is what stops the search below
-    settling on an end-on view, which fits beautifully and shows nothing.
-    """
-    a, b, c = half_size
-    return (
-        abs(look[0]) * 4 * b * c
-        + abs(look[1]) * 4 * a * c
-        + abs(look[2]) * 4 * a * b
-    )
 
 
 def _preview_look_candidates() -> List[List[float]]:
@@ -1259,75 +1334,120 @@ def _preview_look_candidates() -> List[List[float]]:
     return candidates
 
 
-def _preview_extent(half_size: List[float], frame: Dict[str, Any], aspect: float) -> float:
-    """How much of the world the preview has to hold, for this angle."""
-    needed_up = sum(abs(frame["up"][i]) * half_size[i] for i in range(3))
-    needed_right = sum(abs(frame["right"][i]) * half_size[i] for i in range(3))
-    return max(0.001, max(needed_up, needed_right / aspect) * _PREVIEW_EXTENT_PADDING)
+def orient_by_search(box: OrientedBox, aspect: float, preserve_up: bool = True) -> Dict[str, Any]:
+    """Try a few dozen angles and keep the one that shows the piece best.
 
-
-def _best_preview_look(half_size: List[float], aspect: float) -> List[float]:
-    """The angle that shows as much of the piece as the viewport can hold.
-
-    Searched rather than assumed, because the best angle depends on both the
-    piece and the shape of the viewport: a fixed three-quarter view wastes most
-    of a tall viewport on a long timber.
-
-    What is maximized is how long the piece's longest axis appears once the view
-    has been sized to fit it. The obvious alternative -- how much of the
-    viewport the silhouette fills -- is worse than useless here, because it is
-    always won by looking straight down the length of the timber: an end-on view
-    fits beautifully and shows nothing. Length on screen goes to zero there
-    instead, which is the answer wanted.
+    What is maximized is how long the box's longest axis appears once the view
+    has been sized to fit it. The obvious measure -- how much of the viewport
+    the silhouette fills -- is worse than useless, because it is always won by
+    looking straight down the length of the piece: an end-on view fits
+    beautifully and shows nothing. Length on screen goes to zero there instead.
 
     Two angles that show the piece equally long are separated by which shows
     more of it, so a square-on view loses to a three-quarter one.
 
+    With `preserve_up` the candidates are upright, so world +Z stays up the
+    screen. That is what several timbers want: a frame read at a tilt is harder
+    to follow than one drawn slightly smaller, and which way is up is part of
+    what the preview is telling you.
+
     There is very likely a closed form for this -- the best angle for a box in a
     viewport of a given aspect is not a hard problem, and someone has certainly
     solved it. Guessing and checking is fine here: it is a few dozen candidates
-    against eight corners, it runs once when a drawing is asked for rather than
-    per frame, and being able to change the scoring by reading it is worth more
-    than being clever. If the scoring ever gets fussier, that is the moment to
-    look for the closed form rather than add more candidates.
+    against one box, it runs once when a drawing is asked for rather than per
+    frame, and being able to change the scoring by reading it is worth more than
+    being clever.
     """
-    longest_axis = max(range(3), key=lambda axis: half_size[axis])
-    longest = half_size[longest_axis]
-    best_look = [-1.0, 1.0, -0.75]
+    longest = box.half_sizes[box.longest_axis]
+    axis = box.axes[box.longest_axis]
+    best_frame = _camera_frame_looking([-1.0, 1.0, -0.75])
     best_length = -1.0
     best_area = -1.0
     for look in _preview_look_candidates():
-        frame = _camera_frame_looking(look)
-        extent = _preview_extent(half_size, frame, aspect)
-        across = frame["right"][longest_axis] * longest
-        up_screen = frame["up"][longest_axis] * longest
-        on_screen = math.sqrt(across * across + up_screen * up_screen) / extent
-        area = _box_silhouette_area(half_size, _normalize(look))
-        # Within a couple of percent counts as the same length, and then the
-        # view that shows more of the piece wins.
-        if on_screen > best_length * 1.02 or (on_screen > best_length * 0.98 and area > best_area):
-            best_length = max(best_length, on_screen)
-            best_area = area
-            best_look = look
-    return best_look
+        frames = [_camera_frame_looking(look)]
+        if not preserve_up:
+            # Also allow the piece's own length to be the screen's up, which
+            # suits a long timber in a tall viewport and puts the world on its
+            # side to get it.
+            frames.append(_frame_from_look_and_up(look, axis))
+        for frame in frames:
+            extent = _preview_extent(box, frame, aspect)
+            across = sum(frame["right"][i] * axis[i] for i in range(3)) * longest
+            up_screen = sum(frame["up"][i] * axis[i] for i in range(3)) * longest
+            on_screen = math.sqrt(across * across + up_screen * up_screen) / extent
+            area = box.silhouette_area(_normalize(look))
+            # Within a couple of percent counts as the same length, and then
+            # the view that shows more of the piece wins.
+            if on_screen > best_length * 1.02 or (on_screen > best_length * 0.98 and area > best_area):
+                best_length = max(best_length, on_screen)
+                best_area = area
+                best_frame = frame
+    return best_frame
+
+
+# Where a single piece is looked at from, in its own frame: off to one side,
+# above, and a little towards one end, so a long face, a short face and an end
+# are all in view.
+_PIECE_LOOK_IN_BOX = (0.38, 0.86, -0.55)
+
+
+def orient_from_box(box: OrientedBox, aspect: float) -> Dict[str, Any]:
+    """Look at a box from a fixed three-quarter angle in its own frame.
+
+    For a single piece there is nothing to search for: the box is the timber, so
+    the angle that shows it well is the same angle every time, expressed in the
+    timber's own axes rather than the world's. A post and a brace lying at forty
+    degrees get the same view of themselves.
+
+    The piece is laid along whichever way the viewport is longer, since that is
+    the direction there is room in.
+    """
+    length, across, up = box.axes
+    look = _normalize([
+        length[i] * _PIECE_LOOK_IN_BOX[0]
+        + across[i] * _PIECE_LOOK_IN_BOX[1]
+        + up[i] * _PIECE_LOOK_IN_BOX[2]
+        for i in range(3)
+    ])
+    longest = box.axes[box.longest_axis]
+    # A tall viewport wants the piece standing up in it, a wide one wants it
+    # lying down -- so the long axis goes up the screen only in the first.
+    up_hint = longest if aspect < 1 else up
+    return _frame_from_look_and_up(look, up_hint)
+
+
+def _frame_from_look_and_up(look: List[float], up_hint: List[float]) -> Dict[str, Any]:
+    """An orthonormal frame looking along `look`, as close to `up_hint` as it can.
+
+    Falls back to the upright frame when the hint is along the view direction,
+    where it says nothing about which way is up.
+    """
+    forward = _normalize(look)
+    along = sum(up_hint[i] * forward[i] for i in range(3))
+    up = [up_hint[i] - along * forward[i] for i in range(3)]
+    if sum(component * component for component in up) < 1e-9:
+        return _camera_frame_looking(look)
+    up = _normalize(up)
+    return {"right": _normalize(_cross(forward, up)), "up": up, "look": forward}
 
 
 def _preview_viewport(
     rect: List[float],
-    centre: List[float],
-    half_size: List[float],
+    box: OrientedBox,
     page: Dict[str, Any],
     orbit: Dict[str, Any],
+    orient,
 ) -> Dict[str, Any]:
     """The live 3D view beside the elevations, pointed at what is being drawn.
 
     Left to itself the viewer builds a camera at the origin looking at nothing
     in particular, which for a piece standing away from the origin means an
-    empty preview. The angle is chosen to fill the viewport (see
-    _best_preview_look), and `orbit` says how far it may be turned afterwards.
+    empty preview. `orient` is the strategy that picks the angle and `orbit`
+    says how far it may be turned afterwards.
     """
     aspect = _viewport_aspect(rect, page)
-    frame = _camera_frame_looking(_best_preview_look(half_size, aspect))
+    frame = orient(box, aspect)
+    centre = box.centre
     return {
         "id": "preview",
         "rect": rect,
@@ -1337,7 +1457,7 @@ def _preview_viewport(
         "camera": {
             **frame,
             "target": centre,
-            "extent": _preview_extent(half_size, frame, aspect),
+            "extent": _preview_extent(box, frame, aspect),
         },
     }
 
@@ -1421,18 +1541,23 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     if len(entries) == 1:
         viewports = _long_face_viewports(entries[0], page)
         preview_rect = _LONG_FACE_RECTS["preview"]
-        # One piece: the preview turns about the timber's own length, so it can
-        # be looked at from every side without ever being tumbled out of the
-        # attitude it is drawn in. Several pieces have no such axis to speak of.
-        orbit = {
-            "mode": "axis",
-            "axis": _vector3_to_floats(entries[0]["timber"].get_length_direction_global()),
-        }
+        # One piece: oriented from its own box rather than the world box it
+        # happens to occupy, and turned about its own length, so it can be
+        # looked at from every side without ever being tumbled out of the
+        # attitude it is drawn in.
+        preview_box = _timber_box(entries[0])
+        orient = orient_from_box
+        orbit = {"mode": "axis", "axis": list(preview_box.axes[0])}
     else:
         # No selection is treated as the whole frame, so asking for a drawing
         # before selecting anything gives you something rather than nothing.
         viewports = _world_elevation_viewports(entries or timber_entries, page)
         preview_rect = _SELECTION_QUADRANTS["preview"]
+        # Several pieces have no length of their own to speak of, so the angle
+        # is searched for -- and kept upright, since which way is up is part of
+        # what a preview of an assembly is telling you.
+        preview_box = _world_box(centre, half_size)
+        orient = orient_by_search
         orbit = {"mode": "free"}
 
     members = [entry["memberKey"] for entry in entries]
@@ -1440,7 +1565,7 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
         viewport["members"] = members or None
         viewport["ghostOthers"] = True
         viewport["measurements"] = []
-    viewports.append(_preview_viewport(preview_rect, centre, half_size, page, orbit))
+    viewports.append(_preview_viewport(preview_rect, preview_box, page, orbit, orient))
 
     return {
         "id": SELECTION_DRAWING_ID,
