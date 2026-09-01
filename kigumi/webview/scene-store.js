@@ -212,6 +212,11 @@
         ];
     }
 
+    // Where a drawing came from. 'code' is what the frame asked for, 'file' is
+    // the drawings file alone, and 'overridden' is a code drawing the file has
+    // replaced -- see docs/drawing-mode-plan.md.
+    const ORIGINS = ['code', 'overridden', 'file'];
+
     const ORBIT_MODES = ['free', 'axis'];
 
     /**
@@ -276,6 +281,11 @@
         const page = normalizePage(source.page);
         return {
             id: typeof source.id === 'string' && source.id ? source.id : DEFAULT_SCENE_ID,
+            // What to call it in a list, and where it came from. A scene with no
+            // origin is not a drawing -- the 3D scene has neither.
+            name: typeof source.name === 'string' && source.name ? source.name : null,
+            origin: ORIGINS.includes(source.origin) ? source.origin : null,
+            dirty: source.dirty === true,
             // The sheet these viewports sit on, or null for "the canvas".
             page,
             // Which camera controls this scene wants on screen. A drawing asks
@@ -455,6 +465,11 @@
             return Array.from(this.scenesById.keys());
         }
 
+        /** The drawings, in the order python gave them. Not the 3D scene. */
+        drawings() {
+            return Array.from(this.scenesById.values()).filter((scene) => scene.origin !== null);
+        }
+
         /** Take scenes as python sent them, keeping the default 3D scene. */
         setScenes(specs) {
             const normalized = (Array.isArray(specs) ? specs : []).map(normalizeScene);
@@ -506,6 +521,7 @@
         defaultSceneSpec,
         normalizeScene,
         sceneMembers,
+        ORIGINS,
         normalizeOrbit,
         ORBIT_MODES,
         isOrthogonalFrame,

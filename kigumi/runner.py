@@ -119,6 +119,10 @@ class SlotState:
     single_pattern_name: Optional[str] = None
     render_parameter_schema: List[RenderParameterDescriptor] = field(default_factory=list)
     applied_render_parameters: Dict[str, Any] = field(default_factory=dict)
+    # Drawings made in this session and not yet saved. They live here rather
+    # than in the viewer so python stays the one place a drawing comes from,
+    # and they are lost on reload, which is what "unsaved" should mean.
+    pending_drawings: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -1517,6 +1521,29 @@ def _world_elevation_viewports(
     return viewports
 
 
+def _unique_drawing_id(base: str, taken: set) -> str:
+    """A drawing id nothing else is using. Drawing the same piece twice is fine."""
+    candidate = base
+    suffix = 2
+    while candidate in taken:
+        candidate = f"{base} ({suffix})"
+        suffix += 1
+    return candidate
+
+
+def _selection_drawing_name(entries: List[Dict[str, Any]], total: int) -> str:
+    """What to call a drawing nobody has named.
+
+    One piece is called after the piece, which is what anyone would call it.
+    Several are counted, since listing them would not fit and would not help.
+    """
+    if len(entries) == 1:
+        return entries[0]["displayName"]
+    if not entries:
+        return f"whole frame ({total})"
+    return f"{len(entries)} members"
+
+
 def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[str, Any]:
     """A drawing of the selected members, on a sheet.
 
@@ -1569,6 +1596,8 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
 
     return {
         "id": SELECTION_DRAWING_ID,
+        "name": _selection_drawing_name(entries, len(timber_entries)),
+        "members": members,
         "page": page,
         # A drawing shows no camera gizmos.
         "cameraControls": [],
@@ -1640,14 +1669,21 @@ def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
     return scene
 
 
-def collect_drawings(frame: Any, example_path: Optional[Path]) -> List[Dict[str, Any]]:
-    """Every drawing for a frame, from the code and from the file, in order.
+def collect_drawings(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Every drawing for a frame: from the code, from the file, and unsaved.
 
     A file drawing sharing an id with a code one replaces it outright rather
     than patching its fields; a patch model needs a merge rule for every field
     and can come later if it is ever wanted. A file drawing whose code drawing
     has since gone away is kept and shown as a file drawing, because an extra
     row someone can delete beats work vanishing quietly.
+
+    `dirty` says a drawing is not in the file yet. It is worked out here rather
+    than left for the viewer to infer, so there is one answer to it.
     """
     overrides = _read_drawings_file(_drawings_file_path(example_path)) if example_path else {}
     drawings: List[Dict[str, Any]] = []
@@ -1675,6 +1711,22 @@ def collect_drawings(frame: Any, example_path: Optional[Path]) -> List[Dict[str,
         entry["origin"] = ORIGIN_FILE
         drawings.append(entry)
 
+    for drawing in drawings:
+        drawing["dirty"] = False
+        seen.add(drawing["id"])
+
+    # Made this session and not saved. A pending drawing that shares an id with
+    # a saved one has been made since, so it wins -- it is the newer answer.
+    for scene in (pending or []):
+        entry = dict(scene)
+        entry["dirty"] = True
+        entry.setdefault("origin", ORIGIN_FILE)
+        replaced = next((d for d in drawings if d["id"] == entry["id"]), None)
+        if replaced is None:
+            drawings.append(entry)
+        else:
+            drawings[drawings.index(replaced)] = entry
+
     return drawings
 
 
@@ -1688,7 +1740,7 @@ def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> s
     path = _drawings_file_path(example_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     keep = [
-        {key: value for key, value in drawing.items() if key != "origin"}
+        {key: value for key, value in drawing.items() if key not in ("origin", "dirty")}
         for drawing in drawings
         if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)
     ]
@@ -3608,20 +3660,37 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
 
     if command == "get_drawings":
         ss = _resolve_slot(state, payload)
-        return state, make_success_response(
-            request_id, command, {"scenes": collect_drawings(ss.frame, ss.file_path)},
-        ), False
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
 
     if command == "save_drawings":
+        # Everything at once, and only what the file is responsible for.
         ss = _resolve_slot(state, payload)
-        scenes = payload.get("scenes")
-        written = write_drawings_file(ss.file_path, scenes if isinstance(scenes, list) else [])
-        return state, make_success_response(request_id, command, {"path": written}), False
+        drawings = collect_drawings(ss.frame, ss.file_path, ss.pending_drawings)
+        written = write_drawings_file(ss.file_path, drawings)
+        # They are the file's now, so nothing is pending and the next read finds
+        # them there. Keeping them would give the same drawing two answers.
+        ss.pending_drawings = []
+        return state, make_success_response(request_id, command, {
+            "path": written,
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
 
     if command == "create_drawing_from_selection":
         ss = _resolve_slot(state, payload)
         drawing = create_drawing_from_selection(ss.frame, payload.get("member_keys") or [])
-        return state, make_success_response(request_id, command, {"scenes": [drawing]}), False
+        existing = collect_drawings(ss.frame, ss.file_path, ss.pending_drawings)
+        drawing["id"] = _unique_drawing_id(drawing["name"], {d["id"] for d in existing})
+        # The name follows the id, so drawing the same piece twice gives two
+        # rows you can tell apart rather than two called the same thing.
+        drawing["name"] = drawing["id"]
+        drawing["origin"] = ORIGIN_FILE
+        ss.pending_drawings.append(drawing)
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "enterId": drawing["id"],
+        }), False
 
     if command == "get_default_drawing_for_debugging":
         # Testing scaffolding; see build_default_drawing_for_debugging. Kept out

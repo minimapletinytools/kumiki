@@ -46,6 +46,11 @@
             this.tagIndex = [];
             this.tagEntriesById = new Map();
             this.el = null;
+            // Drawings, and which of them is open. Set by the viewer; the panel
+            // keeps no list of its own to fall out of step.
+            this.drawings = [];
+            this.activeSceneId = null;
+            this.drawingsEnabled = false;
             this.viewport = null;
             this._unsubSelection = null;
             this._unsubLayerState = null;
@@ -189,13 +194,20 @@
         _renderTree() {
             if (!this._treeEl) return;
             this._treeEl.innerHTML = '';
+            if (this.drawingsEnabled) {
+                this._renderSection(
+                    this._treeEl, 'drawings', t('viewer.layers.section.drawings'),
+                    () => this._buildDrawingRows(),
+                    () => this._makeSaveDrawingsButton(),
+                );
+            }
             this._renderSection(this._treeEl, 'tags', t('viewer.layers.section.tags'), () => this._buildTagRows());
             this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
             this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
             this._syncHighlight();
         }
 
-        _renderSection(parent, sectionId, title, buildRows) {
+        _renderSection(parent, sectionId, title, buildRows, buildAction) {
             const nodeId = 'section:' + sectionId;
             const expanded = this.expandedNodes.has(nodeId);
 
@@ -211,6 +223,12 @@
             const titleSpan = document.createElement('span');
             titleSpan.textContent = ' ' + title;
             sectionHeader.appendChild(titleSpan);
+            if (typeof buildAction === 'function') {
+                const action = buildAction();
+                if (action) {
+                    sectionHeader.appendChild(action);
+                }
+            }
             sectionHeader.addEventListener('click', () => {
                 this._toggle(nodeId);
             });
@@ -333,6 +351,86 @@
             return this.tagIndex
                 .filter((entry) => this._matchesFilter(entry.name))
                 .map((entry) => this._makeTagRow(entry));
+        }
+
+        /**
+         * Where a drawing came from, as one mark.
+         *
+         * The fill reads as how much of it comes from the drawings file: none,
+         * some, all. Origin and saved-ness are separate things, so they get
+         * separate marks -- crossing them into four glyphs would be a legend to
+         * memorize, and would not survive a third source ever turning up.
+         */
+        _originMark(origin) {
+            if (origin === 'code') {
+                return { glyph: '\u25cb', title: t('viewer.layers.drawing.fromCode') };
+            }
+            if (origin === 'overridden') {
+                return { glyph: '\u25d0', title: t('viewer.layers.drawing.overridden') };
+            }
+            return { glyph: '\u25cf', title: t('viewer.layers.drawing.fromFile') };
+        }
+
+        _buildDrawingRows() {
+            return (this.drawings || [])
+                .filter((drawing) => this._matchesFilter(drawing.name || drawing.id))
+                .map((drawing) => this._makeDrawingRow(drawing));
+        }
+
+        /** One drawing: where it came from, what it is called, and whether it is saved. */
+        _makeDrawingRow(drawing) {
+            const active = drawing.id === this.activeSceneId;
+            const row = document.createElement('div');
+            row.className = 'lp-row lp-row-drawing lp-depth-0 lp-selectable'
+                + (active ? ' lp-row-active-drawing' : '');
+            row.dataset.nodeId = 'drawing:' + drawing.id;
+            row.title = t('viewer.layers.drawing.open.title');
+
+            const chev = document.createElement('span');
+            chev.className = 'lp-chev lp-leaf';
+            row.appendChild(chev);
+
+            const mark = this._originMark(drawing.origin);
+            const origin = document.createElement('span');
+            origin.className = 'lp-drawing-origin';
+            origin.textContent = mark.glyph;
+            origin.title = mark.title;
+            row.appendChild(origin);
+
+            const name = document.createElement('span');
+            name.className = 'lp-drawing-name';
+            name.textContent = drawing.name || drawing.id;
+            row.appendChild(name);
+
+            // The convention an editor uses for a modified tab, for the same
+            // reason: it says there is something to save without saying more.
+            const unsaved = document.createElement('span');
+            unsaved.className = 'lp-drawing-unsaved';
+            unsaved.textContent = drawing.dirty ? '\u2022' : '';
+            unsaved.title = drawing.dirty ? t('viewer.layers.drawing.unsaved') : '';
+            row.appendChild(unsaved);
+
+            row.addEventListener('click', () => {
+                this._emit('kigumi-enter-drawing', { sceneId: drawing.id });
+            });
+
+            return row;
+        }
+
+        /** Save, on the section rather than the rows: it saves all of them. */
+        _makeSaveDrawingsButton() {
+            const anyUnsaved = (this.drawings || []).some((drawing) => drawing.dirty);
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'lp-section-action';
+            button.textContent = t('viewer.layers.drawing.save');
+            button.title = t('viewer.layers.drawing.save.title');
+            button.disabled = !anyUnsaved;
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this._emit('kigumi-save-drawings', {});
+            });
+            return button;
         }
 
         /** One tag: its kind as a colour, its name, and how many wear it. */
@@ -534,6 +632,13 @@
             }
             this.requestedCsgTrees.add(timberKey);
             this._emit('kigumi-request-csg-tree', { memberKey: timberKey });
+        }
+
+        /** The drawings to list, and which one is open. */
+        setDrawings(drawings, activeSceneId) {
+            this.drawings = Array.isArray(drawings) ? drawings : [];
+            this.activeSceneId = activeSceneId || null;
+            this._render();
         }
 
         _emit(type, detail) {
@@ -841,6 +946,24 @@
             this._emitLayerStateSync();
         }
 
+        /** The drawings to list, and which one is open. */
+        setDrawings(drawings, activeSceneId) {
+            this._drawings = { drawings, activeSceneId };
+            this._ensureMounted();
+            if (this._panel) {
+                this._panel.setDrawings(drawings, activeSceneId);
+            }
+        }
+
+        /** Whether the drawings section is offered at all (the beta setting). */
+        setDrawingsEnabled(enabled) {
+            this._drawingsEnabled = Boolean(enabled);
+            this._ensureMounted();
+            if (this._panel) {
+                this._panel.drawingsEnabled = this._drawingsEnabled;
+            }
+        }
+
         _ensureMounted() {
             if (this._panel || !this._selectionManager) {
                 return;
@@ -861,8 +984,13 @@
                 }));
             });
             this._panel = new LayersPanel(this._selectionManager, this._layerStateStore);
+            this._panel.drawingsEnabled = Boolean(this._drawingsEnabled);
             this._panel.mount(this);
             this._panel.setHierarchy(this._hierarchy);
+            // Whatever arrived before there was a panel to give it to.
+            if (this._drawings) {
+                this._panel.setDrawings(this._drawings.drawings, this._drawings.activeSceneId);
+            }
             this._emitLayerStateSync();
         }
 

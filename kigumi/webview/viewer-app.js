@@ -1387,6 +1387,8 @@ class KigumiViewerApp extends LitElement {
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
         this.onCsgTreeRequested = this.onCsgTreeRequested.bind(this);
         this.onCsgByPathRequested = this.onCsgByPathRequested.bind(this);
+        this.onEnterDrawingRequested = this.onEnterDrawingRequested.bind(this);
+        this.onSaveDrawingsRequested = this.onSaveDrawingsRequested.bind(this);
         this.onRailResizeStart = this.onRailResizeStart.bind(this);
         this.onRailResizeMove = this.onRailResizeMove.bind(this);
         this.onRailResizeEnd = this.onRailResizeEnd.bind(this);
@@ -1513,6 +1515,14 @@ class KigumiViewerApp extends LitElement {
             this._layersView.addEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
             this._layersView.addEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
             this._layersView.addEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
+            this._layersView.addEventListener('kigumi-enter-drawing', this.onEnterDrawingRequested);
+            this._layersView.addEventListener('kigumi-save-drawings', this.onSaveDrawingsRequested);
+            this._layersView.setDrawingsEnabled(this.drawingBetaEnabled);
+            if (this.drawingBetaEnabled) {
+                // The list is python's; ask for it once there is somewhere to
+                // show it.
+                this.requestDrawings();
+            }
         }
         // Layers tree (and any background assembly solve) data arrives
         // unprompted, pushed by the extension host once it's actually ready
@@ -1549,6 +1559,8 @@ class KigumiViewerApp extends LitElement {
             this._layersView.removeEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
             this._layersView.removeEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
             this._layersView.removeEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
+            this._layersView.removeEventListener('kigumi-enter-drawing', this.onEnterDrawingRequested);
+            this._layersView.removeEventListener('kigumi-save-drawings', this.onSaveDrawingsRequested);
         }
         if (this.cameraCube) {
             this.cameraCube.dispose();
@@ -2487,12 +2499,16 @@ class KigumiViewerApp extends LitElement {
         if (message.type === 'scenes') {
             const payload = message.payload || {};
             const ids = this.sceneStore.setScenes(payload.scenes);
-            // Scenes are only ever asked for in order to be entered -- by the
-            // draw-selection button or the debug toggle -- so go to what came
-            // back rather than making the user pick from a list of one.
-            if (ids.length > 0 && (payload.enter || this.debugDrawingEnabled)) {
-                this.setActiveScene(ids[0]);
+            // Every drawing command answers with the whole set, so this is also
+            // how the list refreshes -- entering is asked for separately, since
+            // saving or listing should leave you where you are.
+            const entering = payload.enterId && ids.includes(payload.enterId)
+                ? payload.enterId
+                : (payload.enter || this.debugDrawingEnabled ? ids[0] : null);
+            if (entering) {
+                this.setActiveScene(entering);
             }
+            this._layersDrawingsChanged();
             return;
         }
 
@@ -5328,6 +5344,7 @@ class KigumiViewerApp extends LitElement {
         this.syncCameraControls();
         this.applySceneBackground();
         this.applyFootprintVisibility();
+        this._layersDrawingsChanged();
         // What is ghosted follows the scene: a drawing dims everything it is
         // not about, and leaving one puts the frame back.
         this.applySelectionOpacity();
@@ -5364,6 +5381,43 @@ class KigumiViewerApp extends LitElement {
         }
         this.applySelectionOpacity();
         this.requestUpdate();
+    }
+
+    onEnterDrawingRequested(event) {
+        const sceneId = event && event.detail ? event.detail.sceneId : null;
+        if (sceneId) {
+            this.enterDrawing(sceneId);
+        }
+    }
+
+    onSaveDrawingsRequested() {
+        this.saveDrawings();
+    }
+
+    /** Ask python for the drawings, without going to any of them. */
+    requestDrawings() {
+        if (vscode) {
+            vscode.postMessage({ type: 'requestDrawings' });
+        }
+    }
+
+    /** Save every drawing the file is responsible for. */
+    saveDrawings() {
+        if (vscode) {
+            vscode.postMessage({ type: 'requestSaveDrawings' });
+        }
+    }
+
+    /** Enter a drawing by id, from the layers panel. */
+    enterDrawing(sceneId) {
+        this.setActiveScene(sceneId);
+    }
+
+    /** Hand the drawings to the layers panel, which lists them. */
+    _layersDrawingsChanged() {
+        if (this._layersView && typeof this._layersView.setDrawings === 'function') {
+            this._layersView.setDrawings(this.sceneStore.drawings(), this.sceneStore.activeSceneId);
+        }
     }
 
     /** Back to the 3D scene, leaving the drawing where it was. */
