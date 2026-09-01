@@ -57,6 +57,23 @@ def _write_file(example, drawings):
     return path
 
 
+def _ref(feature, timber="posts/fl", csg_path=("cut",), kind="FACE"):
+    """A feature reference as it travels on the wire."""
+    return {"timber": timber, "csgPath": list(csg_path), "feature": feature, "type": kind}
+
+
+def _feature_names(measures):
+    """The pair each measurement is between, for readable assertions."""
+    return [(m["a"]["feature"], m["b"]["feature"]) for m in measures]
+
+
+def _path(feature, timber="posts/fl", csg_path=("cut",), kind="FACE"):
+    """The kumiki form of the same thing."""
+    from kumiki.timber import FeaturePath
+
+    return FeaturePath(timber=timber, csg_path=csg_path, feature=feature, feature_type=kind)
+
+
 def _sheet(drawing_id, name=None, viewports=None):
     """A drawing of the file's own: it lays itself out."""
     return {
@@ -227,8 +244,8 @@ class TestMergeMeasurements:
     """Two tiers: from the file, and not, with the file overriding."""
 
     def _code(self, a, b, **rest):
-        return {"a": a, "b": b, "measureId": rest.get("measureId"),
-                "origin": runner.ORIGIN_CODE}
+        return {"a": _ref(a), "b": _ref(b),
+                "measureId": rest.get("measureId"), "origin": runner.ORIGIN_CODE}
 
     def test_code_measurements_come_through_untouched(self):
         merged = runner.merge_measurements([self._code("x", "y")], [])
@@ -237,7 +254,7 @@ class TestMergeMeasurements:
 
     def test_the_file_overrides_the_one_beneath_it(self):
         merged = runner.merge_measurements(
-            [self._code("x", "y")], [{"a": "x", "b": "y", "placement": 12}],
+            [self._code("x", "y")], [{"a": _ref("x"), "b": _ref("y"), "placement": 12}],
         )
 
         assert len(merged) == 1
@@ -247,7 +264,7 @@ class TestMergeMeasurements:
 
     def test_measuring_a_to_b_is_measuring_b_to_a(self):
         merged = runner.merge_measurements(
-            [self._code("x", "y")], [{"a": "y", "b": "x", "placement": 3}],
+            [self._code("x", "y")], [{"a": _ref("y"), "b": _ref("x"), "placement": 3}],
         )
 
         assert len(merged) == 1
@@ -257,7 +274,7 @@ class TestMergeMeasurements:
         # What the identity rule is for: the file's entry finds the same code
         # measurement again, however many the algorithm emitted around it.
         code = [self._code("x", "y")]
-        once = runner.merge_measurements(code, [{"a": "x", "b": "y", "placement": 7}])
+        once = runner.merge_measurements(code, [{"a": _ref("x"), "b": _ref("y"), "placement": 7}])
         twice = runner.merge_measurements(code, once)
 
         assert len(twice) == 1
@@ -266,14 +283,14 @@ class TestMergeMeasurements:
     def test_an_id_tells_two_of_the_same_pair_apart(self):
         merged = runner.merge_measurements(
             [self._code("x", "y"), self._code("x", "y", measureId="second")],
-            [{"a": "x", "b": "y", "measureId": "second", "placement": 1}],
+            [{"a": _ref("x"), "b": _ref("y"), "measureId": "second", "placement": 1}],
         )
 
         origins = [m["origin"] for m in merged]
         assert origins == [runner.ORIGIN_CODE, runner.ORIGIN_OVERRIDDEN]
 
     def test_the_file_may_add_measurements_of_its_own(self):
-        merged = runner.merge_measurements([], [{"a": "p", "b": "q"}])
+        merged = runner.merge_measurements([], [{"a": _ref("p"), "b": _ref("q")}])
 
         assert [m["origin"] for m in merged] == [runner.ORIGIN_FILE]
 
@@ -281,13 +298,13 @@ class TestMergeMeasurements:
         # Without this, the only way to be rid of a generated measurement is to
         # change the algorithm.
         merged = runner.merge_measurements(
-            [self._code("x", "y")], [{"a": "x", "b": "y", "suppressed": True}],
+            [self._code("x", "y")], [{"a": _ref("x"), "b": _ref("y"), "suppressed": True}],
         )
 
         assert merged == []
 
     def test_suppressing_something_that_is_not_there_adds_nothing(self):
-        merged = runner.merge_measurements([], [{"a": "x", "b": "y", "suppressed": True}])
+        merged = runner.merge_measurements([], [{"a": _ref("x"), "b": _ref("y"), "suppressed": True}])
 
         assert merged == []
 
@@ -295,8 +312,8 @@ class TestMergeMeasurements:
         # A mistake rather than a case to resolve, and not worth refusing the
         # whole file over.
         merged = runner.merge_measurements([], [
-            {"a": "x", "b": "y", "placement": 1},
-            {"a": "x", "b": "y", "placement": 2},
+            {"a": _ref("x"), "b": _ref("y"), "placement": 1},
+            {"a": _ref("x"), "b": _ref("y"), "placement": 2},
         ])
 
         assert len(merged) == 1
@@ -304,10 +321,10 @@ class TestMergeMeasurements:
 
     def test_code_order_is_kept_and_the_file_follows(self):
         merged = runner.merge_measurements(
-            [self._code("a", "b"), self._code("c", "d")], [{"a": "e", "b": "f"}],
+            [self._code("a", "b"), self._code("c", "d")], [{"a": _ref("e"), "b": _ref("f")}],
         )
 
-        assert [(m["a"], m["b"]) for m in merged] == [("a", "b"), ("c", "d"), ("e", "f")]
+        assert _feature_names(merged) == [("a", "b"), ("c", "d"), ("e", "f")]
 
 
 class TestMeasurementsThroughADrawing:
@@ -319,7 +336,7 @@ class TestMeasurementsThroughADrawing:
 
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
-            measurements={"front": [Measure(anchor_a="x", anchor_b="y")]},
+            measurements={"front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -337,8 +354,8 @@ class TestMeasurementsThroughADrawing:
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={
-                "front": [Measure(anchor_a="x", anchor_b="y")],
-                "right": [Measure(anchor_a="x", anchor_b="y")],
+                "front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                "right": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
             },
         )])
 
@@ -354,12 +371,12 @@ class TestMeasurementsThroughADrawing:
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={
-                "front": [Measure(anchor_a="x", anchor_b="y")],
-                "right": [Measure(anchor_a="x", anchor_b="y")],
+                "front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                "right": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
             },
         )])
         _write_file(example, [_override("sheet", "post", [
-            {"id": "front", "measurements": [{"a": "x", "b": "y"}]},
+            {"id": "front", "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -375,10 +392,10 @@ class TestMeasurementsThroughADrawing:
 
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
-            measurements={"front": [Measure(anchor_a="x", anchor_b="y")]},
+            measurements={"front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
-            {"id": "front", "measurements": [{"a": "p", "b": "q"}]},
+            {"id": "front", "measurements": [{"a": _ref("p"), "b": _ref("q")}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -392,7 +409,7 @@ class TestMeasurementsThroughADrawing:
         # An override naming a viewport the code's layout does not produce.
         frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
         _write_file(example, [_override("sheet", "post", [
-            {"id": "nowhere", "measurements": [{"a": "x", "b": "y"}]},
+            {"id": "nowhere", "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -407,26 +424,27 @@ class TestMeasurementsThroughADrawing:
             "id": "sheet", runner.OVERRIDES_KEY: "post", "origin": runner.ORIGIN_OVERRIDDEN,
             "viewports": [],
             "unplaceableMeasurements": {
-                "nowhere": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}],
+                "nowhere": [{"a": _ref("x"), "b": _ref("y"), "origin": runner.ORIGIN_FILE}],
             },
         }])
 
         saved = json.loads(Path(written).read_text())["drawings"][0]
-        assert saved["viewports"] == [{"id": "nowhere", "measurements": [{"a": "x", "b": "y"}]}]
+        assert saved["viewports"][0]["id"] == "nowhere"
+        assert _feature_names(saved["viewports"][0]["measurements"]) == [("x", "y")]
 
     def test_saving_leaves_the_algorithms_measurements_out(self, example):
         # They would stop following the algorithm the moment the frame changed.
         runner.write_drawings_file(example, [{
             "id": "sheet", runner.OVERRIDES_KEY: "post", "origin": runner.ORIGIN_OVERRIDDEN,
             "viewports": [{"id": "front", "measurements": [
-                {"a": "x", "b": "y", "origin": runner.ORIGIN_CODE},
-                {"a": "p", "b": "q", "origin": runner.ORIGIN_FILE},
+                {"a": _ref("x"), "b": _ref("y"), "origin": runner.ORIGIN_CODE},
+                {"a": _ref("p"), "b": _ref("q"), "origin": runner.ORIGIN_FILE},
             ]}],
         }])
 
         saved = json.loads(runner._drawings_file_path(example).read_text())["drawings"][0]
         kept = saved["viewports"][0]["measurements"]
-        assert [(m["a"], m["b"]) for m in kept] == [("p", "q")]
+        assert _feature_names(kept) == [("p", "q")]
 
     def test_an_override_saves_viewport_ids_and_nothing_else(self, example):
         # The layout is the code's; writing it out would freeze it.
@@ -434,7 +452,7 @@ class TestMeasurementsThroughADrawing:
             "id": "sheet", runner.OVERRIDES_KEY: "post", "origin": runner.ORIGIN_OVERRIDDEN,
             "viewports": [{
                 "id": "front", "rect": [0, 0, 1, 1], "camera": {"extent": 2},
-                "measurements": [{"a": "p", "b": "q", "origin": runner.ORIGIN_FILE}],
+                "measurements": [{"a": _ref("p"), "b": _ref("q"), "origin": runner.ORIGIN_FILE}],
             }],
         }])
 
@@ -447,9 +465,9 @@ class TestMeasurementsThroughADrawing:
             "page": {"width": 0.42, "height": 0.297},
             "viewports": [
                 {"id": "front", "rect": [0, 0, 1, 1],
-                 "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}]},
+                 "measurements": [{"a": _ref("x"), "b": _ref("y"), "origin": runner.ORIGIN_FILE}]},
                 {"id": "right", "rect": [0, 0, 1, 1],
-                 "measurements": [{"a": "p", "b": "q", "origin": runner.ORIGIN_FILE}]},
+                 "measurements": [{"a": _ref("p"), "b": _ref("q"), "origin": runner.ORIGIN_FILE}]},
             ],
         }])
 
@@ -464,13 +482,13 @@ class TestMeasurementsThroughADrawing:
             "id": "sheet", "name": "sheet", "origin": runner.ORIGIN_FILE,
             "page": {"width": 0.42, "height": 0.297},
             "viewports": [{"id": "front", "rect": [0, 0, 1, 1],
-                           "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}]}],
+                           "measurements": [{"a": _ref("x"), "b": _ref("y"), "origin": runner.ORIGIN_FILE}]}],
         }])
 
         drawing = runner.collect_drawings(_frame(), example)[0]
         front = next(v for v in drawing["viewports"] if v["id"] == "front")
 
-        assert [(m["a"], m["b"]) for m in front["measurements"]] == [("x", "y")]
+        assert _feature_names(front["measurements"]) == [("x", "y")]
 
     def test_a_drawing_of_its_own_lays_itself_out(self, example):
         # How a drawing is set up to test with: it is not an override at all.
@@ -480,3 +498,75 @@ class TestMeasurementsThroughADrawing:
 
         assert [v["id"] for v in drawing["viewports"]] == ["only"]
         assert drawing["origin"] == runner.ORIGIN_FILE
+
+
+class TestFeaturePath:
+    """A reference to a feature: instructions for finding it again."""
+
+    def test_it_addresses_by_name_and_never_by_position(self):
+        # The property the whole thing rests on. A position stops meaning what
+        # it meant the moment a joint is added above it.
+        from kumiki.timber import FeaturePath
+
+        reference = FeaturePath(
+            timber="posts/fl", csg_path=["tenon_cut"], feature="tenon_front", feature_type="FACE",
+        )
+
+        assert reference.identity() == ("posts/fl", ("tenon_cut",), "tenon_front", "FACE")
+
+    def test_a_list_of_steps_becomes_a_tuple(self):
+        from kumiki.timber import FeaturePath
+
+        assert isinstance(FeaturePath("t", ["a", "b"]).csg_path, tuple)
+
+    def test_the_same_label_on_a_face_and_an_edge_are_different_features(self):
+        # One label can name both, and measuring to the wrong one does not look
+        # wrong on screen.
+        assert _path("x", kind="FACE").identity() != _path("x", kind="EDGE").identity()
+
+    def test_two_timbers_of_one_ticket_path_are_told_apart(self):
+        assert _path("x", timber="posts/fl#0").identity() != _path("x", timber="posts/fl#1").identity()
+
+    def test_a_separator_in_a_ticket_path_cannot_collapse_two_references(self):
+        # Why identity is a tuple and not a joined string: ticket paths contain
+        # slashes themselves.
+        from kumiki.timber import FeaturePath
+
+        one = FeaturePath(timber="posts/fl", csg_path=["cut"])
+        other = FeaturePath(timber="posts", csg_path=["fl", "cut"])
+
+        assert one.identity() != other.identity()
+
+    def test_it_describes_itself_as_a_trail(self):
+        assert _path("tenon_front", csg_path=("tenon_cut",)).describe() == (
+            "posts/fl > tenon_cut > tenon_front"
+        )
+
+    def test_a_reference_to_a_whole_node_needs_no_feature(self):
+        from kumiki.timber import FeaturePath
+
+        assert FeaturePath(timber="posts/fl", csg_path=["tenon_cut"]).describe() == (
+            "posts/fl > tenon_cut"
+        )
+
+    def test_the_wire_form_round_trips_into_the_same_identity(self):
+        from kumiki.timber import FeaturePath
+
+        reference = FeaturePath("posts/fl", ("cut",), "x", "FACE")
+        on_the_wire = runner.serialize_feature_path(reference)
+
+        assert runner._feature_path_identity(on_the_wire) == reference.identity()
+
+    def test_a_measurement_is_the_same_measured_either_way_round(self):
+        from kumiki.timber import Measure
+
+        there = Measure(anchor_a=_path("x"), anchor_b=_path("y"))
+        back = Measure(anchor_a=_path("y"), anchor_b=_path("x"))
+
+        assert there.identity() == back.identity()
+
+    def test_an_id_still_separates_two_of_the_same_pair(self):
+        from kumiki.timber import Measure
+
+        assert (Measure(anchor_a=_path("x"), anchor_b=_path("y")).identity()
+                != Measure(anchor_a=_path("x"), anchor_b=_path("y"), measure_id="2").identity())

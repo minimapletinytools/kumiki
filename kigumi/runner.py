@@ -1631,7 +1631,23 @@ MEASURE_SUPPRESSED = "suppressed"
 _duplicate_warning_given = False
 
 
-def _measure_identity(measure: Dict[str, Any]) -> Tuple[str, str, str]:
+def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]:
+    """A comparable form of a feature reference as it travels on the wire.
+
+    A tuple rather than a joined string, since a ticket path may itself contain
+    a separator and two different references must never collapse into one.
+    """
+    source = anchor if isinstance(anchor, dict) else {}
+    csg_path = source.get("csgPath")
+    return (
+        str(source.get("timber") or ""),
+        tuple(str(step) for step in csg_path) if isinstance(csg_path, list) else (),
+        str(source.get("feature") or ""),
+        str(source.get("type") or ""),
+    )
+
+
+def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
     """What makes a measurement itself, within the viewport it is drawn in.
 
     The anchors unordered, since measuring A to B is measuring B to A, plus an
@@ -1640,14 +1656,27 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[str, str, str]:
     the plan view are a different dimension with a different number, not this
     one seen from elsewhere.
     """
-    anchors = sorted((str(measure.get("a") or ""), str(measure.get("b") or "")))
-    return (anchors[0], anchors[1], str(measure.get("measureId") or ""))
+    first, second = sorted((
+        _feature_path_identity(measure.get("a")),
+        _feature_path_identity(measure.get("b")),
+    ))
+    return (first, second, str(measure.get("measureId") or ""))
+
+
+def serialize_feature_path(path: Any) -> Dict[str, Any]:
+    """A feature reference as the viewer and the file hold it."""
+    return {
+        "timber": path.timber,
+        "csgPath": list(path.csg_path),
+        "feature": path.feature,
+        "type": path.feature_type,
+    }
 
 
 def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
     return {
-        "a": measure.anchor_a,
-        "b": measure.anchor_b,
+        "a": serialize_feature_path(measure.anchor_a),
+        "b": serialize_feature_path(measure.anchor_b),
         "measureId": measure.measure_id,
         "origin": ORIGIN_CODE,
     }

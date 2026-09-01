@@ -2664,10 +2664,55 @@ def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
     return Joint(cuttings=merged_cuttings, ticket=ticket, jointAccessories=merged_accessories)
 
 @dataclass(frozen=True)
+class FeaturePath:
+    """Where a feature is, as instructions for finding it again.
+
+    Semi-stable on purpose. Nothing here is a position -- not "the third cut",
+    not "the second face" -- because a position stops meaning what it meant the
+    moment a joint is added above it. Instead it is the names of the things
+    passed through on the way down: the timber, then the labelled CSG nodes, then
+    the feature on the last of them. Rename any of those and the reference
+    breaks, which is the honest outcome; add or reorder around them and it still
+    finds what it meant.
+
+    `timber` is a ticket path, with `#n` after it when the same path is used more
+    than once. `csg_path` holds the labels of the CSG nodes stepped through,
+    which is what the viewer navigates by and skips the unlabelled intermediates
+    entirely. `feature` names the declared feature on the node arrived at, and
+    `feature_type` is FACE, EDGE or POINT -- kept because one label can name a
+    face and an edge, and a measurement to the wrong one is not obviously wrong
+    on screen.
+    """
+
+    timber: str
+    csg_path: Tuple[str, ...] = ()
+    feature: Optional[str] = None
+    feature_type: Optional[str] = None
+
+    def __post_init__(self):
+        if isinstance(self.csg_path, list):
+            object.__setattr__(self, 'csg_path', tuple(self.csg_path))
+
+    def identity(self) -> Tuple[str, Tuple[str, ...], str, str]:
+        """A comparable form, for deciding whether two references are the same.
+
+        A tuple rather than a joined string: a ticket path may itself contain a
+        separator, and two different references must never collapse into one.
+        """
+        return (self.timber, self.csg_path, self.feature or "", self.feature_type or "")
+
+    def describe(self) -> str:
+        """For a person to read -- a log line, or a broken reference in a list."""
+        trail = " > ".join((self.timber,) + self.csg_path)
+        return f"{trail} > {self.feature}" if self.feature else trail
+
+
+@dataclass(frozen=True)
 class Measure:
     """A dimension between two features, drawn in one viewport.
 
-    The anchors are feature paths, the same names the viewer picks by. A drawing
+    The anchors are FeaturePaths -- instructions for finding a feature again
+    rather than a position in a tree. A drawing
     is a projection, so the two are projected onto the viewport's plane and
     measured there -- which is why a measurement lives under a viewport rather
     than under the drawing. The same pair measured in the front elevation and in
@@ -2682,16 +2727,16 @@ class Measure:
     measurement lives.
     """
 
-    anchor_a: str
-    anchor_b: str
+    anchor_a: FeaturePath
+    anchor_b: FeaturePath
     measure_id: Optional[str] = None
 
-    def identity(self) -> Tuple[str, str, str]:
+    def identity(self) -> Tuple[Tuple, Tuple, str]:
         """What makes this measurement itself, within its viewport.
 
         The anchors unordered, since measuring A to B is measuring B to A.
         """
-        first, second = sorted((self.anchor_a, self.anchor_b))
+        first, second = sorted((self.anchor_a.identity(), self.anchor_b.identity()))
         return (first, second, self.measure_id or "")
 
 

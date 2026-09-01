@@ -418,13 +418,23 @@ Two feature references, the viewport, and the placement. Never frozen numbers:
 the point of referencing features is that the dimension follows the model when
 the code changes.
 
-Features are referenced by CSG path, so a measurement can attach to anything
-pickable rather than only to declared features. Paths are deterministic enough to
-survive most edits, and requiring declarations would block measurements behind
-the eleven joint files that declare none. A reference that stops resolving leaves
-the measurement **greyed out rather than deleted** -- the same rule as an
-orphaned drawing override, for the same reason: work that quietly disappears is
-worse than a broken row someone can see and fix.
+An anchor is a `FeaturePath`: the timber, the labels of the CSG nodes stepped
+through, and the feature on the last of them. Names the whole way down and never
+a position -- not "the third cut", not "the second face" -- because a position
+stops meaning what it meant the moment a joint is added above it. Rename any of
+those and the reference breaks, which is the honest outcome; add or reorder
+around them and it still finds what it meant.
+
+It carries the feature's type as well as its name, since one label can name both
+a face and an edge, and a measurement to the wrong one does not look wrong on
+screen.
+
+That way a measurement can attach to anything pickable rather than only to
+declared features, which would block measurements behind the eleven joint files
+that declare none. A reference that stops resolving leaves the measurement
+**greyed out rather than deleted** -- the same rule as an orphaned drawing
+override, for the same reason: work that quietly disappears is worse than a
+broken row someone can see and fix.
 
 ### Measurements come from code as well as from the file
 
