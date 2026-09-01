@@ -267,7 +267,6 @@ DONE-drawing mode fixes
     -for single timbers, allow free rotation along the timber axis only
 
 
-
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
