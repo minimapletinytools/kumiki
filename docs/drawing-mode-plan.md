@@ -217,7 +217,9 @@ positioned from a world-space anchor. It is not a third camera.
 
 ## Drawings, from code and from file
 
-Agreed, not yet built.
+Built. Both sources, the merge, the marks, and the drawings section of the
+layers panel. Not built: deleting or renaming a drawing, and reverting an
+override back to what the code asks for.
 
 A drawing comes from one of two places, and the difference is worth showing
 rather than hiding:
@@ -359,8 +361,10 @@ a decision to make with a profile in hand.
 
 ## Measurements
 
-Agreed, not yet built. Two features are picked and a dimension is drawn between
-them.
+The model is built -- what a measurement is, how the two tiers merge, and how
+its anchors are named. Nothing shows one yet, and nothing makes one: a
+measurement can only arrive by being declared in python or written into the
+drawings file. Drawing them and picking them are what remain.
 
 **A measurement belongs to a viewport, and is measured in that viewport's
 plane.** This is the whole design, and it dissolves what looks like the hard
