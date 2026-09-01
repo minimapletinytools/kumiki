@@ -545,32 +545,39 @@ guard value and puts the mortise's front face anchor 476 metres away. The hole i
 cut correctly; the anchor is meaningless.
 
 So the extent has to come from the finished piece rather than from what declared
-it. Three ways to get it, in the order they should be tried:
+it -- and analytically, from the CSG itself. Triangles would answer it too, but a
+mesh is a rendering artifact and a lossy one, and feature geometry should not
+depend on either.
 
-**From the triangles.** The mesh already exists, and a feature already knows how
-to test whether a point is on it -- that is how picking works, and the docstrings
-say real features are tested against the triangulated result first. So the
-triangles of the finished member whose vertices lie on the feature *are* its
-extent: their bounds and centroid, exactly cropped, with no new geometry code.
-This is the answer for a face that survives to the surface.
+The CSG already carries what is needed. Every node answers `contains_point` and
+`is_point_on_boundary` exactly, and `get_aabb()` returns bounds in which `None`
+means unbounded -- so a cutter that runs to infinity says so rather than having
+to be detected.
 
-It also settles a second question for free. A feature cropped away entirely has
-no triangles, which is precisely the "this measurement cannot be drawn" case --
-so the same pass that finds the extent says whether the feature is on the
-finished piece at all.
+**The rule: intersect the declaring primitive's box with the timber's, and
+project the centre of what is left onto the feature's plane.** The timber's box
+is always bounded, so it clamps exactly the axes that run away. A cutter extended
+past the timber comes back to the part of it inside the timber; a half space,
+unbounded in every direction it names, comes back to the timber itself. Both land
+on the face, and the same intersection gives the face's bounds, which is what a
+dimension's witness lines need.
 
-**From the declared extent**, when there are no triangles but `get_extent()`
-gives something bounded and sane. Weaker, but better than nothing for a feature
-that is real and simply not on the surface.
+That is an approximation, and the right one: an anchor only has to be somewhere
+sensible on the feature, which is what CSGFeatureExtent says of itself. It
+ignores sibling cuts that may have removed the part of the face the centre lands
+on. Where that matters, `contains_point` on the finished solid says so, and the
+answer is to search the clipped region rather than to trust the centre -- but
+that is a refinement, not the first version.
 
-**From the geometry and the other anchor**, when there is neither: the foot of
-the perpendicular from one anchor onto the other's plane is a perfectly good
-place to attach a dimension, and it is the right answer for a half space, which
-has a plane and no extent by construction.
+Exact boundary evaluation -- walking the tree and doing plane-section booleans
+against every sibling -- would give the true region. It is a real piece of work,
+and worth doing only if the approximation above turns out to place a dimension
+somewhere visibly wrong.
 
-Cost is a scan of one member's triangles per anchor, against a handful of
-measurements per drawing, so it belongs alongside the mesh cache the runner
-already keeps rather than being computed per frame.
+**A feature with nothing left after clipping is not on the finished piece**,
+which is the same question a measurement needs answered before it can be drawn.
+So the pass that finds the anchor also decides whether the measurement is
+drawable at all.
 
 ### The list is viewports first
 
