@@ -1282,6 +1282,14 @@ def _best_preview_look(half_size: List[float], aspect: float) -> List[float]:
 
     Two angles that show the piece equally long are separated by which shows
     more of it, so a square-on view loses to a three-quarter one.
+
+    There is very likely a closed form for this -- the best angle for a box in a
+    viewport of a given aspect is not a hard problem, and someone has certainly
+    solved it. Guessing and checking is fine here: it is a few dozen candidates
+    against eight corners, it runs once when a drawing is asked for rather than
+    per frame, and being able to change the scoring by reading it is worth more
+    than being clever. If the scoring ever gets fussier, that is the moment to
+    look for the closed form rather than add more candidates.
     """
     longest_axis = max(range(3), key=lambda axis: half_size[axis])
     longest = half_size[longest_axis]
