@@ -347,6 +347,78 @@ The vendored three.js has `InstancedMesh` but no `BatchedMesh` and no
 instancing does not apply. Batching means upgrading three or merging by hand —
 a decision to make with a profile in hand.
 
+## Measurements
+
+Agreed, not yet built. Two features are picked and a dimension is drawn between
+them.
+
+**A measurement belongs to a viewport, and is measured in that viewport's
+plane.** This is the whole design, and it dissolves what looks like the hard
+part. Two parallel edges lying in different planes seem to want their true
+distance in one context and their projected distance in another -- but a drawing
+*is* a projection, so the projected distance is the only one that means
+anything on the sheet. There is no second case to detect. True 3D distance is a
+question about the model, and belongs to a measure tool in the 3D scene rather
+than to a dimension on a drawing, which is where every CAD drawing environment
+draws the same line.
+
+The viewport already carries a declared `right` and `up`, so projecting is exact
+and marks can be placed against those axes directly. In the four-long-faces
+layout the camera comes from the timber's own frame, so horizontal on the sheet
+is along the piece, and dimensions come out in the timber's axes for nothing.
+
+### Project first, then ask what is measurable
+
+Compatibility is decided on the projected forms, not in 3D:
+
+| projected pair | measurement |
+|---|---|
+| point, point | distance |
+| point, line | perpendicular distance |
+| line, line, parallel | separation |
+| line, line, not parallel | an angle, not a distance |
+| face seen edge-on | behaves as a line |
+| face seen as an area | no distance is well defined; refused |
+| anything projecting to a point | degenerate; refused |
+
+The same two features can therefore be measurable in one viewport and meaningless
+in another, which is correct and is worth showing: in measurement mode only the
+features that would work are worth highlighting.
+
+**Foreshortening is worth catching.** A feature not parallel to the view plane
+projects shorter than it is, so a dimension taken off it is a number that is
+simply wrong on a drawing. The camera frame and the feature's direction are both
+known, so it is cheap to detect and say so.
+
+### Where the dimension line goes decides what it means
+
+Between two projected points, the direct distance and the horizontal or vertical
+component are all reasonable and none can be inferred. Drafting tools resolve
+this by placement: pull the line below and it reads the horizontal component, to
+the side the vertical, diagonally the aligned distance. One gesture places the
+mark and chooses its meaning, which beats choosing a dimension type first.
+
+### What a measurement holds
+
+Two feature references, the viewport, and the placement. Never frozen numbers:
+the point of referencing features is that the dimension follows the model when
+the code changes.
+
+Features are referenced by CSG path, so a measurement can attach to anything
+pickable rather than only to declared features. Paths are deterministic enough to
+survive most edits, and requiring declarations would block measurements behind
+the eleven joint files that declare none. A reference that stops resolving leaves
+the measurement **greyed out rather than deleted** -- the same rule as an
+orphaned drawing override, for the same reason: work that quietly disappears is
+worse than a broken row someone can see and fix.
+
+Measurements will want a list of their own eventually, so each needs an identity
+from the start even though nothing lists them yet.
+
+Chains and baselines -- a run of mortises dimensioned from one end -- are not in
+this first step, but nothing should be built that a chain could not later be
+placed through.
+
 ## Measurement round trips
 
 Editing a measurement round-trips through python. The numbers, from 311 refreshes
