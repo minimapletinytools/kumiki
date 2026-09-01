@@ -7,7 +7,8 @@ sys.path.insert(0, str(project_root))
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.ticket import JointTicket
-from kumiki.timber import AssemblyFreedom, Cutting, Drawing, Frame, Joint, Ordering
+from kumiki.drawing import Drawing
+from kumiki.timber import AssemblyFreedom, Cutting, Frame, Joint, Ordering
 
 
 def build_frame():

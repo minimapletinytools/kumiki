@@ -15,7 +15,9 @@ import pytest
 
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
-from kumiki.timber import Drawing, Frame
+from kumiki.drawing import Drawing, Measure
+from kumiki.identity import FeaturePath, ResolvedTimberPath, TimberPath
+from kumiki.timber import Frame
 
 
 def _load_runner():
@@ -69,8 +71,6 @@ def _feature_names(measures):
 
 def _path(feature, timber="posts/fl", csg_path=("cut",), kind="FACE"):
     """The kumiki form of the same thing."""
-    from kumiki.timber import FeaturePath
-
     return FeaturePath(timber=timber, csg_path=csg_path, feature=feature, feature_type=kind)
 
 
@@ -332,8 +332,6 @@ class TestMeasurementsThroughADrawing:
         return next(v for v in drawing["viewports"] if v["id"] == "front")["measurements"]
 
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
-        from kumiki.timber import Measure
-
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={"front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
@@ -349,8 +347,6 @@ class TestMeasurementsThroughADrawing:
 
     def test_the_same_pair_in_two_viewports_are_two_measurements(self, example):
         # Neither overrides the other; they have different numbers.
-        from kumiki.timber import Measure
-
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={
@@ -366,8 +362,6 @@ class TestMeasurementsThroughADrawing:
         assert len(by_id["right"]) == 1
 
     def test_an_override_only_reaches_its_own_viewport(self, example):
-        from kumiki.timber import Measure
-
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={
@@ -388,8 +382,6 @@ class TestMeasurementsThroughADrawing:
     def test_adding_a_measurement_does_not_freeze_the_drawing(self, example):
         # The reason measurements merge where everything else replaces: an
         # override of the whole drawing would take its layout with it.
-        from kumiki.timber import Measure
-
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={"front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
@@ -506,18 +498,15 @@ class TestFeaturePath:
     def test_it_addresses_by_name_and_never_by_position(self):
         # The property the whole thing rests on. A position stops meaning what
         # it meant the moment a joint is added above it.
-        from kumiki.timber import FeaturePath
-
         reference = FeaturePath(
-            timber="posts/fl", csg_path=["tenon_cut"], feature="tenon_front", feature_type="FACE",
+            timber=ResolvedTimberPath("posts/fl"), csg_path=["tenon_cut"],
+            feature="tenon_front", feature_type="FACE",
         )
 
-        assert reference.identity() == ("posts/fl", ("tenon_cut",), "tenon_front", "FACE")
+        assert reference.identity() == ("posts/fl#0", ("tenon_cut",), "tenon_front", "FACE")
 
     def test_a_list_of_steps_becomes_a_tuple(self):
-        from kumiki.timber import FeaturePath
-
-        assert isinstance(FeaturePath("t", ["a", "b"]).csg_path, tuple)
+        assert isinstance(FeaturePath(ResolvedTimberPath("t"), ["a", "b"]).csg_path, tuple)
 
     def test_the_same_label_on_a_face_and_an_edge_are_different_features(self):
         # One label can name both, and measuring to the wrong one does not look
@@ -530,43 +519,125 @@ class TestFeaturePath:
     def test_a_separator_in_a_ticket_path_cannot_collapse_two_references(self):
         # Why identity is a tuple and not a joined string: ticket paths contain
         # slashes themselves.
-        from kumiki.timber import FeaturePath
-
-        one = FeaturePath(timber="posts/fl", csg_path=["cut"])
-        other = FeaturePath(timber="posts", csg_path=["fl", "cut"])
+        one = FeaturePath(timber=ResolvedTimberPath("posts/fl"), csg_path=["cut"])
+        other = FeaturePath(timber=ResolvedTimberPath("posts"), csg_path=["fl", "cut"])
 
         assert one.identity() != other.identity()
 
     def test_it_describes_itself_as_a_trail(self):
         assert _path("tenon_front", csg_path=("tenon_cut",)).describe() == (
-            "posts/fl > tenon_cut > tenon_front"
+            "posts/fl#0 > tenon_cut > tenon_front"
         )
 
     def test_a_reference_to_a_whole_node_needs_no_feature(self):
-        from kumiki.timber import FeaturePath
-
-        assert FeaturePath(timber="posts/fl", csg_path=["tenon_cut"]).describe() == (
-            "posts/fl > tenon_cut"
-        )
+        assert FeaturePath(
+            timber=ResolvedTimberPath("posts/fl"), csg_path=["tenon_cut"],
+        ).describe() == "posts/fl#0 > tenon_cut"
 
     def test_the_wire_form_round_trips_into_the_same_identity(self):
-        from kumiki.timber import FeaturePath
-
-        reference = FeaturePath("posts/fl", ("cut",), "x", "FACE")
+        reference = FeaturePath(ResolvedTimberPath("posts/fl"), ("cut",), "x", "FACE")
         on_the_wire = runner.serialize_feature_path(reference)
 
         assert runner._feature_path_identity(on_the_wire) == reference.identity()
 
     def test_a_measurement_is_the_same_measured_either_way_round(self):
-        from kumiki.timber import Measure
-
         there = Measure(anchor_a=_path("x"), anchor_b=_path("y"))
         back = Measure(anchor_a=_path("y"), anchor_b=_path("x"))
 
         assert there.identity() == back.identity()
 
     def test_an_id_still_separates_two_of_the_same_pair(self):
-        from kumiki.timber import Measure
-
         assert (Measure(anchor_a=_path("x"), anchor_b=_path("y")).identity()
                 != Measure(anchor_a=_path("x"), anchor_b=_path("y"), measure_id="2").identity())
+
+
+class TestResolvingATimberPath:
+    """A name becomes a particular timber only against a frame."""
+
+    def test_a_name_alone_says_nothing_about_which(self):
+        # TimberPath deliberately has no occurrence: which of two timbers
+        # sharing a name is not a question a name can answer.
+        assert not hasattr(TimberPath("posts/fl"), "occurrence")
+
+    def test_resolving_finds_the_timber(self):
+        frame = _frame()
+
+        assert frame.resolve_timber_path(TimberPath("posts/fl")) == [
+            ResolvedTimberPath("posts/fl", 0),
+        ]
+
+    def test_a_name_matching_nothing_resolves_to_nothing(self):
+        assert _frame().resolve_timber_path(TimberPath("nowhere")) == []
+
+    def test_a_name_may_match_several(self, recwarn):
+        # And returns all of them, rather than quietly picking the first.
+        frame = _frame(paths=("posts/fl", "posts/fl"))
+
+        assert frame.resolve_timber_path(TimberPath("posts/fl")) == [
+            ResolvedTimberPath("posts/fl", 0),
+            ResolvedTimberPath("posts/fl", 1),
+        ]
+
+    def test_a_duplicated_name_is_warned_about(self):
+        # It is the moment a stable reference turns into an order-dependent one.
+        frame = _frame(paths=("posts/fl", "posts/fl"))
+
+        with pytest.warns(UserWarning, match="share the path"):
+            frame.resolve_timber_path(TimberPath("posts/fl"))
+
+    def test_distinct_names_are_not_warned_about(self, recwarn):
+        _frame().resolve_timber_path(TimberPath("posts/fl"))
+
+        assert not [w for w in recwarn if "share the path" in str(w.message)]
+
+    def test_a_resolved_path_prints_as_the_member_key(self):
+        # The form kigumi has always used, so one convention rather than two.
+        assert str(ResolvedTimberPath("posts/fl", 1)) == "posts/fl#1"
+
+    def test_it_reads_back_what_it_printed(self):
+        original = ResolvedTimberPath("posts/fl", 2)
+
+        assert ResolvedTimberPath.parse(str(original)) == original
+
+    def test_a_name_written_without_an_occurrence_means_the_first(self):
+        # So a reference hand-written in the drawings file matches the
+        # canonical form rather than silently being a different one.
+        assert ResolvedTimberPath.parse("posts/fl") == ResolvedTimberPath("posts/fl", 0)
+
+    def test_a_name_containing_a_hash_survives_the_round_trip(self):
+        assert ResolvedTimberPath.parse("odd#name#3") == ResolvedTimberPath("odd#name", 3)
+
+    def test_it_can_give_back_the_name_it_was_resolved_from(self):
+        assert ResolvedTimberPath("posts/fl", 1).timber_path == TimberPath("posts/fl")
+
+    def test_a_hand_written_reference_matches_the_canonical_one(self):
+        # The two forms are one reference, decided in one place.
+        short = runner._feature_path_identity({"timber": "posts/fl", "csgPath": ["cut"]})
+        canonical = runner._feature_path_identity({"timber": "posts/fl#0", "csgPath": ["cut"]})
+
+        assert short == canonical
+
+
+class TestIdentifiers:
+    def test_two_kinds_of_name_are_not_interchangeable(self):
+        # Both wrap a string; only the type says they are different things.
+        from kumiki.identity import DrawingId, MeasurementId, ViewportId
+
+        assert DrawingId("front") != ViewportId("front")
+        assert ViewportId("front") != MeasurementId("front")
+
+    def test_an_identifier_prints_as_its_name(self):
+        from kumiki.identity import DrawingId
+
+        assert str(DrawingId("post 1")) == "post 1"
+        assert f"{DrawingId('post 1')}" == "post 1"
+
+    def test_a_drawing_names_itself_when_it_is_not_given_an_id(self):
+        from kumiki.identity import DrawingId
+
+        assert Drawing(name="post 1").drawing_id == DrawingId("post 1")
+
+    def test_a_drawing_takes_the_timber_names_as_names(self):
+        assert Drawing(name="d", timber_paths=["posts/fl"]).timber_paths == (
+            TimberPath("posts/fl"),
+        )

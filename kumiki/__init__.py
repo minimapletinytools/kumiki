@@ -24,6 +24,16 @@ from .ticket import (
     as_timber_tag,
     normalize_timber_tags,
 )
+from .identity import (
+    DrawingId,
+    FeaturePath,
+    Identifier,
+    MeasurementId,
+    ResolvedTimberPath,
+    TimberPath,
+    ViewportId,
+)
+from .drawing import Drawing, Measure
 from .timber import *
 from .footprint import *
 from .construction import *

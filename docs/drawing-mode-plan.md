@@ -418,6 +418,36 @@ Two feature references, the viewport, and the placement. Never frozen numbers:
 the point of referencing features is that the dimension follows the model when
 the code changes.
 
+### Naming things, and how much a name can be trusted
+
+Three grades of stability are worth keeping apart: the same code producing the
+same name on every run, an unrelated edit elsewhere leaving it alone, and
+editing the thing itself leaving it alone. An authored name reaches the second
+and often the third. A position reaches only the first -- insert something above
+it and every reference below moves.
+
+So identity comes from what the author wrote, and position is a fallback used
+only where the author did not distinguish two things. Where it is used it gets a
+field of its own rather than being folded into a string, so code and people can
+both see which references are order-dependent. `kumiki_id` is not identity at
+all: it is a counter, already named a runtime-only handle, and must never be
+persisted.
+
+`TimberPath` is what the author calls a timber -- a name, and nothing more,
+because which of two timbers sharing a name is not a question a name can answer.
+`ResolvedTimberPath` is one particular timber in one particular frame, obtained
+only by resolving against a frame or by parsing the member key the viewer
+already uses, since an occurrence has no meaning until there is a frame to count
+within. Resolving is where a duplicated path is discovered, so that is where it
+warns -- and the warning says what actually follows from it: those timbers can
+now only be told apart by the order they were built in.
+
+The weakest link is not timber names, though. A measurement anchored to a
+declared feature is stable against nearly anything; one anchored to a picked but
+unlabelled face is "the nth face of this node", and slides when the joint's
+shape changes. Eleven of the twelve joint files declare no features, so
+**declaring them is worth more to measurement stability than any naming scheme**.
+
 An anchor is a `FeaturePath`: the timber, the labels of the CSG nodes stepped
 through, and the feature on the last of them. Names the whole way down and never
 a position -- not "the third cut", not "the second face" -- because a position

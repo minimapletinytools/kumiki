@@ -1637,10 +1637,17 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
     A tuple rather than a joined string, since a ticket path may itself contain
     a separator and two different references must never collapse into one.
     """
+    # Imported per call: a reload purges kumiki's modules, so a reference held
+    # from before would be to a class that no longer exists.
+    from kumiki.identity import ResolvedTimberPath
+
     source = anchor if isinstance(anchor, dict) else {}
     csg_path = source.get("csgPath")
+    # Through ResolvedTimberPath so that a timber written by hand without an
+    # occurrence means the same reference as the canonical form with one.
+    timber = str(ResolvedTimberPath.parse(str(source.get("timber") or "")))
     return (
-        str(source.get("timber") or ""),
+        timber,
         tuple(str(step) for step in csg_path) if isinstance(csg_path, list) else (),
         str(source.get("feature") or ""),
         str(source.get("type") or ""),
@@ -1664,9 +1671,13 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
 
 
 def serialize_feature_path(path: Any) -> Dict[str, Any]:
-    """A feature reference as the viewer and the file hold it."""
+    """A feature reference as the viewer and the file hold it.
+
+    The timber goes out as the member key the viewer already uses, which is what
+    ResolvedTimberPath prints as.
+    """
     return {
-        "timber": path.timber,
+        "timber": str(path.timber),
         "csgPath": list(path.csg_path),
         "feature": path.feature,
         "type": path.feature_type,
@@ -1677,7 +1688,7 @@ def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
     return {
         "a": serialize_feature_path(measure.anchor_a),
         "b": serialize_feature_path(measure.anchor_b),
-        "measureId": measure.measure_id,
+        "measureId": str(measure.measure_id) if measure.measure_id else None,
         "origin": ORIGIN_CODE,
     }
 
@@ -1803,18 +1814,23 @@ def _read_drawings_file(path: Path) -> List[Dict[str, Any]]:
     ]
 
 
-def _member_keys_for_paths(frame: Any, paths: List[str]) -> List[str]:
-    """The member keys of the timbers a code drawing names, by ticket path."""
-    timber_entries, _ = _assign_member_keys(frame)
-    wanted = set(paths or [])
-    return [entry["memberKey"] for entry in timber_entries if entry["displayName"] in wanted]
+def _member_keys_for_paths(frame: Any, paths: List[Any]) -> List[str]:
+    """The member keys of the timbers a code drawing names.
+
+    Through the frame, since a name may match more than one timber and only the
+    frame knows -- and that is where the ambiguity is warned about.
+    """
+    keys: List[str] = []
+    for path in paths or []:
+        keys.extend(str(resolved) for resolved in frame.resolve_timber_path(path))
+    return keys
 
 
 def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
     """Turn what the frame asked for into a scene the viewer can render."""
     member_keys = _member_keys_for_paths(frame, list(declared.timber_paths))
     scene = create_drawing_from_selection(frame, member_keys)
-    scene["id"] = declared.drawing_id
+    scene["id"] = str(declared.drawing_id)
     scene["name"] = declared.name
     scene["members"] = member_keys
     return scene
@@ -1850,7 +1866,7 @@ def collect_drawings(
         # its own is a drawing of its own, which is what keeps adding one
         # dimension from taking a drawing's page and viewports with it.
         scene = _drawing_from_code(frame, declared)
-        override = overrides.get(declared.drawing_id)
+        override = overrides.get(str(declared.drawing_id))
         if override is not None:
             overridden.add(id(override))
             scene["overriddenBy"] = override["id"]
