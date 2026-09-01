@@ -569,10 +569,44 @@ on. Where that matters, `contains_point` on the finished solid says so, and the
 answer is to search the clipped region rather than to trust the centre -- but
 that is a refinement, not the first version.
 
-Exact boundary evaluation -- walking the tree and doing plane-section booleans
-against every sibling -- would give the true region. It is a real piece of work,
-and worth doing only if the approximation above turns out to place a dimension
-somewhere visibly wrong.
+### A region, not a box
+
+The box above is the first version, not the goal. What a dimension wants is the
+feature's region *in its own plane*: a convex polygon, ordered, lying on it.
+
+Deliberately not oriented to a viewport. Bounds along any axes -- a viewport's
+included -- fall out of projecting a polygon's vertices, so giving the polygon
+answers the question for every viewport, while baking one orientation in answers
+it for one and has to be recomputed for the rest. Geometry stays
+viewport-independent, which is the same rule the rest of drawing mode follows.
+
+Computing it is more tractable than it first looks, because **every primitive
+kumiki has is convex** -- half space, rectangular prism, cylinder, convex polygon
+extrusion, convex polygon loft. A convex solid cut by a plane leaves a convex
+region, so clipping one against another is half-plane intersection rather than
+general polygon boolean work. Three tiers:
+
+**Clip by what encloses.** Start with the declaring primitive's face as a region
+in its plane, walk the tree, and clip by every solid whose parity is additive --
+the intersections, and the timber itself. Each is convex, so each contributes
+half-planes. This is *exact* for the enclosing part, not approximate, and it is
+what turns an extended cutter's face into the part of it inside the timber.
+
+**Subtractions as holes.** A subtracted convex solid removes a convex hole. Kept
+as an outer polygon and a list of holes, that is enough to place an anchor
+somewhere the material actually is, without representing the true boundary.
+
+**Full boundary evaluation.** General polygon booleans over the whole tree. Only
+worth it if holes-as-a-list visibly misplaces something, and the tiers above make
+it a refinement rather than a rewrite.
+
+Cylinders are the one curved case: their section is an ellipse, so either handle
+the parallel and perpendicular cases exactly or approximate with a polygon. Every
+other primitive reduces to half-planes exactly.
+
+The existing `Difference.get_aabb`, which already tightens a box by subtracted
+half spaces, is the same idea at coarser granularity -- so this extends an idiom
+the CSG already has rather than introducing one.
 
 **A feature with nothing left after clipping is not on the finished piece**,
 which is the same question a measurement needs answered before it can be drawn.
