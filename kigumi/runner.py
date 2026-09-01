@@ -1576,6 +1576,126 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     }
 
 
+# --- where drawings come from ------------------------------------------------
+#
+# Two sources. The frame asks for drawings in code (Frame.drawings), and a
+# drawings file may override those and add its own. Which of the two a drawing
+# came from is carried on it, because it is the first thing you want to know
+# when one looks wrong: whether to edit the python or the file.
+
+ORIGIN_CODE = "code"
+ORIGIN_OVERRIDDEN = "overridden"
+ORIGIN_FILE = "file"
+
+
+def _drawings_file_path(example_path: Path) -> Path:
+    """Where a frame's drawings file lives.
+
+    Under .kigumi rather than beside the source: writes there are already known
+    not to wake the file watcher, since refresh stats land there on every
+    refresh.
+    """
+    return example_path.parent / ".kigumi" / "drawings" / f"{example_path.stem}.json"
+
+
+def _read_drawings_file(path: Path) -> Dict[str, Any]:
+    """The drawings file, or an empty one. A broken file is reported, not fatal.
+
+    Losing a viewer because a hand-edited file has a comma out of place would be
+    a poor trade for strictness, and the file is meant to be hand-edited.
+    """
+    if not path.exists():
+        return {}
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log_stderr(f"Warning: could not read {path}: {exc}")
+        return {}
+    if not isinstance(loaded, dict):
+        return {}
+    drawings = loaded.get("drawings")
+    if not isinstance(drawings, list):
+        return {}
+    return {
+        drawing["id"]: drawing
+        for drawing in drawings
+        if isinstance(drawing, dict) and isinstance(drawing.get("id"), str)
+    }
+
+
+def _member_keys_for_paths(frame: Any, paths: List[str]) -> List[str]:
+    """The member keys of the timbers a code drawing names, by ticket path."""
+    timber_entries, _ = _assign_member_keys(frame)
+    wanted = set(paths or [])
+    return [entry["memberKey"] for entry in timber_entries if entry["displayName"] in wanted]
+
+
+def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
+    """Turn what the frame asked for into a scene the viewer can render."""
+    member_keys = _member_keys_for_paths(frame, list(declared.timber_paths))
+    scene = create_drawing_from_selection(frame, member_keys)
+    scene["id"] = declared.drawing_id
+    scene["name"] = declared.name
+    scene["members"] = member_keys
+    return scene
+
+
+def collect_drawings(frame: Any, example_path: Optional[Path]) -> List[Dict[str, Any]]:
+    """Every drawing for a frame, from the code and from the file, in order.
+
+    A file drawing sharing an id with a code one replaces it outright rather
+    than patching its fields; a patch model needs a merge rule for every field
+    and can come later if it is ever wanted. A file drawing whose code drawing
+    has since gone away is kept and shown as a file drawing, because an extra
+    row someone can delete beats work vanishing quietly.
+    """
+    overrides = _read_drawings_file(_drawings_file_path(example_path)) if example_path else {}
+    drawings: List[Dict[str, Any]] = []
+    seen = set()
+
+    for declared in list(getattr(frame, "drawings", None) or []):
+        drawing_id = declared.drawing_id
+        seen.add(drawing_id)
+        if drawing_id in overrides:
+            scene = dict(overrides[drawing_id])
+            scene["id"] = drawing_id
+            scene.setdefault("name", declared.name)
+            scene["origin"] = ORIGIN_OVERRIDDEN
+        else:
+            scene = _drawing_from_code(frame, declared)
+            scene["origin"] = ORIGIN_CODE
+        drawings.append(scene)
+
+    for drawing_id, scene in overrides.items():
+        if drawing_id in seen:
+            continue
+        entry = dict(scene)
+        entry["id"] = drawing_id
+        entry.setdefault("name", drawing_id)
+        entry["origin"] = ORIGIN_FILE
+        drawings.append(entry)
+
+    return drawings
+
+
+def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> str:
+    """Save the drawings that are the file's to keep.
+
+    Only the ones the file is responsible for: a drawing that came from code and
+    was never touched has nothing to save, and writing it out would freeze a
+    copy that stops following the code it was asked for by.
+    """
+    path = _drawings_file_path(example_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    keep = [
+        {key: value for key, value in drawing.items() if key != "origin"}
+        for drawing in drawings
+        if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)
+    ]
+    path.write_text(json.dumps({"drawings": keep}, indent=2) + "\n", encoding="utf-8")
+    return str(path)
+
+
 def serialize_layers(frame: Any) -> Dict[str, Any]:
     """Build the data payload consumed by the viewer's Layers panel.
 
@@ -2206,6 +2326,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_layers_tree", "get_csg_tree",
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
+            "get_drawings", "save_drawings",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
             "shutdown",
@@ -3484,6 +3605,18 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         frame_payload = serialize_frame(ss.frame)
         frame_payload["renderParameters"] = _serialize_render_parameters_for_slot(ss)
         return state, make_success_response(request_id, command, frame_payload), False
+
+    if command == "get_drawings":
+        ss = _resolve_slot(state, payload)
+        return state, make_success_response(
+            request_id, command, {"scenes": collect_drawings(ss.frame, ss.file_path)},
+        ), False
+
+    if command == "save_drawings":
+        ss = _resolve_slot(state, payload)
+        scenes = payload.get("scenes")
+        written = write_drawings_file(ss.file_path, scenes if isinstance(scenes, list) else [])
+        return state, make_success_response(request_id, command, {"path": written}), False
 
     if command == "create_drawing_from_selection":
         ss = _resolve_slot(state, payload)

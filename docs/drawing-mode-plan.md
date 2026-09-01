@@ -215,6 +215,54 @@ drawing's line weights mean nothing.
 but is drawn on the sheet, so its text and witness lines are page-space objects
 positioned from a world-space anchor. It is not a third camera.
 
+## Drawings, from code and from file
+
+Agreed, not yet built.
+
+A drawing comes from one of two places, and the difference is worth showing
+rather than hiding:
+
+- **From code.** The frame asks for it: `Frame.drawings` names a drawing and
+  which timbers it is of. The layout -- page, viewports, cameras -- is not
+  written there; the runner works it out from the members, the same way it does
+  for a drawing made from a selection.
+- **From the file.** `.kigumi/drawings/<stem>.json`, which overlays what the
+  code asked for. It may override a drawing the code declares, and it may
+  introduce drawings of its own, which is mainly how drawings get set up for
+  testing. `.kigumi` is where writes are already proven safe -- refresh stats
+  land there on every refresh without waking the watcher.
+
+An override replaces a code drawing outright rather than patching fields of it.
+A patch model needs a merge rule for every field and can be arrived at later if
+it turns out to be wanted; starting there is a lot of machinery for a case
+nobody has hit.
+
+Overrides key on a drawing's id, so a code drawing needs an id that survives
+editing the python -- not "the third one". When a code drawing goes away, its
+override is kept and shown as a file drawing rather than dropped: an extra row
+someone can delete is much better than work disappearing quietly.
+
+### What the tree shows
+
+One row per drawing, in a section of its own. Where a drawing comes from is a
+mark, and whether it is saved is another, because those are two independent
+things and crossing them into four glyphs makes a legend to memorize:
+
+| mark | meaning |
+|---|---|
+| `○` | from code; nothing in the file |
+| `◐` | from code, overridden by the file |
+| `●` | from the file alone |
+| trailing `•` | unsaved |
+
+The fill reads as how much of the drawing comes from the file. The trailing dot
+is the convention editors already use for a modified tab.
+
+Saving is explicit and saves everything: one deliberate write is far easier to
+reason about than a write per edit, and it keeps the watcher question simple.
+Reverting an override -- back to what the code asked for -- belongs with it, and
+is cheap once overrides exist.
+
 ## Modules
 
 | module | owns |

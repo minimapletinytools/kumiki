@@ -2664,6 +2664,36 @@ def make_compound_joint(joints: List[Joint], ticket: JointTicket) -> Joint:
     return Joint(cuttings=merged_cuttings, ticket=ticket, jointAccessories=merged_accessories)
 
 @dataclass(frozen=True)
+class Drawing:
+    """A drawing the frame asks for: a name, and which timbers it is of.
+
+    Deliberately not a layout. Where the views go on the page, which way their
+    cameras face and at what scale are worked out from the timbers themselves,
+    so a frame says what it wants drawn and never how to draw it -- the same
+    drawing is then as right on a small sheet as on a large one.
+
+    Timbers are named by ticket path, the same name they carry everywhere else.
+    A path naming no timber is not an error here: a drawing of a timber that a
+    later edit removed is worth keeping and showing as empty, rather than
+    failing to raise the frame it belongs to.
+
+    `drawing_id` is what an override in the drawings file keys on, so it has to
+    survive editing the code around it. It defaults to the name, which is stable
+    as long as the name is.
+    """
+
+    name: str
+    timber_paths: Tuple[str, ...] = ()
+    drawing_id: Optional[str] = None
+
+    def __post_init__(self):
+        if isinstance(self.timber_paths, list):
+            object.__setattr__(self, 'timber_paths', tuple(self.timber_paths))
+        if not self.drawing_id:
+            object.__setattr__(self, 'drawing_id', self.name)
+
+
+@dataclass(frozen=True)
 class Frame:
     """
     Represents a complete timber frame structure with all cut timbers and accessories.
@@ -2682,6 +2712,9 @@ class Frame:
     name: Optional[str] = None
     source_joints: Optional[List] = field(default=None, compare=False, hash=False, repr=False)
     footprints: List[Footprint] = field(default_factory=list)
+    # Drawings the frame asks for. The drawings file may override these and add
+    # its own; see docs/drawing-mode-plan.md.
+    drawings: List[Drawing] = field(default_factory=list)
 
     @classmethod
     def from_joints(cls, joints: List[Joint],
