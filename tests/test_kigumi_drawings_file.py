@@ -199,3 +199,145 @@ class TestSaveDrawings:
 
     def test_it_lives_under_kigumi_where_writes_do_not_wake_the_watcher(self, example):
         assert ".kigumi" in runner._drawings_file_path(example).parts
+
+
+class TestMergeMeasurements:
+    """Two tiers: from the file, and not, with the file overriding."""
+
+    def _code(self, a, b, **rest):
+        return {"a": a, "b": b, "viewport": rest.get("viewport"),
+                "measureId": rest.get("measureId"), "origin": runner.ORIGIN_CODE}
+
+    def test_code_measurements_come_through_untouched(self):
+        merged = runner.merge_measurements([self._code("x", "y")], [])
+
+        assert [m["origin"] for m in merged] == [runner.ORIGIN_CODE]
+
+    def test_the_file_overrides_the_one_beneath_it(self):
+        merged = runner.merge_measurements(
+            [self._code("x", "y", viewport="front")],
+            [{"a": "x", "b": "y", "viewport": "top"}],
+        )
+
+        assert len(merged) == 1
+        assert merged[0]["origin"] == runner.ORIGIN_OVERRIDDEN
+        # Moving one to another viewport is an override naming a different one.
+        assert merged[0]["viewport"] == "top"
+
+    def test_measuring_a_to_b_is_measuring_b_to_a(self):
+        merged = runner.merge_measurements(
+            [self._code("x", "y")], [{"a": "y", "b": "x", "viewport": "top"}],
+        )
+
+        assert len(merged) == 1
+        assert merged[0]["origin"] == runner.ORIGIN_OVERRIDDEN
+
+    def test_a_measurement_keeps_its_identity_across_a_move(self):
+        # The point of leaving the viewport out of the identity: an override
+        # that moves a measurement still attaches to it next time round.
+        code = [self._code("x", "y", viewport="front")]
+        moved = runner.merge_measurements(code, [{"a": "x", "b": "y", "viewport": "top"}])
+        again = runner.merge_measurements(code, moved)
+
+        assert len(again) == 1
+        assert again[0]["viewport"] == "top"
+
+    def test_an_id_tells_two_of_the_same_pair_apart(self):
+        merged = runner.merge_measurements(
+            [self._code("x", "y"), self._code("x", "y", measureId="second")],
+            [{"a": "x", "b": "y", "measureId": "second", "viewport": "top"}],
+        )
+
+        origins = [m["origin"] for m in merged]
+        assert origins == [runner.ORIGIN_CODE, runner.ORIGIN_OVERRIDDEN]
+
+    def test_the_file_may_add_measurements_of_its_own(self):
+        merged = runner.merge_measurements([], [{"a": "p", "b": "q"}])
+
+        assert [m["origin"] for m in merged] == [runner.ORIGIN_FILE]
+
+    def test_the_file_may_suppress_one_the_algorithm_produced(self):
+        # Without this, the only way to be rid of a generated measurement is to
+        # change the algorithm.
+        merged = runner.merge_measurements(
+            [self._code("x", "y")], [{"a": "x", "b": "y", "suppressed": True}],
+        )
+
+        assert merged == []
+
+    def test_suppressing_something_that_is_not_there_adds_nothing(self):
+        merged = runner.merge_measurements([], [{"a": "x", "b": "y", "suppressed": True}])
+
+        assert merged == []
+
+    def test_a_repeated_identity_lets_the_later_one_win(self):
+        # A mistake rather than a case to resolve, and not worth refusing the
+        # whole file over.
+        merged = runner.merge_measurements([], [
+            {"a": "x", "b": "y", "viewport": "front"},
+            {"a": "x", "b": "y", "viewport": "top"},
+        ])
+
+        assert len(merged) == 1
+        assert merged[0]["viewport"] == "top"
+
+    def test_code_order_is_kept_and_the_file_follows(self):
+        merged = runner.merge_measurements(
+            [self._code("a", "b"), self._code("c", "d")], [{"a": "e", "b": "f"}],
+        )
+
+        assert [(m["a"], m["b"]) for m in merged] == [("a", "b"), ("c", "d"), ("e", "f")]
+
+
+class TestMeasurementsThroughADrawing:
+    def test_a_code_drawing_carries_the_measurements_it_declares(self, example):
+        from kumiki.timber import Measure
+
+        frame = _frame([Drawing(
+            name="post", timber_paths=["posts/fl"],
+            measurements=[Measure(anchor_a="x", anchor_b="y", viewport="front")],
+        )])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+
+        assert [m["origin"] for m in drawing["measurements"]] == [runner.ORIGIN_CODE]
+
+    def test_adding_a_measurement_does_not_freeze_the_drawing(self, example):
+        # The reason measurements merge where everything else replaces: an
+        # override of the whole drawing would take its layout with it.
+        from kumiki.timber import Measure
+
+        frame = _frame([Drawing(
+            name="post", timber_paths=["posts/fl"],
+            measurements=[Measure(anchor_a="x", anchor_b="y")],
+        )])
+        _write_file(example, [{"id": "post", "measurements": [{"a": "p", "b": "q"}]}])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+
+        assert [m["origin"] for m in drawing["measurements"]] == [
+            runner.ORIGIN_CODE, runner.ORIGIN_FILE,
+        ]
+
+    def test_saving_leaves_the_algorithms_measurements_out(self, example):
+        # They would stop following the algorithm the moment the frame changed.
+        runner.write_drawings_file(example, [{
+            "id": "post", "origin": runner.ORIGIN_OVERRIDDEN,
+            "measurements": [
+                {"a": "x", "b": "y", "origin": runner.ORIGIN_CODE},
+                {"a": "p", "b": "q", "origin": runner.ORIGIN_FILE},
+            ],
+        }])
+
+        saved = json.loads(runner._drawings_file_path(example).read_text())
+        assert [(m["a"], m["b"]) for m in saved["drawings"][0]["measurements"]] == [("p", "q")]
+
+    def test_an_override_of_a_measurement_is_saved(self, example):
+        runner.write_drawings_file(example, [{
+            "id": "post", "origin": runner.ORIGIN_FILE,
+            "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_OVERRIDDEN}],
+        }])
+
+        saved = json.loads(runner._drawings_file_path(example).read_text())
+        assert len(saved["drawings"][0]["measurements"]) == 1
+        assert "origin" not in saved["drawings"][0]["measurements"][0]

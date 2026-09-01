@@ -1617,6 +1617,102 @@ ORIGIN_OVERRIDDEN = "overridden"
 ORIGIN_FILE = "file"
 
 
+# --- measurements -----------------------------------------------------------
+#
+# Two tiers: from the file, and not. A file measurement overrides the one
+# beneath it with the same identity, which is the whole rule. It still produces
+# the three states worth marking -- untouched code, code the file has overridden,
+# and one the file introduced.
+
+MEASURE_SUPPRESSED = "suppressed"
+
+# Warned about once per parse rather than per duplicate: a hand-edited file with
+# a repeated entry would otherwise fill the log with the same sentence.
+_duplicate_warning_given = False
+
+
+def _measure_identity(measure: Dict[str, Any]) -> Tuple[str, str, str]:
+    """What makes a measurement itself, wherever it happens to be drawn.
+
+    The anchors unordered, since measuring A to B is measuring B to A, plus an
+    id for when the same pair is measured more than once. Not the viewport: a
+    measurement moved to another viewport is the same measurement, and if it
+    were not, moving one would orphan whatever the file says about it.
+    """
+    anchors = sorted((str(measure.get("a") or ""), str(measure.get("b") or "")))
+    return (anchors[0], anchors[1], str(measure.get("measureId") or ""))
+
+
+def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
+    return {
+        "a": measure.anchor_a,
+        "b": measure.anchor_b,
+        "viewport": measure.viewport,
+        "measureId": measure.measure_id,
+        "origin": ORIGIN_CODE,
+    }
+
+
+def merge_measurements(
+    code_measures: List[Dict[str, Any]],
+    file_measures: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """The measurements of one drawing, from both tiers.
+
+    A file entry with the same identity as a code one replaces it and is marked
+    as overriding; one with an identity nothing else has is the file's own. An
+    entry marked suppressed removes the code measurement instead of replacing
+    it, which is how a measurement an algorithm produced and nobody wants goes
+    away without the algorithm being changed.
+
+    A repeated identity within a tier is a mistake rather than a case to
+    resolve, so the later one wins. Refusing the file outright would cost
+    someone their drawings over a stray duplicate, which is the same trade the
+    file parser already makes.
+    """
+    global _duplicate_warning_given
+    from_file: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    for measure in file_measures:
+        identity = _measure_identity(measure)
+        if identity in from_file and not _duplicate_warning_given:
+            log_stderr(
+                "Warning: two measurements share an identity; the later one wins. "
+                "Give one of them a measureId to tell them apart."
+            )
+            _duplicate_warning_given = True
+        from_file[identity] = measure
+
+    merged: List[Dict[str, Any]] = []
+    used = set()
+    for measure in code_measures:
+        identity = _measure_identity(measure)
+        override = from_file.get(identity)
+        if override is None:
+            merged.append({**measure, "origin": ORIGIN_CODE})
+            continue
+        used.add(identity)
+        if override.get(MEASURE_SUPPRESSED) is True:
+            continue
+        merged.append({**measure, **override, "origin": ORIGIN_OVERRIDDEN})
+
+    for identity, measure in from_file.items():
+        if identity in used or measure.get(MEASURE_SUPPRESSED) is True:
+            continue
+        merged.append({**measure, "origin": ORIGIN_FILE})
+
+    return merged
+
+
+def _measurements_for_drawing(declared: Any, override: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """A drawing's measurements, whichever tiers it has."""
+    code_measures = [
+        _serialize_code_measure(measure)
+        for measure in (getattr(declared, "measurements", None) or [])
+    ] if declared is not None else []
+    file_measures = list((override or {}).get("measurements") or [])
+    return merge_measurements(code_measures, file_measures)
+
+
 def _drawings_file_path(example_path: Path) -> Path:
     """Where a frame's drawings file lives.
 
@@ -1692,14 +1788,20 @@ def collect_drawings(
     for declared in list(getattr(frame, "drawings", None) or []):
         drawing_id = declared.drawing_id
         seen.add(drawing_id)
-        if drawing_id in overrides:
-            scene = dict(overrides[drawing_id])
+        override = overrides.get(drawing_id)
+        if override is not None:
+            scene = dict(override)
             scene["id"] = drawing_id
             scene.setdefault("name", declared.name)
             scene["origin"] = ORIGIN_OVERRIDDEN
         else:
             scene = _drawing_from_code(frame, declared)
             scene["origin"] = ORIGIN_CODE
+        # Measurements merge where everything else replaces. Overriding them
+        # wholesale would mean that adding one dimension to a drawing froze its
+        # page, its viewports and its layout into the file, and detached it from
+        # the code that asked for it.
+        scene["measurements"] = _measurements_for_drawing(declared, override)
         drawings.append(scene)
 
     for drawing_id, scene in overrides.items():
@@ -1709,6 +1811,8 @@ def collect_drawings(
         entry["id"] = drawing_id
         entry.setdefault("name", drawing_id)
         entry["origin"] = ORIGIN_FILE
+        # No code tier to merge with, so every one of them is the file's.
+        entry["measurements"] = merge_measurements([], list(scene.get("measurements") or []))
         drawings.append(entry)
 
     for drawing in drawings:
@@ -1730,6 +1834,25 @@ def collect_drawings(
     return drawings
 
 
+def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
+    """One drawing as the file should hold it.
+
+    Measurements the code produced are left out. Writing them would freeze what
+    an algorithm generates into the file, and it would stop following the
+    algorithm the moment the frame changed -- the same reason an untouched code
+    drawing is not written out either.
+    """
+    saved = {key: value for key, value in drawing.items() if key not in ("origin", "dirty")}
+    measurements = drawing.get("measurements")
+    if isinstance(measurements, list):
+        saved["measurements"] = [
+            {key: value for key, value in measure.items() if key != "origin"}
+            for measure in measurements
+            if measure.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)
+        ]
+    return saved
+
+
 def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> str:
     """Save the drawings that are the file's to keep.
 
@@ -1739,11 +1862,8 @@ def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> s
     """
     path = _drawings_file_path(example_path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    keep = [
-        {key: value for key, value in drawing.items() if key not in ("origin", "dirty")}
-        for drawing in drawings
-        if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)
-    ]
+    keep = [_savable_drawing(drawing) for drawing in drawings
+            if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)]
     path.write_text(json.dumps({"drawings": keep}, indent=2) + "\n", encoding="utf-8")
     return str(path)
 
