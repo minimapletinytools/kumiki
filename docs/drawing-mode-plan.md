@@ -226,21 +226,31 @@ rather than hiding:
   which timbers it is of. The layout -- page, viewports, cameras -- is not
   written there; the runner works it out from the members, the same way it does
   for a drawing made from a selection.
-- **From the file.** `.kigumi/drawings/<stem>.json`, which overlays what the
-  code asked for. It may override a drawing the code declares, and it may
-  introduce drawings of its own, which is mainly how drawings get set up for
-  testing. `.kigumi` is where writes are already proven safe -- refresh stats
-  land there on every refresh without waking the watcher.
+- **From the file.** `.kigumi/drawings/<stem>.json`, which mirrors the same
+  shape -- drawings holding viewports holding measurements. `.kigumi` is where
+  writes are already proven safe: refresh stats land there on every refresh
+  without waking the watcher.
 
-An override replaces a code drawing outright rather than patching fields of it.
-A patch model needs a merge rule for every field and can be arrived at later if
-it turns out to be wanted; starting there is a lot of machinery for a case
-nobody has hit.
+A file drawing has an id of its own and says outright which code drawing it
+overrides, in `overridesPythonDrawing`, rather than overriding by sharing an id.
+That is what keeps an override recognisable as one: delete the code drawing and
+what remains is plainly a dangling entry to be repointed or removed on purpose,
+not something that has quietly become a drawing in its own right.
 
-Overrides key on a drawing's id, so a code drawing needs an id that survives
-editing the python -- not "the third one". When a code drawing goes away, its
-override is kept and shown as a file drawing rather than dropped: an extra row
-someone can delete is much better than work disappearing quietly.
+So a file drawing is one of two things. Naming a code drawing, it contributes
+measurements to a drawing the code still lays out. Naming none, it is a drawing
+of its own and lays itself out, which is mainly how drawings get set up for
+testing.
+
+An override never brings a layout with it. If it did, adding one dimension to a
+code drawing would take that drawing's page and viewports into the file and
+detach it from the code it was asked for by. Wanting a different layout means
+wanting a different drawing, which the file can simply declare.
+
+`overridesPythonDrawing` names a code drawing's id, so that id needs to survive
+editing the python around it -- not "the third one". A code drawing that goes
+away leaves its override visible and marked as dangling, because work
+disappearing quietly is much worse than a row someone can see and delete.
 
 ### What the tree shows
 
@@ -480,16 +490,10 @@ measurements within each. That is not only how they are stored; it is what the
 reader needs, since the same pair of features measured in the front elevation
 and in the plan view are two different dimensions with two different numbers.
 
-Nothing deletes a viewport today. A measurement written against a viewport the
-layout no longer produces is kept and shown as broken rather than dropped, the
-same rule as an orphaned override.
-
-A file entry replaces a code drawing only when it carries a layout of its own --
-a page or viewports -- which is how a drawing is set up to test with. One
-carrying nothing but measurements leaves the layout to the code and adds to it.
-Without that distinction, adding a single dimension would take the drawing's
-page and viewports with it, which is the outcome merging measurements exists to
-avoid.
+Nothing deletes a viewport today. A measurement naming a viewport the layout does
+not produce cannot be drawn, so it is not shown and the mismatch is warned about
+-- but it is kept, since the viewport may come back when the code changes and
+dropping it would mean the next save deleted it from the file for good.
 
 ### The drawing's own tree
 

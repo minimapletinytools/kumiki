@@ -1703,19 +1703,27 @@ def merge_measurements(
     return merged
 
 
-def measurements_by_viewport(
+def _file_measurements_by_viewport(entry: Optional[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    """A file drawing's measurements, off the viewports they hang from."""
+    by_viewport: Dict[str, List[Dict[str, Any]]] = {}
+    for viewport in (entry or {}).get("viewports") or []:
+        if isinstance(viewport, dict) and isinstance(viewport.get("id"), str):
+            by_viewport[viewport["id"]] = list(viewport.get("measurements") or [])
+    return by_viewport
+
+
+def _measurements_by_viewport(
     declared: Any,
     override: Optional[Dict[str, Any]],
 ) -> Dict[str, List[Dict[str, Any]]]:
     """A drawing's measurements, merged tier over tier, under each viewport.
 
-    Both tiers are keyed by viewport, and the merge happens within one. A
-    viewport named by neither is simply absent, and one the layout does not
-    produce is carried anyway -- a measurement written against a viewport that
-    has gone is worth showing as broken rather than dropping silently.
+    Both tiers hang them off viewports, and the merge happens within one: the
+    same anchors in another viewport are a different dimension, not this one
+    again.
     """
     code_by_viewport = dict(getattr(declared, "measurements", None) or {}) if declared is not None else {}
-    file_by_viewport = dict((override or {}).get("measurements") or {})
+    file_by_viewport = _file_measurements_by_viewport(override)
     merged: Dict[str, List[Dict[str, Any]]] = {}
     for viewport in list(code_by_viewport) + [v for v in file_by_viewport if v not in code_by_viewport]:
         merged[viewport] = merge_measurements(
@@ -1735,39 +1743,35 @@ def _drawings_file_path(example_path: Path) -> Path:
     return example_path.parent / ".kigumi" / "drawings" / f"{example_path.stem}.json"
 
 
-def _read_drawings_file(path: Path) -> Dict[str, Any]:
-    """The drawings file, or an empty one. A broken file is reported, not fatal.
+# What a file drawing names when it is overriding one the code declares. Kept
+# separate from its own id so that an override is always recognisably an
+# override: delete the python drawing and what is left is plainly a dangling
+# entry, rather than something that quietly becomes a drawing in its own right.
+OVERRIDES_KEY = "overridesPythonDrawing"
+
+
+def _read_drawings_file(path: Path) -> List[Dict[str, Any]]:
+    """The drawings file, in order, or nothing. A broken file is reported, not fatal.
 
     Losing a viewer because a hand-edited file has a comma out of place would be
     a poor trade for strictness, and the file is meant to be hand-edited.
     """
     if not path.exists():
-        return {}
+        return []
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except Exception as exc:
         log_stderr(f"Warning: could not read {path}: {exc}")
-        return {}
+        return []
     if not isinstance(loaded, dict):
-        return {}
+        return []
     drawings = loaded.get("drawings")
     if not isinstance(drawings, list):
-        return {}
-    return {
-        drawing["id"]: drawing
-        for drawing in drawings
+        return []
+    return [
+        drawing for drawing in drawings
         if isinstance(drawing, dict) and isinstance(drawing.get("id"), str)
-    }
-
-
-def _replaces_layout(override: Dict[str, Any]) -> bool:
-    """Whether a file entry stands in for a code drawing or only adds to it.
-
-    Carrying a layout -- a page or viewports -- means it is the drawing now.
-    Carrying only measurements means it has something to say about the drawing
-    the code still describes.
-    """
-    return any(override.get(key) for key in ("page", "viewports"))
+    ]
 
 
 def _member_keys_for_paths(frame: Any, paths: List[str]) -> List[str]:
@@ -1794,56 +1798,58 @@ def collect_drawings(
 ) -> List[Dict[str, Any]]:
     """Every drawing for a frame: from the code, from the file, and unsaved.
 
-    A file drawing sharing an id with a code one replaces it outright rather
-    than patching its fields; a patch model needs a merge rule for every field
-    and can come later if it is ever wanted. A file drawing whose code drawing
-    has since gone away is kept and shown as a file drawing, because an extra
-    row someone can delete beats work vanishing quietly.
+    The file mirrors the code -- drawings holding viewports holding measurements
+    -- and a file drawing says outright which code drawing it overrides, if any.
+    So an override contributes measurements to a drawing the code still lays out,
+    a file drawing that overrides nothing is a drawing in its own right, and one
+    naming a code drawing that has gone is plainly a dangling override rather
+    than something that has quietly become its own.
 
     `dirty` says a drawing is not in the file yet. It is worked out here rather
     than left for the viewer to infer, so there is one answer to it.
     """
-    overrides = _read_drawings_file(_drawings_file_path(example_path)) if example_path else {}
+    from_file = _read_drawings_file(_drawings_file_path(example_path)) if example_path else []
+    overrides = {
+        entry[OVERRIDES_KEY]: entry for entry in from_file
+        if isinstance(entry.get(OVERRIDES_KEY), str)
+    }
     drawings: List[Dict[str, Any]] = []
-    seen = set()
+    overridden = set()
 
     for declared in list(getattr(frame, "drawings", None) or []):
-        drawing_id = declared.drawing_id
-        seen.add(drawing_id)
-        override = overrides.get(drawing_id)
-        if override is not None and _replaces_layout(override):
-            # A file entry carrying a layout stands in for the code drawing
-            # entirely, which is how a drawing is set up to test with.
-            scene = dict(override)
-            scene["id"] = drawing_id
-            scene.setdefault("name", declared.name)
-        else:
-            # One carrying only measurements leaves the layout to the code. It
-            # is the reason measurements are the exception to replacing: adding
-            # a dimension must not take a drawing's page and viewports with it.
-            scene = _drawing_from_code(frame, declared)
+        # The layout is always the code's. A file entry that wants a layout of
+        # its own is a drawing of its own, which is what keeps adding one
+        # dimension from taking a drawing's page and viewports with it.
+        scene = _drawing_from_code(frame, declared)
+        override = overrides.get(declared.drawing_id)
+        if override is not None:
+            overridden.add(id(override))
+            scene["overriddenBy"] = override["id"]
         scene["origin"] = ORIGIN_CODE if override is None else ORIGIN_OVERRIDDEN
-        # Measurements merge where everything else replaces. Overriding them
-        # wholesale would mean that adding one dimension to a drawing froze its
-        # page, its viewports and its layout into the file, and detached it from
-        # the code that asked for it.
-        _attach_measurements(scene, measurements_by_viewport(declared, override))
+        _attach_measurements(scene, _measurements_by_viewport(declared, override), scene["name"])
         drawings.append(scene)
 
-    for drawing_id, scene in overrides.items():
-        if drawing_id in seen:
+    for entry in from_file:
+        if id(entry) in overridden:
             continue
-        entry = dict(scene)
-        entry["id"] = drawing_id
-        entry.setdefault("name", drawing_id)
-        entry["origin"] = ORIGIN_FILE
-        # No code tier to merge with, so every one of them is the file's.
-        _attach_measurements(entry, measurements_by_viewport(None, scene))
-        drawings.append(entry)
+        scene = dict(entry)
+        scene.setdefault("name", scene["id"])
+        target = entry.get(OVERRIDES_KEY)
+        if isinstance(target, str):
+            # It says it overrides something the code no longer declares. Shown
+            # rather than dropped, and shown as what it is, so it can be pointed
+            # somewhere else or deleted on purpose.
+            scene["dangling"] = True
+            log_stderr(
+                f"Warning: drawing {scene['id']!r} overrides {target!r}, "
+                "which the frame no longer declares."
+            )
+        scene["origin"] = ORIGIN_FILE
+        _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"])
+        drawings.append(scene)
 
     for drawing in drawings:
         drawing["dirty"] = False
-        seen.add(drawing["id"])
 
     # Made this session and not saved. A pending drawing that shares an id with
     # a saved one has been made since, so it wins -- it is the newer answer.
@@ -1863,20 +1869,30 @@ def collect_drawings(
 def _attach_measurements(
     scene: Dict[str, Any],
     by_viewport: Dict[str, List[Dict[str, Any]]],
+    drawing_name: str,
 ) -> None:
     """Put each viewport's measurements on the viewport they belong to.
 
     A measurement is drawn in a viewport and means nothing outside it, so it
-    travels with the viewport rather than with the drawing. Any left over --
-    written against a viewport this layout does not produce -- are kept on the
-    drawing so they can be shown as broken instead of vanishing.
+    travels with the viewport rather than with the drawing.
+
+    Measurements naming a viewport this layout does not produce cannot be drawn,
+    so they are not shown and the mismatch is warned about. They are kept all the
+    same: a viewport can come back when the code changes, and dropping them here
+    would mean the next save deleted them from the file for good.
     """
     remaining = dict(by_viewport)
     for viewport in scene.get("viewports") or []:
         viewport["measurements"] = remaining.pop(viewport.get("id"), [])
-    scene["orphanedMeasurements"] = {
+    unplaceable = {
         viewport: measures for viewport, measures in remaining.items() if measures
     }
+    for viewport in unplaceable:
+        log_stderr(
+            f"Warning: drawing {drawing_name!r} has measurements for viewport "
+            f"{viewport!r}, which it does not have. They are kept but not shown."
+        )
+    scene["unplaceableMeasurements"] = unplaceable
 
 
 def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
@@ -1889,7 +1905,7 @@ def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
     """
     saved = {
         key: value for key, value in drawing.items()
-        if key not in ("origin", "dirty", "orphanedMeasurements")
+        if key not in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling")
     }
 
     def keepers(measures):
@@ -1899,18 +1915,25 @@ def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
             if measure.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)
         ]
 
-    # Gathered back off the viewports into one map, which is how the file holds
-    # them: the viewports themselves are the layout's to produce.
-    by_viewport: Dict[str, Any] = {}
+    # Written back the way the file holds them: on the viewports. An override
+    # keeps only the ids, since the layout is the code's; a drawing of its own
+    # keeps whatever it had.
+    is_override = isinstance(drawing.get(OVERRIDES_KEY), str)
+    viewports: List[Dict[str, Any]] = []
     for viewport in saved.get("viewports") or []:
         kept = keepers(viewport.get("measurements"))
-        if kept:
-            by_viewport[viewport.get("id")] = kept
-    for viewport, measures in (drawing.get("orphanedMeasurements") or {}).items():
+        if is_override and not kept:
+            continue
+        entry = {"id": viewport.get("id")} if is_override else dict(viewport)
+        entry["measurements"] = kept
+        viewports.append(entry)
+    # Ones that could not be placed keep their viewport, so they come back if it
+    # does rather than being deleted by the next save.
+    for viewport, measures in (drawing.get("unplaceableMeasurements") or {}).items():
         kept = keepers(measures)
         if kept:
-            by_viewport[viewport] = kept
-    saved["measurements"] = by_viewport
+            viewports.append({"id": viewport, "measurements": kept})
+    saved["viewports"] = viewports
     return saved
 
 

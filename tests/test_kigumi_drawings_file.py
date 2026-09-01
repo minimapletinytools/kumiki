@@ -57,12 +57,22 @@ def _write_file(example, drawings):
     return path
 
 
-def _sheet(drawing_id, name=None):
+def _sheet(drawing_id, name=None, viewports=None):
+    """A drawing of the file's own: it lays itself out."""
     return {
         "id": drawing_id,
         "name": name or drawing_id,
         "page": {"width": 0.42, "height": 0.297},
-        "viewports": [],
+        "viewports": viewports if viewports is not None else [],
+    }
+
+
+def _override(drawing_id, target, viewports=None):
+    """A file drawing that says which python drawing it is overriding."""
+    return {
+        "id": drawing_id,
+        runner.OVERRIDES_KEY: target,
+        "viewports": viewports or [],
     }
 
 
@@ -89,14 +99,27 @@ class TestCollectDrawings:
         assert len(drawing["viewports"]) > 0
 
     def test_the_file_overrides_a_drawing_the_code_asked_for(self, example):
+        # By naming it, not by sharing its id.
         frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
-        _write_file(example, [_sheet("post")])
+        _write_file(example, [_override("my post sheet", "post")])
 
-        drawing = runner.collect_drawings(frame, example)[0]
+        drawings = runner.collect_drawings(frame, example)
 
-        assert drawing["origin"] == runner.ORIGIN_OVERRIDDEN
-        # Replaced outright, not patched: the file's viewports are what is used.
-        assert drawing["viewports"] == []
+        assert len(drawings) == 1, "the override is not a second drawing"
+        assert drawings[0]["origin"] == runner.ORIGIN_OVERRIDDEN
+        # The layout is still the code's; an override contributes measurements.
+        assert len(drawings[0]["viewports"]) > 1
+
+    def test_an_override_naming_nothing_the_code_declares_is_dangling(self, example):
+        # The point of naming the target: deleting a python drawing leaves an
+        # entry that is plainly a dangling override, not one that has quietly
+        # become a drawing of its own.
+        _write_file(example, [_override("my post sheet", "a drawing that went away")])
+
+        drawing = runner.collect_drawings(_frame(), example)[0]
+
+        assert drawing["dangling"] is True
+        assert drawing["origin"] == runner.ORIGIN_FILE
 
     def test_the_file_may_introduce_drawings_of_its_own(self, example):
         _write_file(example, [_sheet("test sheet")])
@@ -114,15 +137,14 @@ class TestCollectDrawings:
 
         assert [d["id"] for d in runner.collect_drawings(frame, example)] == ["a", "b", "z"]
 
-    def test_an_override_outlives_the_drawing_it_overrode(self, example):
-        # The code used to declare this and no longer does. Dropping it would
-        # throw away whatever was set up in the file without saying so.
-        _write_file(example, [_sheet("a drawing the code forgot")])
+    def test_a_file_drawing_that_overrides_nothing_is_its_own(self, example):
+        _write_file(example, [_sheet("a sheet of my own")])
 
         drawings = runner.collect_drawings(_frame(), example)
 
         assert len(drawings) == 1
         assert drawings[0]["origin"] == runner.ORIGIN_FILE
+        assert "dangling" not in drawings[0]
 
     def test_a_drawing_of_a_timber_that_is_gone_is_still_a_drawing(self, example):
         # Raising the frame must not fail because a path stopped matching.
@@ -133,9 +155,9 @@ class TestCollectDrawings:
         assert drawing["members"] == []
 
     def test_an_id_keeps_an_override_attached_across_a_rename(self, example):
-        # drawing_id is what the override keys on, so the name can change.
+        # drawing_id is what the override names, so the name can change.
         frame = _frame([Drawing(name="new name", drawing_id="stable", timber_paths=["posts/fl"])])
-        _write_file(example, [_sheet("stable", name="old name")])
+        _write_file(example, [_override("sheet", "stable")])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
@@ -336,7 +358,9 @@ class TestMeasurementsThroughADrawing:
                 "right": [Measure(anchor_a="x", anchor_b="y")],
             },
         )])
-        _write_file(example, [{"id": "post", "measurements": {"front": [{"a": "x", "b": "y"}]}}])
+        _write_file(example, [_override("sheet", "post", [
+            {"id": "front", "measurements": [{"a": "x", "b": "y"}]},
+        ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
         by_id = {v["id"]: v["measurements"] for v in drawing["viewports"]}
@@ -353,55 +377,87 @@ class TestMeasurementsThroughADrawing:
             name="post", timber_paths=["posts/fl"],
             measurements={"front": [Measure(anchor_a="x", anchor_b="y")]},
         )])
-        _write_file(example, [{"id": "post", "measurements": {"front": [{"a": "p", "b": "q"}]}}])
+        _write_file(example, [_override("sheet", "post", [
+            {"id": "front", "measurements": [{"a": "p", "b": "q"}]},
+        ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
         assert [m["origin"] for m in self._front(drawing)] == [
             runner.ORIGIN_CODE, runner.ORIGIN_FILE,
         ]
+        assert len(drawing["viewports"]) > 1, "the code's layout survived"
 
-    def test_a_measurement_for_a_viewport_that_is_gone_is_kept_as_broken(self, example):
-        # Written against a viewport this layout does not produce. Dropping it
-        # would lose the work without saying so.
-        _write_file(example, [{
-            "id": "post", "name": "post",
-            "page": {"width": 0.42, "height": 0.297},
-            "viewports": [{"id": "front", "rect": [0, 0, 1, 1]}],
-            "measurements": {"nowhere": [{"a": "x", "b": "y"}]},
+    def test_a_measurement_for_a_viewport_that_is_gone_is_not_shown(self, example):
+        # An override naming a viewport the code's layout does not produce.
+        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
+        _write_file(example, [_override("sheet", "post", [
+            {"id": "nowhere", "measurements": [{"a": "x", "b": "y"}]},
+        ])])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+
+        assert all(v["measurements"] == [] for v in drawing["viewports"])
+        assert "nowhere" in drawing["unplaceableMeasurements"]
+
+    def test_a_measurement_that_cannot_be_placed_is_not_lost(self, example):
+        # The viewport may come back when the code changes, and a save that
+        # dropped it would have deleted it from the file for good.
+        written = runner.write_drawings_file(example, [{
+            "id": "sheet", runner.OVERRIDES_KEY: "post", "origin": runner.ORIGIN_OVERRIDDEN,
+            "viewports": [],
+            "unplaceableMeasurements": {
+                "nowhere": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}],
+            },
         }])
 
-        drawing = runner.collect_drawings(_frame(), example)[0]
-
-        assert "nowhere" in drawing["orphanedMeasurements"]
+        saved = json.loads(Path(written).read_text())["drawings"][0]
+        assert saved["viewports"] == [{"id": "nowhere", "measurements": [{"a": "x", "b": "y"}]}]
 
     def test_saving_leaves_the_algorithms_measurements_out(self, example):
         # They would stop following the algorithm the moment the frame changed.
         runner.write_drawings_file(example, [{
-            "id": "post", "origin": runner.ORIGIN_OVERRIDDEN,
+            "id": "sheet", runner.OVERRIDES_KEY: "post", "origin": runner.ORIGIN_OVERRIDDEN,
             "viewports": [{"id": "front", "measurements": [
                 {"a": "x", "b": "y", "origin": runner.ORIGIN_CODE},
                 {"a": "p", "b": "q", "origin": runner.ORIGIN_FILE},
             ]}],
         }])
 
-        saved = json.loads(runner._drawings_file_path(example).read_text())
-        kept = saved["drawings"][0]["measurements"]["front"]
+        saved = json.loads(runner._drawings_file_path(example).read_text())["drawings"][0]
+        kept = saved["viewports"][0]["measurements"]
         assert [(m["a"], m["b"]) for m in kept] == [("p", "q")]
 
-    def test_saving_gathers_them_back_under_their_viewports(self, example):
+    def test_an_override_saves_viewport_ids_and_nothing_else(self, example):
+        # The layout is the code's; writing it out would freeze it.
         runner.write_drawings_file(example, [{
-            "id": "post", "origin": runner.ORIGIN_FILE,
+            "id": "sheet", runner.OVERRIDES_KEY: "post", "origin": runner.ORIGIN_OVERRIDDEN,
+            "viewports": [{
+                "id": "front", "rect": [0, 0, 1, 1], "camera": {"extent": 2},
+                "measurements": [{"a": "p", "b": "q", "origin": runner.ORIGIN_FILE}],
+            }],
+        }])
+
+        saved = json.loads(runner._drawings_file_path(example).read_text())["drawings"][0]
+        assert sorted(saved["viewports"][0]) == ["id", "measurements"]
+
+    def test_a_drawing_of_its_own_saves_its_whole_layout(self, example):
+        runner.write_drawings_file(example, [{
+            "id": "sheet", "origin": runner.ORIGIN_FILE,
+            "page": {"width": 0.42, "height": 0.297},
             "viewports": [
-                {"id": "front", "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}]},
-                {"id": "right", "measurements": [{"a": "p", "b": "q", "origin": runner.ORIGIN_FILE}]},
+                {"id": "front", "rect": [0, 0, 1, 1],
+                 "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}]},
+                {"id": "right", "rect": [0, 0, 1, 1],
+                 "measurements": [{"a": "p", "b": "q", "origin": runner.ORIGIN_FILE}]},
             ],
         }])
 
         saved = json.loads(runner._drawings_file_path(example).read_text())["drawings"][0]
 
-        assert sorted(saved["measurements"]) == ["front", "right"]
-        assert "origin" not in saved["measurements"]["front"][0]
+        assert [v["id"] for v in saved["viewports"]] == ["front", "right"]
+        assert saved["viewports"][0]["rect"] == [0, 0, 1, 1]
+        assert "origin" not in saved["viewports"][0]["measurements"][0]
 
     def test_what_is_saved_comes_back_where_it_was(self, example):
         runner.write_drawings_file(example, [{
@@ -416,25 +472,11 @@ class TestMeasurementsThroughADrawing:
 
         assert [(m["a"], m["b"]) for m in front["measurements"]] == [("x", "y")]
 
-    def test_a_file_entry_with_a_layout_stands_in_for_the_drawing(self, example):
-        # How a drawing is set up to test with: the file's layout is the one used.
-        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
-        _write_file(example, [dict(_sheet("post"), viewports=[{"id": "only", "rect": [0, 0, 1, 1]}])])
+    def test_a_drawing_of_its_own_lays_itself_out(self, example):
+        # How a drawing is set up to test with: it is not an override at all.
+        _write_file(example, [_sheet("test sheet", viewports=[{"id": "only", "rect": [0, 0, 1, 1]}])])
 
-        drawing = runner.collect_drawings(frame, example)[0]
+        drawing = runner.collect_drawings(_frame(), example)[0]
 
         assert [v["id"] for v in drawing["viewports"]] == ["only"]
-        assert drawing["origin"] == runner.ORIGIN_OVERRIDDEN
-
-    def test_a_file_entry_with_only_measurements_keeps_the_code_layout(self, example):
-        # Adding a dimension must not take the drawing's page and viewports with
-        # it -- that is the whole reason measurements merge.
-        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
-        _write_file(example, [{"id": "post", "measurements": {"front": [{"a": "x", "b": "y"}]}}])
-
-        drawing = runner.collect_drawings(frame, example)[0]
-
-        assert len(drawing["viewports"]) > 1, "the code layout survived"
-        assert drawing["page"]["width"] > 0
-        # Still marked as touched by the file, so it can be reverted.
-        assert drawing["origin"] == runner.ORIGIN_OVERRIDDEN
+        assert drawing["origin"] == runner.ORIGIN_FILE
