@@ -426,7 +426,15 @@ hand, and that is what shapes the rest of this:
 third measurement the algorithm emitted" stops meaning anything the moment a
 joint is added, and every override attached to one would slide onto its
 neighbour. Derived from its two anchors, an override stays attached across a
-regeneration.
+regeneration. An optional `id` disambiguates when the same pair is measured more
+than once, which is the only case the anchors cannot separate on their own.
+
+**That identity is the drawing's, not the viewport's.** A measurement belongs to
+a viewport, but if the viewport were part of what identifies it then moving one
+to another viewport would change what it is and orphan every override attached
+to it. With the viewport as a property instead, moving a measurement is simply an
+override that names a different one -- which is how a code measurement gets moved
+without the algorithm being changed.
 
 **Code measurements are never written to the file.** The same rule as an
 untouched code drawing, for the same reason: freezing one would stop it
@@ -444,15 +452,40 @@ code drawing would otherwise freeze its page, its viewports and its whole layout
 into the file and detach it from the code. Everything else still replaces, and
 whole-drawing replacement stays available for setting up a drawing to test with.
 
-Each measurement carries the same three marks a drawing does -- from code,
-overridden, from the file -- which is what makes them worth showing at all. A
-measurement whose anchors stop resolving greys out rather than disappearing.
+### Two tiers, three things to show
+
+There are only two tiers: from the file, and not. A file measurement overrides
+the one beneath it with the same identity, and that is the whole rule. It still
+produces the three states worth marking, the same three a drawing has: a code
+measurement nothing has touched, a code measurement the file has overridden, and
+one the file introduced.
+
+Two measurements sharing an identity within the same tier is a mistake rather
+than a case to resolve, so the later one wins and a warning is logged the first
+time the data is parsed. Failing outright would cost someone their drawings over
+a hand-edited file, which is the same trade the file parser already makes.
+
+A measurement greys out rather than disappearing when its anchors stop
+resolving -- and equally when it has been moved to a viewport where its anchors
+project onto each other, since what can be measured is decided per viewport and a
+move can therefore invalidate it.
+
+### The list is viewports first
+
+Measurements hang off viewports, so the drawing's tree lists viewports and the
+measurements within each. That is not only how they are stored; it is what the
+reader needs, since the same pair of features measured in the front elevation
+and in the plan view are two different dimensions with two different numbers.
+
+Nothing deletes a viewport today. Moving a measurement from one viewport to
+another is worth allowing for, and the identity rule above is what makes it
+cheap: the measurement is the same measurement, drawn somewhere else.
 
 ### The drawing's own tree
 
 While a drawing is open there is a tree for the drawing itself: its name and
-where it came from, close and save, its measurements, and the members it is
-about -- which is where the filtered member list belongs rather than as a
+where it came from, close and save, its viewports with their measurements under
+them, and the members it is about -- which is where the filtered member list belongs rather than as a
 separate piece of work, since a drawing can only select what it is about anyway.
 
 Where that tree is shown is deliberately left open. It is likely a panel of its
