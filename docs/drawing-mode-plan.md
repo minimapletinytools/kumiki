@@ -416,8 +416,50 @@ the measurement **greyed out rather than deleted** -- the same rule as an
 orphaned drawing override, for the same reason: work that quietly disappears is
 worse than a broken row someone can see and fix.
 
-Measurements will want a list of their own eventually, so each needs an identity
-from the start even though nothing lists them yet.
+### Measurements come from code as well as from the file
+
+A drawing can declare measurements in python, alongside the timbers it is of.
+Most of them will eventually be produced by algorithm rather than written out by
+hand, and that is what shapes the rest of this:
+
+**An identity derived from what a measurement measures, never an index.** "The
+third measurement the algorithm emitted" stops meaning anything the moment a
+joint is added, and every override attached to one would slide onto its
+neighbour. Derived from its two anchors, an override stays attached across a
+regeneration.
+
+**Code measurements are never written to the file.** The same rule as an
+untouched code drawing, for the same reason: freezing one would stop it
+following the algorithm that produces it.
+
+**So the file has three jobs for a code measurement** -- move it, since an
+algorithm cannot know where there is room on the sheet; suppress it, when it is
+not one you want; and add measurements the algorithm did not produce. Suppression
+is an entry that says "not this one", and is much easier to allow for now than
+to retrofit.
+
+This narrows the rule that a file entry replaces a code drawing outright.
+Measurements are the exception and merge, because adding one measurement to a
+code drawing would otherwise freeze its page, its viewports and its whole layout
+into the file and detach it from the code. Everything else still replaces, and
+whole-drawing replacement stays available for setting up a drawing to test with.
+
+Each measurement carries the same three marks a drawing does -- from code,
+overridden, from the file -- which is what makes them worth showing at all. A
+measurement whose anchors stop resolving greys out rather than disappearing.
+
+### The drawing's own tree
+
+While a drawing is open there is a tree for the drawing itself: its name and
+where it came from, close and save, its measurements, and the members it is
+about -- which is where the filtered member list belongs rather than as a
+separate piece of work, since a drawing can only select what it is about anyway.
+
+Where that tree is shown is deliberately left open. It is likely a panel of its
+own for drawing mode, but it may end up back in the layers rail, or both may be
+shown at once with the members in one and the drawing in the other. So it is
+built as content that can be mounted anywhere -- data in, events out, like the
+layers panel -- and where it goes stays a one-line decision.
 
 Chains and baselines -- a run of mortises dimensioned from one end -- are not in
 this first step, but nothing should be built that a chain could not later be
