@@ -1871,7 +1871,7 @@ def collect_drawings(
             overridden.add(id(override))
             scene["overriddenBy"] = override["id"]
         scene["origin"] = ORIGIN_CODE if override is None else ORIGIN_OVERRIDDEN
-        _attach_measurements(scene, _measurements_by_viewport(declared, override), scene["name"])
+        _attach_measurements(scene, _measurements_by_viewport(declared, override), scene["name"], frame)
         drawings.append(scene)
 
     for entry in from_file:
@@ -1911,10 +1911,34 @@ def collect_drawings(
     return drawings
 
 
+def _resolve_measurement(frame: Any, measure: Dict[str, Any]) -> Dict[str, Any]:
+    """A measurement with its anchors found, or marked as not findable.
+
+    Resolved here rather than in the viewer because finding a feature means
+    walking the CSG, which is python's. What the viewer gets is geometry in
+    world space, which it can project into whichever viewport the measurement
+    belongs to.
+    """
+    resolved = dict(measure)
+    broken = []
+    for key in ("a", "b"):
+        found = resolve_anchor(frame, measure.get(key))
+        if found is None:
+            broken.append(key)
+        else:
+            resolved[key] = {**(measure.get(key) or {}), **found}
+    if broken:
+        # Shown greyed rather than dropped: a reference that stops resolving is
+        # worth seeing, since the fix is usually a rename away.
+        resolved["unresolved"] = broken
+    return resolved
+
+
 def _attach_measurements(
     scene: Dict[str, Any],
     by_viewport: Dict[str, List[Dict[str, Any]]],
     drawing_name: str,
+    frame: Any = None,
 ) -> None:
     """Put each viewport's measurements on the viewport they belong to.
 
@@ -1926,7 +1950,11 @@ def _attach_measurements(
     same: a viewport can come back when the code changes, and dropping them here
     would mean the next save deleted them from the file for good.
     """
-    remaining = dict(by_viewport)
+    remaining = {
+        viewport: [_resolve_measurement(frame, measure) for measure in measures]
+        if frame is not None else measures
+        for viewport, measures in by_viewport.items()
+    }
     for viewport in scene.get("viewports") or []:
         viewport["measurements"] = remaining.pop(viewport.get("id"), [])
     unplaceable = {
@@ -1995,6 +2023,120 @@ def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> s
             if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)]
     path.write_text(json.dumps({"drawings": keep}, indent=2) + "\n", encoding="utf-8")
     return str(path)
+
+
+# --- resolving a measurement's anchors --------------------------------------
+#
+# A FeaturePath says which feature; this finds it and works out where it is. The
+# CSG tree is timber-local, so everything located in it is lifted through the
+# timber's transform before it leaves here -- a measurement between two timbers
+# compares nothing meaningful otherwise.
+
+
+def _find_csg_by_labels(csg: Any, labels: Tuple[str, ...]) -> Optional[Any]:
+    """Walk down a CSG by node label, the way a FeaturePath addresses one.
+
+    A node carries its own label, so a path's first step names the node it
+    starts at rather than one of its children. Unlabelled nodes are stepped
+    through without consuming a step: a path names the labelled ones, and the
+    intermediates -- the ones most likely to move -- are what it skips.
+    """
+    from kumiki.cutcsg import csg_children
+
+    label = _label_name(csg)
+    remaining = labels
+    if label is not None:
+        if not remaining or label != remaining[0]:
+            # A labelled node that is not the one wanted: the wrong branch, and
+            # nothing beneath it can be on this path.
+            return None
+        remaining = remaining[1:]
+    if not remaining:
+        return csg
+    for child in csg_children(csg):
+        found = _find_csg_by_labels(child, remaining)
+        if found is not None:
+            return found
+    return None
+
+
+def _csg_roots_of(cut_timber: Any) -> List[Any]:
+    return [
+        cut.negative_csg for cut in (getattr(cut_timber, "cuts", None) or [])
+        if getattr(cut, "negative_csg", None) is not None
+    ]
+
+
+def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, Any]]:
+    """A feature's unbounded geometry, in world space, as the viewer wants it.
+
+    A plane keeps its normal and a line its direction, because those are what
+    decide whether two features are parallel once projected -- which is what
+    separates a separation from a distance between two points.
+    """
+    from kumiki.geometry import Line, Plane, Point
+
+    def to_world(point: Any) -> List[float]:
+        return _vector3_to_floats(timber.transform.local_to_global(point))
+
+    def direction_to_world(direction: Any) -> List[float]:
+        # A direction is rotated but not translated.
+        origin = timber.transform.local_to_global(direction * 0)
+        moved = timber.transform.local_to_global(direction)
+        return [moved[i, 0] - origin[i, 0] for i in range(3)]
+
+    if isinstance(located, Point):
+        return {"kind": "point", "at": to_world(located.position)}
+    if isinstance(located, Line):
+        return {
+            "kind": "line",
+            "at": to_world(located.point),
+            "direction": direction_to_world(located.direction),
+        }
+    if isinstance(located, Plane):
+        return {
+            "kind": "plane",
+            "at": to_world(located.point),
+            "normal": direction_to_world(located.normal),
+        }
+    return None
+
+
+def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Where the feature an anchor names actually is, in world space.
+
+    None when it cannot be found -- a renamed feature, a timber that has gone, a
+    surface with no plane to measure against. The caller shows the measurement
+    as broken rather than guessing, which is the whole reason a reference is
+    allowed to break honestly.
+    """
+    identity = _feature_path_identity(anchor)
+    member_key, labels, feature_name, _ = identity
+
+    timber_entries, _ = _assign_member_keys(frame)
+    entry = next((e for e in timber_entries if e["memberKey"] == member_key), None)
+    if entry is None:
+        return None
+
+    for root in _csg_roots_of(entry["cutTimber"]):
+        node = _find_csg_by_labels(root, labels)
+        if node is None:
+            continue
+        for feature in node.get_declared_features():
+            if feature.name != feature_name:
+                continue
+            timber = entry["timber"]
+            extent = feature.get_extent(node)
+            located = feature.locate(node)
+            if extent is None and located is None:
+                return None
+            return {
+                "at": _vector3_to_floats(
+                    timber.transform.local_to_global(extent.anchor)
+                ) if extent is not None else None,
+                "geometry": _located_geometry_payload(located, timber),
+            }
+    return None
 
 
 def serialize_layers(frame: Any) -> Dict[str, Any]:

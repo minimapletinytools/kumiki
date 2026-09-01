@@ -641,3 +641,112 @@ class TestIdentifiers:
         assert Drawing(name="d", timber_paths=["posts/fl"]).timber_paths == (
             TimberPath("posts/fl"),
         )
+
+
+class TestResolvingAnchors:
+    """Finding the feature a measurement names, and where it is."""
+
+    @pytest.fixture
+    def measured(self):
+        import importlib.util as _ilu
+
+        path = Path(__file__).resolve().parent.parent / "kigumi" / "test-fixtures" / "measured_frame.py"
+        spec = _ilu.spec_from_file_location("measured_fixture", path)
+        module = _ilu.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module.build_frame()
+
+    def _anchor(self, timber, csg_path, feature):
+        return {"timber": timber, "csgPath": list(csg_path), "feature": feature, "type": "FACE"}
+
+    def test_it_finds_a_declared_face(self, measured):
+        found = runner.resolve_anchor(
+            measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "tenon_top"),
+        )
+
+        assert found is not None
+        assert found["geometry"]["kind"] == "plane"
+
+    def test_the_geometry_comes_back_in_world_space(self, measured):
+        # The CSG tree is timber-local, so anything comparing two timbers has to
+        # be lifted through the timber's transform first. Compared against the
+        # local value rather than against another feature: a tenon's tip and the
+        # mortise floor it seats on genuinely do land in the same place, so two
+        # features agreeing proves nothing either way.
+        from kumiki.cutcsg import csg_children
+
+        def local_anchor(timber_path, feature_name):
+            cut = next(c for c in measured.cut_timbers if c.timber.ticket.path == timber_path)
+            found = []
+
+            def walk(csg):
+                for feature in csg.get_declared_features():
+                    if feature.name == feature_name:
+                        extent = feature.get_extent(csg)
+                        if extent is not None:
+                            found.append([float(extent.anchor[i, 0]) for i in range(3)])
+                for child in csg_children(csg):
+                    walk(child)
+
+            for one in cut.cuts:
+                if getattr(one, "negative_csg", None) is not None:
+                    walk(one.negative_csg)
+            return found[0]
+
+        world = runner.resolve_anchor(
+            measured, self._anchor("receiving_timber#0", ("mortise_hole",), "mortise_bottom"),
+        )["at"]
+
+        assert world != local_anchor("receiving_timber", "mortise_bottom")
+
+    def test_a_path_steps_through_unlabelled_nodes(self, measured):
+        # A path names the labelled nodes only; the intermediates are what it
+        # skips, and they are the ones most likely to move.
+        assert runner.resolve_anchor(
+            measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "tenon_left"),
+        ) is not None
+
+    def test_a_feature_that_is_not_there_does_not_resolve(self, measured):
+        assert runner.resolve_anchor(
+            measured, self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "no_such_face"),
+        ) is None
+
+    def test_a_wrong_path_does_not_find_the_feature_elsewhere(self, measured):
+        # A labelled node that does not match means the wrong branch, so the
+        # walk stops rather than hunting the whole tree for the name.
+        assert runner.resolve_anchor(
+            measured, self._anchor("butt_timber#0", ("mortise_hole",), "tenon_top"),
+        ) is None
+
+    def test_a_timber_that_is_gone_does_not_resolve(self, measured):
+        assert runner.resolve_anchor(
+            measured, self._anchor("no_such_timber#0", ("tenon_waste",), "tenon_top"),
+        ) is None
+
+    def test_an_unbounded_feature_has_geometry_but_no_anchor_point(self, measured):
+        # The shoulder is a half space: a plane to measure against, and no
+        # bounded extent to hang a label on. Where to draw it has to come from
+        # the geometry and the other anchor instead.
+        found = runner.resolve_anchor(
+            measured, self._anchor("butt_timber#0", ("tenon_waste", "shoulder"), "shoulder"),
+        )
+
+        assert found["at"] is None
+        assert found["geometry"]["kind"] == "plane"
+
+    def test_a_drawing_carries_its_measurements_resolved(self, measured):
+        drawings = runner.collect_drawings(measured, None)
+        tenon = next(d for d in drawings if d["id"] == "tenon")
+        front = next(v for v in tenon["viewports"] if v["id"] == "front")
+
+        assert len(front["measurements"]) == 1
+        assert "unresolved" not in front["measurements"][0]
+        assert front["measurements"][0]["a"]["geometry"]["kind"] == "plane"
+
+    def test_a_measurement_that_cannot_be_found_says_so(self, measured):
+        broken = runner._resolve_measurement(measured, {
+            "a": self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "tenon_top"),
+            "b": self._anchor("butt_timber#0", ("tenon_waste", "tenon"), "gone"),
+        })
+
+        assert broken["unresolved"] == ["b"]
