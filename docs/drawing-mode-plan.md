@@ -429,12 +429,15 @@ neighbour. Derived from its two anchors, an override stays attached across a
 regeneration. An optional `id` disambiguates when the same pair is measured more
 than once, which is the only case the anchors cannot separate on their own.
 
-**That identity is the drawing's, not the viewport's.** A measurement belongs to
-a viewport, but if the viewport were part of what identifies it then moving one
-to another viewport would change what it is and orphan every override attached
-to it. With the viewport as a property instead, moving a measurement is simply an
-override that names a different one -- which is how a code measurement gets moved
-without the algorithm being changed.
+**That identity is the viewport's, not the drawing's.** A measurement lives under
+the viewport it is drawn in, and its id only has to be unique there. The same
+anchors in the plan view are not this measurement seen from elsewhere; they are a
+different dimension with a different number, and one may be meaningless while the
+other is fine. So an override reaches only within one viewport.
+
+Moving a measurement between viewports is therefore not a move at all -- the
+dimension changes when the viewport does -- which is why it is left out for now
+rather than treated as a rename.
 
 **Code measurements are never written to the file.** The same rule as an
 untouched code drawing, for the same reason: freezing one would stop it
@@ -477,9 +480,16 @@ measurements within each. That is not only how they are stored; it is what the
 reader needs, since the same pair of features measured in the front elevation
 and in the plan view are two different dimensions with two different numbers.
 
-Nothing deletes a viewport today. Moving a measurement from one viewport to
-another is worth allowing for, and the identity rule above is what makes it
-cheap: the measurement is the same measurement, drawn somewhere else.
+Nothing deletes a viewport today. A measurement written against a viewport the
+layout no longer produces is kept and shown as broken rather than dropped, the
+same rule as an orphaned override.
+
+A file entry replaces a code drawing only when it carries a layout of its own --
+a page or viewports -- which is how a drawing is set up to test with. One
+carrying nothing but measurements leaves the layout to the code and adds to it.
+Without that distinction, adding a single dimension would take the drawing's
+page and viewports with it, which is the outcome merging measurements exists to
+avoid.
 
 ### The drawing's own tree
 

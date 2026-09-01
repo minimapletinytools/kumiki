@@ -205,8 +205,8 @@ class TestMergeMeasurements:
     """Two tiers: from the file, and not, with the file overriding."""
 
     def _code(self, a, b, **rest):
-        return {"a": a, "b": b, "viewport": rest.get("viewport"),
-                "measureId": rest.get("measureId"), "origin": runner.ORIGIN_CODE}
+        return {"a": a, "b": b, "measureId": rest.get("measureId"),
+                "origin": runner.ORIGIN_CODE}
 
     def test_code_measurements_come_through_untouched(self):
         merged = runner.merge_measurements([self._code("x", "y")], [])
@@ -215,37 +215,36 @@ class TestMergeMeasurements:
 
     def test_the_file_overrides_the_one_beneath_it(self):
         merged = runner.merge_measurements(
-            [self._code("x", "y", viewport="front")],
-            [{"a": "x", "b": "y", "viewport": "top"}],
+            [self._code("x", "y")], [{"a": "x", "b": "y", "placement": 12}],
         )
 
         assert len(merged) == 1
         assert merged[0]["origin"] == runner.ORIGIN_OVERRIDDEN
-        # Moving one to another viewport is an override naming a different one.
-        assert merged[0]["viewport"] == "top"
+        # What the file says wins over what the code said.
+        assert merged[0]["placement"] == 12
 
     def test_measuring_a_to_b_is_measuring_b_to_a(self):
         merged = runner.merge_measurements(
-            [self._code("x", "y")], [{"a": "y", "b": "x", "viewport": "top"}],
+            [self._code("x", "y")], [{"a": "y", "b": "x", "placement": 3}],
         )
 
         assert len(merged) == 1
         assert merged[0]["origin"] == runner.ORIGIN_OVERRIDDEN
 
-    def test_a_measurement_keeps_its_identity_across_a_move(self):
-        # The point of leaving the viewport out of the identity: an override
-        # that moves a measurement still attaches to it next time round.
-        code = [self._code("x", "y", viewport="front")]
-        moved = runner.merge_measurements(code, [{"a": "x", "b": "y", "viewport": "top"}])
-        again = runner.merge_measurements(code, moved)
+    def test_an_override_stays_attached_when_it_is_read_back(self):
+        # What the identity rule is for: the file's entry finds the same code
+        # measurement again, however many the algorithm emitted around it.
+        code = [self._code("x", "y")]
+        once = runner.merge_measurements(code, [{"a": "x", "b": "y", "placement": 7}])
+        twice = runner.merge_measurements(code, once)
 
-        assert len(again) == 1
-        assert again[0]["viewport"] == "top"
+        assert len(twice) == 1
+        assert twice[0]["placement"] == 7
 
     def test_an_id_tells_two_of_the_same_pair_apart(self):
         merged = runner.merge_measurements(
             [self._code("x", "y"), self._code("x", "y", measureId="second")],
-            [{"a": "x", "b": "y", "measureId": "second", "viewport": "top"}],
+            [{"a": "x", "b": "y", "measureId": "second", "placement": 1}],
         )
 
         origins = [m["origin"] for m in merged]
@@ -274,12 +273,12 @@ class TestMergeMeasurements:
         # A mistake rather than a case to resolve, and not worth refusing the
         # whole file over.
         merged = runner.merge_measurements([], [
-            {"a": "x", "b": "y", "viewport": "front"},
-            {"a": "x", "b": "y", "viewport": "top"},
+            {"a": "x", "b": "y", "placement": 1},
+            {"a": "x", "b": "y", "placement": 2},
         ])
 
         assert len(merged) == 1
-        assert merged[0]["viewport"] == "top"
+        assert merged[0]["placement"] == 2
 
     def test_code_order_is_kept_and_the_file_follows(self):
         merged = runner.merge_measurements(
@@ -290,17 +289,60 @@ class TestMergeMeasurements:
 
 
 class TestMeasurementsThroughADrawing:
-    def test_a_code_drawing_carries_the_measurements_it_declares(self, example):
+    def _front(self, drawing):
+        return next(v for v in drawing["viewports"] if v["id"] == "front")["measurements"]
+
+    def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
         from kumiki.timber import Measure
 
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
-            measurements=[Measure(anchor_a="x", anchor_b="y", viewport="front")],
+            measurements={"front": [Measure(anchor_a="x", anchor_b="y")]},
         )])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
-        assert [m["origin"] for m in drawing["measurements"]] == [runner.ORIGIN_CODE]
+        assert [m["origin"] for m in self._front(drawing)] == [runner.ORIGIN_CODE]
+        # And nowhere else: the same anchors elsewhere would be another dimension.
+        for viewport in drawing["viewports"]:
+            if viewport["id"] != "front":
+                assert viewport["measurements"] == []
+
+    def test_the_same_pair_in_two_viewports_are_two_measurements(self, example):
+        # Neither overrides the other; they have different numbers.
+        from kumiki.timber import Measure
+
+        frame = _frame([Drawing(
+            name="post", timber_paths=["posts/fl"],
+            measurements={
+                "front": [Measure(anchor_a="x", anchor_b="y")],
+                "right": [Measure(anchor_a="x", anchor_b="y")],
+            },
+        )])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+        by_id = {v["id"]: v["measurements"] for v in drawing["viewports"]}
+
+        assert len(by_id["front"]) == 1
+        assert len(by_id["right"]) == 1
+
+    def test_an_override_only_reaches_its_own_viewport(self, example):
+        from kumiki.timber import Measure
+
+        frame = _frame([Drawing(
+            name="post", timber_paths=["posts/fl"],
+            measurements={
+                "front": [Measure(anchor_a="x", anchor_b="y")],
+                "right": [Measure(anchor_a="x", anchor_b="y")],
+            },
+        )])
+        _write_file(example, [{"id": "post", "measurements": {"front": [{"a": "x", "b": "y"}]}}])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+        by_id = {v["id"]: v["measurements"] for v in drawing["viewports"]}
+
+        assert by_id["front"][0]["origin"] == runner.ORIGIN_OVERRIDDEN
+        assert by_id["right"][0]["origin"] == runner.ORIGIN_CODE
 
     def test_adding_a_measurement_does_not_freeze_the_drawing(self, example):
         # The reason measurements merge where everything else replaces: an
@@ -309,35 +351,90 @@ class TestMeasurementsThroughADrawing:
 
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
-            measurements=[Measure(anchor_a="x", anchor_b="y")],
+            measurements={"front": [Measure(anchor_a="x", anchor_b="y")]},
         )])
-        _write_file(example, [{"id": "post", "measurements": [{"a": "p", "b": "q"}]}])
+        _write_file(example, [{"id": "post", "measurements": {"front": [{"a": "p", "b": "q"}]}}])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
-        assert [m["origin"] for m in drawing["measurements"]] == [
+        assert [m["origin"] for m in self._front(drawing)] == [
             runner.ORIGIN_CODE, runner.ORIGIN_FILE,
         ]
+
+    def test_a_measurement_for_a_viewport_that_is_gone_is_kept_as_broken(self, example):
+        # Written against a viewport this layout does not produce. Dropping it
+        # would lose the work without saying so.
+        _write_file(example, [{
+            "id": "post", "name": "post",
+            "page": {"width": 0.42, "height": 0.297},
+            "viewports": [{"id": "front", "rect": [0, 0, 1, 1]}],
+            "measurements": {"nowhere": [{"a": "x", "b": "y"}]},
+        }])
+
+        drawing = runner.collect_drawings(_frame(), example)[0]
+
+        assert "nowhere" in drawing["orphanedMeasurements"]
 
     def test_saving_leaves_the_algorithms_measurements_out(self, example):
         # They would stop following the algorithm the moment the frame changed.
         runner.write_drawings_file(example, [{
             "id": "post", "origin": runner.ORIGIN_OVERRIDDEN,
-            "measurements": [
+            "viewports": [{"id": "front", "measurements": [
                 {"a": "x", "b": "y", "origin": runner.ORIGIN_CODE},
                 {"a": "p", "b": "q", "origin": runner.ORIGIN_FILE},
+            ]}],
+        }])
+
+        saved = json.loads(runner._drawings_file_path(example).read_text())
+        kept = saved["drawings"][0]["measurements"]["front"]
+        assert [(m["a"], m["b"]) for m in kept] == [("p", "q")]
+
+    def test_saving_gathers_them_back_under_their_viewports(self, example):
+        runner.write_drawings_file(example, [{
+            "id": "post", "origin": runner.ORIGIN_FILE,
+            "viewports": [
+                {"id": "front", "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}]},
+                {"id": "right", "measurements": [{"a": "p", "b": "q", "origin": runner.ORIGIN_FILE}]},
             ],
         }])
 
-        saved = json.loads(runner._drawings_file_path(example).read_text())
-        assert [(m["a"], m["b"]) for m in saved["drawings"][0]["measurements"]] == [("p", "q")]
+        saved = json.loads(runner._drawings_file_path(example).read_text())["drawings"][0]
 
-    def test_an_override_of_a_measurement_is_saved(self, example):
+        assert sorted(saved["measurements"]) == ["front", "right"]
+        assert "origin" not in saved["measurements"]["front"][0]
+
+    def test_what_is_saved_comes_back_where_it_was(self, example):
         runner.write_drawings_file(example, [{
-            "id": "post", "origin": runner.ORIGIN_FILE,
-            "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_OVERRIDDEN}],
+            "id": "sheet", "name": "sheet", "origin": runner.ORIGIN_FILE,
+            "page": {"width": 0.42, "height": 0.297},
+            "viewports": [{"id": "front", "rect": [0, 0, 1, 1],
+                           "measurements": [{"a": "x", "b": "y", "origin": runner.ORIGIN_FILE}]}],
         }])
 
-        saved = json.loads(runner._drawings_file_path(example).read_text())
-        assert len(saved["drawings"][0]["measurements"]) == 1
-        assert "origin" not in saved["drawings"][0]["measurements"][0]
+        drawing = runner.collect_drawings(_frame(), example)[0]
+        front = next(v for v in drawing["viewports"] if v["id"] == "front")
+
+        assert [(m["a"], m["b"]) for m in front["measurements"]] == [("x", "y")]
+
+    def test_a_file_entry_with_a_layout_stands_in_for_the_drawing(self, example):
+        # How a drawing is set up to test with: the file's layout is the one used.
+        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
+        _write_file(example, [dict(_sheet("post"), viewports=[{"id": "only", "rect": [0, 0, 1, 1]}])])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+
+        assert [v["id"] for v in drawing["viewports"]] == ["only"]
+        assert drawing["origin"] == runner.ORIGIN_OVERRIDDEN
+
+    def test_a_file_entry_with_only_measurements_keeps_the_code_layout(self, example):
+        # Adding a dimension must not take the drawing's page and viewports with
+        # it -- that is the whole reason measurements merge.
+        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
+        _write_file(example, [{"id": "post", "measurements": {"front": [{"a": "x", "b": "y"}]}}])
+
+        drawing = runner.collect_drawings(frame, example)[0]
+
+        assert len(drawing["viewports"]) > 1, "the code layout survived"
+        assert drawing["page"]["width"] > 0
+        # Still marked as touched by the file, so it can be reverted.
+        assert drawing["origin"] == runner.ORIGIN_OVERRIDDEN
