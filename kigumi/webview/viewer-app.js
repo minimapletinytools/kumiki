@@ -1649,7 +1649,13 @@ class KigumiViewerApp extends LitElement {
             // Calculate adaptive zoom factor based on current distance
             // This makes zoom speed feel consistent across all scales
             const adaptiveZoomFactor = this.getAdaptiveZoomFactor(event.deltaY > 0);
-            if (this.activePage) {
+            // On a sheet the wheel moves the page, except over a viewport that
+            // is free to be moved itself: a drawing's preview is a camera you
+            // can get closer to, and scaling the whole sheet instead is not
+            // what reaching for it means.
+            const over = this._resolvePointer(event.clientX, event.clientY);
+            const zoomsItsOwnCamera = over && !over.viewport.spec.locked;
+            if (this.activePage && !zoomsItsOwnCamera) {
                 // Inverted on purpose: the factor scales an orbit distance,
                 // where bigger means further away, and a page scale, where
                 // bigger means closer. Passing it straight through is what made
@@ -4028,25 +4034,18 @@ class KigumiViewerApp extends LitElement {
         if (!this.displayOptions.set('footprintColor', color)) {
             return;
         }
-        const next = this.footprintColor;
-        const visible = next !== 'transparent';
-        const swatch = FOOTPRINT_COLOR_SWATCHES[next];
-        if (Array.isArray(this.footprintObjects)) {
+        const swatch = FOOTPRINT_COLOR_SWATCHES[this.footprintColor];
+        if (Array.isArray(this.footprintObjects) && swatch) {
             for (const obj of this.footprintObjects) {
-                if (!obj || !obj.group) {
-                    continue;
+                if (obj && obj.fillMaterial) {
+                    obj.fillMaterial.color.setHex(swatch.fill);
                 }
-                obj.group.visible = visible;
-                if (swatch) {
-                    if (obj.fillMaterial) {
-                        obj.fillMaterial.color.setHex(swatch.fill);
-                    }
-                    if (obj.edgeMaterial) {
-                        obj.edgeMaterial.color.setHex(swatch.edge);
-                    }
+                if (obj && obj.edgeMaterial) {
+                    obj.edgeMaterial.color.setHex(swatch.edge);
                 }
             }
         }
+        this.applyFootprintVisibility();
         this.requestUpdate();
     }
 
@@ -4111,12 +4110,29 @@ class KigumiViewerApp extends LitElement {
             group.position.z = 0.0015;
             group.add(fillMesh);
             group.add(edgeLine);
-            group.visible = this.footprintColor !== 'transparent';
+            group.visible = this.footprintColor !== 'transparent' && !this.isInDrawing;
             if (this.scene) {
                 this.scene.add(group);
             }
 
             this.footprintObjects.push({ group, fillGeometry, fillMaterial, edgeGeometry, edgeMaterial });
+        }
+    }
+
+    /**
+     * Whether the ground footprints are drawn.
+     *
+     * Never in a drawing: a footprint is where the frame meets the ground, and
+     * a sheet is about the pieces rather than the site. The colour setting
+     * stays -- it is the 3D view's, and a drawing that wants one later can say
+     * so -- but for now a drawing simply has none.
+     */
+    applyFootprintVisibility() {
+        const visible = this.footprintColor !== 'transparent' && !this.isInDrawing;
+        for (const obj of (this.footprintObjects || [])) {
+            if (obj && obj.group) {
+                obj.group.visible = visible;
+            }
         }
     }
 
@@ -5272,6 +5288,7 @@ class KigumiViewerApp extends LitElement {
         this.rebuildViewports();
         this.syncCameraControls();
         this.applySceneBackground();
+        this.applyFootprintVisibility();
         // What is ghosted follows the scene: a drawing dims everything it is
         // not about, and leaving one puts the frame back.
         this.applySelectionOpacity();

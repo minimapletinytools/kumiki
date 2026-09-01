@@ -260,7 +260,15 @@ DONE-add N/S/E/W labels to the cube
 DONE-show rough mesaurements in selectino view when eselecting single elemnts
 
 
--zoom is backwards in drawing view
+-drawing mode fixes
+  -don't show footprint in drawing mode, acutally keep this option available for the future, but right now it's always hidden.
+  -zoom is backwards in drawing view
+  -3d perspecive view in drawing should attempt to rotate camera so as much of teh timber fits in the viewport as possible. this is actually done by the thing that psasse the camera/viewport settings into the drawing panel rather than the drawing itself of course.
+  -there are 2 camera types for teh 3d perspcetive viewport
+    -for multiple timbers, as iti s right now
+    -for single timbers, allow free rotation along the timber axis only
+
+
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
