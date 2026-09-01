@@ -1653,13 +1653,13 @@ class KigumiViewerApp extends LitElement {
             // Calculate adaptive zoom factor based on current distance
             // This makes zoom speed feel consistent across all scales
             const adaptiveZoomFactor = this.getAdaptiveZoomFactor(event.deltaY > 0);
-            // On a sheet the wheel moves the page, except over a viewport that
-            // is free to be moved itself: a drawing's preview is a camera you
-            // can get closer to, and scaling the whole sheet instead is not
-            // what reaching for it means.
-            const over = this._resolvePointer(event.clientX, event.clientY);
-            const zoomsItsOwnCamera = over && !over.viewport.spec.locked;
-            if (this.activePage && !zoomsItsOwnCamera) {
+            // On a sheet the wheel moves the page, and only the page. No
+            // viewport zooms: a drawing's cameras are what python declared, and
+            // a view that has been zoomed is no longer at the scale the drawing
+            // says it is. Letting the preview zoom itself also zoomed whichever
+            // viewport was last clicked, since a camera zoom acts on the active
+            // one rather than the one under the pointer.
+            if (this.activePage) {
                 // Inverted on purpose: the factor scales an orbit distance,
                 // where bigger means further away, and a page scale, where
                 // bigger means closer. Passing it straight through is what made
@@ -3595,6 +3595,14 @@ class KigumiViewerApp extends LitElement {
     }
 
     focusSelection() {
+        // Not on a sheet. Focusing is a zoom and a pan of one viewport's
+        // camera, and a drawing's cameras are what python declared -- an
+        // elevation that has been refocused is no longer at the scale the
+        // drawing says it is. The gizmo's focus button is hidden in a drawing
+        // but the f key is not, so the guard belongs here rather than there.
+        if (this.activePage) {
+            return;
+        }
         const bounds = this.getSelectionBounds();
         this.lastBounds = bounds;
         this.focusedCx = (bounds.minX + bounds.maxX) / 2;
