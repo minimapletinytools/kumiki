@@ -385,10 +385,14 @@ The same two features can therefore be measurable in one viewport and meaningles
 in another, which is correct and is worth showing: in measurement mode only the
 features that would work are worth highlighting.
 
-**Foreshortening is worth catching.** A feature not parallel to the view plane
-projects shorter than it is, so a dimension taken off it is a number that is
-simply wrong on a drawing. The camera frame and the feature's direction are both
-known, so it is cheap to detect and say so.
+Foreshortening is not a separate hazard, though it looks like one. A measurement
+is between two features, never of one, so what could be foreshortened is the
+segment between them -- and its projected length is the number the drawing
+wants: two mortises at different depths, dimensioned on the front elevation,
+should read as their separation across that face. The one case that misleads is
+a pair separated purely along the view direction, where the projection collapses
+to nothing, and the degenerate row above already refuses it. The question would
+return only if a measurement of a single feature's own length ever arrives.
 
 ### Where the dimension line goes decides what it means
 
