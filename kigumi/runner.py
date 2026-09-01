@@ -119,6 +119,10 @@ class SlotState:
     single_pattern_name: Optional[str] = None
     render_parameter_schema: List[RenderParameterDescriptor] = field(default_factory=list)
     applied_render_parameters: Dict[str, Any] = field(default_factory=dict)
+    # Drawings made in this session and not yet saved. They live here rather
+    # than in the viewer so python stays the one place a drawing comes from,
+    # and they are lost on reload, which is what "unsaved" should mean.
+    pending_drawings: List[Dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass
@@ -1517,6 +1521,29 @@ def _world_elevation_viewports(
     return viewports
 
 
+def _unique_drawing_id(base: str, taken: set) -> str:
+    """A drawing id nothing else is using. Drawing the same piece twice is fine."""
+    candidate = base
+    suffix = 2
+    while candidate in taken:
+        candidate = f"{base} ({suffix})"
+        suffix += 1
+    return candidate
+
+
+def _selection_drawing_name(entries: List[Dict[str, Any]], total: int) -> str:
+    """What to call a drawing nobody has named.
+
+    One piece is called after the piece, which is what anyone would call it.
+    Several are counted, since listing them would not fit and would not help.
+    """
+    if len(entries) == 1:
+        return entries[0]["displayName"]
+    if not entries:
+        return f"whole frame ({total})"
+    return f"{len(entries)} members"
+
+
 def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[str, Any]:
     """A drawing of the selected members, on a sheet.
 
@@ -1569,11 +1596,389 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
 
     return {
         "id": SELECTION_DRAWING_ID,
+        "name": _selection_drawing_name(entries, len(timber_entries)),
+        "members": members,
         "page": page,
         # A drawing shows no camera gizmos.
         "cameraControls": [],
         "viewports": viewports,
     }
+
+
+# --- where drawings come from ------------------------------------------------
+#
+# Two sources. The frame asks for drawings in code (Frame.drawings), and a
+# drawings file may override those and add its own. Which of the two a drawing
+# came from is carried on it, because it is the first thing you want to know
+# when one looks wrong: whether to edit the python or the file.
+
+ORIGIN_CODE = "code"
+ORIGIN_OVERRIDDEN = "overridden"
+ORIGIN_FILE = "file"
+
+
+# --- measurements -----------------------------------------------------------
+#
+# Two tiers: from the file, and not. A file measurement overrides the one
+# beneath it with the same identity, which is the whole rule. It still produces
+# the three states worth marking -- untouched code, code the file has overridden,
+# and one the file introduced.
+
+MEASURE_SUPPRESSED = "suppressed"
+
+# Warned about once per parse rather than per duplicate: a hand-edited file with
+# a repeated entry would otherwise fill the log with the same sentence.
+_duplicate_warning_given = False
+
+
+def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]:
+    """A comparable form of a feature reference as it travels on the wire.
+
+    A tuple rather than a joined string, since a ticket path may itself contain
+    a separator and two different references must never collapse into one.
+    """
+    source = anchor if isinstance(anchor, dict) else {}
+    csg_path = source.get("csgPath")
+    return (
+        str(source.get("timber") or ""),
+        tuple(str(step) for step in csg_path) if isinstance(csg_path, list) else (),
+        str(source.get("feature") or ""),
+        str(source.get("type") or ""),
+    )
+
+
+def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
+    """What makes a measurement itself, within the viewport it is drawn in.
+
+    The anchors unordered, since measuring A to B is measuring B to A, plus an
+    id for when the same pair is measured twice in the same viewport. Scoped to
+    the viewport because that is where a measurement lives: the same anchors in
+    the plan view are a different dimension with a different number, not this
+    one seen from elsewhere.
+    """
+    first, second = sorted((
+        _feature_path_identity(measure.get("a")),
+        _feature_path_identity(measure.get("b")),
+    ))
+    return (first, second, str(measure.get("measureId") or ""))
+
+
+def serialize_feature_path(path: Any) -> Dict[str, Any]:
+    """A feature reference as the viewer and the file hold it."""
+    return {
+        "timber": path.timber,
+        "csgPath": list(path.csg_path),
+        "feature": path.feature,
+        "type": path.feature_type,
+    }
+
+
+def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
+    return {
+        "a": serialize_feature_path(measure.anchor_a),
+        "b": serialize_feature_path(measure.anchor_b),
+        "measureId": measure.measure_id,
+        "origin": ORIGIN_CODE,
+    }
+
+
+def merge_measurements(
+    code_measures: List[Dict[str, Any]],
+    file_measures: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """The measurements of one drawing, from both tiers.
+
+    A file entry with the same identity as a code one replaces it and is marked
+    as overriding; one with an identity nothing else has is the file's own. An
+    entry marked suppressed removes the code measurement instead of replacing
+    it, which is how a measurement an algorithm produced and nobody wants goes
+    away without the algorithm being changed.
+
+    A repeated identity within a tier is a mistake rather than a case to
+    resolve, so the later one wins. Refusing the file outright would cost
+    someone their drawings over a stray duplicate, which is the same trade the
+    file parser already makes.
+    """
+    global _duplicate_warning_given
+    from_file: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+    for measure in file_measures:
+        identity = _measure_identity(measure)
+        if identity in from_file and not _duplicate_warning_given:
+            log_stderr(
+                "Warning: two measurements share an identity; the later one wins. "
+                "Give one of them a measureId to tell them apart."
+            )
+            _duplicate_warning_given = True
+        from_file[identity] = measure
+
+    merged: List[Dict[str, Any]] = []
+    used = set()
+    for measure in code_measures:
+        identity = _measure_identity(measure)
+        override = from_file.get(identity)
+        if override is None:
+            merged.append({**measure, "origin": ORIGIN_CODE})
+            continue
+        used.add(identity)
+        if override.get(MEASURE_SUPPRESSED) is True:
+            continue
+        merged.append({**measure, **override, "origin": ORIGIN_OVERRIDDEN})
+
+    for identity, measure in from_file.items():
+        if identity in used or measure.get(MEASURE_SUPPRESSED) is True:
+            continue
+        merged.append({**measure, "origin": ORIGIN_FILE})
+
+    return merged
+
+
+def _file_measurements_by_viewport(entry: Optional[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+    """A file drawing's measurements, off the viewports they hang from."""
+    by_viewport: Dict[str, List[Dict[str, Any]]] = {}
+    for viewport in (entry or {}).get("viewports") or []:
+        if isinstance(viewport, dict) and isinstance(viewport.get("id"), str):
+            by_viewport[viewport["id"]] = list(viewport.get("measurements") or [])
+    return by_viewport
+
+
+def _measurements_by_viewport(
+    declared: Any,
+    override: Optional[Dict[str, Any]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """A drawing's measurements, merged tier over tier, under each viewport.
+
+    Both tiers hang them off viewports, and the merge happens within one: the
+    same anchors in another viewport are a different dimension, not this one
+    again.
+    """
+    code_by_viewport = dict(getattr(declared, "measurements", None) or {}) if declared is not None else {}
+    file_by_viewport = _file_measurements_by_viewport(override)
+    merged: Dict[str, List[Dict[str, Any]]] = {}
+    for viewport in list(code_by_viewport) + [v for v in file_by_viewport if v not in code_by_viewport]:
+        merged[viewport] = merge_measurements(
+            [_serialize_code_measure(m) for m in code_by_viewport.get(viewport, ())],
+            list(file_by_viewport.get(viewport) or []),
+        )
+    return merged
+
+
+def _drawings_file_path(example_path: Path) -> Path:
+    """Where a frame's drawings file lives.
+
+    Under .kigumi rather than beside the source: writes there are already known
+    not to wake the file watcher, since refresh stats land there on every
+    refresh.
+    """
+    return example_path.parent / ".kigumi" / "drawings" / f"{example_path.stem}.json"
+
+
+# What a file drawing names when it is overriding one the code declares. Kept
+# separate from its own id so that an override is always recognisably an
+# override: delete the python drawing and what is left is plainly a dangling
+# entry, rather than something that quietly becomes a drawing in its own right.
+OVERRIDES_KEY = "overridesPythonDrawing"
+
+
+def _read_drawings_file(path: Path) -> List[Dict[str, Any]]:
+    """The drawings file, in order, or nothing. A broken file is reported, not fatal.
+
+    Losing a viewer because a hand-edited file has a comma out of place would be
+    a poor trade for strictness, and the file is meant to be hand-edited.
+    """
+    if not path.exists():
+        return []
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        log_stderr(f"Warning: could not read {path}: {exc}")
+        return []
+    if not isinstance(loaded, dict):
+        return []
+    drawings = loaded.get("drawings")
+    if not isinstance(drawings, list):
+        return []
+    return [
+        drawing for drawing in drawings
+        if isinstance(drawing, dict) and isinstance(drawing.get("id"), str)
+    ]
+
+
+def _member_keys_for_paths(frame: Any, paths: List[str]) -> List[str]:
+    """The member keys of the timbers a code drawing names, by ticket path."""
+    timber_entries, _ = _assign_member_keys(frame)
+    wanted = set(paths or [])
+    return [entry["memberKey"] for entry in timber_entries if entry["displayName"] in wanted]
+
+
+def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
+    """Turn what the frame asked for into a scene the viewer can render."""
+    member_keys = _member_keys_for_paths(frame, list(declared.timber_paths))
+    scene = create_drawing_from_selection(frame, member_keys)
+    scene["id"] = declared.drawing_id
+    scene["name"] = declared.name
+    scene["members"] = member_keys
+    return scene
+
+
+def collect_drawings(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """Every drawing for a frame: from the code, from the file, and unsaved.
+
+    The file mirrors the code -- drawings holding viewports holding measurements
+    -- and a file drawing says outright which code drawing it overrides, if any.
+    So an override contributes measurements to a drawing the code still lays out,
+    a file drawing that overrides nothing is a drawing in its own right, and one
+    naming a code drawing that has gone is plainly a dangling override rather
+    than something that has quietly become its own.
+
+    `dirty` says a drawing is not in the file yet. It is worked out here rather
+    than left for the viewer to infer, so there is one answer to it.
+    """
+    from_file = _read_drawings_file(_drawings_file_path(example_path)) if example_path else []
+    overrides = {
+        entry[OVERRIDES_KEY]: entry for entry in from_file
+        if isinstance(entry.get(OVERRIDES_KEY), str)
+    }
+    drawings: List[Dict[str, Any]] = []
+    overridden = set()
+
+    for declared in list(getattr(frame, "drawings", None) or []):
+        # The layout is always the code's. A file entry that wants a layout of
+        # its own is a drawing of its own, which is what keeps adding one
+        # dimension from taking a drawing's page and viewports with it.
+        scene = _drawing_from_code(frame, declared)
+        override = overrides.get(declared.drawing_id)
+        if override is not None:
+            overridden.add(id(override))
+            scene["overriddenBy"] = override["id"]
+        scene["origin"] = ORIGIN_CODE if override is None else ORIGIN_OVERRIDDEN
+        _attach_measurements(scene, _measurements_by_viewport(declared, override), scene["name"])
+        drawings.append(scene)
+
+    for entry in from_file:
+        if id(entry) in overridden:
+            continue
+        scene = dict(entry)
+        scene.setdefault("name", scene["id"])
+        target = entry.get(OVERRIDES_KEY)
+        if isinstance(target, str):
+            # It says it overrides something the code no longer declares. Shown
+            # rather than dropped, and shown as what it is, so it can be pointed
+            # somewhere else or deleted on purpose.
+            scene["dangling"] = True
+            log_stderr(
+                f"Warning: drawing {scene['id']!r} overrides {target!r}, "
+                "which the frame no longer declares."
+            )
+        scene["origin"] = ORIGIN_FILE
+        _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"])
+        drawings.append(scene)
+
+    for drawing in drawings:
+        drawing["dirty"] = False
+
+    # Made this session and not saved. A pending drawing that shares an id with
+    # a saved one has been made since, so it wins -- it is the newer answer.
+    for scene in (pending or []):
+        entry = dict(scene)
+        entry["dirty"] = True
+        entry.setdefault("origin", ORIGIN_FILE)
+        replaced = next((d for d in drawings if d["id"] == entry["id"]), None)
+        if replaced is None:
+            drawings.append(entry)
+        else:
+            drawings[drawings.index(replaced)] = entry
+
+    return drawings
+
+
+def _attach_measurements(
+    scene: Dict[str, Any],
+    by_viewport: Dict[str, List[Dict[str, Any]]],
+    drawing_name: str,
+) -> None:
+    """Put each viewport's measurements on the viewport they belong to.
+
+    A measurement is drawn in a viewport and means nothing outside it, so it
+    travels with the viewport rather than with the drawing.
+
+    Measurements naming a viewport this layout does not produce cannot be drawn,
+    so they are not shown and the mismatch is warned about. They are kept all the
+    same: a viewport can come back when the code changes, and dropping them here
+    would mean the next save deleted them from the file for good.
+    """
+    remaining = dict(by_viewport)
+    for viewport in scene.get("viewports") or []:
+        viewport["measurements"] = remaining.pop(viewport.get("id"), [])
+    unplaceable = {
+        viewport: measures for viewport, measures in remaining.items() if measures
+    }
+    for viewport in unplaceable:
+        log_stderr(
+            f"Warning: drawing {drawing_name!r} has measurements for viewport "
+            f"{viewport!r}, which it does not have. They are kept but not shown."
+        )
+    scene["unplaceableMeasurements"] = unplaceable
+
+
+def _savable_drawing(drawing: Dict[str, Any]) -> Dict[str, Any]:
+    """One drawing as the file should hold it.
+
+    Measurements the code produced are left out. Writing them would freeze what
+    an algorithm generates into the file, and it would stop following the
+    algorithm the moment the frame changed -- the same reason an untouched code
+    drawing is not written out either.
+    """
+    saved = {
+        key: value for key, value in drawing.items()
+        if key not in ("origin", "dirty", "unplaceableMeasurements", "overriddenBy", "dangling")
+    }
+
+    def keepers(measures):
+        return [
+            {key: value for key, value in measure.items() if key != "origin"}
+            for measure in (measures or [])
+            if measure.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)
+        ]
+
+    # Written back the way the file holds them: on the viewports. An override
+    # keeps only the ids, since the layout is the code's; a drawing of its own
+    # keeps whatever it had.
+    is_override = isinstance(drawing.get(OVERRIDES_KEY), str)
+    viewports: List[Dict[str, Any]] = []
+    for viewport in saved.get("viewports") or []:
+        kept = keepers(viewport.get("measurements"))
+        if is_override and not kept:
+            continue
+        entry = {"id": viewport.get("id")} if is_override else dict(viewport)
+        entry["measurements"] = kept
+        viewports.append(entry)
+    # Ones that could not be placed keep their viewport, so they come back if it
+    # does rather than being deleted by the next save.
+    for viewport, measures in (drawing.get("unplaceableMeasurements") or {}).items():
+        kept = keepers(measures)
+        if kept:
+            viewports.append({"id": viewport, "measurements": kept})
+    saved["viewports"] = viewports
+    return saved
+
+
+def write_drawings_file(example_path: Path, drawings: List[Dict[str, Any]]) -> str:
+    """Save the drawings that are the file's to keep.
+
+    Only the ones the file is responsible for: a drawing that came from code and
+    was never touched has nothing to save, and writing it out would freeze a
+    copy that stops following the code it was asked for by.
+    """
+    path = _drawings_file_path(example_path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    keep = [_savable_drawing(drawing) for drawing in drawings
+            if drawing.get("origin") in (ORIGIN_OVERRIDDEN, ORIGIN_FILE)]
+    path.write_text(json.dumps({"drawings": keep}, indent=2) + "\n", encoding="utf-8")
+    return str(path)
 
 
 def serialize_layers(frame: Any) -> Dict[str, Any]:
@@ -2206,6 +2611,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_layers_tree", "get_csg_tree",
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
+            "get_drawings", "save_drawings",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
             "shutdown",
@@ -3485,10 +3891,39 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         frame_payload["renderParameters"] = _serialize_render_parameters_for_slot(ss)
         return state, make_success_response(request_id, command, frame_payload), False
 
+    if command == "get_drawings":
+        ss = _resolve_slot(state, payload)
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "save_drawings":
+        # Everything at once, and only what the file is responsible for.
+        ss = _resolve_slot(state, payload)
+        drawings = collect_drawings(ss.frame, ss.file_path, ss.pending_drawings)
+        written = write_drawings_file(ss.file_path, drawings)
+        # They are the file's now, so nothing is pending and the next read finds
+        # them there. Keeping them would give the same drawing two answers.
+        ss.pending_drawings = []
+        return state, make_success_response(request_id, command, {
+            "path": written,
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
     if command == "create_drawing_from_selection":
         ss = _resolve_slot(state, payload)
         drawing = create_drawing_from_selection(ss.frame, payload.get("member_keys") or [])
-        return state, make_success_response(request_id, command, {"scenes": [drawing]}), False
+        existing = collect_drawings(ss.frame, ss.file_path, ss.pending_drawings)
+        drawing["id"] = _unique_drawing_id(drawing["name"], {d["id"] for d in existing})
+        # The name follows the id, so drawing the same piece twice gives two
+        # rows you can tell apart rather than two called the same thing.
+        drawing["name"] = drawing["id"]
+        drawing["origin"] = ORIGIN_FILE
+        ss.pending_drawings.append(drawing)
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+            "enterId": drawing["id"],
+        }), False
 
     if command == "get_default_drawing_for_debugging":
         # Testing scaffolding; see build_default_drawing_for_debugging. Kept out

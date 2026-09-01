@@ -215,6 +215,64 @@ drawing's line weights mean nothing.
 but is drawn on the sheet, so its text and witness lines are page-space objects
 positioned from a world-space anchor. It is not a third camera.
 
+## Drawings, from code and from file
+
+Agreed, not yet built.
+
+A drawing comes from one of two places, and the difference is worth showing
+rather than hiding:
+
+- **From code.** The frame asks for it: `Frame.drawings` names a drawing and
+  which timbers it is of. The layout -- page, viewports, cameras -- is not
+  written there; the runner works it out from the members, the same way it does
+  for a drawing made from a selection.
+- **From the file.** `.kigumi/drawings/<stem>.json`, which mirrors the same
+  shape -- drawings holding viewports holding measurements. `.kigumi` is where
+  writes are already proven safe: refresh stats land there on every refresh
+  without waking the watcher.
+
+A file drawing has an id of its own and says outright which code drawing it
+overrides, in `overridesPythonDrawing`, rather than overriding by sharing an id.
+That is what keeps an override recognisable as one: delete the code drawing and
+what remains is plainly a dangling entry to be repointed or removed on purpose,
+not something that has quietly become a drawing in its own right.
+
+So a file drawing is one of two things. Naming a code drawing, it contributes
+measurements to a drawing the code still lays out. Naming none, it is a drawing
+of its own and lays itself out, which is mainly how drawings get set up for
+testing.
+
+An override never brings a layout with it. If it did, adding one dimension to a
+code drawing would take that drawing's page and viewports into the file and
+detach it from the code it was asked for by. Wanting a different layout means
+wanting a different drawing, which the file can simply declare.
+
+`overridesPythonDrawing` names a code drawing's id, so that id needs to survive
+editing the python around it -- not "the third one". A code drawing that goes
+away leaves its override visible and marked as dangling, because work
+disappearing quietly is much worse than a row someone can see and delete.
+
+### What the tree shows
+
+One row per drawing, in a section of its own. Where a drawing comes from is a
+mark, and whether it is saved is another, because those are two independent
+things and crossing them into four glyphs makes a legend to memorize:
+
+| mark | meaning |
+|---|---|
+| `○` | from code; nothing in the file |
+| `◐` | from code, overridden by the file |
+| `●` | from the file alone |
+| trailing `•` | unsaved |
+
+The fill reads as how much of the drawing comes from the file. The trailing dot
+is the convention editors already use for a modified tab.
+
+Saving is explicit and saves everything: one deliberate write is far easier to
+reason about than a write per edit, and it keeps the watcher question simple.
+Reverting an override -- back to what the code asked for -- belongs with it, and
+is cheap once overrides exist.
+
 ## Modules
 
 | module | owns |
@@ -298,6 +356,171 @@ The vendored three.js has `InstancedMesh` but no `BatchedMesh` and no
 `mergeGeometries`, and every timber's CSG mesh is a distinct geometry, so
 instancing does not apply. Batching means upgrading three or merging by hand —
 a decision to make with a profile in hand.
+
+## Measurements
+
+Agreed, not yet built. Two features are picked and a dimension is drawn between
+them.
+
+**A measurement belongs to a viewport, and is measured in that viewport's
+plane.** This is the whole design, and it dissolves what looks like the hard
+part. Two parallel edges lying in different planes seem to want their true
+distance in one context and their projected distance in another -- but a drawing
+*is* a projection, so the projected distance is the only one that means
+anything on the sheet. There is no second case to detect. True 3D distance is a
+question about the model, and belongs to a measure tool in the 3D scene rather
+than to a dimension on a drawing, which is where every CAD drawing environment
+draws the same line.
+
+The viewport already carries a declared `right` and `up`, so projecting is exact
+and marks can be placed against those axes directly. In the four-long-faces
+layout the camera comes from the timber's own frame, so horizontal on the sheet
+is along the piece, and dimensions come out in the timber's axes for nothing.
+
+### Project first, then ask what is measurable
+
+Compatibility is decided on the projected forms, not in 3D:
+
+| projected pair | measurement |
+|---|---|
+| point, point | distance |
+| point, line | perpendicular distance |
+| line, line, parallel | separation |
+| line, line, not parallel | an angle, not a distance |
+| face seen edge-on | behaves as a line |
+| face seen as an area | no distance is well defined; refused |
+| anything projecting to a point | degenerate; refused |
+
+The same two features can therefore be measurable in one viewport and meaningless
+in another, which is correct and is worth showing: in measurement mode only the
+features that would work are worth highlighting.
+
+Foreshortening is not a separate hazard, though it looks like one. A measurement
+is between two features, never of one, so what could be foreshortened is the
+segment between them -- and its projected length is the number the drawing
+wants: two mortises at different depths, dimensioned on the front elevation,
+should read as their separation across that face. The one case that misleads is
+a pair separated purely along the view direction, where the projection collapses
+to nothing, and the degenerate row above already refuses it. The question would
+return only if a measurement of a single feature's own length ever arrives.
+
+### Where the dimension line goes decides what it means
+
+Between two projected points, the direct distance and the horizontal or vertical
+component are all reasonable and none can be inferred. Drafting tools resolve
+this by placement: pull the line below and it reads the horizontal component, to
+the side the vertical, diagonally the aligned distance. One gesture places the
+mark and chooses its meaning, which beats choosing a dimension type first.
+
+### What a measurement holds
+
+Two feature references, the viewport, and the placement. Never frozen numbers:
+the point of referencing features is that the dimension follows the model when
+the code changes.
+
+An anchor is a `FeaturePath`: the timber, the labels of the CSG nodes stepped
+through, and the feature on the last of them. Names the whole way down and never
+a position -- not "the third cut", not "the second face" -- because a position
+stops meaning what it meant the moment a joint is added above it. Rename any of
+those and the reference breaks, which is the honest outcome; add or reorder
+around them and it still finds what it meant.
+
+It carries the feature's type as well as its name, since one label can name both
+a face and an edge, and a measurement to the wrong one does not look wrong on
+screen.
+
+That way a measurement can attach to anything pickable rather than only to
+declared features, which would block measurements behind the eleven joint files
+that declare none. A reference that stops resolving leaves the measurement
+**greyed out rather than deleted** -- the same rule as an orphaned drawing
+override, for the same reason: work that quietly disappears is worse than a
+broken row someone can see and fix.
+
+### Measurements come from code as well as from the file
+
+A drawing can declare measurements in python, alongside the timbers it is of.
+Most of them will eventually be produced by algorithm rather than written out by
+hand, and that is what shapes the rest of this:
+
+**An identity derived from what a measurement measures, never an index.** "The
+third measurement the algorithm emitted" stops meaning anything the moment a
+joint is added, and every override attached to one would slide onto its
+neighbour. Derived from its two anchors, an override stays attached across a
+regeneration. An optional `id` disambiguates when the same pair is measured more
+than once, which is the only case the anchors cannot separate on their own.
+
+**That identity is the viewport's, not the drawing's.** A measurement lives under
+the viewport it is drawn in, and its id only has to be unique there. The same
+anchors in the plan view are not this measurement seen from elsewhere; they are a
+different dimension with a different number, and one may be meaningless while the
+other is fine. So an override reaches only within one viewport.
+
+Moving a measurement between viewports is therefore not a move at all -- the
+dimension changes when the viewport does -- which is why it is left out for now
+rather than treated as a rename.
+
+**Code measurements are never written to the file.** The same rule as an
+untouched code drawing, for the same reason: freezing one would stop it
+following the algorithm that produces it.
+
+**So the file has three jobs for a code measurement** -- move it, since an
+algorithm cannot know where there is room on the sheet; suppress it, when it is
+not one you want; and add measurements the algorithm did not produce. Suppression
+is an entry that says "not this one", and is much easier to allow for now than
+to retrofit.
+
+This narrows the rule that a file entry replaces a code drawing outright.
+Measurements are the exception and merge, because adding one measurement to a
+code drawing would otherwise freeze its page, its viewports and its whole layout
+into the file and detach it from the code. Everything else still replaces, and
+whole-drawing replacement stays available for setting up a drawing to test with.
+
+### Two tiers, three things to show
+
+There are only two tiers: from the file, and not. A file measurement overrides
+the one beneath it with the same identity, and that is the whole rule. It still
+produces the three states worth marking, the same three a drawing has: a code
+measurement nothing has touched, a code measurement the file has overridden, and
+one the file introduced.
+
+Two measurements sharing an identity within the same tier is a mistake rather
+than a case to resolve, so the later one wins and a warning is logged the first
+time the data is parsed. Failing outright would cost someone their drawings over
+a hand-edited file, which is the same trade the file parser already makes.
+
+A measurement greys out rather than disappearing when its anchors stop
+resolving -- and equally when it has been moved to a viewport where its anchors
+project onto each other, since what can be measured is decided per viewport and a
+move can therefore invalidate it.
+
+### The list is viewports first
+
+Measurements hang off viewports, so the drawing's tree lists viewports and the
+measurements within each. That is not only how they are stored; it is what the
+reader needs, since the same pair of features measured in the front elevation
+and in the plan view are two different dimensions with two different numbers.
+
+Nothing deletes a viewport today. A measurement naming a viewport the layout does
+not produce cannot be drawn, so it is not shown and the mismatch is warned about
+-- but it is kept, since the viewport may come back when the code changes and
+dropping it would mean the next save deleted it from the file for good.
+
+### The drawing's own tree
+
+While a drawing is open there is a tree for the drawing itself: its name and
+where it came from, close and save, its viewports with their measurements under
+them, and the members it is about -- which is where the filtered member list belongs rather than as a
+separate piece of work, since a drawing can only select what it is about anyway.
+
+Where that tree is shown is deliberately left open. It is likely a panel of its
+own for drawing mode, but it may end up back in the layers rail, or both may be
+shown at once with the members in one and the drawing in the other. So it is
+built as content that can be mounted anywhere -- data in, events out, like the
+layers panel -- and where it goes stays a one-line decision.
+
+Chains and baselines -- a run of mortises dimensioned from one end -- are not in
+this first step, but nothing should be built that a chain could not later be
+placed through.
 
 ## Measurement round trips
 

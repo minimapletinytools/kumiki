@@ -307,6 +307,18 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'requestDrawings') {
+                this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
+                    this.log(`[drawing] requestDrawings error: ${err.message || err}`);
+                });
+                return;
+            }
+            if (message.type === 'requestSaveDrawings') {
+                this._handleDrawingsCommand('save_drawings', {}, { enter: false }).catch((err) => {
+                    this.log(`[drawing] requestSaveDrawings error: ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestDrawingFromSelection') {
                 this._handleRequestDrawingFromSelection(message).catch((err) => {
                     this.log(`[drawing] requestDrawingFromSelection error: ${err.message || err}`);
@@ -984,29 +996,45 @@ class FrameViewSession {
     // until the result lands). A generation counter drops results made stale
     // by a newer refresh.
     /**
-     * Build a drawing of the selected members and hand it to the viewer.
+     * Ask the runner about drawings and hand the answer to the viewer.
+     *
+     * Every drawing command answers with the whole set, because python is where
+     * a drawing comes from -- the viewer holds no list of its own to keep in
+     * step, it just renders what it was last told.
+     */
+    async _handleDrawingsCommand(command, payload = {}, options = {}) {
+        if (!this.runnerSession || this.isDisposed) {
+            return;
+        }
+        const result = await this.runnerSession.slotRequest(command, this.slotName, payload);
+        if (this.isDisposed) {
+            return;
+        }
+        if (result && result.path) {
+            this.log(`[drawing] Saved drawings to ${result.path}`);
+        }
+        this._postToWebview({
+            type: 'scenes',
+            payload: {
+                scenes: (result && result.scenes) || [],
+                enter: options.enter === true,
+                enterId: result && result.enterId,
+            },
+        });
+    }
+
+    /**
+     * Build a drawing of the selected members and go to it.
      *
      * The layout is python's to decide -- it knows the timber's own axes, which
      * is what the four-long-sides sheet is arranged around -- so the viewer
      * sends the selection and renders whatever comes back.
      */
     async _handleRequestDrawingFromSelection(message) {
-        if (!this.runnerSession || this.isDisposed) {
-            return;
-        }
         const memberKeys = Array.isArray(message.memberKeys) ? message.memberKeys : [];
-        const result = await this.runnerSession.slotRequest(
-            'create_drawing_from_selection',
-            this.slotName,
-            { member_keys: memberKeys },
+        await this._handleDrawingsCommand(
+            'create_drawing_from_selection', { member_keys: memberKeys }, { enter: true },
         );
-        if (this.isDisposed) {
-            return;
-        }
-        this._postToWebview({
-            type: 'scenes',
-            payload: { scenes: (result && result.scenes) || [], enter: true },
-        });
     }
 
     /**

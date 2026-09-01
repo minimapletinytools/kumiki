@@ -7,7 +7,7 @@ sys.path.insert(0, str(project_root))
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.ticket import JointTicket
-from kumiki.timber import AssemblyFreedom, Cutting, Frame, Joint, Ordering
+from kumiki.timber import AssemblyFreedom, Cutting, Drawing, Frame, Joint, Ordering
 
 
 def build_frame():
@@ -43,7 +43,17 @@ def build_frame():
         ticket=JointTicket(path="ab_joint", joint_type="test_joint"),
     ).with_order(1)
 
-    return Frame.from_joints(
+    frame = Frame.from_joints(
         joints=[joint],
         name="Assembly Fixture Frame",
+    )
+    # A drawing the frame asks for, so the fixture covers the code source as
+    # well as drawings made from a selection.
+    return Frame(
+        cut_timbers=frame.cut_timbers,
+        accessories=frame.accessories,
+        name=frame.name,
+        source_joints=frame.source_joints,
+        footprints=frame.footprints,
+        drawings=[Drawing(name="timber A", timber_paths=["A"])],
     )
