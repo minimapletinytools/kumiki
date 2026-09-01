@@ -527,6 +527,51 @@ resolving -- and equally when it has been moved to a viewport where its anchors
 project onto each other, since what can be measured is decided per viewport and a
 move can therefore invalidate it.
 
+### Where a feature actually is
+
+Agreed, not yet built.
+
+A measurement needs two things from each of its anchors: the geometry to measure
+on, and somewhere to attach the drawing. `locate()` gives the first and is
+reliable -- an infinite plane or line is exactly what a projected measurement
+computes against.
+
+The second is the hard one, because **a feature's declared extent is the extent
+of the primitive it was declared on, and primitives are deliberately not the
+finished piece**. A half space has no bounded extent at all. A cutter is extended
+past the timber on purpose so the cut is clean, and the mortise-and-tenon extends
+its by `max(tenon_size) / sin(angle)` -- which for a square joint divides by a
+guard value and puts the mortise's front face anchor 476 metres away. The hole is
+cut correctly; the anchor is meaningless.
+
+So the extent has to come from the finished piece rather than from what declared
+it. Three ways to get it, in the order they should be tried:
+
+**From the triangles.** The mesh already exists, and a feature already knows how
+to test whether a point is on it -- that is how picking works, and the docstrings
+say real features are tested against the triangulated result first. So the
+triangles of the finished member whose vertices lie on the feature *are* its
+extent: their bounds and centroid, exactly cropped, with no new geometry code.
+This is the answer for a face that survives to the surface.
+
+It also settles a second question for free. A feature cropped away entirely has
+no triangles, which is precisely the "this measurement cannot be drawn" case --
+so the same pass that finds the extent says whether the feature is on the
+finished piece at all.
+
+**From the declared extent**, when there are no triangles but `get_extent()`
+gives something bounded and sane. Weaker, but better than nothing for a feature
+that is real and simply not on the surface.
+
+**From the geometry and the other anchor**, when there is neither: the foot of
+the perpendicular from one anchor onto the other's plane is a perfectly good
+place to attach a dimension, and it is the right answer for a half space, which
+has a plane and no extent by construction.
+
+Cost is a scan of one member's triangles per anchor, against a handful of
+measurements per drawing, so it belongs alongside the mesh cache the runner
+already keeps rather than being computed per frame.
+
 ### The list is viewports first
 
 Measurements hang off viewports, so the drawing's tree lists viewports and the
