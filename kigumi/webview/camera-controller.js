@@ -193,6 +193,26 @@
             return true;
         }
 
+        /**
+         * Turn about one fixed axis, and no other.
+         *
+         * What a single piece's preview does: every side of the timber is
+         * reachable by spinning it about its own length, and it can never be
+         * tumbled end over end out of the attitude it is drawn in. The up
+         * vector turns with the camera, so the view stays square to the axis.
+         */
+        orbitAboutAxis(dx, speed, axis) {
+            const THREE = this.THREE;
+            const turn = new THREE.Vector3(axis.x, axis.y, axis.z);
+            if (turn.length() === 0) {
+                return;
+            }
+            turn.normalize();
+            const rotation = new THREE.Quaternion().setFromAxisAngle(turn, -dx * speed);
+            this.cameraOffsetDir.applyQuaternion(rotation).normalize();
+            this.cameraUpVector.applyQuaternion(rotation).normalize();
+        }
+
         getAdaptiveZoomFactor(isZoomingOut) {
             const baseZoomFactor = isZoomingOut ? 0.8 : 1.2;
             if (this.orbitDist <= 0) {

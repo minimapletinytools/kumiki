@@ -212,6 +212,31 @@
         ];
     }
 
+    const ORBIT_MODES = ['free', 'axis'];
+
+    /**
+     * How far a viewport may be turned by dragging in it.
+     *
+     * `free` is an ordinary orbit. `axis` turns about one world direction only,
+     * which is what a single timber's preview wants: every side of the piece is
+     * reachable without it ever being tumbled out of the attitude it is drawn
+     * in. An axis mode with no usable axis is not a constraint, so it falls
+     * back to free rather than locking the camera by accident.
+     */
+    function normalizeOrbit(spec) {
+        const source = spec && typeof spec === 'object' ? spec : {};
+        const mode = ORBIT_MODES.includes(source.mode) ? source.mode : 'free';
+        if (mode !== 'axis') {
+            return { mode: 'free', axis: null };
+        }
+        const axis = Array.isArray(source.axis) && source.axis.length === 3
+            && source.axis.every((n) => Number.isFinite(n))
+            ? source.axis.map(Number)
+            : null;
+        const lengthSquared = axis ? dot(axis, axis) : 0;
+        return lengthSquared > 0 ? { mode: 'axis', axis } : { mode: 'free', axis: null };
+    }
+
     function normalizeViewport(spec, index, page) {
         const source = spec && typeof spec === 'object' ? spec : {};
         const rect = normalizeRect(source.rect);
@@ -234,6 +259,7 @@
             // nothing so they float over each other; the sheet beneath them is
             // the page's business, not any camera's.
             background: source.background === undefined ? null : source.background,
+            orbit: normalizeOrbit(source.orbit),
             // A scene knows every member; this says which ones it is about.
             // null means all of them, which is what the 3D scene wants.
             members: Array.isArray(source.members) ? source.members.slice() : null,
@@ -480,6 +506,8 @@
         defaultSceneSpec,
         normalizeScene,
         sceneMembers,
+        normalizeOrbit,
+        ORBIT_MODES,
         isOrthogonalFrame,
         orbitDistanceForExtent,
         firstLoadCameraPlan,

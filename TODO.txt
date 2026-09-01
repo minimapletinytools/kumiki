@@ -261,12 +261,13 @@ DONE-show rough mesaurements in selectino view when eselecting single elemnts
 
 
 -drawing mode fixes
-  -don't show footprint in drawing mode, acutally keep this option available for the future, but right now it's always hidden.
-  -zoom is backwards in drawing view
+  DONE-don't show footprint in drawing mode, acutally keep this option available for the future, but right now it's always hidden.
+  DONE-zoom is backwards in drawing view
   -3d perspecive view in drawing should attempt to rotate camera so as much of teh timber fits in the viewport as possible. this is actually done by the thing that psasse the camera/viewport settings into the drawing panel rather than the drawing itself of course.
-  -there are 2 camera types for teh 3d perspcetive viewport
-    -for multiple timbers, as iti s right now
+  -there are 2 camera types for teh 3d perspcetive viewport (again, this is set by the thing  that passes the info into the drawing panel, so it may need to beserializable like the current viewport/camera settings)
+    -for multiple timbers, as it is right now
     -for single timbers, allow free rotation along the timber axis only
+
 
 
 -do notes for cross_lap_butt_joint

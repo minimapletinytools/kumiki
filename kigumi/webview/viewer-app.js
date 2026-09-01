@@ -108,6 +108,10 @@ class ViewerViewport {
 // piece among its neighbours, not enough to be mistaken for part of the sheet.
 const DRAWING_CONTEXT_OPACITY = 0.05;
 
+// Turning a piece about its own axis covers a full turn in about the width of
+// the viewport, which is roughly how fast a free orbit yaws.
+const DEFAULT_AXIS_ORBIT_SPEED = 0.008;
+
 // A drag on a locked viewport turns more slowly than a free orbit -- it is a
 // nudge within a small cone, so the same hand movement should cover less of it.
 const TILT_ORBIT_SPEED = 0.0016;
@@ -1814,6 +1818,16 @@ class KigumiViewerApp extends LitElement {
         }
         const controller = viewport.cameraController;
         if (!viewport.spec.locked) {
+            const orbit = viewport.spec.orbit;
+            if (orbit && orbit.mode === 'axis') {
+                // Only the sideways part of the drag: dragging up and down
+                // would tumble the piece out of the attitude it is drawn in,
+                // which is the whole thing this mode exists to prevent.
+                controller.orbitAboutAxis(dx, DEFAULT_AXIS_ORBIT_SPEED, {
+                    x: orbit.axis[0], y: orbit.axis[1], z: orbit.axis[2],
+                });
+                return;
+            }
             controller.applyOrbitDelta(dx, dy);
             return;
         }

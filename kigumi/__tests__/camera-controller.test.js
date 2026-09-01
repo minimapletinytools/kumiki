@@ -640,3 +640,73 @@ describe('nudgeWithinCone', () => {
         expect(angleBetween(controller.cameraOffsetDir, declared)).toBeGreaterThan(0.18);
     });
 });
+
+describe('orbitAboutAxis', () => {
+    // A single piece's preview: spin the timber about its own length, never
+    // tumble it end over end.
+    const axis = { x: 0, y: 0, z: 1 };
+
+    function controllerLookingAlongY() {
+        const controller = new CameraController({ THREE });
+        controller.setCameraMode('free', { snapUp: false });
+        controller.cameraOffsetDir.set(0, -1, 0);
+        controller.cameraUpVector.set(0, 0, 1);
+        return controller;
+    }
+
+    test('turns the camera about the axis', () => {
+        const controller = controllerLookingAlongY();
+        controller.orbitAboutAxis(200, 0.008, axis);
+
+        expect(controller.cameraOffsetDir.z).toBeCloseTo(0, 9);
+        expect(Math.abs(controller.cameraOffsetDir.x)).toBeGreaterThan(0.1);
+    });
+
+    test('never leaves the plane perpendicular to the axis', () => {
+        // The point of the constraint: whatever the drag, the camera stays at
+        // the same height around the piece.
+        const controller = controllerLookingAlongY();
+        for (let i = 0; i < 50; i += 1) {
+            controller.orbitAboutAxis(37, 0.008, axis);
+            expect(controller.cameraOffsetDir.z).toBeCloseTo(0, 9);
+        }
+    });
+
+    test('carries the up vector round with it', () => {
+        const controller = controllerLookingAlongY();
+        controller.orbitAboutAxis(150, 0.008, axis);
+
+        // Up was along the axis and stays there, so the view is never rolled.
+        expect(controller.cameraUpVector.z).toBeCloseTo(1, 9);
+        expect(controller.cameraOffsetDir.dot(controller.cameraUpVector)).toBeCloseTo(0, 9);
+    });
+
+    test('reaches every side of the piece', () => {
+        const controller = controllerLookingAlongY();
+        const start = controller.cameraOffsetDir.clone();
+        let opposite = false;
+        for (let i = 0; i < 400; i += 1) {
+            controller.orbitAboutAxis(50, 0.008, axis);
+            if (controller.cameraOffsetDir.dot(start) < -0.99) {
+                opposite = true;
+            }
+        }
+        expect(opposite).toBe(true);
+    });
+
+    test('a degenerate axis moves nothing rather than producing NaN', () => {
+        const controller = controllerLookingAlongY();
+        controller.orbitAboutAxis(100, 0.008, { x: 0, y: 0, z: 0 });
+
+        expect(controller.cameraOffsetDir.y).toBeCloseTo(-1, 9);
+    });
+
+    test('an axis need not be normalized', () => {
+        const long = controllerLookingAlongY();
+        const unit = controllerLookingAlongY();
+        long.orbitAboutAxis(100, 0.008, { x: 0, y: 0, z: 9 });
+        unit.orbitAboutAxis(100, 0.008, axis);
+
+        expect(long.cameraOffsetDir.x).toBeCloseTo(unit.cameraOffsetDir.x, 9);
+    });
+});

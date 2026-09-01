@@ -347,3 +347,86 @@ class TestDrawingFromSelection:
         # The post runs 0..900mm in z once cut, so the views centre on 450mm.
         for viewport in _orthographic_viewports(drawing):
             assert abs(viewport["camera"]["target"][2] - 0.45) < 1e-6
+
+
+class TestPreviewCamera:
+    """The 3D preview beside the elevations, and how far it may be turned."""
+
+    def _preview(self, drawing):
+        return next(v for v in drawing["viewports"] if v["id"] == "preview")
+
+    def _off_axis_degrees(self, look, axis):
+        import math
+
+        dotted = abs(sum(look[i] * axis[i] for i in range(3)))
+        return math.degrees(math.acos(min(1.0, dotted)))
+
+    def test_it_does_not_look_down_the_length_of_the_piece(self):
+        # An end-on view fills the viewport better than any other and shows
+        # nothing at all, so "fit the most in" cannot mean fitting by area.
+        beam = _beam(create_v3(mm(0), mm(0), mm(0)))
+        preview = self._preview(_selection([beam], ["beam#0"]))
+
+        assert self._off_axis_degrees(preview["camera"]["look"], [1.0, 0.0, 0.0]) > 25
+
+    def test_it_looks_down_on_the_piece_rather_than_up_at_it(self):
+        preview = self._preview(_selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"]))
+
+        assert preview["camera"]["look"][2] < 0
+
+    def test_the_angle_follows_the_piece(self):
+        # Two timbers lying along different world axes are not best seen from
+        # the same place, so a fixed three-quarter view cannot be right for both.
+        along_x = _beam(create_v3(mm(0), mm(0), mm(0)))
+        along_y = create_timber(
+            bottom_position=create_v3(mm(0), mm(0), mm(0)),
+            length=mm(2400),
+            size=create_v2(mm(100), mm(200)),
+            length_direction=create_v3(0, 1, 0),
+            width_direction=create_v3(1, 0, 0),
+            ticket="beam",
+        )
+
+        looks = [
+            tuple(self._preview(_selection([timber], ["beam#0"]))["camera"]["look"])
+            for timber in (along_x, along_y)
+        ]
+        assert looks[0] != looks[1]
+
+    def test_the_view_is_sized_to_the_angle_it_chose(self):
+        # Framing on the bounding sphere instead ignores the angle entirely, so
+        # choosing one would change nothing you could see.
+        beam = _beam(create_v3(mm(0), mm(0), mm(0)))
+        preview = self._preview(_selection([beam], ["beam#0"]))
+        radius = ((1.2 ** 2) + (0.05 ** 2) + (0.1 ** 2)) ** 0.5
+
+        assert preview["camera"]["extent"] < radius * 1.6
+
+    def test_one_piece_turns_about_its_own_length(self):
+        # Every side of the timber reachable, and no way to tumble it out of
+        # the attitude it is drawn in.
+        post = _post(create_v3(mm(0), mm(0), mm(0)))
+        preview = self._preview(_selection([post], ["post#0"]))
+
+        assert preview["orbit"]["mode"] == "axis"
+        assert preview["orbit"]["axis"] == [0.0, 0.0, 1.0]
+
+    def test_the_axis_is_the_timbers_own_not_the_worlds(self):
+        beam = _beam(create_v3(mm(0), mm(0), mm(0)))
+        preview = self._preview(_selection([beam], ["beam#0"]))
+
+        assert preview["orbit"]["axis"] == [1.0, 0.0, 0.0]
+
+    def test_several_pieces_orbit_freely(self):
+        # No single length to turn about once there is more than one piece.
+        timbers = [_beam(create_v3(mm(0), mm(0), mm(0))), _post(create_v3(mm(0), mm(0), mm(0)))]
+        preview = self._preview(_selection(timbers, ["beam#0", "post#0"]))
+
+        assert preview["orbit"]["mode"] == "free"
+
+    def test_the_preview_is_still_free_to_be_moved(self):
+        # The orbit is constrained, not the viewport: it is still a live view.
+        preview = self._preview(_selection([_post(create_v3(mm(0), mm(0), mm(0)))], ["post#0"]))
+
+        assert preview["locked"] is False
+        assert preview["projection"] == "perspective"

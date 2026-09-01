@@ -1133,12 +1133,9 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
             "measurements": [],
         })
 
-    viewports.append({
-        "id": "preview",
-        "rect": _DEBUG_DRAWING_RECTS["preview"],
-        "locked": False,
-        "projection": "perspective",
-    })
+    viewports.append(_preview_viewport(
+        _DEBUG_DRAWING_RECTS["preview"], centre, half_size, _DEBUG_DRAWING_PAGE, {"mode": "free"},
+    ))
 
     return {
         "id": "debug-default-drawing",
@@ -1222,12 +1219,89 @@ def _camera_frame_looking(look: List[float]) -> Dict[str, Any]:
     return {"right": _normalize(_cross(forward, up)), "up": up, "look": forward}
 
 
-# Looking from the south-east and above, the angle a frame is usually drawn
-# from. The preview is free, so this is only where it starts.
-_PREVIEW_LOOK = [-1.0, 1.0, -0.75]
-
 # A perspective view wants more room around the piece than an elevation does.
 _PREVIEW_EXTENT_PADDING = 1.6
+
+# Where the preview may look from. Every compass direction, and a few heights
+# above the horizon -- never level with it or straight down, where an upright
+# camera has no up left to speak of.
+_PREVIEW_AZIMUTH_STEPS = 24
+_PREVIEW_ELEVATIONS_DEG = (20.0, 35.0, 50.0)
+
+
+def _box_silhouette_area(half_size: List[float], look: List[float]) -> float:
+    """How much of a box a viewer sees, looking along `look`.
+
+    Exact for a box: the silhouette is the sum of each face pair's area scaled
+    by how squarely it faces the camera. This is what stops the search below
+    settling on an end-on view, which fits beautifully and shows nothing.
+    """
+    a, b, c = half_size
+    return (
+        abs(look[0]) * 4 * b * c
+        + abs(look[1]) * 4 * a * c
+        + abs(look[2]) * 4 * a * b
+    )
+
+
+def _preview_look_candidates() -> List[List[float]]:
+    candidates: List[List[float]] = []
+    for elevation_deg in _PREVIEW_ELEVATIONS_DEG:
+        elevation = math.radians(elevation_deg)
+        for step in range(_PREVIEW_AZIMUTH_STEPS):
+            azimuth = 2 * math.pi * step / _PREVIEW_AZIMUTH_STEPS
+            # Looking down from above, so the z part is negative.
+            candidates.append([
+                math.cos(azimuth) * math.cos(elevation),
+                math.sin(azimuth) * math.cos(elevation),
+                -math.sin(elevation),
+            ])
+    return candidates
+
+
+def _preview_extent(half_size: List[float], frame: Dict[str, Any], aspect: float) -> float:
+    """How much of the world the preview has to hold, for this angle."""
+    needed_up = sum(abs(frame["up"][i]) * half_size[i] for i in range(3))
+    needed_right = sum(abs(frame["right"][i]) * half_size[i] for i in range(3))
+    return max(0.001, max(needed_up, needed_right / aspect) * _PREVIEW_EXTENT_PADDING)
+
+
+def _best_preview_look(half_size: List[float], aspect: float) -> List[float]:
+    """The angle that shows as much of the piece as the viewport can hold.
+
+    Searched rather than assumed, because the best angle depends on both the
+    piece and the shape of the viewport: a fixed three-quarter view wastes most
+    of a tall viewport on a long timber.
+
+    What is maximized is how long the piece's longest axis appears once the view
+    has been sized to fit it. The obvious alternative -- how much of the
+    viewport the silhouette fills -- is worse than useless here, because it is
+    always won by looking straight down the length of the timber: an end-on view
+    fits beautifully and shows nothing. Length on screen goes to zero there
+    instead, which is the answer wanted.
+
+    Two angles that show the piece equally long are separated by which shows
+    more of it, so a square-on view loses to a three-quarter one.
+    """
+    longest_axis = max(range(3), key=lambda axis: half_size[axis])
+    longest = half_size[longest_axis]
+    best_look = [-1.0, 1.0, -0.75]
+    best_length = -1.0
+    best_area = -1.0
+    for look in _preview_look_candidates():
+        frame = _camera_frame_looking(look)
+        extent = _preview_extent(half_size, frame, aspect)
+        across = frame["right"][longest_axis] * longest
+        up_screen = frame["up"][longest_axis] * longest
+        on_screen = math.sqrt(across * across + up_screen * up_screen) / extent
+        area = _box_silhouette_area(half_size, _normalize(look))
+        # Within a couple of percent counts as the same length, and then the
+        # view that shows more of the piece wins.
+        if on_screen > best_length * 1.02 or (on_screen > best_length * 0.98 and area > best_area):
+            best_length = max(best_length, on_screen)
+            best_area = area
+            best_look = look
+    return best_look
 
 
 def _preview_viewport(
@@ -1235,24 +1309,27 @@ def _preview_viewport(
     centre: List[float],
     half_size: List[float],
     page: Dict[str, Any],
+    orbit: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """The live 3D view beside the elevations. Free, so it can be looked around.
+    """The live 3D view beside the elevations, pointed at what is being drawn.
 
-    It still arrives pointed at what is being drawn. Left to itself the viewer
-    builds a camera at the origin looking at nothing in particular, which for a
-    piece standing away from the origin means an empty preview.
+    Left to itself the viewer builds a camera at the origin looking at nothing
+    in particular, which for a piece standing away from the origin means an
+    empty preview. The angle is chosen to fill the viewport (see
+    _best_preview_look), and `orbit` says how far it may be turned afterwards.
     """
-    frame = _camera_frame_looking(_PREVIEW_LOOK)
-    radius = math.sqrt(sum(component * component for component in half_size))
+    aspect = _viewport_aspect(rect, page)
+    frame = _camera_frame_looking(_best_preview_look(half_size, aspect))
     return {
         "id": "preview",
         "rect": rect,
         "locked": False,
         "projection": "perspective",
+        "orbit": orbit,
         "camera": {
             **frame,
             "target": centre,
-            "extent": max(0.001, radius * _PREVIEW_EXTENT_PADDING),
+            "extent": _preview_extent(half_size, frame, aspect),
         },
     }
 
@@ -1336,18 +1413,26 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     if len(entries) == 1:
         viewports = _long_face_viewports(entries[0], page)
         preview_rect = _LONG_FACE_RECTS["preview"]
+        # One piece: the preview turns about the timber's own length, so it can
+        # be looked at from every side without ever being tumbled out of the
+        # attitude it is drawn in. Several pieces have no such axis to speak of.
+        orbit = {
+            "mode": "axis",
+            "axis": _vector3_to_floats(entries[0]["timber"].get_length_direction_global()),
+        }
     else:
         # No selection is treated as the whole frame, so asking for a drawing
         # before selecting anything gives you something rather than nothing.
         viewports = _world_elevation_viewports(entries or timber_entries, page)
         preview_rect = _SELECTION_QUADRANTS["preview"]
+        orbit = {"mode": "free"}
 
     members = [entry["memberKey"] for entry in entries]
     for viewport in viewports:
         viewport["members"] = members or None
         viewport["ghostOthers"] = True
         viewport["measurements"] = []
-    viewports.append(_preview_viewport(preview_rect, centre, half_size, page))
+    viewports.append(_preview_viewport(preview_rect, centre, half_size, page, orbit))
 
     return {
         "id": SELECTION_DRAWING_ID,

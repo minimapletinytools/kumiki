@@ -2,7 +2,7 @@ const {
     SceneStore, DEFAULT_SCENE_ID, defaultSceneSpec, normalizeScene,
     isOrthogonalFrame, orbitDistanceForExtent, firstLoadCameraPlan, pixelRect, viewportAspect, viewportAtPoint,
     normalizePage, normalizePageView, pageScreenRect, viewportScale, extentForScale,
-    panPage, zoomPageAt, MAX_TILT_RADIANS,
+    panPage, zoomPageAt, MAX_TILT_RADIANS, normalizeOrbit,
 } = require('../webview/scene-store.js');
 
 describe('the default 3D scene', () => {
@@ -504,5 +504,40 @@ describe('panPage', () => {
 
     it('does nothing without a sheet', () => {
         expect(panPage(null, { offsetX: 5 }, 800, 600, 40, 40).offsetX).toBe(5);
+    });
+});
+
+describe('normalizeOrbit', () => {
+    // How far a viewport may be turned. Serialized, because which of the two it
+    // is depends on what is being drawn, and that is python's to decide.
+    it('is a free orbit unless something says otherwise', () => {
+        expect(normalizeOrbit(undefined)).toEqual({ mode: 'free', axis: null });
+        expect(normalizeOrbit({ mode: 'free' })).toEqual({ mode: 'free', axis: null });
+    });
+
+    it('keeps the axis a single piece turns about', () => {
+        expect(normalizeOrbit({ mode: 'axis', axis: [0, 0, 1] }))
+            .toEqual({ mode: 'axis', axis: [0, 0, 1] });
+    });
+
+    it('falls back to free when the axis is missing or degenerate', () => {
+        // An axis mode with nothing to turn about would leave the camera stuck,
+        // which is worse than the constraint not applying.
+        expect(normalizeOrbit({ mode: 'axis' }).mode).toBe('free');
+        expect(normalizeOrbit({ mode: 'axis', axis: [0, 0, 0] }).mode).toBe('free');
+        expect(normalizeOrbit({ mode: 'axis', axis: [1, 2] }).mode).toBe('free');
+        expect(normalizeOrbit({ mode: 'axis', axis: ['x', 0, 1] }).mode).toBe('free');
+    });
+
+    it('refuses a mode it does not know', () => {
+        expect(normalizeOrbit({ mode: 'tumble' }).mode).toBe('free');
+    });
+
+    it('reaches a viewport through the scene', () => {
+        const scene = normalizeScene({
+            id: 'd',
+            viewports: [{ id: 'preview', orbit: { mode: 'axis', axis: [0, 0, 1] } }],
+        });
+        expect(scene.viewports[0].orbit).toEqual({ mode: 'axis', axis: [0, 0, 1] });
     });
 });
