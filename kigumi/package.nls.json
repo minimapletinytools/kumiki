@@ -17,11 +17,11 @@
   "command.viewPatternSource.title": "View Source",
   "command.duplicatePatternToWorkspace.title": "Duplicate To Workspace",
   "command.openPatternInNewWindow.title": "Open in New Tab",
-
   "config.openInSplitView.description": "Open the Kigumi viewer in a new editor column beside the active one. When off, the viewer opens in the active column.",
   "config.autoRefreshOnFileChange.description": "Automatically refresh open Kigumi viewers when watched files change.",
   "config.showPoopTaggedJoints.description": "Show poop-tagged joints in the pattern book.",
   "config.assemblyPreview.description": "Show the assembly (disassembly) preview timeline in the frame viewer. Experimental. Takes effect when a viewer is (re)opened.",
+  "config.drawingBeta.description": "Show drawing mode in the frame viewer: the draw button, the drawings section of the layers panel, and the drawing options. Beta. Takes effect when a viewer is (re)opened.",
   "config.logRetentionDays.description": "Delete Kigumi log files in .kigumi/logs that are older than this many days when the extension starts or the setting changes.",
   "config.autoRefreshSidebarOnNewFile.description": "Automatically refresh the Kigumi sidebar when new .py files are created in the workspace."
 }

@@ -25,6 +25,31 @@ export class SelectionPanel {
         return html`<div id="info-panel" class="ip-panel"></div>`;
     }
 
+    /** The draw / close button, which is the way into and out of a drawing. */
+    _drawingButton() {
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'ip-action';
+        const inDrawing = this.app.isInDrawing;
+        action.textContent = inDrawing
+            ? this.t('viewer.selection.leaveDrawing')
+            : this.t('viewer.selection.drawSelection');
+        action.title = inDrawing
+            ? this.t('viewer.selection.leaveDrawing.title')
+            : this.t('viewer.selection.drawSelection.title');
+        // Drawing nothing means drawing the whole frame, which is a reasonable
+        // thing to ask for, so this stays enabled with an empty selection.
+        action.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (inDrawing) {
+                this.app.leaveDrawing();
+            } else {
+                this.app.drawSelection();
+            }
+        });
+        return action;
+    }
+
     updateInfo(frameData) {
         this.app.currentFrameData = frameData || {};
         const timberCount = frameData && frameData.timber_count ? frameData.timber_count : 0;
@@ -152,28 +177,11 @@ export class SelectionPanel {
 
         // Getting into and out of a drawing lives in the header rather than the
         // body: the body is collapsed by default, and a way out of a drawing
-        // that can be collapsed is a trap.
-        const action = document.createElement('button');
-        action.type = 'button';
-        action.className = 'ip-action';
-        const inDrawing = this.app.isInDrawing;
-        action.textContent = inDrawing
-            ? this.t('viewer.selection.leaveDrawing')
-            : this.t('viewer.selection.drawSelection');
-        action.title = inDrawing
-            ? this.t('viewer.selection.leaveDrawing.title')
-            : this.t('viewer.selection.drawSelection.title');
-        // Drawing nothing means drawing the whole frame, which is a reasonable
-        // thing to ask for, so this stays enabled with an empty selection.
-        action.addEventListener('click', (event) => {
-            event.stopPropagation();
-            if (inDrawing) {
-                this.app.leaveDrawing();
-            } else {
-                this.app.drawSelection();
-            }
-        });
-        header.appendChild(action);
+        // that can be collapsed is a trap. Absent entirely while drawing mode
+        // is off, which is what keeps the viewer in the 3D scene.
+        if (this.app.drawingBetaEnabled) {
+            header.appendChild(this._drawingButton());
+        }
         panel.appendChild(header);
 
         const body = document.createElement('div');

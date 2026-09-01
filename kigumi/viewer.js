@@ -181,6 +181,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         // User setting for the assembly preview timeline; the webview combines
         // it with the package-time FEATURE_FLAGS.assemblyPreview master switch.
         assemblyPreviewSetting: vscode.workspace.getConfiguration('kigumi').get('viewer.assemblyPreview', false) === true,
+        drawingBetaSetting: vscode.workspace.getConfiguration('kigumi').get('viewer.drawingBeta', false) === true,
         i18n: { locale, strings: loadCatalog(locale) },
     }));
 

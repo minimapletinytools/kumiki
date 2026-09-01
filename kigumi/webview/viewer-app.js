@@ -572,6 +572,12 @@ const FEATURE_FLAGS = window.FEATURE_FLAGS || {};
 const ASSEMBLY_PREVIEW_ENABLED = Boolean(FEATURE_FLAGS.assemblyPreview)
     && INITIAL_PAYLOAD.assemblyPreviewSetting === true;
 
+// Drawing mode, off unless asked for (kigumi.viewer.drawingBeta). It hides the
+// ways in rather than the machinery: with no draw button, no drawings section
+// and no drawing options, the viewer never leaves the 3D scene, and everything
+// that only matters on a sheet is unreachable rather than disabled.
+const DRAWING_BETA_ENABLED = INITIAL_PAYLOAD.drawingBetaSetting === true;
+
 // Axis-aligned bounds accumulation over flat [x,y,z,...] position arrays.
 function createBoundsAccumulator() {
     return {
@@ -846,6 +852,7 @@ class ViewerSettingsPanel {
                         step="0.1"
                         .value=${String(this.app.disassemblyMultiplier)}>
                 </label>` : ''}
+                ${DRAWING_BETA_ENABLED ? html`
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.drawing')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.section.drawing')}</div>
                 <label>
@@ -855,8 +862,7 @@ class ViewerSettingsPanel {
                 <label>
                     <input id="debug-drawing-toggle" type="checkbox" ?checked=${this.app.debugDrawingEnabled}>
                     ${t('viewer.options.debugDrawing')}
-                </label>
-
+                </label>` : ''}
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
                 <label>
@@ -5190,6 +5196,17 @@ class KigumiViewerApp extends LitElement {
         camera.top = halfHeight;
         camera.bottom = -halfHeight;
         camera.updateProjectionMatrix();
+    }
+
+    /**
+     * Whether drawing mode is offered at all (kigumi.viewer.drawingBeta).
+     *
+     * Read by everything that is a way in: the draw button, the drawings
+     * section of the layers panel, and the drawing options. Off, the viewer
+     * never leaves the 3D scene.
+     */
+    get drawingBetaEnabled() {
+        return DRAWING_BETA_ENABLED;
     }
 
     /** The members this scene is about, or null when it is about all of them. */

@@ -48,7 +48,7 @@
       "kigumi": [
         {
           "id": "kigumi.explorer",
-          "name": "Kigumi Explorer 🐺",
+          "name": "Kigumi Explorer 🦝",
           "icon": "templogo.png"
         }
       ]
@@ -227,6 +227,11 @@
           "type": "boolean",
           "default": false,
           "description": "%config.assemblyPreview.description%"
+        },
+        "kigumi.viewer.drawingBeta": {
+          "type": "boolean",
+          "default": false,
+          "description": "%config.drawingBeta.description%"
         },
         "kigumi.viewer.logRetentionDays": {
           "type": "number",
