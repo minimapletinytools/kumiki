@@ -498,9 +498,16 @@ class CSGFeature(ABC):
     def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         """Whether *point* lies on this feature of *owner*.
 
-        Callers reach this through owner.get_all_features(), which has already
-        established that the point is on the owner's boundary at all.
+        Primitive level, and deliberately so: no root node is involved, so this
+        cannot know what the rest of the tree did to *owner*. A face feature
+        answers for the face's whole PLANE -- the bounding comes from the layer
+        above.
 
+        Which means this is half a test, and callers reach it through
+        owner.get_all_features(), which has already established that the point
+        is on the owner's boundary at all. Used on its own it says yes a long
+        way from the feature: an edge built from two of these answers yes all
+        the way along its line.
         """
         ...
 
@@ -1055,6 +1062,10 @@ class CutCSG(ABC):
     ) -> List['OwnedFeatureHit']:
         """Every feature at *point*: those declared in this subtree, plus the
         edges they form with each other.
+
+        TODO rename to find_all_features: this is a query at a point, not a
+        listing, and the "get" reads like get_declared_features -- which is the
+        one that does NOT include derived edges. The two get confused.
 
         Two gathers, because "near enough to count" means a different distance
         depending on what is being asked. The first collects features at the
