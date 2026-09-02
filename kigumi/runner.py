@@ -2105,30 +2105,42 @@ def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, A
 def _feature_anchor(feature: Any, node: Any, timber: Any, located: Any) -> Optional[List[float]]:
     """Where to attach a dimension to this feature, in world space.
 
-    From the region the feature occupies once cropped to the timber, not from
-    what declared it: a cutter extended past the timber puts its declared anchor
-    out there with it, and a half space has no declared anchor at all.
+    From what the feature occupies once cropped to the timber, not from what
+    declared it: a cutter extended past the timber puts its declared anchor out
+    there with it, and a half space has no declared anchor at all. A face gives
+    a region and a point gives itself; an edge gives a segment, which matters
+    because an edge declared on an extended cutter runs off with it.
 
-    Falls back to the declared extent when the region cannot be worked out --
-    a curved primitive, say -- since somewhere approximate beats nowhere.
+    Falls back to the declared extent when neither can be worked out -- a curved
+    primitive, say -- since somewhere approximate beats nowhere.
     """
-    from kumiki.geometry import Plane
-    from kumiki.csgconvexhull import region_in_plane
+    from kumiki.geometry import Line, Plane, Point
+    from kumiki.csgconvexhull import region_in_plane, segment_on_line
 
-    if isinstance(located, Plane):
+    # A point is already where it is: nothing to crop, and cropping could only
+    # say it is off the piece, which is a different question from where it is.
+    if isinstance(located, Point):
+        return _vector3_to_floats(timber.transform.local_to_global(located.position))
+
+    if isinstance(located, (Plane, Line)):
         solid = timber.get_perfect_timber_within_csg_local()
         # Generous enough to contain the timber before clipping starts, and
-        # measured from the timber rather than from the plane's own point,
+        # measured from the timber rather than from the feature's own point,
         # which may be nowhere near it.
         reach = float(timber.length) * 4
-        region = region_in_plane(
-            located, [node, solid], seed_reach=reach,
-            near=solid.transform.position,
-        )
-        if region is not None and not region.is_empty:
-            centre = region.centroid()
-            if centre is not None:
-                return _vector3_to_floats(timber.transform.local_to_global(centre))
+        bounding = [node, solid]
+        if isinstance(located, Plane):
+            cropped = region_in_plane(
+                located, bounding, seed_reach=reach, near=solid.transform.position,
+            )
+            middle = cropped.centroid() if cropped is not None and not cropped.is_empty else None
+        else:
+            cropped = segment_on_line(
+                located, bounding, seed_reach=reach, near=solid.transform.position,
+            )
+            middle = cropped.midpoint() if cropped is not None and not cropped.is_empty else None
+        if middle is not None:
+            return _vector3_to_floats(timber.transform.local_to_global(middle))
 
     extent = feature.get_extent(node)
     if extent is None:

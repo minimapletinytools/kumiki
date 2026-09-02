@@ -574,20 +574,17 @@ class DerivedEdgeFeature(CSGFeature):
         return intersect_planes(_as_plane(self.a.locate()), _as_plane(self.b.locate()))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Where this edge sits -- currently only approximately.
+        """Where this edge sits -- only approximately, and deliberately so.
 
-        SHORTCOMING, deliberate for now: `ends` is None and `anchor` is the
-        point on the INFINITE line closest to the origin, which need not be
-        anywhere near the stretch of edge that actually exists. An edge a metre
-        up a post can anchor at the origin end of its own line.
+        `ends` is None and `anchor` is the point on the INFINITE line closest to
+        the origin, which need not be anywhere near the stretch of edge that
+        actually exists. Harmless for picking, which only calls test_point, and
+        not good enough to hang a dimension line off.
 
-        That is harmless for picking, which only ever calls test_point, but it
-        is not good enough to hang a dimension line off. Fixing it means
-        cropping the line to the solid (see crop_line_to_csg), and the solid in
-        question is the enclosing timber -- which this feature cannot see,
-        since its owner is whichever node derived it. So the crop has to happen
-        a level up, where the timber is known, and that is measurement's job
-        rather than the feature's.
+        Measurement does the cropping instead, a level up where the enclosing
+        timber is known -- this feature cannot see it, since its owner is
+        whichever node derived it. See csgconvexhull.segment_on_line, called
+        from the runner's _feature_anchor.
         """
         if self.a is None or self.b is None:
             return None
@@ -2281,6 +2278,10 @@ def crop_line_to_csg(
     about the line's origin and bisecting the two crossings. That is enough for
     the convex, axis-aligned cases this exists for; a line that enters and
     leaves a concave solid more than once reports only the outermost span.
+
+    For a measurement anchor use csgconvexhull.segment_on_line instead: exact,
+    takes several solids, and starts near the timber rather than near the line's
+    origin, which may be nowhere close.
     """
     direction = safe_normalize_vector(line.direction)
 

@@ -8,13 +8,15 @@ cropping that turns one into the other.
 import pytest
 
 from kumiki.cutcsg import HalfSpace, RectangularPrism
-from kumiki.geometry import Plane
+from kumiki.geometry import Line, Plane
 from kumiki.csgconvexhull import (
     FeatureRegion,
+    FeatureSegment,
     bounding_half_spaces,
     convex_hull_2d,
     frame_for_plane,
     region_in_plane,
+    segment_on_line,
 )
 from kumiki.rule import Matrix, Transform, create_v2, create_v3, mm, scalar
 
@@ -153,6 +155,77 @@ class TestRegionInPlane:
     def test_an_empty_region_has_no_centroid_to_offer(self):
         assert FeatureRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
                              boundary=()).centroid() is None
+
+
+class TestSegmentOnLine:
+    """An edge, cropped the same way a face is."""
+
+    def test_a_line_through_a_box_is_the_box_thickness(self):
+        box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
+        line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        segment = segment_on_line(line, [box], seed_reach=10, near=_v(0, 0, 0))
+
+        low, high = segment.extent_along(_v(0, 0, 1))
+        assert low == pytest.approx(0.0, abs=1e-9)
+        assert high == pytest.approx(1.0, abs=1e-9)
+
+    def test_the_midpoint_is_the_middle_of_what_survives(self):
+        box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
+        line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        middle = segment_on_line(line, [box], seed_reach=10, near=_v(0, 0, 0)).midpoint()
+
+        assert float(middle[2, 0]) == pytest.approx(0.5, abs=1e-9)
+
+    def test_an_edge_declared_far_away_still_crops_to_the_timber(self):
+        # The whole point, and the same failure a face had: an edge declared on
+        # a cutter extended past the timber has its own point out there with the
+        # cutter. Starting from that point and clipping leaves nothing.
+        timber = _box(size=(0.1, 0.2), start=0.0, end=1.0)
+        far = Line(direction=_v(0, 0, 1), point=_v(0.05, 0.1, 900))
+
+        segment = segment_on_line(far, [timber], seed_reach=10, near=_v(0, 0, 0.5))
+
+        assert not segment.is_empty
+        assert float(segment.midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-6)
+
+    def test_an_unbounded_solid_is_cropped_by_a_bounded_one(self):
+        timber = _box(size=(0.1, 0.2), start=0.0, end=1.0)
+        line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        segment = segment_on_line(
+            line, [HalfSpace(normal=_v(0, 0, 1), offset=scalar(0.25)), timber],
+            seed_reach=10, near=_v(0, 0, 0))
+
+        low, high = segment.extent_along(_v(0, 0, 1))
+        assert low == pytest.approx(0.25, abs=1e-9)
+        assert high == pytest.approx(1.0, abs=1e-9)
+
+    def test_a_line_that_misses_everything_leaves_nothing(self):
+        box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
+        line = Line(direction=_v(0, 0, 1), point=_v(5, 5, 0))
+
+        assert segment_on_line(line, [box], seed_reach=10, near=_v(0, 0, 0)).is_empty
+
+    def test_a_line_running_along_a_face_it_is_outside_of_keeps_nothing(self):
+        # Parallel to every bounding plane it is outside: no bound to compute,
+        # so the parallel case has to answer rather than skip.
+        box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
+        line = Line(direction=_v(0, 0, 1), point=_v(5, 0, 0))
+
+        assert segment_on_line(line, [box], seed_reach=10, near=_v(0, 0, 0.5)).is_empty
+
+    def test_it_gives_up_rather_than_returning_too_much(self):
+        from kumiki.cutcsg import EmptyCSG
+
+        line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        assert segment_on_line(line, [_box(), EmptyCSG()], seed_reach=10, near=_v(0, 0, 0)) is None
+
+    def test_an_empty_segment_has_no_midpoint_to_offer(self):
+        assert FeatureSegment(line=Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)),
+                              ends=()).midpoint() is None
 
 
 class TestConvexHull:

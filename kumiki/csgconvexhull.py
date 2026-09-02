@@ -1,4 +1,4 @@
-"""Where a feature actually is: convex hulls of the CSG, sectioned by a plane.
+"""Where a feature actually is: convex hulls of the CSG, sectioned.
 
 A feature's declared extent is the extent of the primitive it was declared on,
 and primitives are deliberately not the finished piece: a half space is unbounded
@@ -6,11 +6,12 @@ by definition, and a cutter is extended past the timber on purpose so the cut
 comes out clean. Asking such a primitive where its face is gives an answer that
 is nowhere near the timber.
 
-What a dimension wants instead is the feature's region *in its own plane*, cropped
-by what encloses it. That is computed here, and it is tractable for one reason:
-every primitive kumiki has is convex, so a plane section of one is a convex
-region and clipping one against another is half-plane intersection rather than
-general polygon boolean work.
+What a dimension wants instead is the part of the feature that survives cropping
+by what encloses it: a region in its own plane for a face, a segment along its
+own line for an edge. Both are computed here, and both are tractable for one
+reason: every primitive kumiki has is convex, so a section of one is convex and
+clipping one against another is half-space intersection rather than general
+boolean work.
 
 Deliberately not oriented to any viewport. Bounds along any axes -- a viewport's
 included -- fall out of projecting the polygon's corners, so a polygon answers
@@ -33,7 +34,7 @@ import math
 from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
-from .geometry import Plane
+from .geometry import Line, Plane
 from .rule import V3, Matrix, Numeric, scalar
 
 
@@ -91,6 +92,36 @@ class FeatureRegion:
         if not self.boundary:
             return None
         reach = [float((point.T * direction)[0, 0]) for point in self.boundary]
+        return (min(reach), max(reach))
+
+
+@dataclass(frozen=True)
+class FeatureSegment:
+    """A stretch of a line: where an edge is, once cropped.
+
+    The counterpart to FeatureRegion for a feature that locates to a line. An
+    empty `ends` means nothing survived -- the edge is not on the finished piece
+    -- which is worth knowing rather than an error.
+    """
+
+    line: Line
+    ends: Tuple[V3, ...]
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self.ends) < 2
+
+    def midpoint(self) -> Optional[V3]:
+        """The middle of the edge, for a dimension to attach to."""
+        if self.is_empty:
+            return None
+        return (self.ends[0] + self.ends[1]) / scalar(2)
+
+    def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
+        """How far the segment reaches along any direction, as (min, max)."""
+        if self.is_empty:
+            return None
+        reach = [float((point.T * direction)[0, 0]) for point in self.ends]
         return (min(reach), max(reach))
 
 
@@ -369,4 +400,62 @@ def region_in_plane(
     return FeatureRegion(
         plane=plane,
         boundary=tuple(frame.to_3d(x, y) for x, y in corners),
+    )
+
+
+def segment_on_line(
+    line: Line,
+    bounding: Sequence,
+    seed_reach: Numeric,
+    near: Optional[V3] = None,
+) -> Optional[FeatureSegment]:
+    """The part of a line left after clipping by a set of convex solids.
+
+    The one-dimensional twin of region_in_plane, and the same clipping: each
+    half space becomes a bound on the parameter along the line rather than a cut
+    across a polygon.
+
+    `near` is where the edge is expected to be. As with a plane, a line's own
+    point may be nowhere near the timber -- it is wherever the primitive that
+    declared it put it -- so the starting interval is centred on `near` instead.
+
+    None when any solid cannot be described as half spaces, since a segment
+    clipped by only some of them would be silently too long.
+
+    Not crop_line_to_csg, which samples and bisects against one solid around the
+    line's own origin. That one handles shapes this cannot, and is right for
+    drawing a bore axis; for an anchor it would search in the wrong place when
+    the origin is far off, and step straight over an edge shorter than its
+    sample spacing.
+    """
+    direction = _unit(line.direction)
+    origin = line.point
+    reach = float(seed_reach)
+    centre = 0.0 if near is None else float(((near - origin).T * direction)[0, 0])
+    low, high = centre - reach, centre + reach
+
+    for solid in bounding:
+        faces = bounding_half_spaces(solid)
+        if faces is None:
+            return None
+        for normal, point in faces:
+            # Keep where dot(normal, p - point) <= 0, with p = origin + s * direction.
+            along = float((normal.T * direction)[0, 0])
+            offset = float((normal.T * (origin - point))[0, 0])
+            if abs(along) < 1e-12:
+                # Parallel to the line: it either keeps all of it or none.
+                if offset > 0:
+                    return FeatureSegment(line=line, ends=())
+                continue
+            bound = -offset / along
+            if along > 0:
+                high = min(high, bound)
+            else:
+                low = max(low, bound)
+            if low > high:
+                return FeatureSegment(line=line, ends=())
+
+    return FeatureSegment(
+        line=line,
+        ends=(origin + direction * scalar(low), origin + direction * scalar(high)),
     )
