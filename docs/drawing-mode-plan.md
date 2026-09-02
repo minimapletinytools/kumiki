@@ -687,11 +687,63 @@ not produce cannot be drawn, so it is not shown and the mismatch is warned about
 -- but it is kept, since the viewport may come back when the code changes and
 dropping it would mean the next save deleted it from the file for good.
 
+### Selecting a measurement, without muddling it with selecting a timber
+
+Agreed, not yet built.
+
+There are already two kinds of selection and they do different jobs. A *set* of
+timbers, which is what commands act on -- what "draw" draws, what gets exported.
+And at most one *focus*, which is what you are looking at in detail, and is what
+the info pane describes. They coexist on purpose: several timbers selected while
+you drill into one.
+
+A measurement is a third thing to look at, and the risk is real: if it shares
+state with timber selection then clicking a dimension quietly changes what the
+draw button would draw. So:
+
+**One focus, and it knows what kind it is.** Not a second focus field beside the
+first, which would leave "never both at once" as a rule two places have to
+remember rather than something that cannot happen:
+
+```
+focus = null
+      | { kind: 'csg',         timberKey, path, featureLabel, ... }
+      | { kind: 'measurement', viewportId, measureKey }
+```
+
+**Focusing a measurement does not touch the timber selection.** Focusing a CSG
+node does add its timber, and the asymmetry is the point: a CSG node *is part
+of* a timber, so selecting it selects that timber. A measurement is *about*
+timbers without being part of one, and is about two of them as often as one.
+Clicking a dimension to read it must not change what a command would act on.
+
+What focusing a measurement does do is **highlight its two anchors** in the
+view. That is a highlight derived from the focus, not a selection -- the same
+distinction the CSG focus already draws between the node it highlights and the
+timbers that are selected.
+
+Clicking the dimension on the sheet should focus it too, eventually. The overlay
+is transparent to the pointer today, deliberately, so that picking stays the
+canvas's; it would have to take events on the dimension lines alone.
+
 ### The drawing's own tree
 
-While a drawing is open there is a tree for the drawing itself: its name and
-where it came from, close and save, its viewports with their measurements under
-them, and the members it is about -- which is where the filtered member list belongs rather than as a
+While a drawing is open there is a tree for the drawing itself:
+
+```
+tenon                        ○  [close] [save]
+  viewports
+    front
+      tenon_top / shoulder            127mm
+      mortise_front / mortise_back    -- not edge-on in this view
+    right
+      ...
+  members
+    butt_timber
+```
+
+Its name and where it came from, close and save, its viewports with their
+measurements under them, and the members it is about -- which is where the filtered member list belongs rather than as a
 separate piece of work, since a drawing can only select what it is about anyway.
 
 Where that tree is shown is deliberately left open. It is likely a panel of its
@@ -699,6 +751,16 @@ own for drawing mode, but it may end up back in the layers rail, or both may be
 shown at once with the members in one and the drawing in the other. So it is
 built as content that can be mounted anywhere -- data in, events out, like the
 layers panel -- and where it goes stays a one-line decision.
+
+A measurement's row carries the same two marks a drawing's does -- where it came
+from, and whether it is saved -- and its value when it has one.
+
+**When it has none, the row says which of the four it is.** A measurement that
+cannot be drawn currently just does not appear on the sheet, which leaves no way
+to tell a broken reference from one that is simply wrong for the view you are
+looking at. Anchors that did not resolve grey the row wherever it appears; the
+other three are about this viewport, so the same measurement can read fine under
+one and greyed under another, with the reason beside it.
 
 Chains and baselines -- a run of mortises dimensioned from one end -- are not in
 this first step, but nothing should be built that a chain could not later be
