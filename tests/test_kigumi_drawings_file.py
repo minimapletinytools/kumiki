@@ -731,7 +731,6 @@ class TestResolvingAnchors:
             measured, self._anchor("butt_timber#0", ("tenon_waste", "shoulder"), "shoulder"),
         )
 
-        assert found["at"] is None
         assert found["geometry"]["kind"] == "plane"
 
     def test_a_drawing_carries_its_measurements_resolved(self, measured):
@@ -750,3 +749,23 @@ class TestResolvingAnchors:
         })
 
         assert broken["unresolved"] == ["b"]
+
+    def test_an_anchor_lands_on_the_timber_not_on_the_cutter(self, measured):
+        # The mortise cutter is extended past the timber so the cut comes out
+        # clean, which puts its declared face anchor hundreds of metres away.
+        # The anchor has to come from the region cropped to the timber instead.
+        found = runner.resolve_anchor(
+            measured, self._anchor("receiving_timber#0", ("mortise_hole",), "mortise_front"),
+        )
+
+        assert all(abs(component) < 2.0 for component in found["at"])
+
+    def test_an_unbounded_feature_still_gets_an_anchor(self, measured):
+        # A half space has no extent of its own; cropping to the timber gives
+        # it one.
+        found = runner.resolve_anchor(
+            measured, self._anchor("butt_timber#0", ("tenon_waste", "shoulder"), "shoulder"),
+        )
+
+        assert found["at"] is not None
+        assert all(abs(component) < 2.0 for component in found["at"])

@@ -2102,6 +2102,40 @@ def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, A
     return None
 
 
+def _feature_anchor(feature: Any, node: Any, timber: Any, located: Any) -> Optional[List[float]]:
+    """Where to attach a dimension to this feature, in world space.
+
+    From the region the feature occupies once cropped to the timber, not from
+    what declared it: a cutter extended past the timber puts its declared anchor
+    out there with it, and a half space has no declared anchor at all.
+
+    Falls back to the declared extent when the region cannot be worked out --
+    a curved primitive, say -- since somewhere approximate beats nowhere.
+    """
+    from kumiki.geometry import Plane
+    from kumiki.csgconvexhull import region_in_plane
+
+    if isinstance(located, Plane):
+        solid = timber.get_perfect_timber_within_csg_local()
+        # Generous enough to contain the timber before clipping starts, and
+        # measured from the timber rather than from the plane's own point,
+        # which may be nowhere near it.
+        reach = float(timber.length) * 4
+        region = region_in_plane(
+            located, [node, solid], seed_reach=reach,
+            near=solid.transform.position,
+        )
+        if region is not None and not region.is_empty:
+            centre = region.centroid()
+            if centre is not None:
+                return _vector3_to_floats(timber.transform.local_to_global(centre))
+
+    extent = feature.get_extent(node)
+    if extent is None:
+        return None
+    return _vector3_to_floats(timber.transform.local_to_global(extent.anchor))
+
+
 def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Where the feature an anchor names actually is, in world space.
 
@@ -2126,14 +2160,9 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
             if feature.name != feature_name:
                 continue
             timber = entry["timber"]
-            extent = feature.get_extent(node)
             located = feature.locate(node)
-            if extent is None and located is None:
-                return None
             return {
-                "at": _vector3_to_floats(
-                    timber.transform.local_to_global(extent.anchor)
-                ) if extent is not None else None,
+                "at": _feature_anchor(feature, node, timber, located),
                 "geometry": _located_geometry_payload(located, timber),
             }
     return None
