@@ -2279,9 +2279,17 @@ def crop_line_to_csg(
     the convex, axis-aligned cases this exists for; a line that enters and
     leaves a concave solid more than once reports only the outermost span.
 
-    For a measurement anchor use csgconvexhull.segment_on_line instead: exact,
-    takes several solids, and starts near the timber rather than near the line's
-    origin, which may be nowhere close.
+    SUPERSEDED, flagged for removal. csgconvexhull.segment_on_line does this
+    exactly, by half-space clipping rather than sampling: it takes several
+    solids at once, starts near the timber instead of near the line's origin
+    (which may be nowhere close), cannot step over an edge shorter than a
+    sample spacing, and says None rather than guessing when a solid is one it
+    cannot describe. Nothing in the library calls this any more -- only tests.
+
+    The one thing it still does that segment_on_line cannot is handle a
+    non-convex solid, since contains_point sees through a Difference where
+    half-space clipping ignores subtractions. Remove this once segment_on_line
+    accounts for those (see the note at the top of csgconvexhull).
     """
     direction = safe_normalize_vector(line.direction)
 
