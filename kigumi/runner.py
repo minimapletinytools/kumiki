@@ -21,6 +21,7 @@ import sys
 import threading
 import time
 import traceback
+import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional, List, Tuple
@@ -3284,6 +3285,10 @@ def _cropped_edge_segment(
         line, parents + [solid],
         seed_reach=float(timber.length) * 4,
         near=solid.transform.position,
+        # The same tolerance the edge was found by. Without it a real edge
+        # clips to nothing: two faces count as meeting within this distance, so
+        # their line can sit a fraction outside the solids that formed it.
+        tolerance=float(_edge_tolerance()),
     )
     if segment is None:
         # A solid it cannot describe: no answer, rather than a wrong one.
@@ -3334,6 +3339,21 @@ def _edge_highlight_segment(
         segment, absent = _cropped_edge_segment(edge_feature, line, timber)
         if segment is not None or absent:
             return (segment, absent)
+
+    # PROBABLY DELETE ME. The clip above should always answer: every primitive
+    # kumiki has is convex, so every one of them can be described as half
+    # spaces. Reaching here means one could not be -- a gap in
+    # bounding_half_spaces -- and the scan below is the code that made a
+    # selected edge span a whole timber, since it asks test_point without the
+    # boundary check that gives it meaning. It is kept only so a shape we
+    # cannot yet describe still highlights something, and it should go once
+    # bounding_half_spaces is total.
+    warnings.warn(
+        f"Edge {getattr(edge_feature, 'name', '?')!r} could not be clipped to the "
+        "timber, so its highlight is being guessed from mesh vertices. That scan "
+        "over-reaches -- the span may run far past the edge. A primitive here "
+        "cannot be described as half spaces; see kumiki.csgconvexhull."
+    )
 
     on_edge: List[List[float]] = []
     tolerance = _edge_tolerance()
@@ -3733,6 +3753,13 @@ def _extract_highlight_mesh(
                 if owner is not selected_ref:
                     continue
             if edge_feature is not None:
+                # PROBABLY DELETE ME, with the scan in _edge_highlight_segment
+                # and for the same reason: this asks test_point per vertex
+                # without the boundary check, so it lights the strip along the
+                # whole line rather than along the edge. Only reached when the
+                # analytic clip could not describe a primitive, and the caller
+                # warned about that already.
+                #
                 # An edge is a line, and no triangle's centroid sits on one --
                 # matching the way a face does would light nothing at all. The
                 # mesher puts vertices on edges, so the strip along an edge is

@@ -16,6 +16,7 @@ rename fails loudly here instead.
 import importlib.util
 import math
 import sys
+import warnings
 from pathlib import Path
 
 import pytest
@@ -1114,10 +1115,14 @@ class TestEdgeHighlightSpan:
         segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
 
         assert not absent
-        # The fixture's tenon_width_relative_to_joint, which is what the
-        # mortise is that way -- and nowhere near the timber's own length,
-        # which is what this used to report.
-        assert self._span_mm(segment) == pytest.approx(float(inches(3)) * 1000, abs=0.5)
+        # The fixture's tenon_width_relative_to_joint, which is what the mortise
+        # is that way, plus the edge tolerance at each end: the clip is widened
+        # by it, because that is the distance within which the two faces counted
+        # as meeting in the first place.
+        slack = float(runner._edge_tolerance()) * 1000 * 2
+        assert self._span_mm(segment) == pytest.approx(
+            float(inches(3)) * 1000 + slack, abs=0.5)
+        # And nowhere near the timber's own length, which is what it used to say.
         assert self._span_mm(segment) < float(timber.length) * 1000 / 10
 
     def test_an_edge_that_is_not_there_says_so(self, mortise_and_tenon_frame):
@@ -1140,3 +1145,41 @@ class TestEdgeHighlightSpan:
 
         assert not absent
         assert self._span_mm(segment) == pytest.approx(float(timber.length) * 1000, rel=0.01)
+
+    def test_no_edge_falls_back_to_scanning_the_mesh(self, mortise_and_tenon_frame):
+        """The clip should always answer, so the fallback should never run.
+
+        It warns when it does, because reaching it means a primitive could not
+        be described as half spaces -- and the scan it falls back to is the
+        code that made a selected edge span a whole timber.
+        """
+        from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
+
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        nodes = {}
+        stack = [local]
+        while stack:
+            node = stack.pop()
+            for feature in node.get_declared_features():
+                nodes.setdefault(feature.name, (feature, node))
+            stack.extend(csg_children(node))
+
+        checked = 0
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            for a_name, (first, first_owner) in nodes.items():
+                for b_name, (second, second_owner) in nodes.items():
+                    if a_name >= b_name:
+                        continue
+                    edge = DerivedEdgeFeature.derive(
+                        OwnedFeatureHit(feature=first, owner=first_owner),
+                        OwnedFeatureHit(feature=second, owner=second_owner),
+                    )
+                    if edge is None:
+                        continue
+                    runner._edge_highlight_segment(
+                        edge, first_owner, [], None, None, cut_timber.timber)
+                    checked += 1
+
+        assert checked > 10, f"expected plenty of edges to check, got {checked}"

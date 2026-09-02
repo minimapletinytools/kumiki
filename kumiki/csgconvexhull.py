@@ -18,11 +18,18 @@ included -- fall out of projecting the polygon's corners, so a polygon answers
 the question for every viewport at once, where a baked-in orientation answers it
 for one.
 
-Some primitives are described by a convex hull of their points rather than
-exactly -- see bounding_half_spaces -- and the cylinder by a hexagon. Those
-approximations are deliberately made *inwards*, so a region comes out no larger
-than the truth: an anchor placed inside a region that is too small is still on
-the feature, where one placed inside a region that is too large may not be.
+Some primitives are described approximately -- see bounding_half_spaces -- the
+cylinder by a hexagon, a loft by planes pushed out to its corners. Those
+approximations are deliberately made *outwards*, so a region always CONTAINS
+the truth.
+
+One direction, consistently, is the point. Subtractions are not accounted for
+either (see below), which already makes a region too large, so erring inwards
+on primitives would leave a region that is neither a subset nor a superset of
+the truth -- no guarantee at all. Erring outwards everywhere keeps one:
+whatever the region says is not there, really is not there. What it costs is
+that a point inside a region is not certainly on the feature, so an anchor on a
+curved primitive can sit slightly off it.
 
 What this does not do yet: subtracted solids, which remove convex holes from the
 region. Clipping by what encloses is exact; ignoring what has been taken away is
@@ -211,7 +218,8 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
     region" and "this solid is not one I can describe" are different answers and
     only the second should make a caller give up.
     """
-    from .cutcsg import ConvexPolygonExtrusion, Cylinder, HalfSpace, RectangularPrism
+    from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
+                         HalfSpace, RectangularPrism)
     from .pathcsg import PathExtrusion
 
     if isinstance(csg, HalfSpace):
@@ -238,18 +246,17 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         return faces
 
     if isinstance(csg, Cylinder):
-        # A hexagon inscribed in the circle: its faces sit at the apothem, so
-        # the hexagon is contained by the cylinder rather than containing it.
-        # Erring inwards keeps a region no larger than the truth, and an anchor
-        # inside a region that is slightly too small is still on the feature.
+        # A hexagon circumscribing the circle: its faces are tangent to it, so
+        # the hexagon contains the cylinder. Outwards, per the rule at the top
+        # of this file -- a region that contains the truth is one that can be
+        # trusted to say a feature is NOT somewhere.
         axis = _unit(csg.axis_direction)
         across, up = _perpendicular_axes(axis)
-        apothem = csg.radius * scalar(math.cos(math.pi / 6))
         faces = []
         for step in range(6):
             angle = math.pi * step / 3
             normal = across * scalar(math.cos(angle)) + up * scalar(math.sin(angle))
-            faces.append((normal, csg.position + normal * apothem))
+            faces.append((normal, csg.position + normal * csg.radius))
         return faces + _extrusion_caps(axis, csg.position,
                                        csg.start_distance, csg.end_distance)
 
@@ -260,17 +267,100 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         )
 
     if isinstance(csg, PathExtrusion):
-        # The hull of the points the path is built from. A segment that curves
-        # outwards -- an arc bulging away from the chord between its ends --
-        # lies outside that hull, so this omits it. Inwards again, and fine:
-        # the region comes out no larger than the truth.
+        # The hull of the points the path is built from.
+        #
+        # KNOWN BUG: a segment that curves outwards -- an arc bulging away from
+        # the chord between its ends -- lies outside this hull, so the bound is
+        # too small. That is the wrong direction for this file, which errs
+        # outwards everywhere else. Fixing it means bounding the arc rather
+        # than its endpoints. Left for later; it only bites on a curved path.
         points = [seg.start() for seg in csg.path.segments]
         return _extruded_hull_half_spaces(
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
             csg.transform, csg.start_distance, csg.end_distance,
         )
 
+    if isinstance(csg, ConvexPolygonSimpleLoft):
+        return _loft_half_spaces(csg)
+
     return None
+
+
+def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
+    """The planes bounding a loft between two convex profiles.
+
+    A loft's side faces are ruled surfaces, and planar only when the taper is a
+    pure per-axis scale -- which is the case the primitive is actually for, a
+    taper or a relief pocket. There, each side quad lies in one plane and those
+    planes bound the solid exactly.
+
+    Twist the correspondence and a side stops being planar. Each plane is then
+    pushed out to the furthest corner, which bounds the corners' hull -- larger
+    than the loft, and containing it. The primitive already calls a twisted loft
+    undefined behaviour, so a loose bound there is the honest answer.
+    """
+    if csg.start_distance is None or csg.end_distance is None:
+        return None
+
+    matrix = csg.transform.orientation.matrix
+    across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
+    up = Matrix([matrix[0, 1], matrix[1, 1], matrix[2, 1]])
+    axis = Matrix([matrix[0, 2], matrix[1, 2], matrix[2, 2]])
+    origin = csg.transform.position
+
+    def lift(point, distance) -> V3:
+        return (origin + axis * distance
+                + across * scalar(float(point[0]))
+                + up * scalar(float(point[1])))
+
+    bottom = [lift(point, csg.start_distance) for point in csg.bottom_points]
+    top = [lift(point, csg.end_distance) for point in csg.top_points]
+    if len(bottom) < 3 or len(bottom) != len(top):
+        return None
+
+    corners = bottom + top
+    middle = corners[0]
+    for corner in corners[1:]:
+        middle = middle + corner
+    middle = middle / scalar(len(corners))
+
+    faces: BoundingHalfSpaces = _extrusion_caps(
+        axis, origin, csg.start_distance, csg.end_distance)
+
+    for index in range(len(bottom)):
+        following = (index + 1) % len(bottom)
+        along = bottom[following] - bottom[index]
+        rising = top[index] - bottom[index]
+        normal = _cross(along, rising)
+        if _length(normal) < 1e-12:
+            return None
+        normal = _unit(normal)
+        # Outward, whichever way the profiles were wound.
+        if float(((middle - bottom[index]).T * normal)[0, 0]) > 0:
+            normal = -normal
+        # Pushed out to whichever corner reaches furthest along the normal. For
+        # a pure taper every side is planar and nothing moves, so the bound is
+        # exact. Twist the correspondence and the side becomes a ruled surface
+        # with no plane of its own -- this then bounds the corners' hull, which
+        # contains the loft. Loose rather than wrong, which is the direction
+        # this file errs in.
+        reach = max(float(((corner - bottom[index]).T * normal)[0, 0])
+                    for corner in corners)
+        faces.append((normal, bottom[index] + normal * scalar(reach)))
+
+    return faces
+
+
+def _cross(a: V3, b: V3) -> V3:
+    return Matrix([
+        float(a[1, 0]) * float(b[2, 0]) - float(a[2, 0]) * float(b[1, 0]),
+        float(a[2, 0]) * float(b[0, 0]) - float(a[0, 0]) * float(b[2, 0]),
+        float(a[0, 0]) * float(b[1, 0]) - float(a[1, 0]) * float(b[0, 0]),
+    ])
+
+
+def _length(vector: V3) -> float:
+    return math.sqrt(sum(float(vector[i, 0]) ** 2 for i in range(3)))
 
 
 def _extrusion_caps(axis: V3, position: V3, start_distance, end_distance) -> BoundingHalfSpaces:
@@ -417,6 +507,7 @@ def segment_on_line(
     seed_reach: Numeric,
 
     near: Optional[V3] = None,
+    tolerance: float = 0.0,
 ) -> Optional[FeatureSegment]:
     """The part of a line left after clipping by a set of convex solids.
 
@@ -427,6 +518,14 @@ def segment_on_line(
     `near` is where the edge is expected to be. As with a plane, a line's own
     point may be nowhere near the timber -- it is wherever the primitive that
     declared it put it -- so the starting interval is centred on `near` instead.
+
+    `tolerance` widens every bound, and a caller that found this line by a
+    tolerant test must pass the same one. A derived edge is the case that
+    matters: two faces count as meeting when they come within the edge
+    tolerance, so the line through them can sit a fraction outside the very
+    solids that formed it -- a third of a millimetre, in the case that turned
+    this up. Clipped exactly, a real edge comes back empty and reads as not
+    being on the piece at all.
 
     None when any solid cannot be described as half spaces, since a segment
     clipped by only some of them would be silently too long.
@@ -456,10 +555,10 @@ def segment_on_line(
             offset = float((normal.T * (origin - point))[0, 0])
             if abs(along) < 1e-12:
                 # Parallel to the line: it either keeps all of it or none.
-                if offset > 0:
+                if offset > tolerance:
                     return FeatureSegment(line=line, ends=())
                 continue
-            bound = -offset / along
+            bound = (tolerance - offset) / along
             if along > 0:
                 high = min(high, bound)
             else:

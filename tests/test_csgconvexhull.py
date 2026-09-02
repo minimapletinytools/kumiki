@@ -157,6 +157,64 @@ class TestRegionInPlane:
                              boundary=()).centroid() is None
 
 
+class TestLoftedSolids:
+    """A loft's sides are planar only when the taper is a pure per-axis scale."""
+
+    def _square(self, half):
+        return [create_v2(scalar(-half), scalar(-half)), create_v2(scalar(half), scalar(-half)),
+                create_v2(scalar(half), scalar(half)), create_v2(scalar(-half), scalar(half))]
+
+    def _turned(self, half, degrees):
+        import math
+
+        angle = math.radians(degrees)
+        corners = [(-half, -half), (half, -half), (half, half), (-half, half)]
+        return [
+            create_v2(scalar(x * math.cos(angle) - y * math.sin(angle)),
+                      scalar(x * math.sin(angle) + y * math.cos(angle)))
+            for x, y in corners
+        ]
+
+    def _loft(self, bottom, top):
+        from kumiki.cutcsg import ConvexPolygonSimpleLoft
+
+        return ConvexPolygonSimpleLoft(
+            bottom_points=bottom, top_points=top,
+            transform=Transform(position=_v(0, 0, 0),
+                                orientation=Transform.identity().orientation),
+            start_distance=scalar(0), end_distance=scalar(1),
+        )
+
+    def test_a_taper_is_bounded_by_four_sides_and_two_ends(self):
+        assert len(bounding_half_spaces(self._loft(self._square(0.1), self._square(0.05)))) == 6
+
+    def test_a_twisted_loft_is_bounded_loosely_rather_than_refused(self):
+        # Its sides are ruled surfaces with no plane of their own, so each
+        # plane is pushed out to the furthest corner. That bounds the corners'
+        # hull, which contains the loft -- loose, but the right direction.
+        twisted = self._loft(self._square(0.1), self._turned(0.1, 30))
+
+        faces = bounding_half_spaces(twisted)
+
+        assert faces is not None and len(faces) == 6
+        # Every corner of both profiles inside every face.
+        for normal, point in faces:
+            for height, profile in ((0.0, twisted.bottom_points), (1.0, twisted.top_points)):
+                for corner in profile:
+                    at = _v(float(corner[0]), float(corner[1]), height)
+                    assert float(((at - point).T * normal)[0, 0]) <= 1e-9
+
+    def test_the_section_narrows_the_way_the_taper_does(self):
+        taper = self._loft(self._square(0.1), self._square(0.05))
+
+        for height, width in ((0.0, 0.2), (0.5, 0.15), (1.0, 0.1)):
+            region = region_in_plane(
+                Plane(normal=_v(0, 0, 1), point=_v(0, 0, height)),
+                [taper], seed_reach=10, near=_v(0, 0, 0))
+            low, high = region.extent_along(_v(1, 0, 0))
+            assert high - low == pytest.approx(width, abs=1e-9), height
+
+
 class TestSegmentOnLine:
     """An edge, cropped the same way a face is."""
 
@@ -260,15 +318,17 @@ class TestCurvedAndPointyPrimitives:
     def test_a_cylinder_running_to_infinity_has_no_ends(self):
         assert len(bounding_half_spaces(self._cylinder(start=None, end=None))) == 6
 
-    def test_the_hexagon_sits_inside_the_cylinder(self):
-        # Deliberately inwards: a region no larger than the truth keeps an
-        # anchor on the feature, where one too large may put it off.
+    def test_the_hexagon_contains_the_cylinder(self):
+        # Outwards, per the rule at the top of csgconvexhull: one direction,
+        # consistently, so that what a region excludes really is excluded.
         region = region_in_plane(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
                                  [self._cylinder(radius=0.05)], seed_reach=10, near=_v(0, 0, 0))
         across = region.extent_along(_v(1, 0, 0))
 
-        assert across[1] - across[0] < 0.1  # smaller than the diameter
-        assert across[1] - across[0] > 0.08  # but not by much
+        # Tangent faces, so it holds the diameter exactly across the flats,
+        # and reaches past it at the corners -- never short of it.
+        assert across[1] - across[0] >= 0.1 - 1e-9
+        assert across[1] - across[0] < 0.125  # 2r/cos(30) at the widest
 
     def test_a_cylinder_sections_as_a_hexagon(self):
         region = region_in_plane(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
