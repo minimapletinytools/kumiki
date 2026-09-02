@@ -268,6 +268,7 @@ DONE-drawing mode fixes
 
 
 -switthing from one drawing to another while in drawing mode will break the camera sanpping behavior
+  -actualyl camera anglesa re broken in general in drawing mode... they don't seem to be consistent each time I reopen
 -fix lighting in ortho drawing
 -fix background in ortho drawing
 

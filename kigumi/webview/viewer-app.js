@@ -109,6 +109,9 @@ class ViewerViewport {
 // to leave the drawing itself unobscured.
 const MEASUREMENT_OFFSET_PX = 26;
 
+// What a sheet is. Off-white rather than pure white, which glares.
+const PAPER_COLOR = 0xfbfbf8;
+
 // How big the arc of an angle is, in page pixels.
 const MEASUREMENT_ANGLE_RADIUS_PX = 34;
 
@@ -1909,13 +1912,24 @@ class KigumiViewerApp extends LitElement {
      * switching scenes and back does not throw away where you were looking.
      */
     rebuildViewports() {
-        const previous = new Map(this.viewports.map((viewport) => [viewport.id, viewport.cameraController]));
+        // Cameras are kept across a rebuild of the same scene, so a redraw does
+        // not throw away where the reader had got to. They are *not* kept
+        // across a change of scene: every drawing has a viewport called
+        // 'front', and handing one drawing's front camera to another's is how a
+        // drawing came up at the angle the last one was left at -- and never
+        // learned the angle it was supposed to be at, since that is set when a
+        // camera is first pointed.
+        const sceneId = this.sceneStore.activeSceneId;
+        const sameScene = this._viewportsBuiltFor === sceneId;
+        const previous = sameScene
+            ? new Map(this.viewports.map((viewport) => [viewport.id, viewport.cameraController]))
+            : new Map();
+        this._viewportsBuiltFor = sceneId;
         this.viewports = this.sceneStore.activeViewports().map((spec) => {
             const reused = previous.get(spec.id);
             const viewport = new ViewerViewport(spec, reused || new CameraController({ THREE }));
-            // Only a fresh controller takes the spec's angle. Re-pointing a
-            // reused one would throw away the pan and zoom the user has since
-            // applied, every time the viewports are rebuilt.
+            // A fresh controller takes the spec's angle, and remembers it as the
+            // one to spring back to. A reused one already has both.
             if (!reused) {
                 viewport.applySpecCamera();
             }
@@ -2010,7 +2024,12 @@ class KigumiViewerApp extends LitElement {
         if (!this._sheetColors) {
             const theme = THEMES[this.displayOptions.get('activeTheme')] || Object.values(THEMES)[0];
             this._sheetColors = {
-                paper: new THREE.Color(theme.gradientTop),
+                // Paper is paper. The theme tints the desk the sheet lies on,
+                // not the sheet: a drawing tinted with the 3D scene's gradient
+                // reads as a coloured panel rather than as something printed,
+                // and every viewport on it looks like it has a background of
+                // its own when what shows through is the page.
+                paper: new THREE.Color(PAPER_COLOR),
                 // Light enough to sit behind the paper rather than frame it,
                 // while still leaving the sheet's edge visible.
                 desk: new THREE.Color(theme.gradientBottom).multiplyScalar(0.94),
