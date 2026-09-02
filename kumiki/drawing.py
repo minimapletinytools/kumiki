@@ -28,9 +28,40 @@ class MeasureKind(Enum):
     the sheet, and the same two edge-on faces give a separation when they are
     parallel and an angle when they are not. So a measurement says which it is.
 
-    Which of these apply depends on what the two features project to in the
-    viewport, not on what they are -- a face seen edge-on behaves as a line, and
-    an edge seen end-on behaves as a point.
+    Which apply is decided by what the two features *project to* in the
+    viewport, not by what they are. A drawing is a projection, so that is the
+    only thing the sheet can carry:
+
+        feature   projects to   when
+        -------   -----------   ----------------------------------------------
+        point     point         always
+        edge      point         its direction runs along the line of sight
+        edge      line          otherwise
+        face      line          its normal is square to the line of sight,
+                                which is to say the face is seen edge-on
+        face      area          otherwise
+
+    An area cannot be dimensioned. That is what rules out the distance between
+    the middles of two faces seen at an angle -- a number about nothing, since
+    there is no distance between two things that each cover the view.
+
+    Then by projected pair:
+
+        projected pair            admits
+        ----------------------    ----------------------------------------
+        point, point              ALIGNED, HORIZONTAL, VERTICAL
+        point, line               PERPENDICULAR
+        line, line (parallel)     PERPENDICULAR, HORIZONTAL, VERTICAL
+        line, line (crossing)     ANGLE
+        anything, area            nothing
+        coincident or degenerate  nothing
+
+    Worth adding later, and listed here so the shape leaves room for them:
+    RADIUS and DIAMETER of a circular feature, once features name one; ARC
+    LENGTH; a distance ALONG a named direction rather than the sheet's -- along
+    the piece, say, which is the same as HORIZONTAL in a face view but not in a
+    plan; and chains and baselines, which are several measurements sharing a
+    reference rather than a kind of their own.
     """
 
     #: The direct distance between two projected points.

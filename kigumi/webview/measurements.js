@@ -9,6 +9,11 @@
     // two features in space -- two mortises at different depths, dimensioned on
     // the front elevation, read as their separation across that face.
     //
+    // Which measurements a pair of features admits is decided by what the two
+    // project to here, not by what they are. The table of that, and of what is
+    // worth adding later, is on MeasureKind in kumiki/drawing.py; this applies
+    // it, since only the viewport knows how anything lies to the view.
+    //
     // Pure on purpose: the projecting is the viewer's, the arithmetic is here.
 
     // How square something has to be to the view before it counts as square:
