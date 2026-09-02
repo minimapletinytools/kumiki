@@ -3258,25 +3258,83 @@ def _edge_tolerance() -> Any:
     return FEATURE_EDGE_TOLERANCE
 
 
+def _cropped_edge_segment(
+    edge_feature: Any,
+    line: Any,
+    timber: Any,
+) -> Optional[Dict[str, List[float]]]:
+    """The edge's line, clipped to the solids that actually form it.
+
+    An edge exists only where both its faces do, so both parents' owners bound
+    it, and the timber bounds it again.
+
+    Returns (segment, absent). `absent` says the line was cropped away to
+    nothing, which is a real answer: the two planes cross somewhere that is not
+    on either face. A mortise floor's plane run sideways meets the timber's side
+    a foot away from the mortise, and that is not an edge of anything.
+    """
+    from kumiki.csgconvexhull import segment_on_line
+
+    parents = [
+        hit.owner for hit in (edge_feature.a, edge_feature.b)
+        if hit is not None and getattr(hit, "owner", None) is not None
+    ]
+    solid = timber.get_perfect_timber_within_csg_local()
+    segment = segment_on_line(
+        line, parents + [solid],
+        seed_reach=float(timber.length) * 4,
+        near=solid.transform.position,
+    )
+    if segment is None:
+        # A solid it cannot describe: no answer, rather than a wrong one.
+        return (None, False)
+    if segment.is_empty:
+        return (None, True)
+    start, end = segment.ends
+    return ({
+        "start": _vector3_to_floats(timber.transform.local_to_global(start)),
+        "end": _vector3_to_floats(timber.transform.local_to_global(end)),
+    }, False)
+
+
 def _edge_highlight_segment(
     edge_feature: Any,
     owner: 'CutCSG',
     mesh_vertices: List[float],
     timber_rot: List[List[float]],
     timber_pos: List[float],
-) -> Optional[Dict[str, List[float]]]:
-    """The stretch of a derived edge the mesh actually shows, in global space.
+    timber: Any = None,
+) -> Tuple[Optional[Dict[str, List[float]]], bool]:
+    """Where a derived edge runs, in global space, and whether it is there at all.
 
     An edge is a line, and a highlight built out of triangles can only ever
     approximate one -- it lights the strip beside it, which reads as a stray
     wedge rather than as the edge. The viewer draws a line instead, and this
-    says where that line runs: the mesher puts vertices on edges, so the
-    vertices lying on this one are the visible span, and its two extremes are
-    its ends.
+    says where that line runs.
 
-    Returns None when fewer than two vertices land on the edge, which leaves
-    the caller its triangle-strip fallback.
+    Cropped from the CSG, because asking the edge where it is does not bound
+    it: a face feature's test_point checks the face's PLANE and nothing else,
+    so an edge made of two of them answers yes all the way along its line --
+    a metre past the joint that formed it. Picking never noticed, since a
+    click is one point that is on the timber anyway. Scanning the mesh for
+    every vertex the edge claims does notice: the far ones are real vertices
+    genuinely on both planes, so the span came out the length of the timber.
+
+    Falls back to that scan when the line cannot be cropped -- a primitive
+    csgconvexhull cannot describe -- which is no worse than it always was.
+
+    The second return says the edge was cropped away entirely. The caller wants
+    that separately: with no line to draw it would otherwise light the triangles
+    beside the edge instead, and those are found by the same unbounded test.
     """
+    from kumiki.geometry import Line
+
+    line = edge_feature.locate(owner)
+    if timber is not None and isinstance(line, Line):
+        segment, absent = _cropped_edge_segment(edge_feature, line, timber)
+        if segment is not None or absent:
+            return (segment, absent)
+
     on_edge: List[List[float]] = []
     tolerance = _edge_tolerance()
     for index in range(0, len(mesh_vertices), 3):
@@ -3286,7 +3344,7 @@ def _edge_highlight_segment(
             on_edge.append(vertex)
 
     if len(on_edge) < 2:
-        return None
+        return (None, False)
 
     # The two furthest apart are the ends: everything on an edge is collinear,
     # so no projection axis is needed to order them.
@@ -3298,8 +3356,8 @@ def _edge_highlight_segment(
                 start, end, longest = on_edge[i], on_edge[j], span
 
     if longest <= 0:
-        return None
-    return {"start": start, "end": end}
+        return (None, False)
+    return ({"start": start, "end": end}, False)
 
 
 def _features_at_point(root: 'CutCSG', local_pt: List[float], eps: float) -> List[Any]:
@@ -3774,9 +3832,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         parent_csg = _resolve_csg_at_path(local_csg, new_path, local_pt, eps)
 
     highlight_edge = None
+    edge_absent = False
     if edge is not None:
-        highlight_edge = _edge_highlight_segment(
-            edge, target_csg, mesh["vertices"], timber_rot, timber_pos,
+        highlight_edge, edge_absent = _edge_highlight_segment(
+            edge, target_csg, mesh["vertices"], timber_rot, timber_pos, timber,
         )
 
     # Extract highlight mesh for the selected target
@@ -3791,7 +3850,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         selected_path=new_path,
         selected_ref=parent_csg if feature_label is not None else target_csg,
         feature_label=feature_label,
-        edge_feature=edge if highlight_edge is None else None,
+        edge_feature=edge if (highlight_edge is None and not edge_absent) else None,
     )
 
     # When a feature (face) is selected, also extract the parent labeled CSG mesh

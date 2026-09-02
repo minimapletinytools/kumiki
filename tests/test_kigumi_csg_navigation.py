@@ -14,6 +14,7 @@ rename fails loudly here instead.
 """
 
 import importlib.util
+import math
 import sys
 from pathlib import Path
 
@@ -1070,3 +1071,72 @@ class TestJointDisplayName:
                 assert name == "mortise_and_tenon"
                 return
         raise AssertionError("no tenon face found to click on")
+
+
+class TestEdgeHighlightSpan:
+    """How far a selected edge's highlight runs.
+
+    A face feature's test_point checks the face's PLANE and nothing else, so an
+    edge built from two of them answers yes all the way along its line. Asking
+    the mesh which vertices are on the edge therefore collected vertices a
+    timber's length away, and the highlight stretched to match.
+    """
+
+    def _edge(self, frame, a_name, b_name):
+        from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
+
+        cut_timber = _cut_timber_by_name(frame, "receiving_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        nodes = {}
+        stack = [local]
+        while stack:
+            node = stack.pop()
+            for feature in node.get_declared_features():
+                nodes.setdefault(feature.name, (feature, node))
+            stack.extend(csg_children(node))
+
+        first, first_owner = nodes[a_name]
+        second, second_owner = nodes[b_name]
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(feature=first, owner=first_owner),
+            OwnedFeatureHit(feature=second, owner=second_owner),
+        )
+        assert edge is not None, f"{a_name} and {b_name} form no edge"
+        return edge, first_owner, cut_timber.timber
+
+    def _span_mm(self, segment):
+        return math.dist(segment["start"], segment["end"]) * 1000
+
+    def test_a_real_edge_is_the_width_of_the_mortise(self, mortise_and_tenon_frame):
+        edge, owner, timber = self._edge(
+            mortise_and_tenon_frame, "mortise_right", "rough.front")
+
+        segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
+
+        assert not absent
+        # The fixture's tenon_width_relative_to_joint, which is what the
+        # mortise is that way -- and nowhere near the timber's own length,
+        # which is what this used to report.
+        assert self._span_mm(segment) == pytest.approx(float(inches(3)) * 1000, abs=0.5)
+        assert self._span_mm(segment) < float(timber.length) * 1000 / 10
+
+    def test_an_edge_that_is_not_there_says_so(self, mortise_and_tenon_frame):
+        # The mortise floor's plane, run sideways, crosses the timber's own side
+        # a foot from the mortise. Two planes cross there; no two faces do.
+        edge, owner, timber = self._edge(
+            mortise_and_tenon_frame, "mortise_bottom", "rough.left")
+
+        segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
+
+        assert segment is None
+        assert absent, "an edge cropped away to nothing is not merely unknown"
+
+    def test_the_timbers_own_edge_still_runs_its_full_length(self, mortise_and_tenon_frame):
+        # The crop must not shorten an edge that really is that long.
+        edge, owner, timber = self._edge(
+            mortise_and_tenon_frame, "rough.front", "rough.left")
+
+        segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
+
+        assert not absent
+        assert self._span_mm(segment) == pytest.approx(float(timber.length) * 1000, rel=0.01)
