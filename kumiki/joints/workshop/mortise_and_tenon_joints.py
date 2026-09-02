@@ -320,10 +320,17 @@ def cut_mortise_and_tenon_joint(
     # since the shoulder trims whatever reaches past it, so nothing looked
     # wrong until something asked one of its faces where it was.
     sin_angle_sq = scalar(1) - cos_angle * cos_angle
-    back_extension = (
-        scalar(0) if safe_zero_test_sq(sin_angle_sq)
-        else max(tenon_size[0], tenon_size[1]) / sqrt(Abs(sin_angle_sq))
-    )
+    # Answering the note that used to sit on the cropping gate below: passing a
+    # squared value to safe_zero_test does compare it against a linear epsilon,
+    # which is normally the bug safe_zero_test_sq exists to prevent -- but here
+    # it lands on a sensible angle. eps 1e-8 against sin^2 means |sin| < 1e-4,
+    # square to within 0.006 degrees. safe_zero_test_sq would ask for |sin| <
+    # 1e-8, and every joint in between would take the oblique path with a
+    # divisor near zero. One name, used by both, so they cannot disagree.
+    is_square = safe_zero_test(sin_angle_sq)
+    # Only ever evaluated on the oblique path, where |sin| >= 1e-4.
+    sin_angle = sqrt(Abs(sin_angle_sq))
+    back_extension = scalar(0) if is_square else max(tenon_size[0], tenon_size[1]) / sin_angle
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
 
@@ -356,8 +363,7 @@ def cut_mortise_and_tenon_joint(
         )
 
     tenon_prism_cropping_csgs: Optional[List[CutCSG]] = None
-    # why did the agent do safe_zero_test(scalar(1) - cos_angle * cos_angle)...
-    do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not safe_zero_test(scalar(1) - cos_angle * cos_angle)
+    do_lengthwise_cropping = bore_mortise_perpendicular_to_face and not is_square
     if do_lengthwise_cropping:
         # do_lengthwise_cropping implies bore_mortise_perpendicular_to_face, which the
         # require_check above already guarantees means mortise_depth is not None.
@@ -374,7 +380,7 @@ def cut_mortise_and_tenon_joint(
         joint_angle_axis_index = tenon_timber.get_size_index_in_long_face_normal_axis(joint_angle_axis_face)
 
         mortise_hole_length_oblique_direction = mortise_timber.get_face_direction_global(mortise_oblique_end)
-        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_angle_safe / scalar(2)
+        end_crop_distance = tenon_size[joint_angle_axis_index] / sin_angle / scalar(2)
 
         # Crop 1: far end of prism perpendicular to mortise face
         mortise_hole_end_crop_global = HalfSpace(
@@ -441,7 +447,7 @@ def cut_mortise_and_tenon_joint(
             opp_index = 1 if joint_angle_axis_index == 0 else 0
             mortise_hole_size = create_v2(
                 tenon_size[opp_index],
-                tenon_size[joint_angle_axis_index] / sin_angle_safe,
+                tenon_size[joint_angle_axis_index] / sin_angle,
             )
 
             mortise_hole_orientation = Orientation.from_z_and_y(

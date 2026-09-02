@@ -268,3 +268,49 @@ class TestSquareJointNeedsNoBackExtension:
         for name, prism in self._prisms().items():
             assert abs(float(prism.start_distance)) < 1.0, name
             assert abs(float(prism.end_distance)) < 1.0, name
+
+
+class TestObliqueJointStillBuilds:
+    """The oblique path, which nothing else in the suite reaches.
+
+    Squareness decides both the back extension and whether the lengthwise
+    cropping runs, and the cropping divides by the same sine. Nothing here
+    covered that until a change to the one broke the other and the whole suite
+    stayed green.
+    """
+
+    def _frame(self):
+        import sys
+        from pathlib import Path as _Path
+
+        sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+        from patterns.mortise_and_tenon_joints_patterns import example_brace_joint
+
+        # A brace: oblique, and plane-aligned enough to be bored perpendicular
+        # to the face, which is what turns the lengthwise cropping on.
+        return example_brace_joint()
+
+    def test_a_braced_joint_builds_and_stays_bounded(self):
+        from kumiki.cutcsg import csg_children
+
+        prisms = {}
+
+        def walk(csg):
+            label = getattr(getattr(csg, "label", None), "name", None)
+            if label in ("tenon", "mortise_hole"):
+                prisms[label] = csg
+            for child in csg_children(csg):
+                walk(child)
+
+        frame = self._frame()
+        for cut_timber in frame.cut_timbers:
+            for cut in cut_timber.cuts:
+                if getattr(cut, "negative_csg", None) is not None:
+                    walk(cut.negative_csg)
+
+        assert prisms, "no tenon or mortise_hole built"
+        # The reach behind the shoulder is a small multiple of the tenon
+        # rather than a number that ran away.
+        for name, prism in prisms.items():
+            assert abs(float(prism.start_distance)) < 100.0, name
+            assert abs(float(prism.end_distance)) < 100.0, name
