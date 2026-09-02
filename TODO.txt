@@ -290,6 +290,8 @@ DONE-fix background in ortho drawing
 DONE-shoulder_scribe_relief should not use rough.right... as feature name.. please reserve rough/perfect.right for the timber itself
 
 -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
+  for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
+
 
 -Fix the feature stable reference issue: 
   No — and that's a real gap. The #n only goes on the joint segment, which is the top-level Difference's subtract children. Everything below that stays bare, deliberately: _navigate_csg_one_level numbers only when number_joints is set, which happens exactly once, on the first call from _navigate_csg_to_leaf against the timber's own rendered Difference.

@@ -49,9 +49,10 @@ PICK_EPS = 5e-4
 
 # Where the tenon sits in a mortise-and-tenon tree: the joint's node, the waste
 # removed around the tenon, then the tenon prism subtracted back out of it.
-# The joint segment carries its occurrence, which is what tells two identical
-# joints on one timber apart. One joint here, so #0.
-TENON_PATH = ["mortise_and_tenon#0", "tenon_waste", "tenon"]
+# Every segment carries its occurrence, numbered among the siblings sharing its
+# label. That is what tells two identical joints on one timber apart, and two
+# key_slots inside one joint. Nothing is doubled here, so all of them are #0.
+TENON_PATH = ["mortise_and_tenon#0", "tenon_waste#0", "tenon#0"]
 
 
 def _load_runner():
@@ -172,7 +173,7 @@ class TestCSGTreeSerialization:
         labelled = self._by_label(tree)
         # The label people read stays bare; only the path is numbered.
         assert labelled["mortise_and_tenon"]["path"] == ["mortise_and_tenon#0"]
-        assert labelled["tenon_waste"]["path"] == ["mortise_and_tenon#0", "tenon_waste"]
+        assert labelled["tenon_waste"]["path"] == ["mortise_and_tenon#0", "tenon_waste#0"]
         assert labelled["tenon"]["path"] == TENON_PATH
 
     def test_features_carry_their_metadata(self, mortise_and_tenon_frame):
@@ -284,8 +285,9 @@ class TestNavigateToLeaf:
         reference face from a rough one.
         """
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
-        body_path = (type(cut_timber.timber).csg_label("rough", "extended").name,)
-        assert body_path == ("timber (rough, extended)",)
+        # Numbered like every other step: one body, so #0.
+        body_path = (type(cut_timber.timber).csg_label("rough", "extended").name + "#0",)
+        assert body_path == ("timber (rough, extended)#0",)
 
         found = _navigate_every_surface_point(
             cut_timber.render_timber_with_cuts_csg_local()
@@ -304,7 +306,7 @@ class TestNavigateToLeaf:
         )
 
         assert any(
-            path == ("mortise_and_tenon#0", "mortise_hole") for path, _ in found
+            path == ("mortise_and_tenon#0", "mortise_hole#0") for path, _ in found
         ), f"paths found were {sorted({path for path, _ in found})}"
 
 
@@ -722,7 +724,8 @@ class TestEdgePicking:
             f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
 
         result = self._pick(slot, cut_timber, point)
-        assert result["path"][-1] == "shoulder"
+        # The path segment is numbered; the label people read is not.
+        assert result["path"][-1] == "shoulder#0"
         assert result["nodeLabel"] == "shoulder"
 
     def test_ctrl_holds_the_click_to_one_level(self, mortise_and_tenon_frame):
@@ -736,7 +739,7 @@ class TestEdgePicking:
 
         first = self._pick(slot, cut_timber, point, ctrl_click=True)
         assert first["featureLabel"] is None
-        assert first["path"] == ["mortise_and_tenon"]
+        assert first["path"] == ["mortise_and_tenon#0"]
 
     def test_ctrl_clicking_down_reaches_the_edge_once_it_is_deep_enough(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType
@@ -806,7 +809,7 @@ class TestPickDescription:
 
         # What the first click on that point selects.
         path, target, label = runner._navigate_csg_one_level(csg, point, [], PICK_EPS)
-        assert path == ["mortise_and_tenon"] and label is None
+        assert path == ["mortise_and_tenon#0"] and label is None
         described = runner._describe_pick(target, csg, cut_timber, point, PICK_EPS, label)
 
         assert described["featureLabel"] is None
@@ -1255,3 +1258,63 @@ class TestResolvingADerivedEdge:
 
         assert body is not None
         assert any(f.name.startswith("rough.") for f in body.get_declared_features())
+
+
+class TestSameNamedSiblings:
+    """Two nodes under one parent sharing a label.
+
+    A keyed lap joint cuts two key_slots, and until every path segment carried
+    an occurrence they had the same path -- so a reference to the second one
+    silently resolved to the first. The joint segment alone was not enough:
+    both slots are inside the same cut.
+    """
+
+    def _frame(self):
+        import sys
+        from pathlib import Path as _Path
+
+        sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+        from patterns.corner_joints_patterns import create_mitered_and_keyed_lap_joint_example
+
+        return create_mitered_and_keyed_lap_joint_example()
+
+    def _tree_paths(self, frame, label):
+        cut_timber = next(ct for ct in frame.cut_timbers
+                          if ct.timber.ticket.path == "timber_A")
+        tree = runner.serialize_cut_csg_tree(cut_timber)["tree"]
+        found, stack = [], [tree]
+        while stack:
+            node = stack.pop()
+            if node["label"] == label:
+                found.append(tuple(node["path"]))
+            stack.extend(node["children"])
+        return cut_timber, sorted(found)
+
+    def test_two_key_slots_get_different_paths(self):
+        _cut_timber, paths = self._tree_paths(self._frame(), "key_slot")
+
+        assert len(paths) == 2, f"expected two key_slots, got {paths}"
+        assert paths[0] != paths[1]
+        assert paths[0][-1].endswith("#0") and paths[1][-1].endswith("#1")
+
+    def test_each_path_resolves_to_its_own_node(self):
+        # The point of the numbering: not merely different strings, but
+        # different nodes. First-wins would have returned the same one twice.
+        cut_timber, paths = self._tree_paths(self._frame(), "key_slot")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+
+        first = runner._resolve_csg_at_path(local, list(paths[0]))
+        second = runner._resolve_csg_at_path(local, list(paths[1]))
+
+        assert first is not None and second is not None
+        assert first is not second
+
+    def test_an_occurrence_past_the_end_finds_nothing(self):
+        cut_timber, paths = self._tree_paths(self._frame(), "key_slot")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        beyond = list(paths[0][:-1]) + [paths[0][-1].split("#")[0] + "#7"]
+
+        roots, labels = runner._roots_for_path(cut_timber, tuple(beyond))
+        found = [runner._find_csg_by_labels(root, labels) for root in roots]
+
+        assert all(node is None for node in found)
