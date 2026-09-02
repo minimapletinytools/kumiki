@@ -33,6 +33,7 @@ const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
+const KigumiMeasurements = window.KigumiMeasurements;
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -104,6 +105,10 @@ class ViewerViewport {
         controller.orbitDist = orbitDistanceForExtent(camera.extent, this.perspectiveCamera.fov);
     }
 }
+// How far a dimension line sits from what it measures, in page pixels. Enough
+// to leave the drawing itself unobscured.
+const MEASUREMENT_OFFSET_PX = 26;
+
 // How much of a timber a drawing is not about still shows. Enough to place the
 // piece among its neighbours, not enough to be mistaken for part of the sheet.
 const DRAWING_CONTEXT_OPACITY = 0.05;
@@ -1419,6 +1424,9 @@ class KigumiViewerApp extends LitElement {
                         </button>`
                     : ''}
                 <canvas id="c"></canvas>
+                <!-- Dimensions are drawn on the sheet rather than in the scene:
+                     they belong to the page, not to any camera. -->
+                <svg id="measurement-overlay" aria-hidden="true"></svg>
                 <div id="loading-overlay" class=${this.overlayClasses()}>
                     <div id="loading-text">${this.viewState.loadingText}</div>
                     <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
@@ -1960,6 +1968,8 @@ class KigumiViewerApp extends LitElement {
             this.renderer.render(this.scene, viewport.camera);
         }
         this.renderer.autoClear = true;
+        // After the scene, so dimensions sit over what they measure.
+        this.renderMeasurements();
     }
 
     /**
@@ -5223,6 +5233,98 @@ class KigumiViewerApp extends LitElement {
      */
     get drawingBetaEnabled() {
         return DRAWING_BETA_ENABLED;
+    }
+
+    /**
+     * Draw every measurement of the active scene, on the sheet.
+     *
+     * In SVG over the canvas rather than in the scene, because a dimension is
+     * an annotation on the page: it keeps its line weight and its text upright
+     * whatever the camera does, which is the whole point of it being on paper.
+     */
+    renderMeasurements() {
+        const overlay = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#measurement-overlay')
+            : null;
+        if (!overlay) {
+            return;
+        }
+        const element = this.renderRoot.querySelector('#viewport');
+        if (!element || !element.offsetHeight) {
+            return;
+        }
+        overlay.setAttribute('viewBox', `0 0 ${element.offsetWidth} ${element.offsetHeight}`);
+        overlay.innerHTML = '';
+        if (!this.activePage) {
+            // The 3D scene is not a sheet, and has nothing to draw dimensions on.
+            return;
+        }
+
+        const pageRect = this.pageScreenRect(element.offsetWidth, element.offsetHeight);
+        for (const viewport of this.viewports) {
+            for (const measure of (viewport.spec.measurements || [])) {
+                this._drawMeasurement(overlay, viewport, pageRect, measure);
+            }
+        }
+    }
+
+    /** Where a world point lands on the page, in the viewport's own pixels. */
+    _projectToPage(point, viewport, pageRect) {
+        const [x, y, width, height] = viewport.spec.rect;
+        const projected = new THREE.Vector3(point[0], point[1], point[2]).project(viewport.camera);
+        return {
+            x: pageRect.x + (x + (projected.x * 0.5 + 0.5) * width) * pageRect.width,
+            y: pageRect.y + (y + (0.5 - projected.y * 0.5) * height) * pageRect.height,
+            inFront: projected.z < 1,
+        };
+    }
+
+    _drawMeasurement(overlay, viewport, pageRect, measure) {
+        // A measurement whose anchors cannot be found is not drawn. It is still
+        // in the list, greyed, so it can be seen and fixed.
+        if (measure.unresolved || !measure.a || !measure.b) {
+            return;
+        }
+        const from = measure.a.at;
+        const to = measure.b.at;
+        if (!from || !to) {
+            return;
+        }
+        const look = viewport.spec.camera ? viewport.spec.camera.look : [0, 0, -1];
+        const separation = KigumiMeasurements.projectedSeparation(from, to, look);
+        const layout = KigumiMeasurements.dimensionLayout(
+            this._projectToPage(from, viewport, pageRect),
+            this._projectToPage(to, viewport, pageRect),
+            { offset: MEASUREMENT_OFFSET_PX },
+        );
+        if (!layout) {
+            // The two anchors land on each other in this view: there is nothing
+            // to dimension here, however far apart they are in space.
+            return;
+        }
+
+        const draw = (from_, to_, className) => {
+            const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+            line.setAttribute('x1', from_.x);
+            line.setAttribute('y1', from_.y);
+            line.setAttribute('x2', to_.x);
+            line.setAttribute('y2', to_.y);
+            line.setAttribute('class', className);
+            overlay.appendChild(line);
+        };
+
+        for (const witness of layout.witness) {
+            draw(witness.from, witness.to, 'dim-witness');
+        }
+        draw(layout.line.from, layout.line.to, 'dim-line');
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', layout.label.x);
+        text.setAttribute('y', layout.label.y);
+        text.setAttribute('class', 'dim-label');
+        text.setAttribute('transform', `rotate(${layout.label.angle} ${layout.label.x} ${layout.label.y})`);
+        text.textContent = this.fmt(separation);
+        overlay.appendChild(text);
     }
 
     /** The members this scene is about, or null when it is about all of them. */

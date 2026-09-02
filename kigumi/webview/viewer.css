@@ -184,6 +184,42 @@ canvas { display: block; width: 100%; height: 100%; }
 
 /* Sits at the right end of the selection header, where it stays reachable
    whether or not the panel is expanded. */
+/* Dimensions, drawn on the sheet rather than in the scene. Transparent to the
+   pointer: picking is the canvas's, and a dimension line should never be the
+   thing a click lands on. */
+#measurement-overlay {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.dim-line,
+.dim-witness {
+    stroke: var(--hv-title);
+    fill: none;
+}
+
+.dim-line {
+    stroke-width: 1.2;
+}
+
+.dim-witness {
+    stroke-width: 0.8;
+    opacity: 0.7;
+}
+
+.dim-label {
+    fill: var(--hv-title);
+    font-size: 11px;
+    text-anchor: middle;
+    dominant-baseline: text-after-edge;
+    paint-order: stroke;
+    stroke: var(--hv-panel-bg);
+    stroke-width: 3px;
+}
+
 /* The drawings section: where a drawing came from, and whether it is saved. */
 .lp-drawing-origin {
     opacity: 0.75;
