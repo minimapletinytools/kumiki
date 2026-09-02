@@ -265,12 +265,17 @@ DONE-drawing mode fixes
   DONE-there are 2 camera types for teh 3d perspcetive viewport (again, this is set by the thing  that passes the info into the drawing panel, so it may need to beserializable like the current viewport/camera settings)
     -for multiple timbers, as it is right now
     -for single timbers, allow free rotation along the timber axis only
-
-
--switthing from one drawing to another while in drawing mode will break the camera sanpping behavior
+DONE-switthing from one drawing to another while in drawing mode will break the camera sanpping behavior
   -actualyl camera anglesa re broken in general in drawing mode... they don't seem to be consistent each time I reopen
+DONE-fix background in ortho drawing
+
+-revisit how to do LHS menu for drawing mode...
+-get rid of the "draw" button, instead it should show up in the selection view and probabyl show a warning indicating "kumiki prefers that drawings are written with code, but manual drawing issuppotr here..."
+-give viewports labels
+-add background border for drawing...
 -fix lighting in ortho drawing
--fix background in ortho drawing
+
+
 
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint

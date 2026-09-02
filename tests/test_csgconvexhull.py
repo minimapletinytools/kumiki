@@ -231,3 +231,40 @@ class TestCurvedAndPointyPrimitives:
         across = region.extent_along(_v(1, 0, 0))
 
         assert across[1] - across[0] == pytest.approx(1.0, abs=1e-9)
+
+
+class TestSquareJointNeedsNoBackExtension:
+    """A square mortise and tenon should not build a cutter hundreds of metres long."""
+
+    def _prisms(self):
+        import sys
+        from pathlib import Path as _Path
+
+        sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
+        from kumiki.cutcsg import csg_children
+        from kumiki.timber import Frame
+        from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
+
+        frame = Frame.from_joints(joints=[example_basic_mortise_and_tenon_joint()])
+        found = {}
+
+        def walk(csg):
+            label = getattr(getattr(csg, "label", None), "name", None)
+            if label in ("tenon", "mortise_hole"):
+                found[label] = csg
+            for child in csg_children(csg):
+                walk(child)
+
+        for cut_timber in frame.cut_timbers:
+            for cut in cut_timber.cuts:
+                if getattr(cut, "negative_csg", None) is not None:
+                    walk(cut.negative_csg)
+        return found
+
+    def test_the_prisms_stay_the_size_of_the_timber(self):
+        # The reach behind the shoulder is for oblique entry. A square joint
+        # meets the shoulder square-on, and dividing by the guard against zero
+        # gave it the largest extension possible where the least was wanted.
+        for name, prism in self._prisms().items():
+            assert abs(float(prism.start_distance)) < 1.0, name
+            assert abs(float(prism.end_distance)) < 1.0, name

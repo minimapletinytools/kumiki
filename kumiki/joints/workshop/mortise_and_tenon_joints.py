@@ -309,10 +309,21 @@ def cut_mortise_and_tenon_joint(
     # Tenon prism (origin at marking_space) and shoulder half-space
     # -------------------------------------------------------------------------
 
-    # Back-extension from shoulder so prism fully contains tenon at oblique angles
+    # Back-extension from shoulder so prism fully contains tenon at oblique angles.
+    #
+    # None of it on a square joint. sin_angle_sq is zero exactly when the tenon
+    # runs along the mortise face normal, which is to say the joint is square,
+    # and there the prism meets the shoulder square-on and needs no reach behind
+    # it. That case used to divide by a guard against zero instead, which gave
+    # the largest extension possible where the least was wanted -- ten thousand
+    # times the tenon, a cutter hundreds of metres long. It cut the same joint,
+    # since the shoulder trims whatever reaches past it, so nothing looked
+    # wrong until something asked one of its faces where it was.
     sin_angle_sq = scalar(1) - cos_angle * cos_angle
-    sin_angle_safe = scalar(1, 10000) if safe_zero_test_sq(sin_angle_sq) else sqrt(Abs(sin_angle_sq))
-    back_extension = max(tenon_size[0], tenon_size[1]) / sin_angle_safe
+    back_extension = (
+        scalar(0) if safe_zero_test_sq(sin_angle_sq)
+        else max(tenon_size[0], tenon_size[1]) / sqrt(Abs(sin_angle_sq))
+    )
 
     tenon_tip_name = "tenon_top" if tenon_end == TimberEnd.TOP else "tenon_bot"
 
