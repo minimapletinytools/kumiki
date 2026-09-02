@@ -380,6 +380,8 @@ def cut_mortise_and_tenon_joint(
         joint_angle_axis_index = tenon_timber.get_size_index_in_long_face_normal_axis(joint_angle_axis_face)
 
         mortise_hole_length_oblique_direction = mortise_timber.get_face_direction_global(mortise_oblique_end)
+        # Suspect: sin_angle here may want to be Abs(cos_angle).
+        # See docs/oblique-mortise-angle-bug.md
         end_crop_distance = tenon_size[joint_angle_axis_index] / sin_angle / scalar(2)
 
         # Crop 1: far end of prism perpendicular to mortise face
@@ -445,6 +447,8 @@ def cut_mortise_and_tenon_joint(
             )
         else:
             opp_index = 1 if joint_angle_axis_index == 0 else 0
+            # Wrong at any angle but 45: wants Abs(cos_angle), not sin_angle.
+            # See docs/oblique-mortise-angle-bug.md
             mortise_hole_size = create_v2(
                 tenon_size[opp_index],
                 tenon_size[joint_angle_axis_index] / sin_angle,
