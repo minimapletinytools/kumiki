@@ -2104,9 +2104,9 @@ def _labelled_candidates(node: Any, label: str) -> List[Any]:
 def _candidate_segments(node: Any) -> Dict[int, str]:
     """Path segment for every node a step under *node* could name.
 
-    `label#n`, numbered among the candidates sharing that label. Always
-    numbered, even when there is only one: a bare label reads as #0 anyway, and
-    one rule is easier to trust than a rule with an exception.
+    `label` for the first, `label#n` after that. A bare segment reads as #0
+    everywhere that parses one, so the common case -- nothing sharing a label --
+    stays the plain name people already read in the tree and the breadcrumb.
     """
     from kumiki.cutcsg import Difference, SolidUnion, csg_children
 
@@ -2122,7 +2122,7 @@ def _candidate_segments(node: Any) -> Dict[int, str]:
             if label is not None:
                 occurrence = seen.get(label, 0)
                 seen[label] = occurrence + 1
-                segments[id(child)] = f"{label}#{occurrence}"
+                segments[id(child)] = label if occurrence == 0 else f"{label}#{occurrence}"
             elif isinstance(child, (SolidUnion, Difference)):
                 gather(child)
 
@@ -3781,20 +3781,6 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
                     picked = c
             node = picked
     return node
-
-
-def _joint_occurrences(subtract: List[Any]) -> Dict[int, str]:
-    """Path segment for each cut, numbered among the cuts that share its name."""
-    seen: Dict[str, int] = {}
-    segments: Dict[int, str] = {}
-    for child in subtract:
-        name = _label_name(child)
-        if name is None:
-            continue
-        occurrence = seen.get(name, 0)
-        seen[name] = occurrence + 1
-        segments[id(child)] = f"{name}#{occurrence}"
-    return segments
 
 
 def _navigate_csg_one_level(

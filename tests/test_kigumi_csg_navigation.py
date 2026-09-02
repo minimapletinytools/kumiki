@@ -49,10 +49,9 @@ PICK_EPS = 5e-4
 
 # Where the tenon sits in a mortise-and-tenon tree: the joint's node, the waste
 # removed around the tenon, then the tenon prism subtracted back out of it.
-# Every segment carries its occurrence, numbered among the siblings sharing its
-# label. That is what tells two identical joints on one timber apart, and two
-# key_slots inside one joint. Nothing is doubled here, so all of them are #0.
-TENON_PATH = ["mortise_and_tenon#0", "tenon_waste#0", "tenon#0"]
+# A segment is numbered only when something shares its label -- the first is
+# bare, which reads as #0. Nothing is doubled here, so every segment is plain.
+TENON_PATH = ["mortise_and_tenon", "tenon_waste", "tenon"]
 
 
 def _load_runner():
@@ -172,8 +171,8 @@ class TestCSGTreeSerialization:
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
         labelled = self._by_label(tree)
         # The label people read stays bare; only the path is numbered.
-        assert labelled["mortise_and_tenon"]["path"] == ["mortise_and_tenon#0"]
-        assert labelled["tenon_waste"]["path"] == ["mortise_and_tenon#0", "tenon_waste#0"]
+        assert labelled["mortise_and_tenon"]["path"] == ["mortise_and_tenon"]
+        assert labelled["tenon_waste"]["path"] == ["mortise_and_tenon", "tenon_waste"]
         assert labelled["tenon"]["path"] == TENON_PATH
 
     def test_features_carry_their_metadata(self, mortise_and_tenon_frame):
@@ -285,9 +284,8 @@ class TestNavigateToLeaf:
         reference face from a rough one.
         """
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
-        # Numbered like every other step: one body, so #0.
-        body_path = (type(cut_timber.timber).csg_label("rough", "extended").name + "#0",)
-        assert body_path == ("timber (rough, extended)#0",)
+        body_path = (type(cut_timber.timber).csg_label("rough", "extended").name,)
+        assert body_path == ("timber (rough, extended)",)
 
         found = _navigate_every_surface_point(
             cut_timber.render_timber_with_cuts_csg_local()
@@ -306,7 +304,7 @@ class TestNavigateToLeaf:
         )
 
         assert any(
-            path == ("mortise_and_tenon#0", "mortise_hole#0") for path, _ in found
+            path == ("mortise_and_tenon", "mortise_hole") for path, _ in found
         ), f"paths found were {sorted({path for path, _ in found})}"
 
 
@@ -390,7 +388,7 @@ class TestNonPrismPrimitivesArePickable:
             ),
         ])
         path, target, _face = runner._navigate_csg_to_leaf(csg, [2.0, 0.0, 15.0], PICK_EPS)
-        assert path == ["dovetail_housing#0"]
+        assert path == ["dovetail_housing"]
         assert isinstance(target, ConvexPolygonExtrusion)
 
     def test_cylinder_cut_resolves_to_its_label(self):
@@ -406,7 +404,7 @@ class TestNonPrismPrimitivesArePickable:
         ])
         # On the bore wall, one radius off the axis.
         path, target, face = runner._navigate_csg_to_leaf(csg, [1.0, 0.0, 50.0], PICK_EPS)
-        assert path == ["peg_hole#0"]
+        assert path == ["peg_hole"]
         assert isinstance(target, Cylinder)
         assert face == "cylindrical_surface"
 
@@ -724,8 +722,7 @@ class TestEdgePicking:
             f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
 
         result = self._pick(slot, cut_timber, point)
-        # The path segment is numbered; the label people read is not.
-        assert result["path"][-1] == "shoulder#0"
+        assert result["path"][-1] == "shoulder"
         assert result["nodeLabel"] == "shoulder"
 
     def test_ctrl_holds_the_click_to_one_level(self, mortise_and_tenon_frame):
@@ -739,7 +736,7 @@ class TestEdgePicking:
 
         first = self._pick(slot, cut_timber, point, ctrl_click=True)
         assert first["featureLabel"] is None
-        assert first["path"] == ["mortise_and_tenon#0"]
+        assert first["path"] == ["mortise_and_tenon"]
 
     def test_ctrl_clicking_down_reaches_the_edge_once_it_is_deep_enough(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType
@@ -809,7 +806,7 @@ class TestPickDescription:
 
         # What the first click on that point selects.
         path, target, label = runner._navigate_csg_one_level(csg, point, [], PICK_EPS)
-        assert path == ["mortise_and_tenon#0"] and label is None
+        assert path == ["mortise_and_tenon"] and label is None
         described = runner._describe_pick(target, csg, cut_timber, point, PICK_EPS, label)
 
         assert described["featureLabel"] is None
@@ -1295,7 +1292,8 @@ class TestSameNamedSiblings:
 
         assert len(paths) == 2, f"expected two key_slots, got {paths}"
         assert paths[0] != paths[1]
-        assert paths[0][-1].endswith("#0") and paths[1][-1].endswith("#1")
+        # The first is bare, which reads as #0; only the second needs saying.
+        assert not paths[0][-1].endswith("#1") and paths[1][-1].endswith("#1")
 
     def test_each_path_resolves_to_its_own_node(self):
         # The point of the numbering: not merely different strings, but
