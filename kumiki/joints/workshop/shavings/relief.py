@@ -432,7 +432,7 @@ def chop_shoulder_notch_aligned_with_timber(
     distance_from_centerline: Numeric,
     notch_wall_relief_cut_angle_radians: Numeric = scalar(0),
     set_mortise_shoulder_parallel_to_face: Union[TimberLongFace, bool] = False,
-    label: CutCSGLabel = CutCSGLabel("shoulder_notch"),
+    label: CutCSGLabel = CutCSGLabel("shoulder_notch_relief"),
 ) -> Union[RectangularPrism, SolidUnion]:
     """
     Create a shoulder notch on notch_timber at a given distance from its centerline,
@@ -578,7 +578,7 @@ def chop_shoulder_notch_aligned_with_timber(
     notch_prism = RectangularPrism(
         size=create_v2(notch_width, notch_span),
         transform=Transform(position=prism_position_local, orientation=prism_orientation),
-        label=CutCSGLabel("notch"),
+        label=CutCSGLabel("notch_relief"),
         start_distance=scalar(0),
         end_distance=notch_depth,
     )
@@ -634,7 +634,7 @@ def chop_shoulder_notch_on_timber_face(
     notch_width: Numeric,
     notch_depth: Numeric,
     notch_wall_relief_cut_angle: Numeric = scalar(0),
-    label: CutCSGLabel = CutCSGLabel("shoulder_notch"),
+    label: CutCSGLabel = CutCSGLabel("shoulder_notch_relief"),
 ) -> Union[RectangularPrism, SolidUnion]:
     """
     Create a rectangular shoulder notch on a timber face with optional angled walls.
@@ -1040,7 +1040,7 @@ def chop_butt_joint_shoulder_notch_relief_on_plane_aligned_timbers_2sided(
         start_distance=scalar(0),
         end_distance=loft_depth,
         transform=loft_transform,
-        label=CutCSGLabel("shoulder_notch"),
+        label=CutCSGLabel("shoulder_notch_relief"),
     )
 
     receiving_timber_notch_negative_csg_local = adopt_csg(
@@ -1274,7 +1274,7 @@ def chop_butt_joint_shoulder_notch_relief_4sided(
         start_distance=scalar(0),
         end_distance=loft_depth,
         transform=loft_transform,
-        label=CutCSGLabel("shoulder_notch"),
+        label=CutCSGLabel("shoulder_notch_relief"),
     )
     
     receiving_timber_notch_negative_csg_local = adopt_csg(
@@ -1341,7 +1341,7 @@ def chop_scribe_relief(
     timber_to_be_scribed_cutting: Cutting,
     timber_to_be_cut_cutting: Cutting,
     scribe_relief_label: CutCSGLabel = CutCSGLabel("scribe_relief"),
-    scribe_hollow_label: CutCSGLabel = CutCSGLabel("scribe_hollow"),
+    scribe_hollow_label: CutCSGLabel = CutCSGLabel("scribe_hollow_relief"),
 ) -> tuple[CutCSG, CutCSG]:
     """
     scribes timber_to_be_scribed onto timber_to_be_cut such that the entirety of timber_to_be_scribed is cut out of timber_to_be_cut excluding the perfect timber within portion of timber_to_be_cut
@@ -1474,7 +1474,7 @@ def chop_scribe_relief_and_apply(
         negative_csg=_union_into(
             timber_to_be_cut_cutting.negative_csg,
             cut_relief_csg_local,
-            CutCSGLabel("scribe_hollow_cut"),
+            CutCSGLabel("scribe_hollow_relief_cut"),
         ),
     )
 

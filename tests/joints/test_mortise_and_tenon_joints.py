@@ -1081,7 +1081,7 @@ class TestWedgedHalfDovetailMortiseAndTenonJoint:
 
         mortise_ct = joint.cuttings["mortise_timber"]
         assert mortise_ct.negative_csg is not None
-        assert "shoulder_notch" in labels(mortise_ct.negative_csg)
+        assert "shoulder_notch_relief" in labels(mortise_ct.negative_csg)
 
         # The notch removes material, and the result is still a closed solid.
         cut_timber = CutTimber(mortise_ct.timber, cuts=[mortise_ct])

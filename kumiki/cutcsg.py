@@ -236,9 +236,17 @@ class FeatureGroup(Enum):
         B2 intersects with A, and with itself
         C  intersects with itself only
 
-    Defaults today: a timber's perfect-timber-within long faces are B1, and
-    every named joint feature is A -- so joint geometry meets the timber body
-    and not itself. B2 and C are defined but unused until something needs them.
+    Defaults today: a timber's perfect-timber-within and rough faces are B2,
+    and every named joint feature is A -- so joint geometry meets the timber
+    body, and the body meets itself, the latter being the timber's own four
+    long arrises, which drawing generation needs. B1 and C are defined but
+    unused until something needs them.
+
+    A consequence of the body meeting itself: relief geometry embeds the MATING
+    timber's rough body to scribe against, and its faces carry the same reserved
+    rough.* names (see timber.ROUGH_FACE_PREFIX). Two timbers' faces then pair
+    into an edge that reads as one timber's -- rough.back x rough.back -- since
+    the name says nothing about whose body it is.
     """
     A = 1
     B1 = 2

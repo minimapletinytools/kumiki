@@ -795,9 +795,9 @@ class TestReliefCSGNaming:
 
     def test_the_notch_names_its_main_prism_and_its_relief_walls(self):
         notch = self._notch()
-        assert notch.label.name == "shoulder_notch"
+        assert notch.label.name == "shoulder_notch_relief"
         assert [child.label.name for child in notch.children] == [
-            "notch", "notch_wall_relief", "notch_wall_relief",
+            "notch_relief", "notch_wall_relief", "notch_wall_relief",
         ]
 
     def test_a_caller_can_rename_the_notch(self):
@@ -834,7 +834,7 @@ class TestReliefCSGNaming:
     def test_the_scribe_relief_and_hollow_are_named(self):
         (scribe_relief, scribe_hollow), _ = self._scribe()
         assert scribe_relief.label.name == "scribe_relief"
-        assert scribe_hollow.label.name == "scribe_hollow"
+        assert scribe_hollow.label.name == "scribe_hollow_relief"
 
     def test_a_caller_can_rename_what_scribing_returns(self):
         (scribe_relief, scribe_hollow), _ = self._scribe(

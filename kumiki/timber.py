@@ -1696,6 +1696,16 @@ def _get_rough_size_and_offset(timber: PerfectTimberWithin) -> Tuple[V2, V3]:
 # which made a feature called "right" ambiguous between the two prisms -- and
 # only the rough prism ever appears in the rendered CSG tree, so the ambiguity
 # resolved silently and wrongly.
+# RESERVED. Nothing outside this module may name a feature with either prefix:
+# they mean "a face of a timber's own body", and picking, edge derivation and
+# drawing all read them that way.
+#
+# Reserved is not yet enforced, and there is a known hole even within the rule:
+# relief geometry embeds the mating timber's rough body to scribe against, so
+# one timber's CSG tree can hold another's rough.* faces. They pair into edges
+# that read as this timber's -- rough.back x rough.back -- because the name
+# carries no owner. Fixing that means the name, or the embedding, saying whose
+# body it is.
 PTW_FACE_PREFIX = "ptw."
 ROUGH_FACE_PREFIX = "rough."
 
