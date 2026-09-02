@@ -267,6 +267,10 @@ DONE-drawing mode fixes
     -for single timbers, allow free rotation along the timber axis only
 
 
+-switthing from one drawing to another while in drawing mode will break the camera sanpping behavior
+-fix lighting in ortho drawing
+-fix background in ortho drawing
+
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint

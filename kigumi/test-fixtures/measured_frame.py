@@ -59,11 +59,18 @@ def build_frame():
                     "right": [Measure(anchor_a=mortise_front, anchor_b=mortise_bottom)],
                 },
             ),
-            # Both pieces, so world elevations rather than long faces.
+            # Both pieces, so world elevations rather than long faces. From the
+            # shoulder to the mortise floor: how deep the tenon sits in.
+            #
+            # In the plan view, not the front elevation, and the reason is the
+            # point of measurements belonging to viewports. That pair separates
+            # along north, which the front elevation looks straight down -- so
+            # there it projects onto itself and measures nothing, while the plan
+            # view shows the whole of it.
             Drawing(
                 name="the joint",
                 timber_paths=["butt_timber", "receiving_timber"],
-                measurements={"front": [Measure(anchor_a=tenon_top, anchor_b=mortise_bottom)]},
+                measurements={"top": [Measure(anchor_a=shoulder, anchor_b=mortise_bottom)]},
             ),
         ],
     )
