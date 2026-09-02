@@ -349,3 +349,79 @@ describe('choosePickAction', () => {
             .toBe('select');
     });
 });
+
+describe('focusing a measurement', () => {
+    // A third thing to look at, which must not be confused with the timbers a
+    // command would act on.
+    function store() {
+        return new SelectionStore();
+    }
+
+    test('it becomes the focus', () => {
+        const selection = store();
+        selection.setMeasurementFocus({ viewportId: 'front', measureKey: 'a|b' });
+
+        expect(selection.measurementFocus.viewportId).toBe('front');
+        expect(selection.isMeasurementFocused('front', 'a|b')).toBe(true);
+    });
+
+    test('it is not a CSG focus, and cannot be mistaken for one', () => {
+        // The trees, the info pane and the highlighting all ask csgFocus and
+        // mean "the node being looked at".
+        const selection = store();
+        selection.setMeasurementFocus({ viewportId: 'front', measureKey: 'a|b' });
+
+        expect(selection.csgFocus).toBeNull();
+    });
+
+    test('looking at a measurement leaves the timber selection alone', () => {
+        // Otherwise clicking a dimension to read it would quietly change what
+        // the draw button would draw.
+        const selection = store();
+        selection.selectTimber('post#0');
+        selection.selectTimber('beam#0', true);
+
+        selection.setMeasurementFocus({ viewportId: 'front', measureKey: 'a|b' });
+
+        expect(selection.getSelectedTimbers()).toEqual(['post#0', 'beam#0']);
+    });
+
+    test('only one thing is ever being looked at', () => {
+        // Not a rule two fields have to remember: there is one field.
+        const selection = store();
+        selection.setCsgFocus({ timberKey: 'post#0', path: ['cut'] });
+        expect(selection.csgFocus).not.toBeNull();
+
+        selection.setMeasurementFocus({ viewportId: 'front', measureKey: 'a|b' });
+
+        expect(selection.csgFocus).toBeNull();
+        expect(selection.measurementFocus).not.toBeNull();
+    });
+
+    test('and looking at a node again stops looking at the measurement', () => {
+        const selection = store();
+        selection.setMeasurementFocus({ viewportId: 'front', measureKey: 'a|b' });
+
+        selection.setCsgFocus({ timberKey: 'post#0', path: ['cut'] });
+
+        expect(selection.measurementFocus).toBeNull();
+        expect(selection.csgFocus).not.toBeNull();
+    });
+
+    test('clearing everything clears it too', () => {
+        const selection = store();
+        selection.setMeasurementFocus({ viewportId: 'front', measureKey: 'a|b' });
+
+        selection.clearAll();
+
+        expect(selection.measurementFocus).toBeNull();
+        expect(selection.hasSelection()).toBe(false);
+    });
+
+    test('a measurement in another viewport is a different measurement', () => {
+        const selection = store();
+        selection.setMeasurementFocus({ viewportId: 'front', measureKey: 'a|b' });
+
+        expect(selection.isMeasurementFocused('right', 'a|b')).toBe(false);
+    });
+});

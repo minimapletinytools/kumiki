@@ -3,7 +3,7 @@
     // What is selected in the viewer, in two independent pieces:
     //
     //   selectedTimbers  a set, because timbers multi-select
-    //   csgFocus         at most one, because the CSG trees single-select
+    //   focus            at most one, because it is what you are looking at
     //
     // They coexist: several timbers can be selected while you drill into the
     // CSG of exactly one of them. Focusing a CSG node pulls its timber into
@@ -20,8 +20,28 @@
     class SelectionStore {
         constructor() {
             this.selectedTimbers = new Set();
-            this.csgFocus = null;
+            // The one thing being looked at, whatever kind of thing it is. One
+            // field rather than one per kind, so that "never two at once" is
+            // something that cannot happen rather than a rule every place has
+            // to remember.
+            this.focus = null;
             this.listeners = new Set();
+        }
+
+        /**
+         * The focus, when it is a CSG node -- null when it is anything else.
+         *
+         * The trees, the info pane and the highlighting all ask this, and each
+         * of them means "the node being looked at": a focused measurement is
+         * not one, and must not be mistaken for one.
+         */
+        get csgFocus() {
+            return this.focus && this.focus.kind === 'csg' ? this.focus : null;
+        }
+
+        /** The focus, when it is a measurement. */
+        get measurementFocus() {
+            return this.focus && this.focus.kind === 'measurement' ? this.focus : null;
         }
 
         // --- timbers -------------------------------------------------------
@@ -98,7 +118,8 @@
          */
         setCsgFocus({ timberKey, path, featureLabel, cutIndex, context }) {
             this.selectedTimbers.add(timberKey);
-            this.csgFocus = {
+            this.focus = {
+                kind: 'csg',
                 timberKey,
                 path: path || [],
                 featureLabel: featureLabel || null,
@@ -109,10 +130,10 @@
         }
 
         clearCsgFocus(options = {}) {
-            if (!this.csgFocus) {
+            if (!this.focus) {
                 return;
             }
-            this.csgFocus = null;
+            this.focus = null;
             if (!options.silent) {
                 this.emit({ type: 'clear-csg-focus' });
             }
@@ -128,7 +149,28 @@
             if (!this.csgFocus) {
                 return;
             }
-            this.csgFocus.nodeId = nodeId || null;
+            this.focus.nodeId = nodeId || null;
+        }
+
+        /**
+         * Look at a measurement.
+         *
+         * Deliberately leaves the timber selection alone. A CSG node is part of
+         * a timber, so focusing one selects that timber; a measurement is about
+         * timbers without being part of any, and often about two -- and reading
+         * a dimension must not change what a command would act on.
+         */
+        setMeasurementFocus({ viewportId, measureKey }) {
+            this.focus = { kind: 'measurement', viewportId, measureKey };
+            this.emit({ type: 'measurement-focus', measurementFocus: this.focus });
+        }
+
+        /** True if this is the measurement row being looked at. */
+        isMeasurementFocused(viewportId, measureKey) {
+            const focused = this.measurementFocus;
+            return Boolean(focused)
+                && focused.viewportId === viewportId
+                && focused.measureKey === measureKey;
         }
 
         // --- joints ---------------------------------------------------------
@@ -152,12 +194,12 @@
                 return;
             }
             this.selectedTimbers.clear();
-            this.csgFocus = null;
+            this.focus = null;
             this.emit({ type: 'clear-all' });
         }
 
         hasSelection() {
-            return this.selectedTimbers.size > 0 || this.csgFocus !== null;
+            return this.selectedTimbers.size > 0 || this.focus !== null;
         }
 
         onSelectionChanged(callback) {

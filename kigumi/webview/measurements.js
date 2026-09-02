@@ -255,6 +255,45 @@
         };
     }
 
+    // Under this, in world units, the two have projected onto each other and
+    // there is nothing between them to dimension.
+    const DEGENERATE_WORLD = 1e-6;
+
+    /**
+     * Whether a measurement can be drawn in this viewport, and what it comes to.
+     *
+     * One answer for both the sheet and the list, so that a dimension which is
+     * not drawn and a row which says why cannot disagree. Four ways to fail, and
+     * they are worth telling apart: a reference that no longer resolves is
+     * broken everywhere, while the other three are about this view alone -- the
+     * same measurement can read fine under one viewport and be refused by the
+     * next.
+     */
+    function measurementStatus(measure, axes) {
+        if (!measure || measure.unresolved || !measure.a || !measure.b
+            || !measure.a.at || !measure.b.at) {
+            return { drawable: false, reason: 'unresolved' };
+        }
+        const formA = projectedForm(measure.a.geometry, axes.look);
+        const formB = projectedForm(measure.b.geometry, axes.look);
+        const available = availableKinds(formA, formB);
+        if (available.length === 0) {
+            return { drawable: false, reason: 'not-measurable', formA, formB };
+        }
+        if (measure.kind && available.indexOf(measure.kind) === -1) {
+            return {
+                drawable: false, reason: 'kind-unavailable',
+                kind: measure.kind, available, formA, formB,
+            };
+        }
+        const kind = measure.kind || available[0];
+        const value = measureValue(kind, measure.a.at, measure.b.at, formA, formB, axes);
+        if (value.unit === 'length' && value.value < DEGENERATE_WORLD) {
+            return { drawable: false, reason: 'degenerate', kind, formA, formB };
+        }
+        return { drawable: true, kind, value, available, formA, formB };
+    }
+
     // Below this the two anchors are on top of each other in this view, and
     // there is no direction to draw a dimension along.
     const DEGENERATE_PIXELS = 2;
@@ -324,6 +363,7 @@
 
     const KigumiMeasurements = {
         projectedForm,
+        measurementStatus,
         availableKinds,
         kindApplies,
         projectedSeparation,
@@ -331,6 +371,7 @@
         dimensionLayout,
         angleLayout,
         DEGENERATE_PIXELS,
+        DEGENERATE_WORLD,
         ALIGNMENT_EPSILON,
         PARALLEL_EPSILON,
     };

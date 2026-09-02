@@ -34,6 +34,31 @@ const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
 const KigumiMeasurements = window.KigumiMeasurements;
+const { DrawingPanel } = window.KigumiDrawingPanel;
+
+/**
+ * What names one measurement within its viewport.
+ *
+ * The anchors unordered plus an id, matching how the merge decides two
+ * measurements are the same one -- so a row and the thing it stands for cannot
+ * come apart.
+ */
+function measurementKey(measure) {
+    const name = (anchor) => (anchor
+        ? [anchor.timber, (anchor.csgPath || []).join('/'), anchor.feature, anchor.type].join('|')
+        : '');
+    return [name(measure.a), name(measure.b)].sort().join('::')
+        + '::' + (measure.measureId || '');
+}
+
+/** A feature reference, for a person to read. */
+function describeAnchor(anchor) {
+    if (!anchor) {
+        return '?';
+    }
+    const trail = [anchor.timber].concat(anchor.csgPath || []);
+    return anchor.feature ? trail.concat(anchor.feature).join(' > ') : trail.join(' > ');
+}
 
 /**
  * What a viewport spec becomes at runtime: a rect with its own cameras.
@@ -1438,6 +1463,8 @@ class KigumiViewerApp extends LitElement {
                     <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
                 </div>
                 <div id="left-rail">
+                    <!-- Content only; where it lives is this one line. -->
+                    <div id="drawing-panel-host"></div>
                     ${this.selectionPanel.render()}
                     <kigumi-layers-view id="layers-view"></kigumi-layers-view>
                     <div id="rail-resize" title=${t('viewer.layers.resize.title')}
@@ -5302,55 +5329,35 @@ class KigumiViewerApp extends LitElement {
     }
 
     _drawMeasurement(overlay, viewport, pageRect, measure) {
-        // A measurement whose anchors cannot be found is not drawn. It is still
-        // in the list, greyed, so it can be seen and fixed.
-        if (measure.unresolved || !measure.a || !measure.b) {
-            return;
-        }
-        const from = measure.a.at;
-        const to = measure.b.at;
-        if (!from || !to) {
-            return;
-        }
         const camera = viewport.spec.camera || {};
         const axes = {
             look: camera.look || [0, 0, -1],
             right: camera.right || [1, 0, 0],
             up: camera.up || [0, 1, 0],
         };
-        const formA = KigumiMeasurements.projectedForm(measure.a.geometry, axes.look);
-        const formB = KigumiMeasurements.projectedForm(measure.b.geometry, axes.look);
-        const available = KigumiMeasurements.availableKinds(formA, formB);
-        if (available.length === 0) {
-            // Nothing about this pair can be measured in this view -- a face
-            // seen at an angle covers it, and the distance between the middles
-            // of two such faces is a number about nothing.
+        // The same answer the list shows, so a dimension that is not drawn and
+        // a row that says why can never disagree.
+        const status = KigumiMeasurements.measurementStatus(measure, axes);
+        if (!status.drawable) {
             return;
         }
-        // Whichever was asked for, or the natural one for what they project to.
-        const kind = measure.kind && available.indexOf(measure.kind) !== -1
-            ? measure.kind
-            : (measure.kind ? null : available[0]);
-        if (!kind) {
-            // Asked for a measurement this pair does not admit here. The
-            // measurement is fine; this viewport cannot show it.
-            return;
-        }
-        const value = KigumiMeasurements.measureValue(kind, from, to, formA, formB, axes);
-        const fromPage = this._projectToPage(from, viewport, pageRect);
-        const toPage = this._projectToPage(to, viewport, pageRect);
+        const from = measure.a.at;
+        const to = measure.b.at;
+        const value = status.value;
 
-        if (kind === 'angle') {
-            this._drawAngle(overlay, viewport, pageRect, from, to, formA, formB, value);
+        if (status.kind === 'angle') {
+            this._drawAngle(overlay, viewport, pageRect, from, to, status.formA, status.formB, value);
             return;
         }
 
         const layout = KigumiMeasurements.dimensionLayout(
-            fromPage, toPage, { offset: MEASUREMENT_OFFSET_PX },
+            this._projectToPage(from, viewport, pageRect),
+            this._projectToPage(to, viewport, pageRect),
+            { offset: MEASUREMENT_OFFSET_PX },
         );
         if (!layout) {
-            // The two anchors land on each other in this view: there is nothing
-            // to dimension here, however far apart they are in space.
+            // Far enough apart in the world, but on top of each other once
+            // drawn at this scale: nothing to put a dimension line along.
             return;
         }
 
@@ -5551,6 +5558,7 @@ class KigumiViewerApp extends LitElement {
         this.applySceneBackground();
         this.applyFootprintVisibility();
         this._layersDrawingsChanged();
+        this._syncDrawingPanel();
         // What is ghosted follows the scene: a drawing dims everything it is
         // not about, and leaving one puts the frame back.
         this.applySelectionOpacity();
@@ -5617,6 +5625,84 @@ class KigumiViewerApp extends LitElement {
     /** Enter a drawing by id, from the layers panel. */
     enterDrawing(sceneId) {
         this.setActiveScene(sceneId);
+    }
+
+    /**
+     * Keep the drawing's own tree in step with the scene.
+     *
+     * Mounted only while a drawing is open, and taken down on the way out, so
+     * the rail carries nothing about a drawing when there is not one.
+     */
+    _syncDrawingPanel() {
+        const host = this.renderRoot && this.renderRoot.querySelector
+            ? this.renderRoot.querySelector('#drawing-panel-host')
+            : null;
+        if (!host) {
+            return;
+        }
+        const scene = this.sceneStore.activeScene();
+        if (!this.drawingBetaEnabled || !this.isInDrawing) {
+            if (this._drawingPanel) {
+                this._drawingPanel.unmount();
+                this._drawingPanel = null;
+            }
+            return;
+        }
+        if (!this._drawingPanel) {
+            this._drawingPanel = new DrawingPanel(this.selectionManager);
+            this._drawingPanel.mount(host);
+            host.addEventListener('kigumi-close-drawing', () => this.leaveDrawing());
+            host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
+            host.addEventListener('kigumi-focus-measurement', (event) => {
+                this.selectionManager.setMeasurementFocus(event.detail);
+                this._syncDrawingPanel();
+            });
+            host.addEventListener('kigumi-select-drawing-member', (event) => {
+                this.selectionManager.selectTimber(
+                    event.detail.memberKey, event.detail.addToSelection,
+                );
+            });
+        }
+        this._drawingPanel.setDrawing({
+            drawing: scene,
+            viewports: this.viewports.map((viewport) => this._measurementRows(viewport)),
+            members: (this.activeSceneMembers ? Array.from(this.activeSceneMembers) : [])
+                .map((key) => ({
+                    key,
+                    name: (this.memberMetadataByKey.get(key) || {}).name || key,
+                })),
+        });
+    }
+
+    /** One viewport's measurements, judged and described for the list. */
+    _measurementRows(viewport) {
+        const camera = viewport.spec.camera || {};
+        const axes = {
+            look: camera.look || [0, 0, -1],
+            right: camera.right || [1, 0, 0],
+            up: camera.up || [0, 1, 0],
+        };
+        return {
+            id: viewport.id,
+            measurements: (viewport.spec.measurements || []).map((measure) => {
+                const status = KigumiMeasurements.measurementStatus(measure, axes);
+                const named = (anchor) => (anchor && anchor.feature)
+                    || (anchor && anchor.timber) || '?';
+                return {
+                    key: measurementKey(measure),
+                    origin: measure.origin,
+                    between: `${named(measure.a)} / ${named(measure.b)}`,
+                    describes: [measure.a, measure.b]
+                        .map((anchor) => describeAnchor(anchor)).join('  \u2194  '),
+                    status,
+                    formatted: status.drawable
+                        ? (status.value.unit === 'angle'
+                            ? `${status.value.value.toFixed(1)}\u00b0`
+                            : this.fmt(status.value.value))
+                        : '',
+                };
+            }),
+        };
     }
 
     /** Hand the drawings to the layers panel, which lists them. */
