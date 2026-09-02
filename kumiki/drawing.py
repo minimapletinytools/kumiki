@@ -14,9 +14,35 @@ other is fine.
 """
 
 from dataclasses import dataclass, field
+from enum import Enum
 from typing import Mapping, Optional, Tuple
 
 from .identity import DrawingId, FeaturePath, MeasurementId, TimberPath
+
+
+class MeasureKind(Enum):
+    """What a dimension is measuring.
+
+    A pair of features usually admits more than one, and which is wanted cannot
+    be inferred: two points admit the direct distance and either component along
+    the sheet, and the same two edge-on faces give a separation when they are
+    parallel and an angle when they are not. So a measurement says which it is.
+
+    Which of these apply depends on what the two features project to in the
+    viewport, not on what they are -- a face seen edge-on behaves as a line, and
+    an edge seen end-on behaves as a point.
+    """
+
+    #: The direct distance between two projected points.
+    ALIGNED = "aligned"
+    #: Its component across the sheet.
+    HORIZONTAL = "horizontal"
+    #: Its component up the sheet.
+    VERTICAL = "vertical"
+    #: Point to line, or between two parallel lines.
+    PERPENDICULAR = "perpendicular"
+    #: Between two lines that are not parallel.
+    ANGLE = "angle"
 
 
 @dataclass(frozen=True)
@@ -33,11 +59,17 @@ class Measure:
 
     anchor_a: FeaturePath
     anchor_b: FeaturePath
+    #: Which measurement of the pair. None asks for whichever one is natural,
+    #: which is decided in the viewport since it depends on what the two
+    #: features project to there.
+    kind: Optional[MeasureKind] = None
     measure_id: Optional[MeasurementId] = None
 
     def __post_init__(self):
         if isinstance(self.measure_id, str):
             object.__setattr__(self, 'measure_id', MeasurementId(self.measure_id))
+        if isinstance(self.kind, str):
+            object.__setattr__(self, 'kind', MeasureKind(self.kind))
 
     def identity(self) -> Tuple[Tuple, Tuple, str]:
         """What makes this measurement itself, within its viewport.

@@ -109,6 +109,9 @@ class ViewerViewport {
 // to leave the drawing itself unobscured.
 const MEASUREMENT_OFFSET_PX = 26;
 
+// How big the arc of an angle is, in page pixels.
+const MEASUREMENT_ANGLE_RADIUS_PX = 34;
+
 // How much of a timber a drawing is not about still shows. Enough to place the
 // piece among its neighbours, not enough to be mistaken for part of the sheet.
 const DRAWING_CONTEXT_OPACITY = 0.05;
@@ -5290,12 +5293,41 @@ class KigumiViewerApp extends LitElement {
         if (!from || !to) {
             return;
         }
-        const look = viewport.spec.camera ? viewport.spec.camera.look : [0, 0, -1];
-        const separation = KigumiMeasurements.projectedSeparation(from, to, look);
+        const camera = viewport.spec.camera || {};
+        const axes = {
+            look: camera.look || [0, 0, -1],
+            right: camera.right || [1, 0, 0],
+            up: camera.up || [0, 1, 0],
+        };
+        const formA = KigumiMeasurements.projectedForm(measure.a.geometry, axes.look);
+        const formB = KigumiMeasurements.projectedForm(measure.b.geometry, axes.look);
+        const available = KigumiMeasurements.availableKinds(formA, formB);
+        if (available.length === 0) {
+            // Nothing about this pair can be measured in this view -- a face
+            // seen at an angle covers it, and the distance between the middles
+            // of two such faces is a number about nothing.
+            return;
+        }
+        // Whichever was asked for, or the natural one for what they project to.
+        const kind = measure.kind && available.indexOf(measure.kind) !== -1
+            ? measure.kind
+            : (measure.kind ? null : available[0]);
+        if (!kind) {
+            // Asked for a measurement this pair does not admit here. The
+            // measurement is fine; this viewport cannot show it.
+            return;
+        }
+        const value = KigumiMeasurements.measureValue(kind, from, to, formA, formB, axes);
+        const fromPage = this._projectToPage(from, viewport, pageRect);
+        const toPage = this._projectToPage(to, viewport, pageRect);
+
+        if (kind === 'angle') {
+            this._drawAngle(overlay, viewport, pageRect, from, to, formA, formB, value);
+            return;
+        }
+
         const layout = KigumiMeasurements.dimensionLayout(
-            this._projectToPage(from, viewport, pageRect),
-            this._projectToPage(to, viewport, pageRect),
-            { offset: MEASUREMENT_OFFSET_PX },
+            fromPage, toPage, { offset: MEASUREMENT_OFFSET_PX },
         );
         if (!layout) {
             // The two anchors land on each other in this view: there is nothing
@@ -5323,7 +5355,60 @@ class KigumiViewerApp extends LitElement {
         text.setAttribute('y', layout.label.y);
         text.setAttribute('class', 'dim-label');
         text.setAttribute('transform', `rotate(${layout.label.angle} ${layout.label.x} ${layout.label.y})`);
-        text.textContent = this.fmt(separation);
+        text.textContent = this.fmt(value.value);
+        overlay.appendChild(text);
+    }
+
+    /**
+     * An angle, drawn as an arc in the corner the two features make.
+     *
+     * At the corner rather than between them, because that is where an angle
+     * is: the same two faces read as nothing at all anywhere else on the sheet.
+     */
+    _drawAngle(overlay, viewport, pageRect, from, to, formA, formB, value) {
+        // The screen direction of each projected line, taken by stepping a
+        // little along it and seeing where that lands.
+        const screenDirection = (point, direction) => {
+            const here = this._projectToPage(point, viewport, pageRect);
+            const step = 0.01;
+            const there = this._projectToPage([
+                point[0] + direction[0] * step,
+                point[1] + direction[1] * step,
+                point[2] + direction[2] * step,
+            ], viewport, pageRect);
+            const run = { x: there.x - here.x, y: there.y - here.y };
+            const size = Math.hypot(run.x, run.y);
+            return size > 0 ? { x: run.x / size, y: run.y / size } : null;
+        };
+
+        const fromDirection = screenDirection(from, formA.direction);
+        const toDirection = screenDirection(to, formB.direction);
+        if (!fromDirection || !toDirection) {
+            return;
+        }
+        const layout = KigumiMeasurements.angleLayout(
+            this._projectToPage(from, viewport, pageRect), fromDirection,
+            this._projectToPage(to, viewport, pageRect), toDirection,
+            { radius: MEASUREMENT_ANGLE_RADIUS_PX },
+        );
+        if (!layout) {
+            return;
+        }
+
+        const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        arc.setAttribute('d', [
+            'M', layout.start.x, layout.start.y,
+            'A', layout.radius, layout.radius, 0, layout.largeArc, layout.sweepFlag,
+            layout.end.x, layout.end.y,
+        ].join(' '));
+        arc.setAttribute('class', 'dim-line');
+        overlay.appendChild(arc);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', layout.label.x);
+        text.setAttribute('y', layout.label.y);
+        text.setAttribute('class', 'dim-label');
+        text.textContent = `${value.value.toFixed(1)}\u00b0`;
         overlay.appendChild(text);
     }
 

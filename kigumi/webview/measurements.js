@@ -11,6 +11,111 @@
     //
     // Pure on purpose: the projecting is the viewer's, the arithmetic is here.
 
+    // How square something has to be to the view before it counts as square:
+    // an edge a hair off end-on still projects to a line, just a very short
+    // one, and calling it a point would refuse a dimension that is drawable.
+    const ALIGNMENT_EPSILON = 1e-3;
+
+    // Two projected lines within this of parallel are treated as parallel: the
+    // angle between them would be a number nobody wrote down deliberately, and
+    // their separation is what was meant.
+    const PARALLEL_EPSILON = 1e-2;
+
+    /**
+     * What a feature looks like once projected into a viewport.
+     *
+     * This, not what the feature is, decides what can be measured: a face seen
+     * edge-on behaves as a line, an edge seen end-on behaves as a point, and a
+     * face seen at any other angle covers the view and cannot be dimensioned at
+     * all.
+     */
+    function projectedForm(geometry, look) {
+        if (!geometry || !geometry.kind) {
+            return { form: 'none' };
+        }
+        const gaze = normalized(look);
+        if (geometry.kind === 'point') {
+            return { form: 'point' };
+        }
+        if (geometry.kind === 'line') {
+            const direction = normalized(geometry.direction || [0, 0, 0]);
+            const alongView = Math.abs(dot(direction, gaze));
+            return alongView > 1 - ALIGNMENT_EPSILON
+                ? { form: 'point' }
+                : { form: 'line', direction: flatten(direction, gaze) };
+        }
+        if (geometry.kind === 'plane') {
+            const normal = normalized(geometry.normal || [0, 0, 0]);
+            const facingView = Math.abs(dot(normal, gaze));
+            if (facingView > ALIGNMENT_EPSILON) {
+                // Not edge-on: it covers the view, and an area has no distance.
+                return { form: 'area' };
+            }
+            // Edge-on, so it draws as a line running along the plane, square to
+            // its normal and to the line of sight.
+            return { form: 'line', direction: cross(normal, gaze) };
+        }
+        return { form: 'none' };
+    }
+
+    /** The part of a direction that survives projection. */
+    function flatten(direction, gaze) {
+        const along = dot(direction, gaze);
+        return normalized([
+            direction[0] - gaze[0] * along,
+            direction[1] - gaze[1] * along,
+            direction[2] - gaze[2] * along,
+        ]);
+    }
+
+    function cross(a, b) {
+        return normalized([
+            a[1] * b[2] - a[2] * b[1],
+            a[2] * b[0] - a[0] * b[2],
+            a[0] * b[1] - a[1] * b[0],
+        ]);
+    }
+
+    function normalized(v) {
+        const size = length(v);
+        return size > 0 ? [v[0] / size, v[1] / size, v[2] / size] : [0, 0, 0];
+    }
+
+    /**
+     * Which measurements this pair admits in this viewport, best first.
+     *
+     * Empty when there is nothing to measure -- a face that is not edge-on, or
+     * two features that project onto each other. The caller says why rather
+     * than drawing nothing without explanation.
+     */
+    function availableKinds(formA, formB) {
+        if (formA.form === 'none' || formB.form === 'none') {
+            return [];
+        }
+        if (formA.form === 'area' || formB.form === 'area') {
+            // A face seen at an angle covers the view: there is no line to
+            // measure to, and its centre is a point about nothing.
+            return [];
+        }
+        const forms = [formA.form, formB.form].sort().join('-');
+        if (forms === 'point-point') {
+            return ['aligned', 'horizontal', 'vertical'];
+        }
+        if (forms === 'line-point') {
+            return ['perpendicular'];
+        }
+        // Two lines: parallel ones have a separation, crossing ones an angle.
+        const alignment = Math.abs(dot(formA.direction, formB.direction));
+        return alignment > 1 - PARALLEL_EPSILON
+            ? ['perpendicular', 'horizontal', 'vertical']
+            : ['angle'];
+    }
+
+    /** Whether a measurement asking for `kind` can be drawn from these forms. */
+    function kindApplies(kind, formA, formB) {
+        return availableKinds(formA, formB).indexOf(kind) !== -1;
+    }
+
     /** a - b, as a plain triple. */
     function subtract(a, b) {
         return [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
@@ -42,6 +147,107 @@
             delta[1] - gaze[1] * along,
             delta[2] - gaze[2] * along,
         ]);
+    }
+
+    /**
+     * What one measurement comes to, in world units or degrees.
+     *
+     * Everything is computed with the depth taken out first, because a drawing
+     * is a projection and the number it carries is the one seen in the view.
+     */
+    function measureValue(kind, from, to, formA, formB, axes) {
+        const gaze = normalized(axes.look);
+        const delta = subtract(to, from);
+        const along = dot(delta, gaze);
+        const flat = [
+            delta[0] - gaze[0] * along,
+            delta[1] - gaze[1] * along,
+            delta[2] - gaze[2] * along,
+        ];
+
+        if (kind === 'angle') {
+            const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
+            return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
+        }
+        if (kind === 'horizontal') {
+            return { unit: 'length', value: Math.abs(dot(flat, normalized(axes.right))) };
+        }
+        if (kind === 'vertical') {
+            return { unit: 'length', value: Math.abs(dot(flat, normalized(axes.up))) };
+        }
+        if (kind === 'perpendicular') {
+            // Square to whichever of the two is a line: for a point and a line
+            // that is the point's distance from it, and for two parallel lines
+            // the gap between them.
+            const line = formA.form === 'line' ? formA : formB;
+            const direction = normalized(line.direction);
+            const slide = dot(flat, direction);
+            return {
+                unit: 'length',
+                value: length([
+                    flat[0] - direction[0] * slide,
+                    flat[1] - direction[1] * slide,
+                    flat[2] - direction[2] * slide,
+                ]),
+            };
+        }
+        return { unit: 'length', value: length(flat) };
+    }
+
+    /**
+     * The arc of an angle dimension, around where the two lines cross.
+     *
+     * Drawn at the crossing rather than between the two features, because an
+     * angle is a property of the corner they make and reads as nothing anywhere
+     * else. null when they are too near parallel to have a crossing on the
+     * sheet -- which the rules should already have refused, but a dimension
+     * drawn from a crossing at infinity would be worse than none.
+     */
+    function angleLayout(fromPoint, fromDirection, toPoint, toDirection, options) {
+        const settings = options || {};
+        const radius = settings.radius === undefined ? 34 : settings.radius;
+        const cross2d = fromDirection.x * toDirection.y - fromDirection.y * toDirection.x;
+        if (Math.abs(cross2d) < 1e-6) {
+            return null;
+        }
+        const between = { x: toPoint.x - fromPoint.x, y: toPoint.y - fromPoint.y };
+        const travel = (between.x * toDirection.y - between.y * toDirection.x) / cross2d;
+        const vertex = {
+            x: fromPoint.x + fromDirection.x * travel,
+            y: fromPoint.y + fromDirection.y * travel,
+        };
+
+        // Toward each feature, so the arc is drawn in the corner being measured
+        // rather than in the one opposite it.
+        const facing = (point, direction) => {
+            const towards = (point.x - vertex.x) * direction.x + (point.y - vertex.y) * direction.y;
+            return towards < 0 ? { x: -direction.x, y: -direction.y } : direction;
+        };
+        const first = facing(fromPoint, fromDirection);
+        const second = facing(toPoint, toDirection);
+
+        const startAngle = Math.atan2(first.y, first.x);
+        const endAngle = Math.atan2(second.y, second.x);
+        let sweep = endAngle - startAngle;
+        while (sweep > Math.PI) {
+            sweep -= 2 * Math.PI;
+        }
+        while (sweep < -Math.PI) {
+            sweep += 2 * Math.PI;
+        }
+        const midAngle = startAngle + sweep / 2;
+        return {
+            vertex,
+            start: { x: vertex.x + Math.cos(startAngle) * radius, y: vertex.y + Math.sin(startAngle) * radius },
+            end: { x: vertex.x + Math.cos(endAngle) * radius, y: vertex.y + Math.sin(endAngle) * radius },
+            radius,
+            largeArc: 0,
+            sweepFlag: sweep > 0 ? 1 : 0,
+            label: {
+                x: vertex.x + Math.cos(midAngle) * (radius + 12),
+                y: vertex.y + Math.sin(midAngle) * (radius + 12),
+            },
+        };
     }
 
     // Below this the two anchors are on top of each other in this view, and
@@ -112,9 +318,16 @@
     }
 
     const KigumiMeasurements = {
+        projectedForm,
+        availableKinds,
+        kindApplies,
         projectedSeparation,
+        measureValue,
         dimensionLayout,
+        angleLayout,
         DEGENERATE_PIXELS,
+        ALIGNMENT_EPSILON,
+        PARALLEL_EPSILON,
     };
 
     if (typeof module !== 'undefined' && module.exports) {

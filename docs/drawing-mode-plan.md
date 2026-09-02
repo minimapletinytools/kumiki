@@ -408,6 +408,68 @@ a pair separated purely along the view direction, where the projection collapses
 to nothing, and the degenerate row above already refuses it. The question would
 return only if a measurement of a single feature's own length ever arrives.
 
+### What can be measured, and when
+
+Agreed, not yet built in full.
+
+Each feature projects to a different form depending on how it lies to the view,
+and the *projected* pair is what decides the measurement -- which is why the same
+two features can be measurable in one viewport and meaningless in another.
+
+| feature | projects to | when |
+|---|---|---|
+| point | a point | always |
+| edge | a point | its direction runs along the line of sight |
+| edge | a line | otherwise |
+| face | a line | its normal is square to the line of sight -- seen edge-on |
+| face | an area | otherwise |
+
+An area cannot be dimensioned, so a face takes part only when it is edge-on. That
+is the rule that makes two perpendicular faces measurable as an angle and not as
+the distance between their middles, which is a number about nothing.
+
+Then, by projected pair:
+
+| projected pair | measurement | requires |
+|---|---|---|
+| point, point | **aligned** -- the direct distance | nothing |
+| point, point | **horizontal** -- across the sheet | a viewport axis |
+| point, point | **vertical** -- up the sheet | a viewport axis |
+| point, line | **perpendicular** -- point to the line | the line is not end-on |
+| line, line, parallel | **separation** -- between the lines | parallel in projection |
+| line, line, parallel | horizontal, vertical | as above |
+| line, line, not parallel | **angle** between them | not parallel in projection |
+| anything, area | nothing | a face not edge-on cannot be dimensioned |
+| coincident, or both to one point | nothing | degenerate |
+
+**So a pair often has more than one measurement**, and which one is wanted cannot
+be inferred: two points admit the direct distance and either component, and the
+same two edge-on faces give a separation when parallel and an angle when not. The
+measurement has to say which it is, and where the dimension line is dragged is
+what chooses it.
+
+Worth having later, and listed so the shape leaves room: **radius** and
+**diameter** of a circular feature; **arc length**; a distance **along a named
+direction** rather than the sheet's -- along the piece, say, which coincides with
+horizontal in a face view but not in a plan; and chains and baselines.
+
+### Refusing, and saying why
+
+Four different failures, and they are worth telling apart rather than all
+reading as "nothing here":
+
+- **The anchors did not resolve.** A renamed feature, or a timber that has gone.
+- **The kind does not apply to this pair.** An angle asked of two parallel lines,
+  or any dimension asked of a face that is not edge-on in this view. The
+  measurement is fine; this viewport cannot show it.
+- **Degenerate.** The two project onto each other, so there is nothing to
+  measure however far apart they are in space.
+- **Nothing applies at all.** No kind fits the projected pair in any reading.
+
+The first greys the measurement wherever it appears. The others are specific to
+one viewport, so the same measurement may be drawn in one and greyed in another,
+and the reason is worth carrying so it can be shown rather than guessed at.
+
 ### Where the dimension line goes decides what it means
 
 Between two projected points, the direct distance and the horizontal or vertical

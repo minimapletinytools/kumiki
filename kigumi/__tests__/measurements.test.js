@@ -111,3 +111,160 @@ describe('dimensionLayout', () => {
         expect(alongX * 100 + alongY * 100).toBeCloseTo(0, 6);
     });
 });
+
+const { projectedForm, availableKinds, kindApplies, measureValue, angleLayout } =
+    require('../webview/measurements.js');
+
+// A front elevation: looking north, x across the sheet and z up it.
+const FRONT = { look: [0, 1, 0], right: [1, 0, 0], up: [0, 0, 1] };
+
+const face = (normal) => ({ kind: 'plane', normal });
+const edge = (direction) => ({ kind: 'line', direction });
+
+describe('projectedForm', () => {
+    // What a feature looks like once projected is what decides the measurement,
+    // not what the feature is.
+    test('a face square to the view covers it, and an area has no distance', () => {
+        expect(projectedForm(face([0, 1, 0]), FRONT.look).form).toBe('area');
+    });
+
+    test('a face seen edge-on behaves as a line', () => {
+        expect(projectedForm(face([0, 0, 1]), FRONT.look).form).toBe('line');
+    });
+
+    test('an edge along the line of sight behaves as a point', () => {
+        expect(projectedForm(edge([0, 1, 0]), FRONT.look).form).toBe('point');
+    });
+
+    test('an edge across the view stays a line', () => {
+        expect(projectedForm(edge([1, 0, 0]), FRONT.look).form).toBe('line');
+    });
+
+    test('a point is a point however it is looked at', () => {
+        expect(projectedForm({ kind: 'point' }, FRONT.look).form).toBe('point');
+    });
+
+    test('an edge-on face draws along itself, not along its normal', () => {
+        const drawn = projectedForm(face([0, 0, 1]), FRONT.look).direction;
+
+        // Square to its own normal, and to the line of sight.
+        expect(drawn[2]).toBeCloseTo(0, 6);
+        expect(drawn[1]).toBeCloseTo(0, 6);
+    });
+});
+
+describe('availableKinds', () => {
+    const point = { form: 'point' };
+
+    test('two points admit the distance and either component', () => {
+        expect(availableKinds(point, point)).toEqual(['aligned', 'horizontal', 'vertical']);
+    });
+
+    test('a point and a line admit the perpendicular', () => {
+        expect(availableKinds(point, projectedForm(edge([1, 0, 0]), FRONT.look)))
+            .toEqual(['perpendicular']);
+    });
+
+    test('two perpendicular faces admit an angle and not a distance', () => {
+        // The case that started this: the distance between the middles of two
+        // faces that meet at a corner is a number about nothing.
+        const kinds = availableKinds(
+            projectedForm(face([0, 0, 1]), FRONT.look),
+            projectedForm(face([1, 0, 0]), FRONT.look),
+        );
+
+        expect(kinds).toEqual(['angle']);
+    });
+
+    test('two parallel faces admit a separation and not an angle', () => {
+        const kinds = availableKinds(
+            projectedForm(face([0, 0, 1]), FRONT.look),
+            projectedForm(face([0, 0, -1]), FRONT.look),
+        );
+
+        expect(kinds).toContain('perpendicular');
+        expect(kinds).not.toContain('angle');
+    });
+
+    test('a face that is not edge-on admits nothing at all', () => {
+        expect(availableKinds(projectedForm(face([0, 1, 0]), FRONT.look), point)).toEqual([]);
+    });
+
+    test('a measurement can ask whether its kind applies here', () => {
+        const a = projectedForm(face([0, 0, 1]), FRONT.look);
+        const b = projectedForm(face([1, 0, 0]), FRONT.look);
+
+        expect(kindApplies('angle', a, b)).toBe(true);
+        expect(kindApplies('aligned', a, b)).toBe(false);
+    });
+});
+
+describe('measureValue', () => {
+    const a = projectedForm(face([0, 0, 1]), FRONT.look);
+    const b = projectedForm(face([1, 0, 0]), FRONT.look);
+
+    test('the angle between two perpendicular faces is a right angle', () => {
+        expect(measureValue('angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).value)
+            .toBeCloseTo(90, 6);
+    });
+
+    test('the components are taken along the sheet, not the world', () => {
+        const across = measureValue('horizontal', [0, 0, 0], [3, 9, 4], a, b, FRONT);
+        const up = measureValue('vertical', [0, 0, 0], [3, 9, 4], a, b, FRONT);
+
+        expect(across.value).toBeCloseTo(3, 9);
+        expect(up.value).toBeCloseTo(4, 9);
+    });
+
+    test('the aligned distance drops the depth between them', () => {
+        // Nine units of it, in this view.
+        expect(measureValue('aligned', [0, 0, 0], [3, 9, 4], a, b, FRONT).value)
+            .toBeCloseTo(5, 9);
+    });
+
+    test('a perpendicular is square to whichever of the two is a line', () => {
+        const line = projectedForm(edge([1, 0, 0]), FRONT.look);
+        const value = measureValue('perpendicular', [0, 0, 0], [7, 0, 2], { form: 'point' }, line, FRONT);
+
+        // Seven along the line does not count; two away from it does.
+        expect(value.value).toBeCloseTo(2, 9);
+    });
+
+    test('an angle comes back in degrees and a distance in world units', () => {
+        expect(measureValue('angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('angle');
+        expect(measureValue('aligned', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('length');
+    });
+});
+
+describe('angleLayout', () => {
+    test('the arc is drawn where the two lines cross', () => {
+        const layout = angleLayout({ x: 0, y: 100 }, { x: 1, y: 0 },
+                                   { x: 100, y: 0 }, { x: 0, y: -1 }, { radius: 30 });
+
+        expect(layout.vertex.x).toBeCloseTo(100, 6);
+        expect(layout.vertex.y).toBeCloseTo(100, 6);
+    });
+
+    test('its ends sit on the arc at the given radius', () => {
+        const layout = angleLayout({ x: 0, y: 100 }, { x: 1, y: 0 },
+                                   { x: 100, y: 0 }, { x: 0, y: -1 }, { radius: 30 });
+        const reach = (point) => Math.hypot(point.x - layout.vertex.x, point.y - layout.vertex.y);
+
+        expect(reach(layout.start)).toBeCloseTo(30, 6);
+        expect(reach(layout.end)).toBeCloseTo(30, 6);
+    });
+
+    test('it is drawn in the corner being measured, not the one opposite', () => {
+        const layout = angleLayout({ x: 0, y: 100 }, { x: 1, y: 0 },
+                                   { x: 100, y: 0 }, { x: 0, y: -1 }, { radius: 30 });
+
+        // Both features lie left of and above the crossing, so the arc does too.
+        expect(layout.start.x).toBeLessThanOrEqual(layout.vertex.x);
+        expect(layout.end.y).toBeLessThanOrEqual(layout.vertex.y);
+    });
+
+    test('lines that never cross have no corner to draw in', () => {
+        expect(angleLayout({ x: 0, y: 0 }, { x: 1, y: 0 },
+                           { x: 0, y: 50 }, { x: 1, y: 0 }, {})).toBeNull();
+    });
+});
