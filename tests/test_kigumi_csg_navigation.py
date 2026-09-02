@@ -1183,3 +1183,75 @@ class TestEdgeHighlightSpan:
                     checked += 1
 
         assert checked > 10, f"expected plenty of edges to check, got {checked}"
+
+
+class TestResolvingADerivedEdge:
+    """A picked edge, written down and found again.
+
+    An edge is not among any node's declared features, so there is nothing to
+    look up by name: the reference names its two parent faces and the edge is
+    derived again from them.
+    """
+
+    def _picked_edge(self, frame):
+        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(frame, "receiving_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                for hit in local.get_all_features(point):
+                    if hit.feature.feature_type() == CSGFeatureType.EDGE:
+                        return local, hit.feature
+        raise AssertionError("no edge found on the finished surface")
+
+    def _reference(self, frame, local, edge, member_key):
+        from kumiki.identity import DerivedFeaturePath, FeatureRef, ResolvedTimberPath
+
+        positions = runner._node_positions(local)
+        return DerivedFeaturePath(
+            timber=ResolvedTimberPath.parse(member_key),
+            a=FeatureRef(tuple(positions[id(edge.a.owner)][2]), edge.a.feature.name),
+            b=FeatureRef(tuple(positions[id(edge.b.owner)][2]), edge.b.feature.name),
+        )
+
+    def test_a_picked_edge_resolves_to_a_place(self, mortise_and_tenon_frame):
+        entries, _ = runner._assign_member_keys(mortise_and_tenon_frame)
+        entry = next(e for e in entries if "receiving" in e["memberKey"])
+        local, edge = self._picked_edge(mortise_and_tenon_frame)
+        reference = self._reference(mortise_and_tenon_frame, local, edge, entry["memberKey"])
+
+        resolved = runner.resolve_anchor(
+            mortise_and_tenon_frame, runner.serialize_feature_path(reference))
+
+        assert resolved is not None, f"{reference.describe()} did not resolve"
+        assert resolved["at"] is not None
+        assert resolved["geometry"]["kind"] == "line"
+
+    def test_a_parent_that_is_gone_breaks_the_reference(self, mortise_and_tenon_frame):
+        # Rather than resolving to whichever edge happens to be nearby.
+        from kumiki.identity import DerivedFeaturePath, FeatureRef, ResolvedTimberPath
+
+        entries, _ = runner._assign_member_keys(mortise_and_tenon_frame)
+        entry = next(e for e in entries if "receiving" in e["memberKey"])
+        local, edge = self._picked_edge(mortise_and_tenon_frame)
+        good = self._reference(mortise_and_tenon_frame, local, edge, entry["memberKey"])
+        broken = DerivedFeaturePath(
+            timber=good.timber, a=good.a,
+            b=FeatureRef(good.b.csg_path, "renamed_since"),
+        )
+
+        assert runner.resolve_anchor(
+            mortise_and_tenon_frame, runner.serialize_feature_path(broken)) is None
+
+    def test_the_timbers_own_body_is_reachable(self, mortise_and_tenon_frame):
+        # One parent of nearly every edge is a face of the body, which is the
+        # base of the rendered Difference rather than one of the cuts.
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+
+        body = runner._timber_body_csg(cut_timber)
+
+        assert body is not None
+        assert any(f.name.startswith("rough.") for f in body.get_declared_features())

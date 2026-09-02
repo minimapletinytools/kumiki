@@ -16,8 +16,9 @@ import pytest
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.drawing import Drawing, Measure
-from kumiki.identity import (FeaturePath, JointPath, ResolvedJointPath,
-                             ResolvedTimberPath, TimberPath)
+from kumiki.identity import (DerivedFeaturePath, FeaturePath, FeatureRef, JointPath,
+                             ResolvedJointPath, ResolvedTimberPath, SingleFeaturePath,
+                             TimberPath)
 from kumiki.timber import Frame
 
 
@@ -72,7 +73,8 @@ def _feature_names(measures):
 
 def _path(feature, timber="posts/fl", csg_path=("cut",), kind="FACE"):
     """The kumiki form of the same thing."""
-    return FeaturePath(timber=timber, csg_path=csg_path, feature=feature, feature_type=kind)
+    return SingleFeaturePath(timber=timber, ref=FeatureRef(csg_path=csg_path, feature=feature),
+                             feature_type=kind)
 
 
 def _sheet(drawing_id, name=None, viewports=None):
@@ -493,21 +495,23 @@ class TestMeasurementsThroughADrawing:
         assert drawing["origin"] == runner.ORIGIN_FILE
 
 
-class TestFeaturePath:
+class TestSingleFeaturePath:
     """A reference to a feature: instructions for finding it again."""
 
     def test_it_addresses_by_name_and_never_by_position(self):
         # The property the whole thing rests on. A position stops meaning what
         # it meant the moment a joint is added above it.
-        reference = FeaturePath(
-            timber=ResolvedTimberPath("posts/fl"), csg_path=["tenon_cut"],
-            feature="tenon_front", feature_type="FACE",
+        reference = SingleFeaturePath(
+            timber=ResolvedTimberPath("posts/fl"),
+            ref=FeatureRef(csg_path=["tenon_cut"], feature="tenon_front"),
+            feature_type="FACE",
         )
 
         assert reference.identity() == ("posts/fl#0", ("tenon_cut",), "tenon_front", "FACE")
 
     def test_a_list_of_steps_becomes_a_tuple(self):
-        assert isinstance(FeaturePath(ResolvedTimberPath("t"), ["a", "b"]).csg_path, tuple)
+        assert isinstance(
+            SingleFeaturePath(ResolvedTimberPath("t"), FeatureRef(["a", "b"])).csg_path, tuple)
 
     def test_the_same_label_on_a_face_and_an_edge_are_different_features(self):
         # One label can name both, and measuring to the wrong one does not look
@@ -520,8 +524,8 @@ class TestFeaturePath:
     def test_a_separator_in_a_ticket_path_cannot_collapse_two_references(self):
         # Why identity is a tuple and not a joined string: ticket paths contain
         # slashes themselves.
-        one = FeaturePath(timber=ResolvedTimberPath("posts/fl"), csg_path=["cut"])
-        other = FeaturePath(timber=ResolvedTimberPath("posts"), csg_path=["fl", "cut"])
+        one = SingleFeaturePath(timber=ResolvedTimberPath("posts/fl"), ref=FeatureRef(["cut"]))
+        other = SingleFeaturePath(timber=ResolvedTimberPath("posts"), ref=FeatureRef(["fl", "cut"]))
 
         assert one.identity() != other.identity()
 
@@ -531,12 +535,12 @@ class TestFeaturePath:
         )
 
     def test_a_reference_to_a_whole_node_needs_no_feature(self):
-        assert FeaturePath(
-            timber=ResolvedTimberPath("posts/fl"), csg_path=["tenon_cut"],
+        assert SingleFeaturePath(
+            timber=ResolvedTimberPath("posts/fl"), ref=FeatureRef(csg_path=["tenon_cut"]),
         ).describe() == "posts/fl#0 > tenon_cut"
 
     def test_the_wire_form_round_trips_into_the_same_identity(self):
-        reference = FeaturePath(ResolvedTimberPath("posts/fl"), ("cut",), "x", "FACE")
+        reference = SingleFeaturePath(ResolvedTimberPath("posts/fl"), FeatureRef(("cut",), "x"), "FACE")
         on_the_wire = runner.serialize_feature_path(reference)
 
         assert runner._feature_path_identity(on_the_wire) == reference.identity()
@@ -857,3 +861,59 @@ class TestResolvedJointPath:
 
     def test_the_name_alone_cannot_say_which(self):
         assert str(ResolvedJointPath("mortise_and_tenon", 1).joint_path) == "mortise_and_tenon"
+
+
+class TestDerivedFeaturePath:
+    """An edge, referenced by the two faces that form it."""
+
+    def _ref(self, path, feature):
+        return FeatureRef(csg_path=path, feature=feature)
+
+    def _edge(self, timber="posts/fl"):
+        return DerivedFeaturePath(
+            timber=ResolvedTimberPath(timber),
+            a=self._ref(("mortise_and_tenon#0", "mortise_hole"), "mortise_right"),
+            b=self._ref(("timber (rough, extended)",), "rough.left"),
+        )
+
+    def test_either_way_round_is_the_same_edge(self):
+        # Deriving sorts its parents, so a reference must too, or the same edge
+        # written twice would read as two.
+        forwards = self._edge()
+        backwards = DerivedFeaturePath(
+            timber=ResolvedTimberPath("posts/fl"),
+            a=self._ref(("timber (rough, extended)",), "rough.left"),
+            b=self._ref(("mortise_and_tenon#0", "mortise_hole"), "mortise_right"),
+        )
+
+        assert forwards.identity() == backwards.identity()
+
+    def test_it_is_an_edge_by_construction(self):
+        assert self._edge().feature_type == "EDGE"
+
+    def test_it_is_not_a_single_feature_path(self):
+        # The point of the split: a face cannot carry a second parent, and an
+        # edge cannot be missing one.
+        assert isinstance(self._edge(), FeaturePath)
+        assert not isinstance(self._edge(), SingleFeaturePath)
+
+    def test_two_timbers_are_not_confusable(self):
+        assert self._edge("posts/fl").identity() != self._edge("posts/fr").identity()
+
+    def test_the_wire_form_round_trips(self):
+        reference = self._edge()
+
+        on_the_wire = runner.serialize_feature_path(reference)
+
+        assert on_the_wire["kind"] == "edge"
+        assert runner.deserialize_feature_path(on_the_wire).identity() == reference.identity()
+        assert runner._feature_path_identity(on_the_wire) == reference.identity()
+
+    def test_a_single_path_still_reads_without_a_kind(self):
+        # Every reference saved before edges existed is this shape.
+        older = {"timber": "posts/fl#0", "csgPath": ["cut"], "feature": "x", "type": "FACE"}
+
+        read = runner.deserialize_feature_path(older)
+
+        assert isinstance(read, SingleFeaturePath)
+        assert read.identity() == ("posts/fl#0", ("cut",), "x", "FACE")

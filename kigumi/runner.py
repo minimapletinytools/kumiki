@@ -1642,17 +1642,14 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
     # from before would be to a class that no longer exists.
     from kumiki.identity import ResolvedTimberPath
 
-    source = anchor if isinstance(anchor, dict) else {}
-    csg_path = source.get("csgPath")
-    # Through ResolvedTimberPath so that a timber written by hand without an
-    # occurrence means the same reference as the canonical form with one.
-    timber = str(ResolvedTimberPath.parse(str(source.get("timber") or "")))
-    return (
-        timber,
-        tuple(str(step) for step in csg_path) if isinstance(csg_path, list) else (),
-        str(source.get("feature") or ""),
-        str(source.get("type") or ""),
-    )
+    # Through the path types, so a wire form and the object it came from give
+    # the same answer -- including a timber written by hand without an
+    # occurrence, and an edge's two parents whichever way round they were
+    # written.
+    path = deserialize_feature_path(anchor)
+    if path is None:
+        return ("", (), "", "")
+    return path.identity()
 
 
 def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
@@ -1676,13 +1673,53 @@ def serialize_feature_path(path: Any) -> Dict[str, Any]:
 
     The timber goes out as the member key the viewer already uses, which is what
     ResolvedTimberPath prints as.
+
+    A derived edge writes both its parents under an explicit "kind", rather than
+    letting the reader infer one from a field being present. The viewer reads
+    these too, and inference across two languages is how a wire format goes
+    quietly wrong.
     """
+    from kumiki.identity import DerivedFeaturePath
+
+    if isinstance(path, DerivedFeaturePath):
+        return {
+            "kind": "edge",
+            "timber": str(path.timber),
+            "a": {"csgPath": list(path.a.csg_path), "feature": path.a.feature},
+            "b": {"csgPath": list(path.b.csg_path), "feature": path.b.feature},
+            "type": "EDGE",
+        }
     return {
         "timber": str(path.timber),
         "csgPath": list(path.csg_path),
         "feature": path.feature,
         "type": path.feature_type,
     }
+
+
+def deserialize_feature_path(source: Any) -> Optional[Any]:
+    """The reference a wire form names, or None if it names nothing usable."""
+    from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
+                                 SingleFeaturePath)
+
+    if not isinstance(source, dict):
+        return None
+    timber = ResolvedTimberPath.parse(str(source.get("timber") or ""))
+
+    def ref(part: Any) -> FeatureRef:
+        part = part if isinstance(part, dict) else {}
+        steps = part.get("csgPath")
+        return FeatureRef(
+            csg_path=tuple(str(step) for step in steps) if isinstance(steps, list) else (),
+            feature=part.get("feature"),
+        )
+
+    if source.get("kind") == "edge":
+        return DerivedFeaturePath(timber=timber, a=ref(source.get("a")), b=ref(source.get("b")))
+    return SingleFeaturePath(
+        timber=timber, ref=ref(source),
+        feature_type=str(source.get("type")) if source.get("type") else None,
+    )
 
 
 def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
@@ -2149,6 +2186,21 @@ def _feature_anchor(feature: Any, node: Any, timber: Any, located: Any) -> Optio
     return _vector3_to_floats(timber.transform.local_to_global(extent.anchor))
 
 
+def _timber_body_csg(cut_timber: Any) -> Optional[Any]:
+    """The uncut body the cuts are taken out of, or None if it cannot be read.
+
+    The base of the rendered Difference. Kept in one place because it is the
+    half of a timber's CSG that is not a cut, and so is not in cut_timber.cuts.
+    """
+    from kumiki.cutcsg import Difference
+
+    try:
+        local = cut_timber.render_timber_with_cuts_csg_local()
+    except Exception:
+        return None
+    return local.base if isinstance(local, Difference) else local
+
+
 def _roots_for_path(cut_timber: Any, labels: Tuple[str, ...]) -> Tuple[List[Any], Tuple[str, ...]]:
     """Which cuts a path could be in, and what is left of the path to walk.
 
@@ -2166,6 +2218,13 @@ def _roots_for_path(cut_timber: Any, labels: Tuple[str, ...]) -> Tuple[List[Any]
 
     cuts = list(getattr(cut_timber, "cuts", None) or [])
     every = [cut.negative_csg for cut in cuts if getattr(cut, "negative_csg", None) is not None]
+    # The timber's own body as well as the things cut out of it. A face
+    # reference has never needed it -- measurements name joint geometry -- but
+    # an edge nearly always does: it is where joint geometry meets the timber,
+    # so one of its two parents is a face of the body itself.
+    body = _timber_body_csg(cut_timber)
+    if body is not None:
+        every = every + [body]
     if not labels:
         return every, labels
 
@@ -2181,6 +2240,23 @@ def _roots_for_path(cut_timber: Any, labels: Tuple[str, ...]) -> Tuple[List[Any]
     return chosen, labels[1:]
 
 
+def _find_declared_feature(cut_timber: Any, ref: Any) -> Optional[Tuple[Any, Any]]:
+    """The feature a FeatureRef names, with the node declaring it.
+
+    One timber's tree, one reference. Split out because a derived edge needs it
+    twice, once per parent, against the same timber.
+    """
+    roots, labels = _roots_for_path(cut_timber, ref.csg_path)
+    for root in roots:
+        node = _find_csg_by_labels(root, labels)
+        if node is None:
+            continue
+        for feature in node.get_declared_features():
+            if feature.name == ref.feature:
+                return (feature, node)
+    return None
+
+
 def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Where the feature an anchor names actually is, in world space.
 
@@ -2189,29 +2265,54 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
     as broken rather than guessing, which is the whole reason a reference is
     allowed to break honestly.
     """
-    identity = _feature_path_identity(anchor)
-    member_key, labels, feature_name, _ = identity
+    from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit
+    from kumiki.identity import DerivedFeaturePath
 
-    timber_entries, _ = _assign_member_keys(frame)
-    entry = next((e for e in timber_entries if e["memberKey"] == member_key), None)
-    if entry is None:
+    path = deserialize_feature_path(anchor)
+    if path is None:
         return None
 
-    roots, labels = _roots_for_path(entry["cutTimber"], labels)
-    for root in roots:
-        node = _find_csg_by_labels(root, labels)
-        if node is None:
-            continue
-        for feature in node.get_declared_features():
-            if feature.name != feature_name:
-                continue
-            timber = entry["timber"]
-            located = feature.locate(node)
-            return {
-                "at": _feature_anchor(feature, node, timber, located),
-                "geometry": _located_geometry_payload(located, timber),
-            }
-    return None
+    timber_entries, _ = _assign_member_keys(frame)
+    entry = next((e for e in timber_entries
+                  if e["memberKey"] == str(path.timber)), None)
+    if entry is None:
+        return None
+    timber = entry["timber"]
+
+    if isinstance(path, DerivedFeaturePath):
+        # A derived edge is not among anyone's declared features, so there is
+        # nothing to look up by name. Resolve the two faces that form it and
+        # derive it again -- which also means its name never has to be unique,
+        # and its properties come out right rather than being stored and going
+        # stale.
+        first = _find_declared_feature(entry["cutTimber"], path.a)
+        second = _find_declared_feature(entry["cutTimber"], path.b)
+        if first is None or second is None:
+            return None
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(feature=first[0], owner=first[1]),
+            OwnedFeatureHit(feature=second[0], owner=second[1]),
+        )
+        if edge is None:
+            # The two faces no longer form an edge: moved apart, made parallel,
+            # or put in groups that do not meet. Broken, honestly.
+            return None
+        owner = first[1]
+        located = edge.locate(owner)
+        return {
+            "at": _feature_anchor(edge, owner, timber, located),
+            "geometry": _located_geometry_payload(located, timber),
+        }
+
+    found = _find_declared_feature(entry["cutTimber"], path.ref)
+    if found is None:
+        return None
+    feature, node = found
+    located = feature.locate(node)
+    return {
+        "at": _feature_anchor(feature, node, timber, located),
+        "geometry": _located_geometry_payload(located, timber),
+    }
 
 
 def serialize_layers(frame: Any) -> Dict[str, Any]:
@@ -3199,19 +3300,26 @@ def _node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
     contribute nothing to it -- the same way navigation drills through them
     transparently.
     """
-    from kumiki.cutcsg import csg_children
+    from kumiki.cutcsg import Difference, csg_children
 
     positions: Dict[int, Tuple[int, int, List[str]]] = {}
     order = 0
 
-    def walk(node: Any, depth: int, path: List[str]) -> None:
+    def walk(node: Any, depth: int, path: List[str], segment: Optional[str] = None) -> None:
         nonlocal order
         label = _label_name(node)
-        node_path = path + [label] if label else path
+        # `segment` carries the joint's occurrence for a top-level cut, the same
+        # numbering the tree payload and navigation use. Without it a path names
+        # the first joint of that name, and every reference into the second one
+        # resolves to the wrong cut -- or to nothing.
+        step = segment or label
+        node_path = path + [step] if step else path
         positions[id(node)] = (depth, order, node_path)
         order += 1
+        joints = (_joint_occurrences(node.subtract)
+                  if isinstance(node, Difference) and not path else {})
         for child in csg_children(node):
-            walk(child, depth + 1, node_path)
+            walk(child, depth + 1, node_path, joints.get(id(child)))
 
     walk(root, 0, [])
     return positions

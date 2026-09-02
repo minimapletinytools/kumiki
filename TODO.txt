@@ -287,9 +287,7 @@ DONE-drawing mode fixes
 DONE-switthing from one drawing to another while in drawing mode will break the camera sanpping behavior
   -actualyl camera anglesa re broken in general in drawing mode... they don't seem to be consistent each time I reopen
 DONE-fix background in ortho drawing
-
-
--shoulder_scribe_relief should not use rough.right... as feature name.. please reserve rough/perfect.right for the timber itself
+DONE-shoulder_scribe_relief should not use rough.right... as feature name.. please reserve rough/perfect.right for the timber itself
 
 -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
 

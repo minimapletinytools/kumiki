@@ -25,11 +25,14 @@ from .ticket import (
     normalize_timber_tags,
 )
 from .identity import (
+    DerivedFeaturePath,
     DrawingId,
     FeaturePath,
+    FeatureRef,
     Identifier,
     MeasurementId,
     ResolvedTimberPath,
+    SingleFeaturePath,
     TimberPath,
     ViewportId,
 )

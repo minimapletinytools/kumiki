@@ -14,17 +14,16 @@ project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 from kumiki.drawing import Drawing, Measure
-from kumiki.identity import FeaturePath, ResolvedTimberPath
+from kumiki.identity import FeatureRef, ResolvedTimberPath, SingleFeaturePath
 from kumiki.timber import Frame
 from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
 
 
 def _face(timber, cut, feature):
     """A declared face of one timber, named the way the drawings file names it."""
-    return FeaturePath(
+    return SingleFeaturePath(
         timber=ResolvedTimberPath(timber),
-        csg_path=cut,
-        feature=feature,
+        ref=FeatureRef(csg_path=cut, feature=feature),
         feature_type="FACE",
     )
 
