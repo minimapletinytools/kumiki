@@ -47,7 +47,9 @@ PICK_EPS = 5e-4
 
 # Where the tenon sits in a mortise-and-tenon tree: the joint's node, the waste
 # removed around the tenon, then the tenon prism subtracted back out of it.
-TENON_PATH = ["mortise_and_tenon", "tenon_waste", "tenon"]
+# The joint segment carries its occurrence, which is what tells two identical
+# joints on one timber apart. One joint here, so #0.
+TENON_PATH = ["mortise_and_tenon#0", "tenon_waste", "tenon"]
 
 
 def _load_runner():
@@ -166,8 +168,9 @@ class TestCSGTreeSerialization:
     def test_labelled_nodes_carry_their_navigable_path(self, mortise_and_tenon_frame):
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
         labelled = self._by_label(tree)
-        assert labelled["mortise_and_tenon"]["path"] == ["mortise_and_tenon"]
-        assert labelled["tenon_waste"]["path"] == ["mortise_and_tenon", "tenon_waste"]
+        # The label people read stays bare; only the path is numbered.
+        assert labelled["mortise_and_tenon"]["path"] == ["mortise_and_tenon#0"]
+        assert labelled["tenon_waste"]["path"] == ["mortise_and_tenon#0", "tenon_waste"]
         assert labelled["tenon"]["path"] == TENON_PATH
 
     def test_features_carry_their_metadata(self, mortise_and_tenon_frame):
@@ -299,7 +302,7 @@ class TestNavigateToLeaf:
         )
 
         assert any(
-            path == ("mortise_and_tenon", "mortise_hole") for path, _ in found
+            path == ("mortise_and_tenon#0", "mortise_hole") for path, _ in found
         ), f"paths found were {sorted({path for path, _ in found})}"
 
 
@@ -383,7 +386,7 @@ class TestNonPrismPrimitivesArePickable:
             ),
         ])
         path, target, _face = runner._navigate_csg_to_leaf(csg, [2.0, 0.0, 15.0], PICK_EPS)
-        assert path == ["dovetail_housing"]
+        assert path == ["dovetail_housing#0"]
         assert isinstance(target, ConvexPolygonExtrusion)
 
     def test_cylinder_cut_resolves_to_its_label(self):
@@ -399,7 +402,7 @@ class TestNonPrismPrimitivesArePickable:
         ])
         # On the bore wall, one radius off the axis.
         path, target, face = runner._navigate_csg_to_leaf(csg, [1.0, 0.0, 50.0], PICK_EPS)
-        assert path == ["peg_hole"]
+        assert path == ["peg_hole#0"]
         assert isinstance(target, Cylinder)
         assert face == "cylindrical_surface"
 

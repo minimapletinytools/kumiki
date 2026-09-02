@@ -2148,6 +2148,38 @@ def _feature_anchor(feature: Any, node: Any, timber: Any, located: Any) -> Optio
     return _vector3_to_floats(timber.transform.local_to_global(extent.anchor))
 
 
+def _roots_for_path(cut_timber: Any, labels: Tuple[str, ...]) -> Tuple[List[Any], Tuple[str, ...]]:
+    """Which cuts a path could be in, and what is left of the path to walk.
+
+    A path may name the joint it starts in -- the form the CSG tree shows,
+    `mortise_and_tenon#1/tenon_waste/tenon` -- and that leading segment is the
+    only thing telling two identical joints on one timber apart. Where it names
+    one, the cut is chosen by occurrence and the segment is consumed.
+
+    A path that starts below the joint is the older form and still resolves: it
+    matches no cutting name, so every cut is searched, as it always was. So is
+    a joint segment without an occurrence, which reads as #0 -- the cut that
+    first-wins would have found anyway.
+    """
+    from kumiki.identity import ResolvedJointPath
+
+    cuts = list(getattr(cut_timber, "cuts", None) or [])
+    every = [cut.negative_csg for cut in cuts if getattr(cut, "negative_csg", None) is not None]
+    if not labels:
+        return every, labels
+
+    wanted = ResolvedJointPath.parse(labels[0])
+    # Numbered over every cut sharing the name, which is what the tree numbers
+    # by too -- a cut that contributed no CSG still takes its place in the count.
+    matching = [cut.negative_csg for cut in cuts if _label_name(cut) == wanted.path]
+    if not matching:
+        return every, labels
+    # An occurrence past the end names a joint that is not there any more, which
+    # is a broken reference rather than a reason to fall back to another cut.
+    chosen = [root for root in matching[wanted.occurrence:wanted.occurrence + 1] if root is not None]
+    return chosen, labels[1:]
+
+
 def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Where the feature an anchor names actually is, in world space.
 
@@ -2164,7 +2196,8 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
     if entry is None:
         return None
 
-    for root in _csg_roots_of(entry["cutTimber"]):
+    roots, labels = _roots_for_path(entry["cutTimber"], labels)
+    for root in roots:
         node = _find_csg_by_labels(root, labels)
         if node is None:
             continue
@@ -2421,6 +2454,7 @@ def _serialize_csg_node(
     attribution: _CutAttribution,
     cut_timber: 'CutTimber',
     parity: 'CSGParity',
+    path_label: Optional[str] = None,
 ) -> Dict[str, Any]:
     """One CSG node and everything beneath it.
 
@@ -2443,7 +2477,10 @@ def _serialize_csg_node(
     }
 
     label = _label_name(csg)
-    node_path = path + [label] if label else path
+    # `label` stays the bare name people read; the path segment may carry the
+    # occurrence that tells two identical joints apart.
+    segment = path_label or label
+    node_path = path + [segment] if segment else path
 
     node: Dict[str, Any] = {
         # kind is the class name and stays machine-readable -- the viewer keys
@@ -2461,10 +2498,11 @@ def _serialize_csg_node(
         "children": [],
     }
 
-    def child(node_csg: 'CutCSG', child_role: str, child_attribution: _CutAttribution) -> None:
+    def child(node_csg: 'CutCSG', child_role: str, child_attribution: _CutAttribution,
+              child_path_label: Optional[str] = None) -> None:
         node["children"].append(_serialize_csg_node(
             node_csg, node_path, child_role, child_attribution, cut_timber,
-            child_parity.get(id(node_csg), parity),
+            child_parity.get(id(node_csg), parity), child_path_label,
         ))
 
     if isinstance(csg, Difference):
@@ -2475,11 +2513,18 @@ def _serialize_csg_node(
         # is inherited there rather than re-derived.
         aligned = len(csg.subtract) == len(cuts) and not path
         joints_by_cutting = _joint_by_cutting_id(cut_timber) if aligned else {}
+        seen_joints: Dict[str, int] = {}
         for index, sub_csg in enumerate(csg.subtract):
             sub_attribution = attribution
+            joint_segment = None
             if aligned:
                 sub_attribution = _cut_attribution(joints_by_cutting, cuts[index], index)
-            child(sub_csg, "subtract", sub_attribution)
+                joint_name = _label_name(cuts[index])
+                if joint_name is not None:
+                    occurrence = seen_joints.get(joint_name, 0)
+                    seen_joints[joint_name] = occurrence + 1
+                    joint_segment = f"{joint_name}#{occurrence}"
+            child(sub_csg, "subtract", sub_attribution, joint_segment)
     elif isinstance(csg, SolidUnion):
         for member in csg.children:
             child(member, "child", attribution)
@@ -3463,12 +3508,19 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
                 results.extend(_find_labeled(ch, label_name))
         return results
 
+    from kumiki.identity import ResolvedJointPath
+
     node = csg
-    for name in path:
-        candidates = _find_labeled(node, name)
+    for segment in path:
+        # A segment may carry the occurrence that tells same-named siblings
+        # apart. Names match bare; the number, when given, chooses.
+        wanted = ResolvedJointPath.parse(segment)
+        candidates = _find_labeled(node, wanted.path)
         if not candidates:
             break
-        if len(candidates) == 1 or local_pt is None:
+        if wanted.occurrence and wanted.occurrence < len(candidates):
+            node = candidates[wanted.occurrence]
+        elif len(candidates) == 1 or local_pt is None:
             node = candidates[0]
         else:
             # Multiple with same name — pick the one on boundary
@@ -3483,25 +3535,47 @@ def _resolve_csg_at_path(csg: Any, path: List[str], local_pt: Optional[List[floa
     return node
 
 
+def _joint_occurrences(subtract: List[Any]) -> Dict[int, str]:
+    """Path segment for each cut, numbered among the cuts that share its name."""
+    seen: Dict[str, int] = {}
+    segments: Dict[int, str] = {}
+    for child in subtract:
+        name = _label_name(child)
+        if name is None:
+            continue
+        occurrence = seen.get(name, 0)
+        seen[name] = occurrence + 1
+        segments[id(child)] = f"{name}#{occurrence}"
+    return segments
+
+
 def _navigate_csg_one_level(
     node: Any,
     local_pt: List[float],
     current_path: List[str],
     eps: float = 1e-4,
+    number_joints: bool = False,
 ) -> Tuple[List[str], Any, Optional[str]]:
     """Navigate one level deeper into *node* based on click point.
 
     Returns (new_path, target_csg_to_highlight, feature_label_or_None).
+
+    *number_joints* is set for the timber's own top-level Difference, whose
+    subtract children are its cuts: there, and only there, a segment carries the
+    occurrence that tells two identical joints apart. Deeper segments stay bare,
+    which is what the walkers below match on.
     """
     from kumiki.cutcsg import SolidUnion, Difference
 
     if isinstance(node, Difference):
+        joint_occurrence = _joint_occurrences(node.subtract) if number_joints else {}
         # Check which subtract child the point lies on
         for sub in node.subtract:
             if _csg_point_on_boundary(sub, local_pt, eps):
                 sub_label = _label_name(sub)
                 if sub_label:
-                    return (current_path + [sub_label], sub, None)
+                    segment = joint_occurrence.get(id(sub), sub_label)
+                    return (current_path + [segment], sub, None)
                 # Unlabeled compound → drill through transparently
                 if isinstance(sub, (SolidUnion, Difference)):
                     return _navigate_csg_one_level(sub, local_pt, current_path, eps)
@@ -3541,8 +3615,10 @@ def _navigate_csg_to_leaf(
 
     path: List[str] = []
     node = csg
+    first = True
     while True:
-        new_path, target, label = _navigate_csg_one_level(node, local_pt, path, eps)
+        new_path, target, label = _navigate_csg_one_level(node, local_pt, path, eps, first)
+        first = False
         if label is not None:
             # Reached a leaf
             return (new_path, target, label)

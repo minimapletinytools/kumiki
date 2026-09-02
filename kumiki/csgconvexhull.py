@@ -359,7 +359,10 @@ def _clip_polygon(corners: List[Tuple[float, float]], a: float, b: float, c: flo
 def region_in_plane(
     plane: Plane,
     bounding: Sequence,
+
+    # TODO this parameter is questionable, just use NaN for bounds?
     seed_reach: Numeric,
+
     near: Optional[V3] = None,
 ) -> Optional[FeatureRegion]:
     """The part of a plane left after clipping by a set of convex solids.
@@ -380,8 +383,11 @@ def region_in_plane(
 
     for solid in bounding:
         faces = bounding_half_spaces(solid)
+
+        # WHY? is this really necessary?
         if faces is None:
             return None
+        
         for normal, point in faces:
             # The half space, written in the plane's own two axes.
             a = float((normal.T * frame.u)[0, 0])
@@ -406,7 +412,10 @@ def region_in_plane(
 def segment_on_line(
     line: Line,
     bounding: Sequence,
+
+    # TODO this parameter is questionable, just use NaN for bounds?
     seed_reach: Numeric,
+
     near: Optional[V3] = None,
 ) -> Optional[FeatureSegment]:
     """The part of a line left after clipping by a set of convex solids.
@@ -436,8 +445,11 @@ def segment_on_line(
 
     for solid in bounding:
         faces = bounding_half_spaces(solid)
+
+        # WHY? is this really necessary?
         if faces is None:
             return None
+        
         for normal, point in faces:
             # Keep where dot(normal, p - point) <= 0, with p = origin + s * direction.
             along = float((normal.T * direction)[0, 0])

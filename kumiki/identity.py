@@ -111,6 +111,60 @@ class ResolvedTimberPath:
 
 
 @dataclass(frozen=True)
+class JointPath:
+    """What a joint is called, before there is a timber to look in.
+
+    The same split as TimberPath, for the same reason: a joint cannot say which
+    of two identical joints it is, because it does not know the order it was cut
+    in -- only the timber holding the cuts does. Ask one, with
+    CutTimber.resolve_joint_path.
+    """
+
+    path: str
+
+    def __str__(self) -> str:
+        return self.path
+
+
+@dataclass(frozen=True)
+class ResolvedJointPath:
+    """One particular joint on one particular timber.
+
+    `occurrence` says which of the same-named joints on that timber this is, in
+    the order the timber's cuts were applied. Scoped to the timber rather than
+    the frame, so a joint added on another timber renumbers nothing here.
+
+    As with a timber, this is the fallback and the only order-dependent thing:
+    a timber whose joints are all named differently never has an ambiguous one.
+    Two identical joints on one timber -- both ends of a brace, say -- are the
+    case it exists for.
+    """
+
+    path: str
+    occurrence: int = 0
+
+    @property
+    def joint_path(self) -> JointPath:
+        """The name, without the timber-dependent part."""
+        return JointPath(self.path)
+
+    def __str__(self) -> str:
+        return f"{self.path}#{self.occurrence}"
+
+    @classmethod
+    def parse(cls, text: str) -> 'ResolvedJointPath':
+        """Read one back from a stored path segment.
+
+        No '#n' means occurrence 0, so a reference written before joints were
+        told apart still points where it always did.
+        """
+        name, separator, occurrence = str(text).rpartition("#")
+        if separator and occurrence.isdigit():
+            return cls(path=name, occurrence=int(occurrence))
+        return cls(path=str(text))
+
+
+@dataclass(frozen=True)
 class FeaturePath:
     """Where a feature is, as instructions for finding it again.
 

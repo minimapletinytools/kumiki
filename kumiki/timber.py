@@ -1909,6 +1909,36 @@ class CutTimber:
         self.cuts = cuts if cuts is not None else []
         self.joints = joints if joints is not None else []
 
+    def resolve_joint_path(self, path: 'JointPath') -> List['ResolvedJointPath']:
+        """Which of this timber's joints a name refers to.
+
+        A list, for the same reason Frame.resolve_timber_path returns one: two
+        identical joints on one timber -- both ends of a brace -- share a name,
+        and pretending a name means one joint quietly picks whichever was cut
+        first. Where it does match several the reference stops being stable, so
+        it warns.
+
+        Counted over this timber's cuts, in order, which is what the cut labels
+        and the CSG paths below them are numbered by.
+        """
+        from .identity import ResolvedJointPath
+
+        wanted = str(path)
+        matches = [
+            ResolvedJointPath(path=wanted, occurrence=occurrence)
+            for occurrence, _ in enumerate(
+                cut for cut in (self.cuts or [])
+                if getattr(getattr(cut, "label", None), "name", None) == wanted
+            )
+        ]
+        if len(matches) > 1:
+            warnings.warn(
+                f"{len(matches)} joints on this timber share the name {wanted!r}. They can "
+                "only be told apart by the order they were cut in, so adding another before "
+                "them will move anything that refers to them -- a drawing, or a measurement."
+            )
+        return matches
+
     @property
     def name(self) -> str:
         """Get the name from the underlying timber's ticket."""

@@ -16,7 +16,8 @@ import pytest
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.drawing import Drawing, Measure
-from kumiki.identity import FeaturePath, ResolvedTimberPath, TimberPath
+from kumiki.identity import (FeaturePath, JointPath, ResolvedJointPath,
+                             ResolvedTimberPath, TimberPath)
 from kumiki.timber import Frame
 
 
@@ -769,3 +770,90 @@ class TestResolvingAnchors:
 
         assert found["at"] is not None
         assert all(abs(component) < 2.0 for component in found["at"])
+
+
+class TestTellingIdenticalJointsApart:
+    """Two of the same joint on one timber, told apart by the order cut.
+
+    A brace carries a tenon at each end. Both are the same joint, so both label
+    their cut the same and both declare a face called `tenon_front` under the
+    same path -- 0.66m apart. Before the occurrence, a reference to one of them
+    quietly resolved to whichever was cut first.
+    """
+
+    INNER = ("tenon_cut", "tenon_waste", "tenon_cropped", "tenon")
+
+    def _frame(self):
+        from patterns.mortise_and_tenon_joints_patterns import example_brace_joint
+
+        return example_brace_joint()
+
+    def _anchor(self, runner, frame, first):
+        path = (first,) + self.INNER if first else self.INNER
+        return runner.resolve_anchor(frame, {
+            "timber": "brace_timber#0",
+            "csgPath": list(path),
+            "feature": "tenon_front",
+            "featureType": "FACE",
+        })
+
+    def test_the_two_tenons_resolve_to_different_places(self):
+        runner = _load_runner()
+        frame = self._frame()
+
+        first = self._anchor(runner, frame, "mortise_and_tenon#0")["at"]
+        second = self._anchor(runner, frame, "mortise_and_tenon#1")["at"]
+
+        assert first is not None and second is not None
+        apart = max(abs(a - b) for a, b in zip(first, second))
+        assert apart > 0.1, f"expected two different tenons, got {first} and {second}"
+
+    def test_no_occurrence_means_the_first(self):
+        # What a reference written before joints were numbered meant, and what
+        # first-wins would have found anyway.
+        runner = _load_runner()
+        frame = self._frame()
+
+        assert (self._anchor(runner, frame, "mortise_and_tenon")["at"]
+                == self._anchor(runner, frame, "mortise_and_tenon#0")["at"])
+
+    def test_a_path_below_the_joint_still_resolves(self):
+        # The older form, which names no cutting: every cut is searched, as
+        # before. Saved drawings are written this way.
+        runner = _load_runner()
+        frame = self._frame()
+
+        assert self._anchor(runner, frame, None)["at"] is not None
+
+    def test_an_occurrence_that_is_not_there_breaks_honestly(self):
+        # Rather than falling back to another cut, which would measure
+        # something real and wrong.
+        runner = _load_runner()
+
+        assert self._anchor(runner, self._frame(), "mortise_and_tenon#7") is None
+
+    def test_the_timber_lists_both_and_says_so(self):
+        frame = self._frame()
+        brace = next(ct for ct in frame.cut_timbers
+                     if "brace" in str(getattr(ct.timber, "ticket", "")))
+
+        with pytest.warns(UserWarning, match="share the name"):
+            matches = brace.resolve_joint_path(JointPath("mortise_and_tenon"))
+
+        assert [str(m) for m in matches] == ["mortise_and_tenon#0", "mortise_and_tenon#1"]
+
+
+class TestResolvedJointPath:
+    def test_it_round_trips(self):
+        assert ResolvedJointPath.parse("mortise_and_tenon#2") == ResolvedJointPath("mortise_and_tenon", 2)
+        assert str(ResolvedJointPath("mortise_and_tenon", 2)) == "mortise_and_tenon#2"
+
+    def test_a_bare_name_is_the_first(self):
+        assert ResolvedJointPath.parse("mortise_and_tenon").occurrence == 0
+
+    def test_a_name_containing_a_hash_survives(self):
+        # Split from the right, so only the final #n is the occurrence.
+        assert ResolvedJointPath.parse("odd#name#3") == ResolvedJointPath("odd#name", 3)
+
+    def test_the_name_alone_cannot_say_which(self):
+        assert str(ResolvedJointPath("mortise_and_tenon", 1).joint_path) == "mortise_and_tenon"
