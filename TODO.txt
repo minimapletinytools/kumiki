@@ -289,11 +289,7 @@ DONE-switthing from one drawing to another while in drawing mode will break the 
 DONE-fix background in ortho drawing
 DONE-shoulder_scribe_relief should not use rough.right... as feature name.. please reserve rough/perfect.right for the timber itself
 
--right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
-  for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
-
-
--Fix the feature stable reference issue: 
+DONE-Fix the feature stable reference issue: 
   No — and that's a real gap. The #n only goes on the joint segment, which is the top-level Difference's subtract children. Everything below that stays bare, deliberately: _navigate_csg_one_level numbers only when number_joints is set, which happens exactly once, on the first call from _navigate_csg_to_leaf against the timber's own rendered Difference.
 
   So two prisms sharing a label inside one SolidUnion, or inside a nested Difference deeper in a joint's own geometry, produce identical path segments today.
@@ -303,6 +299,14 @@ DONE-shoulder_scribe_relief should not use rough.right... as feature name.. plea
   - _resolve_csg_at_path is the one that copes best. It parses every segment through ResolvedJointPath.parse, so if a deeper segment ever did carry #n it would honour it. And when several candidates share a name with no occurrence given, it falls back to the pre-existing geometric tiebreak — preferring whichever child's boundary contains local_pt. That works for a click but not for a stored reference, since a saved path has no point attached.
   - _find_csg_by_labels (what resolve_anchor uses below the joint segment) just compares bare names and returns the first child that matches — the same silent first-wins the joint occurrence was introduced to kill, only one level down.
   - _serialize_csg_node numbers only the aligned top-level subtract children, so the tree payload's deeper segments are bare too.
+
+
+-increase edge selsection threhsold...
+-add realtime feature raycasting as you move your mouse....
+
+
+-right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
+  for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
 
 
 
