@@ -99,14 +99,20 @@
             return { cleared: had };
         }
 
-        /** Whether two answers are about the same feature, so redrawing is pointless. */
+        /**
+         * Whether two answers are about the same feature, so redrawing is pointless.
+         *
+         * The feature's name as well as the path: two faces of one prism share
+         * a path and differ only by which face, so comparing paths alone would
+         * leave the first one drawn while the pointer sits on the second.
+         */
         static sameFeature(one, other) {
             if (!one || !other) {
                 return one === other;
             }
             return one.memberKey === other.memberKey
                 && (one.path || []).join('/') === (other.path || []).join('/')
-                && one.feature === other.feature;
+                && (one.featureLabel || null) === (other.featureLabel || null);
         }
     }
 

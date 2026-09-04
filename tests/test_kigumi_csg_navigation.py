@@ -1389,21 +1389,30 @@ class TestPickYieldsAMeasurementReference:
 
 
 class TestHoveringOverAFeature:
-    """What is under the pointer, answered cheaply enough to ask while it moves.
+    """What the pointer is over: the answer a click would give, without clicking.
 
-    A click walks every triangle of the timber to build its highlight, which is
-    far too slow to run per mouse move. Hover resolves the same feature and
-    outlines it from the CSG instead.
+    Deliberately the same code as a click. An outline drawn from the CSG was
+    cheaper and wrong in a way that showed -- a face with mortises through it
+    outlined as a whole rectangle over the openings -- so hover asks the same
+    question and the viewer draws the answer differently.
     """
 
     def _slot(self, frame, member):
+        from kumiki.triangles import triangulate_cutcsg
+
         cut_timber = _cut_timber_by_name(frame, member)
+        timber = cut_timber.timber
         local = cut_timber.render_timber_with_cuts_csg_local()
+        vertices = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                vertices.extend([float(world[i, 0]) for i in range(3)])
+        mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
 
         class Slot:
-            mesh_cache = {member: {"local_csg": local,
-                                   "cut_timber": cut_timber,
-                                   "mesh": None}}
+            mesh_cache = {member: {"local_csg": local, "cut_timber": cut_timber, "mesh": mesh}}
 
         class State:
             _active = Slot()
@@ -1423,16 +1432,17 @@ class TestHoveringOverAFeature:
                         return [float(world[i, 0]) for i in range(3)]
         raise AssertionError("no such feature on the surface")
 
-    def _hover(self, frame, member, predicate):
+    def _hover(self, frame, member, predicate, **extra):
         state, slot, local, cut_timber = self._slot(frame, member)
         point = self._a_point_on(local, cut_timber, predicate)
-        return runner._handle_hover_feature_at_point(
-            state, {"memberKey": member, "point": point}, slot)
+        payload = {"memberKey": member, "point": point, "currentPath": [], "ctrlClick": False}
+        payload.update(extra)
+        return runner._handle_hover_feature_at_point(state, payload, slot)
 
-    def _hover_until(self, frame, member, wanted):
-        """Hover over surface points until one resolves to what is wanted.
+    def _hover_until(self, frame, member, wanted, **extra):
+        """Hover over surface points until one answers what is wanted.
 
-        By the result rather than by the feature under the point: a point on a
+        By the result rather than the feature under the point: a point on a
         face is often on one of its edges too, and an edge is the better answer
         there -- which is what a click does as well.
         """
@@ -1444,23 +1454,46 @@ class TestHoveringOverAFeature:
             for vertex in triangle:
                 world = timber.transform.local_to_global(
                     runner._to_v3([float(vertex[i]) for i in range(3)]))
-                result = runner._handle_hover_feature_at_point(
-                    state, {"memberKey": member,
-                            "point": [float(world[i, 0]) for i in range(3)]}, slot)
+                payload = {"memberKey": member,
+                           "point": [float(world[i, 0]) for i in range(3)],
+                           "currentPath": [], "ctrlClick": False}
+                payload.update(extra)
+                result = runner._handle_hover_feature_at_point(state, payload, slot)
                 if wanted(result):
                     return result
-        raise AssertionError("nothing on the surface resolved to what was wanted")
+        raise AssertionError("nothing on the surface answered what was wanted")
 
-    def test_a_face_comes_back_outlined(self, mortise_and_tenon_frame):
+    def test_a_face_answers_with_the_triangles_a_click_would_light(self, mortise_and_tenon_frame):
         result = self._hover_until(
             mortise_and_tenon_frame, "receiving_timber",
-            lambda r: r["featureType"] == "FACE" and r["outline"])
+            lambda r: r["featureType"] == "FACE" and r["highlightMesh"]["vertices"])
 
-        # A convex region, so at least a triangle's worth of corners.
-        assert len(result["outline"]) >= 3
-        assert all(len(corner) == 3 for corner in result["outline"])
+        # Real triangles off the rendered mesh -- so a face with something cut
+        # through it comes back with the hole missing, which is the whole point
+        # of not drawing this from the CSG.
+        assert len(result["highlightMesh"]["vertices"]) % 9 == 0
+        assert result["featureLabel"] is not None
 
-    def test_an_edge_comes_back_as_its_two_ends(self, mortise_and_tenon_frame):
+    def test_it_is_the_same_answer_a_click_gives(self, mortise_and_tenon_frame):
+        # Not a likeness of it. The only difference is what the viewer does
+        # with it: another colour, and under the selection.
+        from kumiki.cutcsg import CSGFeatureType
+
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "receiving_timber")
+        point = self._a_point_on(local, cut_timber,
+                                 lambda f: f.feature_type() == CSGFeatureType.FACE)
+        payload = {"memberKey": "receiving_timber", "point": point,
+                   "currentPath": [], "ctrlClick": False}
+
+        hovered = runner._handle_hover_feature_at_point(state, dict(payload), slot)
+        clicked = runner._handle_find_csg_at_point(state, dict(payload), slot)
+
+        assert hovered["path"] == clicked["path"]
+        assert hovered["featureLabel"] == clicked["featureLabel"]
+        assert hovered["highlightMesh"] == clicked["highlightMesh"]
+        assert hovered["highlightEdge"] == clicked["highlightEdge"]
+
+    def test_an_edge_comes_back_as_a_line_to_draw(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType
 
         result = self._hover(
@@ -1468,7 +1501,7 @@ class TestHoveringOverAFeature:
             lambda f: f.feature_type() == CSGFeatureType.EDGE)
 
         assert result["featureType"] == "EDGE"
-        assert len(result["outline"]) == 2
+        assert result["highlightEdge"]["start"] and result["highlightEdge"]["end"]
 
     def test_it_says_what_a_measurement_would_hold(self, mortise_and_tenon_frame):
         # So the viewer can say whether this and whatever is already held could
@@ -1482,13 +1515,20 @@ class TestHoveringOverAFeature:
         assert result["reference"] is not None
         assert runner.resolve_anchor(mortise_and_tenon_frame, result["reference"]) is not None
 
-    def test_it_does_not_touch_the_mesh(self, mortise_and_tenon_frame):
-        # The whole reason it can run while the pointer moves. The cache entry
-        # has no mesh at all here, and hovering still answers.
-        result = self._hover_until(
-            mortise_and_tenon_frame, "receiving_timber", lambda r: r["feature"] is not None)
+    def test_it_drills_from_where_the_selection_already_is(self, mortise_and_tenon_frame):
+        # Hover has to follow the same rules as clicking, or it shows something
+        # a click would not do. Held path and ctrl included: whatever they mean
+        # to a click, they mean the same here.
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "receiving_timber")
+        point = self._a_point_on(local, cut_timber, lambda f: True)
+        payload = {"memberKey": "receiving_timber", "point": point,
+                   "currentPath": ["mortise_and_tenon"], "ctrlClick": True}
 
-        assert result["feature"] is not None
+        hovered = runner._handle_hover_feature_at_point(state, dict(payload), slot)
+        clicked = runner._handle_find_csg_at_point(state, dict(payload), slot)
+
+        assert hovered["path"] == clicked["path"]
+        assert hovered["nodeLabel"] == clicked["nodeLabel"]
 
     def test_an_unknown_member_is_refused(self):
         class Slot:
@@ -1509,28 +1549,21 @@ class TestHoveringOverAFeature:
 
         class Runner:
             _active = slot
-            slots = {"main": slot}
-            active_slot = "main"
 
-        request = {
-            "id": "hover-1",
-            "command": "hover_feature_at_point",
-            "payload": {"memberKey": "receiving_timber", "point": point},
-        }
-
-        # _resolve_slot needs a slot to find; give it the one we built.
-        import types
-        runner_state = Runner()
         original = runner._resolve_slot
         runner._resolve_slot = lambda state, payload: slot
         try:
-            _state, response, _stop = runner.handle_request(runner_state, request)
+            _state, response, _stop = runner.handle_request(Runner(), {
+                "id": "hover-1",
+                "command": "hover_feature_at_point",
+                "payload": {"memberKey": "receiving_timber", "point": point},
+            })
         finally:
             runner._resolve_slot = original
 
         assert response.get("ok") is not False, response
         result = response.get("result") or response.get("payload") or {}
-        assert "outline" in result or "feature" in result, response
+        assert result.get("highlightMesh") is not None, response
 
 
 class TestTheBroadphase:

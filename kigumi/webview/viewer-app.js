@@ -278,8 +278,8 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 // What the pointer is over, as opposed to what is selected. A different hue as
 // well as a different shape -- an outline rather than a fill -- so the two
 // never read as the same state.
-const HOVER_OUTLINE_COLOR = 0xffa726;
-const HOVER_OUTLINE_WIDTH_PX = 3;
+const HOVER_COLOR = 0xffa726;
+const HOVER_OPACITY = 0.55;
 
 // A selected edge is drawn as a line rather than shaded like a face, so it
 // needs a width of its own -- several times the timbers' own edge lines, or the
@@ -3046,21 +3046,38 @@ class KigumiViewerApp extends LitElement {
         if (!due || !this._hoverClient) {
             return;
         }
-        const target = window.KigumiHover.hoverTarget(
-            this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y),
-        );
+        const hits = this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y);
+        const target = window.KigumiHover.hoverTarget(hits);
         if (!target) {
             // Off the model. Nothing to ask, and nothing should stay lit.
-            if (this._hover.feature) {
-                this._hover.clear();
-                this.clearHoverOutline();
-            }
+            this._hover.clear();
+            this.clearHoverOutline();
             return;
         }
+
+        // The same decision a click makes, so hover shows what a click would
+        // do rather than something else. Clicking an unselected timber selects
+        // the whole timber; clicking one already selected drills into it. Only
+        // the second has a feature to ask the runner about.
+        const decision = choosePickAction({
+            hits,
+            selectedTimbers: this.selectionManager.selectedTimbers,
+            shiftKey: false,
+        });
+        if (decision.action !== 'csg') {
+            this.clearHoverOutline();
+            return;
+        }
+
+        // From wherever the selection already is, exactly as the click does.
+        const focus = this.selectionManager.csgFocus;
+        const currentPath = (focus && focus.timberKey === target.memberKey) ? focus.path : [];
         vscode.postMessage({
             type: 'hoverFeatureAtPoint',
             memberKey: target.memberKey,
             point: target.point,
+            currentPath,
+            ctrlClick: false,
             request: due.request,
         });
     }
@@ -3078,56 +3095,60 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this._hoverDrawn = message;
-        this.drawHoverOutline(message.outline);
+        this.drawHoverHighlight(message);
     }
 
     /**
-     * Outline what is under the pointer.
+     * Draw what a click would have highlighted, in the hover colour.
      *
-     * A line, never a filled highlight: this says what a click would take, and
-     * it has to be tellable apart from what a click already took. The shape is
-     * the feature's own outline from the CSG -- see _feature_outline, which
-     * also says where it is only approximate.
+     * The same mesh and the same line the selection uses, from the same runner
+     * answer -- only the colour and the render order differ. Drawing it any
+     * other way is how hover ends up showing something a click would not do:
+     * an outline taken from the CSG was convex, so a timber face with mortises
+     * through it lit as a whole rectangle over the openings.
      */
-    drawHoverOutline(outline) {
+    drawHoverHighlight(message) {
         this.clearHoverOutline();
-        if (!Array.isArray(outline) || outline.length < 2) {
-            return;
+        const mesh = message.highlightMesh;
+        const edge = message.highlightEdge;
+
+        if (edge && Array.isArray(edge.start) && Array.isArray(edge.end)) {
+            this._buildHoverEdgeLine(edge.start, edge.end);
         }
-        const positions = [];
-        for (let index = 0; index < outline.length; index += 1) {
-            // Closed for a face, open for an edge's two ends.
-            const next = outline.length > 2 ? outline[(index + 1) % outline.length] : outline[index + 1];
-            if (!next) {
-                break;
+        if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
+            this._buildHighlightMesh(
+                mesh.vertices, mesh.indices, HOVER_COLOR, HOVER_OPACITY, '_hoverHighlightMesh',
+            );
+            // Under the selection's own highlight, which sits at 999: what is
+            // selected outranks what is merely under the pointer.
+            if (this._hoverHighlightMesh) {
+                this._hoverHighlightMesh.renderOrder = 900;
             }
-            positions.push(...outline[index], ...next);
         }
-        if (positions.length === 0) {
-            return;
-        }
+    }
+
+    _buildHoverEdgeLine(start, end) {
         const geometry = new THREE.LineSegmentsGeometry();
-        geometry.setPositions(positions);
+        geometry.setPositions([...start, ...end]);
         const material = new THREE.LineMaterial({
-            color: HOVER_OUTLINE_COLOR,
-            linewidth: HOVER_OUTLINE_WIDTH_PX,
+            color: HOVER_COLOR,
+            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
             resolution: this._getRendererResolution(),
             depthTest: false,
             transparent: true,
-            opacity: 0.9,
+            opacity: HOVER_OPACITY,
         });
         const line = new THREE.LineSegments2(geometry, material);
         line.computeLineDistances();
-        // Under the selection highlight, which is at 1000: what is selected
-        // matters more than what is merely under the pointer.
-        line.renderOrder = 900;
+        line.renderOrder = 901;
         this.scene.add(line);
-        this._hoverOutline = line;
+        this._hoverHighlightEdge = line;
     }
 
     clearHoverOutline() {
         this._hoverDrawn = null;
-        this._disposeHighlightMesh('_hoverOutline');
+        this._disposeHighlightMesh('_hoverHighlightMesh');
+        this._disposeHighlightMesh('_hoverHighlightEdge');
     }
 
     /** Leaving the canvas, or changing mode: nothing should stay lit. */

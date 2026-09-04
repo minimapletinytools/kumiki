@@ -4081,145 +4081,25 @@ def _extract_highlight_mesh(
     return out_verts, out_idx, matched, total_tris
 
 
-def _feature_outline(feature: Any, node: Any, timber: Any, located: Any) -> Optional[List[List[float]]]:
-    """The shape of a feature, in world space, without touching the mesh.
-
-    A face comes back as the corners of its cropped region, an edge as the two
-    ends of its segment, a point as itself. All of it from the CSG, which is
-    what makes it cheap enough to run while the pointer moves: on a timber
-    where walking the mesh for a highlight takes 78ms, this takes 0.07ms.
-
-    APPROXIMATE, and not the same shape a click highlights. The click walks the
-    rendered mesh and gets the surface as it really is. This clips a plane by
-    half spaces, so it is convex by construction and cannot have a hole in it,
-    and csgconvexhull does not account for subtractions. Concretely: the front
-    face of a beam with eight mortises through it outlines as one rectangle the
-    length of the beam, with every mortise opening inside it.
-
-    Which is tolerable for what this is for. An outline of a face means its
-    outer boundary, and that is what this draws; the hole boundaries are
-    missing, not wrong. The identity is exact either way -- WHICH feature the
-    pointer is over comes from the same resolution a click uses, and only the
-    drawn shape approximates.
-
-    Where it would mislead is a face mostly cut away, which outlines at full
-    size. If that matters more than the 78ms, the answer is to walk the mesh
-    on a longer dwell and replace the outline once it arrives.
-
-    None when the feature cannot be placed -- a curved surface, a primitive
-    csgconvexhull cannot describe. The caller shows the name and draws nothing
-    rather than guessing an outline.
-    """
-    from kumiki.geometry import Line, Plane, Point
-    from kumiki.csgconvexhull import region_in_plane, segment_on_line
-
-    def to_world(points):
-        return [_vector3_to_floats(timber.transform.local_to_global(point)) for point in points]
-
-    if isinstance(located, Point):
-        return to_world([located.position])
-
-    solid = timber.get_perfect_timber_within_csg_local()
-    reach = float(timber.length) * 4
-    near = solid.transform.position
-
-    if isinstance(located, Plane):
-        region = region_in_plane(located, [node, solid], seed_reach=reach, near=near)
-        if region is None or region.is_empty:
-            return None
-        return to_world(region.boundary)
-
-    if isinstance(located, Line):
-        segment = segment_on_line(
-            located, [node, solid], seed_reach=reach, near=near,
-            tolerance=float(_edge_tolerance()),
-        )
-        if segment is None or segment.is_empty:
-            return None
-        return to_world(segment.ends)
-
-    return None
-
-
 def _handle_hover_feature_at_point(
     state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None,
 ) -> Dict[str, Any]:
-    """What is under the pointer, cheaply enough to ask while it is moving.
+    """What the pointer is over: the answer a click would give, without clicking.
 
-    The same resolution a click does, and none of the drawing. A click walks
-    every triangle of the timber to build a highlight mesh, which takes long
-    enough that asking it per mouse move would queue up faster than it could
-    answer. This resolves the feature and hands back its outline from the CSG
-    instead -- two orders of magnitude cheaper, and an outline is what a hover
-    should look like anyway: it says what you are about to click without
-    pretending to have selected it.
+    Deliberately the same code, not a cheaper likeness of it. An outline drawn
+    from the CSG was cheaper and was wrong in a way that showed: a face comes
+    back convex, so a timber face with mortises through it outlined as a whole
+    rectangle over the openings, and a face half cut away outlined at full size.
+    Hover exists to say what a click would take, so it has to be what a click
+    would take -- the same mesh, the same feature, the same drilling.
+
+    The viewer draws it in another colour and under the selection. That is the
+    entire difference.
+
+    Affordable because of when it is asked rather than how much it costs: the
+    pointer has to settle first, so this runs once per rest, not once per move.
     """
-    ss = slot_state if slot_state is not None else state._active
-    member_key = payload.get("memberKey")
-    point = payload.get("point")
-    eps = 5e-4
-
-    if not isinstance(member_key, str) or member_key not in ss.mesh_cache:
-        raise ValueError(f"Unknown memberKey: {member_key}")
-    if not isinstance(point, list) or len(point) != 3:
-        raise ValueError("point must be [x, y, z]")
-
-    cached = ss.mesh_cache[member_key]
-    local_csg = cached.get("local_csg")
-    cut_timber = cached.get("cut_timber")
-    if local_csg is None or cut_timber is None:
-        raise ValueError(f"No CSG data cached for {member_key}")
-
-    timber = cut_timber.timber
-    timber_rot, timber_pos = _build_inv_transform_float(timber.transform)
-    local_pt = _inv_transform_point(timber_rot, timber_pos, [float(p) for p in point])
-
-    started = time.monotonic()
-    new_path, target_csg, feature_label = _navigate_csg_to_leaf(local_csg, local_pt, eps)
-
-    feature_hits = _features_at_point(local_csg, local_pt, eps)
-    edge = _resolve_derived_edge(feature_hits) if feature_label is not None else None
-    feature_type = None
-    owner, node = None, target_csg
-    if edge is not None:
-        owned = _edge_owner(local_csg, edge)
-        if owned is not None:
-            node, new_path = owned[0], owned[1]
-        feature_label, feature_type, owner = edge.name, "EDGE", edge
-    elif feature_label is not None:
-        # The label a click resolves to is a declared feature's name where the
-        # node declares one, and a generic word -- "face", "cylindrical_surface"
-        # -- where it does not. Only the first can be outlined.
-        owner = next((hit.feature for hit in feature_hits
-                      if hit.feature.name == feature_label), None)
-        if owner is not None:
-            node = next((hit.owner for hit in feature_hits
-                         if hit.feature is owner), target_csg)
-
-    outline = None
-    if owner is not None:
-        located = owner.locate(node)
-        outline = _feature_outline(owner, node, timber, located)
-
-    described = _describe_pick(
-        target_csg, local_csg, cut_timber, local_pt, eps, feature_label, feature_type,
-    )
-
-    return {
-        "memberKey": member_key,
-        "path": new_path,
-        "feature": feature_label,
-        "featureType": described.get("featureType") or feature_type,
-        "nodeLabel": described.get("nodeLabel"),
-        "nodeDisplayName": described.get("nodeDisplayName"),
-        # What a measurement would hold, so the viewer can say whether this and
-        # whatever is already held could be measured -- before the click.
-        "reference": _pick_reference(
-            local_csg, member_key, new_path, feature_label, feature_type, edge,
-        ),
-        "outline": outline,
-        "elapsedMs": round((time.monotonic() - started) * 1000, 2),
-    }
+    return _handle_find_csg_at_point(state, payload, slot_state)
 
 
 def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:

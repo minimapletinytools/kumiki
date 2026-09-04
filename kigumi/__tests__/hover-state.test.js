@@ -1,7 +1,7 @@
 const { HoverState, hoverTarget } = require('../webview/hover-state.js');
 
-function answer(feature, path = ['cut'], memberKey = 'post#0') {
-    return { memberKey, path, feature };
+function answer(featureLabel, path = ['cut'], memberKey = 'post#0') {
+    return { memberKey, path, featureLabel };
 }
 
 describe('hover pacing', () => {
@@ -57,7 +57,7 @@ describe('hover pacing', () => {
         const result = hover.answered(due.request, answer('mortise_right'));
 
         expect(result.kept).toBe(true);
-        expect(hover.feature.feature).toBe('mortise_right');
+        expect(hover.feature.featureLabel).toBe('mortise_right');
     });
 
     it('an answer overtaken by a newer question is dropped', () => {
@@ -97,6 +97,12 @@ describe('telling two answers apart', () => {
 
     it('the same name on a different node is not', () => {
         expect(HoverState.sameFeature(answer('a', ['one']), answer('a', ['two']))).toBe(false);
+    });
+
+    it('two faces of one prism are told apart', () => {
+        // Same path, different face. Comparing paths alone would leave the
+        // first drawn while the pointer sits on the second.
+        expect(HoverState.sameFeature(answer('left'), answer('right'))).toBe(false);
     });
 
     it('the same name on a different timber is not', () => {
