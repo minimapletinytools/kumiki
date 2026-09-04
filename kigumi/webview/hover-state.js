@@ -64,7 +64,10 @@
         reset() {
             /** What is under the pointer, as the runner answered. */
             this.feature = null;
+            /** Where the pointer is, in canvas coordinates. */
             this.at = null;
+            /** What is currently drawn for it, so an unchanged answer is not redrawn. */
+            this.drawn = null;
             this._pending = null;
             this._asked = 0;
             this._outstanding = false;
@@ -150,9 +153,39 @@
             return { kept: true, feature: this.feature };
         }
 
+        /**
+         * Ask about the same place again, without the pointer having moved.
+         *
+         * For when the question changed rather than the place -- cycling to the
+         * next feature under the pointer asks the same point a different thing.
+         */
+        askAgain() {
+            if (this.at === null) {
+                return false;
+            }
+            this._pending = { x: this.at.x, y: this.at.y };
+            this._stillFrames = 0;
+            this.drawn = null;
+            return true;
+        }
+
+        /**
+         * Whether an answer is worth drawing, given what is drawn already.
+         *
+         * Remembers what it says yes to, so the caller does not have to keep a
+         * copy of the last answer beside this one and keep the two in step.
+         */
+        shouldDraw(feature) {
+            if (HoverState.sameFeature(this.drawn, feature)) {
+                return false;
+            }
+            this.drawn = feature;
+            return true;
+        }
+
         /** The pointer left, or the mode changed: hold nothing. */
         clear() {
-            const had = this.feature !== null;
+            const had = this.feature !== null || this.drawn !== null;
             this.reset();
             return { cleared: had };
         }

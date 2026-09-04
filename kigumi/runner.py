@@ -4190,6 +4190,77 @@ def _extract_highlight_mesh(
     return out_verts, out_idx, matched, total_tris
 
 
+def _pick_from_candidate(local_csg: Any, hit: Any):
+    """Everything a pick needs, for one chosen feature at the point.
+
+    Returns (path, node, label, type, edge) or None when the feature's owner
+    cannot be placed in the tree, which leaves the caller with what it had.
+    """
+    from kumiki.cutcsg import CSGFeatureType
+
+    feature = hit.feature
+    if feature.feature_type() == CSGFeatureType.EDGE:
+        owned = _edge_owner(local_csg, feature)
+        if owned is None:
+            return None
+        return (owned[1], owned[0], feature.name, "EDGE", feature)
+
+    positions = _node_positions(local_csg)
+    placed = positions.get(id(hit.owner))
+    if placed is None:
+        return None
+    return (placed[2], hit.owner, feature.name, feature.feature_type().name, None)
+
+
+def _picked_anchor(
+    feature_hits: List[Any],
+    timber: Any,
+    feature_label: Optional[str],
+    edge: Any,
+    owner: Any,
+) -> Optional[List[float]]:
+    """Where a dimension to what was picked would attach, in world space.
+
+    The same anchor a measurement would resolve to, so what the viewer measures
+    while deciding is what it will measure once decided.
+    """
+    if feature_label is None:
+        return None
+    if edge is not None:
+        return _feature_anchor(edge, owner, timber, edge.locate(owner))
+    hit = next((h for h in feature_hits if h.feature.name == feature_label), None)
+    if hit is None:
+        return None
+    return _feature_anchor(hit.feature, hit.owner, timber, hit.feature.locate(hit.owner))
+
+
+def _picked_geometry(
+    feature_hits: List[Any],
+    timber: Any,
+    feature_label: Optional[str],
+    edge: Any,
+    owner: Any,
+) -> Optional[Dict[str, Any]]:
+    """The unbounded geometry of what was picked, in world space, or None.
+
+    None for a feature lying on no plane or line -- a cylinder's barrel, a
+    lofted side. Those are good to select and cannot be measured against, which
+    the viewer needs to be able to say BEFORE the click rather than after.
+
+    Sent as geometry rather than as a verdict because what decides whether a
+    pair can be dimensioned is what each of them PROJECTS to, and only the
+    viewer knows which direction it is looking from.
+    """
+    if feature_label is None:
+        return None
+    if edge is not None:
+        return _located_geometry_payload(edge.locate(owner), timber)
+    hit = next((h for h in feature_hits if h.feature.name == feature_label), None)
+    if hit is None:
+        return None
+    return _located_geometry_payload(hit.feature.locate(hit.owner), timber)
+
+
 def _handle_hover_feature_at_point(
     state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None,
 ) -> Dict[str, Any]:
@@ -4267,6 +4338,23 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     feature_type = None
     feature_hits = _features_at_point(local_csg, local_pt, eps)
     edge = _resolve_derived_edge(feature_hits) if feature_label is not None else None
+
+    # Which of the features at this point is wanted, when more than one is.
+    #
+    # The best answer is the most specific -- an edge beats the two faces that
+    # form it -- and that is right for a click that means "this thing here". It
+    # is wrong when what you want is one of those faces. A face seen edge-on in
+    # an elevation, which is the one you most often measure to, is never the
+    # best answer anywhere: it shows as a line, and on that line the edge wins.
+    #
+    # So the caller can ask for the next one instead, and the count goes back so
+    # it knows how many there are to cycle through.
+    candidate_index = int(payload.get("candidateIndex") or 0)
+    if candidate_index and feature_hits:
+        chosen = feature_hits[candidate_index % len(feature_hits)]
+        picked = _pick_from_candidate(local_csg, chosen)
+        if picked is not None:
+            new_path, target_csg, feature_label, feature_type, edge = picked
     if edge is not None:
         owned = _edge_owner(local_csg, edge)
         if owned is not None:
@@ -4330,9 +4418,20 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         # because only the runner can see the CSG a path has to be read against
         # -- an edge in particular is not a feature anyone declared, so it has
         # to name the two faces that form it.
+        "candidateCount": len(feature_hits),
         "reference": _pick_reference(
             local_csg, member_key, new_path, feature_label, feature_type, edge,
         ),
+        # Where the feature is, unbounded, in world space. What decides whether
+        # a pair can be dimensioned is what each PROJECTS to, and only the
+        # viewer knows the direction it is looking from -- so it gets the plane
+        # or the line and works that out itself.
+        "geometry": _picked_geometry(feature_hits, timber, feature_label, edge, target_csg),
+        # And where a dimension would attach, which is what makes the difference
+        # between a pair that admits a measurement and one that admits a
+        # measurement of nothing: two edges in line with each other are a
+        # perfectly good pair whose distance is zero.
+        "at": _picked_anchor(feature_hits, timber, feature_label, edge, target_csg),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a

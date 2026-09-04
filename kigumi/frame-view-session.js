@@ -307,6 +307,18 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'measurePickAtPoint') {
+                this._handleMeasurePickAtPoint(message).catch((err) => {
+                    this.log(`[measure] pick failed: ${err.message || err}`);
+                });
+                return;
+            }
+            if (message.type === 'addMeasurement') {
+                this._handleAddMeasurement(message).catch((err) => {
+                    this.log(`[measure] ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'hoverFeatureAtPoint') {
                 // Reported once and then not again. This fires while the
                 // pointer moves, so logging every failure would bury the log --
@@ -973,6 +985,33 @@ class FrameViewSession {
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
+    }
+
+    async _handleMeasurePickAtPoint(message) {
+        if (!this.runnerSession) {
+            return;
+        }
+        const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, {
+            memberKey: message.memberKey,
+            point: message.point,
+            currentPath: message.currentPath || [],
+            ctrlClick: false,
+        });
+        this._postToWebview({ type: 'measurePickResult', ...result });
+    }
+
+    async _handleAddMeasurement(message) {
+        // Through the same path every other drawings command takes, so the
+        // whole set comes back as a 'scenes' message and the tree and the sheet
+        // redraw from one answer. Posting a shape of its own is how a
+        // measurement gets made and never appears.
+        await this._handleDrawingsCommand('add_measurement', {
+            drawingId: message.drawingId,
+            viewportId: message.viewportId,
+            a: message.a,
+            b: message.b,
+            kind: message.kind || null,
+        }, { enter: false });
     }
 
     async _handleHoverFeatureAtPoint(message) {

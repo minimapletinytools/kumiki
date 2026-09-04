@@ -125,6 +125,53 @@ describe('hover pacing', () => {
         expect(patient.due()).not.toBeNull();
     });
 
+    it('an unchanged answer is not drawn again', () => {
+        // The state remembers what it said yes to, so the caller does not keep
+        // a copy beside this one and let the two drift apart.
+        const hover = new HoverState();
+
+        expect(hover.shouldDraw(answer('a'))).toBe(true);
+        expect(hover.shouldDraw(answer('a'))).toBe(false);
+        expect(hover.shouldDraw(answer('b'))).toBe(true);
+    });
+
+    it('clearing forgets what is drawn as well as what is under the pointer', () => {
+        const hover = new HoverState();
+        hover.shouldDraw(answer('a'));
+
+        expect(hover.clear().cleared).toBe(true);
+        expect(hover.shouldDraw(answer('a'))).toBe(true);
+    });
+
+    it('the same place can be asked about again', () => {
+        // The place did not change, the question did -- cycling to the next
+        // feature under the pointer asks the same point a different thing.
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        const first = hover.due();
+        hover.answered(first.request, answer('a'));
+
+        expect(hover.askAgain()).toBe(true);
+        const again = hover.due();
+
+        expect([again.x, again.y]).toEqual([100, 100]);
+        expect(again.request).not.toBe(first.request);
+    });
+
+    it('asking again forgets what is drawn, so the answer is drawn', () => {
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        hover.shouldDraw(answer('a'));
+
+        hover.askAgain();
+
+        expect(hover.shouldDraw(answer('a'))).toBe(true);
+    });
+
+    it('there is nothing to ask again about before the pointer has moved', () => {
+        expect(new HoverState().askAgain()).toBe(false);
+    });
+
     it('clearing forgets what was under the pointer', () => {
         const hover = new HoverState();
         hover.moved(100, 100);

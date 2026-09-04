@@ -1,4 +1,6 @@
-const { MeasureMode, sameReference, STATES } = require('../webview/measure-mode.js');
+const {
+    MeasureMode, couldMeasure, sameReference, STATES,
+} = require('../webview/measure-mode.js');
 
 function face(feature, path = ['cut'], timber = 'post#0') {
     return { pick: { reference: { timber, csgPath: path, feature, type: 'FACE' } } };
@@ -45,12 +47,34 @@ describe('measure mode', () => {
         expect(result.measurement.b.feature).toBe('b');
     });
 
-    it('the measurement belongs to the viewport the first pick was in', () => {
+    it('the measurement belongs to the viewport the second pick was in', () => {
+        // The first may be taken from whichever view shows it best; the
+        // dimension is drawn where the pair was completed.
         const mode = new MeasureMode();
         mode.pick(face('a').pick, 'front');
         mode.pick(face('b').pick, 'top');
 
-        expect(mode.measurement.viewportId).toBe('front');
+        expect(mode.measurement.viewportId).toBe('top');
+    });
+
+    it('re-picking the second end moves the measurement to that view', () => {
+        const mode = new MeasureMode();
+        mode.pick(face('a').pick, 'front');
+        mode.pick(face('b').pick, 'top');
+
+        mode.pick(face('c').pick, 'right');
+
+        expect(mode.measurement.viewportId).toBe('right');
+    });
+
+    it('releasing the second end forgets which view it was in', () => {
+        const mode = new MeasureMode();
+        mode.pick(face('a').pick, 'front');
+        mode.pick(face('b').pick, 'top');
+
+        mode.escape();
+
+        expect(mode.viewportId).toBeNull();
     });
 
     it('a third pick replaces the second rather than making another', () => {
@@ -173,5 +197,77 @@ describe('comparing references', () => {
             edge('mortise_right', 'rough.left').pick.reference,
             face('mortise_right').pick.reference,
         )).toBe(false);
+    });
+});
+
+
+describe('whether a second pick could finish the measurement', () => {
+    const AXES = { look: [0, 1, 0], right: [1, 0, 0], up: [0, 0, 1] };
+    const plane = (normal, at) => ({
+        geometry: { kind: 'plane', normal, at: [0, 0, 0] },
+        at: at || [0, 0, 0],
+    });
+    const nothing = { geometry: null };
+
+    // Stands in for measurements.availableKinds, so this module stays free of
+    // the one that knows about projection.
+    const forms = (one, other) => (
+        one.kind === 'plane' && other.kind === 'plane' ? ['projected_angle'] : []
+    );
+
+    it('says yes when the pair admits something', () => {
+        expect(couldMeasure(plane([0, 0, 1]), plane([1, 0, 0]), AXES, forms).ok).toBe(true);
+    });
+
+    it('says no when the pair admits nothing', () => {
+        const verdict = couldMeasure(plane([0, 0, 1]), { geometry: { kind: 'point' } }, AXES, forms);
+
+        expect(verdict.ok).toBe(false);
+        expect(verdict.reason).toBe('not-measurable');
+    });
+
+    it('a feature lying on no plane or line cannot be measured against', () => {
+        // A cylinder's barrel, a lofted side: good to select, nothing to
+        // measure to, and worth saying before the click rather than after.
+        const verdict = couldMeasure(plane([0, 0, 1]), nothing, AXES, forms);
+
+        expect(verdict.ok).toBe(false);
+        expect(verdict.reason).toBe('not-measurable');
+    });
+
+    it('nothing held is nothing to compare against', () => {
+        expect(couldMeasure(null, plane([0, 0, 1]), AXES, forms).reason).toBe('nothing-held');
+    });
+
+    it('a pair that measures nothing is refused', () => {
+        // Two things in line with each other in this view are a good pair
+        // whose distance is zero, and a dimension reading zero says nothing
+        // while covering what it is drawn over.
+        const value = () => 0;
+
+        const verdict = couldMeasure(
+            plane([0, 0, 1], [0, 0, 0]), plane([1, 0, 0], [0, 0, 0]), AXES, forms, value);
+
+        expect(verdict.ok).toBe(false);
+        expect(verdict.reason).toBe('degenerate');
+    });
+
+    it('a pair that measures something is allowed', () => {
+        const value = () => 0.05;
+
+        expect(couldMeasure(
+            plane([0, 0, 1], [0, 0, 0]), plane([1, 0, 0], [1, 0, 0]), AXES, forms, value,
+        ).ok).toBe(true);
+    });
+
+    it('without positions it cannot tell, and does not pretend to', () => {
+        // No anchor on one of them: the pair is judged on what it admits and
+        // nothing more.
+        const value = () => 0;
+
+        expect(couldMeasure(
+            { geometry: { kind: 'plane', normal: [0, 0, 1] } },
+            plane([1, 0, 0]), AXES, forms, value,
+        ).ok).toBe(true);
     });
 });

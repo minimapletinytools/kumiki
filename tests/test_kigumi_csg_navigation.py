@@ -1649,3 +1649,90 @@ class TestTheBroadphase:
 
         assert with_filter[0] == without[0]
         assert with_filter[2] == without[2]
+
+
+class TestChoosingAmongTheFeaturesAtAPoint:
+    """Reaching a face that is never the best answer anywhere.
+
+    A face seen edge-on shows as a line, and on that line the edge formed with
+    it wins -- an edge is the more specific answer, which is right for a click
+    meaning "this thing here" and wrong when the face is what you want. In an
+    elevation that face is the one you most often measure to.
+    """
+
+    def _slot(self, frame, member):
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(frame, member)
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        vertices = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                vertices.extend([float(world[i, 0]) for i in range(3)])
+        mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
+
+        class Slot:
+            mesh_cache = {member: {"local_csg": local, "cut_timber": cut_timber, "mesh": mesh}}
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot(), local, cut_timber, vertices
+
+    def _at_an_edge(self, frame, member):
+        from kumiki.cutcsg import CSGFeatureType
+
+        state, slot, local, cut_timber, vertices = self._slot(frame, member)
+        for index in range(0, len(vertices), 3):
+            point = vertices[index:index + 3]
+            payload = {"memberKey": member, "point": point,
+                       "currentPath": [], "ctrlClick": False}
+            first = runner._handle_find_csg_at_point(state, dict(payload), slot)
+            if first.get("featureType") == "EDGE" and first.get("candidateCount", 0) > 1:
+                return state, slot, payload, first
+        raise AssertionError("no point offered an edge and something else")
+
+    def test_the_edge_is_what_a_plain_click_takes(self, mortise_and_tenon_frame):
+        _state, _slot, _payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        assert first["featureType"] == "EDGE"
+
+    def test_asking_for_the_next_one_reaches_a_face(self, mortise_and_tenon_frame):
+        state, slot, payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        second = runner._handle_find_csg_at_point(
+            state, dict(payload, candidateIndex=1), slot)
+
+        assert second["featureLabel"] != first["featureLabel"]
+        assert second["reference"] is not None
+
+    def test_the_count_says_how_many_there_are_to_cycle(self, mortise_and_tenon_frame):
+        _state, _slot, _payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        assert first["candidateCount"] >= 2
+
+    def test_cycling_past_the_end_comes_back_round(self, mortise_and_tenon_frame):
+        state, slot, payload, first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+        count = first["candidateCount"]
+
+        wrapped = runner._handle_find_csg_at_point(
+            state, dict(payload, candidateIndex=count), slot)
+
+        assert wrapped["featureLabel"] == first["featureLabel"]
+
+    def test_a_chosen_face_can_still_be_measured_to(self, mortise_and_tenon_frame):
+        # The point of reaching it.
+        state, slot, payload, _first = self._at_an_edge(
+            mortise_and_tenon_frame, "receiving_timber")
+
+        second = runner._handle_find_csg_at_point(
+            state, dict(payload, candidateIndex=1), slot)
+
+        assert runner.resolve_anchor(mortise_and_tenon_frame, second["reference"]) is not None
