@@ -1531,3 +1531,75 @@ class TestHoveringOverAFeature:
         assert response.get("ok") is not False, response
         result = response.get("result") or response.get("payload") or {}
         assert "outline" in result or "feature" in result, response
+
+
+class TestTheBroadphase:
+    """Rejecting triangles by a box before asking the CSG about them."""
+
+    def test_a_box_rejects_what_is_outside_it(self, mortise_and_tenon_frame):
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        node = runner._find_csg_by_labels(
+            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+
+        inside = runner._aabb_filter(node, 5e-4)
+
+        assert inside is not None
+        box = node.get_aabb()
+        middle = [(float(box.min_x) + float(box.max_x)) / 2,
+                  (float(box.min_y) + float(box.max_y)) / 2,
+                  (float(box.min_z) + float(box.max_z)) / 2]
+        assert inside(middle)
+        assert not inside([float(box.max_x) + 1.0, middle[1], middle[2]])
+
+    def test_an_unbounded_solid_cannot_be_filtered(self):
+        # A half space has no box worth having, so the walk goes ahead
+        # unfiltered rather than rejecting everything.
+        from kumiki.cutcsg import HalfSpace
+        from kumiki.rule import create_v3, scalar
+
+        unbounded = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)),
+                              offset=scalar(0))
+
+        assert runner._aabb_filter(unbounded, 5e-4) is None
+
+    def test_an_empty_solid_rejects_everything(self):
+        from kumiki.cutcsg import EmptyCSG
+
+        rejects = runner._aabb_filter(EmptyCSG(), 5e-4)
+
+        assert rejects is not None
+        assert not rejects([0.0, 0.0, 0.0])
+
+    def test_the_highlight_is_the_same_with_the_filter_as_without(self, mortise_and_tenon_frame):
+        # The point: faster, not different. A broadphase that changed the answer
+        # would be a bug wearing an optimisation's clothes.
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        verts = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                verts.extend([float(world[i, 0]) for i in range(3)])
+        indices = list(range(len(verts) // 3))
+        rot, pos = runner._build_inv_transform_float(timber.transform)
+        node = runner._find_csg_by_labels(
+            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+
+        with_filter = runner._extract_highlight_mesh(
+            verts, indices, node, rot, pos, 5e-4, root_csg=local)
+
+        original = runner._aabb_filter
+        runner._aabb_filter = lambda csg, eps: None
+        try:
+            without = runner._extract_highlight_mesh(
+                verts, indices, node, rot, pos, 5e-4, root_csg=local)
+        finally:
+            runner._aabb_filter = original
+
+        assert with_filter[0] == without[0]
+        assert with_filter[2] == without[2]
