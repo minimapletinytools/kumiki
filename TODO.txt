@@ -304,6 +304,9 @@ DONE-Fix the feature stable reference issue:
 -increase edge selsection threhsold...
 -add realtime feature raasting as you move your mouse....
 
+-# TODO we actually do want face to face angle and perpendicular distance dimensioning which is permitted in 3d view, but not in project 2d view
+
+-consider refactoring runner.py
 
 -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
   for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?

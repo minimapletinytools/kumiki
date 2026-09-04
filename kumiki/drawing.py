@@ -20,6 +20,79 @@ from typing import Mapping, Optional, Tuple
 from .identity import DrawingId, FeaturePath, MeasurementId, TimberPath
 
 
+# TODO we will turn this enum into a bit more complicated of a class
+class MeasurementFeature(Enum):
+    AREA = 2
+    LINE = 1
+    POINT = 0
+
+
+# the type of measurement, including projected to a 2d drawing viewport and full 3d cases.
+class MeasurementKind(Enum):
+    """What a dimension is measuring.
+
+    A pair of features may admit more than one measurement kind
+    A measurement may be interpreted in 3d or projectd to a 2d drawing
+
+    A 2d drawing is a projection
+
+        feature   projects to   when
+        -------   -----------   ----------------------------------------------
+        point     point         always
+        edge      point         its direction runs along the line of sight
+        edge      line          otherwise
+        face      line          its normal is square to the line of sight,
+                                which is to say the face is seen edge-on
+        face      area          otherwise
+
+    projects pairs admit the following measurements
+
+        projected pair            admits
+        ----------------------    ----------------------------------------
+        point, point              PERPENDICULAR, HORIZONTAL, VERTICAL
+        point, line               PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
+        line, line (parallel)     PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
+        line, line (crossing)     ANGLE
+        anything, area            nothing
+        coincident or degenerate  nothing
+
+    in 3D we admit additional measurements:
+
+    TODO finish
+
+    TODO Worth adding later, and listed here so the shape leaves room for them:
+    RADIUS and DIAMETER of a circular feature, once features name one; ARC
+    LENGTH; a distance ALONG a named direction rather than the sheet's -- along
+    the piece, say, which is the same as HORIZONTAL in a face view but not in a
+    plan; and chains and baselines, which are several measurements sharing a
+    reference rather than a kind of their own.
+    """
+        
+    # requires 2 features to not be parallel (points are parallel to nothing so neither can be a point
+    ANGLE
+    PROJECTED_ANGLE
+
+    # requires 2 features to be parallel (or one of them to be a point)
+    PERENDICULAR_DISTANCE
+    PROJECTED_PERPENDICULAR_DISTANCE
+    PROJECTED_HORIZONTAL_DISTANCE
+    PROJECTED_VERTICAL_DISTANCE
+
+class MeasurementKindDebugInformation:
+    original_feature_A: MeasurementFeature
+    original_feature_B: MeasurementFeature
+
+    projected_feature_A: MeasurementFeature
+    projected_feature_B: MeasurementFeature
+
+    mesaurement_kind: MeasurementKind
+
+    def measurement_kind_name(self) -> string:
+        # starts with feature_to_feature
+        # or "projected_feature" for each feature that's projected
+        # then we have measurement kind at the end
+
+# TODO DELETE-RELPACE this class with the above
 class MeasureKind(Enum):
     """What a dimension is measuring.
 
@@ -41,10 +114,6 @@ class MeasureKind(Enum):
                                 which is to say the face is seen edge-on
         face      area          otherwise
 
-    An area cannot be dimensioned. That is what rules out the distance between
-    the middles of two faces seen at an angle -- a number about nothing, since
-    there is no distance between two things that each cover the view.
-
     Then by projected pair:
 
         projected pair            admits
@@ -64,15 +133,18 @@ class MeasureKind(Enum):
     reference rather than a kind of their own.
     """
 
-    #: The direct distance between two projected points.
+    # TODO prefix these ones with POINT_TO_POINT
+    #: The direct distance between two projected points.   TODO rename to direct
     ALIGNED = "aligned"
-    #: Its component across the sheet.
+    #: point to point component across the sheet.
     HORIZONTAL = "horizontal"
-    #: Its component up the sheet.
+    #: point to point component up the sheet.
     VERTICAL = "vertical"
+
+    # TODO are these really necessary? I think it's nice becasue we have an enum to describe the measurement kind, but it's not actually useful for setting the kind as they are not compatible
     #: Point to line, or between two parallel lines.
     PERPENDICULAR = "perpendicular"
-    #: Between two lines that are not parallel.
+    #: Between two lines that are not parallel. 
     ANGLE = "angle"
 
 
@@ -80,6 +152,8 @@ class MeasureKind(Enum):
 class Measure:
     """A dimension between two features, drawn in one viewport.
 
+    TODO identity should include kind as well
+    TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
     Identity is the anchors, plus `measure_id` when the same pair is measured
     more than once in the same viewport -- deliberately not a position in a
     list, so that a measurement generated by an algorithm keeps whatever the
@@ -90,10 +164,9 @@ class Measure:
 
     anchor_a: FeaturePath
     anchor_b: FeaturePath
-    #: Which measurement of the pair. None asks for whichever one is natural,
-    #: which is decided in the viewport since it depends on what the two
-    #: features project to there.
+    # the measurement kind to use or None to use the default
     kind: Optional[MeasureKind] = None
+    # the measurementId which allows multiple measurements with the same anchors and kind
     measure_id: Optional[MeasurementId] = None
 
     def __post_init__(self):
