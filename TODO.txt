@@ -301,9 +301,14 @@ DONE-Fix the feature stable reference issue:
   - _serialize_csg_node numbers only the aligned top-level subtract children, so the tree payload's deeper segments are bare too.
 
 
+-TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
+-add support for 3d measurements
+
 -increase edge selsection threhsold...
 -add realtime feature raasting as you move your mouse....
 
+
+-consider refactoring runner.py
 
 -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
   for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?

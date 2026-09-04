@@ -157,12 +157,13 @@ describe('availableKinds', () => {
     const point = { form: 'point' };
 
     test('two points admit the distance and either component', () => {
-        expect(availableKinds(point, point)).toEqual(['aligned', 'horizontal', 'vertical']);
+        expect(availableKinds(point, point)).toEqual(['projected_perpendicular_distance', 'projected_horizontal_distance',
+             'projected_vertical_distance']);
     });
 
     test('a point and a line admit the perpendicular', () => {
         expect(availableKinds(point, projectedForm(edge([1, 0, 0]), FRONT.look)))
-            .toEqual(['perpendicular']);
+            .toEqual(['projected_perpendicular_distance']);
     });
 
     test('two perpendicular faces admit an angle and not a distance', () => {
@@ -173,7 +174,7 @@ describe('availableKinds', () => {
             projectedForm(face([1, 0, 0]), FRONT.look),
         );
 
-        expect(kinds).toEqual(['angle']);
+        expect(kinds).toEqual(['projected_angle']);
     });
 
     test('two parallel faces admit a separation and not an angle', () => {
@@ -182,8 +183,8 @@ describe('availableKinds', () => {
             projectedForm(face([0, 0, -1]), FRONT.look),
         );
 
-        expect(kinds).toContain('perpendicular');
-        expect(kinds).not.toContain('angle');
+        expect(kinds).toContain('projected_perpendicular_distance');
+        expect(kinds).not.toContain('projected_angle');
     });
 
     test('a face that is not edge-on admits nothing at all', () => {
@@ -194,8 +195,10 @@ describe('availableKinds', () => {
         const a = projectedForm(face([0, 0, 1]), FRONT.look);
         const b = projectedForm(face([1, 0, 0]), FRONT.look);
 
+        expect(kindApplies('projected_angle', a, b)).toBe(true);
+        expect(kindApplies('projected_perpendicular_distance', a, b)).toBe(false);
+        // The name it used to go by still resolves, for measurements already saved.
         expect(kindApplies('angle', a, b)).toBe(true);
-        expect(kindApplies('aligned', a, b)).toBe(false);
     });
 });
 
@@ -204,35 +207,40 @@ describe('measureValue', () => {
     const b = projectedForm(face([1, 0, 0]), FRONT.look);
 
     test('the angle between two perpendicular faces is a right angle', () => {
-        expect(measureValue('angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).value)
+        expect(measureValue('projected_angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).value)
             .toBeCloseTo(90, 6);
     });
 
     test('the components are taken along the sheet, not the world', () => {
-        const across = measureValue('horizontal', [0, 0, 0], [3, 9, 4], a, b, FRONT);
-        const up = measureValue('vertical', [0, 0, 0], [3, 9, 4], a, b, FRONT);
+        const across = measureValue('projected_horizontal_distance', [0, 0, 0], [3, 9, 4], a, b, FRONT);
+        const up = measureValue('projected_vertical_distance', [0, 0, 0], [3, 9, 4], a, b, FRONT);
 
         expect(across.value).toBeCloseTo(3, 9);
         expect(up.value).toBeCloseTo(4, 9);
     });
 
-    test('the aligned distance drops the depth between them', () => {
-        // Nine units of it, in this view.
-        expect(measureValue('aligned', [0, 0, 0], [3, 9, 4], a, b, FRONT).value)
-            .toBeCloseTo(5, 9);
+    test('between two points it is the distance, with the depth dropped', () => {
+        // Nine units of depth, in this view. Two points have no line to be
+        // square to, so the perpendicular distance is simply the distance --
+        // which is why this and the old `aligned` are now one kind.
+        const point = { form: 'point' };
+
+        expect(measureValue(
+            'projected_perpendicular_distance', [0, 0, 0], [3, 9, 4], point, point, FRONT,
+        ).value).toBeCloseTo(5, 9);
     });
 
     test('a perpendicular is square to whichever of the two is a line', () => {
         const line = projectedForm(edge([1, 0, 0]), FRONT.look);
-        const value = measureValue('perpendicular', [0, 0, 0], [7, 0, 2], { form: 'point' }, line, FRONT);
+        const value = measureValue('projected_perpendicular_distance', [0, 0, 0], [7, 0, 2], { form: 'point' }, line, FRONT);
 
         // Seven along the line does not count; two away from it does.
         expect(value.value).toBeCloseTo(2, 9);
     });
 
     test('an angle comes back in degrees and a distance in world units', () => {
-        expect(measureValue('angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('angle');
-        expect(measureValue('aligned', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('length');
+        expect(measureValue('projected_angle', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('angle');
+        expect(measureValue('projected_perpendicular_distance', [0, 0, 0], [1, 0, 1], a, b, FRONT).unit).toBe('length');
     });
 });
 

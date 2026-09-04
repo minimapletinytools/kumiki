@@ -1731,7 +1731,11 @@ def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
         # Neither is part of identity: asking for a different kind, or moving
         # the line, is not measuring something else. They travel so that
         # overriding one in the file starts from what the code asked for.
-        "kind": measure.kind.name if getattr(measure, "kind", None) else None,
+        #
+        # Structured rather than named: `angle` composes for a solid angle and
+        # is also what every measurement written before spaces called a
+        # projected one, so a bare name cannot carry both.
+        "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
         "placement": {"offset": placement.offset} if placement is not None else None,
         "origin": ORIGIN_CODE,
     }
