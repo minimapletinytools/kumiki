@@ -1652,6 +1652,14 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
     return path.identity()
 
 
+def _measure_pair_identity(measure: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Just the two features of a measurement, without what is measured between."""
+    return tuple(sorted((
+        _feature_path_identity(measure.get("a")),
+        _feature_path_identity(measure.get("b")),
+    )))
+
+
 def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
     """What makes a measurement itself, within the viewport it is drawn in.
 
@@ -1783,11 +1791,26 @@ def merge_measurements(
             _duplicate_warning_given = True
         from_file[identity] = measure
 
+    from kumiki.drawing import MeasurementSource, does_override_identities
+
     merged: List[Dict[str, Any]] = []
     used = set()
     for measure in code_measures:
         identity = _measure_identity(measure)
-        override = from_file.get(identity)
+        # Through does_override rather than a bare lookup, so the rule about
+        # what replaces what lives in one place. For these two tiers it is a
+        # full match, which is what the dict already did -- but it is the rule
+        # that says so, not this loop.
+        override = None
+        for candidate_identity, candidate in from_file.items():
+            if does_override_identities(
+                candidate_identity, _measure_pair_identity(candidate),
+                MeasurementSource.FILE_OVERRIDE,
+                identity, _measure_pair_identity(measure),
+                MeasurementSource.PYTHON_CODED,
+            ):
+                override, identity = candidate, candidate_identity
+                break
         if override is None:
             merged.append({**measure, "origin": ORIGIN_CODE})
             continue

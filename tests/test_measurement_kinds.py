@@ -20,7 +20,9 @@ from kumiki.drawing import (
     MeasurementKind,
     MeasurementOperation,
     MeasurementPlacement,
+    MeasurementSource,
     MeasurementSpace,
+    does_override,
     kinds_for,
 )
 from kumiki.identity import FeatureRef, ResolvedTimberPath, SingleFeaturePath
@@ -267,3 +269,56 @@ class TestKindTellsTwoMeasurementsApart:
         }
 
         assert runner._measure_identity(on_the_wire) == measure.identity()
+
+
+class TestWhatReplacesWhat:
+    """Three tiers: an algorithm proposes, code decides, the file has the last word."""
+
+    GENERATED = MeasurementSource.PYTHON_GENERATED
+    CODED = MeasurementSource.PYTHON_CODED
+    FILE = MeasurementSource.FILE_OVERRIDE
+
+    def _anchor(self, name):
+        return SingleFeaturePath(
+            ResolvedTimberPath("post"), FeatureRef((name,), name), "FACE")
+
+    def _measure(self, kind=None):
+        return Measure(self._anchor("aaa"), self._anchor("zzz"), kind=kind)
+
+    def test_a_file_override_must_match_the_kind_too(self):
+        # It was written against a particular dimension. The vertical between
+        # the same two features is one it was never about.
+        across = self._measure("horizontal")
+        up = self._measure("vertical")
+
+        assert does_override(across, across, self.FILE, self.CODED)
+        assert not does_override(up, across, self.FILE, self.CODED)
+
+    def test_code_overrules_an_algorithm_whatever_kind_it_chose(self):
+        # Otherwise you would have to guess the generated kind to replace it,
+        # which stops working the next time the algorithm changes.
+        across = self._measure("horizontal")
+        up = self._measure("vertical")
+
+        assert does_override(up, across, self.CODED, self.GENERATED)
+
+    def test_a_different_pair_is_never_the_same_measurement(self):
+        one = self._measure("horizontal")
+        other = Measure(self._anchor("aaa"), self._anchor("mmm"), kind="horizontal")
+
+        assert not does_override(other, one, self.FILE, self.CODED)
+        assert not does_override(other, one, self.CODED, self.GENERATED)
+
+    def test_two_of_the_same_tier_sit_beside_each_other(self):
+        # However alike. Two coded measurements are two measurements.
+        measure = self._measure("horizontal")
+
+        assert not does_override(measure, measure, self.CODED, self.CODED)
+        assert not does_override(measure, measure, self.FILE, self.FILE)
+
+    def test_a_lower_tier_never_displaces_a_higher_one(self):
+        measure = self._measure("horizontal")
+
+        assert not does_override(measure, measure, self.CODED, self.FILE)
+        assert not does_override(measure, measure, self.GENERATED, self.FILE)
+        assert not does_override(measure, measure, self.GENERATED, self.CODED)

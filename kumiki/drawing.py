@@ -362,6 +362,10 @@ class Measure:
         wire = kind.as_wire()
         return (wire["operation"], wire["space"], wire["direction"])
 
+    def pair_identity(self) -> Tuple[Tuple, Tuple]:
+        """Just the two features, without saying what is measured between them."""
+        return (self.anchor_a.identity(), self.anchor_b.identity())
+
     def identity(self) -> Tuple[Tuple, Tuple, Tuple, str]:
         """What makes this measurement itself, within its viewport.
 
@@ -386,6 +390,81 @@ class Measure:
             self.kind_identity(self.kind),
             str(self.measure_id or ""),
         )
+
+
+class MeasurementSource(Enum):
+    """Where a measurement came from, which decides what it may replace.
+
+    Three tiers, each able to replace the ones below it and nothing else. An
+    algorithm proposes, a person writing code decides, and the drawings file --
+    which is to say the viewer -- has the last word.
+    """
+
+    #: An algorithm produced it. Replaceable by anything.
+    PYTHON_GENERATED = "python_generated"
+    #: Somebody wrote it in the frame's code.
+    PYTHON_CODED = "python_coded"
+    #: The drawings file, written by the viewer or by hand.
+    FILE_OVERRIDE = "file_override"
+
+
+_SOURCE_RANK = {
+    MeasurementSource.PYTHON_GENERATED: 0,
+    MeasurementSource.PYTHON_CODED: 1,
+    MeasurementSource.FILE_OVERRIDE: 2,
+}
+
+
+def does_override(
+    candidate: Measure,
+    existing: Measure,
+    candidate_source: MeasurementSource,
+    existing_source: MeasurementSource,
+) -> bool:
+    """Whether *candidate* replaces *existing*, rather than sitting beside it.
+
+    A tier only replaces one below it: two measurements from the same tier are
+    two measurements, however alike, and a lower tier never displaces a higher.
+
+    What counts as the same measurement depends on which tier is asking, and
+    the difference is the kind:
+
+    - A FILE_OVERRIDE matches on everything, kind included. It was written
+      against a particular measurement -- the horizontal one, say -- and the
+      vertical between the same two features is a different dimension it was
+      never about. Changing a kind is therefore not an edit but a different
+      measurement, said as suppressing one and adding another.
+
+    - Anything else matches on the two features alone. A person writing a
+      measurement in code is overruling what an algorithm proposed for that
+      pair, and would have to guess the generated kind to say so otherwise --
+      which is exactly the sort of thing that stops working when the algorithm
+      is next changed.
+    """
+    return does_override_identities(
+        candidate.identity(), candidate.pair_identity(), candidate_source,
+        existing.identity(), existing.pair_identity(), existing_source,
+    )
+
+
+def does_override_identities(
+    candidate_identity: Tuple,
+    candidate_pair: Tuple,
+    candidate_source: MeasurementSource,
+    existing_identity: Tuple,
+    existing_pair: Tuple,
+    existing_source: MeasurementSource,
+) -> bool:
+    """does_override, for a caller holding identities rather than Measures.
+
+    The viewer reads measurements out of a file as plain dictionaries and never
+    builds a Measure from them, so the rule lives here where both can reach it.
+    """
+    if _SOURCE_RANK[candidate_source] <= _SOURCE_RANK[existing_source]:
+        return False
+    if candidate_source is MeasurementSource.FILE_OVERRIDE:
+        return candidate_identity == existing_identity
+    return candidate_pair == existing_pair
 
 
 @dataclass(frozen=True)

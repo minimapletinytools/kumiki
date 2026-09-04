@@ -301,7 +301,9 @@ DONE-Fix the feature stable reference issue:
   - _serialize_csg_node numbers only the aligned top-level subtract children, so the tree payload's deeper segments are bare too.
 
 
--TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
+DONE-TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
+DONE-consider dropping kind from measurement identity when checking for override on python 
+
 -add support for 3d measurements
 
 -increase edge selsection threhsold...
@@ -313,6 +315,23 @@ DONE-Fix the feature stable reference issue:
 -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
   for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
 
+
+-erdo website w/ actually how the program works details
+  -do the sliding navigation galrlery thing at the top
+  -rephrase as "programmatic cad"
+  -first clickable bullet: program your frames
+    -highilght AI workflow
+    -code <-> preview sample
+  -second clickable bullet: live preview in kigumi
+    -highlight all features
+  -third cilkcable bullet: real parametric joinery
+    -joint exapmles, with different configuartions
+  -drawing generation (COMING SOON)
+    -automatic generation -> customize in code -> manual override in kigumi
+  -assembly generation (BETA)
+    -assembly video
+
+-update decorative end cut to use front face axis as the angle direction
 
 
 
