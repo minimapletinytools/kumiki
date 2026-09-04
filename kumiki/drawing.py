@@ -20,77 +20,87 @@ from typing import Mapping, Optional, Tuple
 from .identity import DrawingId, FeaturePath, MeasurementId, TimberPath
 
 
-# TODO we will turn this enum into a bit more complicated of a class
-class MeasurementFeature(Enum):
-    AREA = 2
-    LINE = 1
-    POINT = 0
+# =============================================================================
+# PARKED DESIGN SKETCH -- not code yet, kept verbatim below.
+#
+# Where measurement kinds are going: 3D as well as projected, fewer and more
+# general kinds, and a name composed from its parts rather than enumerated. The
+# sketch is commented out because it does not parse -- it is notes -- and an
+# unimportable kumiki.drawing takes the whole library with it.
+# =============================================================================
+#
+# # TODO we will turn this enum into a bit more complicated of a class
+# class MeasurementFeature(Enum):
+#     AREA = 2
+#     LINE = 1
+#     POINT = 0
+#
+#
+# # the type of measurement, including projected to a 2d drawing viewport and full 3d cases.
+# class MeasurementKind(Enum):
+#     """What a dimension is measuring.
+#
+#     A pair of features may admit more than one measurement kind
+#     A measurement may be interpreted in 3d or projectd to a 2d drawing
+#
+#     A 2d drawing is a projection
+#
+#         feature   projects to   when
+#         -------   -----------   ----------------------------------------------
+#         point     point         always
+#         edge      point         its direction runs along the line of sight
+#         edge      line          otherwise
+#         face      line          its normal is square to the line of sight,
+#                                 which is to say the face is seen edge-on
+#         face      area          otherwise
+#
+#     projects pairs admit the following measurements
+#
+#         projected pair            admits
+#         ----------------------    ----------------------------------------
+#         point, point              PERPENDICULAR, HORIZONTAL, VERTICAL
+#         point, line               PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
+#         line, line (parallel)     PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
+#         line, line (crossing)     ANGLE
+#         anything, area            nothing
+#         coincident or degenerate  nothing
+#
+#     in 3D we admit additional measurements:
+#
+#     TODO finish
+#
+#     TODO Worth adding later, and listed here so the shape leaves room for them:
+#     RADIUS and DIAMETER of a circular feature, once features name one; ARC
+#     LENGTH; a distance ALONG a named direction rather than the sheet's -- along
+#     the piece, say, which is the same as HORIZONTAL in a face view but not in a
+#     plan; and chains and baselines, which are several measurements sharing a
+#     reference rather than a kind of their own.
+#     """
+#
+#     # requires 2 features to not be parallel (points are parallel to nothing so neither can be a point
+#     ANGLE
+#     PROJECTED_ANGLE
+#
+#     # requires 2 features to be parallel (or one of them to be a point)
+#     PERENDICULAR_DISTANCE
+#     PROJECTED_PERPENDICULAR_DISTANCE
+#     PROJECTED_HORIZONTAL_DISTANCE
+#     PROJECTED_VERTICAL_DISTANCE
+#
+# class MeasurementKindDebugInformation:
+#     original_feature_A: MeasurementFeature
+#     original_feature_B: MeasurementFeature
+#
+#     projected_feature_A: MeasurementFeature
+#     projected_feature_B: MeasurementFeature
+#
+#     mesaurement_kind: MeasurementKind
+#
+#     def measurement_kind_name(self) -> string:
+#         # starts with feature_to_feature
+#         # or "projected_feature" for each feature that's projected
+#         # then we have measurement kind at the end
 
-
-# the type of measurement, including projected to a 2d drawing viewport and full 3d cases.
-class MeasurementKind(Enum):
-    """What a dimension is measuring.
-
-    A pair of features may admit more than one measurement kind
-    A measurement may be interpreted in 3d or projectd to a 2d drawing
-
-    A 2d drawing is a projection
-
-        feature   projects to   when
-        -------   -----------   ----------------------------------------------
-        point     point         always
-        edge      point         its direction runs along the line of sight
-        edge      line          otherwise
-        face      line          its normal is square to the line of sight,
-                                which is to say the face is seen edge-on
-        face      area          otherwise
-
-    projects pairs admit the following measurements
-
-        projected pair            admits
-        ----------------------    ----------------------------------------
-        point, point              PERPENDICULAR, HORIZONTAL, VERTICAL
-        point, line               PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
-        line, line (parallel)     PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
-        line, line (crossing)     ANGLE
-        anything, area            nothing
-        coincident or degenerate  nothing
-
-    in 3D we admit additional measurements:
-
-    TODO finish
-
-    TODO Worth adding later, and listed here so the shape leaves room for them:
-    RADIUS and DIAMETER of a circular feature, once features name one; ARC
-    LENGTH; a distance ALONG a named direction rather than the sheet's -- along
-    the piece, say, which is the same as HORIZONTAL in a face view but not in a
-    plan; and chains and baselines, which are several measurements sharing a
-    reference rather than a kind of their own.
-    """
-        
-    # requires 2 features to not be parallel (points are parallel to nothing so neither can be a point
-    ANGLE
-    PROJECTED_ANGLE
-
-    # requires 2 features to be parallel (or one of them to be a point)
-    PERENDICULAR_DISTANCE
-    PROJECTED_PERPENDICULAR_DISTANCE
-    PROJECTED_HORIZONTAL_DISTANCE
-    PROJECTED_VERTICAL_DISTANCE
-
-class MeasurementKindDebugInformation:
-    original_feature_A: MeasurementFeature
-    original_feature_B: MeasurementFeature
-
-    projected_feature_A: MeasurementFeature
-    projected_feature_B: MeasurementFeature
-
-    mesaurement_kind: MeasurementKind
-
-    def measurement_kind_name(self) -> string:
-        # starts with feature_to_feature
-        # or "projected_feature" for each feature that's projected
-        # then we have measurement kind at the end
 
 # TODO DELETE-RELPACE this class with the above
 class MeasureKind(Enum):

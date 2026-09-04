@@ -301,10 +301,12 @@ DONE-Fix the feature stable reference issue:
   - _serialize_csg_node numbers only the aligned top-level subtract children, so the tree payload's deeper segments are bare too.
 
 
+-TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
+-add support for 3d measurements
+
 -increase edge selsection threhsold...
 -add realtime feature raasting as you move your mouse....
 
--# TODO we actually do want face to face angle and perpendicular distance dimensioning which is permitted in 3d view, but not in project 2d view
 
 -consider refactoring runner.py
 
