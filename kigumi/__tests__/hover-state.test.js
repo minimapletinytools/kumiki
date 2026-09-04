@@ -20,33 +20,54 @@ describe('hover pacing', () => {
         expect(result.reason).toBe('barely-moved');
     });
 
-    it('nothing is asked until a frame has passed without moving', () => {
+    it('asks straight away, with nothing to wait for', () => {
         const hover = new HoverState();
         hover.moved(100, 100);
 
-        expect(hover.due()).toBeNull();
         expect(hover.due()).not.toBeNull();
     });
 
-    it('a pointer that keeps moving asks nothing on the way past', () => {
-        // Every frame of a sweep has a move in it, so the still frame never
-        // arrives until the sweep stops.
+    it('asks nothing more while a question is still out', () => {
+        // Answering is not parallel: the requests go to one runner over a pipe.
+        // Firing per frame regardless would build a queue answered long after
+        // the pointer has gone.
         const hover = new HoverState();
         hover.moved(100, 100);
         hover.due();
-        hover.moved(200, 100);
-        hover.due();
-        hover.moved(300, 100);
 
+        hover.moved(200, 100);
+
+        expect(hover.due()).toBeNull();
+    });
+
+    it('asks again as soon as the answer arrives', () => {
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        const first = hover.due();
+        hover.answered(first.request, answer('a'));
+
+        hover.moved(200, 100);
+
+        expect(hover.due()).not.toBeNull();
+    });
+
+    it('gives up on a question that never comes back', () => {
+        // Otherwise one failure leaves hover silent for the rest of the session.
+        const hover = new HoverState({ abandonAfter: 3 });
+        hover.moved(100, 100);
+        hover.due();
+        hover.moved(200, 100);
+
+        expect(hover.due()).toBeNull();
         expect(hover.due()).toBeNull();
         expect(hover.due()).not.toBeNull();
     });
 
     it('asks about where the pointer ended up, not where it began', () => {
+        // Several moves can land in one frame; only the last is worth asking.
         const hover = new HoverState();
         hover.moved(100, 100);
         hover.moved(300, 200);
-        hover.due();
 
         const due = hover.due();
 
@@ -54,7 +75,7 @@ describe('hover pacing', () => {
     });
 
     it('an answer to the current question is kept', () => {
-        const hover = new HoverState({ settleFrames: 0 });
+        const hover = new HoverState();
         hover.moved(100, 100);
         const due = hover.due();
 
@@ -65,9 +86,9 @@ describe('hover pacing', () => {
     });
 
     it('an answer overtaken by a newer question is dropped', () => {
-        // The normal case, not an edge one: the pointer keeps moving while the
-        // runner is working, and the old answer is about a place it has left.
-        const hover = new HoverState({ settleFrames: 0 });
+        // Reachable once a question has been abandoned and asked again: the
+        // late answer is about a place the pointer has long left.
+        const hover = new HoverState({ abandonAfter: 1 });
         hover.moved(100, 100);
         const first = hover.due();
         hover.moved(400, 400);
@@ -80,8 +101,32 @@ describe('hover pacing', () => {
         expect(hover.feature).toBeNull();
     });
 
+    it('settling can be asked for, and is off by default', () => {
+        // Zero asks the frame the pointer moves. A larger number trades
+        // responsiveness for fewer questions.
+        expect(new HoverState().due()).toBeNull();
+
+        const patient = new HoverState({ settleFrames: 2 });
+        patient.moved(100, 100);
+
+        expect(patient.due()).toBeNull();
+        expect(patient.due()).toBeNull();
+        expect(patient.due()).not.toBeNull();
+    });
+
+    it('a move restarts the settling', () => {
+        const patient = new HoverState({ settleFrames: 2 });
+        patient.moved(100, 100);
+        patient.due();
+        patient.moved(300, 100);
+
+        expect(patient.due()).toBeNull();
+        expect(patient.due()).toBeNull();
+        expect(patient.due()).not.toBeNull();
+    });
+
     it('clearing forgets what was under the pointer', () => {
-        const hover = new HoverState({ settleFrames: 0 });
+        const hover = new HoverState();
         hover.moved(100, 100);
         hover.answered(hover.due().request, answer('mortise_right'));
 

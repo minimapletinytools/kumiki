@@ -20,22 +20,35 @@
     // affordable, but not free, so this also:
     //
     //   - ignores a move that has not travelled far enough to mean anything,
-    //   - waits for one still frame, so a sweep asks nothing on the way past,
+    //   - asks nothing while a question is still out, so a sweep cannot queue
+    //     up hundreds of them and answer them all after the pointer has gone,
     //   - keeps only the newest answer, since an older one is about a place the
     //     pointer has already left.
+    //
+    // There is no delay before asking. A wait long enough to be worth having is
+    // long enough to feel, and the question is cheap enough not to need one --
+    // what paces it is the answer coming back, which is the honest limit.
 
     /** Below this the pointer has not really moved, in canvas pixels. */
     const MOVE_SLOP_PX = 3;
 
     /**
-     * A pointer is settled once a frame has passed without it moving.
+     * Frames of stillness before asking. Zero asks the frame the pointer moves.
      *
-     * Not a wait measured in milliseconds: any number long enough to be worth
-     * having is long enough to feel. One still frame is the shortest thing
-     * that means "stopped", and it costs nothing when the pointer is sweeping,
-     * since every frame of a sweep has a move in it.
+     * Zero is the default because the question is cheap and the answer paces
+     * itself -- see due(). Raise it to trade responsiveness for fewer
+     * questions, on a slow model or a slow machine.
      */
-    const SETTLE_FRAMES = 1;
+    const SETTLE_FRAMES = 0;
+
+    /**
+     * How many frames to wait on an unanswered question before asking again.
+     *
+     * Not a delay -- nothing waits on this in the normal case. It is the escape
+     * from a question that never comes back, so a hover that failed once does
+     * not stay silent for the rest of the session.
+     */
+    const ABANDON_AFTER_FRAMES = 60;
 
     class HoverState {
         constructor(options) {
@@ -43,6 +56,8 @@
             this.slop = settings.slop === undefined ? MOVE_SLOP_PX : settings.slop;
             this.settleFrames = settings.settleFrames === undefined
                 ? SETTLE_FRAMES : settings.settleFrames;
+            this.abandonAfter = settings.abandonAfter === undefined
+                ? ABANDON_AFTER_FRAMES : settings.abandonAfter;
             this.reset();
         }
 
@@ -52,6 +67,8 @@
             this.at = null;
             this._pending = null;
             this._asked = 0;
+            this._outstanding = false;
+            this._waited = 0;
             this._stillFrames = 0;
         }
 
@@ -69,21 +86,40 @@
             }
             this._pending = { x, y };
             this._stillFrames = 0;
-            return { ask: false, reason: 'settling' };
+            return { ask: false, reason: 'pending' };
         }
 
         /**
-         * Time passed. Returns the point to ask about once the pointer settles.
+         * A frame passed. Returns the point to ask about, or nothing.
          *
          * Called from the render loop rather than a timer, so a hover cannot
          * outlive the viewer that owns it.
+         *
+         * One question at a time. Asking is not free and answering is not
+         * parallel -- the requests go to a single runner over a pipe and are
+         * answered one after another -- so firing per frame regardless would
+         * build a queue that gets answered long after the pointer has gone.
+         * Waiting for the answer instead paces this at exactly the rate the
+         * runner can keep up with, whatever that turns out to be.
+         *
+         * That is why settleFrames defaults to zero: the pacing comes from the
+         * answer rather than from a delay decided in advance.
          */
         due() {
+            if (this._outstanding) {
+                this._waited += 1;
+                if (this._waited < this.abandonAfter) {
+                    return null;
+                }
+                // Nothing came back. Give up rather than going quiet for good;
+                // if the answer ever arrives it is stale by number anyway.
+                this._outstanding = false;
+            }
             if (this._pending === null) {
                 return null;
             }
-            // Counted before it is raised, so a frame that had a move in it is
-            // not the still frame: the first call after moving always waits.
+            // Counted before it is raised, so a frame with a move in it is not
+            // a still one. At the default of zero this never waits.
             if (this._stillFrames < this.settleFrames) {
                 this._stillFrames += 1;
                 return null;
@@ -91,6 +127,8 @@
             const point = this._pending;
             this._pending = null;
             this._stillFrames = 0;
+            this._outstanding = true;
+            this._waited = 0;
             this._asked += 1;
             return { x: point.x, y: point.y, request: this._asked };
         }
@@ -102,6 +140,9 @@
          * pointer keeps moving while the runner is working.
          */
         answered(request, feature) {
+            if (request === this._asked) {
+                this._outstanding = false;
+            }
             if (request !== this._asked) {
                 return { kept: false, reason: 'stale' };
             }
@@ -157,7 +198,9 @@
         };
     }
 
-    const KigumiHover = { HoverState, hoverTarget, MOVE_SLOP_PX, SETTLE_FRAMES };
+    const KigumiHover = {
+        HoverState, hoverTarget, MOVE_SLOP_PX, SETTLE_FRAMES, ABANDON_AFTER_FRAMES,
+    };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiHover;
