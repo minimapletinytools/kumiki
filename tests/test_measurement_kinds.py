@@ -25,7 +25,8 @@ from kumiki.drawing import (
     does_override,
     kinds_for,
 )
-from kumiki.identity import FeatureRef, ResolvedTimberPath, SingleFeaturePath
+from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
+                             SingleFeaturePath)
 
 DISTANCE = MeasurementOperation.DISTANCE
 ANGLE = MeasurementOperation.ANGLE
@@ -322,3 +323,37 @@ class TestWhatReplacesWhat:
         assert not does_override(measure, measure, self.CODED, self.FILE)
         assert not does_override(measure, measure, self.GENERATED, self.FILE)
         assert not does_override(measure, measure, self.GENERATED, self.CODED)
+
+
+class TestMeasuringAFaceToAnEdge:
+    """The pair whose two identities are different shapes."""
+
+    def _face(self):
+        return SingleFeaturePath(
+            ResolvedTimberPath("post"), FeatureRef(("cut",), "tenon_left"), "FACE")
+
+    def _edge(self):
+        return DerivedFeaturePath(
+            ResolvedTimberPath("post"),
+            FeatureRef(("cut",), "tenon_left"), FeatureRef(("body",), "rough.front"))
+
+    def test_it_can_be_measured_at_all(self):
+        # A face's identity has a name where an edge's has a whole parent
+        # reference, and python will not order a string against a tuple. So
+        # this raised rather than measuring -- on the ordinary case of
+        # dimensioning a face to an arris.
+        measure = Measure(self._face(), self._edge())
+
+        assert measure.identity() is not None
+
+    def test_it_is_one_measurement_whichever_way_round(self):
+        assert Measure(self._face(), self._edge()).identity() == Measure(
+            self._edge(), self._face()).identity()
+
+    def test_the_order_is_stable(self):
+        # Nothing reads the order; it exists so a pair comes out the same way
+        # round every time.
+        one = Measure(self._face(), self._edge())
+        other = Measure(self._face(), self._edge())
+
+        assert one.anchor_a.identity() == other.anchor_a.identity()

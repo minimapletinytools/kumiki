@@ -5500,13 +5500,24 @@ class KigumiViewerApp extends LitElement {
         };
     }
 
-    _drawMeasurement(overlay, viewport, pageRect, measure) {
-        const camera = viewport.spec.camera || {};
-        const axes = {
+    /**
+     * A viewport's camera axes, as the measurement code wants them.
+     *
+     * In one place because three callers ask -- drawing a dimension, listing
+     * one, and now colouring a hover -- and a dimension that is drawn against
+     * different axes than it was judged against would be drawn wrong.
+     */
+    viewportAxes(viewport) {
+        const camera = (viewport && viewport.spec && viewport.spec.camera) || {};
+        return {
             look: camera.look || [0, 0, -1],
             right: camera.right || [1, 0, 0],
             up: camera.up || [0, 1, 0],
         };
+    }
+
+    _drawMeasurement(overlay, viewport, pageRect, measure) {
+        const axes = this.viewportAxes(viewport);
         // The same answer the list shows, so a dimension that is not drawn and
         // a row that says why can never disagree.
         const status = KigumiMeasurements.measurementStatus(measure, axes);
@@ -5848,12 +5859,7 @@ class KigumiViewerApp extends LitElement {
 
     /** One viewport's measurements, judged and described for the list. */
     _measurementRows(viewport) {
-        const camera = viewport.spec.camera || {};
-        const axes = {
-            look: camera.look || [0, 0, -1],
-            right: camera.right || [1, 0, 0],
-            up: camera.up || [0, 1, 0],
-        };
+        const axes = this.viewportAxes(viewport);
         return {
             id: viewport.id,
             measurements: (viewport.spec.measurements || []).map((measure) => {

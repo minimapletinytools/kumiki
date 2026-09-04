@@ -1654,10 +1654,12 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
 
 def _measure_pair_identity(measure: Dict[str, Any]) -> Tuple[Any, Any]:
     """Just the two features of a measurement, without what is measured between."""
+    from kumiki.identity import identity_order
+
     return tuple(sorted((
         _feature_path_identity(measure.get("a")),
         _feature_path_identity(measure.get("b")),
-    )))
+    ), key=identity_order))
 
 
 def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
@@ -1677,10 +1679,12 @@ def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
     """
     from kumiki.drawing import Measure, MeasurementKind
 
+    from kumiki.identity import identity_order
+
     first, second = sorted((
         _feature_path_identity(measure.get("a")),
         _feature_path_identity(measure.get("b")),
-    ))
+    ), key=identity_order)
     kind = measure.get("kind")
     return (
         first, second,
@@ -1920,6 +1924,82 @@ def _drawing_from_code(frame: Any, declared: Any) -> Dict[str, Any]:
     return scene
 
 
+def add_measurement(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+    measure: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Put a measurement on a viewport, and say which entry now holds it.
+
+    The file is where a measurement made in the viewer lives, even when the
+    drawing it is on came from code: an override contributes measurements to a
+    drawing the code still lays out. So this finds or makes that override rather
+    than touching the code drawing, which it could not change anyway.
+
+    A pair already measured in this viewport is replaced rather than added
+    beside. Two dimensions between the same two features, drawn on top of each
+    other, is not something anyone means to ask for -- and the second click of a
+    measurement is often a correction of the first.
+    """
+    existing = collect_drawings(frame, example_path, pending)
+    target = next((d for d in existing if d["id"] == drawing_id), None)
+    if target is None:
+        raise ValueError(f"No drawing {drawing_id!r} to measure on")
+
+    holder = _measurement_holder(existing, pending, target)
+    viewport = next(
+        (v for v in holder.setdefault("viewports", []) if v.get("id") == viewport_id), None)
+    if viewport is None:
+        viewport = {"id": viewport_id, "measurements": []}
+        holder["viewports"].append(viewport)
+
+    measures = viewport.setdefault("measurements", [])
+    pair = _measure_pair_identity(measure)
+    kept = [m for m in measures if _measure_pair_identity(m) != pair]
+    kept.append(measure)
+    viewport["measurements"] = kept
+
+    if holder not in pending:
+        pending.append(holder)
+    return holder
+
+
+def _measurement_holder(
+    existing: List[Dict[str, Any]],
+    pending: List[Dict[str, Any]],
+    target: Dict[str, Any],
+) -> Dict[str, Any]:
+    """The file entry a measurement on *target* belongs in, made if need be.
+
+    A drawing of the file's own holds its own measurements. One from the code
+    cannot, so it gets an override -- named after the drawing it overrides, so
+    that deleting the code drawing leaves something plainly dangling rather than
+    something that has quietly become a drawing in its own right.
+    """
+    if target.get("origin") == ORIGIN_FILE:
+        held = next((d for d in pending if d["id"] == target["id"]), None)
+        return held if held is not None else _savable_drawing(target)
+
+    overriding = target.get("overriddenBy")
+    if overriding:
+        held = next((d for d in pending if d["id"] == overriding), None)
+        if held is not None:
+            return held
+        found = next((d for d in existing if d["id"] == overriding), None)
+        if found is not None:
+            return _savable_drawing(found)
+
+    return {
+        "id": f"{target['id']}-measurements",
+        "name": target.get("name", target["id"]),
+        OVERRIDES_KEY: target["id"],
+        "viewports": [],
+    }
+
+
 def collect_drawings(
     frame: Any,
     example_path: Optional[Path],
@@ -1937,7 +2017,17 @@ def collect_drawings(
     `dirty` says a drawing is not in the file yet. It is worked out here rather
     than left for the viewer to infer, so there is one answer to it.
     """
-    from_file = _read_drawings_file(_drawings_file_path(example_path)) if example_path else []
+    saved = _read_drawings_file(_drawings_file_path(example_path)) if example_path else []
+    # Unsaved entries stand in for saved ones of the same id, and are merged in
+    # here rather than appended at the end. An override contributes measurements
+    # to a drawing the code lays out, so a pending override has to go through
+    # the same merge -- appended, it would replace the code drawing instead and
+    # take the layout with it.
+    pending_by_id = {entry["id"]: dict(entry) for entry in (pending or []) if entry.get("id")}
+    from_file = [pending_by_id.pop(entry["id"], entry) for entry in saved]
+    from_file.extend(pending_by_id.values())
+    unsaved = {entry["id"] for entry in (pending or []) if entry.get("id")}
+
     overrides = {
         entry[OVERRIDES_KEY]: entry for entry in from_file
         if isinstance(entry.get(OVERRIDES_KEY), str)
@@ -1977,20 +2067,14 @@ def collect_drawings(
         _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"])
         drawings.append(scene)
 
+    # Not in the file yet: either the drawing itself is unsaved, or the override
+    # contributing its measurements is. The second matters as much as the first
+    # -- a dimension added to a code drawing is unsaved work in a drawing that
+    # otherwise is not.
     for drawing in drawings:
-        drawing["dirty"] = False
-
-    # Made this session and not saved. A pending drawing that shares an id with
-    # a saved one has been made since, so it wins -- it is the newer answer.
-    for scene in (pending or []):
-        entry = dict(scene)
-        entry["dirty"] = True
-        entry.setdefault("origin", ORIGIN_FILE)
-        replaced = next((d for d in drawings if d["id"] == entry["id"]), None)
-        if replaced is None:
-            drawings.append(entry)
-        else:
-            drawings[drawings.index(replaced)] = entry
+        drawing["dirty"] = (
+            drawing["id"] in unsaved or drawing.get("overriddenBy") in unsaved
+        )
 
     return drawings
 
@@ -3068,7 +3152,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_layers_tree", "get_csg_tree",
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
-            "get_drawings", "save_drawings",
+            "get_drawings", "save_drawings", "add_measurement",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
             "shutdown",
@@ -4612,6 +4696,23 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         ss.pending_drawings = []
         return state, make_success_response(request_id, command, {
             "path": written,
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "add_measurement":
+        ss = _resolve_slot(state, payload)
+        add_measurement(
+            ss.frame, ss.file_path, ss.pending_drawings,
+            str(payload.get("drawingId") or ""),
+            str(payload.get("viewportId") or ""),
+            {
+                "a": payload.get("a"),
+                "b": payload.get("b"),
+                "kind": payload.get("kind"),
+                "measureId": payload.get("measureId"),
+            },
+        )
+        return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
         }), False
 

@@ -17,7 +17,8 @@ from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Mapping, Optional, Tuple
 
-from .identity import DrawingId, FeaturePath, MeasurementId, TimberPath
+from .identity import (DrawingId, FeaturePath, MeasurementId, TimberPath,
+                       identity_order)
 
 
 class MeasurementSpace(Enum):
@@ -340,7 +341,7 @@ class Measure:
         if self.anchor_a is None or self.anchor_b is None:
             return
         first, second = self.anchor_a, self.anchor_b
-        if first.identity() <= second.identity():
+        if identity_order(first.identity()) <= identity_order(second.identity()):
             return
         object.__setattr__(self, 'anchor_a', second)
         object.__setattr__(self, 'anchor_b', first)
