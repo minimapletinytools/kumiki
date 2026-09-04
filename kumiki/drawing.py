@@ -77,24 +77,6 @@ class MeasureKind(Enum):
 
 
 @dataclass(frozen=True)
-class MeasurementPlacement:
-    """Where a dimension sits, as distinct from what it measures.
-
-    Its own object rather than a bare number because placement grows: which
-    side of the feature the line sits on, where the text goes when it will not
-    fit between the arrows, whether a witness line is drawn. `offset` is the
-    only one of those that exists yet.
-
-    None throughout means "wherever the viewport puts it", which is what every
-    measurement written before placement existed means.
-    """
-
-    #: How far the dimension line sits from the features, in page units.
-    #: None asks the viewport for its own default.
-    offset: Optional[float] = None
-
-
-@dataclass(frozen=True)
 class Measure:
     """A dimension between two features, drawn in one viewport.
 
@@ -113,17 +95,12 @@ class Measure:
     #: features project to there.
     kind: Optional[MeasureKind] = None
     measure_id: Optional[MeasurementId] = None
-    #: Where the dimension sits. Deliberately not part of identity: moving a
-    #: dimension line is not measuring something else.
-    placement: Optional[MeasurementPlacement] = None
 
     def __post_init__(self):
         if isinstance(self.measure_id, str):
             object.__setattr__(self, 'measure_id', MeasurementId(self.measure_id))
         if isinstance(self.kind, str):
             object.__setattr__(self, 'kind', MeasureKind(self.kind))
-        if isinstance(self.placement, dict):
-            object.__setattr__(self, 'placement', MeasurementPlacement(**self.placement))
 
     def identity(self) -> Tuple[Tuple, Tuple, str]:
         """What makes this measurement itself, within its viewport.

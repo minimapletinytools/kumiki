@@ -1723,16 +1723,10 @@ def deserialize_feature_path(source: Any) -> Optional[Any]:
 
 
 def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
-    placement = getattr(measure, "placement", None)
     return {
         "a": serialize_feature_path(measure.anchor_a),
         "b": serialize_feature_path(measure.anchor_b),
         "measureId": str(measure.measure_id) if measure.measure_id else None,
-        # Neither is part of identity: asking for a different kind, or moving
-        # the line, is not measuring something else. They travel so that
-        # overriding one in the file starts from what the code asked for.
-        "kind": measure.kind.name if getattr(measure, "kind", None) else None,
-        "placement": {"offset": placement.offset} if placement is not None else None,
         "origin": ORIGIN_CODE,
     }
 
@@ -3860,44 +3854,6 @@ def _navigate_csg_to_leaf(
         node = target
 
 
-def _pick_reference(
-    local_csg: Any,
-    member_key: str,
-    node_path: List[str],
-    feature_label: Optional[str],
-    feature_type: Optional[str],
-    edge: Any = None,
-) -> Optional[Dict[str, Any]]:
-    """The reference a measurement would hold for what was just picked.
-
-    None while a click is still drilling down through compounds and has not
-    reached a feature, and None for a derived edge whose parents cannot both be
-    placed in the tree -- neither is something to measure to yet.
-    """
-    from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
-                                 SingleFeaturePath)
-
-    if feature_label is None:
-        return None
-    timber = ResolvedTimberPath.parse(member_key)
-
-    if edge is not None:
-        positions = _node_positions(local_csg)
-        parents = []
-        for hit in (getattr(edge, "a", None), getattr(edge, "b", None)):
-            if hit is None or id(hit.owner) not in positions:
-                return None
-            parents.append(FeatureRef(tuple(positions[id(hit.owner)][2]), hit.feature.name))
-        return serialize_feature_path(
-            DerivedFeaturePath(timber=timber, a=parents[0], b=parents[1]))
-
-    return serialize_feature_path(SingleFeaturePath(
-        timber=timber,
-        ref=FeatureRef(tuple(node_path), feature_label),
-        feature_type=feature_type,
-    ))
-
-
 def _extract_highlight_mesh(
     mesh_vertices: List[float],
     mesh_indices: List[int],
@@ -4096,13 +4052,6 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         # once, so it cannot infer which one a result belongs to.
         "memberKey": member_key,
         "path": new_path,
-        # What a measurement would hold if this pick became one. Built here
-        # because only the runner can see the CSG a path has to be read against
-        # -- an edge in particular is not a feature anyone declared, so it has
-        # to name the two faces that form it.
-        "reference": _pick_reference(
-            local_csg, member_key, new_path, feature_label, feature_type, edge,
-        ),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a
