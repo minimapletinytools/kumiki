@@ -37,8 +37,8 @@ from .identity import (
     ViewportId,
 )
 from .drawing import (Drawing, Measure, MeasurementDirection, MeasurementFeature,
-                      MeasurementKind, MeasurementOperation, MeasurementSpace,
-                      kinds_for)
+                      MeasurementKind, MeasurementOperation, MeasurementPlacement,
+                      MeasurementSpace, kinds_for)
 from .timber import *
 from .footprint import *
 from .construction import *

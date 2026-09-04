@@ -1652,20 +1652,41 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
     return path.identity()
 
 
+def _measure_pair_identity(measure: Dict[str, Any]) -> Tuple[Any, Any]:
+    """Just the two features of a measurement, without what is measured between."""
+    return tuple(sorted((
+        _feature_path_identity(measure.get("a")),
+        _feature_path_identity(measure.get("b")),
+    )))
+
+
 def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
     """What makes a measurement itself, within the viewport it is drawn in.
 
-    The anchors unordered, since measuring A to B is measuring B to A, plus an
-    id for when the same pair is measured twice in the same viewport. Scoped to
+    The anchors unordered, since measuring A to B is measuring B to A. Then the
+    kind, because two kinds between one pair are two dimensions and both should
+    show. Then an id, for the same pair measured twice the same way. Scoped to
     the viewport because that is where a measurement lives: the same anchors in
     the plan view are a different dimension with a different number, not this
     one seen from elsewhere.
+
+    The same tuple Measure.identity builds, because the two are compared
+    against each other -- a file measurement overrides a code one by matching
+    it. A kind is normalized through MeasurementKind first, so one written
+    under an older name matches the same kind written under the new one.
     """
+    from kumiki.drawing import Measure, MeasurementKind
+
     first, second = sorted((
         _feature_path_identity(measure.get("a")),
         _feature_path_identity(measure.get("b")),
     ))
-    return (first, second, str(measure.get("measureId") or ""))
+    kind = measure.get("kind")
+    return (
+        first, second,
+        Measure.kind_identity(MeasurementKind.from_wire(kind) if kind else None),
+        str(measure.get("measureId") or ""),
+    )
 
 
 def serialize_feature_path(path: Any) -> Dict[str, Any]:
@@ -1723,10 +1744,20 @@ def deserialize_feature_path(source: Any) -> Optional[Any]:
 
 
 def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
+    placement = getattr(measure, "placement", None)
     return {
         "a": serialize_feature_path(measure.anchor_a),
         "b": serialize_feature_path(measure.anchor_b),
         "measureId": str(measure.measure_id) if measure.measure_id else None,
+        # Neither is part of identity: asking for a different kind, or moving
+        # the line, is not measuring something else. They travel so that
+        # overriding one in the file starts from what the code asked for.
+        #
+        # Structured rather than named: `angle` composes for a solid angle and
+        # is also what every measurement written before spaces called a
+        # projected one, so a bare name cannot carry both.
+        "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
+        "placement": {"offset": placement.offset} if placement is not None else None,
         "origin": ORIGIN_CODE,
     }
 
@@ -1760,11 +1791,26 @@ def merge_measurements(
             _duplicate_warning_given = True
         from_file[identity] = measure
 
+    from kumiki.drawing import MeasurementSource, does_override_identities
+
     merged: List[Dict[str, Any]] = []
     used = set()
     for measure in code_measures:
         identity = _measure_identity(measure)
-        override = from_file.get(identity)
+        # Through does_override rather than a bare lookup, so the rule about
+        # what replaces what lives in one place. For these two tiers it is a
+        # full match, which is what the dict already did -- but it is the rule
+        # that says so, not this loop.
+        override = None
+        for candidate_identity, candidate in from_file.items():
+            if does_override_identities(
+                candidate_identity, _measure_pair_identity(candidate),
+                MeasurementSource.FILE_OVERRIDE,
+                identity, _measure_pair_identity(measure),
+                MeasurementSource.PYTHON_CODED,
+            ):
+                override, identity = candidate, candidate_identity
+                break
         if override is None:
             merged.append({**measure, "origin": ORIGIN_CODE})
             continue
@@ -3854,6 +3900,44 @@ def _navigate_csg_to_leaf(
         node = target
 
 
+def _pick_reference(
+    local_csg: Any,
+    member_key: str,
+    node_path: List[str],
+    feature_label: Optional[str],
+    feature_type: Optional[str],
+    edge: Any = None,
+) -> Optional[Dict[str, Any]]:
+    """The reference a measurement would hold for what was just picked.
+
+    None while a click is still drilling down through compounds and has not
+    reached a feature, and None for a derived edge whose parents cannot both be
+    placed in the tree -- neither is something to measure to yet.
+    """
+    from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
+                                 SingleFeaturePath)
+
+    if feature_label is None:
+        return None
+    timber = ResolvedTimberPath.parse(member_key)
+
+    if edge is not None:
+        positions = _node_positions(local_csg)
+        parents = []
+        for hit in (getattr(edge, "a", None), getattr(edge, "b", None)):
+            if hit is None or id(hit.owner) not in positions:
+                return None
+            parents.append(FeatureRef(tuple(positions[id(hit.owner)][2]), hit.feature.name))
+        return serialize_feature_path(
+            DerivedFeaturePath(timber=timber, a=parents[0], b=parents[1]))
+
+    return serialize_feature_path(SingleFeaturePath(
+        timber=timber,
+        ref=FeatureRef(tuple(node_path), feature_label),
+        feature_type=feature_type,
+    ))
+
+
 def _extract_highlight_mesh(
     mesh_vertices: List[float],
     mesh_indices: List[int],
@@ -4052,6 +4136,13 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         # once, so it cannot infer which one a result belongs to.
         "memberKey": member_key,
         "path": new_path,
+        # What a measurement would hold if this pick became one. Built here
+        # because only the runner can see the CSG a path has to be read against
+        # -- an edge in particular is not a feature anyone declared, so it has
+        # to name the two faces that form it.
+        "reference": _pick_reference(
+            local_csg, member_key, new_path, feature_label, feature_type, edge,
+        ),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a

@@ -13,7 +13,7 @@ are two dimensions with two numbers, and either may be meaningless while the
 other is fine.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Mapping, Optional, Tuple
 
@@ -264,6 +264,24 @@ def kinds_for(
 
 
 @dataclass(frozen=True)
+class MeasurementPlacement:
+    """Where a dimension sits, as distinct from what it measures.
+
+    Its own object rather than a bare number because placement grows: which
+    side of the feature the line sits on, where the text goes when it will not
+    fit between the arrows, whether a witness line is drawn. `offset` is the
+    only one of those that exists yet.
+
+    None throughout means "wherever the viewport puts it", which is what every
+    measurement written before placement existed means.
+    """
+
+    #: How far the dimension line sits from the features, in page units.
+    #: None asks the viewport for its own default.
+    offset: Optional[float] = None
+
+
+@dataclass(frozen=True)
 class Measure:
     """A dimension between two features, drawn in one viewport.
 
@@ -283,6 +301,9 @@ class Measure:
     kind: Optional[MeasurementKind] = None
     # the measurementId which allows multiple measurements with the same anchors and kind
     measure_id: Optional[MeasurementId] = None
+    #: Where the dimension sits. Deliberately not part of identity: moving a
+    #: dimension line is not measuring something else.
+    placement: Optional[MeasurementPlacement] = None
 
     def __post_init__(self):
         if isinstance(self.measure_id, str):
@@ -291,14 +312,159 @@ class Measure:
             # A name, or the structured form a file holds. An older name still
             # reads: see MeasurementKind.parse.
             object.__setattr__(self, 'kind', MeasurementKind.from_wire(self.kind))
+        if isinstance(self.placement, dict):
+            object.__setattr__(self, 'placement', MeasurementPlacement(**self.placement))
+        self._canonicalise_anchors()
 
-    def identity(self) -> Tuple[Tuple, Tuple, str]:
+    def _canonicalise_anchors(self) -> None:
+        """Put the two anchors in one order, so a pair cannot be written twice.
+
+        Measuring A to B and measuring B to A are the same measurement, and
+        without this they are two: two entries in a viewport, two dimensions
+        drawn on top of each other, and a file override that matches neither.
+        Sorting at creation means there is only ever one way to write it down.
+
+        Swapping is safe because every kind there is today is symmetric -- each
+        computes an absolute value or a length, so the number does not depend on
+        which anchor came first. The one thing that does is which SIDE the
+        dimension line sits on, since it is offset perpendicular to the run
+        between the anchors, and reversing the run reverses the perpendicular.
+        The offset is signed, so negating it puts the line back where it was.
+
+        WHEN AN ASYMMETRIC KIND ARRIVES -- one where A to B and B to A are
+        genuinely different measurements, rather than the same one drawn from
+        the other end -- this has to stop being unconditional and start asking
+        the kind. It is written here rather than left to be discovered because
+        by then the ordering will look like something nothing depends on.
+        """
+        if self.anchor_a is None or self.anchor_b is None:
+            return
+        first, second = self.anchor_a, self.anchor_b
+        if first.identity() <= second.identity():
+            return
+        object.__setattr__(self, 'anchor_a', second)
+        object.__setattr__(self, 'anchor_b', first)
+        if self.placement is not None and self.placement.offset is not None:
+            object.__setattr__(
+                self, 'placement',
+                replace(self.placement, offset=-self.placement.offset))
+
+    @staticmethod
+    def kind_identity(kind: Optional['MeasurementKind']) -> Tuple:
+        """A kind in a comparable form, or an empty one for "whichever is natural".
+
+        The parts rather than the name, because a name can arrive as an older
+        one -- `angle` and `projected_angle` are the same kind written years
+        apart, and must not read as two different measurements.
+        """
+        if kind is None:
+            return ()
+        wire = kind.as_wire()
+        return (wire["operation"], wire["space"], wire["direction"])
+
+    def pair_identity(self) -> Tuple[Tuple, Tuple]:
+        """Just the two features, without saying what is measured between them."""
+        return (self.anchor_a.identity(), self.anchor_b.identity())
+
+    def identity(self) -> Tuple[Tuple, Tuple, Tuple, str]:
         """What makes this measurement itself, within its viewport.
 
-        The anchors unordered, since measuring A to B is measuring B to A.
+        The anchors come already in one order (see _canonicalise_anchors), so
+        measuring A to B and measuring B to A are one measurement.
+
+        The kind is part of it, because two kinds between one pair are two
+        dimensions and both should show: the horizontal and the vertical
+        between the same two points is an ordinary thing to want. The
+        alternative was making the author mint a measure_id to tell them apart,
+        which is a chore for the common case.
+
+        The cost, which the editing flow has to know about: changing a
+        measurement's kind changes its identity. So an override cannot edit a
+        code measurement's kind in place -- it is a different measurement now.
+        Say it as suppressing the original and adding the new one, which is
+        what those two mechanisms are already for.
         """
-        first, second = sorted((self.anchor_a.identity(), self.anchor_b.identity()))
-        return (first, second, str(self.measure_id or ""))
+        return (
+            self.anchor_a.identity(),
+            self.anchor_b.identity(),
+            self.kind_identity(self.kind),
+            str(self.measure_id or ""),
+        )
+
+
+class MeasurementSource(Enum):
+    """Where a measurement came from, which decides what it may replace.
+
+    Three tiers, each able to replace the ones below it and nothing else. An
+    algorithm proposes, a person writing code decides, and the drawings file --
+    which is to say the viewer -- has the last word.
+    """
+
+    #: An algorithm produced it. Replaceable by anything.
+    PYTHON_GENERATED = "python_generated"
+    #: Somebody wrote it in the frame's code.
+    PYTHON_CODED = "python_coded"
+    #: The drawings file, written by the viewer or by hand.
+    FILE_OVERRIDE = "file_override"
+
+
+_SOURCE_RANK = {
+    MeasurementSource.PYTHON_GENERATED: 0,
+    MeasurementSource.PYTHON_CODED: 1,
+    MeasurementSource.FILE_OVERRIDE: 2,
+}
+
+
+def does_override(
+    candidate: Measure,
+    existing: Measure,
+    candidate_source: MeasurementSource,
+    existing_source: MeasurementSource,
+) -> bool:
+    """Whether *candidate* replaces *existing*, rather than sitting beside it.
+
+    A tier only replaces one below it: two measurements from the same tier are
+    two measurements, however alike, and a lower tier never displaces a higher.
+
+    What counts as the same measurement depends on which tier is asking, and
+    the difference is the kind:
+
+    - A FILE_OVERRIDE matches on everything, kind included. It was written
+      against a particular measurement -- the horizontal one, say -- and the
+      vertical between the same two features is a different dimension it was
+      never about. Changing a kind is therefore not an edit but a different
+      measurement, said as suppressing one and adding another.
+
+    - Anything else matches on the two features alone. A person writing a
+      measurement in code is overruling what an algorithm proposed for that
+      pair, and would have to guess the generated kind to say so otherwise --
+      which is exactly the sort of thing that stops working when the algorithm
+      is next changed.
+    """
+    return does_override_identities(
+        candidate.identity(), candidate.pair_identity(), candidate_source,
+        existing.identity(), existing.pair_identity(), existing_source,
+    )
+
+
+def does_override_identities(
+    candidate_identity: Tuple,
+    candidate_pair: Tuple,
+    candidate_source: MeasurementSource,
+    existing_identity: Tuple,
+    existing_pair: Tuple,
+    existing_source: MeasurementSource,
+) -> bool:
+    """does_override, for a caller holding identities rather than Measures.
+
+    The viewer reads measurements out of a file as plain dictionaries and never
+    builds a Measure from them, so the rule lives here where both can reach it.
+    """
+    if _SOURCE_RANK[candidate_source] <= _SOURCE_RANK[existing_source]:
+        return False
+    if candidate_source is MeasurementSource.FILE_OVERRIDE:
+        return candidate_identity == existing_identity
+    return candidate_pair == existing_pair
 
 
 @dataclass(frozen=True)
