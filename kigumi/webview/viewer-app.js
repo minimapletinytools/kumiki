@@ -761,6 +761,24 @@ class ViewerSettingsPanel {
             : t(`viewer.options.footprint.color.${colorId}`));
         return html`
             <section id="render-controls" aria-label=${t('viewer.options.ariaLabel')}>
+                <!-- Save belongs to the panel, not to any one section: it writes
+                     every option down, and sitting at the end of the common list
+                     it read as belonging to the 3D settings it sat above. -->
+                <div class="viewer-settings-header">
+                    <div class="viewer-settings-title">${t('viewer.options.ariaLabel')}</div>
+                    <button
+                        id="save-settings-btn"
+                        type="button"
+                        title=${t('viewer.options.saveSettings.title')}
+                        @click=${() => {
+                            if (vscode) {
+                                vscode.postMessage({
+                                    type: 'requestSaveViewerSettings',
+                                    settings: this.app.collectViewerSettingsPayload(),
+                                });
+                            }
+                        }}>${t('viewer.options.saveSettings')}</button>
+                </div>
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.common')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.section.common')}</div>
                 <label>
@@ -841,18 +859,6 @@ class ViewerSettingsPanel {
                     <input id="debug-toggle" type="checkbox" ?checked=${this.app.debugEnabled}>
                     ${t('viewer.options.debugInfo')}
                 </label>
-                <button
-                    id="save-settings-btn"
-                    type="button"
-                    title=${t('viewer.options.saveSettings.title')}
-                    @click=${() => {
-                        if (vscode) {
-                            vscode.postMessage({
-                                type: 'requestSaveViewerSettings',
-                                settings: this.app.collectViewerSettingsPayload(),
-                            });
-                        }
-                    }}>${t('viewer.options.saveSettings')}</button>
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.section.threeD')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.section.threeD')}</div>
                 <label>
@@ -901,10 +907,11 @@ class ViewerSettingsPanel {
                     <input id="drawing-ghosts-toggle" type="checkbox" ?checked=${this.app.showDrawingGhosts}>
                     ${t('viewer.options.drawingGhosts')}
                 </label>
-                <label>
-                    <input id="debug-drawing-toggle" type="checkbox" ?checked=${this.app.debugDrawingEnabled}>
-                    ${t('viewer.options.debugDrawing')}
-                </label>` : ''}
+                <button
+                    id="debug-drawing-btn"
+                    type="button"
+                    title=${t('viewer.options.debugDrawing.title')}
+                    @click=${() => this.app.openDebugDrawing()}>${t('viewer.options.debugDrawing')}</button>` : ''}
                 <div class="viewer-settings-divider" role="separator" aria-label=${t('viewer.options.export.ariaLabel')}></div>
                 <div class="viewer-settings-subtitle">${t('viewer.options.export.subtitle')}</div>
                 <label>
@@ -1009,10 +1016,6 @@ class ViewerSettingsPanel {
                 id: 'drawing-ghosts-toggle', on: 'change',
                 apply: (el) => app.setDrawingGhostsVisible(el.checked),
                 sync: (el) => { el.checked = app.showDrawingGhosts; },
-            },
-            {
-                id: 'debug-drawing-toggle', on: 'change',
-                apply: (el) => app.setDebugDrawingEnabled(el.checked),
             },
             {
                 id: 'left-click-rotate-toggle', on: 'change',
@@ -5906,12 +5909,16 @@ class KigumiViewerApp extends LitElement {
      * drawing python builds (get_default_drawing_for_debugging), so the
      * multi-viewport path has something to render until real drawings arrive.
      */
-    setDebugDrawingEnabled(enabled) {
-        this.debugDrawingEnabled = Boolean(enabled);
-        if (!this.debugDrawingEnabled) {
-            this.setActiveScene(DEFAULT_SCENE_ID);
-            return;
-        }
+    /**
+     * Go to the debug drawing, asking python to build it the first time.
+     *
+     * A button rather than a checkbox, because it is a place to go rather than
+     * a state to be in: leaving is what the drawing's own control is for, and a
+     * checkbox that ticks itself off when you leave by any other route is a
+     * checkbox that lies about where you are.
+     */
+    openDebugDrawing() {
+        this.debugDrawingEnabled = true;
         if (this.sceneStore.sceneIds().includes(DEBUG_DRAWING_SCENE_ID)) {
             this.setActiveScene(DEBUG_DRAWING_SCENE_ID);
             return;
@@ -5919,6 +5926,15 @@ class KigumiViewerApp extends LitElement {
         if (vscode) {
             vscode.postMessage({ type: 'requestDebugDrawing' });
         }
+    }
+
+    setDebugDrawingEnabled(enabled) {
+        if (enabled) {
+            this.openDebugDrawing();
+            return;
+        }
+        this.debugDrawingEnabled = false;
+        this.setActiveScene(DEFAULT_SCENE_ID);
     }
 
     setProjectionMode(isOrthographic) {

@@ -614,6 +614,18 @@ canvas { display: block; width: 100%; height: 100%; }
     gap: 10px;
     backdrop-filter: blur(4px);
 }
+.viewer-settings-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.viewer-settings-title {
+    color: var(--hv-title);
+    font: 600 12px 'Segoe UI', sans-serif;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+}
 .parameter-header {
     display: flex;
     align-items: center;

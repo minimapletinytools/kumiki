@@ -28,6 +28,7 @@
   "viewer.options.disassemblySpacing.label": "disassembly spacing (×{multiplier})",
   "viewer.options.debugInfo": "debug info",
   "viewer.options.debugDrawing": "debug drawing (4 viewports)",
+  "viewer.options.debugDrawing.title": "Open a scaffolding drawing of four viewports, built by python, for working on drawing mode",
   "viewer.options.leftClickRotate": "left click to rotate camera",
   "viewer.options.geometry.label": "geometry",
   "viewer.options.geometry.actual": "rough (actual geometry)",

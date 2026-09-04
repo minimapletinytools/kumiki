@@ -28,6 +28,7 @@
   "viewer.options.disassemblySpacing.label": "分解時の間隔 (×{multiplier})",
   "viewer.options.debugInfo": "デバッグ情報",
   "viewer.options.debugDrawing": "デバッグ図面（4ビューポート）",
+  "viewer.options.debugDrawing.title": "ドローイングモードの作業用に、Pythonが組み立てた4ビューポートの足場図面を開きます",
   "viewer.options.leftClickRotate": "左クリックドラッグでカメラを回転",
   "viewer.options.geometry.label": "ジオメトリ",
   "viewer.options.geometry.actual": "ラフ(実寸法)",
