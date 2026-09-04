@@ -1316,3 +1316,73 @@ class TestSameNamedSiblings:
         found = [runner._find_csg_by_labels(root, labels) for root in roots]
 
         assert all(node is None for node in found)
+
+
+class TestPickYieldsAMeasurementReference:
+    """What a pick hands back for a measurement to hold.
+
+    Only the runner can build this: a path means nothing without the CSG it is
+    read against, and a derived edge is not a declared feature at all, so it has
+    to name the two faces that form it.
+    """
+
+    def _pick_at(self, frame, member, predicate):
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(frame, member)
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                for hit in local.get_all_features(point):
+                    if predicate(hit.feature):
+                        return local, hit.feature
+        raise AssertionError("no such feature on the finished surface")
+
+    def test_a_face_pick_references_that_face(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        local, feature = self._pick_at(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda f: f.feature_type() == CSGFeatureType.FACE and f.name.startswith("mortise"))
+
+        reference = runner._pick_reference(
+            local, "receiving_timber#0", ["mortise_and_tenon", "mortise_hole"],
+            feature.name, "FACE", None)
+
+        assert reference["timber"] == "receiving_timber#0"
+        assert reference["feature"] == feature.name
+        assert reference.get("kind") != "edge"
+
+    def test_an_edge_pick_references_both_its_parents(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        local, edge = self._pick_at(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+
+        reference = runner._pick_reference(
+            local, "receiving_timber#0", [], edge.name, "EDGE", edge)
+
+        assert reference["kind"] == "edge"
+        assert {reference["a"]["feature"], reference["b"]["feature"]} == {
+            edge.a.feature.name, edge.b.feature.name}
+
+    def test_the_reference_resolves_back_to_a_place(self, mortise_and_tenon_frame):
+        # The round trip that matters: what a pick writes down, resolve_anchor
+        # finds again.
+        from kumiki.cutcsg import CSGFeatureType
+
+        local, edge = self._pick_at(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+        reference = runner._pick_reference(
+            local, "receiving_timber#0", [], edge.name, "EDGE", edge)
+
+        resolved = runner.resolve_anchor(mortise_and_tenon_frame, reference)
+
+        assert resolved is not None and resolved["at"] is not None
+
+    def test_a_pick_still_drilling_down_references_nothing(self, mortise_and_tenon_frame):
+        # No feature reached yet, so there is nothing to measure to.
+        assert runner._pick_reference(None, "t#0", ["cut"], None, None, None) is None
