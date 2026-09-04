@@ -3028,7 +3028,7 @@ class KigumiViewerApp extends LitElement {
             this._hover = new window.KigumiHover.HoverState();
         }
         this._hoverClient = { x: event.clientX, y: event.clientY };
-        this._hover.moved(event.clientX, event.clientY, performance.now());
+        this._hover.moved(event.clientX, event.clientY);
     }
 
     /**
@@ -3042,29 +3042,27 @@ class KigumiViewerApp extends LitElement {
         if (!this._hover || typeof vscode === 'undefined') {
             return;
         }
-        const due = this._hover.due(performance.now());
+        const due = this._hover.due();
         if (!due || !this._hoverClient) {
             return;
         }
-        const hits = this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y);
-        const target = window.KigumiHover.hoverTarget(hits);
-        if (!target) {
-            // Off the model. Nothing to ask, and nothing should stay lit.
-            this._hover.clear();
-            this.clearHoverOutline();
-            return;
-        }
-
-        // The same decision a click makes, so hover shows what a click would
-        // do rather than something else. Clicking an unselected timber selects
-        // the whole timber; clicking one already selected drills into it. Only
-        // the second has a feature to ask the runner about.
+        // The same decision a click makes, so hover shows what a click would do
+        // rather than something else. Clicking an unselected timber selects the
+        // whole timber; clicking one already selected drills into it. Only the
+        // second has a feature to ask the runner about.
+        //
+        // The decision also says WHICH member, which is not the nearest one: a
+        // click drills into the selected timber wherever it sits along the ray.
         const decision = choosePickAction({
-            hits,
+            hits: this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y),
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: false,
         });
-        if (decision.action !== 'csg') {
+        const target = window.KigumiHover.hoverTarget(decision);
+        if (decision.action !== 'csg' || !target) {
+            // Either nothing under the pointer, or a click here would take the
+            // whole timber rather than anything inside it.
+            this._hover.clear();
             this.clearHoverOutline();
             return;
         }

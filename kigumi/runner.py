@@ -4000,6 +4000,7 @@ def _extract_highlight_mesh(
     selected_ref: Optional[Any] = None,
     feature_label: Optional[str] = None,
     edge_feature: Optional[Any] = None,
+    feature_type: Optional[str] = None,
 ) -> Tuple[List[float], List[int], int, int]:
     """Extract triangles belonging to *target_csg* from the rendered mesh.
 
@@ -4023,7 +4024,26 @@ def _extract_highlight_mesh(
     # CSG. It matters because the target is usually small and the mesh is the
     # whole timber -- a mortise on a beam keeps 10 triangles out of 376, and the
     # walk drops from 2.8ms to 0.1ms.
+    # An edge whose line has already been worked out has no triangles to light:
+    # the line IS its highlight. Without this the walk still runs, comparing
+    # every triangle against an edge's name that no face can ever answer to, and
+    # spends a fifth of a second arriving at nothing.
+    if feature_type == "EDGE" and edge_feature is None:
+        return [], [], 0, len(mesh_indices) // 3
+
     inside_box = _aabb_filter(target_csg, eps)
+
+    # The feature we are matching against, looked up once instead of once per
+    # triangle. _detect_face_label asks the node for EVERY feature at the point
+    # and compares names; when the name is a declared feature we can ask that
+    # one feature directly, which is the same answer without the search.
+    #
+    # test_point is only meaningful for a point already known to be on the
+    # owner's boundary -- which the loop below establishes before it gets here.
+    wanted_feature = None
+    if feature_label is not None and edge_feature is None:
+        wanted_feature = next(
+            (f for f in target_csg.get_declared_features() if f.name == feature_label), None)
 
     for tri in range(total_tris):
         i0 = mesh_indices[tri * 3]
@@ -4067,7 +4087,12 @@ def _extract_highlight_mesh(
                         on_edge += 1
                 if on_edge < 2:
                     continue
+            elif wanted_feature is not None:
+                if not wanted_feature.test_point(target_csg, _to_v3(local_c), eps):
+                    continue
             elif feature_label is not None:
+                # A generic name -- "left", "cylindrical_surface" -- which no
+                # declared feature answers to, so it has to be worked out.
                 tri_face_label = _detect_face_label(target_csg, local_c, eps)
                 if tri_face_label != feature_label:
                     continue
@@ -4189,6 +4214,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         selected_ref=parent_csg if feature_label is not None else target_csg,
         feature_label=feature_label,
         edge_feature=edge if (highlight_edge is None and not edge_absent) else None,
+        feature_type=feature_type,
     )
 
     # When a feature (face) is selected, also extract the parent labeled CSG mesh

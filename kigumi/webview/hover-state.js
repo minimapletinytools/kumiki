@@ -20,21 +20,29 @@
     // affordable, but not free, so this also:
     //
     //   - ignores a move that has not travelled far enough to mean anything,
-    //   - waits for the pointer to settle before asking,
+    //   - waits for one still frame, so a sweep asks nothing on the way past,
     //   - keeps only the newest answer, since an older one is about a place the
     //     pointer has already left.
 
     /** Below this the pointer has not really moved, in canvas pixels. */
     const MOVE_SLOP_PX = 3;
 
-    /** How long the pointer settles before asking, in milliseconds. */
-    const SETTLE_MS = 40;
+    /**
+     * A pointer is settled once a frame has passed without it moving.
+     *
+     * Not a wait measured in milliseconds: any number long enough to be worth
+     * having is long enough to feel. One still frame is the shortest thing
+     * that means "stopped", and it costs nothing when the pointer is sweeping,
+     * since every frame of a sweep has a move in it.
+     */
+    const SETTLE_FRAMES = 1;
 
     class HoverState {
         constructor(options) {
             const settings = options || {};
             this.slop = settings.slop === undefined ? MOVE_SLOP_PX : settings.slop;
-            this.settle = settings.settle === undefined ? SETTLE_MS : settings.settle;
+            this.settleFrames = settings.settleFrames === undefined
+                ? SETTLE_FRAMES : settings.settleFrames;
             this.reset();
         }
 
@@ -44,6 +52,7 @@
             this.at = null;
             this._pending = null;
             this._asked = 0;
+            this._stillFrames = 0;
         }
 
         /**
@@ -51,14 +60,15 @@
          *
          * `now` is passed in rather than read, so a test can drive time.
          */
-        moved(x, y, now) {
+        moved(x, y) {
             const far = this.at === null
                 || Math.abs(x - this.at.x) + Math.abs(y - this.at.y) > this.slop;
             this.at = { x, y };
             if (!far) {
                 return { ask: false, reason: 'barely-moved' };
             }
-            this._pending = { x, y, since: now };
+            this._pending = { x, y };
+            this._stillFrames = 0;
             return { ask: false, reason: 'settling' };
         }
 
@@ -68,12 +78,19 @@
          * Called from the render loop rather than a timer, so a hover cannot
          * outlive the viewer that owns it.
          */
-        due(now) {
-            if (this._pending === null || now - this._pending.since < this.settle) {
+        due() {
+            if (this._pending === null) {
+                return null;
+            }
+            // Counted before it is raised, so a frame that had a move in it is
+            // not the still frame: the first call after moving always waits.
+            if (this._stillFrames < this.settleFrames) {
+                this._stillFrames += 1;
                 return null;
             }
             const point = this._pending;
             this._pending = null;
+            this._stillFrames = 0;
             this._asked += 1;
             return { x: point.x, y: point.y, request: this._asked };
         }
@@ -117,25 +134,30 @@
     }
 
     /**
-     * What to ask about, given the ray hits under the pointer.
+     * What to ask about, given what a click here would act on.
      *
-     * A hit is {memberKey, hit}, where the inner hit carries the world point --
-     * two nested things both reasonably called "hit", which is exactly how the
-     * wrong one gets used. Pinned here by a test rather than by memory.
+     * Takes the pick decision rather than the ray hits, because those are not
+     * the same member: a click drills into a SELECTED timber wherever it sits
+     * along the ray, not into whatever is nearest. Handed the hits instead,
+     * hover asked about the frontmost one and lit something a click would not
+     * have touched.
+     *
+     * The shape is {memberKey, hit}, and the inner hit carries the world point
+     * -- two nested things both reasonably called "hit", which is exactly how
+     * the wrong one gets used.
      */
-    function hoverTarget(hits) {
-        const found = (hits || [])[0];
-        if (!found || !found.hit || !found.hit.point) {
+    function hoverTarget(decision) {
+        if (!decision || !decision.hit || !decision.hit.point) {
             return null;
         }
-        const point = found.hit.point;
+        const point = decision.hit.point;
         return {
-            memberKey: found.memberKey,
+            memberKey: decision.memberKey,
             point: [point.x, point.y, point.z],
         };
     }
 
-    const KigumiHover = { HoverState, hoverTarget, MOVE_SLOP_PX, SETTLE_MS };
+    const KigumiHover = { HoverState, hoverTarget, MOVE_SLOP_PX, SETTLE_FRAMES };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiHover;

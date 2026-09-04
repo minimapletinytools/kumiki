@@ -1569,6 +1569,19 @@ class TestHoveringOverAFeature:
 class TestTheBroadphase:
     """Rejecting triangles by a box before asking the CSG about them."""
 
+    def test_an_edge_lights_no_triangles_and_does_not_look_for_any(self):
+        # The line is the edge's highlight. Without the early return the walk
+        # still runs, comparing every triangle against a name no face answers
+        # to, and arrives at nothing the slow way.
+        from kumiki.cutcsg import EmptyCSG
+
+        verts, idx, matched, total = runner._extract_highlight_mesh(
+            [0.0] * 9, [0, 1, 2], EmptyCSG(), None, None, 5e-4,
+            feature_label="a\u00d7b", feature_type="EDGE")
+
+        assert verts == [] and idx == [] and matched == 0
+        assert total == 1
+
     def test_a_box_rejects_what_is_outside_it(self, mortise_and_tenon_frame):
         cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()

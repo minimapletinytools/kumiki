@@ -11,8 +11,8 @@ describe('hover pacing', () => {
 
     it('a move that has barely travelled is not worth asking about', () => {
         const hover = new HoverState();
-        hover.moved(100, 100, 0);
-        hover.due(1000);
+        hover.moved(100, 100);
+        hover.due();
 
         const result = hover.moved(101, 100, 1000);
 
@@ -20,39 +20,43 @@ describe('hover pacing', () => {
         expect(result.reason).toBe('barely-moved');
     });
 
-    it('nothing is asked until the pointer settles', () => {
-        const hover = new HoverState({ settle: 40 });
-        hover.moved(100, 100, 0);
+    it('nothing is asked until a frame has passed without moving', () => {
+        const hover = new HoverState();
+        hover.moved(100, 100);
 
-        expect(hover.due(20)).toBeNull();
-        expect(hover.due(40)).not.toBeNull();
+        expect(hover.due()).toBeNull();
+        expect(hover.due()).not.toBeNull();
     });
 
-    it('a pointer that keeps moving keeps resetting the wait', () => {
-        // Otherwise a sweep across the model would fire a question per step.
-        const hover = new HoverState({ settle: 40 });
-        hover.moved(100, 100, 0);
-        hover.moved(200, 100, 30);
-        hover.moved(300, 100, 60);
+    it('a pointer that keeps moving asks nothing on the way past', () => {
+        // Every frame of a sweep has a move in it, so the still frame never
+        // arrives until the sweep stops.
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        hover.due();
+        hover.moved(200, 100);
+        hover.due();
+        hover.moved(300, 100);
 
-        expect(hover.due(80)).toBeNull();
-        expect(hover.due(100)).not.toBeNull();
+        expect(hover.due()).toBeNull();
+        expect(hover.due()).not.toBeNull();
     });
 
     it('asks about where the pointer ended up, not where it began', () => {
-        const hover = new HoverState({ settle: 40 });
-        hover.moved(100, 100, 0);
-        hover.moved(300, 200, 10);
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        hover.moved(300, 200);
+        hover.due();
 
-        const due = hover.due(60);
+        const due = hover.due();
 
         expect([due.x, due.y]).toEqual([300, 200]);
     });
 
     it('an answer to the current question is kept', () => {
-        const hover = new HoverState({ settle: 0 });
-        hover.moved(100, 100, 0);
-        const due = hover.due(10);
+        const hover = new HoverState({ settleFrames: 0 });
+        hover.moved(100, 100);
+        const due = hover.due();
 
         const result = hover.answered(due.request, answer('mortise_right'));
 
@@ -63,11 +67,11 @@ describe('hover pacing', () => {
     it('an answer overtaken by a newer question is dropped', () => {
         // The normal case, not an edge one: the pointer keeps moving while the
         // runner is working, and the old answer is about a place it has left.
-        const hover = new HoverState({ settle: 0 });
-        hover.moved(100, 100, 0);
-        const first = hover.due(10);
-        hover.moved(400, 400, 20);
-        hover.due(30);
+        const hover = new HoverState({ settleFrames: 0 });
+        hover.moved(100, 100);
+        const first = hover.due();
+        hover.moved(400, 400);
+        hover.due();
 
         const result = hover.answered(first.request, answer('stale_feature'));
 
@@ -77,9 +81,9 @@ describe('hover pacing', () => {
     });
 
     it('clearing forgets what was under the pointer', () => {
-        const hover = new HoverState({ settle: 0 });
-        hover.moved(100, 100, 0);
-        hover.answered(hover.due(10).request, answer('mortise_right'));
+        const hover = new HoverState({ settleFrames: 0 });
+        hover.moved(100, 100);
+        hover.answered(hover.due().request, answer('mortise_right'));
 
         expect(hover.clear().cleared).toBe(true);
         expect(hover.feature).toBeNull();
@@ -125,21 +129,21 @@ describe('what to ask about', () => {
     // threw inside the render loop and froze the view, so it is pinned here.
     const hit = (memberKey, x, y, z) => ({ memberKey, hit: { point: { x, y, z } } });
 
-    it('takes the frontmost hit and its world point', () => {
-        expect(hoverTarget([hit('post#0', 1, 2, 3), hit('post#1', 9, 9, 9)])).toEqual({
+    it('takes the member the click decided on, and its world point', () => {
+        expect(hoverTarget(hit('post#0', 1, 2, 3))).toEqual({
             memberKey: 'post#0',
             point: [1, 2, 3],
         });
     });
 
-    it('nothing under the pointer is nothing to ask', () => {
-        expect(hoverTarget([])).toBeNull();
+    it('nothing decided is nothing to ask', () => {
         expect(hoverTarget(null)).toBeNull();
+        expect(hoverTarget({ action: 'clear' })).toBeNull();
     });
 
-    it('a hit without a point is not asked about either', () => {
+    it('a decision without a point is not asked about either', () => {
         // Rather than reading undefined off it, which is what threw.
-        expect(hoverTarget([{ memberKey: 'post#0' }])).toBeNull();
-        expect(hoverTarget([{ memberKey: 'post#0', hit: {} }])).toBeNull();
+        expect(hoverTarget({ memberKey: 'post#0' })).toBeNull();
+        expect(hoverTarget({ memberKey: 'post#0', hit: {} })).toBeNull();
     });
 });
