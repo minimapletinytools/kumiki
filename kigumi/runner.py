@@ -3581,15 +3581,29 @@ def _cropped_edge_segment(
         if hit is not None and getattr(hit, "owner", None) is not None
     ]
     solid = timber.get_perfect_timber_within_csg_local()
-    segment = segment_on_line(
-        line, parents + [solid],
-        seed_reach=float(timber.length) * 4,
-        near=solid.transform.position,
-        # The same tolerance the edge was found by. Without it a real edge
-        # clips to nothing: two faces count as meeting within this distance, so
-        # their line can sit a fraction outside the solids that formed it.
-        tolerance=float(_edge_tolerance()),
-    )
+    def clipped(tolerance):
+        return segment_on_line(
+            line, parents + [solid],
+            seed_reach=float(timber.length) * 4,
+            near=solid.transform.position,
+            tolerance=tolerance,
+        )
+
+    # Two questions, one number, and only one of them wants it.
+    #
+    # WHETHER the edge is there needs the tolerance it was found by: two faces
+    # count as meeting within that distance, so a real edge's line can sit a
+    # fraction outside the solids that formed it and clip away to nothing.
+    #
+    # HOW FAR it runs does not. Widening the bounds to answer the first question
+    # also pushed both ends out by that tolerance, so every edge was drawn long
+    # at each end -- a fifth again on a 19mm arris.
+    #
+    # So take the exact span where there is one, and fall back to the tolerant
+    # one only for the edge that exact clipping loses entirely.
+    segment = clipped(0.0)
+    if segment is None or segment.is_empty:
+        segment = clipped(float(_edge_tolerance()))
     if segment is None:
         # A solid it cannot describe: no answer, rather than a wrong one.
         return (None, False)

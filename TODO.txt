@@ -305,17 +305,20 @@ DONE-TODO should we enforce canonical ordering on anchor_a / anchor_b, we can cr
 DONE-consider dropping kind from measurement identity when checking for override on python 
 DONE-add realtime feature raasting as you move your mouse....
 
-
--on cofee table, we're getting {"feature":"tenon_left×rough.front"} because tenon_left and roguh.front are coplanar
+DONE-on cofee table, we're getting {"feature":"tenon_left×rough.front"} because tenon_left and roguh.front are coplanar
   DONE-parallel faces should never intersect as features
-  -make suer tenon_left is not in a intersection group with rough.front. I think tenon_left does not need to be in any intersection group for now actually.
+  DONE-make suer tenon_left is not in a intersection group with rough.front. I think tenon_left does not need to be in any intersection group for now actually.
 
 
--make sure drawings only intersect with PTW
+-make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
+  -welly oush ould force show lines for PTW faces (maybe light grey)
+  -and you should highlight the refreence edge as wel if there is one in drawing mode
+  -or just add an option in general to highlight the reference edge for 3d view mode as well
 -why do edges extend beyond their actual bonudaries...
--sa[e settings buttons needs to move to panel header
+-save settings buttons needs to move to panel header
 -debug drawing should be a button not a checkbox in the options view, or just move it to be one of the default drawnigs that ships with every frame
 -add support for 3d measurements
+  -maybe there should be a spceial drawing that's available in regular view mode...
 
 -increase edge selsection threhsold...
 -add ability to select timber edges and end face edges (either using face face intersection or as explicit named features, probably the latter)

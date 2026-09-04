@@ -1116,13 +1116,11 @@ class TestEdgeHighlightSpan:
         segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
 
         assert not absent
-        # The fixture's tenon_width_relative_to_joint, which is what the mortise
-        # is that way, plus the edge tolerance at each end: the clip is widened
-        # by it, because that is the distance within which the two faces counted
-        # as meeting in the first place.
-        slack = float(runner._edge_tolerance()) * 1000 * 2
-        assert self._span_mm(segment) == pytest.approx(
-            float(inches(3)) * 1000 + slack, abs=0.5)
+        # Exactly the fixture's tenon_width_relative_to_joint, which is what the
+        # mortise is that way. No slack: the tolerance decides WHETHER an edge is
+        # there, and widening the clip to answer that also pushed both ends out
+        # by it, so an edge was drawn long at each end.
+        assert self._span_mm(segment) == pytest.approx(float(inches(3)) * 1000, abs=0.5)
         # And nowhere near the timber's own length, which is what it used to say.
         assert self._span_mm(segment) < float(timber.length) * 1000 / 10
 
@@ -1136,6 +1134,36 @@ class TestEdgeHighlightSpan:
 
         assert segment is None
         assert absent, "an edge cropped away to nothing is not merely unknown"
+
+    def test_an_edge_that_only_exists_within_tolerance_is_still_found(
+            self, mortise_and_tenon_frame):
+        """The reason the tolerance is there at all.
+
+        Two faces count as meeting within the edge tolerance, so a real edge's
+        line can sit a fraction outside the solids that formed it and clip away
+        to nothing when clipped exactly. Those keep the tolerant span; only the
+        exactly-clippable ones get the exact one.
+        """
+        from kumiki.cutcsg import CSGFeatureType
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        found = 0
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                point = runner._to_v3([float(vertex[i]) for i in range(3)])
+                for hit in local.get_all_features(point):
+                    if hit.feature.feature_type() != CSGFeatureType.EDGE:
+                        continue
+                    segment, absent = runner._edge_highlight_segment(
+                        hit.feature, hit.owner, [], None, None, cut_timber.timber)
+                    assert not absent, f"{hit.feature.name} vanished"
+                    assert segment is not None
+                    found += 1
+                    if found > 20:
+                        return
+        assert found > 0
 
     def test_the_timbers_own_edge_still_runs_its_full_length(self, mortise_and_tenon_frame):
         # The crop must not shorten an edge that really is that long.
