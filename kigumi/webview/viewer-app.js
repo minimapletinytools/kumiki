@@ -1856,7 +1856,18 @@ class KigumiViewerApp extends LitElement {
             this.updateCylinderSilhouettes();
             // Asked from here rather than a timer: a hover cannot outlive the
             // viewer, and nothing is asked while the tab is not drawing.
-            this.pumpHover();
+            //
+            // Guarded because this runs inside the frame: a throw here would
+            // stop renderViewports below it and freeze the view, which is a
+            // spectacular way for a hover to fail.
+            try {
+                this.pumpHover();
+            } catch (error) {
+                if (!this._hoverBroken) {
+                    this._hoverBroken = true;
+                    this.emitViewerLog('hover-error', { message: String(error && error.message || error) });
+                }
+            }
             this.renderViewports();
         };
         animate();
@@ -3035,9 +3046,10 @@ class KigumiViewerApp extends LitElement {
         if (!due || !this._hoverClient) {
             return;
         }
-        const hits = this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y);
-        const hit = hits[0] || null;
-        if (!hit) {
+        const target = window.KigumiHover.hoverTarget(
+            this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y),
+        );
+        if (!target) {
             // Off the model. Nothing to ask, and nothing should stay lit.
             if (this._hover.feature) {
                 this._hover.clear();
@@ -3047,8 +3059,8 @@ class KigumiViewerApp extends LitElement {
         }
         vscode.postMessage({
             type: 'hoverFeatureAtPoint',
-            memberKey: hit.memberKey,
-            point: [hit.point.x, hit.point.y, hit.point.z],
+            memberKey: target.memberKey,
+            point: target.point,
             request: due.request,
         });
     }

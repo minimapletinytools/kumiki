@@ -308,11 +308,16 @@ class FrameViewSession {
                 return;
             }
             if (message.type === 'hoverFeatureAtPoint') {
-                // Deliberately quiet on failure: this fires while the pointer
-                // moves, so a broken hover would fill the log rather than say
-                // anything useful, and there is nothing the user asked for to
-                // report back on.
-                this._handleHoverFeatureAtPoint(message).catch(() => {});
+                // Reported once and then not again. This fires while the
+                // pointer moves, so logging every failure would bury the log --
+                // but logging none of them is how a hover that never worked
+                // looked exactly like a hover that found nothing.
+                this._handleHoverFeatureAtPoint(message).catch((err) => {
+                    if (!this._hoverErrorReported) {
+                        this._hoverErrorReported = true;
+                        this.log(`[hover] ${err.message || err} (further hover errors are not logged)`);
+                    }
+                });
                 return;
             }
             if (message.type === 'requestDrawings') {

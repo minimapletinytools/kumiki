@@ -110,7 +110,26 @@
         }
     }
 
-    const KigumiHover = { HoverState, MOVE_SLOP_PX, SETTLE_MS };
+    /**
+     * What to ask about, given the ray hits under the pointer.
+     *
+     * A hit is {memberKey, hit}, where the inner hit carries the world point --
+     * two nested things both reasonably called "hit", which is exactly how the
+     * wrong one gets used. Pinned here by a test rather than by memory.
+     */
+    function hoverTarget(hits) {
+        const found = (hits || [])[0];
+        if (!found || !found.hit || !found.hit.point) {
+            return null;
+        }
+        const point = found.hit.point;
+        return {
+            memberKey: found.memberKey,
+            point: [point.x, point.y, point.z],
+        };
+    }
+
+    const KigumiHover = { HoverState, hoverTarget, MOVE_SLOP_PX, SETTLE_MS };
 
     if (typeof module !== 'undefined' && module.exports) {
         module.exports = KigumiHover;

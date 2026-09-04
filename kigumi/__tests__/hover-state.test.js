@@ -1,4 +1,4 @@
-const { HoverState } = require('../webview/hover-state.js');
+const { HoverState, hoverTarget } = require('../webview/hover-state.js');
 
 function answer(feature, path = ['cut'], memberKey = 'post#0') {
     return { memberKey, path, feature };
@@ -109,5 +109,31 @@ describe('telling two answers apart', () => {
     it('nothing matches nothing', () => {
         expect(HoverState.sameFeature(null, null)).toBe(true);
         expect(HoverState.sameFeature(answer('a'), null)).toBe(false);
+    });
+});
+
+
+describe('what to ask about', () => {
+    // A ray hit is {memberKey, hit}, and the inner hit carries the point. Two
+    // nested things both reasonably called "hit" -- reaching for the wrong one
+    // threw inside the render loop and froze the view, so it is pinned here.
+    const hit = (memberKey, x, y, z) => ({ memberKey, hit: { point: { x, y, z } } });
+
+    it('takes the frontmost hit and its world point', () => {
+        expect(hoverTarget([hit('post#0', 1, 2, 3), hit('post#1', 9, 9, 9)])).toEqual({
+            memberKey: 'post#0',
+            point: [1, 2, 3],
+        });
+    });
+
+    it('nothing under the pointer is nothing to ask', () => {
+        expect(hoverTarget([])).toBeNull();
+        expect(hoverTarget(null)).toBeNull();
+    });
+
+    it('a hit without a point is not asked about either', () => {
+        // Rather than reading undefined off it, which is what threw.
+        expect(hoverTarget([{ memberKey: 'post#0' }])).toBeNull();
+        expect(hoverTarget([{ memberKey: 'post#0', hit: {} }])).toBeNull();
     });
 });
