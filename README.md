@@ -1,14 +1,17 @@
 # Kumiki
 
-Kumiki is a Code Assisted Design (CoAD) library for programmatically designing timber framed structures and woodworking in general.
+Kumiki is a PROGRAMMATIC CAD library for timber framing and woodworking.
 
-As Kumiki is a CoAD library, it is well suited for usage with AI agents.
+As a programmatic CAD tool, it is well suited for usage with AI agents 🤖
 
 Kumiki is used together with Kigumi--a VSCode extension for viewing your kumiki designs!
 
-Kumiki is in BETA, try it out! There are many more features to come and expect frequent breaking changes accompanied by a minor version bump. The AI agent should be able to easily address any breaking API changes based on the changelog.
+Kumiki is in FREE and OPEN SOURCE (FOSS), try it out! There are many more features to come. 
 
 ![](oscarshed.png)
+
+
+Expect frequent breaking changes accompanied by a minor version bump. The AI agent should be able to easily address any breaking API changes based on the changelog.
 
 ## setup
 
@@ -48,7 +51,9 @@ Understanding Kumiki will also allow you to better instruct the agent to impleme
 
 ## Drawing Support
 
-To generate drawings, your best bet right now is to export as STEP or STL files and generate drawings in another software. Kumiki/Kigumi will add support for this in 3 stages:
+Drawing support (for making plans or per-member blueprints) is coming very soon!
+
+For now, your best bet right now is to export as STEP or STL files and generate drawings in another software. Kumiki/Kigumi will add support for this in 3 stages:
 
 1. ability to measure features relative to each other in Kigumi
 2. ability to generate and export drawings inside kigumi
@@ -68,4 +73,4 @@ Kigumi has a separate project scanning flow such that it can be used with the Ku
 
 ## Developing Kigumi
 
-TODO
+Kigumi is 100% AI SLOP and it seems to not even be that awful :). Still, it's designed with more care than I might sometimes pretends. It may be best to open a bug report of feature request in github vs making a PR as I have no documented architectural guidance for kigumi yet simultaneously highly opinionated.
