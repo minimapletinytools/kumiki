@@ -275,6 +275,12 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
     feature: 0x0288d1,
 });
 
+// What the pointer is over, as opposed to what is selected. A different hue as
+// well as a different shape -- an outline rather than a fill -- so the two
+// never read as the same state.
+const HOVER_OUTLINE_COLOR = 0xffa726;
+const HOVER_OUTLINE_WIDTH_PX = 3;
+
 // A selected edge is drawn as a line rather than shaded like a face, so it
 // needs a width of its own -- several times the timbers' own edge lines, or the
 // selection does not read as thicker than the geometry it sits on.
@@ -1678,6 +1684,13 @@ class KigumiViewerApp extends LitElement {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
+        canvas.addEventListener('pointermove', (event) => {
+            this.handleCanvasHover(event);
+        });
+        canvas.addEventListener('pointerleave', () => {
+            this.clearHover();
+        });
+
         canvas.addEventListener('mousedown', (event) => {
             const action = actionForButton(event.button, this.leftClickDragRotatesCamera);
             if (!action) {
@@ -1841,6 +1854,9 @@ class KigumiViewerApp extends LitElement {
             this.stepCameraAnimation();
             this.renderCameraControls();
             this.updateCylinderSilhouettes();
+            // Asked from here rather than a timer: a hover cannot outlive the
+            // viewer, and nothing is asked while the tab is not drawing.
+            this.pumpHover();
             this.renderViewports();
         };
         animate();
@@ -2526,6 +2542,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'hoverFeatureResult') {
+            this.handleHoverResult(message);
+            return;
+        }
+
         if (message.type === 'csgSelectionResult') {
             this.handleCSGSelectionResult(message);
             return;
@@ -2984,6 +3005,126 @@ class KigumiViewerApp extends LitElement {
         this.selectionManager.clearCsgFocus();
         this.lastPickDetail = null;
         this.removeCSGHighlight();
+    }
+
+    // -------------------------------------------------------------------------
+    // Hover: what the pointer is over, without selecting it
+    // -------------------------------------------------------------------------
+
+    /** The pointer moved over the canvas. Cheap: no request goes out here. */
+    handleCanvasHover(event) {
+        if (!this._hover) {
+            this._hover = new window.KigumiHover.HoverState();
+        }
+        this._hoverClient = { x: event.clientX, y: event.clientY };
+        this._hover.moved(event.clientX, event.clientY, performance.now());
+    }
+
+    /**
+     * Ask about the pointer, once it has settled.
+     *
+     * Driven from the render loop rather than a timer, so a hover cannot
+     * outlive the viewer that owns it, and so nothing is asked while the tab
+     * is not drawing.
+     */
+    pumpHover() {
+        if (!this._hover || typeof vscode === 'undefined') {
+            return;
+        }
+        const due = this._hover.due(performance.now());
+        if (!due || !this._hoverClient) {
+            return;
+        }
+        const hits = this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y);
+        const hit = hits[0] || null;
+        if (!hit) {
+            // Off the model. Nothing to ask, and nothing should stay lit.
+            if (this._hover.feature) {
+                this._hover.clear();
+                this.clearHoverOutline();
+            }
+            return;
+        }
+        vscode.postMessage({
+            type: 'hoverFeatureAtPoint',
+            memberKey: hit.memberKey,
+            point: [hit.point.x, hit.point.y, hit.point.z],
+            request: due.request,
+        });
+    }
+
+    /** An answer came back. Draws only when it is about somewhere new. */
+    handleHoverResult(message) {
+        if (!this._hover) {
+            return;
+        }
+        const kept = this._hover.answered(message.request, message);
+        if (!kept.kept) {
+            return;
+        }
+        if (window.KigumiHover.HoverState.sameFeature(this._hoverDrawn, message)) {
+            return;
+        }
+        this._hoverDrawn = message;
+        this.drawHoverOutline(message.outline);
+    }
+
+    /**
+     * Outline what is under the pointer.
+     *
+     * A line, never a filled highlight: this says what a click would take, and
+     * it has to be tellable apart from what a click already took. The shape is
+     * the feature's own outline from the CSG -- see _feature_outline, which
+     * also says where it is only approximate.
+     */
+    drawHoverOutline(outline) {
+        this.clearHoverOutline();
+        if (!Array.isArray(outline) || outline.length < 2) {
+            return;
+        }
+        const positions = [];
+        for (let index = 0; index < outline.length; index += 1) {
+            // Closed for a face, open for an edge's two ends.
+            const next = outline.length > 2 ? outline[(index + 1) % outline.length] : outline[index + 1];
+            if (!next) {
+                break;
+            }
+            positions.push(...outline[index], ...next);
+        }
+        if (positions.length === 0) {
+            return;
+        }
+        const geometry = new THREE.LineSegmentsGeometry();
+        geometry.setPositions(positions);
+        const material = new THREE.LineMaterial({
+            color: HOVER_OUTLINE_COLOR,
+            linewidth: HOVER_OUTLINE_WIDTH_PX,
+            resolution: this._getRendererResolution(),
+            depthTest: false,
+            transparent: true,
+            opacity: 0.9,
+        });
+        const line = new THREE.LineSegments2(geometry, material);
+        line.computeLineDistances();
+        // Under the selection highlight, which is at 1000: what is selected
+        // matters more than what is merely under the pointer.
+        line.renderOrder = 900;
+        this.scene.add(line);
+        this._hoverOutline = line;
+    }
+
+    clearHoverOutline() {
+        this._hoverDrawn = null;
+        this._disposeHighlightMesh('_hoverOutline');
+    }
+
+    /** Leaving the canvas, or changing mode: nothing should stay lit. */
+    clearHover() {
+        if (this._hover) {
+            this._hover.clear();
+        }
+        this._hoverClient = null;
+        this.clearHoverOutline();
     }
 
     handleCanvasClick(event) {

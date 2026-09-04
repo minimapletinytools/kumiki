@@ -307,6 +307,14 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'hoverFeatureAtPoint') {
+                // Deliberately quiet on failure: this fires while the pointer
+                // moves, so a broken hover would fill the log rather than say
+                // anything useful, and there is nothing the user asked for to
+                // report back on.
+                this._handleHoverFeatureAtPoint(message).catch(() => {});
+                return;
+            }
             if (message.type === 'requestDrawings') {
                 this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
                     this.log(`[drawing] requestDrawings error: ${err.message || err}`);
@@ -960,6 +968,20 @@ class FrameViewSession {
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
+    }
+
+    async _handleHoverFeatureAtPoint(message) {
+        if (!this.runnerSession) {
+            return;
+        }
+        const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, {
+            memberKey: message.memberKey,
+            point: message.point,
+        });
+        // The request number goes out and comes back untouched, so the viewer
+        // can tell an answer about where the pointer is now from one about
+        // where it was two moves ago.
+        this._postToWebview({ type: 'hoverFeatureResult', request: message.request, ...result });
     }
 
     async _handleRequestCSGTree(message) {

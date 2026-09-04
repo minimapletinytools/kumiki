@@ -1500,3 +1500,34 @@ class TestHoveringOverAFeature:
         with pytest.raises(ValueError, match="Unknown memberKey"):
             runner._handle_hover_feature_at_point(
                 State(), {"memberKey": "nope", "point": [0, 0, 0]}, Slot())
+
+    def test_the_command_answers_through_the_runner_protocol(self, mortise_and_tenon_frame):
+        # The dispatch, not just the handler: a command the protocol does not
+        # know about is a viewer that silently never hovers.
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "receiving_timber")
+        point = self._a_point_on(local, cut_timber, lambda f: True)
+
+        class Runner:
+            _active = slot
+            slots = {"main": slot}
+            active_slot = "main"
+
+        request = {
+            "id": "hover-1",
+            "command": "hover_feature_at_point",
+            "payload": {"memberKey": "receiving_timber", "point": point},
+        }
+
+        # _resolve_slot needs a slot to find; give it the one we built.
+        import types
+        runner_state = Runner()
+        original = runner._resolve_slot
+        runner._resolve_slot = lambda state, payload: slot
+        try:
+            _state, response, _stop = runner.handle_request(runner_state, request)
+        finally:
+            runner._resolve_slot = original
+
+        assert response.get("ok") is not False, response
+        result = response.get("result") or response.get("payload") or {}
+        assert "outline" in result or "feature" in result, response
