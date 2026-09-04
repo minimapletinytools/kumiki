@@ -134,9 +134,15 @@ class CSGFeatureType(Enum):
 # plus, for edges and points, however far a human click lands from a target it
 # cannot hit exactly. Code doing exact analytic work wants
 # FeatureTestTolerances.exact() instead.
+#
+# Edges and points are roomier again than the reasoning above alone would give
+# them, because they are what a measurement is usually taken to: a dimension
+# runs to an arris or a corner far more often than to the middle of a face, and
+# a snap that keeps missing is worse than one that occasionally takes the
+# neighbouring edge -- which the specificity ordering then sorts out.
 FEATURE_FACE_TOLERANCE = scalar('5e-4')
-FEATURE_EDGE_TOLERANCE = scalar('2e-3')
-FEATURE_POINT_TOLERANCE = scalar('4e-3')
+FEATURE_EDGE_TOLERANCE = scalar('4e-3')
+FEATURE_POINT_TOLERANCE = scalar('8e-3')
 
 
 @dataclass(frozen=True)

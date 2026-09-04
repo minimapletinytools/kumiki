@@ -278,8 +278,36 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 // What the pointer is over, as opposed to what is selected. A different hue as
 // well as a different shape -- an outline rather than a fill -- so the two
 // never read as the same state.
+/**
+ * Every triangle edge of a mesh, as line-segment positions.
+ *
+ * So a face still shows when it projects to a line: seen exactly edge-on it has
+ * no area to shade, and the mesh renders as nothing, while its boundary is
+ * still there to draw.
+ */
+function _meshEdgePositions(vertices, indices) {
+    const out = [];
+    const at = (index) => [vertices[index * 3], vertices[index * 3 + 1], vertices[index * 3 + 2]];
+    const list = indices || [];
+    for (let triangle = 0; triangle + 2 < list.length; triangle += 3) {
+        const corners = [list[triangle], list[triangle + 1], list[triangle + 2]];
+        for (let side = 0; side < 3; side += 1) {
+            out.push(...at(corners[side]), ...at(corners[(side + 1) % 3]));
+        }
+    }
+    return out;
+}
+
 const HOVER_COLOR = 0xffa726;
+// Shown while measuring, for a feature that could not finish the measurement
+// from where you are looking. Said in colour rather than by refusing the click,
+// since the answer depends on the view and the useful thing is to see that.
+const HOVER_REFUSED_COLOR = 0xef5350;
 const HOVER_OPACITY = 0.55;
+// The feature a measurement is being taken from, while the other end is chosen.
+// Its own colour: it is neither hovered nor selected, it is held.
+const HELD_COLOR = 0x66bb6a;
+const HELD_OPACITY = 0.6;
 
 // A selected edge is drawn as a line rather than shaded like a face, so it
 // needs a width of its own -- several times the timbers' own edge lines, or the
@@ -2558,6 +2586,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'measurePickResult') {
+            this._measurePicked(message);
+            return;
+        }
+
         if (message.type === 'csgSelectionResult') {
             this.handleCSGSelectionResult(message);
             return;
@@ -2889,6 +2922,28 @@ class KigumiViewerApp extends LitElement {
     }
 
     onWindowKeyDown(event) {
+        // Tab is checked before the defaultPrevented guard: it is the focus
+        // key, so something else may well have claimed it already, and this
+        // only acts while the pointer is over a feature -- which is not a
+        // moment anyone is tabbing between controls.
+        if (event.key === 'Tab' && this._hover && this._hover.feature) {
+            // Step to the next feature under the pointer. A face seen edge-on
+            // is never the best answer where it lies -- the edge formed with it
+            // wins -- so without this it cannot be reached at all, and in an
+            // elevation it is the one most worth measuring to.
+            event.preventDefault();
+            const count = Math.max(1, this._hover.feature.candidateCount || 1);
+            this._candidateIndex = ((this._candidateIndex || 0) + 1) % count;
+            this.emitViewerLog('measure-cycle', {
+                index: this._candidateIndex,
+                of: count,
+                from: this._hover.feature.featureLabel,
+            });
+            // The place did not change, the question did: ask the same point
+            // again so the hover shows what the next click would now take.
+            this._hover.askAgain();
+            return;
+        }
         if (event.defaultPrevented) {
             return;
         }
@@ -2896,6 +2951,14 @@ class KigumiViewerApp extends LitElement {
             event.preventDefault();
             if (this.contextMenuState) {
                 this.closeMemberContextMenu();
+            } else if (this._measureMode && this._measureMode.isActive) {
+                // One end at a time, so leaving a half-made measurement takes
+                // two presses: the second feature, then the mode.
+                const released = this._measureMode.escape();
+                if (released.action === 'left') {
+                    this.clearHeldFeature();
+                }
+                this.emitViewerLog('measure-escape', { action: released.action });
             } else if (this.selectionManager.csgFocus) {
                 this._dropCsgFocus();
             } else {
@@ -3027,8 +3090,14 @@ class KigumiViewerApp extends LitElement {
         if (!this._hover) {
             this._hover = new window.KigumiHover.HoverState();
         }
-        this._hoverClient = { x: event.clientX, y: event.clientY };
-        this._hover.moved(event.clientX, event.clientY);
+        // Where the pointer is lives on the hover state, which tracks it
+        // anyway to decide whether a move was worth anything.
+        const result = this._hover.moved(event.clientX, event.clientY);
+        if (result.reason !== 'barely-moved') {
+            // Cycling is about one place. Move somewhere else and it starts
+            // again at the best answer there.
+            this._candidateIndex = 0;
+        }
     }
 
     /**
@@ -3043,7 +3112,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const due = this._hover.due();
-        if (!due || !this._hoverClient) {
+        if (!due) {
             return;
         }
         // The same decision a click makes, so hover shows what a click would do
@@ -3054,7 +3123,7 @@ class KigumiViewerApp extends LitElement {
         // The decision also says WHICH member, which is not the nearest one: a
         // click drills into the selected timber wherever it sits along the ray.
         const decision = choosePickAction({
-            hits: this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y),
+            hits: this._findMembersAlongRay(due.x, due.y),
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: false,
         });
@@ -3076,6 +3145,7 @@ class KigumiViewerApp extends LitElement {
             point: target.point,
             currentPath,
             ctrlClick: false,
+            candidateIndex: this._candidateIndex || 0,
             request: due.request,
         });
     }
@@ -3089,11 +3159,11 @@ class KigumiViewerApp extends LitElement {
         if (!kept.kept) {
             return;
         }
-        if (window.KigumiHover.HoverState.sameFeature(this._hoverDrawn, message)) {
+        if (!this._hover.shouldDraw(message)) {
             return;
         }
-        this._hoverDrawn = message;
-        this.drawHoverHighlight(message);
+        this.drawHoverHighlight(message, this._measureVerdict(message).ok
+            ? HOVER_COLOR : HOVER_REFUSED_COLOR);
     }
 
     /**
@@ -3105,17 +3175,73 @@ class KigumiViewerApp extends LitElement {
      * an outline taken from the CSG was convex, so a timber face with mortises
      * through it lit as a whole rectangle over the openings.
      */
-    drawHoverHighlight(message) {
+    /**
+     * Whether a feature could finish the measurement in hand, from a given view.
+     *
+     * One answer for two callers: the hover paints by it, and the click refuses
+     * by it. Two judgements would eventually disagree, and a feature drawn red
+     * that the click then accepted would be worse than either on its own.
+     *
+     * `{ok: true}` when nothing is held -- the first pick is always allowed,
+     * since there is nothing yet for it to be wrong about.
+     */
+    _measureVerdict(message, viewport) {
+        const mode = this._measureMode;
+        if (!mode || mode.state !== window.KigumiMeasureMode.STATES.FROM) {
+            // Nothing held, so nothing to be wrong against -- but a feature
+            // that can never be measured to is still no good as a first pick.
+            // Taking one leaves the measurement unfinishable: every second pick
+            // is then refused, and the refusal is about the pick you just made
+            // rather than the one you made a minute ago, which reads as the
+            // click doing nothing.
+            //
+            // A feature with no plane or line has nothing to measure against; a
+            // feature nobody declared cannot be referred to afterwards, so a
+            // dimension to it could not be saved.
+            if (!message || !message.geometry || !message.reference) {
+                return { ok: false, reason: 'unmeasurable-feature' };
+            }
+            return { ok: true, reason: 'nothing-held' };
+        }
+        const at = viewport === undefined
+            ? (this._hover && this._hover.at ? this._resolvePointer(this._hover.at.x, this._hover.at.y) : null)
+            : viewport;
+        if (!at) {
+            return { ok: true, reason: 'no-viewport' };
+        }
+        const axes = this.viewportAxes(at.viewport || at);
+        return window.KigumiMeasureMode.couldMeasure(
+            { geometry: mode.fromGeometry, at: mode.fromAt }, message, axes,
+            (one, other, viewAxes) => KigumiMeasurements.availableKinds(
+                KigumiMeasurements.projectedForm(one, viewAxes.look),
+                KigumiMeasurements.projectedForm(other, viewAxes.look),
+            ),
+            (kind, fromAt, toAt, one, other, viewAxes) => {
+                const measured = KigumiMeasurements.measureValue(
+                    kind, fromAt, toAt,
+                    KigumiMeasurements.projectedForm(one, viewAxes.look),
+                    KigumiMeasurements.projectedForm(other, viewAxes.look),
+                    viewAxes,
+                );
+                // An angle of zero is two things in line, which is as much a
+                // measurement of nothing as a distance of zero.
+                return measured ? measured.value : null;
+            },
+        );
+    }
+
+    drawHoverHighlight(message, color) {
         this.clearHoverOutline();
         const mesh = message.highlightMesh;
         const edge = message.highlightEdge;
+        const shade = color === undefined ? HOVER_COLOR : color;
 
         if (edge && Array.isArray(edge.start) && Array.isArray(edge.end)) {
-            this._buildHoverEdgeLine(edge.start, edge.end);
+            this._buildHoverEdgeLine(edge.start, edge.end, shade);
         }
         if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
             this._buildHighlightMesh(
-                mesh.vertices, mesh.indices, HOVER_COLOR, HOVER_OPACITY, '_hoverHighlightMesh',
+                mesh.vertices, mesh.indices, shade, HOVER_OPACITY, '_hoverHighlightMesh',
             );
             // Under the selection's own highlight, which sits at 999: what is
             // selected outranks what is merely under the pointer.
@@ -3125,11 +3251,11 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    _buildHoverEdgeLine(start, end) {
+    _buildHoverEdgeLine(start, end, color) {
         const geometry = new THREE.LineSegmentsGeometry();
         geometry.setPositions([...start, ...end]);
         const material = new THREE.LineMaterial({
-            color: HOVER_COLOR,
+            color: color === undefined ? HOVER_COLOR : color,
             linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
             resolution: this._getRendererResolution(),
             depthTest: false,
@@ -3144,7 +3270,9 @@ class KigumiViewerApp extends LitElement {
     }
 
     clearHoverOutline() {
-        this._hoverDrawn = null;
+        if (this._hover) {
+            this._hover.drawn = null;
+        }
         this._disposeHighlightMesh('_hoverHighlightMesh');
         this._disposeHighlightMesh('_hoverHighlightEdge');
     }
@@ -3154,8 +3282,203 @@ class KigumiViewerApp extends LitElement {
         if (this._hover) {
             this._hover.clear();
         }
-        this._hoverClient = null;
         this.clearHoverOutline();
+    }
+
+    // -------------------------------------------------------------------------
+    // Measurement mode: making a dimension by picking
+    // -------------------------------------------------------------------------
+
+    get measureMode() {
+        if (!this._measureMode) {
+            this._measureMode = new window.KigumiMeasureMode.MeasureMode();
+        }
+        return this._measureMode;
+    }
+
+    /**
+     * A click inside a drawing. Returns whether measurement mode took it.
+     *
+     * Inside a drawing there is no plain "look at this feature" selection --
+     * picking a feature is how a measurement starts. Outside one, this does
+     * nothing and the click means what it always meant.
+     */
+    handleMeasurePick(event, hits) {
+        if (!this.drawingBetaEnabled || !this.isInDrawing) {
+            return false;
+        }
+        const resolved = this._resolvePointer(event.clientX, event.clientY);
+        const viewportId = resolved ? resolved.viewport.id : null;
+        const decision = choosePickAction({
+            hits,
+            selectedTimbers: this.selectionManager.selectedTimbers,
+            shiftKey: false,
+        });
+        const target = window.KigumiHover.hoverTarget(decision);
+        if (!target) {
+            return false;
+        }
+        // The pick has to come back from the runner before the mode can act on
+        // it: only python can say which feature a point is on. So the click is
+        // sent as a hover would be, and _measurePicked continues once it lands.
+        this._measurePendingViewport = viewportId;
+        // Kept as well as its id: judging the pick needs the viewport's axes.
+        this._measurePendingViewportObject = resolved;
+        if (typeof vscode !== 'undefined') {
+            // Its own message rather than borrowing the hover one: the two ask
+            // the same question but mean different things, and a hover answer
+            // arriving mid-measurement must not be mistaken for a click.
+            vscode.postMessage({
+                type: 'measurePickAtPoint',
+                memberKey: target.memberKey,
+                point: target.point,
+                currentPath: [],
+                ctrlClick: false,
+                // Whatever the hover is showing is what the click takes.
+                candidateIndex: this._candidateIndex || 0,
+            });
+        }
+        return true;
+    }
+
+    /**
+     * Show the feature a measurement is being taken from.
+     *
+     * The mesh, and its edges as well. A face seen exactly edge-on -- which is
+     * the usual case in an elevation, and the case where measuring to it makes
+     * most sense -- projects to a line with no area, so the mesh alone renders
+     * as nothing at all. Its boundary still projects to that line, so drawing
+     * the edges keeps it visible from any direction.
+     */
+    drawHeldFeature(message) {
+        this.clearHeldFeature();
+        const mesh = message && message.highlightMesh;
+        const edge = message && message.highlightEdge;
+
+        if (edge && Array.isArray(edge.start) && Array.isArray(edge.end)) {
+            const geometry = new THREE.LineSegmentsGeometry();
+            geometry.setPositions([...edge.start, ...edge.end]);
+            this._addHeldLine(geometry);
+        }
+        if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
+            this._buildHighlightMesh(
+                mesh.vertices, mesh.indices, HELD_COLOR, HELD_OPACITY, '_heldFeatureMesh',
+            );
+            if (this._heldFeatureMesh) {
+                this._heldFeatureMesh.renderOrder = 902;
+            }
+            const outline = new THREE.LineSegmentsGeometry();
+            outline.setPositions(_meshEdgePositions(mesh.vertices, mesh.indices));
+            this._addHeldLine(outline);
+        }
+    }
+
+    _addHeldLine(geometry) {
+        const material = new THREE.LineMaterial({
+            color: HELD_COLOR,
+            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
+            resolution: this._getRendererResolution(),
+            depthTest: false,
+            transparent: true,
+        });
+        const line = new THREE.LineSegments2(geometry, material);
+        line.computeLineDistances();
+        line.renderOrder = 903;
+        this.scene.add(line);
+        this._heldFeatureLine = line;
+    }
+
+    clearHeldFeature() {
+        this._disposeHighlightMesh('_heldFeatureMesh');
+        this._disposeHighlightMesh('_heldFeatureLine');
+    }
+
+    /** A pick came back while measuring. Offers it to the mode. */
+    _measurePicked(message) {
+        // Judged before the mode sees it, by the same rule the hover painted
+        // it with: a feature shown red is not one you can pick. Refusing here
+        // rather than in MeasureMode keeps projection out of the state
+        // machine, which is what makes that testable without a viewport.
+        const verdict = this._measureVerdict(message, this._measurePendingViewportObject);
+        if (!verdict.ok) {
+            this.emitViewerLog('measure-pick', {
+                feature: message.featureLabel,
+                type: message.featureType,
+                candidates: message.candidateCount,
+                action: 'refused',
+                reason: verdict.reason,
+            });
+            this.reportMeasureRefusal(verdict.reason, message);
+            return;
+        }
+        const result = this.measureMode.pick(message, this._measurePendingViewport);
+        this.emitViewerLog('measure-pick', {
+            feature: message.featureLabel,
+            type: message.featureType,
+            candidates: message.candidateCount,
+            action: result.action,
+            reason: result.reason,
+        });
+        if (result.action === 'refused') {
+            this.reportMeasureRefusal(result.reason, message);
+            return;
+        }
+        if (result.action === 'from') {
+            // Shown, so it is clear what the measurement is being taken FROM
+            // while the second end is being chosen.
+            this.drawHeldFeature(message);
+            this.emitViewerLog('measure-from', { feature: message.featureLabel });
+            return;
+        }
+        this.commitMeasurement(result.measurement);
+    }
+
+    /**
+     * Say why a pick cannot be measured, rather than doing nothing.
+     *
+     * A click that silently achieves nothing is the worst of the options: it
+     * looks like the viewer missed the click.
+     */
+    reportMeasureRefusal(reason, message) {
+        const said = {
+            'no-feature': 'nothing to measure here yet -- the click is still on its way in',
+            'same-feature': 'that is the feature already held; pick a different one',
+            'not-measurable': 'nothing can be dimensioned between those two in this view '
+                + '-- try another view, or another feature',
+            'degenerate': 'those two are in line in this view, so the measurement would be '
+                + 'zero -- try another view, or another feature',
+            'unmeasurable-feature': 'that one cannot be measured to -- it has no plane or line '
+                + 'of its own, or it is a face nobody named. Tab steps to the next feature '
+                + 'under the pointer',
+        }[reason] || reason;
+        this.emitViewerLog('measure-refused', { reason, said, feature: message && message.featureLabel });
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({ type: 'log', text: `[measure] ${said}` });
+        }
+    }
+
+    /** Send a finished measurement to be held in the file tier. */
+    commitMeasurement(measurement) {
+        if (!measurement || typeof vscode === 'undefined') {
+            return;
+        }
+        vscode.postMessage({
+            type: 'addMeasurement',
+            drawingId: this.sceneStore.activeSceneId,
+            viewportId: measurement.viewportId,
+            a: measurement.a,
+            b: measurement.b,
+        });
+    }
+
+    /** Leaving a drawing, or changing mode: hold nothing, show nothing held. */
+    clearMeasureMode() {
+        if (this._measureMode) {
+            this._measureMode.leave();
+        }
+        this.clearHeldFeature();
+        this._measurePendingViewport = null;
+        this._measurePendingViewportObject = null;
     }
 
     handleCanvasClick(event) {
@@ -3163,6 +3486,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const hits = this._findMembersAlongRay(event.clientX, event.clientY);
+        // Inside a drawing, picking a feature starts a measurement rather than
+        // selecting it. There is no plain "look at this one" there.
+        if (this.handleMeasurePick(event, hits)) {
+            return;
+        }
         const decision = choosePickAction({
             hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
@@ -5736,6 +6064,15 @@ class KigumiViewerApp extends LitElement {
         if (!this.sceneStore.setActiveScene(sceneId)) {
             return;
         }
+        // Nothing held carries across a change of mode. A feature selected in
+        // the model means nothing in a drawing, a half-made measurement means
+        // nothing outside one, and either left lit would be something the new
+        // mode cannot act on.
+        this.clearMeasureMode();
+        this.clearHover();
+        // Clears whatever is focused, feature or measurement -- they are one
+        // field, so this is both.
+        this._dropCsgFocus();
         this.rebuildViewports();
         this.syncCameraControls();
         this.applySceneBackground();
