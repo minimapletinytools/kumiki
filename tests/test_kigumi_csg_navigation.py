@@ -1386,3 +1386,117 @@ class TestPickYieldsAMeasurementReference:
     def test_a_pick_still_drilling_down_references_nothing(self, mortise_and_tenon_frame):
         # No feature reached yet, so there is nothing to measure to.
         assert runner._pick_reference(None, "t#0", ["cut"], None, None, None) is None
+
+
+class TestHoveringOverAFeature:
+    """What is under the pointer, answered cheaply enough to ask while it moves.
+
+    A click walks every triangle of the timber to build its highlight, which is
+    far too slow to run per mouse move. Hover resolves the same feature and
+    outlines it from the CSG instead.
+    """
+
+    def _slot(self, frame, member):
+        cut_timber = _cut_timber_by_name(frame, member)
+        local = cut_timber.render_timber_with_cuts_csg_local()
+
+        class Slot:
+            mesh_cache = {member: {"local_csg": local,
+                                   "cut_timber": cut_timber,
+                                   "mesh": None}}
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot(), local, cut_timber
+
+    def _a_point_on(self, local, cut_timber, predicate):
+        from kumiki.triangles import triangulate_cutcsg
+
+        timber = cut_timber.timber
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                local_pt = [float(vertex[i]) for i in range(3)]
+                for hit in local.get_all_features(runner._to_v3(local_pt)):
+                    if predicate(hit.feature):
+                        world = timber.transform.local_to_global(runner._to_v3(local_pt))
+                        return [float(world[i, 0]) for i in range(3)]
+        raise AssertionError("no such feature on the surface")
+
+    def _hover(self, frame, member, predicate):
+        state, slot, local, cut_timber = self._slot(frame, member)
+        point = self._a_point_on(local, cut_timber, predicate)
+        return runner._handle_hover_feature_at_point(
+            state, {"memberKey": member, "point": point}, slot)
+
+    def _hover_until(self, frame, member, wanted):
+        """Hover over surface points until one resolves to what is wanted.
+
+        By the result rather than by the feature under the point: a point on a
+        face is often on one of its edges too, and an edge is the better answer
+        there -- which is what a click does as well.
+        """
+        from kumiki.triangles import triangulate_cutcsg
+
+        state, slot, local, cut_timber = self._slot(frame, member)
+        timber = cut_timber.timber
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                result = runner._handle_hover_feature_at_point(
+                    state, {"memberKey": member,
+                            "point": [float(world[i, 0]) for i in range(3)]}, slot)
+                if wanted(result):
+                    return result
+        raise AssertionError("nothing on the surface resolved to what was wanted")
+
+    def test_a_face_comes_back_outlined(self, mortise_and_tenon_frame):
+        result = self._hover_until(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda r: r["featureType"] == "FACE" and r["outline"])
+
+        # A convex region, so at least a triangle's worth of corners.
+        assert len(result["outline"]) >= 3
+        assert all(len(corner) == 3 for corner in result["outline"])
+
+    def test_an_edge_comes_back_as_its_two_ends(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        result = self._hover(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+
+        assert result["featureType"] == "EDGE"
+        assert len(result["outline"]) == 2
+
+    def test_it_says_what_a_measurement_would_hold(self, mortise_and_tenon_frame):
+        # So the viewer can say whether this and whatever is already held could
+        # be measured -- before the click, which is the point of hovering.
+        from kumiki.cutcsg import CSGFeatureType
+
+        result = self._hover(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+
+        assert result["reference"] is not None
+        assert runner.resolve_anchor(mortise_and_tenon_frame, result["reference"]) is not None
+
+    def test_it_does_not_touch_the_mesh(self, mortise_and_tenon_frame):
+        # The whole reason it can run while the pointer moves. The cache entry
+        # has no mesh at all here, and hovering still answers.
+        result = self._hover_until(
+            mortise_and_tenon_frame, "receiving_timber", lambda r: r["feature"] is not None)
+
+        assert result["feature"] is not None
+
+    def test_an_unknown_member_is_refused(self):
+        class Slot:
+            mesh_cache = {}
+
+        class State:
+            _active = Slot()
+
+        with pytest.raises(ValueError, match="Unknown memberKey"):
+            runner._handle_hover_feature_at_point(
+                State(), {"memberKey": "nope", "point": [0, 0, 0]}, Slot())
