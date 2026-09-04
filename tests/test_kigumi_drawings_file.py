@@ -917,3 +917,160 @@ class TestDerivedFeaturePath:
 
         assert isinstance(read, SingleFeaturePath)
         assert read.identity() == ("posts/fl#0", ("cut",), "x", "FACE")
+
+
+class TestAddingAMeasurement:
+    """Putting a measurement on a viewport, from the viewer."""
+
+    def _frame(self):
+        # No timbers: nothing here resolves an anchor, and a drawing is all the
+        # measurement needs somewhere to live.
+        return Frame(cut_timbers=[], name="f",
+                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+
+    def _measure(self):
+        return {
+            "a": {"timber": "post#0", "csgPath": ["cut"], "feature": "left", "type": "FACE"},
+            "b": {"timber": "post#0", "csgPath": ["cut"], "feature": "right", "type": "FACE"},
+            "kind": None,
+            "measureId": None,
+        }
+
+    def test_a_code_drawing_gets_an_override_to_hold_it(self):
+        # The code drawing cannot hold it -- it is code -- so the file does,
+        # while the code keeps the layout.
+        runner = _load_runner()
+        frame = self._frame()
+        pending = []
+
+        holder = runner.add_measurement(frame, None, pending, "plan", "front", self._measure())
+
+        assert holder[runner.OVERRIDES_KEY] == "plan"
+        assert holder in pending
+        assert holder["viewports"][0]["id"] == "front"
+        assert len(holder["viewports"][0]["measurements"]) == 1
+
+    def test_the_drawing_still_shows_as_the_codes_own_layout(self):
+        runner = _load_runner()
+        frame = self._frame()
+        pending = []
+        runner.add_measurement(frame, None, pending, "plan", "front", self._measure())
+
+        scenes = runner.collect_drawings(frame, None, pending)
+        plan = next(d for d in scenes if d["id"] == "plan")
+
+        assert plan["origin"] == runner.ORIGIN_OVERRIDDEN
+        assert plan["dirty"] is True
+
+    def test_a_second_measurement_of_the_same_pair_replaces_the_first(self):
+        # Two dimensions between one pair drawn on top of each other is not
+        # something anyone means to ask for.
+        runner = _load_runner()
+        frame = self._frame()
+        pending = []
+        runner.add_measurement(frame, None, pending, "plan", "front", self._measure())
+
+        second = dict(self._measure(), kind="horizontal")
+        holder = runner.add_measurement(frame, None, pending, "plan", "front", second)
+
+        measures = holder["viewports"][0]["measurements"]
+        assert len(measures) == 1
+        assert measures[0]["kind"] == "horizontal"
+
+    def test_a_different_pair_sits_beside_it(self):
+        runner = _load_runner()
+        frame = self._frame()
+        pending = []
+        runner.add_measurement(frame, None, pending, "plan", "front", self._measure())
+
+        other = dict(self._measure())
+        other["b"] = dict(other["b"], feature="top")
+        holder = runner.add_measurement(frame, None, pending, "plan", "front", other)
+
+        assert len(holder["viewports"][0]["measurements"]) == 2
+
+    def test_another_viewport_is_another_place(self):
+        # A measurement lives in the viewport it is drawn in; the same pair in
+        # the plan is a different dimension with a different number.
+        runner = _load_runner()
+        frame = self._frame()
+        pending = []
+        runner.add_measurement(frame, None, pending, "plan", "front", self._measure())
+
+        holder = runner.add_measurement(frame, None, pending, "plan", "top", self._measure())
+
+        assert {v["id"] for v in holder["viewports"]} == {"front", "top"}
+
+    def test_measuring_on_a_drawing_that_is_not_there(self):
+        runner = _load_runner()
+
+        with pytest.raises(ValueError, match="No drawing"):
+            runner.add_measurement(self._frame(), None, [], "nope", "front", self._measure())
+
+
+class TestAMeasurementMadeInTheViewer:
+    """The whole way from a pick to a dimension on the sheet."""
+
+    def _fixture_frame(self):
+        import importlib.util
+        import sys
+
+        path = (Path(__file__).resolve().parent.parent
+                / "kigumi" / "test-fixtures" / "measured_frame.py")
+        spec = importlib.util.spec_from_file_location("kigumi_measured_fixture", path)
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_measured_fixture"] = module
+        spec.loader.exec_module(module)
+        return module.build_frame()
+
+    def _anchor(self, cut, feature):
+        return {"timber": "butt_timber#0", "csgPath": list(cut),
+                "feature": feature, "type": "FACE"}
+
+    def test_it_lands_on_the_drawing_the_code_laid_out(self):
+        runner = _load_runner()
+        frame = self._fixture_frame()
+        scenes = runner.collect_drawings(frame, None, [])
+        drawing = next(d for d in scenes if d["viewports"])
+        viewport = drawing["viewports"][0]["id"]
+        pending = []
+
+        runner.add_measurement(frame, None, pending, drawing["id"], viewport, {
+            "a": self._anchor(("tenon_waste", "tenon"), "tenon_top"),
+            "b": self._anchor(("tenon_waste", "shoulder"), "shoulder"),
+            "kind": None, "measureId": None,
+        })
+
+        after = next(d for d in runner.collect_drawings(frame, None, pending)
+                     if d["id"] == drawing["id"])
+        drawn = [m for v in after["viewports"] for m in (v.get("measurements") or [])]
+
+        assert len(drawn) >= 1
+        # The layout is still the code's, and the measurement is the file's.
+        assert len(after["viewports"]) == len(drawing["viewports"])
+        assert after["origin"] == runner.ORIGIN_OVERRIDDEN
+        assert after["dirty"] is True
+
+    def test_both_ends_resolve_to_somewhere(self):
+        # A measurement that cannot find its features is shown as broken, so
+        # this is the difference between a dimension and a complaint.
+        runner = _load_runner()
+        frame = self._fixture_frame()
+        scenes = runner.collect_drawings(frame, None, [])
+        drawing = next(d for d in scenes if d["viewports"])
+        pending = []
+
+        runner.add_measurement(frame, None, pending, drawing["id"],
+                               drawing["viewports"][0]["id"], {
+            "a": self._anchor(("tenon_waste", "tenon"), "tenon_top"),
+            "b": self._anchor(("tenon_waste", "shoulder"), "shoulder"),
+            "kind": None, "measureId": None,
+        })
+
+        after = next(d for d in runner.collect_drawings(frame, None, pending)
+                     if d["id"] == drawing["id"])
+        made = next(m for v in after["viewports"] for m in (v.get("measurements") or [])
+                    if m["a"].get("feature") == "tenon_top")
+
+        assert made["a"].get("at") is not None
+        assert made["b"].get("at") is not None

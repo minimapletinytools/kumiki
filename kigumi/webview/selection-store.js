@@ -129,6 +129,12 @@
             this.emit({ type: 'csg-focus', csgFocus: this.csgFocus });
         }
 
+        /**
+         * Stop looking at whatever is focused -- a feature OR a measurement.
+         *
+         * One field holds both, so this clears either. The name is about the
+         * common case rather than the whole of what it does.
+         */
         clearCsgFocus(options = {}) {
             if (!this.focus) {
                 return;

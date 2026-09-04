@@ -165,6 +165,21 @@ class ResolvedJointPath:
         return cls(path=str(text))
 
 
+def identity_order(identity: Tuple) -> str:
+    """A sortable key for any identity tuple, whatever shape it is.
+
+    Identities are compared to put a pair in one order, and the shapes differ:
+    a face's third element is a feature's name, a derived edge's is a whole
+    parent reference. Python will not order a string against a tuple, so a pair
+    made of one of each -- a dimension from a face to an edge, which is an
+    ordinary thing to want -- raised instead of sorting.
+
+    The key only has to be total and stable, not meaningful: nothing reads the
+    order, it exists so that A to B and B to A come out the same way round.
+    """
+    return repr(identity)
+
+
 @dataclass(frozen=True)
 class FeatureRef:
     """Where a feature is within one timber's CSG, without saying which timber.
