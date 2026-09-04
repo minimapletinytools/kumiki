@@ -307,6 +307,19 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'hoverFeatureAtPoint') {
+                // Reported once and then not again. This fires while the
+                // pointer moves, so logging every failure would bury the log --
+                // but logging none of them is how a hover that never worked
+                // looked exactly like a hover that found nothing.
+                this._handleHoverFeatureAtPoint(message).catch((err) => {
+                    if (!this._hoverErrorReported) {
+                        this._hoverErrorReported = true;
+                        this.log(`[hover] ${err.message || err} (further hover errors are not logged)`);
+                    }
+                });
+                return;
+            }
             if (message.type === 'requestDrawings') {
                 this._handleDrawingsCommand('get_drawings', {}, { enter: false }).catch((err) => {
                     this.log(`[drawing] requestDrawings error: ${err.message || err}`);
@@ -960,6 +973,20 @@ class FrameViewSession {
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
+    }
+
+    async _handleHoverFeatureAtPoint(message) {
+        if (!this.runnerSession) {
+            return;
+        }
+        const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, {
+            memberKey: message.memberKey,
+            point: message.point,
+        });
+        // The request number goes out and comes back untouched, so the viewer
+        // can tell an answer about where the pointer is now from one about
+        // where it was two moves ago.
+        this._postToWebview({ type: 'hoverFeatureResult', request: message.request, ...result });
     }
 
     async _handleRequestCSGTree(message) {

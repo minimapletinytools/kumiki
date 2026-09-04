@@ -3064,7 +3064,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
         "examplePath": str(ss.file_path),
         "commands": [
             "ping", "reload_example", "get_frame", "get_geometry",
-            "get_member", "find_csg_at_point", "find_csg_by_path",
+            "get_member", "find_csg_at_point", "hover_feature_at_point", "find_csg_by_path",
             "get_layers_tree", "get_csg_tree",
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
@@ -3938,6 +3938,56 @@ def _pick_reference(
     ))
 
 
+def _aabb_filter(csg: Any, eps: float):
+    """A cheap "could this point be on *csg*" test, or None if it cannot help.
+
+    None when the box says nothing useful -- a solid unbounded in every
+    direction, or one whose bounds cannot be read. An empty solid rejects
+    everything, which is a real answer rather than an unhelpful one.
+
+    The bounds are the CSG's own, so points must be in the same space it is:
+    timber-local, the same as the centroids the caller computes.
+    """
+    try:
+        with warnings.catch_warnings():
+            # Asking speculatively, and "unbounded" is a perfectly good answer:
+            # it means the box cannot help and the walk goes ahead unfiltered.
+            # The library's warning is for callers who wanted a real box.
+            warnings.simplefilter("ignore")
+            box = csg.get_aabb()
+    except Exception:
+        return None
+    if box is None:
+        return None
+    if getattr(box, "is_empty", False):
+        return lambda point: False
+
+    bounds = [
+        (box.min_x, box.max_x),
+        (box.min_y, box.max_y),
+        (box.min_z, box.max_z),
+    ]
+    limits = []
+    for low, high in bounds:
+        limits.append((
+            None if low is None else float(low) - eps,
+            None if high is None else float(high) + eps,
+        ))
+    if all(low is None and high is None for low, high in limits):
+        return None
+
+    def inside(point) -> bool:
+        for axis, (low, high) in enumerate(limits):
+            value = point[axis]
+            if low is not None and value < low:
+                return False
+            if high is not None and value > high:
+                return False
+        return True
+
+    return inside
+
+
 def _extract_highlight_mesh(
     mesh_vertices: List[float],
     mesh_indices: List[int],
@@ -3950,6 +4000,7 @@ def _extract_highlight_mesh(
     selected_ref: Optional[Any] = None,
     feature_label: Optional[str] = None,
     edge_feature: Optional[Any] = None,
+    feature_type: Optional[str] = None,
 ) -> Tuple[List[float], List[int], int, int]:
     """Extract triangles belonging to *target_csg* from the rendered mesh.
 
@@ -3968,6 +4019,32 @@ def _extract_highlight_mesh(
         and len(selected_path) > 0
     )
 
+    # Broadphase: a triangle whose centroid is outside the target's own box
+    # cannot be on its boundary, and a box test is far cheaper than asking the
+    # CSG. It matters because the target is usually small and the mesh is the
+    # whole timber -- a mortise on a beam keeps 10 triangles out of 376, and the
+    # walk drops from 2.8ms to 0.1ms.
+    # An edge whose line has already been worked out has no triangles to light:
+    # the line IS its highlight. Without this the walk still runs, comparing
+    # every triangle against an edge's name that no face can ever answer to, and
+    # spends a fifth of a second arriving at nothing.
+    if feature_type == "EDGE" and edge_feature is None:
+        return [], [], 0, len(mesh_indices) // 3
+
+    inside_box = _aabb_filter(target_csg, eps)
+
+    # The feature we are matching against, looked up once instead of once per
+    # triangle. _detect_face_label asks the node for EVERY feature at the point
+    # and compares names; when the name is a declared feature we can ask that
+    # one feature directly, which is the same answer without the search.
+    #
+    # test_point is only meaningful for a point already known to be on the
+    # owner's boundary -- which the loop below establishes before it gets here.
+    wanted_feature = None
+    if feature_label is not None and edge_feature is None:
+        wanted_feature = next(
+            (f for f in target_csg.get_declared_features() if f.name == feature_label), None)
+
     for tri in range(total_tris):
         i0 = mesh_indices[tri * 3]
         i1 = mesh_indices[tri * 3 + 1]
@@ -3978,6 +4055,8 @@ def _extract_highlight_mesh(
         cz = (mesh_vertices[i0*3+2] + mesh_vertices[i1*3+2] + mesh_vertices[i2*3+2]) / 3.0
         # Convert centroid to timber-local
         local_c = _inv_transform_point(timber_rot, timber_pos, [cx, cy, cz])
+        if inside_box is not None and not inside_box(local_c):
+            continue
         if _csg_point_on_boundary(target_csg, local_c, eps):
             if enforce_owner:
                 owner = _resolve_csg_at_path(root_csg, selected_path, local_c, eps)
@@ -4008,7 +4087,12 @@ def _extract_highlight_mesh(
                         on_edge += 1
                 if on_edge < 2:
                     continue
+            elif wanted_feature is not None:
+                if not wanted_feature.test_point(target_csg, _to_v3(local_c), eps):
+                    continue
             elif feature_label is not None:
+                # A generic name -- "left", "cylindrical_surface" -- which no
+                # declared feature answers to, so it has to be worked out.
                 tri_face_label = _detect_face_label(target_csg, local_c, eps)
                 if tri_face_label != feature_label:
                     continue
@@ -4020,6 +4104,27 @@ def _extract_highlight_mesh(
             matched += 1
 
     return out_verts, out_idx, matched, total_tris
+
+
+def _handle_hover_feature_at_point(
+    state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None,
+) -> Dict[str, Any]:
+    """What the pointer is over: the answer a click would give, without clicking.
+
+    Deliberately the same code, not a cheaper likeness of it. An outline drawn
+    from the CSG was cheaper and was wrong in a way that showed: a face comes
+    back convex, so a timber face with mortises through it outlined as a whole
+    rectangle over the openings, and a face half cut away outlined at full size.
+    Hover exists to say what a click would take, so it has to be what a click
+    would take -- the same mesh, the same feature, the same drilling.
+
+    The viewer draws it in another colour and under the selection. That is the
+    entire difference.
+
+    Affordable because of when it is asked rather than how much it costs: the
+    pointer has to settle first, so this runs once per rest, not once per move.
+    """
+    return _handle_find_csg_at_point(state, payload, slot_state)
 
 
 def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
@@ -4109,6 +4214,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         selected_ref=parent_csg if feature_label is not None else target_csg,
         feature_label=feature_label,
         edge_feature=edge if (highlight_edge is None and not edge_absent) else None,
+        feature_type=feature_type,
     )
 
     # When a feature (face) is selected, also extract the parent labeled CSG mesh
@@ -4604,6 +4710,11 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         ss = _resolve_slot(state, payload)
         member_name = _require_str(payload, "name", "get_member requires payload.name")
         return state, make_success_response(request_id, command, get_member_result(ss.frame, member_name)), False
+
+    if command == "hover_feature_at_point":
+        ss = _resolve_slot(state, payload)
+        result = _handle_hover_feature_at_point(state, payload, ss)
+        return state, make_success_response(request_id, command, result), False
 
     if command == "find_csg_at_point":
         ss = _resolve_slot(state, payload)

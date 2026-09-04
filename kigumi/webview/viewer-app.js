@@ -275,6 +275,12 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
     feature: 0x0288d1,
 });
 
+// What the pointer is over, as opposed to what is selected. A different hue as
+// well as a different shape -- an outline rather than a fill -- so the two
+// never read as the same state.
+const HOVER_COLOR = 0xffa726;
+const HOVER_OPACITY = 0.55;
+
 // A selected edge is drawn as a line rather than shaded like a face, so it
 // needs a width of its own -- several times the timbers' own edge lines, or the
 // selection does not read as thicker than the geometry it sits on.
@@ -1678,6 +1684,13 @@ class KigumiViewerApp extends LitElement {
             window.scrollTo({ top: 0, behavior: 'smooth' });
         });
 
+        canvas.addEventListener('pointermove', (event) => {
+            this.handleCanvasHover(event);
+        });
+        canvas.addEventListener('pointerleave', () => {
+            this.clearHover();
+        });
+
         canvas.addEventListener('mousedown', (event) => {
             const action = actionForButton(event.button, this.leftClickDragRotatesCamera);
             if (!action) {
@@ -1841,6 +1854,20 @@ class KigumiViewerApp extends LitElement {
             this.stepCameraAnimation();
             this.renderCameraControls();
             this.updateCylinderSilhouettes();
+            // Asked from here rather than a timer: a hover cannot outlive the
+            // viewer, and nothing is asked while the tab is not drawing.
+            //
+            // Guarded because this runs inside the frame: a throw here would
+            // stop renderViewports below it and freeze the view, which is a
+            // spectacular way for a hover to fail.
+            try {
+                this.pumpHover();
+            } catch (error) {
+                if (!this._hoverBroken) {
+                    this._hoverBroken = true;
+                    this.emitViewerLog('hover-error', { message: String(error && error.message || error) });
+                }
+            }
             this.renderViewports();
         };
         animate();
@@ -2526,6 +2553,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        if (message.type === 'hoverFeatureResult') {
+            this.handleHoverResult(message);
+            return;
+        }
+
         if (message.type === 'csgSelectionResult') {
             this.handleCSGSelectionResult(message);
             return;
@@ -2984,6 +3016,146 @@ class KigumiViewerApp extends LitElement {
         this.selectionManager.clearCsgFocus();
         this.lastPickDetail = null;
         this.removeCSGHighlight();
+    }
+
+    // -------------------------------------------------------------------------
+    // Hover: what the pointer is over, without selecting it
+    // -------------------------------------------------------------------------
+
+    /** The pointer moved over the canvas. Cheap: no request goes out here. */
+    handleCanvasHover(event) {
+        if (!this._hover) {
+            this._hover = new window.KigumiHover.HoverState();
+        }
+        this._hoverClient = { x: event.clientX, y: event.clientY };
+        this._hover.moved(event.clientX, event.clientY);
+    }
+
+    /**
+     * Ask about the pointer, once it has settled.
+     *
+     * Driven from the render loop rather than a timer, so a hover cannot
+     * outlive the viewer that owns it, and so nothing is asked while the tab
+     * is not drawing.
+     */
+    pumpHover() {
+        if (!this._hover || typeof vscode === 'undefined') {
+            return;
+        }
+        const due = this._hover.due();
+        if (!due || !this._hoverClient) {
+            return;
+        }
+        // The same decision a click makes, so hover shows what a click would do
+        // rather than something else. Clicking an unselected timber selects the
+        // whole timber; clicking one already selected drills into it. Only the
+        // second has a feature to ask the runner about.
+        //
+        // The decision also says WHICH member, which is not the nearest one: a
+        // click drills into the selected timber wherever it sits along the ray.
+        const decision = choosePickAction({
+            hits: this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y),
+            selectedTimbers: this.selectionManager.selectedTimbers,
+            shiftKey: false,
+        });
+        const target = window.KigumiHover.hoverTarget(decision);
+        if (decision.action !== 'csg' || !target) {
+            // Either nothing under the pointer, or a click here would take the
+            // whole timber rather than anything inside it.
+            this._hover.clear();
+            this.clearHoverOutline();
+            return;
+        }
+
+        // From wherever the selection already is, exactly as the click does.
+        const focus = this.selectionManager.csgFocus;
+        const currentPath = (focus && focus.timberKey === target.memberKey) ? focus.path : [];
+        vscode.postMessage({
+            type: 'hoverFeatureAtPoint',
+            memberKey: target.memberKey,
+            point: target.point,
+            currentPath,
+            ctrlClick: false,
+            request: due.request,
+        });
+    }
+
+    /** An answer came back. Draws only when it is about somewhere new. */
+    handleHoverResult(message) {
+        if (!this._hover) {
+            return;
+        }
+        const kept = this._hover.answered(message.request, message);
+        if (!kept.kept) {
+            return;
+        }
+        if (window.KigumiHover.HoverState.sameFeature(this._hoverDrawn, message)) {
+            return;
+        }
+        this._hoverDrawn = message;
+        this.drawHoverHighlight(message);
+    }
+
+    /**
+     * Draw what a click would have highlighted, in the hover colour.
+     *
+     * The same mesh and the same line the selection uses, from the same runner
+     * answer -- only the colour and the render order differ. Drawing it any
+     * other way is how hover ends up showing something a click would not do:
+     * an outline taken from the CSG was convex, so a timber face with mortises
+     * through it lit as a whole rectangle over the openings.
+     */
+    drawHoverHighlight(message) {
+        this.clearHoverOutline();
+        const mesh = message.highlightMesh;
+        const edge = message.highlightEdge;
+
+        if (edge && Array.isArray(edge.start) && Array.isArray(edge.end)) {
+            this._buildHoverEdgeLine(edge.start, edge.end);
+        }
+        if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
+            this._buildHighlightMesh(
+                mesh.vertices, mesh.indices, HOVER_COLOR, HOVER_OPACITY, '_hoverHighlightMesh',
+            );
+            // Under the selection's own highlight, which sits at 999: what is
+            // selected outranks what is merely under the pointer.
+            if (this._hoverHighlightMesh) {
+                this._hoverHighlightMesh.renderOrder = 900;
+            }
+        }
+    }
+
+    _buildHoverEdgeLine(start, end) {
+        const geometry = new THREE.LineSegmentsGeometry();
+        geometry.setPositions([...start, ...end]);
+        const material = new THREE.LineMaterial({
+            color: HOVER_COLOR,
+            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
+            resolution: this._getRendererResolution(),
+            depthTest: false,
+            transparent: true,
+            opacity: HOVER_OPACITY,
+        });
+        const line = new THREE.LineSegments2(geometry, material);
+        line.computeLineDistances();
+        line.renderOrder = 901;
+        this.scene.add(line);
+        this._hoverHighlightEdge = line;
+    }
+
+    clearHoverOutline() {
+        this._hoverDrawn = null;
+        this._disposeHighlightMesh('_hoverHighlightMesh');
+        this._disposeHighlightMesh('_hoverHighlightEdge');
+    }
+
+    /** Leaving the canvas, or changing mode: nothing should stay lit. */
+    clearHover() {
+        if (this._hover) {
+            this._hover.clear();
+        }
+        this._hoverClient = null;
+        this.clearHoverOutline();
     }
 
     handleCanvasClick(event) {

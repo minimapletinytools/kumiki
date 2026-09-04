@@ -1386,3 +1386,266 @@ class TestPickYieldsAMeasurementReference:
     def test_a_pick_still_drilling_down_references_nothing(self, mortise_and_tenon_frame):
         # No feature reached yet, so there is nothing to measure to.
         assert runner._pick_reference(None, "t#0", ["cut"], None, None, None) is None
+
+
+class TestHoveringOverAFeature:
+    """What the pointer is over: the answer a click would give, without clicking.
+
+    Deliberately the same code as a click. An outline drawn from the CSG was
+    cheaper and wrong in a way that showed -- a face with mortises through it
+    outlined as a whole rectangle over the openings -- so hover asks the same
+    question and the viewer draws the answer differently.
+    """
+
+    def _slot(self, frame, member):
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(frame, member)
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        vertices = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                vertices.extend([float(world[i, 0]) for i in range(3)])
+        mesh = {"vertices": vertices, "indices": list(range(len(vertices) // 3))}
+
+        class Slot:
+            mesh_cache = {member: {"local_csg": local, "cut_timber": cut_timber, "mesh": mesh}}
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot(), local, cut_timber
+
+    def _a_point_on(self, local, cut_timber, predicate):
+        from kumiki.triangles import triangulate_cutcsg
+
+        timber = cut_timber.timber
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                local_pt = [float(vertex[i]) for i in range(3)]
+                for hit in local.get_all_features(runner._to_v3(local_pt)):
+                    if predicate(hit.feature):
+                        world = timber.transform.local_to_global(runner._to_v3(local_pt))
+                        return [float(world[i, 0]) for i in range(3)]
+        raise AssertionError("no such feature on the surface")
+
+    def _hover(self, frame, member, predicate, **extra):
+        state, slot, local, cut_timber = self._slot(frame, member)
+        point = self._a_point_on(local, cut_timber, predicate)
+        payload = {"memberKey": member, "point": point, "currentPath": [], "ctrlClick": False}
+        payload.update(extra)
+        return runner._handle_hover_feature_at_point(state, payload, slot)
+
+    def _hover_until(self, frame, member, wanted, **extra):
+        """Hover over surface points until one answers what is wanted.
+
+        By the result rather than the feature under the point: a point on a
+        face is often on one of its edges too, and an edge is the better answer
+        there -- which is what a click does as well.
+        """
+        from kumiki.triangles import triangulate_cutcsg
+
+        state, slot, local, cut_timber = self._slot(frame, member)
+        timber = cut_timber.timber
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                payload = {"memberKey": member,
+                           "point": [float(world[i, 0]) for i in range(3)],
+                           "currentPath": [], "ctrlClick": False}
+                payload.update(extra)
+                result = runner._handle_hover_feature_at_point(state, payload, slot)
+                if wanted(result):
+                    return result
+        raise AssertionError("nothing on the surface answered what was wanted")
+
+    def test_a_face_answers_with_the_triangles_a_click_would_light(self, mortise_and_tenon_frame):
+        result = self._hover_until(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda r: r["featureType"] == "FACE" and r["highlightMesh"]["vertices"])
+
+        # Real triangles off the rendered mesh -- so a face with something cut
+        # through it comes back with the hole missing, which is the whole point
+        # of not drawing this from the CSG.
+        assert len(result["highlightMesh"]["vertices"]) % 9 == 0
+        assert result["featureLabel"] is not None
+
+    def test_it_is_the_same_answer_a_click_gives(self, mortise_and_tenon_frame):
+        # Not a likeness of it. The only difference is what the viewer does
+        # with it: another colour, and under the selection.
+        from kumiki.cutcsg import CSGFeatureType
+
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "receiving_timber")
+        point = self._a_point_on(local, cut_timber,
+                                 lambda f: f.feature_type() == CSGFeatureType.FACE)
+        payload = {"memberKey": "receiving_timber", "point": point,
+                   "currentPath": [], "ctrlClick": False}
+
+        hovered = runner._handle_hover_feature_at_point(state, dict(payload), slot)
+        clicked = runner._handle_find_csg_at_point(state, dict(payload), slot)
+
+        assert hovered["path"] == clicked["path"]
+        assert hovered["featureLabel"] == clicked["featureLabel"]
+        assert hovered["highlightMesh"] == clicked["highlightMesh"]
+        assert hovered["highlightEdge"] == clicked["highlightEdge"]
+
+    def test_an_edge_comes_back_as_a_line_to_draw(self, mortise_and_tenon_frame):
+        from kumiki.cutcsg import CSGFeatureType
+
+        result = self._hover(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+
+        assert result["featureType"] == "EDGE"
+        assert result["highlightEdge"]["start"] and result["highlightEdge"]["end"]
+
+    def test_it_says_what_a_measurement_would_hold(self, mortise_and_tenon_frame):
+        # So the viewer can say whether this and whatever is already held could
+        # be measured -- before the click, which is the point of hovering.
+        from kumiki.cutcsg import CSGFeatureType
+
+        result = self._hover(
+            mortise_and_tenon_frame, "receiving_timber",
+            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+
+        assert result["reference"] is not None
+        assert runner.resolve_anchor(mortise_and_tenon_frame, result["reference"]) is not None
+
+    def test_it_drills_from_where_the_selection_already_is(self, mortise_and_tenon_frame):
+        # Hover has to follow the same rules as clicking, or it shows something
+        # a click would not do. Held path and ctrl included: whatever they mean
+        # to a click, they mean the same here.
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "receiving_timber")
+        point = self._a_point_on(local, cut_timber, lambda f: True)
+        payload = {"memberKey": "receiving_timber", "point": point,
+                   "currentPath": ["mortise_and_tenon"], "ctrlClick": True}
+
+        hovered = runner._handle_hover_feature_at_point(state, dict(payload), slot)
+        clicked = runner._handle_find_csg_at_point(state, dict(payload), slot)
+
+        assert hovered["path"] == clicked["path"]
+        assert hovered["nodeLabel"] == clicked["nodeLabel"]
+
+    def test_an_unknown_member_is_refused(self):
+        class Slot:
+            mesh_cache = {}
+
+        class State:
+            _active = Slot()
+
+        with pytest.raises(ValueError, match="Unknown memberKey"):
+            runner._handle_hover_feature_at_point(
+                State(), {"memberKey": "nope", "point": [0, 0, 0]}, Slot())
+
+    def test_the_command_answers_through_the_runner_protocol(self, mortise_and_tenon_frame):
+        # The dispatch, not just the handler: a command the protocol does not
+        # know about is a viewer that silently never hovers.
+        state, slot, local, cut_timber = self._slot(mortise_and_tenon_frame, "receiving_timber")
+        point = self._a_point_on(local, cut_timber, lambda f: True)
+
+        class Runner:
+            _active = slot
+
+        original = runner._resolve_slot
+        runner._resolve_slot = lambda state, payload: slot
+        try:
+            _state, response, _stop = runner.handle_request(Runner(), {
+                "id": "hover-1",
+                "command": "hover_feature_at_point",
+                "payload": {"memberKey": "receiving_timber", "point": point},
+            })
+        finally:
+            runner._resolve_slot = original
+
+        assert response.get("ok") is not False, response
+        result = response.get("result") or response.get("payload") or {}
+        assert result.get("highlightMesh") is not None, response
+
+
+class TestTheBroadphase:
+    """Rejecting triangles by a box before asking the CSG about them."""
+
+    def test_an_edge_lights_no_triangles_and_does_not_look_for_any(self):
+        # The line is the edge's highlight. Without the early return the walk
+        # still runs, comparing every triangle against a name no face answers
+        # to, and arrives at nothing the slow way.
+        from kumiki.cutcsg import EmptyCSG
+
+        verts, idx, matched, total = runner._extract_highlight_mesh(
+            [0.0] * 9, [0, 1, 2], EmptyCSG(), None, None, 5e-4,
+            feature_label="a\u00d7b", feature_type="EDGE")
+
+        assert verts == [] and idx == [] and matched == 0
+        assert total == 1
+
+    def test_a_box_rejects_what_is_outside_it(self, mortise_and_tenon_frame):
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        node = runner._find_csg_by_labels(
+            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+
+        inside = runner._aabb_filter(node, 5e-4)
+
+        assert inside is not None
+        box = node.get_aabb()
+        middle = [(float(box.min_x) + float(box.max_x)) / 2,
+                  (float(box.min_y) + float(box.max_y)) / 2,
+                  (float(box.min_z) + float(box.max_z)) / 2]
+        assert inside(middle)
+        assert not inside([float(box.max_x) + 1.0, middle[1], middle[2]])
+
+    def test_an_unbounded_solid_cannot_be_filtered(self):
+        # A half space has no box worth having, so the walk goes ahead
+        # unfiltered rather than rejecting everything.
+        from kumiki.cutcsg import HalfSpace
+        from kumiki.rule import create_v3, scalar
+
+        unbounded = HalfSpace(normal=create_v3(scalar(0), scalar(0), scalar(1)),
+                              offset=scalar(0))
+
+        assert runner._aabb_filter(unbounded, 5e-4) is None
+
+    def test_an_empty_solid_rejects_everything(self):
+        from kumiki.cutcsg import EmptyCSG
+
+        rejects = runner._aabb_filter(EmptyCSG(), 5e-4)
+
+        assert rejects is not None
+        assert not rejects([0.0, 0.0, 0.0])
+
+    def test_the_highlight_is_the_same_with_the_filter_as_without(self, mortise_and_tenon_frame):
+        # The point: faster, not different. A broadphase that changed the answer
+        # would be a bug wearing an optimisation's clothes.
+        from kumiki.triangles import triangulate_cutcsg
+
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        timber = cut_timber.timber
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        verts = []
+        for triangle in triangulate_cutcsg(local).mesh.triangles:
+            for vertex in triangle:
+                world = timber.transform.local_to_global(
+                    runner._to_v3([float(vertex[i]) for i in range(3)]))
+                verts.extend([float(world[i, 0]) for i in range(3)])
+        indices = list(range(len(verts) // 3))
+        rot, pos = runner._build_inv_transform_float(timber.transform)
+        node = runner._find_csg_by_labels(
+            runner._roots_for_path(cut_timber, ("mortise_hole",))[0][0], ("mortise_hole",))
+
+        with_filter = runner._extract_highlight_mesh(
+            verts, indices, node, rot, pos, 5e-4, root_csg=local)
+
+        original = runner._aabb_filter
+        runner._aabb_filter = lambda csg, eps: None
+        try:
+            without = runner._extract_highlight_mesh(
+                verts, indices, node, rot, pos, 5e-4, root_csg=local)
+        finally:
+            runner._aabb_filter = original
+
+        assert with_filter[0] == without[0]
+        assert with_filter[2] == without[2]
