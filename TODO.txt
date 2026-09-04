@@ -303,11 +303,22 @@ DONE-Fix the feature stable reference issue:
 
 DONE-TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
 DONE-consider dropping kind from measurement identity when checking for override on python 
+DONE-add realtime feature raasting as you move your mouse....
 
+
+-on cofee table, we're getting {"feature":"tenon_left×rough.front"} because tenon_left and roguh.front are coplanar
+  -parallel faces should never intersect
+  -make suer tenon_left is not in a intersection group with rough.front
+  -make sure drawings only intersect with PTW
+  -
+-why do edges extend beyond their actual bonudaries...
+-sa[e settings buttons needs to move to panel header
+-debug drawing should be a button not a checkbox in the options view, or just move it to be one of the default drawnigs that ships with every frame
 -add support for 3d measurements
 
 -increase edge selsection threhsold...
--add realtime feature raasting as you move your mouse....
+-add ability to select timber edges and end face edges (either using face face intersection or as explicit named features, probably the latter)
+
 
 
 -consider refactoring runner.py
