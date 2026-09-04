@@ -36,7 +36,7 @@ from .identity import (
     TimberPath,
     ViewportId,
 )
-from .drawing import Drawing, Measure, MeasureKind
+from .drawing import Drawing, Measure, MeasureKind, MeasurementPlacement
 from .timber import *
 from .footprint import *
 from .construction import *
