@@ -87,7 +87,48 @@
     }
 
     /**
-     * Which measurements this pair admits in this viewport, best first.
+     * Which kinds each projected pair admits, best first.
+     *
+     * The same table kumiki.drawing.kinds_for holds, and it is checked against
+     * that one by a test -- two copies of a rule is how a rule drifts. Kept
+     * here as well because the projection itself needs a camera, so the viewer
+     * is the only place that knows which pair it is looking at.
+     *
+     * Names are composed from the kind's parts: space, then direction, then
+     * operation. Everything here is projected, since that is what a sheet has.
+     */
+    /**
+     * The older names, as kumiki.drawing reads them too.
+     *
+     * `aligned` and `perpendicular` both become one kind: between two points
+     * the shortest distance IS the distance, which is why the two collapsed.
+     */
+    const LEGACY_KINDS = Object.freeze({
+        aligned: 'projected_perpendicular_distance',
+        perpendicular: 'projected_perpendicular_distance',
+        horizontal: 'projected_horizontal_distance',
+        vertical: 'projected_vertical_distance',
+        angle: 'projected_angle',
+    });
+
+    /** A kind by its composed name, whatever name it arrived under. */
+    function normalizeKind(kind) {
+        return LEGACY_KINDS[kind] || kind;
+    }
+
+    const PROJECTED_RULES = Object.freeze({
+        'point-point': Object.freeze([
+            'projected_perpendicular_distance',
+            'projected_horizontal_distance',
+            'projected_vertical_distance',
+        ]),
+        'line-point': Object.freeze(['projected_perpendicular_distance']),
+        'line-line-parallel': Object.freeze(['projected_perpendicular_distance']),
+        'line-line-crossing': Object.freeze(['projected_angle']),
+    });
+
+    /**
+     * Which kinds this pair admits in this viewport, best first.
      *
      * Empty when there is nothing to measure -- a face that is not edge-on, or
      * two features that project onto each other. The caller says why rather
@@ -103,22 +144,19 @@
             return [];
         }
         const forms = [formA.form, formB.form].sort().join('-');
-        if (forms === 'point-point') {
-            return ['aligned', 'horizontal', 'vertical'];
+        if (forms === 'line-line') {
+            // Parallel ones have a separation, crossing ones an angle.
+            const alignment = Math.abs(dot(formA.direction, formB.direction));
+            return alignment > 1 - PARALLEL_EPSILON
+                ? PROJECTED_RULES['line-line-parallel']
+                : PROJECTED_RULES['line-line-crossing'];
         }
-        if (forms === 'line-point') {
-            return ['perpendicular'];
-        }
-        // Two lines: parallel ones have a separation, crossing ones an angle.
-        const alignment = Math.abs(dot(formA.direction, formB.direction));
-        return alignment > 1 - PARALLEL_EPSILON
-            ? ['perpendicular', 'horizontal', 'vertical']
-            : ['angle'];
+        return PROJECTED_RULES[forms] || [];
     }
 
     /** Whether a measurement asking for `kind` can be drawn from these forms. */
     function kindApplies(kind, formA, formB) {
-        return availableKinds(formA, formB).indexOf(kind) !== -1;
+        return availableKinds(formA, formB).indexOf(normalizeKind(kind)) !== -1;
     }
 
     /** a - b, as a plain triple. */
@@ -170,21 +208,29 @@
             delta[2] - gaze[2] * along,
         ];
 
-        if (kind === 'angle') {
+        const named = normalizeKind(kind);
+
+        if (named === 'projected_angle') {
             const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
             return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
         }
-        if (kind === 'horizontal') {
+        if (named === 'projected_horizontal_distance') {
             return { unit: 'length', value: Math.abs(dot(flat, normalized(axes.right))) };
         }
-        if (kind === 'vertical') {
+        if (named === 'projected_vertical_distance') {
             return { unit: 'length', value: Math.abs(dot(flat, normalized(axes.up))) };
         }
-        if (kind === 'perpendicular') {
+        if (named === 'projected_perpendicular_distance') {
+            // Between two points there is no line to be square to, and the
+            // shortest distance is just the distance -- which is what makes
+            // this one kind rather than the two it used to be.
+            const line = formA.form === 'line' ? formA : (formB.form === 'line' ? formB : null);
+            if (line === null) {
+                return { unit: 'length', value: length(flat) };
+            }
             // Square to whichever of the two is a line: for a point and a line
             // that is the point's distance from it, and for two parallel lines
             // the gap between them.
-            const line = formA.form === 'line' ? formA : formB;
             const direction = normalized(line.direction);
             const slide = dot(flat, direction);
             return {
@@ -362,6 +408,8 @@
     }
 
     const KigumiMeasurements = {
+        PROJECTED_RULES,
+        normalizeKind,
         projectedForm,
         measurementStatus,
         availableKinds,

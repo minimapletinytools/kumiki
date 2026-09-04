@@ -20,142 +20,247 @@ from typing import Mapping, Optional, Tuple
 from .identity import DrawingId, FeaturePath, MeasurementId, TimberPath
 
 
-# =============================================================================
-# PARKED DESIGN SKETCH -- not code yet, kept verbatim below.
-#
-# Where measurement kinds are going: 3D as well as projected, fewer and more
-# general kinds, and a name composed from its parts rather than enumerated. The
-# sketch is commented out because it does not parse -- it is notes -- and an
-# unimportable kumiki.drawing takes the whole library with it.
-# =============================================================================
-#
-# # TODO we will turn this enum into a bit more complicated of a class
-# class MeasurementFeature(Enum):
-#     AREA = 2
-#     LINE = 1
-#     POINT = 0
-#
-#
-# # the type of measurement, including projected to a 2d drawing viewport and full 3d cases.
-# class MeasurementKind(Enum):
-#     """What a dimension is measuring.
-#
-#     A pair of features may admit more than one measurement kind
-#     A measurement may be interpreted in 3d or projectd to a 2d drawing
-#
-#     A 2d drawing is a projection
-#
-#         feature   projects to   when
-#         -------   -----------   ----------------------------------------------
-#         point     point         always
-#         edge      point         its direction runs along the line of sight
-#         edge      line          otherwise
-#         face      line          its normal is square to the line of sight,
-#                                 which is to say the face is seen edge-on
-#         face      area          otherwise
-#
-#     projects pairs admit the following measurements
-#
-#         projected pair            admits
-#         ----------------------    ----------------------------------------
-#         point, point              PERPENDICULAR, HORIZONTAL, VERTICAL
-#         point, line               PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
-#         line, line (parallel)     PERPENDICULAR (HORIZONTAL, VERTICAL  technically allowed but not used in practice)
-#         line, line (crossing)     ANGLE
-#         anything, area            nothing
-#         coincident or degenerate  nothing
-#
-#     in 3D we admit additional measurements:
-#
-#     TODO finish
-#
-#     TODO Worth adding later, and listed here so the shape leaves room for them:
-#     RADIUS and DIAMETER of a circular feature, once features name one; ARC
-#     LENGTH; a distance ALONG a named direction rather than the sheet's -- along
-#     the piece, say, which is the same as HORIZONTAL in a face view but not in a
-#     plan; and chains and baselines, which are several measurements sharing a
-#     reference rather than a kind of their own.
-#     """
-#
-#     # requires 2 features to not be parallel (points are parallel to nothing so neither can be a point
-#     ANGLE
-#     PROJECTED_ANGLE
-#
-#     # requires 2 features to be parallel (or one of them to be a point)
-#     PERENDICULAR_DISTANCE
-#     PROJECTED_PERPENDICULAR_DISTANCE
-#     PROJECTED_HORIZONTAL_DISTANCE
-#     PROJECTED_VERTICAL_DISTANCE
-#
-# class MeasurementKindDebugInformation:
-#     original_feature_A: MeasurementFeature
-#     original_feature_B: MeasurementFeature
-#
-#     projected_feature_A: MeasurementFeature
-#     projected_feature_B: MeasurementFeature
-#
-#     mesaurement_kind: MeasurementKind
-#
-#     def measurement_kind_name(self) -> string:
-#         # starts with feature_to_feature
-#         # or "projected_feature" for each feature that's projected
-#         # then we have measurement kind at the end
+class MeasurementSpace(Enum):
+    """Whether a measurement is taken on the sheet or in the solid.
 
-
-# TODO DELETE-RELPACE this class with the above
-class MeasureKind(Enum):
-    """What a dimension is measuring.
-
-    A pair of features usually admits more than one, and which is wanted cannot
-    be inferred: two points admit the direct distance and either component along
-    the sheet, and the same two edge-on faces give a separation when they are
-    parallel and an angle when they are not. So a measurement says which it is.
-
-    Which apply is decided by what the two features *project to* in the
-    viewport, not by what they are. A drawing is a projection, so that is the
-    only thing the sheet can carry:
-
-        feature   projects to   when
-        -------   -----------   ----------------------------------------------
-        point     point         always
-        edge      point         its direction runs along the line of sight
-        edge      line          otherwise
-        face      line          its normal is square to the line of sight,
-                                which is to say the face is seen edge-on
-        face      area          otherwise
-
-    Then by projected pair:
-
-        projected pair            admits
-        ----------------------    ----------------------------------------
-        point, point              ALIGNED, HORIZONTAL, VERTICAL
-        point, line               PERPENDICULAR
-        line, line (parallel)     PERPENDICULAR, HORIZONTAL, VERTICAL
-        line, line (crossing)     ANGLE
-        anything, area            nothing
-        coincident or degenerate  nothing
-
-    Worth adding later, and listed here so the shape leaves room for them:
-    RADIUS and DIAMETER of a circular feature, once features name one; ARC
-    LENGTH; a distance ALONG a named direction rather than the sheet's -- along
-    the piece, say, which is the same as HORIZONTAL in a face view but not in a
-    plan; and chains and baselines, which are several measurements sharing a
-    reference rather than a kind of their own.
+    A drawing is a projection, so a dimension on one measures what the viewport
+    shows. The same two features also have a relationship in three dimensions,
+    which is a different number and sometimes a different question entirely --
+    two faces at an angle have an angle between them in the solid, and cover
+    each other on the sheet.
     """
 
-    # TODO prefix these ones with POINT_TO_POINT
-    #: The direct distance between two projected points.   TODO rename to direct
-    ALIGNED = "aligned"
-    #: point to point component across the sheet.
+    PROJECTED = "projected"
+    THREE_D = "3d"
+
+
+class MeasurementOperation(Enum):
+    """What is being computed. RADIUS and ARC_LENGTH belong here when they come."""
+
+    DISTANCE = "distance"
+    ANGLE = "angle"
+
+
+class MeasurementDirection(Enum):
+    """Which direction a distance is taken along.
+
+    PERPENDICULAR is the shortest distance and means something in either space.
+    HORIZONTAL and VERTICAL are directions *of the sheet*, so they exist only
+    when projected -- the solid has no up. The three-dimensional counterpart is
+    a distance along a named direction, which does not exist yet.
+    """
+
+    PERPENDICULAR = "perpendicular"
     HORIZONTAL = "horizontal"
-    #: point to point component up the sheet.
     VERTICAL = "vertical"
 
-    # TODO are these really necessary? I think it's nice becasue we have an enum to describe the measurement kind, but it's not actually useful for setting the kind as they are not compatible
-    #: Point to line, or between two parallel lines.
-    PERPENDICULAR = "perpendicular"
-    #: Between two lines that are not parallel. 
-    ANGLE = "angle"
+
+class MeasurementFeature(Enum):
+    """What a feature behaves as, for the purpose of measuring it.
+
+    Four members, but two of them belong to one space each. A face is a PLANE
+    in the solid and becomes either a LINE or an AREA once projected, depending
+    on whether it is seen edge-on. AREA is the projected dead end: a face seen
+    at an angle covers the view, and there is no distance between two things
+    that each cover the view.
+
+    That one distinction is the whole of the difference between the two spaces.
+    Face to face angle and perpendicular distance are perfectly good questions
+    in the solid, where both are planes, and meaningless on the sheet, where
+    both are areas.
+    """
+
+    POINT = "point"
+    LINE = "line"
+    #: Solid only. A face, before projection.
+    PLANE = "plane"
+    #: Projected only. A face seen at an angle, which cannot be dimensioned.
+    AREA = "area"
+
+
+#: What a feature can project to. A point stays a point; an edge seen end-on
+#: becomes one; a face is a line edge-on and an area otherwise. Which of the two
+#: it is depends on the viewing direction, so only the viewport can say -- this
+#: says what the possibilities are.
+PROJECTS_TO: Mapping[MeasurementFeature, Tuple[MeasurementFeature, ...]] = {
+    MeasurementFeature.POINT: (MeasurementFeature.POINT,),
+    MeasurementFeature.LINE: (MeasurementFeature.POINT, MeasurementFeature.LINE),
+    MeasurementFeature.PLANE: (MeasurementFeature.LINE, MeasurementFeature.AREA),
+}
+
+
+@dataclass(frozen=True)
+class MeasurementKind:
+    """What a dimension is measuring.
+
+    A structured value rather than one name per combination. The combinations
+    multiply -- every operation needs a projected form and a solid one, and a
+    distance needs a direction -- so spelling each out by hand means a name to
+    invent and keep in sync for each, and the list doubles again when RADIUS or
+    a distance along a named direction arrives.
+
+    The name is composed from the parts instead, which is why there is no
+    mapping to maintain: `projected_horizontal_distance` is exactly its three
+    fields, read out.
+    """
+
+    operation: MeasurementOperation
+    space: MeasurementSpace
+    #: Only meaningful for a DISTANCE. An angle has no direction to take.
+    direction: MeasurementDirection = MeasurementDirection.PERPENDICULAR
+
+    def __post_init__(self):
+        for field_name, kind in (("operation", MeasurementOperation),
+                                 ("space", MeasurementSpace),
+                                 ("direction", MeasurementDirection)):
+            value = getattr(self, field_name)
+            if isinstance(value, str):
+                object.__setattr__(self, field_name, kind(value))
+        if (self.space is MeasurementSpace.THREE_D
+                and self.direction is not MeasurementDirection.PERPENDICULAR):
+            raise ValueError(
+                f"{self.direction.value} is a direction of the sheet, so it only exists "
+                "projected. The solid has no up."
+            )
+
+    @property
+    def name(self) -> str:
+        """The composed name, e.g. `projected_horizontal_distance`."""
+        parts = []
+        if self.space is MeasurementSpace.PROJECTED:
+            parts.append("projected")
+        if self.operation is MeasurementOperation.DISTANCE:
+            parts.append(self.direction.value)
+        parts.append(self.operation.value)
+        return "_".join(parts)
+
+    def __str__(self) -> str:
+        return self.name
+
+    def as_wire(self) -> dict:
+        """The form a file holds, which says each part rather than naming the whole.
+
+        Not the composed name, because one name is ambiguous: `angle` is what
+        this calls a solid angle, and is also what every measurement written
+        before spaces existed calls a projected one. Saying the space outright
+        costs a few characters and cannot be misread.
+        """
+        return {
+            "operation": self.operation.value,
+            "space": self.space.value,
+            "direction": self.direction.value,
+        }
+
+    @classmethod
+    def from_wire(cls, value) -> Optional['MeasurementKind']:
+        """A kind as read from a file: the structured form, or an older name."""
+        if value is None:
+            return None
+        if isinstance(value, Mapping):
+            return cls(
+                MeasurementOperation(value.get("operation", "distance")),
+                MeasurementSpace(value.get("space", "projected")),
+                MeasurementDirection(value.get("direction", "perpendicular")),
+            )
+        return cls.parse(str(value))
+
+    @classmethod
+    def parse(cls, text: str) -> 'MeasurementKind':
+        """Read a kind back from its name, or from one of the older names.
+
+        The old names were all projected, and `aligned` and `perpendicular` both
+        become a perpendicular distance: between two points the shortest
+        distance IS the distance, which is why the two collapsed into one.
+
+        Where an old name and a new one collide -- `angle`, which now composes
+        for a SOLID angle -- the old reading wins, because every file that
+        contains the word was written meaning the old one. Solid kinds are
+        written structured (see as_wire), so nothing needs the ambiguous form.
+        """
+        legacy = _LEGACY_KIND_NAMES.get(str(text))
+        if legacy is not None:
+            return legacy
+        parts = str(text).split("_")
+        space = MeasurementSpace.PROJECTED if parts[:1] == ["projected"] else MeasurementSpace.THREE_D
+        if space is MeasurementSpace.PROJECTED:
+            parts = parts[1:]
+        if parts == ["angle"]:
+            return cls(MeasurementOperation.ANGLE, space)
+        if len(parts) == 2 and parts[1] == "distance":
+            return cls(MeasurementOperation.DISTANCE, space, MeasurementDirection(parts[0]))
+        raise ValueError(f"not a measurement kind: {text!r}")
+
+
+def _projected(operation, direction=MeasurementDirection.PERPENDICULAR) -> MeasurementKind:
+    return MeasurementKind(operation, MeasurementSpace.PROJECTED, direction)
+
+
+def _solid(operation) -> MeasurementKind:
+    return MeasurementKind(operation, MeasurementSpace.THREE_D)
+
+
+#: The names measurements were written with before kinds had structure.
+_LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
+    # Between two points, the direct distance and the perpendicular distance
+    # are the same number, so these two are now one kind.
+    "aligned": _projected(MeasurementOperation.DISTANCE),
+    "perpendicular": _projected(MeasurementOperation.DISTANCE),
+    "horizontal": _projected(MeasurementOperation.DISTANCE, MeasurementDirection.HORIZONTAL),
+    "vertical": _projected(MeasurementOperation.DISTANCE, MeasurementDirection.VERTICAL),
+    "angle": _projected(MeasurementOperation.ANGLE),
+}
+
+
+def kinds_for(
+    feature_a: MeasurementFeature,
+    feature_b: MeasurementFeature,
+    space: MeasurementSpace,
+    parallel: Optional[bool] = None,
+) -> Tuple[MeasurementKind, ...]:
+    """Which kinds a pair admits, best first. Empty when it admits none.
+
+    *feature_a* and *feature_b* are what the two features behave as in this
+    space -- already projected, if the space is projected. *parallel* says
+    whether two directions line up, and is only consulted when both are lines
+    or planes, since that is the only pair whose answer depends on it.
+
+    The rules are here rather than in the viewer because they are the same rules
+    in both, and two copies of a table is how a table drifts. What the viewer
+    keeps is the projection itself, which needs a camera to work out.
+    """
+    pair = {feature_a, feature_b}
+
+    if MeasurementFeature.AREA in pair:
+        # A face seen at an angle covers the view: nothing to measure to, and
+        # its middle is a point about nothing.
+        return ()
+    if MeasurementFeature.PLANE in pair and space is MeasurementSpace.PROJECTED:
+        raise ValueError("a plane is a solid-space feature; project it first")
+    if MeasurementFeature.AREA in pair and space is MeasurementSpace.THREE_D:
+        raise ValueError("an area is a projected feature; it has no solid counterpart")
+
+    flat = {MeasurementFeature.LINE, MeasurementFeature.PLANE}
+    both_flat = feature_a in flat and feature_b in flat
+    if both_flat and parallel is False:
+        return (_projected(MeasurementOperation.ANGLE) if space is MeasurementSpace.PROJECTED
+                else _solid(MeasurementOperation.ANGLE),)
+
+    if space is MeasurementSpace.THREE_D:
+        return (_solid(MeasurementOperation.DISTANCE),)
+
+    perpendicular = _projected(MeasurementOperation.DISTANCE)
+    if pair == {MeasurementFeature.POINT}:
+        # Both points: the sheet's own directions are as good a question as the
+        # distance itself, and often the one wanted.
+        return (
+            perpendicular,
+            _projected(MeasurementOperation.DISTANCE, MeasurementDirection.HORIZONTAL),
+            _projected(MeasurementOperation.DISTANCE, MeasurementDirection.VERTICAL),
+        )
+    # Point to line, or two parallel lines. A horizontal or vertical component
+    # is technically available here too and is not offered: it is not what
+    # anyone means by the distance to a line.
+    return (perpendicular,)
 
 
 @dataclass(frozen=True)
@@ -175,15 +280,17 @@ class Measure:
     anchor_a: FeaturePath
     anchor_b: FeaturePath
     # the measurement kind to use or None to use the default
-    kind: Optional[MeasureKind] = None
+    kind: Optional[MeasurementKind] = None
     # the measurementId which allows multiple measurements with the same anchors and kind
     measure_id: Optional[MeasurementId] = None
 
     def __post_init__(self):
         if isinstance(self.measure_id, str):
             object.__setattr__(self, 'measure_id', MeasurementId(self.measure_id))
-        if isinstance(self.kind, str):
-            object.__setattr__(self, 'kind', MeasureKind(self.kind))
+        if self.kind is not None and not isinstance(self.kind, MeasurementKind):
+            # A name, or the structured form a file holds. An older name still
+            # reads: see MeasurementKind.parse.
+            object.__setattr__(self, 'kind', MeasurementKind.from_wire(self.kind))
 
     def identity(self) -> Tuple[Tuple, Tuple, str]:
         """What makes this measurement itself, within its viewport.
