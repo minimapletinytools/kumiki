@@ -14,13 +14,16 @@ from pathlib import Path
 import pytest
 
 from kumiki.drawing import (
+    Measure,
     MeasurementDirection,
     MeasurementFeature,
     MeasurementKind,
     MeasurementOperation,
+    MeasurementPlacement,
     MeasurementSpace,
     kinds_for,
 )
+from kumiki.identity import FeatureRef, ResolvedTimberPath, SingleFeaturePath
 
 DISTANCE = MeasurementOperation.DISTANCE
 ANGLE = MeasurementOperation.ANGLE
@@ -147,3 +150,120 @@ class TestTheViewerAgrees:
         }
 
         assert self._viewer_rules() == expected
+
+
+class TestAnchorsAreWrittenInOneOrder:
+    """Measuring A to B and measuring B to A are the same measurement."""
+
+    def _anchor(self, name):
+        return SingleFeaturePath(
+            ResolvedTimberPath("post"), FeatureRef((name,), name), "FACE")
+
+    def test_the_pair_comes_out_the_same_way_round(self):
+        first, second = self._anchor("aaa"), self._anchor("zzz")
+
+        forwards = Measure(first, second)
+        backwards = Measure(second, first)
+
+        assert forwards.anchor_a.feature == backwards.anchor_a.feature
+        assert forwards == backwards
+
+    def test_it_is_one_measurement_however_it_was_written(self):
+        # Without this a pair written both ways is two entries in a viewport,
+        # two dimensions drawn on top of each other, and a file override that
+        # matches neither.
+        first, second = self._anchor("aaa"), self._anchor("zzz")
+
+        assert Measure(first, second).identity() == Measure(second, first).identity()
+
+    def test_swapping_keeps_the_dimension_on_the_same_side(self):
+        # The offset is perpendicular to the run between the anchors, so
+        # reversing the run reverses the side. The offset is signed, so
+        # negating it puts the line back.
+        first, second = self._anchor("aaa"), self._anchor("zzz")
+
+        swapped = Measure(second, first, placement=MeasurementPlacement(offset=-24.0))
+
+        assert swapped.placement.offset == 24.0
+
+    def test_an_order_that_is_already_canonical_is_left_alone(self):
+        first, second = self._anchor("aaa"), self._anchor("zzz")
+
+        kept = Measure(first, second, placement=MeasurementPlacement(offset=-24.0))
+
+        assert kept.anchor_a.feature == "aaa"
+        assert kept.placement.offset == -24.0
+
+    def test_no_placement_is_fine(self):
+        first, second = self._anchor("aaa"), self._anchor("zzz")
+
+        assert Measure(second, first).placement is None
+
+
+class TestKindTellsTwoMeasurementsApart:
+    """Two kinds between one pair are two dimensions, and both should show."""
+
+    def _anchor(self, name):
+        return SingleFeaturePath(
+            ResolvedTimberPath("post"), FeatureRef((name,), name), "FACE")
+
+    def _pair(self):
+        return self._anchor("aaa"), self._anchor("zzz")
+
+    def test_the_horizontal_and_the_vertical_are_not_the_same_measurement(self):
+        # The ordinary thing to want between two points, without having to mint
+        # an id to say they are different.
+        first, second = self._pair()
+
+        across = Measure(first, second, kind="horizontal")
+        up = Measure(first, second, kind="vertical")
+
+        assert across.identity() != up.identity()
+
+    def test_the_same_kind_written_twice_is_one_measurement(self):
+        first, second = self._pair()
+
+        assert (Measure(first, second, kind="horizontal").identity()
+                == Measure(second, first, kind="horizontal").identity())
+
+    def test_an_older_name_matches_the_kind_it_became(self):
+        # A file written before kinds had structure has to keep overriding the
+        # code measurement it always overrode.
+        first, second = self._pair()
+        older = Measure(first, second, kind="angle")
+        newer = Measure(first, second,
+                        kind={"operation": "angle", "space": "projected",
+                              "direction": "perpendicular"})
+
+        assert older.identity() == newer.identity()
+
+    def test_asking_for_no_kind_is_its_own_measurement(self):
+        # "Whichever is natural" is a different request from naming one, even
+        # when the viewport would resolve it to the same thing.
+        first, second = self._pair()
+
+        assert Measure(first, second).identity() != Measure(
+            first, second, kind="horizontal").identity()
+
+    def test_the_viewer_and_the_library_build_the_same_identity(self):
+        # A file measurement overrides a code one by matching this tuple, so
+        # the two sides have to agree on what it is.
+        import importlib.util
+        import sys
+
+        runner_path = Path(__file__).resolve().parent.parent / "kigumi" / "runner.py"
+        spec = importlib.util.spec_from_file_location("kigumi_runner_kinds", runner_path)
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_kinds"] = runner
+        spec.loader.exec_module(runner)
+
+        first, second = self._pair()
+        measure = Measure(first, second, kind="horizontal")
+        on_the_wire = {
+            "a": runner.serialize_feature_path(measure.anchor_a),
+            "b": runner.serialize_feature_path(measure.anchor_b),
+            "kind": measure.kind.as_wire(),
+            "measureId": None,
+        }
+
+        assert runner._measure_identity(on_the_wire) == measure.identity()

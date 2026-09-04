@@ -13,7 +13,7 @@ are two dimensions with two numbers, and either may be meaningless while the
 other is fine.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Mapping, Optional, Tuple
 
@@ -314,14 +314,78 @@ class Measure:
             object.__setattr__(self, 'kind', MeasurementKind.from_wire(self.kind))
         if isinstance(self.placement, dict):
             object.__setattr__(self, 'placement', MeasurementPlacement(**self.placement))
+        self._canonicalise_anchors()
 
-    def identity(self) -> Tuple[Tuple, Tuple, str]:
+    def _canonicalise_anchors(self) -> None:
+        """Put the two anchors in one order, so a pair cannot be written twice.
+
+        Measuring A to B and measuring B to A are the same measurement, and
+        without this they are two: two entries in a viewport, two dimensions
+        drawn on top of each other, and a file override that matches neither.
+        Sorting at creation means there is only ever one way to write it down.
+
+        Swapping is safe because every kind there is today is symmetric -- each
+        computes an absolute value or a length, so the number does not depend on
+        which anchor came first. The one thing that does is which SIDE the
+        dimension line sits on, since it is offset perpendicular to the run
+        between the anchors, and reversing the run reverses the perpendicular.
+        The offset is signed, so negating it puts the line back where it was.
+
+        WHEN AN ASYMMETRIC KIND ARRIVES -- one where A to B and B to A are
+        genuinely different measurements, rather than the same one drawn from
+        the other end -- this has to stop being unconditional and start asking
+        the kind. It is written here rather than left to be discovered because
+        by then the ordering will look like something nothing depends on.
+        """
+        if self.anchor_a is None or self.anchor_b is None:
+            return
+        first, second = self.anchor_a, self.anchor_b
+        if first.identity() <= second.identity():
+            return
+        object.__setattr__(self, 'anchor_a', second)
+        object.__setattr__(self, 'anchor_b', first)
+        if self.placement is not None and self.placement.offset is not None:
+            object.__setattr__(
+                self, 'placement',
+                replace(self.placement, offset=-self.placement.offset))
+
+    @staticmethod
+    def kind_identity(kind: Optional['MeasurementKind']) -> Tuple:
+        """A kind in a comparable form, or an empty one for "whichever is natural".
+
+        The parts rather than the name, because a name can arrive as an older
+        one -- `angle` and `projected_angle` are the same kind written years
+        apart, and must not read as two different measurements.
+        """
+        if kind is None:
+            return ()
+        wire = kind.as_wire()
+        return (wire["operation"], wire["space"], wire["direction"])
+
+    def identity(self) -> Tuple[Tuple, Tuple, Tuple, str]:
         """What makes this measurement itself, within its viewport.
 
-        The anchors unordered, since measuring A to B is measuring B to A.
+        The anchors come already in one order (see _canonicalise_anchors), so
+        measuring A to B and measuring B to A are one measurement.
+
+        The kind is part of it, because two kinds between one pair are two
+        dimensions and both should show: the horizontal and the vertical
+        between the same two points is an ordinary thing to want. The
+        alternative was making the author mint a measure_id to tell them apart,
+        which is a chore for the common case.
+
+        The cost, which the editing flow has to know about: changing a
+        measurement's kind changes its identity. So an override cannot edit a
+        code measurement's kind in place -- it is a different measurement now.
+        Say it as suppressing the original and adding the new one, which is
+        what those two mechanisms are already for.
         """
-        first, second = sorted((self.anchor_a.identity(), self.anchor_b.identity()))
-        return (first, second, str(self.measure_id or ""))
+        return (
+            self.anchor_a.identity(),
+            self.anchor_b.identity(),
+            self.kind_identity(self.kind),
+            str(self.measure_id or ""),
+        )
 
 
 @dataclass(frozen=True)

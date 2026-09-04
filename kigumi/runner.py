@@ -1655,17 +1655,30 @@ def _feature_path_identity(anchor: Any) -> Tuple[str, Tuple[str, ...], str, str]
 def _measure_identity(measure: Dict[str, Any]) -> Tuple[Any, Any, str]:
     """What makes a measurement itself, within the viewport it is drawn in.
 
-    The anchors unordered, since measuring A to B is measuring B to A, plus an
-    id for when the same pair is measured twice in the same viewport. Scoped to
+    The anchors unordered, since measuring A to B is measuring B to A. Then the
+    kind, because two kinds between one pair are two dimensions and both should
+    show. Then an id, for the same pair measured twice the same way. Scoped to
     the viewport because that is where a measurement lives: the same anchors in
     the plan view are a different dimension with a different number, not this
     one seen from elsewhere.
+
+    The same tuple Measure.identity builds, because the two are compared
+    against each other -- a file measurement overrides a code one by matching
+    it. A kind is normalized through MeasurementKind first, so one written
+    under an older name matches the same kind written under the new one.
     """
+    from kumiki.drawing import Measure, MeasurementKind
+
     first, second = sorted((
         _feature_path_identity(measure.get("a")),
         _feature_path_identity(measure.get("b")),
     ))
-    return (first, second, str(measure.get("measureId") or ""))
+    kind = measure.get("kind")
+    return (
+        first, second,
+        Measure.kind_identity(MeasurementKind.from_wire(kind) if kind else None),
+        str(measure.get("measureId") or ""),
+    )
 
 
 def serialize_feature_path(path: Any) -> Dict[str, Any]:
