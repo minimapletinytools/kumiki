@@ -4030,6 +4030,23 @@ def _feature_outline(feature: Any, node: Any, timber: Any, located: Any) -> Opti
     what makes it cheap enough to run while the pointer moves: on a timber
     where walking the mesh for a highlight takes 78ms, this takes 0.07ms.
 
+    APPROXIMATE, and not the same shape a click highlights. The click walks the
+    rendered mesh and gets the surface as it really is. This clips a plane by
+    half spaces, so it is convex by construction and cannot have a hole in it,
+    and csgconvexhull does not account for subtractions. Concretely: the front
+    face of a beam with eight mortises through it outlines as one rectangle the
+    length of the beam, with every mortise opening inside it.
+
+    Which is tolerable for what this is for. An outline of a face means its
+    outer boundary, and that is what this draws; the hole boundaries are
+    missing, not wrong. The identity is exact either way -- WHICH feature the
+    pointer is over comes from the same resolution a click uses, and only the
+    drawn shape approximates.
+
+    Where it would mislead is a face mostly cut away, which outlines at full
+    size. If that matters more than the 78ms, the answer is to walk the mesh
+    on a longer dwell and replace the outline once it arrives.
+
     None when the feature cannot be placed -- a curved surface, a primitive
     csgconvexhull cannot describe. The caller shows the name and draws nothing
     rather than guessing an outline.
