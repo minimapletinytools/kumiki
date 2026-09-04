@@ -6,6 +6,7 @@ e.g. "posts/frontleft" or "door/boards/1". Folders are implicit in the path and
 will be rendered as actual folders in the layer view.
 """
 
+import warnings
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, replace
 from enum import Enum
@@ -289,5 +290,20 @@ class BoardTicket(TimberTicket):
 @dataclass(frozen=True)
 class JointTicket(Ticket):
     """Concept ticket metadata for joints."""
-
     joint_type: Optional[str] = None
+
+    # Accepted and discarded, for patterns written when tags lived on every
+    # ticket. Joints will get their own tagging system; until then a tag here
+    # would land somewhere nothing reads, so it is dropped rather than kept --
+    # ticket.tags stays empty, and the warning says so. This used to be a
+    # TypeError, which was louder but stopped old patterns opening at all.
+    tags: tuple = ()
+
+    def __post_init__(self) -> None:
+        if self.tags:
+            warnings.warn(
+                f"JointTicket({self.path!r}) was given tags {tuple(self.tags)!r}. Joints do "
+                "not carry tags yet, so these are discarded. Move them to the timbers the "
+                "joint is cut on, or drop them."
+            )
+            object.__setattr__(self, "tags", ())

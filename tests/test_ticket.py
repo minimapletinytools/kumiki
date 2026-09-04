@@ -30,10 +30,19 @@ class TestTicket:
         assert ticket_a.kumiki_id != ticket_b.kumiki_id
 
     def test_joints_do_not_carry_tags(self):
-        # Joints will get their own tagging system; a stray tags= here should
-        # fail loudly rather than land somewhere nothing reads.
-        with pytest.raises(TypeError):
-            JointTicket(joint_type="plain_butt", tags=("bent1",))  # type: ignore[call-arg]
+        # Joints will get their own tagging system; a tag here would land
+        # somewhere nothing reads, so it is discarded rather than kept.
+        with pytest.warns(UserWarning, match="do not carry tags"):
+            ticket = JointTicket(joint_type="plain_butt", tags=("bent1",))  # type: ignore[call-arg]
+
+        assert ticket.tags == ()
+
+    def test_a_joint_without_tags_says_nothing(self):
+        import warnings
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            assert JointTicket(joint_type="plain_butt").tags == ()
 
 
 class TestTimberTag:
