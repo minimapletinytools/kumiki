@@ -236,6 +236,10 @@ class FeatureGroup(Enum):
         B2 intersects with A, and with itself
         C  intersects with itself only
 
+    NONE is the exception to the scheme: it meets nothing, not even itself, and
+    is how a feature says it forms no edges at all. Some geometry is worth
+    naming and pointing at without every face of it turning into an arris.
+
     Defaults today: a timber's perfect-timber-within and rough faces are B2,
     and every named joint feature is A -- so joint geometry meets the timber
     body, and the body meets itself, the latter being the timber's own four
@@ -252,6 +256,8 @@ class FeatureGroup(Enum):
     B1 = 2
     B2 = 3
     C = 4
+    #: Forms no edges with anything, including itself.
+    NONE = 5
 
 
 # Which groups each group forms edges with. Symmetric by construction; see
@@ -261,6 +267,7 @@ FEATURE_GROUP_PAIRS: dict = {
     FeatureGroup.B1: frozenset({FeatureGroup.A}),
     FeatureGroup.B2: frozenset({FeatureGroup.A, FeatureGroup.B2}),
     FeatureGroup.C: frozenset({FeatureGroup.C}),
+    FeatureGroup.NONE: frozenset(),
 }
 
 

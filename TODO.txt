@@ -307,10 +307,11 @@ DONE-add realtime feature raasting as you move your mouse....
 
 
 -on cofee table, we're getting {"feature":"tenon_left×rough.front"} because tenon_left and roguh.front are coplanar
-  -parallel faces should never intersect
-  -make suer tenon_left is not in a intersection group with rough.front
-  -make sure drawings only intersect with PTW
-  -
+  DONE-parallel faces should never intersect as features
+  -make suer tenon_left is not in a intersection group with rough.front. I think tenon_left does not need to be in any intersection group for now actually.
+
+
+-make sure drawings only intersect with PTW
 -why do edges extend beyond their actual bonudaries...
 -sa[e settings buttons needs to move to panel header
 -debug drawing should be a button not a checkbox in the options view, or just move it to be one of the default drawnigs that ships with every frame

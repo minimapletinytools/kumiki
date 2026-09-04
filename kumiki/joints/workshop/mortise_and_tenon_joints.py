@@ -125,6 +125,10 @@ class InsetShoulderReliefStyle(Enum):
 # ============================================================================
 
 
+#: A tenon's own faces: named and selectable, forming no edges.
+_TENON_FACE = FeatureProperties(group=FeatureGroup.NONE)
+
+
 def cut_mortise_and_tenon_joint(
     arrangement: ButtJointTimberArrangement,
     tenon_size: V2,
@@ -352,12 +356,22 @@ def cut_mortise_and_tenon_joint(
             transform=marking_space.transform,
             start_distance=-back_extension,
             end_distance=tenon_length,
+            # The tenon's own faces form no edges. Where they cross the timber
+            # body they make arrises nobody dimensions -- and the same pairing
+            # produces ones that are not on the piece at all, since the prism
+            # reaches past it. The edge worth having against the body is the
+            # shoulder's, and the shoulder is not one of these.
             _features=[
-                SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT),
-                SimpleRectangularPrismFeature("tenon_left", face=PrismFace.LEFT),
-                SimpleRectangularPrismFeature("tenon_front", face=PrismFace.FRONT),
-                SimpleRectangularPrismFeature("tenon_back", face=PrismFace.BACK),
-                SimpleRectangularPrismFeature(tenon_tip_name, face=PrismFace.TOP),
+                SimpleRectangularPrismFeature(
+                    "tenon_right", face=PrismFace.RIGHT, properties=_TENON_FACE),
+                SimpleRectangularPrismFeature(
+                    "tenon_left", face=PrismFace.LEFT, properties=_TENON_FACE),
+                SimpleRectangularPrismFeature(
+                    "tenon_front", face=PrismFace.FRONT, properties=_TENON_FACE),
+                SimpleRectangularPrismFeature(
+                    "tenon_back", face=PrismFace.BACK, properties=_TENON_FACE),
+                SimpleRectangularPrismFeature(
+                    tenon_tip_name, face=PrismFace.TOP, properties=_TENON_FACE),
             ],
             label=CutCSGLabel("tenon"),
         )

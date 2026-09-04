@@ -4144,3 +4144,51 @@ def _all_nodes(root):
     yield root
     for child in csg_children(root):
         yield from _all_nodes(child)
+
+
+class TestAFeatureThatFormsNoEdges:
+    """FeatureGroup.NONE: named and selectable, and never an arris."""
+
+    def _prism(self, *features):
+        return RectangularPrism(
+            size=create_v2(scalar(4), scalar(6)),
+            transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10),
+            _features=list(features),
+        )
+
+    def _face(self, name, face, group):
+        return SimpleRectangularPrismFeature(
+            name, face=face, properties=FeatureProperties(group=group))
+
+    def test_it_meets_nothing(self):
+        for other in FeatureGroup:
+            assert not feature_groups_intersect(FeatureGroup.NONE, other)
+            assert not feature_groups_intersect(other, FeatureGroup.NONE)
+
+    def test_not_even_itself(self):
+        # Unlike C, which is the group for geometry whose own faces do meet.
+        assert not feature_groups_intersect(FeatureGroup.NONE, FeatureGroup.NONE)
+
+    def test_a_pair_including_one_derives_no_edge(self):
+        prism = self._prism(
+            self._face("quiet", PrismFace.RIGHT, FeatureGroup.NONE),
+            self._face("body", PrismFace.FRONT, FeatureGroup.B1),
+        )
+        features = {f.name: f for f in prism.get_declared_features()}
+
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(feature=features["quiet"], owner=prism),
+            OwnedFeatureHit(feature=features["body"], owner=prism),
+        )
+
+        assert edge is None
+
+    def test_it_is_still_a_feature_you_can_point_at(self):
+        # The whole point: no edges, but still named, still selectable.
+        prism = self._prism(self._face("quiet", PrismFace.RIGHT, FeatureGroup.NONE))
+
+        on_the_face = create_v3(scalar(2), scalar(0), scalar(5))
+        hits = prism.get_all_features(on_the_face)
+
+        assert [hit.feature.name for hit in hits] == ["quiet"]

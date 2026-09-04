@@ -182,7 +182,8 @@ class TestCSGTreeSerialization:
         assert {"tenon_right", "tenon_left", "tenon_front", "tenon_back"} <= set(by_name)
         assert by_name["tenon_right"]["type"] == "FACE"
         assert by_name["tenon_right"]["real"] is True
-        assert by_name["tenon_right"]["group"] == "A"
+        # NONE: a tenon's faces are named and selectable and form no edges.
+        assert by_name["tenon_right"]["group"] == "NONE"
 
     def test_the_timber_body_carries_its_reserved_face_names(self, mortise_and_tenon_frame):
         tree = self._tree(mortise_and_tenon_frame, "butt_timber")
