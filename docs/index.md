@@ -1,9 +1,9 @@
 # Kumiki
 
-Kumiki is a Code Assisted Design (CoAD) library for programmatically designing
+Kumiki is a programmatic CAD library for designing
 timber-framed structures and woodworking joinery in Python. It's used together
 with [kigumi](https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi),
-a VS Code extension for viewing and iterating on your Kumiki designs.
+a VS Code extension for viewing and iterating on your kumiki designs.
 
 For the full kigumi + VS Code setup, see [Getting Started](https://kumiki.build/install).
 

@@ -105,20 +105,8 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 
 :: TODO
-
-
--conisder naming short edges on timber as well
--make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
-  -welly oush ould force show lines for PTW faces (maybe light grey)
-  -and you should highlight the refreence edge as wel if there is one in drawing mode
-  -or just add an option in general to highlight the reference edge for 3d view mode as well
--conisder just shippingthe defalut drawing with every frame by fdefault
--add support for 3d measurements
-  -maybe there should be a spceial drawing that's available in regular view mode...
--consider refactoring runner.py
--right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
-  for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
--redo website w/ actually how the program works details
+DONE-label the gizmo lol
+DONE-redo website w/ actually how the program works details
   -do the sliding navigation galrlery thing at the top
   -rephrase as "programmatic cad"
   -first clickable bullet: program your frames
@@ -132,6 +120,18 @@ DONE-sliding dovetail (maybe you want tapered variants)
     -automatic generation -> customize in code -> manual override in kigumi
   -assembly generation (BETA)
     -assembly video
+    
+-conisder naming short edges on timber as well
+-make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
+  -welly oush ould force show lines for PTW faces (maybe light grey)
+  -and you should highlight the refreence edge as wel if there is one in drawing mode
+  -or just add an option in general to highlight the reference edge for 3d view mode as well
+-conisder just shippingthe defalut drawing with every frame by fdefault
+-add support for 3d measurements
+  -maybe there should be a spceial drawing that's available in regular view mode...
+-consider refactoring runner.py
+-right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
+  for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
 -update decorative end cut to use front face axis as the angle direction
 -revisit how to do LHS menu for drawing mode...
 -get rid of the "draw" button, instead it should show up in the selection view and probabyl show a warning indicating "kumiki prefers that drawings are written with code, but manual drawing issuppotr here..."
@@ -155,7 +155,6 @@ DONE-sliding dovetail (maybe you want tapered variants)
 
 -make parameters human readable
 -fix tusk failing from other direction bug
--label the gizmo lol
 -create helper method for building cut timber from list of joints
 -house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
