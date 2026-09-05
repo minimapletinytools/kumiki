@@ -475,7 +475,6 @@ def cut_practice_path_extrusion_corner_end_decoration(
 
 def cut_practice_straight_angled_end_cut_decoration(
         timber: BlockLike, 
-        timber_end: TimberEnd, 
         front_face: TimberFace, 
         position_from_end: Numeric,
         angle: Numeric = degrees(0),
@@ -483,8 +482,6 @@ def cut_practice_straight_angled_end_cut_decoration(
     ) -> Joint:
     """
 
-            angle_towards_face
-            v
     ____________
     front_face  \\      <-timber_end
     _____________\\
@@ -493,10 +490,8 @@ def cut_practice_straight_angled_end_cut_decoration(
         timber: the timber to have the decoration cut on it
         timber_end: the end of the timber the decoration is cut on
         position_from_end: distance from timber_end along the timber's centerline where the angle cut plane lies 
-        angle: angle to make the cut, 0 is perpendicular, 
+        angle: angle to make the cut, 0 is perpendicular, angle is in the front_face axis
         front_face: the face that the angle cut is visible from
-        angle_towards_face: the face that the cut angles towards, so when angle > 0, this face will have more cut away from it than the opposite face, by default this is either RIGHTo rFRONT (based on front_face)
     """
-    # TODO assert  front_face and angle_towards_face are orthogonal
     # TODO finish
     pass
