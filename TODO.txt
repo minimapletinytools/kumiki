@@ -1,319 +1,5 @@
 
-
-
-
-:: 9/2/2026 viewport editing in drawing mode
-
-viewports come in 2 variations, floating and grid
-
-grid viewport can be "split" in either axis, etiher appending ot the current list or creating a sub list depending on conext
-
-floating viewports float
-
-you cna select viewports via the LHS menu, or I guess if you click but don't drag, you will "select" thev iewport
-
-you can resize viewports with the drag modal thing after selecting them, rgid stuff is resized appropritaely
-
-you can delete viewport,s but not the last grid viewport?  Or if you can, yo uneed a way to create the first grid viewport
-
-viewports should probbaly carry their own preview and render to file render settings?
-
-:: 8/28/2026 drawing mode
-
-lets focus in a it on where this is all leading too now hich is creating a drawing mode. 
-
-In drawing mode, there is a subset of timbers being renderd from multiple camera angles usually in orthographic mode (e.g. front/left/back/right orthogonal view + perspective preview) so we want to look into refactoring kigumi mode in preparation for this support. 
-
-Thus kigumi will need to support distinct views of the same data with distinct scene view states and esaily be able to switch between them. So this is at the core of the refactor we need to do. Don't be shy about refactoring code. the current code is rather carelessly written so be bold about proposing changes or just cleanin gup the existing code in general as the kigumi state is getting icreasingly big where better organizaiton is needed. Here are the notes for drawing mode, do some research to understand the problem better, ask me many questions, and we'll build a plan togethe.
-
-
-
-
-we want to support multiple views for planning and drawing in the same window
-
-To enter drawing mode on a set of timbers:
--hide all timbers not in the set from the timber list in the LHS
--joints containing set timbers are shown, the rest are hidden
-  -CutTimbers underneath joints that contain set tmibers can be greyed out or hidden
--hide all stuff not in the set
-
-drawing mode may come with a blueprint camera angle lock:
--clicking and dragging does rotate camera by a bit but it snaps back when you release
--panning and zoom is still allowed (note zoom is change view frustum not moving camera in/out, I'm not sure how zoom is currently implemented)
--a blueprint camera angle lot consists of a +x and +y vector, and a look at direction that must be orthogonal
-  -measurement marks are placed relative to the blueprint camera angle
-
-in drawing mode, there should be a button somewhere that says "leave drawing" to return out of it
-
-eventually we will add a concept of "measurements" which are a set of fetaures that have measurements for them being rendered
-upon entering drawing mode, we will likely change to a different set of measurements being displayed
-so there should be a concept of a measurement set taht's being rendered (and the user can modify) that may change when you change focus.
-note that the non drawing scene can also render measurements, but in drawing mode measurements can reference the blueprint camera angle
-
-to enter drawing mode, for now, we can convert a selection into drawing mode (just for testing)
-
-the tree view now has a measurement section showing all the measurements for the current drawing set
-
-drawing sets include:
--the entire frame
--slices
--individual timbers
--perhaps some new tag type for drawing sets that aren't slices
--arbitary selections (for testing, but I guess the drawing generator may decide to group arbitarry selections into one drawing group)
-
-the measurement set is generated as follows
--first check if python exported any measurements together with the frame (to be added)
--next read some measurement spec file that matches the program file name to get any user added override spec for each drawing set.
-
-:: 8/23/2026 drawing details
-
--improve footprint system
-  -allow adding slice lines from the footprint and also auto derive slice lines from the footprint boundary
-  -slice lines are tagged with slice tag (see below)
-DONE-improve tagging system
-  -tags become typed, if a vanilla string is passed in, it gets converted to arbitrary
-    -slice: user defined slice sections, although there should maybe be a slice creation function that creates a slice from a slicing plane. (these need to get passed into the final frame too) 
-    -member: enum type that takes values mudsill, post, joist, girt, brace, rafter, tie_beam, etc. These will have their own default marking instructions in the drawing system
-    -generic: for user space stuff
-  -for now, there sholud be > in the tree view that expands a list of tags (different ypes have different colors, but they all have a string name that's displa1yed). click selects everything with that tag, shift click adds tagged stuff to selection.
-    -in the other direction, if a tag is partially selected, highlight it and put a * in it. Or just auto collapse the tag section if we do our own selection if computing the reverse is too annoying. 
-
--plan generator: plans are for positioning multiple timbers in a frame
-  -plans are generated based on slices
-    -only timbers in that silce are shown
-    -a timber can be in many slices of course
-    -would be cool to have a 3d plan view, and this can be done with a non axis aligned slice that everything gets thrown into
-  -timbers in each slice are joint-aware, so timber ends butting into joints or corners on both ends don't  need their length marked 
-    -??this is tricky though, we nede a new parameter on the joint to indicate its position can be determined from a perfect face of another timber
-  -when generating plans for ecah slice, we can customize each timber, e.g. drawn from centerline, or drawn for outside,/inside, use ladder
-    -these can be overriden with defaults based on member tags
-  -each slice will pre process the members in it attempting to categorize by its position
-    -touching bottom or close to bottom
-    -horizontal/vertical
-    -organize parallel members from left to right, top to bottom
-    -figure out which members butt into other members
-
--drawing generator: drawings are for marking joints on a timber
-  -some features can be tagged
-    -measure locally, which indicates they should be measured to local featuers of that joints
-    -measure locally from, which indicates what other local feature they should eb measured from
-    -must be marked
-    -marking optional
-    -never mark
-  -we want to indicate which feature to be measured globally
-    -so for example, we may choose th ecenterline of tenon to be measured globally,
-    -can be proiritized listo f features to pick from, and that gives the algo some flexibility to pick the most appropritae feature
-  -do we need jonit level tagging so fjoint level measurement styling? (or maybe feature level tagging is sufficient)
-    -one thing is that some joints may have many many features (e.g. from notching) but most of them don't need to be marked... but maybe by default all features are unmarked unless tagged?
-  -do we need an override mechanism for feature styling?
-    -so for example, a cut timber with multiple of the same mortises may want to disable local feature marking on all but one mortise
-
--feature solving
-  -come up with al ist of all features to be solved
-  -ensure every feature can be fully measured from every other featuer
-  -solve requirements
-    -faces: needs point and normal
-    -edges: 2 points, or 1 point and direction
-    -point: 1 point
-    note that normal/direction can be solved against the drawing orthographic orientation
-
--drawing edit mode
-  -shows drawing dimensions in viewer
-  -user can drag to reposition measurements or add new labels to them
-  -user can delete measurements
-  -user can create new measurements by picknig 2 measureable features
-  -upon save, writes a file that gets read by the drawing generator to override auto generated drawings
-
-:: 8/22/2026 drawing ruminations
-
-We're getting ready to add some general measurement related features. Here are some larefgly disorganized note,s please do some research of what's in the code already and what's needed to achieve the features we want.
-
--in kigumi you can select timbers, once at imber is selected, you can then select some face fetaures on the timbers.
--it appears not all face features can be selected. what are the rules for what face features can be selected?
--how are face features selected, in particular, how do we map it back to the CSG tree
--we have named features and features derived from the cSG geometery, (they are suppose to map from each other, but currently it's just the test_point function, we need to add more abilities to select named features from points that were raycasted on the meshed geometry)
-
-some questions on how we want to proceed
-
--we want to be able to identify certain face intersections in the CSG tree, there should be some general rule for which intersecting faces produce edges, for now lets go with the following
-  -define 3  face groups A B1 B2 C (we may add more in teh future)
-    -features in group A intersect with featuers in B1 and B2
-    -fetaures in group B2 interesct with themselves
-    -fetaures in group C intersect with themselves
-  -I think for new we can keep it simple, we just need group A and group. B1. by default, all of the perfect timber within long faces go into B1 and all named fetaures go into group A, but the above is what a mor egeneral system could look like
-
--we want to build out the rest of the CSG feature class, so it should support points, edges, faces. Note that points and edges. 
-  -note that a CSG feature may not correspond to acutaly geometry, we should probably be able to tag CSGfeature as real geometry or not
-    -real geometry may get cropped by the CSG tree so when selecting for real geometry, it FIRST tests the actual triangulated CSG geometrey before testing the CSGFeature
-    -non-real geometry can get tested without checking against triangulated geometry first as CSG operations do not affect it
-
-To help inform the above, here are the user facing features we ultimately want to build on top of thi ssystem
-
-1. we want to improve fetaure selection display, it should be multi lined  
-  -feature type
-  -joint the feature came from
-  -maybe show the feature highlighted within the CSG tree (expandable)
-  -which local face on the timber it most points towards
-
-2. the ability to "store" 1 selected feature in kigumi, and then click on other features to create measurements that render in the kigumi viewer. these measurements can be saved so that we can keep making more selections to show more measurements. 
-  -Dont' worry about UI for this right now, just make sure it's possible to select the features we want
-  -in addition, 2 features need to be able to be measured relative to each other and this follows a set of rules e.g.
-    -2 parallel edges measures the distance between the 2 edeges as if they were infinite lines
-    -2 parallel faces similar
-    -ponit and face/line measures the projected distance
-    -etc
-  -when rendering measurements, each type measurements renders in a different way, general speaking distances have 2 lines that come out of the points being measured and then a line drown between thoes 2 lines with the distance label on it.
-    -we should be able to customize how this looks a little bit on a per mesaurement basis, but don't worry about teh UI for this just yet, just so long as the funcitonality is there.
-  -non real CSG features may need to be rendered so that the user knows they can cilck on it (e.g. center axis of a peg hole)
-    -we also need some way to determine when to prioritize non real geometry vs clicking on the real geometery, I think in general we can always just prioritize non real geometry, but make sure things like cylinder axis aren't too long (i.e. cropped to the faces in the case of a peg hole)
-  -accessories are excluded from this
-
-3. automatic drawing eneration, thisi s a complicated topic, but the main thing relevant to us here is that we need to be able to tag certain named features to nidicate they should be measured in a certain way for the drawing generatino algorithm to do its magic. I need to work through the details, but here are a couple of use case examples
-  -timbers may have a reference edge which all measurements should be taken from where possible
-  -measurements may alos be taken from rough faces of the timebr if they match the perfect timber within dimensions
-  -timbers have rough faces that do not match their perfect timber within dimensions, measurements should never be taken from rough faces (there may be some exceptions such as for certain features tagged as "Decorative" though)
-  -if no face matches perfect timber within dimenisons, we may need to render a perfectt timber within wireframe to take measurements from
-  -we may want to take a "ladder" of measurements for eaxmple a series of mortise holes, where each measurement is taken from the previous, this would be across several joints, or within a joint
-  -within a joint, we may want to say certain features are always preferred to be measured local to another feature of that joint, for example peg holes are measured local to the centerline of the tenon and the joint shoulder
-  -in general we want to ensure every named feature can be derived somehow, but we may have some ability to turn off features needing to be measured, for eaxmple a series of mortise holes where each hole is the same size
-
-
--followups
-  -I think in general we can always just prioritize non real geometry, but make sure things like cylinder axis aren't too long (i.e. cropped to the faces in the case of a peg hole)
-  -+1 to That argues for promoting named_features from List[Tuple[str, Face]] to a small dataclass with name, group, and later measurement tags.
-  -add epsilon parmeter to test functions in cutcsg.py
-  -for intersecting planes, we simply test if the point is on both planes in question right, and that deals with the infinite line issue. I tihnk in some sense CSG featuer is implicitly bound by points being on the boundary or contained in the CSG featuer itself. note though that we may eventually have face features that aren't complete faces e.g. just a lower triangle of a prism face or something. 
-  -+1 to Naming. An edge derived from two faces needs a stable identity for ladders and drawing references. The obvious one is the ordered pair of parent feature names, which also makes it human-readable in a breadcrumb.
-  -PTW faces may need special treatment as when we generate the CSG tree we use the rough CSG of the timber, at the very least we should do the following
-    -both the PTW and rough timber CSGs should have special reserved names so that their faces can ALWAYS be uniquely identified and any timber will only have 1 set of these faces
-    -in viewer mode, we may either render PTW, rough timber, or both. 
-      -for now measurements are only drawn if the feature is being rendered
-      -we may eventually want to show PTW measurements when rendering teh rough timber, lets put a pin on it, 
-  -RE feature 1
-    -can we add some additional metadata to CSG, so that a CSG can be attributed to a joint? seems like a nice to have for organizational reasons even if not necesasry
-    -I still want to be able to show the entire CSG feature tree in an expandable drop down, very useful for debugging
-      -click on the tree hierarchy highlighs the fetaure, clicking on the feature selects in the hierarchy
-  -RE feature 2
-    -one consideratino here is we need to know where to draw the measurement lines too. It's helpful to know at least the bounds of the feature being selected (exact geo may not be necessary)
-      -for edges we want to know its ends
-      -for faces we want to know its approximate "center"
-  -RE feature 3
-    -lets add awraning instead if reference face is not a perfect face, I think there may be cases where there are no perfect faces but we still pick an arbitrary face to pull all measurements from and render the internal PTW face in this case to show measurements
-    -I think we should be able to support center planes. I think we need to add the 2 LongCenterPlane to the timber fetaur eenum so that they can be reference here
-    -mark a TODO, we should consider changing reference_faces to a list of reference FEATURES that are chosen in order of priority to take measurements from. that's more generic, and then drops the rough == perfect requirement
-
-
-
-
-
-
-
-::: 7/29 board notes
-
-board related joints
-
--you should do the FauxTimber thing again that changes the timber orientation so you can use existing cuts on it. Make sure to convert the maybe end cuts into actual cuts when rotating back
--multi morise and tenon
-  -this could be a compound joint helpre that calls morties and tenon joint in a regular pattern
--wooden hinge joint :O
--reinforced_butt_joint(reinforcement_parameters) could be bsicuti, dowel spline, pocket hole screw, etc (maybe separate function for ecah is better)
--reinforced_edge_joint
--reinforced_corner_butt_joint
--reinforce_corner_miter_joint
--dovetail_corner_joint
--Half-blind dovetail corenr joint
--route-a-corner/edge
-  -corner
-    -rabet_corner_joint/rabet_edge_joint (single/dobule variants)
-    -drawer lock joint, there are 2 variants, one with a double and one tha's a sigle and dado mayb ecall the single and dode one a dado and rabet joint
-  -Breadboard end (this is an end to edge dado joint)
-  -shiplap
-  -cleat joint (not really a joint)
-  -dado_joint (edge to face)
-
-DONE-sliding dovetail (maybe you want tapered variants)
-  -the tricky thing about this is th edovetail can be on edge or end...
--blind housed dovetail
--splined miter joint
--bridge joint(just tongue nad fork)
--haunched tenon lol ugh
--finger corner joint (or box joint)
--finger splice joint 
--make some placeholders for the 
--rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
-
-
-
-
-
-:: TODO
-DONE-review feature referencing in kumiki
-  DONE-create feature enum point/edge/face and support them
-  DONE-CSGfeature class should return more info about the feature
-    -face features need to beintersectable with another face for edges
-    -edges can be intersected with face for point,s but we don't actually need this
-  DONE-we need some special face treatment
-    -figure out when faces intersect via union/interseciton/difference
-    -if 2 named face features intersect thisp roduces a named edge feature,
-      -careful that you don't end up with too many of these if you have several such CSG operations
-        -I think in most cases you'd rather a prism define its own edge feature then rely on intersecting
-      -in general the one place we really need this is where the shoulder plane intersect the PTW faces of the timber, so PTW timber faces are kinda special in this sense
-DONE-cleanup notching code lol...
-DONE-think about how to reverse map selected face into feature (already works I guess but maybe the code is a bit dodgy)
-DONE-add cutcsglables to everything
-IGNORE/DONE-name all the rest of your joints
-DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a project?)
-DONE-don't show accesories in timber list ivew.. tehy should only show under jonits
-DONE-add cutcsglabels to build a butt
-IGNORE-feature listing in tree weirdness to sort out:
-DONE-finish cutcsg lables in relief.py
-DONE-test edge selection and in particular face face intersecting edges (doesn't seem to work)
-  -Derived edges still don't appear in the trees. I leaned toward omitting them, since they're computed per query from face pairs rather than declared on a node, so listing them per node would misrepresent them — but you never confirmed that.
-    -so maybe remove regular features from CSG tree. I don't think they show anyways? Also ok just to show them. you can add get_known_features which may not return all fetaures or something like that. 
-    -they never show up anyways right now, so this is moot
-  -in general this is a weird thing where we know the CSGtree statically, but only its features are knowwn when you click nad raycast, I think that's fine. the name feature can still show up undernearth the CSG tree it's a part of but it disappears when you unselect it.
-  -you can maybe consider an edge a sub feature of a named face feature,
-  -which feature does the edge belong to? what to show selected in the tree? (maybe just pick the deepest node, but show both trees in the selectino view)
-DONE-make select all the way down to feature the default behavior, and then ctrl clikc to select one level at a time (opposite of what it is right now)
-DONE-add N/S/E/W labels to the cube
-DONE-show rough mesaurements in selectino view when eselecting single elemnts
-DONE-drawing mode fixes
-  DONE-don't show footprint in drawing mode, acutally keep this option available for the future, but right now it's always hidden.
-  DONE-zoom is backwards in drawing view
-  DONE-3d perspecive view in drawing should attempt to rotate camera so as much of teh timber fits in the viewport as possible. this is actually done by the thing that psasse the camera/viewport settings into the drawing panel rather than the drawing itself of course.
-  DONE-there are 2 camera types for teh 3d perspcetive viewport (again, this is set by the thing  that passes the info into the drawing panel, so it may need to beserializable like the current viewport/camera settings)
-    -for multiple timbers, as it is right now
-    -for single timbers, allow free rotation along the timber axis only
-DONE-switthing from one drawing to another while in drawing mode will break the camera sanpping behavior
-  -actualyl camera anglesa re broken in general in drawing mode... they don't seem to be consistent each time I reopen
-DONE-fix background in ortho drawing
-DONE-shoulder_scribe_relief should not use rough.right... as feature name.. please reserve rough/perfect.right for the timber itself
-
-DONE-Fix the feature stable reference issue: 
-  No — and that's a real gap. The #n only goes on the joint segment, which is the top-level Difference's subtract children. Everything below that stays bare, deliberately: _navigate_csg_one_level numbers only when number_joints is set, which happens exactly once, on the first call from _navigate_csg_to_leaf against the timber's own rendered Difference.
-
-  So two prisms sharing a label inside one SolidUnion, or inside a nested Difference deeper in a joint's own geometry, produce identical path segments today.
-
-  What each of the three walkers does with that ambiguity:
-
-  - _resolve_csg_at_path is the one that copes best. It parses every segment through ResolvedJointPath.parse, so if a deeper segment ever did carry #n it would honour it. And when several candidates share a name with no occurrence given, it falls back to the pre-existing geometric tiebreak — preferring whichever child's boundary contains local_pt. That works for a click but not for a stored reference, since a saved path has no point attached.
-  - _find_csg_by_labels (what resolve_anchor uses below the joint segment) just compares bare names and returns the first child that matches — the same silent first-wins the joint occurrence was introduced to kill, only one level down.
-  - _serialize_csg_node numbers only the aligned top-level subtract children, so the tree payload's deeper segments are bare too.
-
-
-DONE-TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
-DONE-consider dropping kind from measurement identity when checking for override on python 
-DONE-add realtime feature raasting as you move your mouse....
-
-DONEDONE-on cofee table, we're getting {"feature":"tenon_left×rough.front"} -- NOT coplanar, they are perpendicular and that edge is real. Tenon faces are FeatureGroup.NONE now so they form no edges at all
-  DONE-parallel faces should never intersect as features
-  DONE-make suer tenon_left is not in a intersection group with rough.front. I think tenon_left does not need to be in any intersection group for now actually.
-DONEDONE-why do edges extend beyond their actual bonudaries...  (it was the edge tolerance widening both ends; extent is clipped exactly now)
-DONE-save settings buttons needs to move to panel header, not in the 3d view section.
-DONE-debug drawing should be a button not a checkbox in the options view, 
-DONE-increase edge selsection threhsold...
-DONE-add ability to select timber LONG edges as explicit named features (rough.front_left etc). END FACE edges are still not named -- an end face meeting each long face is a different set of four
--conisder naming short edges on timber as well
+:: 9/5/2026
 -name all features
   -consider giving a default feature set to each CSG primitive and allow named features to reference them? but it's better just to name all the featuers I think...
     -it could be weird as this creates cases where there are unnamed features that can't be selected and it looks buggy... so instead if we have default efatues we can highlight them but not click on them at least (indicating this is a non mesaureable feature)
@@ -376,26 +62,63 @@ DONE-add ability to select timber LONG edges as explicit named features (rough.f
      is computed lazily AFTER the first test_point succeeds) and should restore
      most of the early-out for the non-declaring primitives. not measured yet.
 
+
+
+
+
+::: 7/29 board notes
+
+board related joints
+
+-you should do the FauxTimber thing again that changes the timber orientation so you can use existing cuts on it. Make sure to convert the maybe end cuts into actual cuts when rotating back
+-multi morise and tenon
+  -this could be a compound joint helpre that calls morties and tenon joint in a regular pattern
+-wooden hinge joint :O
+-reinforced_butt_joint(reinforcement_parameters) could be bsicuti, dowel spline, pocket hole screw, etc (maybe separate function for ecah is better)
+-reinforced_edge_joint
+-reinforced_corner_butt_joint
+-reinforce_corner_miter_joint
+-dovetail_corner_joint
+-Half-blind dovetail corenr joint
+-route-a-corner/edge
+  -corner
+    -rabet_corner_joint/rabet_edge_joint (single/dobule variants)
+    -drawer lock joint, there are 2 variants, one with a double and one tha's a sigle and dado mayb ecall the single and dode one a dado and rabet joint
+  -Breadboard end (this is an end to edge dado joint)
+  -shiplap
+  -cleat joint (not really a joint)
+  -dado_joint (edge to face)
+
+DONE-sliding dovetail (maybe you want tapered variants)
+  -the tricky thing about this is th edovetail can be on edge or end...
+-blind housed dovetail
+-splined miter joint
+-bridge joint(just tongue nad fork)
+-haunched tenon lol ugh
+-finger corner joint (or box joint)
+-finger splice joint 
+-make some placeholders for the 
+-rice dumpling joint (or Zongjiaosun / 粽角榫 ??? I think its baojiansun
+
+
+
+
+
+:: TODO
+
+
+-conisder naming short edges on timber as well
 -make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
   -welly oush ould force show lines for PTW faces (maybe light grey)
   -and you should highlight the refreence edge as wel if there is one in drawing mode
   -or just add an option in general to highlight the reference edge for 3d view mode as well
-
-
 -conisder just shippingthe defalut drawing with every frame by fdefault
 -add support for 3d measurements
   -maybe there should be a spceial drawing that's available in regular view mode...
-
-
-
-
 -consider refactoring runner.py
-
 -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
   for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
-
-
--erdo website w/ actually how the program works details
+-redo website w/ actually how the program works details
   -do the sliding navigation galrlery thing at the top
   -rephrase as "programmatic cad"
   -first clickable bullet: program your frames
@@ -409,48 +132,34 @@ DONE-add ability to select timber LONG edges as explicit named features (rough.f
     -automatic generation -> customize in code -> manual override in kigumi
   -assembly generation (BETA)
     -assembly video
-
 -update decorative end cut to use front face axis as the angle direction
-
-
-
-
 -revisit how to do LHS menu for drawing mode...
 -get rid of the "draw" button, instead it should show up in the selection view and probabyl show a warning indicating "kumiki prefers that drawings are written with code, but manual drawing issuppotr here..."
 -give viewports labels
 -add background border for drawing...
 -fix lighting in ortho drawing
-
-
-
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
-
 -add proper reference face/edge support to timbers
   # TODO consider replacing with a list of reference long features taken in order of priority, with the first one being the main one that gets rendered as a red line?
     reference_faces: Optional[tuple[str, ...]] = None
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
-
-
 -more selection related things
   -selecting on face features visualy selects all faces that coincide with that one when extended to infinity, see if you can localize the visuall yselection...
     -this also happens with edges (try selecting an edge on one of the plates in tinyhous120)
   -there are some redundant solid unions (only 1 element contained) that could be ad-hdoc skipped when click drilling into a timber
     -also consider disabling the 1 step at a time drilling into a feature, it's not really all that necessary.
   -should show perfect.face not rough.face if rough == perfect?
-
 -create halfspace decorative cut 
-  
+
 -make parameters human readable
 -fix tusk failing from other direction bug
 -label the gizmo lol
 -create helper method for building cut timber from list of joints
 -house joint seems to be broken withp lain miter joints?? the house timbers get flipped wtf
-
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
-
 -rename/reorg all mortise and tenon joints
   DONE-mortise_and_tenon_join/...
   DONE-delete 45 degree relative tenon size, basic, 
@@ -466,7 +175,6 @@ DONE-add ability to select timber LONG edges as explicit named features (rough.f
 -add STL mesh support shouldn't be hard :O
   -make a cabriole leg table example 
     -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
-
 -consider doing the big 1 joint per file reorg
   -decide how to reorg examples too...
   -maybe get ird of folder + example support, examples are always leaf nodes?
@@ -474,15 +182,12 @@ DONE-add ability to select timber LONG edges as explicit named features (rough.f
 -add shouder to cross lap joint
   -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
   -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
-
 -update shed example to include panels
   -make a video about this maybe after you do some more edge joints
-
 -patern book changes
   -timber ticket names sholud get praented in a new folder matching their pattern name when the entire pattern file is opened together in kigumi, same with joint ticket names (i.e. some_timber -> pattern_name/some_timber)
   -view source button should search for the pattern name and jump to it in the source file when youc lick it, same with duplicate source if possible
 -maybe add a changes detected, refresh kigumi sidebar button at teh top or osmetihng... or just enable aut refresh fml and have a setting to turn it off.
-
 -enable potato (scribe) notching on the remaining joints?
 -update wedged half dovtail to support shoulder shapes and peg
  -create simple build-a-butt helper function that lets you configure which shoulder and tenon shape yo uwant
@@ -495,16 +200,12 @@ DONE-add ability to select timber LONG edges as explicit named features (rough.f
   -examples should maybe get pathed somehow? use actual floder paths and hardcode drop all top level folders that all patterns exist in for that lbirary
   -"Example Frames" -> "Examples"
 -selecting cylinders, their surfaces render over the ends, I guess atht's probably intentional TBH...
-
-
-
 -new kigumi icon
   DONE-make suer to update the sidebar icon as well
 -add an optional scale ruler to the view and havei t default off
 -maybe do a logging pass? (add logging levels for python stuff so agent and adjust level)
 -add sensibility checks to arrangement (so basically they intersect at least a little bit)
   -maybe add a generic check intersection function so we can get more precise about it within the joit fuctions.
-
 -consider adding in some config object that gets passed through all functions (well ilke one dumpall objcet for joints, etc, so you can easily add carp to it)
 -you want to add some structural patterns too (all the ones in your agent_usage_insturctions.md)
 -add searching + tag searching functionality on top of the patternbook/frames/examples in the sidebar
@@ -514,9 +215,7 @@ DONE-add ability to select timber LONG edges as explicit named features (rough.f
 -you broke notching on mortise and tenon joint again
 -look into promoting some plain joints
 -rewrite accessories as timbers probably, so you can leverage any drawing capabilites that are added to timbers in the future 
-
 -add more tests using the right way
-
 -assembly
   -rename dissamebly to tatamae LOL`
   -make assembiles work in patterns
@@ -567,6 +266,72 @@ DONE-add ability to select timber LONG edges as explicit named features (rough.f
 
 
 :: TODONE 
+DONE-review feature referencing in kumiki
+  DONE-create feature enum point/edge/face and support them
+  DONE-CSGfeature class should return more info about the feature
+    -face features need to beintersectable with another face for edges
+    -edges can be intersected with face for point,s but we don't actually need this
+  DONE-we need some special face treatment
+    -figure out when faces intersect via union/interseciton/difference
+    -if 2 named face features intersect thisp roduces a named edge feature,
+      -careful that you don't end up with too many of these if you have several such CSG operations
+        -I think in most cases you'd rather a prism define its own edge feature then rely on intersecting
+      -in general the one place we really need this is where the shoulder plane intersect the PTW faces of the timber, so PTW timber faces are kinda special in this sense
+DONE-cleanup notching code lol...
+DONE-think about how to reverse map selected face into feature (already works I guess but maybe the code is a bit dodgy)
+DONE-add cutcsglables to everything
+IGNORE/DONE-name all the rest of your joints
+DONE/IGNORE-allow multiple footprints in a frame (or allow multipl eframes in a project?)
+DONE-don't show accesories in timber list ivew.. tehy should only show under jonits
+DONE-add cutcsglabels to build a butt
+IGNORE-feature listing in tree weirdness to sort out:
+DONE-finish cutcsg lables in relief.py
+DONE-test edge selection and in particular face face intersecting edges (doesn't seem to work)
+  -Derived edges still don't appear in the trees. I leaned toward omitting them, since they're computed per query from face pairs rather than declared on a node, so listing them per node would misrepresent them — but you never confirmed that.
+    -so maybe remove regular features from CSG tree. I don't think they show anyways? Also ok just to show them. you can add get_known_features which may not return all fetaures or something like that. 
+    -they never show up anyways right now, so this is moot
+  -in general this is a weird thing where we know the CSGtree statically, but only its features are knowwn when you click nad raycast, I think that's fine. the name feature can still show up undernearth the CSG tree it's a part of but it disappears when you unselect it.
+  -you can maybe consider an edge a sub feature of a named face feature,
+  -which feature does the edge belong to? what to show selected in the tree? (maybe just pick the deepest node, but show both trees in the selectino view)
+DONE-make select all the way down to feature the default behavior, and then ctrl clikc to select one level at a time (opposite of what it is right now)
+DONE-add N/S/E/W labels to the cube
+DONE-show rough mesaurements in selectino view when eselecting single elemnts
+DONE-drawing mode fixes
+  DONE-don't show footprint in drawing mode, acutally keep this option available for the future, but right now it's always hidden.
+  DONE-zoom is backwards in drawing view
+  DONE-3d perspecive view in drawing should attempt to rotate camera so as much of teh timber fits in the viewport as possible. this is actually done by the thing that psasse the camera/viewport settings into the drawing panel rather than the drawing itself of course.
+  DONE-there are 2 camera types for teh 3d perspcetive viewport (again, this is set by the thing  that passes the info into the drawing panel, so it may need to beserializable like the current viewport/camera settings)
+    -for multiple timbers, as it is right now
+    -for single timbers, allow free rotation along the timber axis only
+DONE-switthing from one drawing to another while in drawing mode will break the camera sanpping behavior
+  -actualyl camera anglesa re broken in general in drawing mode... they don't seem to be consistent each time I reopen
+DONE-fix background in ortho drawing
+DONE-shoulder_scribe_relief should not use rough.right... as feature name.. please reserve rough/perfect.right for the timber itself
+
+DONE-Fix the feature stable reference issue: 
+  No — and that's a real gap. The #n only goes on the joint segment, which is the top-level Difference's subtract children. Everything below that stays bare, deliberately: _navigate_csg_one_level numbers only when number_joints is set, which happens exactly once, on the first call from _navigate_csg_to_leaf against the timber's own rendered Difference.
+
+  So two prisms sharing a label inside one SolidUnion, or inside a nested Difference deeper in a joint's own geometry, produce identical path segments today.
+
+  What each of the three walkers does with that ambiguity:
+
+  - _resolve_csg_at_path is the one that copes best. It parses every segment through ResolvedJointPath.parse, so if a deeper segment ever did carry #n it would honour it. And when several candidates share a name with no occurrence given, it falls back to the pre-existing geometric tiebreak — preferring whichever child's boundary contains local_pt. That works for a click but not for a stored reference, since a saved path has no point attached.
+  - _find_csg_by_labels (what resolve_anchor uses below the joint segment) just compares bare names and returns the first child that matches — the same silent first-wins the joint occurrence was introduced to kill, only one level down.
+  - _serialize_csg_node numbers only the aligned top-level subtract children, so the tree payload's deeper segments are bare too.
+
+
+DONE-TODO should we enforce canonical ordering on anchor_a / anchor_b, we can create a new class CanonicalFeaturePathPair or something
+DONE-consider dropping kind from measurement identity when checking for override on python 
+DONE-add realtime feature raasting as you move your mouse....
+
+DONE-on cofee table, we're getting {"feature":"tenon_left×rough.front"} -- NOT coplanar, they are perpendicular and that edge is real. Tenon faces are FeatureGroup.NONE now so they form no edges at all
+  DONE-parallel faces should never intersect as features
+  DONE-make suer tenon_left is not in a intersection group with rough.front. I think tenon_left does not need to be in any intersection group for now actually.
+DONE-why do edges extend beyond their actual bonudaries...  (it was the edge tolerance widening both ends; extent is clipped exactly now)
+DONE-save settings buttons needs to move to panel header, not in the 3d view section.
+DONE-debug drawing should be a button not a checkbox in the options view, 
+DONE-increase edge selsection threhsold...
+DONE-add ability to select timber LONG edges as explicit named features (rough.front_left etc). END FACE edges are still not named -- an end face meeting each long face is a different set of four
 
 DONE-Fix tag → label in runner.py
 DONE-Give the kumiki feature API a tolerance, then delete the float shadow, tolerance parmeter defaults to a new feature_test_epsilon or osemtihing that's a little bigger than the generi cone
@@ -1729,7 +1494,212 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 
-:: END TODONE
+:: ARCHIVE
+
+
+:: 9/2/2026 viewport editing in drawing mode
+
+viewports come in 2 variations, floating and grid
+
+grid viewport can be "split" in either axis, etiher appending ot the current list or creating a sub list depending on conext
+
+floating viewports float
+
+you cna select viewports via the LHS menu, or I guess if you click but don't drag, you will "select" thev iewport
+
+you can resize viewports with the drag modal thing after selecting them, rgid stuff is resized appropritaely
+
+you can delete viewport,s but not the last grid viewport?  Or if you can, yo uneed a way to create the first grid viewport
+
+viewports should probbaly carry their own preview and render to file render settings?
+
+:: 8/28/2026 drawing mode
+
+lets focus in a it on where this is all leading too now hich is creating a drawing mode. 
+
+In drawing mode, there is a subset of timbers being renderd from multiple camera angles usually in orthographic mode (e.g. front/left/back/right orthogonal view + perspective preview) so we want to look into refactoring kigumi mode in preparation for this support. 
+
+Thus kigumi will need to support distinct views of the same data with distinct scene view states and esaily be able to switch between them. So this is at the core of the refactor we need to do. Don't be shy about refactoring code. the current code is rather carelessly written so be bold about proposing changes or just cleanin gup the existing code in general as the kigumi state is getting icreasingly big where better organizaiton is needed. Here are the notes for drawing mode, do some research to understand the problem better, ask me many questions, and we'll build a plan togethe.
+
+
+
+
+we want to support multiple views for planning and drawing in the same window
+
+To enter drawing mode on a set of timbers:
+-hide all timbers not in the set from the timber list in the LHS
+-joints containing set timbers are shown, the rest are hidden
+  -CutTimbers underneath joints that contain set tmibers can be greyed out or hidden
+-hide all stuff not in the set
+
+drawing mode may come with a blueprint camera angle lock:
+-clicking and dragging does rotate camera by a bit but it snaps back when you release
+-panning and zoom is still allowed (note zoom is change view frustum not moving camera in/out, I'm not sure how zoom is currently implemented)
+-a blueprint camera angle lot consists of a +x and +y vector, and a look at direction that must be orthogonal
+  -measurement marks are placed relative to the blueprint camera angle
+
+in drawing mode, there should be a button somewhere that says "leave drawing" to return out of it
+
+eventually we will add a concept of "measurements" which are a set of fetaures that have measurements for them being rendered
+upon entering drawing mode, we will likely change to a different set of measurements being displayed
+so there should be a concept of a measurement set taht's being rendered (and the user can modify) that may change when you change focus.
+note that the non drawing scene can also render measurements, but in drawing mode measurements can reference the blueprint camera angle
+
+to enter drawing mode, for now, we can convert a selection into drawing mode (just for testing)
+
+the tree view now has a measurement section showing all the measurements for the current drawing set
+
+drawing sets include:
+-the entire frame
+-slices
+-individual timbers
+-perhaps some new tag type for drawing sets that aren't slices
+-arbitary selections (for testing, but I guess the drawing generator may decide to group arbitarry selections into one drawing group)
+
+the measurement set is generated as follows
+-first check if python exported any measurements together with the frame (to be added)
+-next read some measurement spec file that matches the program file name to get any user added override spec for each drawing set.
+
+:: 8/23/2026 drawing details
+
+-improve footprint system
+  -allow adding slice lines from the footprint and also auto derive slice lines from the footprint boundary
+  -slice lines are tagged with slice tag (see below)
+DONE-improve tagging system
+  -tags become typed, if a vanilla string is passed in, it gets converted to arbitrary
+    -slice: user defined slice sections, although there should maybe be a slice creation function that creates a slice from a slicing plane. (these need to get passed into the final frame too) 
+    -member: enum type that takes values mudsill, post, joist, girt, brace, rafter, tie_beam, etc. These will have their own default marking instructions in the drawing system
+    -generic: for user space stuff
+  -for now, there sholud be > in the tree view that expands a list of tags (different ypes have different colors, but they all have a string name that's displa1yed). click selects everything with that tag, shift click adds tagged stuff to selection.
+    -in the other direction, if a tag is partially selected, highlight it and put a * in it. Or just auto collapse the tag section if we do our own selection if computing the reverse is too annoying. 
+
+-plan generator: plans are for positioning multiple timbers in a frame
+  -plans are generated based on slices
+    -only timbers in that silce are shown
+    -a timber can be in many slices of course
+    -would be cool to have a 3d plan view, and this can be done with a non axis aligned slice that everything gets thrown into
+  -timbers in each slice are joint-aware, so timber ends butting into joints or corners on both ends don't  need their length marked 
+    -??this is tricky though, we nede a new parameter on the joint to indicate its position can be determined from a perfect face of another timber
+  -when generating plans for ecah slice, we can customize each timber, e.g. drawn from centerline, or drawn for outside,/inside, use ladder
+    -these can be overriden with defaults based on member tags
+  -each slice will pre process the members in it attempting to categorize by its position
+    -touching bottom or close to bottom
+    -horizontal/vertical
+    -organize parallel members from left to right, top to bottom
+    -figure out which members butt into other members
+
+-drawing generator: drawings are for marking joints on a timber
+  -some features can be tagged
+    -measure locally, which indicates they should be measured to local featuers of that joints
+    -measure locally from, which indicates what other local feature they should eb measured from
+    -must be marked
+    -marking optional
+    -never mark
+  -we want to indicate which feature to be measured globally
+    -so for example, we may choose th ecenterline of tenon to be measured globally,
+    -can be proiritized listo f features to pick from, and that gives the algo some flexibility to pick the most appropritae feature
+  -do we need jonit level tagging so fjoint level measurement styling? (or maybe feature level tagging is sufficient)
+    -one thing is that some joints may have many many features (e.g. from notching) but most of them don't need to be marked... but maybe by default all features are unmarked unless tagged?
+  -do we need an override mechanism for feature styling?
+    -so for example, a cut timber with multiple of the same mortises may want to disable local feature marking on all but one mortise
+
+-feature solving
+  -come up with al ist of all features to be solved
+  -ensure every feature can be fully measured from every other featuer
+  -solve requirements
+    -faces: needs point and normal
+    -edges: 2 points, or 1 point and direction
+    -point: 1 point
+    note that normal/direction can be solved against the drawing orthographic orientation
+
+-drawing edit mode
+  -shows drawing dimensions in viewer
+  -user can drag to reposition measurements or add new labels to them
+  -user can delete measurements
+  -user can create new measurements by picknig 2 measureable features
+  -upon save, writes a file that gets read by the drawing generator to override auto generated drawings
+
+:: 8/22/2026 drawing ruminations
+
+We're getting ready to add some general measurement related features. Here are some larefgly disorganized note,s please do some research of what's in the code already and what's needed to achieve the features we want.
+
+-in kigumi you can select timbers, once at imber is selected, you can then select some face fetaures on the timbers.
+-it appears not all face features can be selected. what are the rules for what face features can be selected?
+-how are face features selected, in particular, how do we map it back to the CSG tree
+-we have named features and features derived from the cSG geometery, (they are suppose to map from each other, but currently it's just the test_point function, we need to add more abilities to select named features from points that were raycasted on the meshed geometry)
+
+some questions on how we want to proceed
+
+-we want to be able to identify certain face intersections in the CSG tree, there should be some general rule for which intersecting faces produce edges, for now lets go with the following
+  -define 3  face groups A B1 B2 C (we may add more in teh future)
+    -features in group A intersect with featuers in B1 and B2
+    -fetaures in group B2 interesct with themselves
+    -fetaures in group C intersect with themselves
+  -I think for new we can keep it simple, we just need group A and group. B1. by default, all of the perfect timber within long faces go into B1 and all named fetaures go into group A, but the above is what a mor egeneral system could look like
+
+-we want to build out the rest of the CSG feature class, so it should support points, edges, faces. Note that points and edges. 
+  -note that a CSG feature may not correspond to acutaly geometry, we should probably be able to tag CSGfeature as real geometry or not
+    -real geometry may get cropped by the CSG tree so when selecting for real geometry, it FIRST tests the actual triangulated CSG geometrey before testing the CSGFeature
+    -non-real geometry can get tested without checking against triangulated geometry first as CSG operations do not affect it
+
+To help inform the above, here are the user facing features we ultimately want to build on top of thi ssystem
+
+1. we want to improve fetaure selection display, it should be multi lined  
+  -feature type
+  -joint the feature came from
+  -maybe show the feature highlighted within the CSG tree (expandable)
+  -which local face on the timber it most points towards
+
+2. the ability to "store" 1 selected feature in kigumi, and then click on other features to create measurements that render in the kigumi viewer. these measurements can be saved so that we can keep making more selections to show more measurements. 
+  -Dont' worry about UI for this right now, just make sure it's possible to select the features we want
+  -in addition, 2 features need to be able to be measured relative to each other and this follows a set of rules e.g.
+    -2 parallel edges measures the distance between the 2 edeges as if they were infinite lines
+    -2 parallel faces similar
+    -ponit and face/line measures the projected distance
+    -etc
+  -when rendering measurements, each type measurements renders in a different way, general speaking distances have 2 lines that come out of the points being measured and then a line drown between thoes 2 lines with the distance label on it.
+    -we should be able to customize how this looks a little bit on a per mesaurement basis, but don't worry about teh UI for this just yet, just so long as the funcitonality is there.
+  -non real CSG features may need to be rendered so that the user knows they can cilck on it (e.g. center axis of a peg hole)
+    -we also need some way to determine when to prioritize non real geometry vs clicking on the real geometery, I think in general we can always just prioritize non real geometry, but make sure things like cylinder axis aren't too long (i.e. cropped to the faces in the case of a peg hole)
+  -accessories are excluded from this
+
+3. automatic drawing eneration, thisi s a complicated topic, but the main thing relevant to us here is that we need to be able to tag certain named features to nidicate they should be measured in a certain way for the drawing generatino algorithm to do its magic. I need to work through the details, but here are a couple of use case examples
+  -timbers may have a reference edge which all measurements should be taken from where possible
+  -measurements may alos be taken from rough faces of the timebr if they match the perfect timber within dimensions
+  -timbers have rough faces that do not match their perfect timber within dimensions, measurements should never be taken from rough faces (there may be some exceptions such as for certain features tagged as "Decorative" though)
+  -if no face matches perfect timber within dimenisons, we may need to render a perfectt timber within wireframe to take measurements from
+  -we may want to take a "ladder" of measurements for eaxmple a series of mortise holes, where each measurement is taken from the previous, this would be across several joints, or within a joint
+  -within a joint, we may want to say certain features are always preferred to be measured local to another feature of that joint, for example peg holes are measured local to the centerline of the tenon and the joint shoulder
+  -in general we want to ensure every named feature can be derived somehow, but we may have some ability to turn off features needing to be measured, for eaxmple a series of mortise holes where each hole is the same size
+
+
+-followups
+  -I think in general we can always just prioritize non real geometry, but make sure things like cylinder axis aren't too long (i.e. cropped to the faces in the case of a peg hole)
+  -+1 to That argues for promoting named_features from List[Tuple[str, Face]] to a small dataclass with name, group, and later measurement tags.
+  -add epsilon parmeter to test functions in cutcsg.py
+  -for intersecting planes, we simply test if the point is on both planes in question right, and that deals with the infinite line issue. I tihnk in some sense CSG featuer is implicitly bound by points being on the boundary or contained in the CSG featuer itself. note though that we may eventually have face features that aren't complete faces e.g. just a lower triangle of a prism face or something. 
+  -+1 to Naming. An edge derived from two faces needs a stable identity for ladders and drawing references. The obvious one is the ordered pair of parent feature names, which also makes it human-readable in a breadcrumb.
+  -PTW faces may need special treatment as when we generate the CSG tree we use the rough CSG of the timber, at the very least we should do the following
+    -both the PTW and rough timber CSGs should have special reserved names so that their faces can ALWAYS be uniquely identified and any timber will only have 1 set of these faces
+    -in viewer mode, we may either render PTW, rough timber, or both. 
+      -for now measurements are only drawn if the feature is being rendered
+      -we may eventually want to show PTW measurements when rendering teh rough timber, lets put a pin on it, 
+  -RE feature 1
+    -can we add some additional metadata to CSG, so that a CSG can be attributed to a joint? seems like a nice to have for organizational reasons even if not necesasry
+    -I still want to be able to show the entire CSG feature tree in an expandable drop down, very useful for debugging
+      -click on the tree hierarchy highlighs the fetaure, clicking on the feature selects in the hierarchy
+  -RE feature 2
+    -one consideratino here is we need to know where to draw the measurement lines too. It's helpful to know at least the bounds of the feature being selected (exact geo may not be necessary)
+      -for edges we want to know its ends
+      -for faces we want to know its approximate "center"
+  -RE feature 3
+    -lets add awraning instead if reference face is not a perfect face, I think there may be cases where there are no perfect faces but we still pick an arbitrary face to pull all measurements from and render the internal PTW face in this case to show measurements
+    -I think we should be able to support center planes. I think we need to add the 2 LongCenterPlane to the timber fetaur eenum so that they can be reference here
+    -mark a TODO, we should consider changing reference_faces to a list of reference FEATURES that are chosen in order of priority to take measurements from. that's more generic, and then drops the rough == perfect requirement
+
+
+
+
 
 :: 8/29/2026 tag hierarchy
 vertical
