@@ -253,6 +253,14 @@ const gallery = [
     viewport.style.height = `${panels[current].offsetHeight}px`;
   }
 
+  // Measured rather than expressed as a percentage: the step is one panel plus
+  // the gutter between them, and Chrome rejects the calc() that would say so.
+  function slide() {
+    if (!track || panels.length === 0) return;
+    const step = panels.length > 1 ? panels[1].offsetLeft - panels[0].offsetLeft : 0;
+    track.style.transform = `translateX(${-current * step}px)`;
+  }
+
   function select(index: number, focusTab = false) {
     if (!track || tabs.length === 0) return;
     const next = (index + tabs.length) % tabs.length;
@@ -269,7 +277,7 @@ const gallery = [
       if (i === next) panel.removeAttribute('inert');
       else panel.setAttribute('inert', '');
     });
-    track.style.transform = `translateX(-${next * 100}%)`;
+    slide();
     syncHeight();
     if (focusTab) tabs[next].focus();
     history.replaceState(null, '', `#${panels[next].id.replace('panel-', '')}`);
@@ -294,10 +302,11 @@ const gallery = [
 
   // The panel grows when its images arrive and when the column reflows, and
   // both happen after the height above was measured.
-  syncHeight();
-  window.addEventListener('resize', syncHeight);
+  function reflow() { slide(); syncHeight(); }
+  reflow();
+  window.addEventListener('resize', reflow);
   if (typeof ResizeObserver !== 'undefined') {
-    const observer = new ResizeObserver(syncHeight);
+    const observer = new ResizeObserver(reflow);
     panels.forEach((panel) => observer.observe(panel));
   }
 
@@ -428,8 +437,13 @@ const gallery = [
     transition: height 0.42s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .track {
+    --panel-gap: 4rem;
     display: flex;
     align-items: flex-start;
+    /* Panels sit flush against each other without this, so the next panel's
+       image shadow (32px of blur) reaches across the boundary and draws a soft
+       edge down the visible panel's left margin. */
+    gap: var(--panel-gap);
     /* Slides horizontally between panels. */
     transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
   }
@@ -473,7 +487,7 @@ const gallery = [
   .gallery h2 { margin: 0 0 1.8rem; }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
     gap: 1rem;
   }
   .grid figure {
