@@ -2,11 +2,16 @@
 import Layout from '../layouts/Layout.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<Layout title="About · kumiki" description="Why kumiki exists, and who's behind it.">
+<Layout title="About · Kumiki" description="Why Kumiki exists, and who's behind it.">
   <section class="about">
-    <h1>About</h1>
+    <p class="eyebrow">About the project</p>
+    <h1>Japanese joinery, and decades of writing software</h1>
 
     <div class="prose">
+      <p class="lead">
+        Kumiki exists because the two things I do — Japanese carpentry and writing
+        software — turned out to be the same thing.
+      </p>
       <p>
         Like many others, I went headfirst into Japanese carpentry during COVID. I've also been
         designing games and software with some intensity for decades. Kumiki is the combined
@@ -18,11 +23,11 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         representing repeating patterns of joints that follow systematic geometric rules.
       </p>
       <p>
-        When I originally created kumiki, I figured few people would be willing to write
-        <strong>CODE</strong> to make their <strong>DESIGNS</strong>, even with kumiki designed
+        When I originally created Kumiki, I figured few people would be willing to write
+        <strong>CODE</strong> to make their <strong>DESIGNS</strong>, even with Kumiki designed
         to be as simple and accessible as it is. By the time I released it, though, the agentic
         coding ship had sailed. I won't say much about that, except that it has, as a matter of
-        fact, made kumiki more &mdash; not less &mdash; accessible as a CAD program.
+        fact, made Kumiki more &mdash; not less &mdash; accessible as a CAD program.
       </p>
       <p>
         I hope you enjoy using it as much as I enjoy making it. Kumiki is free and open source!
@@ -42,13 +47,19 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 <style>
   .about {
-    max-width: 640px;
+    max-width: 660px;
     margin: 0 auto;
-    padding: 2.2rem 0 2rem;
+    padding: 3rem 0 2rem;
   }
   .about h1 {
-    font-size: 2.2rem;
-    margin: 0 0 1.6rem;
+    font-size: clamp(2.1rem, 4vw, 2.9rem);
+    margin: 0 0 1.8rem;
+  }
+  .prose .lead {
+    font-size: 1.2rem;
+    color: var(--ink);
+    padding-bottom: 1.2rem;
+    border-bottom: 1px solid var(--border-soft);
   }
   .prose p {
     color: var(--ink-soft);

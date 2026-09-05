@@ -2,11 +2,11 @@
 import Layout from '../layouts/Layout.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
-<Layout title="Install · kumiki">
+<Layout title="Install · Kumiki">
   <section class="install">
     <h1>Getting Started</h1>
     <p class="lead">
-      kumiki is a Python timber-framing library used through the <strong>kigumi</strong> VS Code
+      Kumiki is a Python timber-framing library used through the <strong>Kigumi</strong> VS Code
       extension. Follow the steps below to go from zero to your first 3D timber frame.
     </p>
 
@@ -32,15 +32,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <div class="step">
         <div class="step-header">
           <span class="step-num">2</span>
-          <h2>Install the kigumi VS Code extension</h2>
+          <h2>Install the Kigumi VS Code extension</h2>
         </div>
         <div class="step-body">
           <div class="step-content">
             <p>
-              Install the <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi" target="_blank" rel="noreferrer">kigumi extension from the VS Code Marketplace</a>.
+              Install the <a href="https://marketplace.visualstudio.com/items?itemName=minimaple.kigumi" target="_blank" rel="noreferrer">Kigumi extension from the VS Code Marketplace</a>.
             </p>
             <ul>
-              <li>Using <strong>Cursor</strong>? kigumi is also <a href="https://open-vsx.org/extension/minimaple/kigumi" target="_blank" rel="noreferrer">available on OpenVSX</a>.</li>
+              <li>Using <strong>Cursor</strong>? Kigumi is also <a href="https://open-vsx.org/extension/minimaple/kigumi" target="_blank" rel="noreferrer">available on OpenVSX</a>.</li>
               <li>Prefer a manual install? Grab the <code>.vsix</code> file from the <a href="https://github.com/minimapletinytools/kumiki/releases" target="_blank" rel="noreferrer">releases page</a>.</li>
             </ul>
           </div>
@@ -84,7 +84,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <div class="step-content">
             <p>
               Create a new folder anywhere on your machine, then in VS Code choose
-              <strong>File › Open Folder</strong> and open it. This folder becomes your kigumi project workspace.
+              <strong>File › Open Folder</strong> and open it. This folder becomes your Kigumi project workspace.
             </p>
           </div>
           {/* image slot */}
@@ -94,15 +94,15 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       <div class="step">
         <div class="step-header">
           <span class="step-num">5</span>
-          <h2>Open the kigumi sidebar</h2>
+          <h2>Open the Kigumi sidebar</h2>
         </div>
         <div class="step-body">
           <div class="step-content">
-            <p>Find the kigumi sidebar — it's the kumiki icon in the VS Code activity bar. A few ways to get there:</p>
+            <p>Find the Kigumi sidebar — it's the Kumiki icon in the VS Code activity bar. A few ways to get there:</p>
             <ul>
-              <li>Click the kigumi icon in the vertical column on the left side of VS Code.</li>
+              <li>Click the Kigumi icon in the vertical column on the left side of VS Code.</li>
               <li>It may be tucked inside a dropdown at the top of the left panel.</li>
-              <li>Open the command palette (<kbd>Cmd/Ctrl + Shift + P</kbd>) and choose <strong>View: Show kigumi</strong>.</li>
+              <li>Open the command palette (<kbd>Cmd/Ctrl + Shift + P</kbd>) and choose <strong>View: Show Kigumi</strong>.</li>
             </ul>
           </div>
           {/* image slot */}
@@ -117,8 +117,8 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <div class="step-body">
           <div class="step-content">
             <p>
-              In the kigumi sidebar, click the <strong>Initialize Project</strong> button and wait a few seconds.
-              This installs kumiki and creates the necessary project files in your workspace.
+              In the Kigumi sidebar, click the <strong>Initialize Project</strong> button and wait a few seconds.
+              This installs Kumiki and creates the necessary project files in your workspace.
             </p>
           </div>
           {/* image slot */}
@@ -141,7 +141,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <div class="step-body">
           <div class="step-content">
             <p>
-              Once initialized, the kigumi sidebar shows two kinds of items:
+              Once initialized, the Kigumi sidebar shows two kinds of items:
             </p>
             <ul>
               <li><strong>Frames</strong> — your own design files (<code>.py</code> scripts).</li>
@@ -160,7 +160,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <div class="step-body">
           <div class="step-content">
             <p>
-              Click <strong>my_cute_frame</strong> in the sidebar to open it in the kigumi viewer.
+              Click <strong>my_cute_frame</strong> in the sidebar to open it in the Kigumi viewer.
               Edit <code>my_cute_frame.py</code> and click the <strong>refresh</strong> button in the viewer to see your changes live.
             </p>
           </div>
@@ -177,7 +177,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
           <div class="step-content">
             <p>
               Any new <code>.py</code> frame file you create will appear in the <strong>Frames</strong> section of the
-              kigumi sidebar. If it doesn't show up immediately, click the sidebar's <strong>refresh</strong> button.
+              Kigumi sidebar. If it doesn't show up immediately, click the sidebar's <strong>refresh</strong> button.
             </p>
           </div>
           {/* image slot */}
@@ -191,7 +191,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     <div class="ai-section">
       <h2>Using AI to design frames</h2>
       <p>
-        kumiki frames are written in Python, which means AI coding agents can write them for you.
+        Kumiki frames are written in Python, which means AI coding agents can write them for you.
       </p>
       <ul>
         <li>We recommend using <strong>Claude</strong>, <strong>Antigravity</strong>, or <strong>Codex</strong> for designing frames.</li>
@@ -331,7 +331,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   /* image placeholder — remove once real images are added */
   .step-body img {
     width: 100%;
-    border-radius: 0.6rem;
+    border-radius: var(--radius);
     border: 1px solid var(--border);
     display: block;
   }
@@ -358,7 +358,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
     background: var(--surface);
     border: 1px solid var(--border);
     border-left: 3px solid var(--accent-soft);
-    border-radius: 0.6rem;
+    border-radius: var(--radius);
     padding: 1rem 1.2rem;
     margin-top: 1rem;
   }
@@ -382,14 +382,14 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   code {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 0.3rem;
+    border-radius: var(--radius);
     padding: 0.05rem 0.35rem;
     font-size: 0.92em;
   }
   kbd {
     background: var(--surface);
     border: 1px solid var(--border);
-    border-radius: 0.3rem;
+    border-radius: var(--radius);
     padding: 0.1rem 0.4rem;
     font-size: 0.88em;
     font-family: ui-monospace, monospace;

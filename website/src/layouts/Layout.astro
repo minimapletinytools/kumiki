@@ -2,9 +2,12 @@
 export interface Props {
   title: string;
   description?: string;
+  /** Let the page run full width and manage its own columns, so full-bleed
+      section bands are actually full width rather than faked with 100vw. */
+  wide?: boolean;
 }
 
-const { title, description = 'Kumiki — Python timber-framing library and Kigumi VS Code viewer.' } = Astro.props;
+const { title, description = 'Kumiki — Python timber-framing library and Kigumi VS Code viewer.', wide = false } = Astro.props;
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 ---
 <!doctype html>
@@ -31,7 +34,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         <a href={`${base}/about`}>About</a>
       </nav>
     </header>
-    <main>
+    <main class={wide ? 'wide' : undefined}>
       <slot />
     </main>
     <footer class="site-footer">
@@ -44,15 +47,26 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
     <style is:global>
       :root {
-        --bg: #f7f3ec;
-        --surface: #fffaf1;
-        --ink: #1f1a14;
-        --ink-soft: #4d4438;
-        --accent: #b54e1c;
+        /* Warm, because the subject is timber -- a cold grey palette would be
+           a lie about what this is for. Seriousness comes from structure and
+           density instead: a deeper ground so renders sit ON something rather
+           than dissolving into the page, a wider type scale, and less
+           rounding. */
+        --bg: #efe9de;
+        --bg-deep: #e5dccd;
+        --surface: #fdfaf4;
+        --paper: #fffdf8;
+        --ink: #191410;
+        --ink-soft: #574c3e;
+        --ink-faint: #8a7c68;
+        --accent: #9c3f12;
         --accent-soft: #e8a26c;
-        --border: #d9cdb6;
-        --shadow: 0 10px 30px rgba(31, 26, 20, 0.08);
-        --max: 1080px;
+        --border: #cdbfa5;
+        --border-soft: #ded3c0;
+        --shadow: 0 1px 2px rgba(25, 20, 16, 0.05), 0 12px 32px rgba(25, 20, 16, 0.09);
+        --shadow-lift: 0 2px 4px rgba(25, 20, 16, 0.06), 0 22px 50px rgba(25, 20, 16, 0.13);
+        --max: 1140px;
+        --radius: 0.35rem;
       }
 
       * { box-sizing: border-box; }
@@ -73,7 +87,7 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       .site-header {
         max-width: var(--max);
         margin: 0 auto;
-        padding: 1.4rem 1.5rem;
+        padding: 1.5rem 1.5rem 1.2rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
@@ -97,15 +111,16 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         height: 2rem;
         background: var(--ink);
         color: var(--surface);
-        border-radius: 0.4rem;
+        border-radius: var(--radius);
         font-size: 1.05rem;
         font-family: "Hiragino Mincho ProN", "Yu Mincho", serif;
       }
 
       .site-nav {
         display: flex;
-        gap: 1.4rem;
+        gap: 1.5rem;
         font-weight: 500;
+        font-size: 0.94rem;
       }
       .site-nav a { color: var(--ink-soft); }
       .site-nav a:hover { color: var(--ink); text-decoration: none; }
@@ -115,6 +130,9 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
         margin: 0 auto;
         padding: 1rem 1.5rem 4rem;
       }
+      main.wide { max-width: none; padding: 0 0 4rem; }
+      /* The column a wide page puts its own content back into. */
+      .column { max-width: var(--max); margin: 0 auto; padding: 0 1.5rem; }
 
       .site-footer {
         max-width: var(--max);
@@ -132,14 +150,62 @@ const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       .footer-row a { color: var(--ink-soft); }
       .footer-row a:hover { color: var(--accent); }
 
-      h1, h2, h3 { line-height: 1.2; }
+      /* A real scale, so the page asserts a hierarchy instead of running at one
+         size throughout. */
+      h1, h2, h3 { line-height: 1.15; letter-spacing: -0.021em; font-weight: 650; }
+      h1 { font-size: clamp(2.6rem, 5.4vw, 4rem); }
+      h2 { font-size: clamp(1.75rem, 3vw, 2.4rem); }
+      h3 { font-size: 1.12rem; letter-spacing: -0.01em; }
+
+      /* The label above a section: small, spaced, quiet. Does the work a big
+         heading would otherwise have to do twice. */
+      .eyebrow {
+        font-size: 0.74rem;
+        font-weight: 700;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--ink-faint);
+        margin: 0 0 0.75rem;
+      }
+
+      /* A full-width band. Sections that read as decisions rather than as one
+         long column. */
+      .band { background: var(--bg-deep); border-block: 1px solid var(--border-soft); }
+      .band-inner { max-width: var(--max); margin: 0 auto; padding: 4.5rem 1.5rem; }
+
+      /* Every render sits on a surface with an edge. These images are pale
+         cream on a pale cream page, and without this they dissolve into it. */
+      .plate {
+        display: block;
+        width: 100%;
+        height: auto;
+        background: var(--paper);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+      }
+
+      .status {
+        display: inline-block;
+        margin-left: 0.6rem;
+        padding: 0.16rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.62rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        vertical-align: 0.18em;
+        border: 1px solid currentColor;
+      }
+      .status-soon { color: var(--ink-faint); }
+      .status-beta { color: var(--accent); }
 
       .btn {
         display: inline-flex;
         align-items: center;
         gap: 0.55rem;
-        padding: 0.85rem 1.3rem;
-        border-radius: 0.6rem;
+        padding: 0.85rem 1.35rem;
+        border-radius: var(--radius);
         font-weight: 600;
         font-size: 1rem;
         border: 1px solid transparent;

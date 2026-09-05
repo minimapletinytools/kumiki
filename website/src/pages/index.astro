@@ -2,68 +2,204 @@
 import Layout from '../layouts/Layout.astro';
 const base = import.meta.env.BASE_URL.replace(/\/$/, '');
 
+// The five clickable bullets ARE the navigation: the strip selects, the panel
+// slides. Each one has to say how the program works rather than what it is
+// like, which is what the three cards here used to do.
+const features = [
+  {
+    id: 'program',
+    label: 'Program your frames',
+    kicker: 'Python in, frame out',
+    heading: 'A frame is a program, so it is diffable, reusable and parametric',
+    body: `Timbers, joints and assemblies are ordinary Python. Change a span and every
+      joint that depends on it moves. Keep a frame in git, review a change as a diff,
+      import a bent you already built and place it four times.`,
+    points: [
+      'Joints are function calls with named arguments, not hand-placed geometry',
+      'Patterns compose: a bent becomes a bay becomes a building',
+      'Works with an AI assistant, because the design is text a model can read and edit',
+    ],
+    image: `${base}/photos/feature_code.png`,
+    imageAlt: 'Python source declaring mitered and keyed lap joints at a frame corner',
+    second: `${base}/photos/oscarshed.png`,
+    secondAlt: "The shed that code builds, rendered in Kigumi",
+  },
+  {
+    id: 'preview',
+    label: 'Live preview in Kigumi',
+    kicker: 'The VS Code extension',
+    heading: 'The frame redraws as you save, beside the code that made it',
+    body: `Kigumi runs the frame and renders it in the editor. Select a timber and read
+      its dimensions, walk into a joint's CSG tree, hide layers, cut sections, and
+      measure what you are looking at.`,
+    points: [
+      'Selection down to a single face, edge or joint feature',
+      'Layers, tags and per-member visibility for picking a frame apart',
+      'X-ray and section views for reading a joint from the inside',
+    ],
+    image: `${base}/photos/double_sawhorse_xray.png`,
+    imageAlt: 'X-ray view of a double sawhorse, showing the joinery inside the timbers',
+    second: `${base}/photos/coffee_table.png`,
+    secondAlt: 'A coffee table frame rendered in the viewer',
+  },
+  {
+    id: 'joinery',
+    label: 'Real parametric joinery',
+    kicker: 'Joints, not boolean cuts',
+    heading: 'Traditional joints that stay correct when the timbers change',
+    body: `Mortise and tenon, dovetails, half-laps, scarfs, wedged and pegged variants —
+      each one is a parametric joint that re-cuts itself when the timbers it joins move,
+      change size, or meet at a different angle.`,
+    points: [
+      'Housings, shoulders, reliefs and pegs derived from the timbers, not drawn',
+      'Angled and compound intersections, not just square ones',
+      'The same joint at another size or angle is the same call with other numbers',
+    ],
+    image: `${base}/photos/half_blind_cross_lap_joint_xray.png`,
+    imageAlt: 'X-ray of a half-blind cross lap joint with keys',
+    second: `${base}/photos/mortise_tenon_brace_joint.png`,
+    secondAlt: 'A pegged mortise-and-tenon brace joint at an angle',
+  },
+  {
+    id: 'drawings',
+    label: 'Drawing generation',
+    status: 'soon',
+    kicker: 'Shop drawings',
+    heading: 'Elevations and plans generated from the frame itself',
+    body: `A drawing is a projection of the model, so it cannot drift from it. Kumiki lays
+      the views out from the timbers themselves — you never place a viewport or a scale.`,
+    points: [
+      'Generated automatically from the frame',
+      'Customised in code, where the drawing is part of the design',
+      'Overridden by hand in Kigumi when a sheet needs one more dimension',
+    ],
+    image: `${base}/photos/feature_drawing.png`,
+    imageAlt: 'A generated sheet: front elevation, plan, side elevation and isometric',
+  },
+  {
+    id: 'assembly',
+    label: 'Assembly generation',
+    status: 'beta',
+    kicker: 'Order of operations',
+    heading: 'The order the frame goes together, worked out from the joinery',
+    body: `Kumiki solves which timbers can be moved into place, and in what order, from the
+      joints themselves — then plays it back so you can watch the frame come apart.`,
+    points: [
+      'Assembly order derived from how each joint actually goes together',
+      'Scrub from assembled to disassembled to read a sequence',
+      'Catches a frame that cannot be assembled before you cut it',
+    ],
+    image: `${base}/photos/feature_assembly.png`,
+    imageAlt: 'A coffee table part-way disassembled, with the assembly timeline slider',
+    second: `${base}/photos/feature_assembly_2.png`,
+    secondAlt: 'The same frame at another point in the assembly sequence',
+  },
+];
+
 const gallery = [
-  { src: `${base}/photos/oscarshed.png`, alt: "Oscar's Shed timber frame" },
-  { src: `${base}/photos/oscarshed_built.png`, alt: "Oscar's Shed, built: the finished real-world structure" },
+  { src: `${base}/photos/oscarshed_built.png`, alt: "Oscar's Shed, built: the finished structure" },
+  { src: `${base}/photos/tinyhouse120_front.png`, alt: 'Tiny house frame, front view' },
+  { src: `${base}/photos/timber_frame_shed.png`, alt: 'Full timber-framed shed model' },
   { src: `${base}/photos/sawhorsey.png`, alt: 'Sawhorse pattern' },
+  { src: `${base}/photos/double_sawhorse.png`, alt: 'Double sawhorse with pegged joinery' },
   { src: `${base}/photos/round_crosslap_joint.png`, alt: 'Round crosslap joint detail' },
   { src: `${base}/photos/wedged_half_dovetail.png`, alt: 'Wedged half dovetail joint' },
-  { src: `${base}/photos/tinyhouse120_front.png`, alt: 'Tiny house, front view' },
-  { src: `${base}/photos/timber_frame_shed.png`, alt: 'Full timber-framed shed model' },
-  { src: `${base}/photos/double_sawhorse.png`, alt: 'Double sawhorse with pegged joinery' },
-  { src: `${base}/photos/double_sawhorse_xray.png`, alt: 'X-ray view: double sawhorse joinery detail' },
-  { src: `${base}/photos/cute_frame_joints.png`, alt: 'Small pegged frame showing four matching corner joints' },
-  { src: `${base}/photos/mortise_tenon_brace_joint.png`, alt: 'Pegged mortise-and-tenon brace joint at a corner' },
-  { src: `${base}/photos/dropin_dovetail_butt_joint.png`, alt: 'Drop-in dovetail butt (T) joint' },
-  { src: `${base}/photos/dropin_dovetail_butt_joint_xray.png`, alt: 'X-ray view: drop-in dovetail butt joint detail' },
-  { src: `${base}/photos/double_angled_joint.png`, alt: 'Pegged double-angled beam intersection' },
+  { src: `${base}/photos/dropin_dovetail_butt_joint.png`, alt: 'Drop-in dovetail butt joint' },
+  { src: `${base}/photos/dropin_dovetail_butt_joint_xray.png`, alt: 'X-ray: drop-in dovetail butt joint' },
   { src: `${base}/photos/half_blind_cross_lap_joint.png`, alt: 'Half-blind cross lap joint with keys' },
-  { src: `${base}/photos/half_blind_cross_lap_joint_xray.png`, alt: 'X-ray view: half-blind cross lap joint detail' },
-  { src: `${base}/photos/gooseneck_joint.png`, alt: 'Gooseneck splice joint' },
   { src: `${base}/photos/splined_opposing_joint.png`, alt: 'Splined opposing scarf joint' },
-  { src: `${base}/photos/splined_opposing_joint_xray.png`, alt: 'X-ray view: splined opposing scarf joint detail' },
-  { src: `${base}/photos/coffee_table.png`, alt: 'Coffee table with rounded-end table top boards' },
+  { src: `${base}/photos/splined_opposing_joint_xray.png`, alt: 'X-ray: splined opposing scarf joint' },
 ];
 ---
-<Layout title="Kumiki — timber-framing for code">
+<Layout title="Kumiki — programmatic CAD for timber framing" wide>
+  <div class="column">
   <section class="hero">
     <div class="hero-copy">
-      <h1>Kumiki</h1>
+      <p class="eyebrow">Programmatic CAD for timber framing</p>
+      <h1>Design a timber frame the way you write software</h1>
       <p class="tagline">
-        A Python library for designing traditional timber frames in code, with a VS Code viewer
-        called <strong>Kigumi</strong> for live 3D preview as you edit.
+        <strong>Kumiki</strong> is a Python library for real timber joinery — parametric joints,
+        assembly order, and shop drawings generated from the frame itself.
+        <strong>Kigumi</strong> renders it live in VS Code as you type.
       </p>
       <div class="cta">
-        <a class="btn btn-primary" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">
+        <a class="btn btn-primary" href={`${base}/install`}>Get started</a>
+        <a class="btn btn-secondary" href="https://github.com/minimapletinytools/kumiki" target="_blank" rel="noreferrer">
           View on GitHub
         </a>
-        <a class="btn btn-secondary" href={`${base}/install`}>
-          How to Install
-        </a>
       </div>
+      <dl class="facts">
+        <div><dt>Joint types</dt><dd>30+</dd></div>
+        <div><dt>Runs in</dt><dd>VS Code</dd></div>
+        <div><dt>Exports</dt><dd>STL &amp; OBJ</dd></div>
+      </dl>
     </div>
     <div class="hero-image">
-      <img src={`${base}/photos/tinyhouse120_angle.png`} alt="Kumiki-rendered tiny house frame" />
+      <img class="plate" src={`${base}/photos/tinyhouse120_angle.png`} alt="A tiny house frame designed in Kumiki" />
+    </div>
+  </section>
+  </div>
+
+  <section class="band" id="features">
+    <div class="band-inner">
+      <p class="eyebrow">How it works</p>
+      <div class="tabs" role="tablist" aria-label="What Kumiki does">
+        {features.map((feature, i) => (
+          <button
+            class="tab"
+            type="button"
+            role="tab"
+            id={`tab-${feature.id}`}
+            aria-controls={`panel-${feature.id}`}
+            aria-selected={i === 0 ? 'true' : 'false'}
+            tabindex={i === 0 ? 0 : -1}
+            data-index={i}
+          >
+            <span class="tab-num">
+              {String(i + 1).padStart(2, '0')}
+              {feature.status === 'soon' && <span class="status status-soon">Soon</span>}
+              {feature.status === 'beta' && <span class="status status-beta">Beta</span>}
+            </span>
+            <span class="tab-label">{feature.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div class="viewport" id="viewport">
+        <div class="track" id="track">
+          {features.map((feature, i) => (
+            <section
+              class="panel"
+              role="tabpanel"
+              id={`panel-${feature.id}`}
+              aria-labelledby={`tab-${feature.id}`}
+              inert={i !== 0}
+            >
+              <div class="panel-copy">
+                <p class="eyebrow">{feature.kicker}</p>
+                <h2>{feature.heading}</h2>
+                <p class="panel-body">{feature.body}</p>
+                <ul class="panel-points">
+                  {feature.points.map((point) => <li>{point}</li>)}
+                </ul>
+              </div>
+              <div class="panel-media">
+                <img class="plate" src={feature.image} alt={feature.imageAlt} loading="lazy" />
+                {feature.second && (
+                  <img class="plate plate-second" src={feature.second} alt={feature.secondAlt} loading="lazy" />
+                )}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
     </div>
   </section>
 
-  <section class="features">
-    <article>
-      <h3>Code your frames</h3>
-      <p>Express timbers, joints, and assemblies as Python. Reuse patterns, parameterize sizes, and version-control your designs.</p>
-    </article>
-    <article>
-      <h3>See them live</h3>
-      <p>The Kigumi VS Code extension renders your frame in 3D and refreshes as you save — no separate CAD tool required.</p>
-    </article>
-    <article>
-      <h3>Real joinery</h3>
-      <p>Built-in support for traditional joints — mortise &amp; tenon, dovetails, half-laps, wedged variants, and more.</p>
-    </article>
-  </section>
-
+  <div class="column">
   <section class="gallery">
-    <h2>Gallery</h2>
+    <p class="eyebrow">Built with Kumiki</p>
+    <h2>Frames, joints and finished work</h2>
     <div class="grid">
       {gallery.map((photo, i) => (
         <figure>
@@ -72,6 +208,21 @@ const gallery = [
           </button>
         </figure>
       ))}
+    </div>
+  </section>
+  </div>
+
+  <section class="band closing">
+    <div class="band-inner closing-inner">
+      <h2>Start with a sawhorse, end with a barn</h2>
+      <p>
+        Kumiki installs as a Python package; Kigumi installs from the VS Code marketplace.
+        The patterns that made everything on this page ship with it.
+      </p>
+      <div class="cta">
+        <a class="btn btn-primary" href={`${base}/install`}>Install Kumiki</a>
+        <a class="btn btn-secondary" href="https://kumiki.build/docs/" target="_blank" rel="noreferrer">Read the docs</a>
+      </div>
     </div>
   </section>
 
@@ -85,6 +236,72 @@ const gallery = [
 </Layout>
 
 <script>
+  // --- the sliding feature gallery -----------------------------------------
+  const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.tab'));
+  const panels = Array.from(document.querySelectorAll<HTMLElement>('.panel'));
+  const track = document.getElementById('track');
+
+  const viewport = document.getElementById('viewport');
+  let current = 0;
+
+  // All five panels stay laid out side by side -- that is what the track
+  // slides along -- so the viewport is told how tall the visible one is.
+  // Without this it would stand at the height of the tallest panel and the
+  // short ones would sit in a pool of whitespace.
+  function syncHeight() {
+    if (!viewport || !panels[current]) return;
+    viewport.style.height = `${panels[current].offsetHeight}px`;
+  }
+
+  function select(index: number, focusTab = false) {
+    if (!track || tabs.length === 0) return;
+    const next = (index + tabs.length) % tabs.length;
+    current = next;
+    tabs.forEach((tab, i) => {
+      const on = i === next;
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+    });
+    // inert rather than hidden: the off-screen panels must keep their place in
+    // the track, but their links and images should stay out of the tab order
+    // and off a screen reader.
+    panels.forEach((panel, i) => {
+      if (i === next) panel.removeAttribute('inert');
+      else panel.setAttribute('inert', '');
+    });
+    track.style.transform = `translateX(-${next * 100}%)`;
+    syncHeight();
+    if (focusTab) tabs[next].focus();
+    history.replaceState(null, '', `#${panels[next].id.replace('panel-', '')}`);
+  }
+
+  tabs.forEach((tab, i) => {
+    tab.addEventListener('click', () => select(i));
+    tab.addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight') { event.preventDefault(); select(i + 1, true); }
+      if (event.key === 'ArrowLeft') { event.preventDefault(); select(i - 1, true); }
+      if (event.key === 'Home') { event.preventDefault(); select(0, true); }
+      if (event.key === 'End') { event.preventDefault(); select(tabs.length - 1, true); }
+    });
+  });
+
+  // Deep link: /#joinery opens that panel.
+  const wanted = window.location.hash.replace('#', '');
+  if (wanted) {
+    const found = panels.findIndex((panel) => panel.id === `panel-${wanted}`);
+    if (found >= 0) select(found);
+  }
+
+  // The panel grows when its images arrive and when the column reflows, and
+  // both happen after the height above was measured.
+  syncHeight();
+  window.addEventListener('resize', syncHeight);
+  if (typeof ResizeObserver !== 'undefined') {
+    const observer = new ResizeObserver(syncHeight);
+    panels.forEach((panel) => observer.observe(panel));
+  }
+
+  // --- gallery lightbox -----------------------------------------------------
   const gallery = Array.from(document.querySelectorAll<HTMLButtonElement>('.thumb'));
   const lightbox = document.getElementById('lightbox') as HTMLDivElement | null;
   const lightboxImage = document.getElementById('lightbox-image') as HTMLImageElement | null;
@@ -113,17 +330,11 @@ const gallery = [
     document.body.style.overflow = '';
   }
 
-  gallery.forEach((btn, i) => {
-    btn.addEventListener('click', () => show(i));
-  });
-
+  gallery.forEach((btn, i) => btn.addEventListener('click', () => show(i)));
   closeBtn?.addEventListener('click', close);
   prevBtn?.addEventListener('click', () => show(currentIndex - 1));
   nextBtn?.addEventListener('click', () => show(currentIndex + 1));
-
-  lightbox?.addEventListener('click', (e) => {
-    if (e.target === lightbox) close();
-  });
+  lightbox?.addEventListener('click', (e) => { if (e.target === lightbox) close(); });
 
   document.addEventListener('keydown', (e) => {
     if (!lightbox || lightbox.hidden) return;
@@ -136,95 +347,181 @@ const gallery = [
 <style>
   .hero {
     display: grid;
-    grid-template-columns: 1.05fr 1fr;
-    gap: 2.5rem;
+    grid-template-columns: 1.02fr 1fr;
+    gap: 3.5rem;
     align-items: center;
-    padding: 2.5rem 0 3.5rem;
+    padding: 3rem 0 4.5rem;
   }
-  .hero-copy h1 {
-    font-size: clamp(2.4rem, 5vw, 3.6rem);
-    margin: 0 0 0.8rem;
-    letter-spacing: -0.01em;
-  }
+  .hero-copy h1 { margin: 0 0 1.1rem; max-width: 15ch; }
   .tagline {
-    font-size: 1.15rem;
+    font-size: 1.08rem;
     color: var(--ink-soft);
-    margin: 0 0 1.6rem;
-    max-width: 32ch;
+    margin: 0 0 2rem;
+    max-width: 46ch;
   }
-  .cta {
+  .cta { display: flex; gap: 0.8rem; flex-wrap: wrap; }
+
+  /* Three small facts under the buttons. Quiet, but they answer the questions
+     a serious reader asks in the first ten seconds. */
+  .facts {
     display: flex;
-    gap: 0.9rem;
-    flex-wrap: wrap;
+    gap: 2.4rem;
+    margin: 2.6rem 0 0;
+    padding: 1.4rem 0 0;
+    border-top: 1px solid var(--border-soft);
   }
-  .hero-image img {
-    width: 100%;
-    height: auto;
-    border-radius: 0.9rem;
-    box-shadow: var(--shadow);
-    border: 1px solid var(--border);
-    background: var(--surface);
+  .facts div { margin: 0; }
+  .facts dt {
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    font-weight: 600;
   }
+  .facts dd { margin: 0.25rem 0 0; font-size: 1.15rem; font-weight: 650; }
 
-  .features {
+  /* --- the sliding feature gallery --- */
+  .tabs {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1.2rem;
-    margin: 1rem 0 3rem;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0 1.5rem;
+    margin: 0 0 2.6rem;
+    border-bottom: 1px solid var(--border);
   }
-  .features article {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 0.7rem;
-    padding: 1.2rem 1.3rem;
+  .tab {
+    display: block;
+    text-align: left;
+    padding: 0.2rem 0 0.9rem;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    color: var(--ink-faint);
+    font: inherit;
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: color 0.15s ease, border-color 0.15s ease;
   }
-  .features h3 { margin: 0 0 0.4rem; font-size: 1.05rem; }
-  .features p { margin: 0; color: var(--ink-soft); font-size: 0.95rem; }
+  .tab-label { display: block; }
+  /* Grid items default to min-width:auto, so the five columns could not shrink
+     below their longest word and pushed the whole document wider than a phone
+     screen. Below the breakpoint the strip becomes a swipeable row instead,
+     whose overflow is its own rather than the page's. */
+  .tab { min-width: 0; }
+  .tab:hover { color: var(--ink-soft); }
+  .tab[aria-selected='true'] { color: var(--ink); border-bottom-color: var(--accent); }
+  .tab-num {
+    display: block;
+    margin-bottom: 0.45rem;
+    font-size: 0.72rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-faint);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .tab[aria-selected='true'] .tab-num { color: var(--accent); }
 
-  .gallery h2 {
-    font-size: 1.4rem;
-    margin: 0 0 1rem;
+  .viewport {
+    overflow: hidden;
+    transition: height 0.42s cubic-bezier(0.4, 0, 0.2, 1);
   }
+  .track {
+    display: flex;
+    align-items: flex-start;
+    /* Slides horizontally between panels. */
+    transition: transform 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .track, .viewport { transition: none; }
+  }
+  .panel {
+    flex: 0 0 100%;
+    display: grid;
+    grid-template-columns: 0.85fr 1.15fr;
+    gap: 3rem;
+    align-items: center;
+  }
+  .panel-copy h2 { margin: 0 0 1rem; max-width: 20ch; }
+  .panel-body { margin: 0 0 1.4rem; color: var(--ink-soft); }
+  .panel-points { margin: 0; padding: 0; list-style: none; }
+  .panel-points li {
+    position: relative;
+    padding: 0.5rem 0 0.5rem 1.4rem;
+    border-top: 1px solid var(--border-soft);
+    font-size: 0.94rem;
+    color: var(--ink-soft);
+  }
+  .panel-points li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 1.05rem;
+    width: 0.42rem;
+    height: 0.42rem;
+    background: var(--accent);
+    border-radius: 1px;
+  }
+  .panel-media { display: grid; gap: 0.9rem; justify-items: end; }
+  /* An inset, not a second exhibit -- at any real size it doubled the panel's
+     height and left the copy floating in the middle of it. */
+  .plate-second { width: 40%; }
+
+  /* --- gallery --- */
+  .gallery { padding: 4.5rem 0 1rem; }
+  .gallery h2 { margin: 0 0 1.8rem; }
   .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 0.9rem;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 1rem;
   }
   .grid figure {
     margin: 0;
-    border-radius: 0.6rem;
+    border-radius: var(--radius);
     overflow: hidden;
     border: 1px solid var(--border);
-    background: var(--surface);
+    background: var(--paper);
     aspect-ratio: 4 / 3;
+    transition: box-shadow 0.18s ease, transform 0.18s ease;
   }
-  .grid img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-  }
-
+  .grid figure:hover { box-shadow: var(--shadow-lift); transform: translateY(-2px); }
+  .grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .thumb {
     display: block;
     width: 100%;
     height: 100%;
-    padding: 0;
-    margin: 0;
-    border: none;
-    background: none;
+    padding: 0; margin: 0; border: none; background: none;
     cursor: zoom-in;
   }
 
-  @media (max-width: 760px) {
-    .hero { grid-template-columns: 1fr; padding: 1.5rem 0 2rem; }
-    .features { grid-template-columns: 1fr; }
+  .closing-inner { text-align: center; }
+  .closing-inner h2 { margin: 0 0 0.8rem; }
+  .closing-inner p {
+    margin: 0 auto 1.8rem;
+    max-width: 52ch;
+    color: var(--ink-soft);
+  }
+  .closing-inner .cta { justify-content: center; }
+
+  @media (max-width: 900px) {
+    .tabs {
+      display: flex;
+      gap: 1.5rem;
+      overflow-x: auto;
+      scrollbar-width: thin;
+      -webkit-overflow-scrolling: touch;
+    }
+    .tab { flex: 0 0 auto; }
+    .tab-label { white-space: nowrap; }
+    .hero { grid-template-columns: 1fr; gap: 2.2rem; padding: 1.5rem 0 2.5rem; }
+    .panel { grid-template-columns: 1fr; gap: 1.8rem; }
+    .plate-second { display: none; }
+    .facts { gap: 1.6rem; }
   }
 
-  .lightbox[hidden] {
-    display: none;
-  }
-
+  /* --- lightbox --- */
+  .lightbox[hidden] { display: none; }
   .lightbox {
     position: fixed;
     inset: 0;
@@ -236,19 +533,17 @@ const gallery = [
     justify-items: center;
     gap: 0 1rem;
     padding: 3rem 1.5rem;
-    background: rgba(20, 16, 10, 0.88);
+    background: rgba(18, 14, 10, 0.9);
   }
-
   .lightbox-image {
     grid-column: 2;
     grid-row: 1;
     max-width: 100%;
     max-height: calc(100vh - 8rem);
     object-fit: contain;
-    border-radius: 0.5rem;
-    box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-lift);
   }
-
   .lightbox-caption {
     grid-column: 1 / -1;
     grid-row: 2;
@@ -257,36 +552,28 @@ const gallery = [
     font-size: 0.9rem;
     text-align: center;
   }
-
   .lightbox-close {
     position: absolute;
-    top: 1rem;
-    right: 1.2rem;
-    width: 2.4rem;
-    height: 2.4rem;
+    top: 1rem; right: 1.2rem;
+    width: 2.4rem; height: 2.4rem;
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.3);
     background: rgba(255, 255, 255, 0.08);
     color: var(--surface);
-    font-size: 1.6rem;
-    line-height: 1;
+    font-size: 1.6rem; line-height: 1;
     cursor: pointer;
   }
   .lightbox-close:hover { background: rgba(255, 255, 255, 0.18); }
-
   .lightbox-nav {
     grid-row: 1;
-    width: 3rem;
-    height: 3rem;
+    width: 3rem; height: 3rem;
     border-radius: 50%;
     border: 1px solid rgba(255, 255, 255, 0.3);
     background: rgba(255, 255, 255, 0.08);
     color: var(--surface);
-    font-size: 1.8rem;
-    line-height: 1;
+    font-size: 1.8rem; line-height: 1;
     cursor: pointer;
-    display: grid;
-    place-items: center;
+    display: grid; place-items: center;
   }
   .lightbox-nav:hover { background: rgba(255, 255, 255, 0.18); }
   .lightbox-prev { grid-column: 1; }
