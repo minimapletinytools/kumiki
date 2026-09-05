@@ -3563,7 +3563,8 @@ def _cropped_edge_segment(
     edge_feature: Any,
     line: Any,
     timber: Any,
-) -> Optional[Dict[str, List[float]]]:
+    owner: Any = None,
+):
     """The edge's line, clipped to the solids that actually form it.
 
     An edge exists only where both its faces do, so both parents' owners bound
@@ -3576,10 +3577,16 @@ def _cropped_edge_segment(
     """
     from kumiki.csgconvexhull import segment_on_line
 
+    # A derived edge is bounded by the two solids its parent faces belong to.
+    # A declared one -- a timber's own arris -- belongs to a single primitive,
+    # which is the owner it was found on.
+    hits = [getattr(edge_feature, "a", None), getattr(edge_feature, "b", None)]
     parents = [
-        hit.owner for hit in (edge_feature.a, edge_feature.b)
+        hit.owner for hit in hits
         if hit is not None and getattr(hit, "owner", None) is not None
     ]
+    if not parents:
+        parents = [owner]
     solid = timber.get_perfect_timber_within_csg_local()
     def clipped(tolerance):
         return segment_on_line(
@@ -3650,7 +3657,7 @@ def _edge_highlight_segment(
 
     line = edge_feature.locate(owner)
     if timber is not None and isinstance(line, Line):
-        segment, absent = _cropped_edge_segment(edge_feature, line, timber)
+        segment, absent = _cropped_edge_segment(edge_feature, line, timber, owner)
         if segment is not None or absent:
             return (segment, absent)
 
@@ -3708,13 +3715,21 @@ def _features_at_point(root: 'CutCSG', local_pt: List[float], eps: float) -> Lis
 
 
 def _resolve_derived_edge(hits: List[Any]) -> Optional[Any]:
-    """The derived edge under the click, if one is the best answer there."""
+    """The DERIVED edge under the click, if one is the best answer there.
+
+    Only derived. A timber's own arris is an edge as well, and a declared
+    feature -- it has a name, an owner and a place in the tree, so it is
+    referred to the way any declared feature is. Only an edge that exists
+    nowhere but as the product of two faces needs the roundabout treatment.
+    """
     from kumiki.cutcsg import CSGFeatureType
 
     if not hits:
         return None
     best = hits[0]
     if best.feature.feature_type() != CSGFeatureType.EDGE:
+        return None
+    if getattr(best.feature, "a", None) is None:
         return None
     return best.feature
 
@@ -4279,6 +4294,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     # click is still descending through compounds it selects them whole, and
     # jumping to an edge deep inside would skip the levels between.
     feature_type = None
+    declared_edge = None
     feature_hits = _features_at_point(local_csg, local_pt, eps)
     edge = _resolve_derived_edge(feature_hits) if feature_label is not None else None
     if edge is not None:
@@ -4287,16 +4303,35 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
             target_csg, new_path = owned[0], owned[1]
             feature_label = edge.name
             feature_type = "EDGE"
+    elif feature_label is not None and feature_hits:
+        # A declared edge -- a timber's own arris -- beats the face a click
+        # lands on, the same way a derived one does and for the same reason: it
+        # is the more specific answer at that point. Unlike a derived one it
+        # belongs to the node that declared it, so it is placed the way any
+        # declared feature is.
+        from kumiki.cutcsg import CSGFeatureType
+
+        best = feature_hits[0]
+        if best.feature.feature_type() == CSGFeatureType.EDGE:
+            placed = _node_positions(local_csg).get(id(best.owner))
+            if placed is not None:
+                new_path, target_csg = placed[2], best.owner
+                feature_label, feature_type = best.feature.name, "EDGE"
+                declared_edge = best.feature
 
     parent_csg = None
     if new_path:
         parent_csg = _resolve_csg_at_path(local_csg, new_path, local_pt, eps)
 
+    # An edge is drawn as a line whether it was derived or declared: a timber's
+    # own arris needs the line as much as a joint's does, and without this it
+    # was picked and then nothing was drawn for it.
     highlight_edge = None
     edge_absent = False
-    if edge is not None:
+    edge_feature = edge if edge is not None else declared_edge
+    if edge_feature is not None:
         highlight_edge, edge_absent = _edge_highlight_segment(
-            edge, target_csg, mesh["vertices"], timber_rot, timber_pos, timber,
+            edge_feature, target_csg, mesh["vertices"], timber_rot, timber_pos, timber,
         )
 
     # Extract highlight mesh for the selected target

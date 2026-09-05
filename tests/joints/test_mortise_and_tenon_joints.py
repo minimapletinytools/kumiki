@@ -1381,14 +1381,15 @@ class TestMortiseAndTenonFeatures:
         # The outline you would mark on the face before chopping.
         assert {edge for edge in edges if edge.startswith("mortise_")}
 
-    def test_the_timbers_own_arrises_still_derive(self, simple_T_configuration):
-        # These worked before any joint geometry declared anything; the new
-        # declarations must not crowd them out.
+    def test_the_timbers_own_arrises_are_still_reachable(self, simple_T_configuration):
+        # They used to come from two rough faces meeting. They are declared now
+        # -- rough.front_left rather than rough.front x rough.left -- and the
+        # point of the test is unchanged: joint geometry must not crowd them out.
         from kumiki.cutcsg import CSGFeatureType
 
         edges = self._picked(self._rendered(simple_T_configuration)["tenon_timber"],
                              CSGFeatureType.EDGE)
-        assert {edge for edge in edges if edge.count("rough.") == 2}
+        assert {edge for edge in edges if edge.startswith("rough.") and "\u00d7" not in edge}
 
 
 class TestBuildAButtCSGNaming:

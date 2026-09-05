@@ -190,7 +190,11 @@ class TestCSGTreeSerialization:
         base = tree["children"][0]
         names = {f["name"] for f in base["features"]}
         assert {"rough.right", "rough.left", "rough.top"} <= names
-        assert all(f["group"] == "B2" for f in base["features"])
+        # The four long arrises are declared alongside the faces.
+        assert {"rough.front_left", "rough.back_right"} <= names
+        # B1: they meet joint geometry and not each other, since the arrises
+        # they used to make by meeting are named outright now.
+        assert all(f["group"] == "B1" for f in base["features"])
 
     def test_joint_attribution_flows_down_the_cut(self, mortise_and_tenon_frame):
         """The body belongs to no joint; everything under a cut belongs to one."""
@@ -1106,6 +1110,21 @@ class TestEdgeHighlightSpan:
         assert edge is not None, f"{a_name} and {b_name} form no edge"
         return edge, first_owner, cut_timber.timber
 
+    def _declared_edge(self, frame, name):
+        """A timber's own arris, which is declared rather than derived."""
+        from kumiki.cutcsg import csg_children
+
+        cut_timber = _cut_timber_by_name(frame, "receiving_timber")
+        local = cut_timber.render_timber_with_cuts_csg_local()
+        stack = [local]
+        while stack:
+            node = stack.pop()
+            for feature in node.get_declared_features():
+                if feature.name == name:
+                    return feature, node, cut_timber.timber
+            stack.extend(csg_children(node))
+        raise AssertionError(f"no feature named {name!r}")
+
     def _span_mm(self, segment):
         return math.dist(segment["start"], segment["end"]) * 1000
 
@@ -1167,8 +1186,8 @@ class TestEdgeHighlightSpan:
 
     def test_the_timbers_own_edge_still_runs_its_full_length(self, mortise_and_tenon_frame):
         # The crop must not shorten an edge that really is that long.
-        edge, owner, timber = self._edge(
-            mortise_and_tenon_frame, "rough.front", "rough.left")
+        edge, owner, timber = self._declared_edge(
+            mortise_and_tenon_frame, "rough.front_left")
 
         segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
 
@@ -1232,9 +1251,12 @@ class TestResolvingADerivedEdge:
             for vertex in triangle:
                 point = runner._to_v3([float(vertex[i]) for i in range(3)])
                 for hit in local.get_all_features(point):
-                    if hit.feature.feature_type() == CSGFeatureType.EDGE:
+                    # Derived specifically: a timber's own arris is an edge as
+                    # well, and a declared one, with no parents to name.
+                    if (hit.feature.feature_type() == CSGFeatureType.EDGE
+                            and getattr(hit.feature, "a", None) is not None):
                         return local, hit.feature
-        raise AssertionError("no edge found on the finished surface")
+        raise AssertionError("no derived edge found on the finished surface")
 
     def _reference(self, frame, local, edge, member_key):
         from kumiki.identity import DerivedFeaturePath, FeatureRef, ResolvedTimberPath
@@ -1388,7 +1410,8 @@ class TestPickYieldsAMeasurementReference:
 
         local, edge = self._pick_at(
             mortise_and_tenon_frame, "receiving_timber",
-            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+            lambda f: (f.feature_type() == CSGFeatureType.EDGE
+                       and getattr(f, "a", None) is not None))
 
         reference = runner._pick_reference(
             local, "receiving_timber#0", [], edge.name, "EDGE", edge)
@@ -1404,7 +1427,8 @@ class TestPickYieldsAMeasurementReference:
 
         local, edge = self._pick_at(
             mortise_and_tenon_frame, "receiving_timber",
-            lambda f: f.feature_type() == CSGFeatureType.EDGE)
+            lambda f: (f.feature_type() == CSGFeatureType.EDGE
+                       and getattr(f, "a", None) is not None))
         reference = runner._pick_reference(
             local, "receiving_timber#0", [], edge.name, "EDGE", edge)
 
@@ -1529,6 +1553,7 @@ class TestHoveringOverAFeature:
             mortise_and_tenon_frame, "receiving_timber",
             lambda f: f.feature_type() == CSGFeatureType.EDGE)
 
+
         assert result["featureType"] == "EDGE"
         assert result["highlightEdge"]["start"] and result["highlightEdge"]["end"]
 
@@ -1540,6 +1565,7 @@ class TestHoveringOverAFeature:
         result = self._hover(
             mortise_and_tenon_frame, "receiving_timber",
             lambda f: f.feature_type() == CSGFeatureType.EDGE)
+
 
         assert result["reference"] is not None
         assert runner.resolve_anchor(mortise_and_tenon_frame, result["reference"]) is not None

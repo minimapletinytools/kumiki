@@ -1719,28 +1719,61 @@ _TIMBER_FACES: List[Tuple[str, PrismFace]] = [
 ]
 
 
+#: The four arrises that run a timber's length, each between two long faces.
+#: Named in the order the faces are, so front_right is one thing however it is
+#: reached. Top and bottom take no part: those are ends, and the edges round an
+#: end are the end face meeting each long face -- a different set, not named yet.
+_TIMBER_LONG_ARRISES: List[Tuple[str, PrismFace, PrismFace]] = [
+    ("front_right", PrismFace.FRONT, PrismFace.RIGHT),
+    ("front_left", PrismFace.FRONT, PrismFace.LEFT),
+    ("back_right", PrismFace.BACK, PrismFace.RIGHT),
+    ("back_left", PrismFace.BACK, PrismFace.LEFT),
+]
+
+
+def _long_arris_tags(prefix: str) -> List[CSGFeature]:
+    """Named features for a timber's four long arrises.
+
+    Declared rather than left to be derived from the two faces meeting. A
+    derived edge cannot be referred to by name afterwards and depends on both
+    its parents being found again at a point; an arris a timber simply has is
+    worth naming once. It is also why the faces themselves no longer meet each
+    other -- see _ptw_face_tags -- since otherwise the same line would be
+    reachable two ways and show up twice.
+    """
+    return [
+        SimpleRectangularPrismEdgeFeature(
+            name=f"{prefix}{name}",
+            faces=(first, second),
+            properties=FeatureProperties(group=FeatureGroup.B1),
+        )
+        for name, first, second in _TIMBER_LONG_ARRISES
+    ]
+
+
 def _ptw_face_tags() -> List[CSGFeature]:
     """Named features for the 6 faces of a timber's perfect-timber-within prism.
 
-    Group B2: they form edges against joint features (group A), and also
-    against each other -- the latter being the timber's own four long arrises,
-    which drawing generation needs, since a reference edge is defined as the
-    edge between two reference faces.
+    Group B1: they form edges against joint features (group A) and not against
+    each other. The timber's own four long arrises used to come from faces
+    meeting faces; they are declared outright now (see _long_arris_tags), so
+    letting the faces pair as well would make the same line reachable two ways
+    and show it twice.
     """
     return [
         SimpleRectangularPrismFeature(
             name=PTW_FACE_PREFIX + face_name,
             face=face,
-            properties=FeatureProperties(group=FeatureGroup.B2),
+            properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ]
+    ] + _long_arris_tags(PTW_FACE_PREFIX)
 
 
 def _rough_face_tags() -> List[CSGFeature]:
     """Named features for the 6 faces of a timber's rough (as-sawn) prism.
 
-    Group B2 as well, but kept separately named: a rough face only coincides
+    Group B1 as well, but kept separately named: a rough face only coincides
     with its perfect-timber-within counterpart on a reference face, and
     measurements may never be taken from one that does not (see
     PerfectTimberWithin.is_face_perfect).
@@ -1749,10 +1782,10 @@ def _rough_face_tags() -> List[CSGFeature]:
         SimpleRectangularPrismFeature(
             name=ROUGH_FACE_PREFIX + face_name,
             face=face,
-            properties=FeatureProperties(group=FeatureGroup.B2),
+            properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ]
+    ] + _long_arris_tags(ROUGH_FACE_PREFIX)
 
 
 def _create_extended_rectangular_prism(

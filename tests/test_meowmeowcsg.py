@@ -37,6 +37,7 @@ from kumiki.cutcsg import (
     SimpleConvexPolygonExtrusionFeature,
     SimpleCylinderFeature,
     SimpleLoftFeature,
+    SimpleRectangularPrismEdgeFeature,
     SimpleRectangularPrismFeature,
     FeatureGroup,
     CylinderPart,
@@ -4192,3 +4193,60 @@ class TestAFeatureThatFormsNoEdges:
         hits = prism.get_all_features(on_the_face)
 
         assert [hit.feature.name for hit in hits] == ["quiet"]
+
+
+class TestANamedArris:
+    """An edge a prism simply has, declared rather than derived."""
+
+    def _prism(self, *features):
+        return RectangularPrism(
+            size=create_v2(scalar(4), scalar(6)), transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(10), _features=list(features))
+
+    def _arris(self, name="arris.front_right",
+               faces=(PrismFace.FRONT, PrismFace.RIGHT)):
+        return SimpleRectangularPrismEdgeFeature(name, faces=faces)
+
+    def test_it_is_an_edge(self):
+        assert self._arris().feature_type() == CSGFeatureType.EDGE
+
+    def test_it_locates_to_the_line_the_two_faces_meet_in(self):
+        # Which is what a derived edge could do and a declared one could not,
+        # before this existed -- and what makes it measurable rather than
+        # merely pickable.
+        arris = self._arris()
+
+        line = arris.locate(self._prism(arris))
+
+        assert isinstance(line, Line)
+        assert [round(float(line.point[i, 0]), 6) for i in range(3)] == [2.0, 3.0, 0.0]
+
+    def test_two_faces_that_never_meet_locate_to_nothing(self):
+        # Opposite faces are parallel and share no line. Better to say so than
+        # to invent an answer.
+        opposite = self._arris("nope", faces=(PrismFace.FRONT, PrismFace.BACK))
+
+        assert opposite.locate(self._prism(opposite)) is None
+
+    def test_a_point_is_on_it_only_when_it_is_on_both_faces(self):
+        arris = self._arris()
+        prism = self._prism(arris)
+
+        assert arris.test_point(prism, create_v3(scalar(2), scalar(3), scalar(5)))
+        # On the right face, not on the front one.
+        assert not arris.test_point(prism, create_v3(scalar(2), scalar(0), scalar(5)))
+
+    def test_it_has_an_extent_to_hang_an_annotation_from(self):
+        arris = self._arris()
+
+        assert arris.get_extent(self._prism(arris)) is not None
+
+    def test_it_is_found_by_a_point_query_like_any_other_feature(self):
+        # The difference from a derived edge: it is simply there, and does not
+        # have to be reconstructed from two face hits.
+        arris = self._arris()
+        prism = self._prism(arris)
+
+        hits = prism.get_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
+
+        assert arris.name in [hit.feature.name for hit in hits]

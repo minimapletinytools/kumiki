@@ -750,6 +750,57 @@ class SimpleRectangularPrismFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
+class SimpleRectangularPrismEdgeFeature(CSGFeature):
+    """An arris of a RectangularPrism, named by the two faces it lies between.
+
+    Declared rather than derived, which is the difference that matters. A
+    derived edge exists only as the product of two face hits at a query point,
+    so it cannot be referred to afterwards by name and its identity depends on
+    both parents surviving. An arris a timber simply HAS is a thing to name
+    once, and then to measure to for as long as the timber has it.
+
+    The two faces must actually meet: opposite faces are parallel and share no
+    line, and asking for that pair gets None from locate() rather than an
+    invented answer.
+    """
+
+    faces: Tuple[PrismFace, PrismFace] = (PrismFace.FRONT, PrismFace.RIGHT)
+
+    def feature_type(self) -> CSGFeatureType:
+        return CSGFeatureType.EDGE
+
+    def _sides(self) -> Tuple['SimpleRectangularPrismFeature', 'SimpleRectangularPrismFeature']:
+        """The two faces as features, so their geometry is worked out once, there."""
+        return (
+            SimpleRectangularPrismFeature(name=self.name, face=self.faces[0]),
+            SimpleRectangularPrismFeature(name=self.name, face=self.faces[1]),
+        )
+
+    def test_point(self, owner: 'CutCSG', point: V3,
+                   test_tolerance: Optional[Numeric] = None) -> bool:
+        first, second = self._sides()
+        return (first.test_point(owner, point, test_tolerance)
+                and second.test_point(owner, point, test_tolerance))
+
+    def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
+        """The line the two faces meet in, or None if they never do."""
+        first, second = self._sides()
+        return intersect_planes(_as_plane(first.locate(owner)), _as_plane(second.locate(owner)))
+
+    def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
+        """Where the arris sits -- only approximately, as for a derived edge.
+
+        `ends` is None and `anchor` is the point on the INFINITE line closest to
+        the origin. Cropping it to the timber is measurement's job, a level up
+        where the enclosing solid is known; see csgconvexhull.segment_on_line.
+        """
+        line = self.locate(owner)
+        if not isinstance(line, Line):
+            return None
+        return CSGFeatureExtent(anchor=line.point)
+
+
+@dataclass(frozen=True)
 class SimpleCylinderFeature(CSGFeature):
     """One surface of a Cylinder: an end cap, or the barrel."""
     part: CylinderPart = CylinderPart.BARREL

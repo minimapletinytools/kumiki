@@ -309,9 +309,14 @@ DONEDONE-on cofee table, we're getting {"feature":"tenon_left×rough.front"} -- 
   DONE-parallel faces should never intersect as features
   DONE-make suer tenon_left is not in a intersection group with rough.front. I think tenon_left does not need to be in any intersection group for now actually.
 DONEDONE-why do edges extend beyond their actual bonudaries...  (it was the edge tolerance widening both ends; extent is clipped exactly now)
--save settings buttons needs to move to panel header, not in the 3d view section.
--debug drawing should be a button not a checkbox in the options view, 
+DONE-save settings buttons needs to move to panel header, not in the 3d view section.
+DONE-debug drawing should be a button not a checkbox in the options view, 
+DONE-increase edge selsection threhsold...
 
+DONE-add ability to select timber LONG edges as explicit named features (rough.front_left etc). END FACE edges are still not named -- an end face meeting each long face is a different set of four
+-name all features
+  -consider giving a default feature set to each CSG primitive and allow named features to reference them? but it's better just to name all the featuers I think...
+    -it could be weird as this creates cases where there are unnamed features that can't be selected and it looks buggy... so instead if we have default efatues we can highlight them but not click on them at least (indicating this is a non mesaureable feature)
 
 -make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
   -welly oush ould force show lines for PTW faces (maybe light grey)
@@ -323,8 +328,6 @@ DONEDONE-why do edges extend beyond their actual bonudaries...  (it was the edge
 -add support for 3d measurements
   -maybe there should be a spceial drawing that's available in regular view mode...
 
--increase edge selsection threhsold...
--add ability to select timber edges and end face edges (either using face face intersection or as explicit named features, probably the latter)
 
 
 
