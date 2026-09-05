@@ -312,11 +312,69 @@ DONEDONE-why do edges extend beyond their actual bonudaries...  (it was the edge
 DONE-save settings buttons needs to move to panel header, not in the 3d view section.
 DONE-debug drawing should be a button not a checkbox in the options view, 
 DONE-increase edge selsection threhsold...
-
 DONE-add ability to select timber LONG edges as explicit named features (rough.front_left etc). END FACE edges are still not named -- an end face meeting each long face is a different set of four
+-conisder naming short edges on timber as well
 -name all features
   -consider giving a default feature set to each CSG primitive and allow named features to reference them? but it's better just to name all the featuers I think...
     -it could be weird as this creates cases where there are unnamed features that can't be selected and it looks buggy... so instead if we have default efatues we can highlight them but not click on them at least (indicating this is a non mesaureable feature)
+
+    OPEN DECISION -- investigated 2026-09-05, not started. findings:
+
+    -we already HAVE defaults, they are just not features. _detect_face_label
+     falls back to a generic name by direction ("left", "right", "face",
+     "cylindrical_surface"). that is a default feature set with no identity, no
+     geometry and no reference -- which IS the buggy-looking halfway state.
+     the question is whether to promote them from strings to features.
+
+    -47% of primitives declare nothing (484 of 1019 across coffee_table and
+     tinyhouse120): RectangularPrism 216/579, HalfSpace 224/396,
+     ConvexPolygonExtrusion 40/40, Cylinder 4/4. naming everything is not a
+     backlog that shrinks -- every new joint adds more, and forgetting is
+     silent. so probably both: defaults as the floor, names where a feature is
+     worth referring to.
+
+    -"highlight but don't click" falls out of the geometry rather than needing
+     a policy: locate() already returns None for a cylinder barrel and a lofted
+     side. a default you can locate is measurable; one you cannot is
+     highlight-only. the viewer already refuses unlocatable features.
+
+    -which primitives permit sensible defaults:
+       RectangularPrism        6 faces + 12 arrises   stable, keyed by PrismFace
+       HalfSpace               1 face                 stable
+       Cylinder                2 caps + barrel        caps measurable, barrel not
+       ConvexPolygonExtrusion  2 caps + n sides       SIDES ARE POSITIONAL
+       ConvexPolygonSimpleLoft caps + n sides         sides planar only for a pure taper
+       PathExtrusion           per segment            straight segments only
+       Difference/Union/etc    none                   no surface of their own
+
+    -the override key is the hard part. a named feature must say WHICH default
+     it replaces. for a prism that is PrismFace.RIGHT, an enum, and already how
+     SimpleRectangularPrismFeature identifies itself -- so declared-wins-by-key
+     is natural. for a polygon extrusion side the key is "the third side",
+     which is a POSITION, and renumbers when a vertex is inserted. same trap as
+     timber occurrence and joint occurrence. suggests starting with the
+     primitives that have enum-named parts (975 of the 1019 above) and leaving
+     the positional ones generic for now.
+
+    -COST, measured on the tinyhouse mid-height front beam with 6 face defaults
+     per prism (prototype, not committed):
+       point query   2.56ms -> 4.80ms  (x1.9)
+       face hits         82 -> 170
+       edges derived     46 -> 117
+       worst point    5 faces/10 pairs -> 11 faces/55 pairs
+     it is NOT a flat per-leaf constant, for two reasons:
+       1. collect_hits early-returns [] when a primitive declares nothing --
+          14 of that timber's 43 primitives take that path today and cost
+          nothing at all. defaults remove the early-out, so the increase lands
+          hardest exactly where there was no cost.
+       2. derive_edge_hits is O(k^2) in the faces found AT THE POINT, so more
+          coincident faces multiplies edge derivation quadratically.
+
+    -before accepting that cost, try gating defaults behind a boundary test:
+     if the point is not on the primitive's boundary at all, no real feature
+     can match, so skip every default. that inverts the current order (boundary
+     is computed lazily AFTER the first test_point succeeds) and should restore
+     most of the early-out for the non-declaring primitives. not measured yet.
 
 -make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
   -welly oush ould force show lines for PTW faces (maybe light grey)
