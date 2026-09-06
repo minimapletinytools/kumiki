@@ -424,7 +424,7 @@ class TestNonPrismPrimitivesArePickable:
         assert face == "side.0"
 
 
-class TestDetectFaceLabel:
+class TestDescribeLeafCsg:
     def test_prefers_a_declared_named_feature(self):
         """A declared name beats the geometric guess.
 
@@ -438,22 +438,22 @@ class TestDetectFaceLabel:
             end_distance=scalar(100),
             _features=[SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT)],
         )
-        assert runner._detect_feature_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
+        assert runner._describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
 
     def test_a_face_nobody_named_answers_with_the_prisms_own_default(self):
         """No longer the timber-local direction, because nothing is unnamed now.
 
         A prism names its own boundary, so "side.0" is a true answer about the
         shape that has the face. Less friendly than "right", which said where
-        the face is on the TIMBER -- see the note on _detect_feature_label
+        the face is on the TIMBER -- see the note on _describe_leaf_csg
         about composing the two.
         """
         prism = _timber_prism(named=False)
 
-        assert runner._detect_feature_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "side.0"
-        assert runner._detect_feature_label(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "side.2"
-        assert runner._detect_feature_label(prism, [0.0, 3.0, 50.0], PICK_EPS) == "side.1"
-        assert runner._detect_feature_label(prism, [0.0, 0.0, 100.0], PICK_EPS) == "cap.1"
+        assert runner._describe_leaf_csg(prism, [2.0, 0.0, 50.0], PICK_EPS) == "side.0"
+        assert runner._describe_leaf_csg(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "side.2"
+        assert runner._describe_leaf_csg(prism, [0.0, 3.0, 50.0], PICK_EPS) == "side.1"
+        assert runner._describe_leaf_csg(prism, [0.0, 0.0, 100.0], PICK_EPS) == "cap.1"
 
     def test_a_shape_that_names_nothing_still_gets_a_label_and_a_warning(self):
         """The fallbacks are kept for the gap, not for the common case.
@@ -483,21 +483,21 @@ class TestDetectFaceLabel:
 
         with warnings_module.catch_warnings(record=True) as caught:
             warnings_module.simplefilter("always")
-            label = runner._detect_feature_label(extrusion, [2.0, 0.0, 50.0], PICK_EPS)
+            label = runner._describe_leaf_csg(extrusion, [2.0, 0.0, 50.0], PICK_EPS)
 
         assert label == "unknown face feature"
         assert any("does not" in str(w.message) for w in caught)
 
     def test_a_half_space_answers_with_its_own_default(self):
         # It used to reach the "cut_plane" fallback, which is a friendlier name
-        # than "side.0" -- see the note on _detect_feature_label. The fallback
+        # than "side.0" -- see the note on _describe_leaf_csg. The fallback
         # is still there, it is just no longer the thing that answers.
         from kumiki.cutcsg import HalfSpace
 
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(50)
         )
-        assert runner._detect_feature_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "side.0"
+        assert runner._describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "side.0"
 
     def test_half_space_named_feature_wins_over_cut_plane(self):
         from kumiki.cutcsg import HalfSpace
@@ -507,7 +507,7 @@ class TestDetectFaceLabel:
             offset=scalar(50),
             _features=[HalfSpaceFeature("shoulder")],
         )
-        assert runner._detect_feature_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
+        assert runner._describe_leaf_csg(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
 
 
 class TestPickingToleranceIsPerCall:
@@ -834,7 +834,7 @@ class TestPickDescription:
     """What the selection display gets from one click.
 
     featureLabel / featureType / jointName / facesToward, computed once per
-    pick -- unlike _detect_feature_label, which runs per triangle during highlight
+    pick -- unlike _describe_leaf_csg, which runs per triangle during highlight
     extraction and stays a cheap string lookup.
     """
 

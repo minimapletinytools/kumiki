@@ -3485,8 +3485,14 @@ def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
             return hit.feature
     return hits[0].feature
 
-def _detect_feature_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> str:
-    """Name the feature of primitive *csg* that *local_pt* lies on.
+def _describe_leaf_csg(csg: Any, local_pt: List[float], eps: float = 1e-4) -> str:
+    """What to call the part of primitive *csg* that *local_pt* lies on.
+
+    A leaf's own account of itself: one primitive, one point, one string, and
+    no tree. _describe_pick is the other half -- it walks from the root to say
+    which joint made this node and which way the surface really faces, neither
+    of which a primitive can know about itself. This one runs per triangle
+    during highlight extraction, so it stays a lookup.
 
     Whatever names the point, preferring the name someone chose. An AUTHORED
     feature wins outright -- a prism built in its own local frame (a tenon's
@@ -3513,7 +3519,8 @@ def _detect_feature_label(csg: Any, local_pt: List[float], eps: float = 1e-4) ->
     timber in scope. Left undone deliberately; the shape of that string is a
     decision, not a detail.
     """
-    from kumiki.cutcsg import HalfSpace
+    from kumiki.cutcsg import Cylinder, HalfSpace
+    from kumiki.rule import are_vectors_perpendicular
 
     point = _to_v3(local_pt)
 
@@ -3543,7 +3550,14 @@ def _detect_feature_label(csg: Any, local_pt: List[float], eps: float = 1e-4) ->
     if normal is None:
         return "unknown feature"
 
+    # A barrel is not a face, and saying so beats calling it one. Unreachable
+    # for a Cylinder as things stand, since a cylinder names its own barrel --
+    # it is here for the shape that gains a curved side and no defaults.
+    if isinstance(csg, Cylinder) and are_vectors_perpendicular(normal, csg.axis_direction):
+        return "cylindrical_surface"
+
     return "unknown face feature"
+
 
 def _node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
     """Every node in *root* keyed by id, as (depth, document order, label path).
@@ -3783,7 +3797,7 @@ def _describe_pick(
 ) -> Dict[str, Any]:
     """Everything the selection display wants to say about one click.
 
-    Kept separate from _detect_feature_label, which runs per triangle during
+    Kept separate from _describe_leaf_csg, which runs per triangle during
     highlight extraction and must stay a cheap string lookup. This runs once.
 
     The three CSG-ish arguments are all about one timber and are easy to
@@ -3850,7 +3864,7 @@ def _describe_pick(
     return {
         **described,
         # featureLabel is only a name when the primitive declared one. Without
-        # that it is _detect_feature_label's geometric guess, which the display
+        # that it is _describe_leaf_csg's geometric guess, which the display
         # must not present as a name -- it is a direction, and one that has not
         # been sign-corrected, unlike the normal below.
         "featureLabel": feature_label,
@@ -4009,7 +4023,7 @@ def _navigate_csg_one_level(
             return (current_path + [segment], child, None)
         if isinstance(child, (SolidUnion, Difference)):
             return _navigate_csg_one_level(child, local_pt, current_path, eps, segments)
-        return (current_path, child, _detect_feature_label(child, local_pt, eps))
+        return (current_path, child, _describe_leaf_csg(child, local_pt, eps))
 
     if isinstance(node, Difference):
         for sub in node.subtract:
@@ -4026,7 +4040,7 @@ def _navigate_csg_one_level(
         return (current_path, node, "face")
 
     # Leaf primitive — report face
-    return (current_path, node, _detect_feature_label(node, local_pt, eps))
+    return (current_path, node, _describe_leaf_csg(node, local_pt, eps))
 
 
 def _navigate_csg_to_leaf(
@@ -4185,7 +4199,7 @@ def _extract_highlight_mesh(
     inside_box = _aabb_filter(target_csg, eps)
 
     # The feature we are matching against, looked up once instead of once per
-    # triangle. _detect_feature_label asks the node for EVERY feature at the point
+    # triangle. _describe_leaf_csg asks the node for EVERY feature at the point
     # and compares names; when the name is a declared feature we can ask that
     # one feature directly, which is the same answer without the search.
     #
@@ -4243,7 +4257,7 @@ def _extract_highlight_mesh(
             elif feature_label is not None:
                 # A generic name -- "left", "cylindrical_surface" -- which no
                 # declared feature answers to, so it has to be worked out.
-                tri_face_label = _detect_feature_label(target_csg, local_c, eps)
+                tri_face_label = _describe_leaf_csg(target_csg, local_c, eps)
                 if tri_face_label != feature_label:
                     continue
             base = len(out_verts) // 3
