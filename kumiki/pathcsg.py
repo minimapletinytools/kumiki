@@ -91,7 +91,7 @@ class PathSegment(ABC):
         values, where its x(y) relation has a local turning point (e.g. an
         arc passing through its circle's own north/south pole) and so isn't
         single-valued across its full span. Empty for segments whose x(y) is
-        already monotonic (e.g. any LineSegment). Used as extra band-boundary
+        already monotonic (e.g. any StraightSegment). Used as extra band-boundary
         breakpoints by decompose_path_into_convex_pieces.
         """
 
@@ -127,7 +127,7 @@ class PathSegment(ABC):
         """
         Like tessellate(), but also forces a vertex at every y-value in
         `other_breaks` that falls strictly inside this segment's own y-range
-        -- even for a LineSegment, which tessellate() alone never subdivides.
+        -- even for a StraightSegment, which tessellate() alone never subdivides.
 
         This exists because decompose_path_into_convex_pieces's band sweep
         can cut a v-band boundary through the MIDDLE of some other segment's
@@ -150,7 +150,7 @@ class PathSegment(ABC):
         both endpoints, ordered starting near point_lo and ending near
         point_hi, for meshing only. Used by decompose_path_into_convex_pieces
         to keep a curved band-edge curved in the output piece instead of
-        flattening it to a chord. Empty for a LineSegment (a chord between
+        flattening it to a chord. Empty for a StraightSegment (a chord between
         two of its own points IS the segment).
 
         Must draw from the exact same per-tolerance sample grid tessellate()
@@ -181,11 +181,18 @@ def _right_perpendicular(v: V2) -> V2:
 
 
 # ============================================================================
-# LineSegment
+# StraightSegment
 # ============================================================================
 
 @dataclass(frozen=True)
-class LineSegment(PathSegment):
+class StraightSegment(PathSegment):
+    """A straight run of a path, between two points in the path's 2D plane.
+
+    Straight rather than Line, so it pairs with ArcSegment by what the segment
+    DOES, and so it does not collide with geometry.LineSegment -- which is a
+    different thing entirely: a bounded stretch of an infinite 3D line.
+    """
+
     line_start: V2
     line_end: V2
 
@@ -278,8 +285,8 @@ class LineSegment(PathSegment):
     def sample_interior(self, point_lo: V2, point_hi: V2, tolerance: float) -> List[V2]:
         return []
 
-    def reverse(self) -> 'LineSegment':
-        return LineSegment(self.line_end, self.line_start)
+    def reverse(self) -> 'StraightSegment':
+        return StraightSegment(self.line_end, self.line_start)
 
 
 # ============================================================================

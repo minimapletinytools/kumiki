@@ -4,7 +4,7 @@ Decorative Joints Patterns
 
 
 from kumiki import *
-from kumiki.pathcsg import LineSegment, ArcSegment
+from kumiki.pathcsg import StraightSegment, ArcSegment
 from kumiki.patternbook import Pattern, make_pattern_from_joint
 
 
@@ -93,7 +93,7 @@ def example_path_extrusion_corner_end_decoration() -> Joint:
         center=create_v2(inches(2), inches(2)), radius=inches(1),
         start_angle=pi, sweep_angle=-pi / 2,
     )
-    run = LineSegment(tuck.end, create_v2(inches(4), scalar(0)))
+    run = StraightSegment(tuck.end, create_v2(inches(4), scalar(0)))
 
     return cut_practice_path_extrusion_corner_end_decoration(
         timber=timber,

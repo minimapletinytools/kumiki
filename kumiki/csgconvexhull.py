@@ -94,6 +94,11 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
     None rather than an empty list, because "this solid does not bound the
     region" and "this solid is not one I can describe" are different answers and
     only the second should make a caller give up.
+
+    An EmptyCSG gets None too, which is the one case where None is not the whole
+    truth: it is perfectly describable, it just contains nothing, and half
+    spaces cannot say that -- no bounding planes already means the opposite,
+    everything. Both crop functions catch it before asking here.
     """
     from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
                          HalfSpace, RectangularPrism)
@@ -157,6 +162,10 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         # small removes less than it should, which is the safe direction -- so
         # a curved cutter is the milder half of this bug and a curved body the
         # sharper one.
+        #
+        # For analytic purposes, treat a path extrusion as if it was created
+        # from all straight line extrusions. Proper support for curves is
+        # unlikely to be added anytime soon.
         points = [seg.start() for seg in csg.path.segments]
         return _extruded_hull_half_spaces(
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
@@ -359,13 +368,27 @@ def approximately_crop_plane_to_area_on_csg(
     in that direction.
 
     None when any of the solids cannot be described as half spaces, since a
-    region clipped by only some of them would be silently too large.
+    region clipped by only some of them would be silently too large. An empty
+    solid is not one of those: it contains nothing, so it crops everything away
+    and the region comes back empty -- the same answer the line crop gives.
     """
+    from .cutcsg import EmptyCSG
+
     frame = frame_for_plane(plane, near)
     reach = float(seed_reach)
     corners = [(-reach, -reach), (reach, -reach), (reach, reach), (-reach, reach)]
 
     for solid in bounding:
+        if isinstance(solid, EmptyCSG):
+            # Nothing is inside it, so nothing survives being clipped by it.
+            # Handled here rather than in bounding_half_spaces because that
+            # function answers in half spaces, and "contains nothing" is not
+            # something half spaces can say -- an empty list of them already
+            # means the opposite, everything. So it says None, meaning "not a
+            # solid I can describe", and the line crop has always caught this
+            # case first for the same reason.
+            return ConvexPlanarRegion(plane=plane, boundary=())
+
         faces = bounding_half_spaces(solid)
         if faces is None:
             # Clipped by only the solids it understood, the region would be

@@ -1,5 +1,5 @@
 """
-Tests for pathcsg.py: Path/LineSegment/ArcSegment and the PathExtrusion CutCSG
+Tests for pathcsg.py: Path/StraightSegment/ArcSegment and the PathExtrusion CutCSG
 primitive, including decompose_path_into_convex_pieces.
 """
 
@@ -9,7 +9,7 @@ from kumiki.rule import create_v2, create_v3, Transform, scalar, pi
 from kumiki.cutcsg import ExtrusionCap
 from kumiki.geometry import Plane
 from kumiki.pathcsg import (
-    ArcSegment, LineSegment, FancyPath, Path, PathExtrusion,
+    ArcSegment, StraightSegment, FancyPath, Path, PathExtrusion,
     SimplePathExtrusionFeature,
 )
 from kumiki.triangles import mesh_cutcsg
@@ -79,12 +79,12 @@ class TestPathCSG:
         notch_arc = ArcSegment(center=notch_center, radius=r, start_angle=scalar(0), sweep_angle=-pi)
 
         path = FancyPath([
-            LineSegment(p_bl, p_br),
-            LineSegment(p_br, p_tr),
-            LineSegment(p_tr, notch_start),
+            StraightSegment(p_bl, p_br),
+            StraightSegment(p_br, p_tr),
+            StraightSegment(p_tr, notch_start),
             notch_arc,
-            LineSegment(notch_end, p_tl),
-            LineSegment(p_tl, p_bl),
+            StraightSegment(notch_end, p_tl),
+            StraightSegment(p_tl, p_bl),
         ])
         assert path.is_valid()
 
@@ -114,7 +114,7 @@ class TestPathCSG:
     def _leg_profile_path(self) -> FancyPath:
         p0 = create_v2(scalar(0), scalar(0))
         p1 = create_v2(scalar(3, 100), scalar(0))
-        line_foot = LineSegment(p0, p1)
+        line_foot = StraightSegment(p0, p1)
 
         knee = ArcSegment(center=create_v2(scalar(3, 100), scalar(5, 100)),
                            radius=scalar(5, 100), start_angle=-pi / 2, sweep_angle=pi / 2)
@@ -125,9 +125,9 @@ class TestPathCSG:
 
         p5 = create_v2(scalar(2, 100), scalar(15, 100))
         p6 = create_v2(scalar(0), scalar(15, 100))
-        line_shin = LineSegment(foot_bulge.end, p5)
-        line_top = LineSegment(p5, p6)
-        line_back = LineSegment(p6, p0)
+        line_shin = StraightSegment(foot_bulge.end, p5)
+        line_top = StraightSegment(p5, p6)
+        line_back = StraightSegment(p6, p0)
 
         return FancyPath([line_foot, knee, ankle, foot_bulge, line_shin, line_top, line_back])
 
@@ -217,11 +217,11 @@ class TestPathExtrusionTolerance:
         b = create_v2(scalar(1, 10), scalar(0))
         c = create_v2(scalar(1, 10), scalar(1, 10))
         d = create_v2(scalar(0), scalar(1, 10))
-        return FancyPath([LineSegment(a, b), LineSegment(b, c),
-                          LineSegment(c, d), LineSegment(d, a)])
+        return FancyPath([StraightSegment(a, b), StraightSegment(b, c),
+                          StraightSegment(c, d), StraightSegment(d, a)])
 
     def test_eps_reaches_a_line_segment_boundary(self):
-        """Through FancyPath.locate_boundary_segment into LineSegment."""
+        """Through FancyPath.locate_boundary_segment into StraightSegment."""
         extrusion = PathExtrusion(
             path=self._square(), transform=Transform.identity(),
             start_distance=scalar(0), end_distance=scalar(1, 10),
@@ -280,8 +280,8 @@ class TestPathExtrusionLocate:
         b = create_v2(scalar(1, 10), scalar(0))
         c = create_v2(scalar(1, 10), scalar(1, 10))
         d = create_v2(scalar(0), scalar(1, 10))
-        return FancyPath([LineSegment(a, b), LineSegment(b, c),
-                          LineSegment(c, d), LineSegment(d, a)])
+        return FancyPath([StraightSegment(a, b), StraightSegment(b, c),
+                          StraightSegment(c, d), StraightSegment(d, a)])
 
     def _extrusion(self, path):
         return PathExtrusion(path=path, transform=Transform.identity(),

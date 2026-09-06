@@ -8,7 +8,7 @@ from typing import Dict, List, Optional, Tuple, Union
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
 from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation, Abs, Matrix, degrees
 from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg, CutCSGLabel
-from kumiki.pathcsg import PathSegment, LineSegment, Path, PathExtrusion
+from kumiki.pathcsg import PathSegment, StraightSegment, Path, PathExtrusion
 from kumiki.measuring import get_center_point_on_face_global
 
 
@@ -345,10 +345,10 @@ def cut_practice_rafter_tail_scallop_corner_end_decoration(
     )
 
 
-def _line_if_nondegenerate(a: Matrix, b: Matrix) -> Optional[LineSegment]:
+def _line_if_nondegenerate(a: Matrix, b: Matrix) -> Optional[StraightSegment]:
     if safe_zero_test(a[0] - b[0]) and safe_zero_test(a[1] - b[1]):
         return None
-    return LineSegment(a, b)
+    return StraightSegment(a, b)
 
 
 def cut_practice_path_extrusion_corner_end_decoration(

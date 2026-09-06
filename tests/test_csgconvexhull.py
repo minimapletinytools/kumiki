@@ -126,11 +126,24 @@ class TestRegionInPlane:
     def test_it_gives_up_rather_than_returning_too_much(self):
         # A region clipped by only the solids it understood would be silently
         # larger than the truth, which is worse than no answer.
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        assert approximately_crop_plane_to_area_on_csg(
+            plane, [_box(), _undescribable()], seed_reach=10, near=_v(0, 0, 0)) is None
+
+    def test_an_empty_solid_crops_everything_away_rather_than_giving_up(self):
+        # "Contains nothing" is an answer; "cannot describe" is not. The two
+        # crops used to disagree about which one this was, and an empty solid
+        # is not hypothetical -- a timber whose stock is already perfect puts
+        # one in its own tree.
         from kumiki.cutcsg import EmptyCSG
 
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
-        assert approximately_crop_plane_to_area_on_csg(plane, [_box(), EmptyCSG()], seed_reach=10, near=_v(0, 0, 0)) is None
+        region = approximately_crop_plane_to_area_on_csg(
+            plane, [_box(), EmptyCSG()], seed_reach=10, near=_v(0, 0, 0))
+
+        assert region is not None and region.is_empty
 
     def test_the_centroid_lies_in_the_plane(self):
         box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
