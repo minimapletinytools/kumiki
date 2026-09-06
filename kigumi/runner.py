@@ -2337,7 +2337,17 @@ def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, A
     return None
 
 
-def _feature_anchor(feature: Any, node: Any, timber: Any, located: Any) -> Optional[List[float]]:
+def _segment_length(segment: Any) -> float:
+    """How long a cropped segment is, for choosing between pieces of one edge."""
+    start, end = segment.ends
+    return float(sum(
+        (float(start[axis, 0]) - float(end[axis, 0])) ** 2 for axis in range(3)
+    )) ** 0.5
+
+
+def _feature_anchor(
+    feature: Any, node: Any, timber: Any, located: Any, root_csg: Any = None,
+) -> Optional[List[float]]:
     """Where to attach a dimension to this feature, in world space.
 
     From what the feature occupies once cropped to the timber, not from what
@@ -2350,7 +2360,10 @@ def _feature_anchor(feature: Any, node: Any, timber: Any, located: Any) -> Optio
     primitive, say -- since somewhere approximate beats nowhere.
     """
     from kumiki.geometry import Line, Plane, Point
-    from kumiki.csgconvexhull import region_in_plane, segment_on_line
+    from kumiki.csgconvexhull import (
+        approximately_crop_plane_to_area_on_csg,
+        crop_line_to_segments_on_csg,
+    )
 
     # A point is already where it is: nothing to crop, and cropping could only
     # say it is off the piece, which is a different question from where it is.
@@ -2363,17 +2376,25 @@ def _feature_anchor(feature: Any, node: Any, timber: Any, located: Any) -> Optio
         # measured from the timber rather than from the feature's own point,
         # which may be nowhere near it.
         reach = float(timber.length) * 4
-        bounding = [node, solid]
+        middle = None
         if isinstance(located, Plane):
-            cropped = region_in_plane(
-                located, bounding, seed_reach=reach, near=solid.transform.position,
+            # Still the enclosing solids rather than the tree: cropping a plane
+            # cannot subtract yet, so a face half taken away by a cut anchors at
+            # the centroid of the whole face. See that function's docstring.
+            cropped = approximately_crop_plane_to_area_on_csg(
+                located, [node, solid], seed_reach=reach, near=solid.transform.position,
             )
             middle = cropped.centroid() if cropped is not None and not cropped.is_empty else None
-        else:
-            cropped = segment_on_line(
-                located, bounding, seed_reach=reach, near=solid.transform.position,
+        elif root_csg is not None:
+            segments = crop_line_to_segments_on_csg(
+                located, root_csg, seed_reach=reach, near=solid.transform.position,
             )
-            middle = cropped.midpoint() if cropped is not None and not cropped.is_empty else None
+            if segments:
+                # The longest piece. A cut can leave an edge in several, and a
+                # dimension has to attach to one of them -- the biggest is the
+                # one a reader would point at.
+                longest = max(segments, key=lambda segment: _segment_length(segment))
+                middle = longest.midpoint()
         if middle is not None:
             return _vector3_to_floats(timber.transform.local_to_global(middle))
 
@@ -2475,6 +2496,11 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
     if entry is None:
         return None
     timber = entry["timber"]
+    # The solid the cuts have left, which is what an edge anchor is cropped to.
+    try:
+        root_csg = entry["cutTimber"].render_timber_with_cuts_csg_local()
+    except Exception:
+        root_csg = None
 
     if isinstance(path, DerivedFeaturePath):
         # A derived edge is not among anyone's declared features, so there is
@@ -2497,7 +2523,7 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
         owner = first[1]
         located = edge.locate(owner)
         return {
-            "at": _feature_anchor(edge, owner, timber, located),
+            "at": _feature_anchor(edge, owner, timber, located, root_csg),
             "geometry": _located_geometry_payload(located, timber),
         }
 
@@ -2507,7 +2533,7 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
     feature, node = found
     located = feature.locate(node)
     return {
-        "at": _feature_anchor(feature, node, timber, located),
+        "at": _feature_anchor(feature, node, timber, located, root_csg),
         "geometry": _located_geometry_payload(located, timber),
     }
 
@@ -3559,23 +3585,40 @@ def _edge_tolerance() -> Any:
     return FEATURE_EDGE_TOLERANCE
 
 
-def _cropped_edge_segment(
+def _cropped_edge_segments(
     edge_feature: Any,
     line: Any,
     timber: Any,
+    root_csg: Any,
     owner: Any = None,
 ):
-    """The edge's line, clipped to the solids that actually form it.
+    """The edge's line, clipped to where the edge actually exists.
 
-    An edge exists only where both its faces do, so both parents' owners bound
-    it, and the timber bounds it again.
+    Returns (segments, absent). Each segment is a {"start", "end"} pair in world
+    space, in order along the line; there is more than one when a cut crosses
+    the middle of the edge and leaves a piece either side of it.
 
-    Returns (segment, absent). `absent` says the line was cropped away to
-    nothing, which is a real answer: the two planes cross somewhere that is not
-    on either face. A mortise floor's plane run sideways meets the timber's side
-    a foot away from the mortise, and that is not an edge of anything.
+    `absent` says the line was cropped away to nothing, which is a real answer:
+    the two planes cross somewhere that is not on either face. A mortise
+    floor's plane run sideways meets the timber's side a foot away from the
+    mortise, and that is not an edge of anything.
+
+    Three conditions, all necessary, so all three are intersected:
+
+      - both parent faces are there. A derived edge is where two faces MEET,
+        and a face is bounded by the solid that declared it. Without this the
+        line runs the length of the timber, since a mortise wall's plane
+        carries on long after the mortise stops.
+      - the material is there. The whole tree, so that a cut which removes part
+        of the edge shortens it and one through the middle splits it in two.
+
+    Written as an Intersection so the interval algebra does the work: the
+    edge is on the body AND on its parents, which is what an intersection is.
+    Not the perfect-timber box, which used to stand in for the body -- rough
+    stock is larger than it, so every rough arris clipped away to nothing.
     """
-    from kumiki.csgconvexhull import segment_on_line
+    from kumiki.csgconvexhull import crop_line_to_segments_on_csg
+    from kumiki.cutcsg import Intersection
 
     # A derived edge is bounded by the two solids its parent faces belong to.
     # A declared one -- a timber's own arris -- belongs to a single primitive,
@@ -3586,13 +3629,17 @@ def _cropped_edge_segment(
         if hit is not None and getattr(hit, "owner", None) is not None
     ]
     if not parents:
-        parents = [owner]
-    solid = timber.get_perfect_timber_within_csg_local()
+        parents = [owner] if owner is not None else []
+
+    solid = root_csg
+    for parent in parents:
+        solid = Intersection(left=solid, right=parent)
+
     def clipped(tolerance):
-        return segment_on_line(
-            line, parents + [solid],
+        return crop_line_to_segments_on_csg(
+            line, solid,
             seed_reach=float(timber.length) * 4,
-            near=solid.transform.position,
+            near=timber.get_perfect_timber_within_csg_local().transform.position,
             tolerance=tolerance,
         )
 
@@ -3606,48 +3653,49 @@ def _cropped_edge_segment(
     # also pushed both ends out by that tolerance, so every edge was drawn long
     # at each end -- a fifth again on a 19mm arris.
     #
-    # So take the exact span where there is one, and fall back to the tolerant
-    # one only for the edge that exact clipping loses entirely.
-    segment = clipped(0.0)
-    if segment is None or segment.is_empty:
-        segment = clipped(float(_edge_tolerance()))
-    if segment is None:
+    # So take the exact spans where there are any, and fall back to the tolerant
+    # ones only for the edge that exact clipping loses entirely.
+    segments = clipped(0.0)
+    if not segments:
+        segments = clipped(float(_edge_tolerance()))
+    if segments is None:
         # A solid it cannot describe: no answer, rather than a wrong one.
         return (None, False)
-    if segment.is_empty:
+    if not segments:
         return (None, True)
-    start, end = segment.ends
-    return ({
-        "start": _vector3_to_floats(timber.transform.local_to_global(start)),
-        "end": _vector3_to_floats(timber.transform.local_to_global(end)),
-    }, False)
+
+    out = []
+    for segment in segments:
+        start, end = segment.ends
+        out.append({
+            "start": _vector3_to_floats(timber.transform.local_to_global(start)),
+            "end": _vector3_to_floats(timber.transform.local_to_global(end)),
+        })
+    return (out, False)
 
 
-def _edge_highlight_segment(
+def _edge_highlight_segments(
     edge_feature: Any,
     owner: 'CutCSG',
-    mesh_vertices: List[float],
-    timber_rot: List[List[float]],
-    timber_pos: List[float],
-    timber: Any = None,
-) -> Tuple[Optional[Dict[str, List[float]]], bool]:
-    """Where a derived edge runs, in global space, and whether it is there at all.
+    timber: Any,
+    root_csg: Any,
+) -> Tuple[Optional[List[Dict[str, List[float]]]], bool]:
+    """Where a selected edge runs, in world space, and whether it is there at all.
 
     An edge is a line, and a highlight built out of triangles can only ever
     approximate one -- it lights the strip beside it, which reads as a stray
-    wedge rather than as the edge. The viewer draws a line instead, and this
-    says where that line runs.
+    wedge rather than as the edge. The viewer draws lines instead, and this says
+    where they run.
 
     Cropped from the CSG, because asking the edge where it is does not bound
     it: a face feature's test_point checks the face's PLANE and nothing else,
     so an edge made of two of them answers yes all the way along its line --
     a metre past the joint that formed it. Picking never noticed, since a
-    click is one point that is on the timber anyway. Scanning the mesh for
-    every vertex the edge claims does notice: the far ones are real vertices
-    genuinely on both planes, so the span came out the length of the timber.
+    click is one point that is on the timber anyway.
 
-    Falls back to that scan when the line cannot be cropped -- a primitive
-    csgconvexhull cannot describe -- which is no worse than it always was.
+    A list, because a cut through the middle of an edge leaves a piece either
+    side of it. None when the tree holds a primitive csgconvexhull cannot
+    describe, and the caller falls back to lighting triangles.
 
     The second return says the edge was cropped away entirely. The caller wants
     that separately: with no line to draw it would otherwise light the triangles
@@ -3656,49 +3704,9 @@ def _edge_highlight_segment(
     from kumiki.geometry import Line
 
     line = edge_feature.locate(owner)
-    if timber is not None and isinstance(line, Line):
-        segment, absent = _cropped_edge_segment(edge_feature, line, timber, owner)
-        if segment is not None or absent:
-            return (segment, absent)
-
-    # PROBABLY DELETE ME. The clip above should always answer: every primitive
-    # kumiki has is convex, so every one of them can be described as half
-    # spaces. Reaching here means one could not be -- a gap in
-    # bounding_half_spaces -- and the scan below is the code that made a
-    # selected edge span a whole timber, since it asks test_point without the
-    # boundary check that gives it meaning. It is kept only so a shape we
-    # cannot yet describe still highlights something, and it should go once
-    # bounding_half_spaces is total.
-    warnings.warn(
-        f"Edge {getattr(edge_feature, 'name', '?')!r} could not be clipped to the "
-        "timber, so its highlight is being guessed from mesh vertices. That scan "
-        "over-reaches -- the span may run far past the edge. A primitive here "
-        "cannot be described as half spaces; see kumiki.csgconvexhull."
-    )
-
-    on_edge: List[List[float]] = []
-    tolerance = _edge_tolerance()
-    for index in range(0, len(mesh_vertices), 3):
-        vertex = [mesh_vertices[index], mesh_vertices[index + 1], mesh_vertices[index + 2]]
-        local = _inv_transform_point(timber_rot, timber_pos, vertex)
-        if edge_feature.test_point(owner, _to_v3(local), tolerance):
-            on_edge.append(vertex)
-
-    if len(on_edge) < 2:
+    if timber is None or root_csg is None or not isinstance(line, Line):
         return (None, False)
-
-    # The two furthest apart are the ends: everything on an edge is collinear,
-    # so no projection axis is needed to order them.
-    start, end, longest = on_edge[0], on_edge[1], -1.0
-    for i in range(len(on_edge)):
-        for j in range(i + 1, len(on_edge)):
-            span = sum((on_edge[i][axis] - on_edge[j][axis]) ** 2 for axis in range(3))
-            if span > longest:
-                start, end, longest = on_edge[i], on_edge[j], span
-
-    if longest <= 0:
-        return (None, False)
-    return ({"start": start, "end": end}, False)
+    return _cropped_edge_segments(edge_feature, line, timber, root_csg, owner)
 
 
 def _features_at_point(root: 'CutCSG', local_pt: List[float], eps: float) -> List[Any]:
@@ -4176,12 +4184,11 @@ def _extract_highlight_mesh(
                 if owner is not selected_ref:
                     continue
             if edge_feature is not None:
-                # PROBABLY DELETE ME, with the scan in _edge_highlight_segment
-                # and for the same reason: this asks test_point per vertex
-                # without the boundary check, so it lights the strip along the
-                # whole line rather than along the edge. Only reached when the
-                # analytic clip could not describe a primitive, and the caller
-                # warned about that already.
+                # The last fallback, and a poor one: it asks test_point per
+                # vertex without the boundary check, so it lights the strip
+                # along the whole line rather than along the edge. Only reached
+                # when crop_line_to_segments_on_csg met a primitive it could not
+                # describe as half spaces, and it should go once that is total.
                 #
                 # An edge is a line, and no triangle's centroid sits on one --
                 # matching the way a face does would light nothing at all. The
@@ -4330,8 +4337,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     edge_absent = False
     edge_feature = edge if edge is not None else declared_edge
     if edge_feature is not None:
-        highlight_edge, edge_absent = _edge_highlight_segment(
-            edge_feature, target_csg, mesh["vertices"], timber_rot, timber_pos, timber,
+        highlight_edge, edge_absent = _edge_highlight_segments(
+            edge_feature, target_csg, timber, local_csg,
         )
 
     # Extract highlight mesh for the selected target
@@ -4400,7 +4407,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     if parent_hl is not None:
         result["parentHighlightMesh"] = parent_hl
     if highlight_edge is not None:
-        result["highlightEdge"] = highlight_edge
+        # A list: a cut through the middle of an edge leaves a piece either side.
+        result["highlightEdgeSegments"] = highlight_edge
     return result
 
 

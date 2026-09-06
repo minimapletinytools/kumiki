@@ -31,10 +31,15 @@ whatever the region says is not there, really is not there. What it costs is
 that a point inside a region is not certainly on the feature, so an anchor on a
 curved primitive can sit slightly off it.
 
-What this does not do yet: subtracted solids, which remove convex holes from the
-region. Clipping by what encloses is exact; ignoring what has been taken away is
-the other approximation, and it shows up only as an anchor placed where a later
-cut has since removed the material.
+The two dimensions differ in how far they get. A LINE is done properly: clipping
+one by a convex solid gives an interval, and intervals union, intersect and
+subtract exactly, so crop_line_to_segments_on_csg walks the whole tree and
+returns as many pieces as the cuts leave. A PLANE is not: subtracting in the
+plane means polygon booleans, and a result that can have holes, so
+approximately_crop_plane_to_area_on_csg still only intersects the solids that
+ENCLOSE the region and counts anything subtracted as still present. Its name
+says so. It shows up as an anchor placed where a later cut has since removed the
+material.
 """
 
 import math
@@ -446,7 +451,7 @@ def _clip_polygon(corners: List[Tuple[float, float]], a: float, b: float, c: flo
     return kept
 
 
-def region_in_plane(
+def approximately_crop_plane_to_area_on_csg(
     plane: Plane,
     bounding: Sequence,
 
@@ -456,6 +461,21 @@ def region_in_plane(
     near: Optional[V3] = None,
 ) -> Optional[FeatureRegion]:
     """The part of a plane left after clipping by a set of convex solids.
+
+    APPROXIMATELY, and the name says so because the difference matters. This
+    takes the solids that ENCLOSE the region and intersects them; it does not
+    walk the tree, so anything subtracted is still counted as present. A face
+    half removed by a housing comes back whole, and its centroid can sit over
+    material that is no longer there.
+
+    Its one-dimensional counterpart, crop_line_to_segments_on_csg, is exact:
+    clipping a line gives an interval, and intervals subtract cleanly, so it
+    walks the whole tree. Doing the same here means polygon booleans in the
+    plane, and a result that can have holes and several pieces -- worth doing,
+    not yet done.
+
+    Erring outwards is what keeps this useful meanwhile: the region always
+    CONTAINS the truth, so whatever it says is not there really is not there.
 
     `near` is where the region is expected to be -- the timber, usually -- and
     is what the work starts from, since a plane's own point may be nowhere near
@@ -499,25 +519,178 @@ def region_in_plane(
     )
 
 
-def segment_on_line(
+# A stretch of the line, as the two parameter values bounding it.
+Span = Tuple[float, float]
+
+
+def _spans_within_primitive(
+    faces: BoundingHalfSpaces,
     line: Line,
-    bounding: Sequence,
+    seed: Span,
+    tolerance: float,
+    removing: bool = False,
+) -> List[Span]:
+    """Clip `seed` by one convex solid's half spaces. One span, or none.
+
+    `removing` says this solid is being taken away rather than added, which
+    changes only the degenerate case: a line lying exactly IN one of the faces.
+    Added, such a line is on the solid and is kept. Removed, it lies in the wall
+    of the void rather than inside it, so it survives the cut -- which is what
+    an arris shared with a mortise wall is. Getting this backwards eats every
+    edge a cut passes through the plane of.
+    """
+    direction = _unit(line.direction)
+    origin = line.point
+    low, high = seed
+    for normal, point in faces:
+        # Keep where dot(normal, p - point) <= 0, with p = origin + s * direction.
+        along = float((normal.T * direction)[0, 0])
+        offset = float((normal.T * (origin - point))[0, 0])
+        if abs(along) < 1e-12:
+            # Parallel to the line: it either keeps all of it or none.
+            if offset >= tolerance if removing else offset > tolerance:
+                return []
+            continue
+        bound = (tolerance - offset) / along
+        if along > 0:
+            high = min(high, bound)
+        else:
+            low = max(low, bound)
+        if low > high:
+            return []
+    return [(low, high)]
+
+
+def _merged_spans(spans: Sequence[Span]) -> List[Span]:
+    """Overlapping and touching spans joined, in order along the line."""
+    ordered = sorted(span for span in spans if span[1] > span[0])
+    merged: List[Span] = []
+    for low, high in ordered:
+        if merged and low <= merged[-1][1]:
+            if high > merged[-1][1]:
+                merged[-1] = (merged[-1][0], high)
+            continue
+        merged.append((low, high))
+    return merged
+
+
+def _intersected_spans(left: Sequence[Span], right: Sequence[Span]) -> List[Span]:
+    """The stretches covered by both sets."""
+    out: List[Span] = []
+    for a_low, a_high in left:
+        for b_low, b_high in right:
+            low, high = max(a_low, b_low), min(a_high, b_high)
+            if high > low:
+                out.append((low, high))
+    return _merged_spans(out)
+
+
+def _subtracted_spans(keep: Sequence[Span], remove: Sequence[Span]) -> List[Span]:
+    """`keep` with `remove` taken out of it. This is what splits an edge in two."""
+    out = list(keep)
+    for cut_low, cut_high in _merged_spans(remove):
+        next_out: List[Span] = []
+        for low, high in out:
+            if cut_high <= low or cut_low >= high:
+                next_out.append((low, high))
+                continue
+            if cut_low > low:
+                next_out.append((low, cut_low))
+            if cut_high < high:
+                next_out.append((cut_high, high))
+        out = next_out
+    return _merged_spans(out)
+
+
+def _spans_on_csg(
+    csg, line: Line, seed: Span, tolerance: float, removing: bool = False,
+) -> Optional[List[Span]]:
+    """Where a line runs inside a whole CSG tree, as spans of its parameter.
+
+    None if any primitive in the tree cannot be described as half spaces --
+    a partial answer would be silently wrong in an unknown direction.
+
+    The tolerance flips sign on the way into a subtraction. Everywhere else in
+    this file the approximation is made outwards, so that whatever the answer
+    says is NOT there really is not there; for a solid being removed, erring
+    outwards means removing LESS, not more. Widening a subtractor instead would
+    eat the very edge it forms -- a mortise wall flush with the face it opens
+    onto would delete the arris it shares with it. Nesting takes care of itself:
+    a difference inside a subtraction flips back and is additive again.
+    """
+    from .cutcsg import Difference, EmptyCSG, Intersection, SolidUnion
+
+    if isinstance(csg, EmptyCSG):
+        # Bounds nothing and contains nothing -- an answer, not a failure.
+        return []
+
+    if isinstance(csg, SolidUnion):
+        out: List[Span] = []
+        for child in csg.children:
+            spans = _spans_on_csg(child, line, seed, tolerance, removing)
+            if spans is None:
+                return None
+            out.extend(spans)
+        return _merged_spans(out)
+
+    if isinstance(csg, Intersection):
+        left = _spans_on_csg(csg.left, line, seed, tolerance, removing)
+        if left is None:
+            return None
+        right = _spans_on_csg(csg.right, line, seed, tolerance, removing)
+        if right is None:
+            return None
+        return _intersected_spans(left, right)
+
+    if isinstance(csg, Difference):
+        kept = _spans_on_csg(csg.base, line, seed, tolerance, removing)
+        if kept is None:
+            return None
+        removed: List[Span] = []
+        for solid in csg.subtract:
+            spans = _spans_on_csg(solid, line, seed, -tolerance, not removing)
+            if spans is None:
+                return None
+            removed.extend(spans)
+        return _subtracted_spans(kept, removed)
+
+    faces = bounding_half_spaces(csg)
+    if faces is None:
+        return None
+    return _spans_within_primitive(faces, line, seed, tolerance, removing)
+
+
+def crop_line_to_segments_on_csg(
+    line: Line,
+    csg,
 
     # TODO this parameter is questionable, just use NaN for bounds?
     seed_reach: Numeric,
 
     near: Optional[V3] = None,
     tolerance: float = 0.0,
-) -> Optional[FeatureSegment]:
-    """The part of a line left after clipping by a set of convex solids.
+) -> Optional[List[FeatureSegment]]:
+    """The parts of a line that lie on a CSG solid.
 
-    The one-dimensional twin of region_in_plane, and the same clipping: each
-    half space becomes a bound on the parameter along the line rather than a cut
-    across a polygon.
+    The one-dimensional counterpart to approximately_crop_plane_to_area_on_csg,
+    and exact where that one is not: clipping a line by a convex solid gives an
+    interval, and intervals can be unioned, intersected and subtracted, so the
+    whole tree is walked rather than only the solids that bound it. A cut that
+    removes part of an edge shortens it, and a cut through the middle of one
+    splits it in two -- which is why this returns a list.
 
-    `near` is where the edge is expected to be. As with a plane, a line's own
-    point may be nowhere near the timber -- it is wherever the primitive that
-    declared it put it -- so the starting interval is centred on `near` instead.
+    Three different answers, so three return values:
+
+        None   a primitive in the tree cannot be described as half spaces, so
+               there is no answer -- the caller should not treat it as one.
+        []     the line is not on this solid at all. Worth knowing: two planes
+               can meet somewhere that is on neither face.
+        [...]  one segment per surviving piece, in order along the line.
+
+    `near` is where the edge is expected to be. A line's own point may be
+    nowhere near the timber -- it is wherever the primitive that declared it put
+    it -- so the starting interval is centred on `near` instead. `seed_reach` is
+    how far that interval runs each way, and only has to outreach the solid.
 
     `tolerance` widens every bound, and a caller that found this line by a
     tolerant test must pass the same one. A derived edge is the case that
@@ -527,46 +700,29 @@ def segment_on_line(
     this up. Clipped exactly, a real edge comes back empty and reads as not
     being on the piece at all.
 
-    None when any solid cannot be described as half spaces, since a segment
-    clipped by only some of them would be silently too long.
-
-    Not crop_line_to_csg, which samples and bisects against one solid around the
-    line's own origin. That one handles shapes this cannot, and is right for
-    drawing a bore axis; for an anchor it would search in the wrong place when
-    the origin is far off, and step straight over an edge shorter than its
-    sample spacing.
+    KNOWN OVER-REPORT, and a deliberate one. A line lying exactly IN a
+    subtracted solid's face is kept, because that is what an arris shared with
+    a flush cut is -- a mortise wall meeting the face it opens onto forms a real
+    edge, and removing it would delete every such edge on the piece. Along one
+    dimension there is no way to tell that case from a cut that grazes the line
+    while eating the material behind it, so the second is kept too, and shows up
+    as a short extra piece where a cut has taken a corner off. Outwards, per the
+    rule at the top of this file: what the answer says is NOT there really is
+    not. Telling the two apart needs the surface either side of the line, not
+    just the line.
     """
     direction = _unit(line.direction)
     origin = line.point
     reach = float(seed_reach)
     centre = 0.0 if near is None else float(((near - origin).T * direction)[0, 0])
-    low, high = centre - reach, centre + reach
 
-    for solid in bounding:
-        faces = bounding_half_spaces(solid)
-
-        # WHY? is this really necessary?
-        if faces is None:
-            return None
-        
-        for normal, point in faces:
-            # Keep where dot(normal, p - point) <= 0, with p = origin + s * direction.
-            along = float((normal.T * direction)[0, 0])
-            offset = float((normal.T * (origin - point))[0, 0])
-            if abs(along) < 1e-12:
-                # Parallel to the line: it either keeps all of it or none.
-                if offset > tolerance:
-                    return FeatureSegment(line=line, ends=())
-                continue
-            bound = (tolerance - offset) / along
-            if along > 0:
-                high = min(high, bound)
-            else:
-                low = max(low, bound)
-            if low > high:
-                return FeatureSegment(line=line, ends=())
-
-    return FeatureSegment(
-        line=line,
-        ends=(origin + direction * scalar(low), origin + direction * scalar(high)),
-    )
+    spans = _spans_on_csg(csg, line, (centre - reach, centre + reach), tolerance)
+    if spans is None:
+        return None
+    return [
+        FeatureSegment(
+            line=line,
+            ends=(origin + direction * scalar(low), origin + direction * scalar(high)),
+        )
+        for low, high in spans
+    ]

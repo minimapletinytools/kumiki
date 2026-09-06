@@ -659,6 +659,28 @@ const EXPORT_FORMAT_PROP = {
     step: 'exportFormatStepEnabled',
 };
 
+/**
+ * A cropped edge as one flat position array, for LineSegmentsGeometry.
+ *
+ * A list, because a cut through the middle of an edge leaves a piece either
+ * side of it and drawing one line across both would run straight through the
+ * hole. LineSegmentsGeometry takes disjoint pairs natively, so several pieces
+ * cost no more than one.
+ */
+function edgeSegmentPositions(segments) {
+    if (!Array.isArray(segments)) {
+        return [];
+    }
+    const positions = [];
+    for (const segment of segments) {
+        if (!segment || !Array.isArray(segment.start) || !Array.isArray(segment.end)) {
+            continue;
+        }
+        positions.push(...segment.start, ...segment.end);
+    }
+    return positions;
+}
+
 // Classify the current selection into one of SELECTION_VISUAL_STATES from a
 // plain snapshot (list of selected timber keys + the csg focus), so the
 // decision is pure and independently testable.
@@ -3112,10 +3134,10 @@ class KigumiViewerApp extends LitElement {
     drawHoverHighlight(message) {
         this.clearHoverOutline();
         const mesh = message.highlightMesh;
-        const edge = message.highlightEdge;
+        const positions = edgeSegmentPositions(message.highlightEdgeSegments);
 
-        if (edge && Array.isArray(edge.start) && Array.isArray(edge.end)) {
-            this._buildHoverEdgeLine(edge.start, edge.end);
+        if (positions.length > 0) {
+            this._buildHoverEdgeLine(positions);
         }
         if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
             this._buildHighlightMesh(
@@ -3129,9 +3151,9 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    _buildHoverEdgeLine(start, end) {
+    _buildHoverEdgeLine(positions) {
         const geometry = new THREE.LineSegmentsGeometry();
-        geometry.setPositions([...start, ...end]);
+        geometry.setPositions(positions);
         const material = new THREE.LineMaterial({
             color: HOVER_COLOR,
             linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
@@ -3306,13 +3328,11 @@ class KigumiViewerApp extends LitElement {
 
         // Build highlight geometry
         this.removeCSGHighlight();
-        const highlightEdge = message.highlightEdge || null;
-        if (highlightEdge && Array.isArray(highlightEdge.start) && Array.isArray(highlightEdge.end)) {
+        const edgePositions = edgeSegmentPositions(message.highlightEdgeSegments);
+        if (edgePositions.length > 0) {
             // An edge is a line: shading the triangles beside it lit a stray
             // wedge that read as geometry rather than as a selection.
-            this._buildHighlightEdgeLine(
-                highlightEdge.start, highlightEdge.end, CSG_HIGHLIGHT_COLORS.feature,
-            );
+            this._buildHighlightEdgeLine(edgePositions, CSG_HIGHLIGHT_COLORS.feature);
         }
         if (featureLabel && parentHlMesh && Array.isArray(parentHlMesh.vertices) && parentHlMesh.vertices.length > 0) {
             // Feature selected: parent CSG gets dim highlight, feature face gets bright highlight
@@ -3387,9 +3407,9 @@ class KigumiViewerApp extends LitElement {
     }
 
     /** The fat line over a selected edge. */
-    _buildHighlightEdgeLine(start, end, color) {
+    _buildHighlightEdgeLine(positions, color) {
         const geometry = new THREE.LineSegmentsGeometry();
-        geometry.setPositions([...start, ...end]);
+        geometry.setPositions(positions);
 
         const material = new THREE.LineMaterial({
             color,

@@ -643,9 +643,11 @@ class TestEdgePicking:
             f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
 
         result = self._pick(slot, cut_timber, point)
-        segment = result["highlightEdge"]
-        assert len(segment["start"]) == 3 and len(segment["end"]) == 3
-        assert segment["start"] != segment["end"]
+        segments = result["highlightEdgeSegments"]
+        assert len(segments) >= 1
+        for segment in segments:
+            assert len(segment["start"]) == 3 and len(segment["end"]) == 3
+            assert segment["start"] != segment["end"]
 
     def test_the_clicked_point_lies_on_the_drawn_line(self, mortise_and_tenon_frame):
         """A line somewhere else on the timber would look like a stray mark."""
@@ -656,7 +658,12 @@ class TestEdgePicking:
             f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
         clicked = self._to_global(cut_timber, point)
 
-        segment = self._pick(slot, cut_timber, point)["highlightEdge"]
+        segments = self._pick(slot, cut_timber, point)["highlightEdgeSegments"]
+        # The clicked point is on one of the pieces, not necessarily the first:
+        # a cut through the middle of an edge leaves one either side of it.
+        segment = min(segments, key=lambda s: min(
+            sum((clicked[i] - s[end_key][i]) ** 2 for i in range(3))
+            for end_key in ("start", "end")))
         start, end = segment["start"], segment["end"]
         span = [end[i] - start[i] for i in range(3)]
         length_sq = sum(component * component for component in span)
@@ -688,7 +695,7 @@ class TestEdgePicking:
             f.feature_type() == CSGFeatureType.FACE and f.name == "shoulder"))
 
         result = self._pick(slot, cut_timber, point)
-        assert "highlightEdge" not in result
+        assert "highlightEdgeSegments" not in result
         assert result["stats"]["trianglesMatched"] > 0
 
     def test_the_edge_shows_up_as_something(self, mortise_and_tenon_frame):
@@ -704,7 +711,7 @@ class TestEdgePicking:
             f.feature_type() == CSGFeatureType.EDGE and "shoulder" in f.name))
 
         result = self._pick(slot, cut_timber, point)
-        assert result.get("highlightEdge") or result["stats"]["trianglesMatched"] > 0
+        assert result.get("highlightEdgeSegments") or result["stats"]["trianglesMatched"] > 0
 
     def test_the_middle_of_a_face_still_selects_the_face(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType
@@ -1108,7 +1115,7 @@ class TestEdgeHighlightSpan:
             OwnedFeatureHit(feature=second, owner=second_owner),
         )
         assert edge is not None, f"{a_name} and {b_name} form no edge"
-        return edge, first_owner, cut_timber.timber
+        return edge, first_owner, cut_timber.timber, local
 
     def _declared_edge(self, frame, name):
         """A timber's own arris, which is declared rather than derived."""
@@ -1121,18 +1128,22 @@ class TestEdgeHighlightSpan:
             node = stack.pop()
             for feature in node.get_declared_features():
                 if feature.name == name:
-                    return feature, node, cut_timber.timber
+                    return feature, node, cut_timber.timber, local
             stack.extend(csg_children(node))
         raise AssertionError(f"no feature named {name!r}")
 
-    def _span_mm(self, segment):
-        return math.dist(segment["start"], segment["end"]) * 1000
+    def _span_mm(self, segments):
+        """The longest piece, in mm. A cut can leave an edge in several."""
+        return max(math.dist(s["start"], s["end"]) for s in segments) * 1000
+
+    def _total_mm(self, segments):
+        return sum(math.dist(s["start"], s["end"]) for s in segments) * 1000
 
     def test_a_real_edge_is_the_width_of_the_mortise(self, mortise_and_tenon_frame):
-        edge, owner, timber = self._edge(
+        edge, owner, timber, root = self._edge(
             mortise_and_tenon_frame, "mortise_right", "rough.front")
 
-        segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
+        segment, absent = runner._edge_highlight_segments(edge, owner, timber, root)
 
         assert not absent
         # Exactly the fixture's tenon_width_relative_to_joint, which is what the
@@ -1146,10 +1157,10 @@ class TestEdgeHighlightSpan:
     def test_an_edge_that_is_not_there_says_so(self, mortise_and_tenon_frame):
         # The mortise floor's plane, run sideways, crosses the timber's own side
         # a foot from the mortise. Two planes cross there; no two faces do.
-        edge, owner, timber = self._edge(
+        edge, owner, timber, root = self._edge(
             mortise_and_tenon_frame, "mortise_bottom", "rough.left")
 
-        segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
+        segment, absent = runner._edge_highlight_segments(edge, owner, timber, root)
 
         assert segment is None
         assert absent, "an edge cropped away to nothing is not merely unknown"
@@ -1175,8 +1186,8 @@ class TestEdgeHighlightSpan:
                 for hit in local.get_all_features(point):
                     if hit.feature.feature_type() != CSGFeatureType.EDGE:
                         continue
-                    segment, absent = runner._edge_highlight_segment(
-                        hit.feature, hit.owner, [], None, None, cut_timber.timber)
+                    segment, absent = runner._edge_highlight_segments(
+                        hit.feature, hit.owner, cut_timber.timber, local)
                     assert not absent, f"{hit.feature.name} vanished"
                     assert segment is not None
                     found += 1
@@ -1186,20 +1197,23 @@ class TestEdgeHighlightSpan:
 
     def test_the_timbers_own_edge_still_runs_its_full_length(self, mortise_and_tenon_frame):
         # The crop must not shorten an edge that really is that long.
-        edge, owner, timber = self._declared_edge(
+        edge, owner, timber, root = self._declared_edge(
             mortise_and_tenon_frame, "rough.front_left")
 
-        segment, absent = runner._edge_highlight_segment(edge, owner, [], None, None, timber)
+        segments, absent = runner._edge_highlight_segments(edge, owner, timber, root)
 
         assert not absent
-        assert self._span_mm(segment) == pytest.approx(float(timber.length) * 1000, rel=0.01)
+        # Nothing cuts this corner, so it survives whole and in one piece.
+        assert len(segments) == 1
+        assert self._span_mm(segments) == pytest.approx(float(timber.length) * 1000, rel=0.01)
 
-    def test_no_edge_falls_back_to_scanning_the_mesh(self, mortise_and_tenon_frame):
-        """The clip should always answer, so the fallback should never run.
+    def test_every_edge_on_a_real_timber_can_be_cropped(self, mortise_and_tenon_frame):
+        """The tree walk should answer for everything a real timber is made of.
 
-        It warns when it does, because reaching it means a primitive could not
-        be described as half spaces -- and the scan it falls back to is the
-        code that made a selected edge span a whole timber.
+        None means it met a primitive it could not describe as half spaces, and
+        the caller then falls back to lighting the triangles beside the line --
+        the code that made a selected edge span a whole timber. Nothing here
+        should reach it.
         """
         from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
 
@@ -1214,21 +1228,21 @@ class TestEdgeHighlightSpan:
             stack.extend(csg_children(node))
 
         checked = 0
-        with warnings.catch_warnings():
-            warnings.simplefilter("error")
-            for a_name, (first, first_owner) in nodes.items():
-                for b_name, (second, second_owner) in nodes.items():
-                    if a_name >= b_name:
-                        continue
-                    edge = DerivedEdgeFeature.derive(
-                        OwnedFeatureHit(feature=first, owner=first_owner),
-                        OwnedFeatureHit(feature=second, owner=second_owner),
-                    )
-                    if edge is None:
-                        continue
-                    runner._edge_highlight_segment(
-                        edge, first_owner, [], None, None, cut_timber.timber)
-                    checked += 1
+        for a_name, (first, first_owner) in nodes.items():
+            for b_name, (second, second_owner) in nodes.items():
+                if a_name >= b_name:
+                    continue
+                edge = DerivedEdgeFeature.derive(
+                    OwnedFeatureHit(feature=first, owner=first_owner),
+                    OwnedFeatureHit(feature=second, owner=second_owner),
+                )
+                if edge is None:
+                    continue
+                segments, absent = runner._edge_highlight_segments(
+                    edge, first_owner, cut_timber.timber, local)
+                assert segments is not None or absent, (
+                    f"{a_name} x {b_name} could not be cropped at all")
+                checked += 1
 
         assert checked > 10, f"expected plenty of edges to check, got {checked}"
 
@@ -1544,7 +1558,7 @@ class TestHoveringOverAFeature:
         assert hovered["path"] == clicked["path"]
         assert hovered["featureLabel"] == clicked["featureLabel"]
         assert hovered["highlightMesh"] == clicked["highlightMesh"]
-        assert hovered["highlightEdge"] == clicked["highlightEdge"]
+        assert hovered["highlightEdgeSegments"] == clicked["highlightEdgeSegments"]
 
     def test_an_edge_comes_back_as_a_line_to_draw(self, mortise_and_tenon_frame):
         from kumiki.cutcsg import CSGFeatureType
@@ -1555,7 +1569,8 @@ class TestHoveringOverAFeature:
 
 
         assert result["featureType"] == "EDGE"
-        assert result["highlightEdge"]["start"] and result["highlightEdge"]["end"]
+        segments = result["highlightEdgeSegments"]
+        assert segments and all(s["start"] and s["end"] for s in segments)
 
     def test_it_says_what_a_measurement_would_hold(self, mortise_and_tenon_frame):
         # So the viewer can say whether this and whatever is already held could

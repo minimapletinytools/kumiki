@@ -27,7 +27,6 @@ from kumiki.cutcsg import (
     DerivedEdgeFeature,
     OwnedFeatureHit,
     CSGFeatureExtent,
-    crop_line_to_csg,
     safe_zero_test_sq,
     CSGFeatureType,
     FeatureTestTolerances,
@@ -3415,58 +3414,6 @@ class TestNonRealFeatures:
         near_axis = create_v3(scalar(1, 100), scalar(0), scalar(5))
         assert prism.find_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 1000))) is None
         assert prism.find_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 10))) is not None
-
-
-class TestCropLineToCSG:
-    """Non-real geometry is unbounded; drawing it means clipping it to the body."""
-
-    def _prism(self):
-        return RectangularPrism(
-            size=Matrix([scalar(4), scalar(6)]),
-            transform=Transform.identity(),
-            start_distance=scalar(0),
-            end_distance=scalar(10),
-        )
-
-    def test_it_clips_to_where_the_line_enters_and_leaves(self):
-        across = Line(direction=create_v3(scalar(1), scalar(0), scalar(0)),
-                      point=create_v3(scalar(0), scalar(0), scalar(5)))
-        span = crop_line_to_csg(across, self._prism(), search_extent=scalar(50))
-        assert span is not None
-        entry, exit_ = span
-        assert float(entry[0]) == pytest.approx(-2.0, abs=1e-6)
-        assert float(exit_[0]) == pytest.approx(2.0, abs=1e-6)
-
-    def test_it_clips_along_the_length_axis(self):
-        along = Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
-                     point=create_v3(scalar(0), scalar(0), scalar(5)))
-        span = crop_line_to_csg(along, self._prism(), search_extent=scalar(50))
-        assert span is not None
-        assert float(span[0][2]) == pytest.approx(0.0, abs=1e-6)
-        assert float(span[1][2]) == pytest.approx(10.0, abs=1e-6)
-
-    def test_a_line_that_misses_returns_none(self):
-        miss = Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
-                    point=create_v3(scalar(99), scalar(0), scalar(0)))
-        assert crop_line_to_csg(miss, self._prism(), search_extent=scalar(50)) is None
-
-    def test_it_clips_to_the_uncut_body_not_the_cut_result(self):
-        """A bore is a void: clipping its axis to the cut solid finds nothing."""
-        body = self._prism()
-        bore = Cylinder(
-            axis_direction=create_v3(scalar(0), scalar(0), scalar(1)),
-            radius=scalar(1),
-            position=create_v3(scalar(0), scalar(0), scalar(0)),
-            start_distance=scalar(-1),
-            end_distance=scalar(11),
-        )
-        axis = Line(direction=create_v3(scalar(0), scalar(0), scalar(1)),
-                    point=create_v3(scalar(0), scalar(0), scalar(5)))
-        assert crop_line_to_csg(axis, Difference(base=body, subtract=[bore]),
-                                search_extent=scalar(50)) is None
-        span = crop_line_to_csg(axis, body, search_extent=scalar(50))
-        assert span is not None
-        assert float(span[1][2]) == pytest.approx(10.0, abs=1e-6)
 
 
 class TestCompoundNodesOwnNoFeatures:
