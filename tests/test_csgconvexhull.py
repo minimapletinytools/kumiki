@@ -289,15 +289,41 @@ class TestTheBoundedTypes:
         assert ConvexPlanarRegion(plane=plane, boundary=()).is_empty
         assert ConvexPlanarRegion(plane=plane, boundary=(_v(0, 0, 0), _v(1, 0, 0))).is_empty
 
-    def test_the_check_scales_with_the_region(self):
-        # A tiny face's corners are the same rounding noise as a big one's, so
-        # a fixed slack would reject millimetre-sized faces or accept bent
-        # metre-sized ones.
+    def test_the_check_does_not_care_how_big_the_region_is(self):
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
         for size in (0.005, 5.0):
             ConvexPlanarRegion(plane=plane, boundary=(
                 _v(0, 0, 0), _v(size, 0, 0), _v(size, size, 0), _v(0, size, 0)))
+
+    def test_a_reversal_between_two_short_edges_is_still_a_reversal(self):
+        """Why the test is per corner and relative rather than one number.
+
+        A turn is a cross product, so it is an AREA: |e1||e2|sin(t). Compared
+        against a single slack taken from the outline's longest edge, the same
+        angle reads as huge between two long edges and as nothing between two
+        short ones -- so this dent, which is a real reflex corner, passed as
+        convex. Dividing the edge lengths back out leaves the angle itself.
+        """
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
+        nick = 1e-5
+        # A metre square with a 14-micron dent in the middle of its top edge.
+        dented = (
+            _v(0, 0, 0), _v(1, 0, 0), _v(1, 1, 0),
+            _v(0.5 + nick, 1, 0), _v(0.5, 1 - nick, 0), _v(0.5 - nick, 1, 0),
+            _v(0, 1, 0),
+        )
+
+        with pytest.raises(ValueError, match="not convex"):
+            ConvexPlanarRegion(plane=plane, boundary=dented)
+
+    def test_a_repeated_corner_is_not_a_turn(self):
+        # No edge, so no direction to turn from. Dividing by its length would
+        # divide by zero.
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        ConvexPlanarRegion(plane=plane, boundary=(
+            _v(0, 0, 0), _v(1, 0, 0), _v(1, 0, 0), _v(1, 1, 0), _v(0, 1, 0)))
 
 
 class TestCropLineToSegmentsOnCsg:

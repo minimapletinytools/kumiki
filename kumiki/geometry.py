@@ -228,6 +228,13 @@ class LineSegment:
         return (min(reach), max(reach))
 
 
+# The sine of the angle below which a corner counts as straight rather than as
+# turning. Dimensionless on purpose: it is an angle, so it means the same thing
+# on a 5mm face and a 5m one. Generous next to double-precision rounding, which
+# leaves a corner that should be exactly straight at around 1e-15.
+STRAIGHT_ENOUGH = 1e-9
+
+
 @dataclass(frozen=True)
 class ConvexPlanarRegion:
     """An area of a Plane, bounded by a convex outline lying in it.
@@ -254,19 +261,28 @@ class ConvexPlanarRegion:
             return
         normal = unit_vector(self.plane.normal)
         edges = [corners[(i + 1) % len(corners)] - corners[i] for i in range(len(corners))]
-        longest = max(
-            float((edge.T * edge)[0, 0]) for edge in edges
-        ) ** 0.5
-        # A turn is an area, so the slack has to scale with the region: the same
-        # rounding noise is huge on a 5mm face and invisible on a 5m one.
-        slack = 1e-9 * longest * longest
+        lengths = [float((edge.T * edge)[0, 0]) ** 0.5 for edge in edges]
         turning = 0
         for i in range(len(corners)):
+            after = (i + 1) % len(corners)
+            # The cross product is an AREA -- |e1||e2|sin(t) -- so comparing it
+            # against one number for the whole outline asks a different question
+            # at every corner. Dividing the two edge lengths back out leaves
+            # sin(t) itself: the angle turned through, which is what "straight
+            # on" is actually about, and which no longer depends on how long
+            # this corner's edges happen to be or how long the longest one is.
+            # Measured absolutely, a real reflex corner between two 14um edges
+            # sits below the slack a 1m edge sets, and passes as convex.
+            scale = lengths[i] * lengths[after]
+            if scale == 0.0:
+                # A repeated corner: no edge, so no direction, so no turn.
+                continue
             turn = float(
-                (cross_product(edges[i], edges[(i + 1) % len(corners)]).T * normal)[0, 0]
-            )
-            if abs(turn) <= slack:
-                # Straight on, or a repeated corner. Neither way of turning.
+                (cross_product(edges[i], edges[after]).T * normal)[0, 0]
+            ) / scale
+            if abs(turn) <= STRAIGHT_ENOUGH:
+                # Straight on. Clipping makes these whenever a cut passes
+                # exactly through a corner.
                 continue
             direction = 1 if turn > 0 else -1
             if turning == 0:
