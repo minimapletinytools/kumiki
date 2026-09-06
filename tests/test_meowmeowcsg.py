@@ -31,6 +31,7 @@ from kumiki.cutcsg import (
     CSGFeatureType,
     FeatureTestTolerances,
     FeatureProperties,
+    FeatureCategory,
     FeatureSource,
     ProgrammableCSGFeature,
     HalfSpaceFeature,
@@ -3127,6 +3128,88 @@ class TestProgrammableCSGFeature:
         hits = prism.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
         assert {h.name for h in hits} == {"plain_right", "computed_right"}
         assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "computed_right"
+
+
+class TestDefaultOrderFollowsTimberFeature:
+    """A prism's default indices run in TimberFeature's order.
+
+    Not a coincidence worth leaving to chance. TimberFeature is the vocabulary
+    a person uses about a timber -- RIGHT_FRONT_EDGE, BOTTOM_LEFT_EDGE -- and
+    every default on a timber's own prism has one of those as its counterpart.
+    Numbering them the same way means "arris.5" and BOTTOM_FRONT_EDGE pick out
+    the same line, and anything mapping between the two can do it by position.
+
+    cutcsg cannot import timber to state this itself (timber imports cutcsg),
+    so it is stated here.
+    """
+
+    def _prism(self):
+        return RectangularPrism(
+            size=Matrix([scalar(4), scalar(6)]),
+            transform=Transform.identity(),
+            start_distance=scalar(0),
+            end_distance=scalar(10),
+        )
+
+    def _defaults_by_faces(self):
+        """Every default edge, keyed by the pair of faces it lies between."""
+        return {
+            frozenset(feature.faces): key[1]
+            for key, feature in self._prism().default_features().items()
+            if isinstance(feature, SimpleRectangularPrismEdgeFeature)
+        }
+
+    def _faces_named_in(self, member):
+        """The PrismFaces an edge member's own name mentions."""
+        words = member.name.replace("_EDGE", "").split("_")
+        return frozenset(PrismFace[word] for word in words)
+
+    def test_every_arris_index_ascends_with_the_enum(self):
+        from kumiki.timber import TimberFeature
+
+        edges = [m for m in TimberFeature if m.name.endswith("_EDGE")]
+        by_faces = self._defaults_by_faces()
+
+        indices = [by_faces[self._faces_named_in(member)] for member in edges]
+
+        assert indices == sorted(indices), dict(zip([m.name for m in edges], indices))
+        assert indices == list(range(12))
+
+    def test_every_side_index_ascends_with_the_enum(self):
+        from kumiki.timber import TimberFeature
+
+        sides = [m for m in TimberFeature
+                 if m.name.endswith("_FACE") and m.name not in ("TOP_FACE", "BOTTOM_FACE")]
+        by_face = {
+            feature.face: key[1]
+            for key, feature in self._prism().default_features().items()
+            if isinstance(feature, SimpleRectangularPrismFeature)
+            and key[0] is FeatureCategory.SIDE
+        }
+
+        indices = [by_face[PrismFace[m.name.replace("_FACE", "")]] for m in sides]
+
+        assert indices == list(range(4))
+
+    def test_the_caps_are_the_one_place_it_cannot_follow(self):
+        """TimberFeature lists TOP before BOTTOM; a CAP index cannot.
+
+        CAP 0 is the START end and 1 is the END end, which is what
+        start_distance and end_distance mean on every primitive that has them.
+        Flipping to match would make cap.0 the end of the shape, and a
+        cylinder and an extrusion would inherit the lie.
+        """
+        from kumiki.timber import TimberFeature
+
+        caps = {
+            feature.face: key[1]
+            for key, feature in self._prism().default_features().items()
+            if isinstance(feature, SimpleRectangularPrismFeature)
+            and key[0] is FeatureCategory.CAP
+        }
+
+        assert caps == {PrismFace.BOTTOM: 0, PrismFace.TOP: 1}
+        assert TimberFeature.TOP_FACE.value < TimberFeature.BOTTOM_FACE.value
 
 
 class TestDeclaredFeatures:

@@ -143,8 +143,15 @@ def default_feature_name(key: FeatureKey) -> str:
 
 # A prism's four sides in order around it -- +x, +y, -x, -y -- which is what
 # fixes the meaning of SIDE n, and with it ARRIS n as the join between side n
-# and side n+1. Any consistent cycle would do; this one is the cycle the local
-# axes already run in.
+# and side n+1.
+#
+# Not just any consistent cycle: this is timber.TimberFeature's order, so that
+# side n and arris n pick out the same things RIGHT_FACE..BACK_FACE and
+# RIGHT_FRONT_EDGE..TOP_BACK_EDGE do, in the same sequence. Anything mapping
+# between the two vocabularies can then do it by position. Only the caps
+# differ, because CAP 0 has to mean the START end -- see
+# TestDefaultOrderFollowsTimberFeature, which pins all of this from the test
+# side, since timber imports cutcsg and so cutcsg cannot say it here.
 _PRISM_SIDE_ORDER: Tuple['PrismFace', ...] = ()  # filled in below, once PrismFace exists
 
 
