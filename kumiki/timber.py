@@ -1731,6 +1731,21 @@ _TIMBER_LONG_ARRISES: List[Tuple[str, PrismFace, PrismFace]] = [
 ]
 
 
+#: The eight arrises around a timber's two ends, each between an end face and
+#: a long face. Named and ordered as TimberFeature has them --
+#: BOTTOM_RIGHT_EDGE through TOP_BACK_EDGE -- so the two vocabularies line up.
+_TIMBER_SHORT_ARRISES: List[Tuple[str, PrismFace, PrismFace]] = [
+    ("bottom_right", PrismFace.BOTTOM, PrismFace.RIGHT),
+    ("bottom_front", PrismFace.BOTTOM, PrismFace.FRONT),
+    ("bottom_left", PrismFace.BOTTOM, PrismFace.LEFT),
+    ("bottom_back", PrismFace.BOTTOM, PrismFace.BACK),
+    ("top_right", PrismFace.TOP, PrismFace.RIGHT),
+    ("top_front", PrismFace.TOP, PrismFace.FRONT),
+    ("top_left", PrismFace.TOP, PrismFace.LEFT),
+    ("top_back", PrismFace.TOP, PrismFace.BACK),
+]
+
+
 def _long_arris_tags(prefix: str) -> List[CSGFeature]:
     """Named features for a timber's four long arrises.
 
@@ -1751,14 +1766,44 @@ def _long_arris_tags(prefix: str) -> List[CSGFeature]:
     ]
 
 
+def _short_arris_tags(prefix: str) -> List[CSGFeature]:
+    """Named features for the eight arrises around a timber's two ends.
+
+    The same argument as _long_arris_tags: a timber HAS these, so they are
+    worth a name that survives being referred to later. The prism underneath
+    names them too, as arris.4 through arris.11, and an override at the same
+    key replaces the default rather than joining it -- so naming them here is
+    what turns "arris.7" into "ptw.bottom_back" without leaving both.
+
+    Where they differ from the long ones is what they are for. A long arris
+    runs the length of the piece and is what you measure a joint from. An end
+    arris moves whenever the timber is cut to length, so it is a thing to point
+    at rather than to measure from -- which is a reason to name it, not a
+    reason to leave it anonymous.
+    """
+    return [
+        SimpleRectangularPrismEdgeFeature(
+            name=f"{prefix}{name}",
+            faces=(first, second),
+            properties=FeatureProperties(group=FeatureGroup.B1),
+        )
+        for name, first, second in _TIMBER_SHORT_ARRISES
+    ]
+
+
 def _ptw_face_tags() -> List[CSGFeature]:
     """Named features for the 6 faces of a timber's perfect-timber-within prism.
 
     Group B1: they form edges against joint features (group A) and not against
-    each other. The timber's own four long arrises used to come from faces
-    meeting faces; they are declared outright now (see _long_arris_tags), so
-    letting the faces pair as well would make the same line reachable two ways
-    and show it twice.
+    each other. The timber's own arrises used to come from faces meeting faces;
+    all twelve are declared outright now (see _long_arris_tags and
+    _short_arris_tags), so letting the faces pair as well would make the same
+    line reachable two ways and show it twice.
+
+    Between the faces, the long arrises and the short ones, this names every
+    slot the prism underneath offers -- so a timber's body carries no anonymous
+    defaults at all, and every part of it can be referred to by a name that
+    means something about a timber rather than about a prism.
     """
     return [
         SimpleRectangularPrismFeature(
@@ -1767,7 +1812,7 @@ def _ptw_face_tags() -> List[CSGFeature]:
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(PTW_FACE_PREFIX)
+    ] + _long_arris_tags(PTW_FACE_PREFIX) + _short_arris_tags(PTW_FACE_PREFIX)
 
 
 def _rough_face_tags() -> List[CSGFeature]:
@@ -1785,7 +1830,7 @@ def _rough_face_tags() -> List[CSGFeature]:
             properties=FeatureProperties(group=FeatureGroup.B1),
         )
         for face_name, face in _TIMBER_FACES
-    ] + _long_arris_tags(ROUGH_FACE_PREFIX)
+    ] + _long_arris_tags(ROUGH_FACE_PREFIX) + _short_arris_tags(ROUGH_FACE_PREFIX)
 
 
 def _create_extended_rectangular_prism(

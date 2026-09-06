@@ -192,16 +192,17 @@ class TestCSGTreeSerialization:
         assert {"rough.right", "rough.left", "rough.top"} <= names
         # The four long arrises are declared alongside the faces.
         assert {"rough.front_left", "rough.back_right"} <= names
+        # The arrises at each end are named too, so a timber's body has a name
+        # for every face and every edge it has.
+        assert {"rough.bottom_right", "rough.top_back"} <= names
         # B1: they meet joint geometry and not each other, since the arrises
         # they used to make by meeting are named outright now.
-        authored = [f for f in base["features"] if not f["name"].startswith(
+        assert all(f["group"] == "B1" for f in base["features"])
+        # Six faces, four long arrises, eight at the ends: every slot the prism
+        # offers, so none of its anonymous defaults survive the override.
+        assert len(base["features"]) == 18
+        assert not [f for f in base["features"] if f["name"].startswith(
             ("cap.", "side.", "arris.", "corner."))]
-        assert authored and all(f["group"] == "B1" for f in authored)
-        # The prism's own defaults fill the slots the timber did not name --
-        # here, the arrises at each end. They pair with nothing, which is what
-        # keeps them from multiplying derived edges across the tree.
-        defaults = [f for f in base["features"] if f not in authored]
-        assert defaults and all(f["group"] == "NONE" for f in defaults)
 
     def test_joint_attribution_flows_down_the_cut(self, mortise_and_tenon_frame):
         """The body belongs to no joint; everything under a cut belongs to one."""
