@@ -31,6 +31,7 @@ from kumiki.cutcsg import (
     CSGFeatureType,
     FeatureTestTolerances,
     FeatureProperties,
+    FeatureSource,
     ProgrammableCSGFeature,
     HalfSpaceFeature,
     SimpleConvexPolygonExtrusionFeature,
@@ -2530,12 +2531,14 @@ class TestCSGFeatures:
 
         assert hs.find_feature(off_boundary) is None
 
-    def test_halfspace_no_named_feature(self):
-        """HalfSpace without named_feature returns no features."""
+    def test_halfspace_names_its_one_surface_by_default(self):
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(5))
         on_boundary = create_v3(scalar(0), scalar(0), scalar(5))
-        assert hs.find_feature(on_boundary) is None
-        assert hs.get_all_features(on_boundary) == []
+
+        found = hs.find_feature(on_boundary)
+
+        assert found is not None and found.name == "side.0"
+        assert hs.get_declared_features(FeatureSource.OVERRIDES) == []
 
     def test_rectangular_prism_named_features(self):
         """A prism hits only the faces it actually declares."""
@@ -2564,12 +2567,23 @@ class TestCSGFeatures:
         assert hit.name == "my_top"
         assert hit.feature.face == PrismFace.TOP
 
-        # Point on left face — not named, so no feature
+        # Point on the left face, which nobody named. It answers with the
+        # prism's own default now rather than with nothing, and the authored
+        # names still win where they were given -- an override at a default's
+        # key replaces it, so "my_right" did not leave "side.0" behind.
         left_pt = create_v3(scalar(-2), scalar(0), scalar(5))
-        assert prism.find_feature(left_pt) is None
+        left = prism.find_feature(left_pt)
+        assert left is not None and left.name == "side.2"
+        assert {f.name for f in prism.get_declared_features()} >= {"my_right", "my_top"}
+        assert "side.0" not in {f.name for f in prism.get_declared_features()}
 
-    def test_rectangular_prism_no_named_features(self):
-        """RectangularPrism without named_features returns nothing."""
+    def test_rectangular_prism_with_nothing_authored_still_names_its_own_faces(self):
+        """A prism nobody has named still knows what its own surfaces are.
+
+        It used to answer None here, because a feature existed only if someone
+        had written one. Defaults mean the shape names its own boundary and an
+        author only has to say what is SPECIAL about it.
+        """
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
@@ -2577,10 +2591,15 @@ class TestCSGFeatures:
             end_distance=scalar(10),
         )
         right_pt = create_v3(scalar(2), scalar(0), scalar(5))
-        assert prism.find_feature(right_pt) is None
 
-    def test_cylinder_returns_no_features(self):
-        """Cylinder has no feature support — always returns empty."""
+        found = prism.find_feature(right_pt)
+
+        assert found is not None
+        assert found.feature.name == "side.0"
+        assert prism.get_declared_features(FeatureSource.OVERRIDES) == []
+
+    def test_cylinder_names_its_barrel_by_default(self):
+        """It used to have no feature support at all; now it names its own."""
         cyl = Cylinder(
             axis_direction=Matrix([scalar(0), scalar(0), scalar(1)]),
             radius=scalar(3),
@@ -2589,7 +2608,7 @@ class TestCSGFeatures:
             end_distance=scalar(10),
         )
         on_boundary = create_v3(scalar(3), scalar(0), scalar(5))
-        assert cyl.get_all_features(on_boundary) == []
+        assert {h.name for h in cyl.get_all_features(on_boundary)} == {"side.0"}
 
     def test_solid_union_collects_child_features(self):
         """SolidUnion collects features from children that have named features."""
@@ -2950,12 +2969,19 @@ class TestCylinderFeatures:
         assert bore.find_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "bore_top"
         assert bore.find_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "wall"
 
-    def test_unnamed_cylinder_yields_nothing(self):
-        assert self._bore().get_all_features(create_v3(scalar(2), scalar(0), scalar(5))) == []
+    def test_an_unnamed_cylinder_still_names_its_barrel(self):
+        names = {h.name for h in
+                 self._bore().get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))}
+
+        assert names == {"side.0"}
 
     def test_a_cap_is_not_claimed_by_the_barrel_name(self):
         bore = self._bore(_features=[SimpleCylinderFeature("wall", part=CylinderPart.BARREL)])
-        assert bore.find_feature(create_v3(scalar(0), scalar(0), scalar(0))) is None
+
+        # The authored name is the barrel's and stays there. The cap answers
+        # with the cylinder's own default rather than borrowing it.
+        cap = bore.find_feature(create_v3(scalar(0), scalar(0), scalar(0)))
+        assert cap is not None and cap.name == "cap.0"
 
 
 class TestLoftFeatures:
@@ -2994,8 +3020,11 @@ class TestLoftFeatures:
         feature = loft.find_feature(midway)
         assert feature is not None and feature.name == "front_face"
 
-    def test_unnamed_loft_yields_nothing(self):
-        assert self._taper().get_all_features(create_v3(scalar(0), scalar(0), scalar(0))) == []
+    def test_an_unnamed_loft_still_names_its_own_faces(self):
+        names = {h.name for h in
+                 self._taper().get_all_features(create_v3(scalar(0), scalar(0), scalar(0)))}
+
+        assert names == {"cap.0"}
 
 
 class TestProgrammableCSGFeature:
@@ -3026,8 +3055,14 @@ class TestProgrammableCSGFeature:
         )
         prism = self._prism(lower_right)
 
-        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(2))) is not None
-        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(8))) is None
+        def claimed_by_predicate(point):
+            return "lower_right_half" in {h.name for h in prism.get_all_features(point)}
+
+        # The prism's own default names the whole right face either way, so the
+        # question is whether the PREDICATE claims the point, not whether
+        # anything does.
+        assert claimed_by_predicate(create_v3(scalar(2), scalar(0), scalar(2)))
+        assert not claimed_by_predicate(create_v3(scalar(2), scalar(0), scalar(8)))
 
     def test_it_still_requires_the_point_to_be_on_the_boundary(self):
         """A predicate that says yes to everything cannot claim interior points."""
@@ -3074,7 +3109,11 @@ class TestProgrammableCSGFeature:
 
     def test_a_predicateless_feature_matches_nothing(self):
         prism = self._prism(ProgrammableCSGFeature("inert"))
-        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5))) is None
+
+        names = {h.name for h in prism.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))}
+
+        assert "inert" not in names
+        assert names  # the prism's own default is still there to be found
 
     def test_it_coexists_with_simple_features_and_respects_priority(self):
         prism = self._prism(
@@ -3102,16 +3141,27 @@ class TestDeclaredFeatures:
                 SimpleRectangularPrismFeature("b", face=PrismFace.TOP),
             ],
         )
-        assert [f.name for f in prism.get_declared_features()] == ["a", "b"]
+        # Authored first, then whatever default slots are still free. Asking
+        # for one layer or the other is what FeatureSource is for.
+        assert [f.name for f in prism.get_declared_features(FeatureSource.OVERRIDES)] == ["a", "b"]
+        both = [f.name for f in prism.get_declared_features()]
+        assert both[:2] == ["a", "b"]
+        # "a" is the right side and "b" the top, so those two default slots are
+        # taken rather than duplicated.
+        assert "side.0" not in both and "cap.1" not in both
 
-    def test_is_empty_when_nothing_is_declared(self):
+    def test_only_the_authored_layer_is_empty_when_nothing_is_authored(self):
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
             start_distance=scalar(0),
             end_distance=scalar(10),
         )
-        assert prism.get_declared_features() == []
+
+        assert prism.get_declared_features(FeatureSource.OVERRIDES) == []
+        # Six faces, four long arrises, and four at each end.
+        assert len(prism.get_declared_features(FeatureSource.DEFAULTS)) == 18
+        assert len(prism.get_declared_features()) == 18
 
 
 class TestCSGFeatureType:

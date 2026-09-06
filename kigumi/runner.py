@@ -3461,18 +3461,43 @@ def _nearest_timber_local_face_name(normal: Any) -> str:
     return best_name
 
 
+def _authored_feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
+    """The best feature at a point that someone actually named.
+
+    The whole hit list, filtered to the authored layer, rather than
+    find_feature -- which would hand back the primitive's own default when an
+    authored feature is a hair further away.
+    """
+    from kumiki.cutcsg import FeatureSource, FeatureTestTolerances
+
+    authored = {
+        id(feature)
+        for feature in csg.get_declared_features(FeatureSource.OVERRIDES)
+    }
+    for hit in csg.get_all_features(point, FeatureTestTolerances(face=eps)):
+        if id(hit.feature) in authored:
+            return hit.feature
+    return None
+
+
 def _detect_face_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> str:
     """Name the feature of primitive *csg* that *local_pt* lies on.
 
     Two layers, in order:
 
-    1. The primitive's own named feature, via kumiki's CSGFeature lookup. This
+    1. The primitive's AUTHORED feature, via kumiki's CSGFeature lookup. This
        is authoritative -- a prism built in its own local frame (a tenon's
        marking_space, say) has a "top" that is not the timber's top, so a
        declared name always beats a geometric guess.
     2. Failing that, a generic label. Most joint geometry is still unnamed, so
        this is the common path today: name the face by whichever of the
        timber's own six directions its outward normal points along.
+
+    Authored only, deliberately. Every primitive now names its own boundary by
+    default, so asking for both layers would always succeed at step 1 and this
+    would answer "side.0" where it used to answer "right". A default name says
+    where a face is on its own primitive; the fallback says where it is on the
+    TIMBER, which is the more useful of the two for a label a person reads.
 
     HalfSpace and a cylinder's barrel get fixed names instead -- neither has a
     "face" in the timber's sense, and naming them by direction would read as a
@@ -3487,7 +3512,7 @@ def _detect_face_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> st
     # the analytic face and the triangulated mesh the ray actually hit. Edges
     # and points keep their (wider) defaults, since hitting one is a snap
     # rather than a direct hit.
-    feature = csg.find_feature(point, FeatureTestTolerances(face=eps))
+    feature = _authored_feature_at(csg, point, eps)
     if feature is not None:
         return feature.name
 

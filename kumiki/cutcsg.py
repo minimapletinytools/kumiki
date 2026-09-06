@@ -19,10 +19,10 @@ point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 import re
-from typing import Callable, Iterator, List, Optional, Tuple, Union, cast
+from typing import Callable, Dict, Iterator, List, Optional, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
-from enum import Enum
+from enum import Enum, Flag
 import warnings
 from .rule import *
 from .geometry import Line, Plane, Point, intersect_planes, planes_are_parallel
@@ -71,6 +71,68 @@ class BoundingBox:
     max_z: Optional[Numeric]
     is_empty: bool = False
 
+class FeatureCategory(Enum):
+    """What kind of place on a primitive's boundary a default feature names.
+
+    One vocabulary across every primitive, because they agree more than their
+    own key types make them look: a prism's TOP and a cylinder's TOP and an
+    extrusion's ExtrusionCap.TOP are the same idea, and a prism's four sides,
+    an extrusion's n sides and a cylinder's single barrel are the same idea
+    again. A cylinder is an extrusion with one curved side.
+
+    Paired with an index, this addresses any of them: (SIDE, 2) means the third
+    side of whatever this is. Indices run in the primitive's own order -- for
+    an extrusion, side n runs from vertex n to vertex n+1, which is the meaning
+    ExtrusionFeatureKey already had.
+
+    ARRIS categories are split by which end they belong to rather than carrying
+    two indices, so a key is always a category and ONE number.
+    """
+
+    CAP = 0           # 0 = the start end, 1 = the end end
+    SIDE = 1          # n = the nth side; a cylinder's barrel is side 0
+    ARRIS = 2         # n = where side n meets side n+1 -- a timber's long arris
+    START_ARRIS = 3   # n = where side n meets the start cap
+    END_ARRIS = 4     # n = where side n meets the end cap
+    START_CORNER = 5  # n = vertex n of the start profile
+    END_CORNER = 6
+
+
+# Where a default feature sits on a primitive: a category and an index within
+# it. Deliberately not a string -- the set is finite and known per primitive,
+# and a typo in a string key is a feature that silently never matches.
+FeatureKey = Tuple[FeatureCategory, int]
+
+# The two ends, named so callers do not write 0 and 1 and mean the wrong one.
+START_CAP: FeatureKey = (FeatureCategory.CAP, 0)
+END_CAP: FeatureKey = (FeatureCategory.CAP, 1)
+
+
+# What every default carries. FeatureGroup.NONE is the important half -- see
+# RectangularPrism.default_features for why a default that pairs would be a
+# problem rather than a bonus.
+_DEFAULT_FEATURE_PROPERTIES: 'FeatureProperties'
+
+
+def default_feature_name(key: FeatureKey) -> str:
+    """What a default feature is called when nobody has named it.
+
+    Deterministic, so a default is referenceable -- from a drawing, a
+    measurement, an override -- without anyone having authored a name for it.
+    Lower case and dotted to sit alongside the authored names already in use,
+    which look like "ptw.front" and "rough.back_right".
+    """
+    category, index = key
+    return f"{category.name.lower()}.{index}"
+
+
+# A prism's four sides in order around it -- +x, +y, -x, -y -- which is what
+# fixes the meaning of SIDE n, and with it ARRIS n as the join between side n
+# and side n+1. Any consistent cycle would do; this one is the cycle the local
+# axes already run in.
+_PRISM_SIDE_ORDER: Tuple['PrismFace', ...] = ()  # filled in below, once PrismFace exists
+
+
 class PrismFace(Enum):
     """Face of a RectangularPrism, indices match TimberFace."""
     TOP = 1
@@ -79,6 +141,10 @@ class PrismFace(Enum):
     FRONT = 4
     LEFT = 5
     BACK = 6
+
+
+_PRISM_SIDE_ORDER = (PrismFace.RIGHT, PrismFace.FRONT, PrismFace.LEFT, PrismFace.BACK)
+_PRISM_CAP_KEYS = {PrismFace.BOTTOM: START_CAP, PrismFace.TOP: END_CAP}
 
 
 class ExtrusionCap(Enum):
@@ -343,6 +409,15 @@ class FeatureProperties:
     purpose: FeaturePurpose = FeaturePurpose.NOT_SPECIFIED
 
 
+# An authored feature beats an anonymous default wherever both could answer.
+# Set explicitly rather than left to the order the two lists happen to be
+# concatenated in, since that is invisible at the point it decides something.
+_DEFAULT_FEATURE_PRIORITY = 1000
+
+_DEFAULT_FEATURE_PROPERTIES = FeatureProperties(
+    group=FeatureGroup.NONE, priority=_DEFAULT_FEATURE_PRIORITY)
+
+
 def _sort_feature_hits(hits: List['OwnedFeatureHit']) -> List['OwnedFeatureHit']:
     """Best answer first.
 
@@ -470,6 +545,17 @@ class CSGFeature(ABC):
     """
     name: str
     properties: FeatureProperties = field(default_factory=FeatureProperties)
+
+    def feature_key(self) -> Optional['FeatureKey']:
+        """Which default slot this feature occupies, or None if it has none.
+
+        This is what lets an authored feature REPLACE the default at the same
+        place rather than sit alongside it. None is the honest answer for
+        anything with no fixed place on a primitive -- a ProgrammableCSGFeature
+        matching a formula, or a derived edge, which exists only as the product
+        of two hits and never occupies a slot of its own.
+        """
+        return None
 
     @abstractmethod
     def feature_type(self) -> CSGFeatureType:
@@ -713,6 +799,10 @@ class HalfSpaceFeature(CSGFeature):
     A half-space has exactly one face, so this needs no key to say which.
     """
 
+    def feature_key(self) -> Optional[FeatureKey]:
+        # Its only surface. Not a cap: a half space has no ends to be an end of.
+        return (FeatureCategory.SIDE, 0)
+
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
@@ -738,6 +828,11 @@ class HalfSpaceFeature(CSGFeature):
 class SimpleRectangularPrismFeature(CSGFeature):
     """One of the six faces of a RectangularPrism, named by PrismFace."""
     face: PrismFace = PrismFace.TOP
+
+    def feature_key(self) -> Optional[FeatureKey]:
+        if self.face in _PRISM_CAP_KEYS:
+            return _PRISM_CAP_KEYS[self.face]
+        return (FeatureCategory.SIDE, _PRISM_SIDE_ORDER.index(self.face))
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
@@ -825,6 +920,31 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.EDGE
 
+    def feature_key(self) -> Optional[FeatureKey]:
+        """The arris between two adjacent sides, or None between a side and a cap.
+
+        ARRIS n is where side n meets side n+1, so only an adjacent PAIR of
+        sides has one. A side against a cap is a START_ARRIS or an END_ARRIS,
+        and opposite sides never meet at all.
+        """
+        first, second = self.faces
+        if first in _PRISM_CAP_KEYS or second in _PRISM_CAP_KEYS:
+            cap, side = ((first, second) if first in _PRISM_CAP_KEYS
+                         else (second, first))
+            if side in _PRISM_CAP_KEYS:
+                return None  # two caps never meet
+            category = (FeatureCategory.START_ARRIS if cap is PrismFace.BOTTOM
+                        else FeatureCategory.END_ARRIS)
+            return (category, _PRISM_SIDE_ORDER.index(side))
+        low, high = (_PRISM_SIDE_ORDER.index(first), _PRISM_SIDE_ORDER.index(second))
+        low, high = min(low, high), max(low, high)
+        sides = len(_PRISM_SIDE_ORDER)
+        if high - low == 1:
+            return (FeatureCategory.ARRIS, low)
+        if low == 0 and high == sides - 1:
+            return (FeatureCategory.ARRIS, high)  # the wrap-around join
+        return None  # opposite sides: parallel, no arris
+
     def _sides(self) -> Tuple['SimpleRectangularPrismFeature', 'SimpleRectangularPrismFeature']:
         """The two faces as features, so their geometry is worked out once, there."""
         return (
@@ -860,6 +980,14 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
 class SimpleCylinderFeature(CSGFeature):
     """One surface of a Cylinder: an end cap, or the barrel."""
     part: CylinderPart = CylinderPart.BARREL
+
+    def feature_key(self) -> Optional[FeatureKey]:
+        if self.part is CylinderPart.BOTTOM:
+            return START_CAP
+        if self.part is CylinderPart.TOP:
+            return END_CAP
+        # A cylinder is an extrusion with one side, and that side is curved.
+        return (FeatureCategory.SIDE, 0)
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
@@ -906,6 +1034,13 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
     """One side face (points[key] -> points[key+1 mod n]) or end cap of a
     ConvexPolygonExtrusion."""
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
+
+    def feature_key(self) -> Optional[FeatureKey]:
+        if self.key is ExtrusionCap.BOTTOM:
+            return START_CAP
+        if self.key is ExtrusionCap.TOP:
+            return END_CAP
+        return (FeatureCategory.SIDE, int(self.key))
 
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
@@ -980,6 +1115,13 @@ class SimpleLoftFeature(CSGFeature):
     """
     key: ExtrusionFeatureKey = ExtrusionCap.TOP
 
+    def feature_key(self) -> Optional[FeatureKey]:
+        if self.key is ExtrusionCap.BOTTOM:
+            return START_CAP
+        if self.key is ExtrusionCap.TOP:
+            return END_CAP
+        return (FeatureCategory.SIDE, int(self.key))
+
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.FACE
 
@@ -1032,6 +1174,73 @@ class SimpleLoftFeature(CSGFeature):
         if self.key == ExtrusionCap.BOTTOM:
             return safe_equality_test(z, owner.start_distance, eps=test_tolerance)
         return owner._point_on_side(self.key, x, y, z, eps=test_tolerance)
+
+
+class FeatureSource(Flag):
+    """Which features a query is asking for.
+
+    DEFAULTS are what a primitive names on its own, in FeatureKey slots.
+    OVERRIDES are what an author handed it: a replacement for a default at the
+    same key, or a feature at a slot no default occupies. BOTH is the answer to
+    "what does this shape name", which is what nearly every caller wants.
+    """
+
+    DEFAULTS = 1
+    OVERRIDES = 2
+    BOTH = 3
+
+
+@dataclass(frozen=True)
+class HasFeatures:
+    """Storage for the features a primitive names on its own boundary.
+
+    A mixin rather than a field on CutCSG, because a compound node names
+    nothing: a SolidUnion, Difference or Intersection has no surface of its
+    own, only the surfaces its children contribute. Only the primitives that
+    have a boundary of their own inherit this.
+
+    Six primitives carried an identical copy of the field and its accessor
+    before this existed. That is the whole reason it exists -- feature storage
+    is one idea, and the shapes that have features differ in their geometry,
+    not in how they hold a list.
+
+    Two layers, not one. A primitive names its own boundary through
+    default_features(), keyed by FeatureKey; an author overrides or adds to
+    that through `_features`. An authored feature whose key matches a default
+    REPLACES it, so naming a face does not leave the anonymous one behind to be
+    found twice.
+    """
+
+    _features: Optional[List['CSGFeature']] = field(default=None, kw_only=True)
+
+    def default_features(self) -> Dict['FeatureKey', 'CSGFeature']:
+        """What this primitive names on its own, keyed by where it sits.
+
+        Empty here: a shape opts in by overriding this. Whatever it returns
+        must be in FeatureGroup.NONE -- see the note on default_features in
+        RectangularPrism for why that matters more than it looks.
+        """
+        return {}
+
+    def get_declared_features(
+        self, source: 'FeatureSource' = FeatureSource.BOTH,
+    ) -> List['CSGFeature']:
+        """Features this node names on its own boundary, whether or not any
+        point lies on them.
+        """
+        authored = list(self._features or ())
+        if source is FeatureSource.OVERRIDES:
+            return authored
+
+        defaults = dict(self.default_features())
+        if source is FeatureSource.DEFAULTS:
+            return list(defaults.values())
+
+        for feature in authored:
+            key = feature.feature_key()
+            if key is not None:
+                defaults.pop(key, None)
+        return authored + list(defaults.values())
 
 
 @dataclass(frozen=True)
@@ -1122,14 +1331,16 @@ class CutCSG(ABC):
         """
         return re.sub(r"(?<!^)(?=[A-Z])", " ", cls.__name__).lower()
 
-    def get_declared_features(self) -> List[CSGFeature]:
+    def get_declared_features(
+        self, source: 'FeatureSource' = FeatureSource.BOTH,
+    ) -> List[CSGFeature]:
         """Features this node names on its own boundary, whether or not any
         point lies on them.
 
         Empty by default, and it stays empty for the compound nodes: a
         SolidUnion, Difference or Intersection has no surface of its own to
-        name, only the surfaces its children contribute. Each primitive
-        declares a private `_features` and overrides this to expose it.
+        name, only the surfaces its children contribute. The primitives that do
+        have a boundary get this from HasFeatures instead.
         """
         return []
 
@@ -1383,7 +1594,7 @@ class EmptyCSG(CutCSG):
 
 
 @dataclass(frozen=True)
-class HalfSpace(CutCSG):
+class HalfSpace(HasFeatures, CutCSG):
     """
     An infinite half-plane defined by a normal vector and offset from origin.
     
@@ -1396,18 +1607,18 @@ class HalfSpace(CutCSG):
         offset: Distance from origin along normal direction where plane is located (default: 0)
     """
 
+    def default_features(self) -> Dict[FeatureKey, CSGFeature]:
+        """Its one surface. See RectangularPrism.default_features for the group."""
+        key = (FeatureCategory.SIDE, 0)
+        return {key: HalfSpaceFeature(name=default_feature_name(key),
+                                      properties=_DEFAULT_FEATURE_PROPERTIES)}
+
     @classmethod
     def display_name(cls) -> str:
         return "half-space"
     normal: Direction3D
     offset: Numeric = scalar(0)
     # Features this primitive names on its own boundary. Private: read it
-    # through get_declared_features(), query it through get_all_features().
-    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
-
-    def get_declared_features(self) -> List[CSGFeature]:
-        return list(self._features or ())
-
     def __repr__(self) -> str:
         return f"HalfSpace(normal={self.normal.T}, offset={self.offset})"
     
@@ -1466,7 +1677,7 @@ class HalfSpace(CutCSG):
         )
         return BoundingBox(None, None, None, None, None, None)
 @dataclass(frozen=True)
-class RectangularPrism(CutCSG):
+class RectangularPrism(HasFeatures, CutCSG):
     """
     A prism with rectangular cross-section, optionally infinite in one or both ends.
     Note,they are parameterized similar to the Timber class which is atypical for such a primitive.
@@ -1493,6 +1704,48 @@ class RectangularPrism(CutCSG):
         end_distance: Distance from position along Z-axis to end of prism (None = infinite)
     """
 
+    def default_features(self) -> Dict[FeatureKey, CSGFeature]:
+        """Every face and arris a prism has, named without anyone asking.
+
+        ALL DEFAULTS ARE IN FeatureGroup.NONE, AND THIS IS LOAD BEARING. The
+        group is what decides which features may pair to form a DERIVED edge,
+        and derived edges are found by pairing every face near a query point
+        with every other -- O(k^2) in k. Before defaults, a primitive nobody
+        had named contributed k = 0. Putting these in a pairing group instead
+        would set k to a dozen per primitive across the whole tree, and produce
+        a mass of derived edges that are geometrically real and mean nothing.
+
+        A default is a thing you can SELECT and MEASURE TO, not a thing that
+        combines. Anything wanting to combine is authored, with a group chosen
+        on purpose -- which is what _ptw_face_tags and the joint code do.
+        """
+        features: Dict[FeatureKey, CSGFeature] = {}
+
+        def named(key: FeatureKey, feature_for) -> None:
+            features[key] = feature_for(default_feature_name(key))
+
+        for face, key in _PRISM_CAP_KEYS.items():
+            named(key, lambda name, face=face: SimpleRectangularPrismFeature(
+                name=name, face=face, properties=_DEFAULT_FEATURE_PROPERTIES))
+        for index, face in enumerate(_PRISM_SIDE_ORDER):
+            named((FeatureCategory.SIDE, index),
+                  lambda name, face=face: SimpleRectangularPrismFeature(
+                      name=name, face=face, properties=_DEFAULT_FEATURE_PROPERTIES))
+
+        sides = len(_PRISM_SIDE_ORDER)
+        for index in range(sides):
+            pair = (_PRISM_SIDE_ORDER[index], _PRISM_SIDE_ORDER[(index + 1) % sides])
+            named((FeatureCategory.ARRIS, index),
+                  lambda name, pair=pair: SimpleRectangularPrismEdgeFeature(
+                      name=name, faces=pair, properties=_DEFAULT_FEATURE_PROPERTIES))
+            for cap, category in ((PrismFace.BOTTOM, FeatureCategory.START_ARRIS),
+                                  (PrismFace.TOP, FeatureCategory.END_ARRIS)):
+                ends = (cap, _PRISM_SIDE_ORDER[index])
+                named((category, index),
+                      lambda name, ends=ends: SimpleRectangularPrismEdgeFeature(
+                          name=name, faces=ends, properties=_DEFAULT_FEATURE_PROPERTIES))
+        return features
+
     @classmethod
     def display_name(cls) -> str:
         return "prism"
@@ -1502,12 +1755,6 @@ class RectangularPrism(CutCSG):
     end_distance: Optional[Numeric] = None    # ending distance of the prism in the direction of the +Z axis. None means infinite in positive direction
 
     # Features this primitive names on its own boundary. Private: read it
-    # through get_declared_features(), query it through get_all_features().
-    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
-
-    def get_declared_features(self) -> List[CSGFeature]:
-        return list(self._features or ())
-
     def get_bottom_position(self) -> V3:
         """
         Get the position of the bottom of the prism (at start_distance).
@@ -1789,7 +2036,7 @@ def make_finite_rectangular_prism_from_half_space(half_space: HalfSpace, size_of
         end_distance=depth_of_space,
     )
 @dataclass(frozen=True)
-class Cylinder(CutCSG):
+class Cylinder(HasFeatures, CutCSG):
     """
     A cylinder with circular cross-section, optionally infinite in one or both ends.
     
@@ -1818,11 +2065,20 @@ class Cylinder(CutCSG):
     end_distance: Optional[Numeric] = None    # None means infinite in positive direction
 
     # Features this primitive names on its own boundary. Private: read it
-    # through get_declared_features(), query it through get_all_features().
-    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
+    def default_features(self) -> Dict[FeatureKey, CSGFeature]:
+        """Two caps and the barrel. See RectangularPrism for why the group is NONE.
 
-    def get_declared_features(self) -> List[CSGFeature]:
-        return list(self._features or ())
+        No arrises: a cylinder's rims are circles, and there is no feature class
+        for one yet. START_ARRIS 0 and END_ARRIS 0 are the slots they will take.
+        """
+        parts = ((START_CAP, CylinderPart.BOTTOM),
+                 (END_CAP, CylinderPart.TOP),
+                 ((FeatureCategory.SIDE, 0), CylinderPart.BARREL))
+        return {
+            key: SimpleCylinderFeature(name=default_feature_name(key), part=part,
+                                       properties=_DEFAULT_FEATURE_PROPERTIES)
+            for key, part in parts
+        }
 
     def _axial_and_radial(self, point: V3) -> Tuple[Numeric, Numeric]:
         """Distance along the axis from `position`, and distance from the axis."""
@@ -2399,7 +2655,7 @@ def translate_profiles(profiles: Profiles, translation: V2) -> Profiles:
 
 
 @dataclass(frozen=True)
-class ConvexPolygonExtrusion(CutCSG):
+class ConvexPolygonExtrusion(HasFeatures, CutCSG):
     """
     An extruded Convex Polygon shape, optionally infinite in one or both ends.
     
@@ -2420,6 +2676,24 @@ class ConvexPolygonExtrusion(CutCSG):
         end_distance: Distance from position along Z-axis to end of extrusion (None = infinite)
     """
 
+    def default_features(self) -> Dict[FeatureKey, CSGFeature]:
+        """Two caps and a side per edge of the profile.
+
+        No arrises yet: SimpleRectangularPrismEdgeFeature is a prism's, and an
+        extrusion needs its own before ARRIS n can be filled in here.
+        """
+        features: Dict[FeatureKey, CSGFeature] = {}
+        for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
+            features[key] = SimpleConvexPolygonExtrusionFeature(
+                name=default_feature_name(key), key=cap,
+                properties=_DEFAULT_FEATURE_PROPERTIES)
+        for index in range(len(self.points)):
+            key = (FeatureCategory.SIDE, index)
+            features[key] = SimpleConvexPolygonExtrusionFeature(
+                name=default_feature_name(key), key=index,
+                properties=_DEFAULT_FEATURE_PROPERTIES)
+        return features
+
     @classmethod
     def display_name(cls) -> str:
         return "extrusion"
@@ -2429,12 +2703,6 @@ class ConvexPolygonExtrusion(CutCSG):
     end_distance: Optional[Numeric] = None    # ending distance in the direction of the +Z axis. None means infinite in positive direction
 
     # Features this primitive names on its own boundary. Private: read it
-    # through get_declared_features(), query it through get_all_features().
-    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
-
-    def get_declared_features(self) -> List[CSGFeature]:
-        return list(self._features or ())
-
     def get_bottom_position(self) -> V3:
         """
         Get the position of the bottom of the extrusion (at start_distance).
@@ -2764,7 +3032,7 @@ class ConvexPolygonExtrusion(CutCSG):
 
 
 @dataclass(frozen=True)
-class ConvexPolygonSimpleLoft(CutCSG):
+class ConvexPolygonSimpleLoft(HasFeatures, CutCSG):
     """
     A solid formed by straight-line lofting between two convex polygons in parallel
     planes, connected index-to-index (vertex i of bottom_points connects by a
@@ -2803,6 +3071,20 @@ class ConvexPolygonSimpleLoft(CutCSG):
         transform: Transform (position and orientation) in global coordinates (default: identity)
     """
 
+    def default_features(self) -> Dict[FeatureKey, CSGFeature]:
+        """Two caps and a side per edge of the profile, as an extrusion has."""
+        features: Dict[FeatureKey, CSGFeature] = {}
+        for key, cap in ((START_CAP, ExtrusionCap.BOTTOM), (END_CAP, ExtrusionCap.TOP)):
+            features[key] = SimpleLoftFeature(
+                name=default_feature_name(key), key=cap,
+                properties=_DEFAULT_FEATURE_PROPERTIES)
+        for index in range(len(self.bottom_points)):
+            key = (FeatureCategory.SIDE, index)
+            features[key] = SimpleLoftFeature(
+                name=default_feature_name(key), key=index,
+                properties=_DEFAULT_FEATURE_PROPERTIES)
+        return features
+
     @classmethod
     def display_name(cls) -> str:
         return "loft"
@@ -2813,12 +3095,6 @@ class ConvexPolygonSimpleLoft(CutCSG):
     transform: Transform = field(default_factory=Transform.identity)
 
     # Features this primitive names on its own boundary. Private: read it
-    # through get_declared_features(), query it through get_all_features().
-    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
-
-    def get_declared_features(self) -> List[CSGFeature]:
-        return list(self._features or ())
-
     def get_bottom_position(self) -> V3:
         """Get the position of the bottom of the loft (at start_distance)."""
         return self.transform.position - safe_transform_vector(self.transform.orientation.matrix, Matrix([scalar(0), scalar(0), self.start_distance]))

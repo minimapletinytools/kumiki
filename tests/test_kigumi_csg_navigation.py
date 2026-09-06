@@ -194,7 +194,14 @@ class TestCSGTreeSerialization:
         assert {"rough.front_left", "rough.back_right"} <= names
         # B1: they meet joint geometry and not each other, since the arrises
         # they used to make by meeting are named outright now.
-        assert all(f["group"] == "B1" for f in base["features"])
+        authored = [f for f in base["features"] if not f["name"].startswith(
+            ("cap.", "side.", "arris.", "start_arris.", "end_arris."))]
+        assert authored and all(f["group"] == "B1" for f in authored)
+        # The prism's own defaults fill the slots the timber did not name --
+        # here, the arrises at each end. They pair with nothing, which is what
+        # keeps them from multiplying derived edges across the tree.
+        defaults = [f for f in base["features"] if f not in authored]
+        assert defaults and all(f["group"] == "NONE" for f in defaults)
 
     def test_joint_attribution_flows_down_the_cut(self, mortise_and_tenon_frame):
         """The body belongs to no joint; everything under a cut belongs to one."""
@@ -1518,7 +1525,16 @@ class TestHoveringOverAFeature:
         state, slot, local, cut_timber = self._slot(frame, member)
         timber = cut_timber.timber
         for triangle in triangulate_cutcsg(local).mesh.triangles:
-            for vertex in triangle:
+            # Centroids as well as corners. Every primitive names its own
+            # arrises now, and a mesh vertex is exactly where arrises meet, so
+            # a corner always answers EDGE -- correctly, but it means a caller
+            # after a FACE would never find one. A centroid is interior to its
+            # triangle and so on a face and nothing else.
+            centroid = [
+                sum(float(vertex[axis]) for vertex in triangle) / 3.0
+                for axis in range(3)
+            ]
+            for vertex in list(triangle) + [centroid]:
                 world = timber.transform.local_to_global(
                     runner._to_v3([float(vertex[i]) for i in range(3)]))
                 payload = {"memberKey": member,

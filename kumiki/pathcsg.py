@@ -30,6 +30,7 @@ from .cutcsg import (
     CSGFeatureExtent,
     CSGFeatureType,
     CutCSG,
+    HasFeatures,
     LocatedGeometry,
     _finite_midpoint,
     ExtrusionCap,
@@ -917,7 +918,7 @@ class SimplePathExtrusionFeature(CSGFeature):
 
 
 @dataclass(frozen=True)
-class PathExtrusion(CutCSG):
+class PathExtrusion(HasFeatures, CutCSG):
     """
     Generalizes ConvexPolygonExtrusion to an arbitrary closed FancyPath (lines and
     arcs today, more segment types later) -- convexity is NOT required.
@@ -934,12 +935,6 @@ class PathExtrusion(CutCSG):
     end_distance: Optional[Numeric] = None
 
     # Features this primitive names on its own boundary. Private: read it
-    # through get_declared_features(), query it through get_all_features().
-    _features: Optional[List[CSGFeature]] = field(default=None, kw_only=True)
-
-    def get_declared_features(self) -> List[CSGFeature]:
-        return list(self._features or ())
-
     def __repr__(self) -> str:
         return (f"PathExtrusion({len(self.path.segments)} segments, "
                 f"transform={self.transform}, start={self.start_distance}, end={self.end_distance})")

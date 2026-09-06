@@ -1,3 +1,5 @@
+# TODO rename this file, not just convex hull testing
+
 """Where a feature actually is: the CSG, sectioned by a line or a plane.
 
 A feature's declared extent is the extent of the primitive it was declared on,
