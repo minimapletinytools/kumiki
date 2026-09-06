@@ -43,122 +43,18 @@ material.
 """
 
 import math
-from dataclasses import dataclass
 from typing import List, Optional, Sequence, Tuple
 
-from .geometry import Line, Plane
+from .geometry import (
+    Line,
+    Plane,
+    PlanarRegion,
+    Segment,
+    frame_for_plane,
+    perpendicular_axes,
+    unit_vector,
+)
 from .rule import V3, Matrix, Numeric, scalar
-
-
-@dataclass(frozen=True)
-class PlaneFrame:
-    """Two axes on a plane, for working in it as if it were flat."""
-
-    origin: V3
-    u: V3
-    v: V3
-
-    def to_2d(self, point: V3) -> Tuple[float, float]:
-        offset = point - self.origin
-        return (
-            float((offset.T * self.u)[0, 0]),
-            float((offset.T * self.v)[0, 0]),
-        )
-
-    def to_3d(self, x: float, y: float) -> V3:
-        return self.origin + self.u * scalar(x) + self.v * scalar(y)
-
-
-@dataclass(frozen=True)
-class FeatureRegion:
-    """A convex region of a plane: where a feature is, once cropped.
-
-    `boundary` is in order around the region, and lies on `plane`. An empty
-    boundary means the feature has nothing left after cropping -- it is not on
-    the finished piece at all, which is a thing worth knowing rather than an
-    error.
-    """
-
-    plane: Plane
-    boundary: Tuple[V3, ...]
-
-    @property
-    def is_empty(self) -> bool:
-        return len(self.boundary) < 3
-
-    def centroid(self) -> Optional[V3]:
-        """A point in the middle of the region, for a dimension to attach to."""
-        if not self.boundary:
-            return None
-        total = self.boundary[0]
-        for point in self.boundary[1:]:
-            total = total + point
-        return total / scalar(len(self.boundary))
-
-    def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
-        """How far the region reaches along any direction, as (min, max).
-
-        This is what makes orienting to a viewport unnecessary: ask along the
-        viewport's own axes and the answer is the bounds in that view.
-        """
-        if not self.boundary:
-            return None
-        reach = [float((point.T * direction)[0, 0]) for point in self.boundary]
-        return (min(reach), max(reach))
-
-
-@dataclass(frozen=True)
-class FeatureSegment:
-    """A stretch of a line: where an edge is, once cropped.
-
-    The counterpart to FeatureRegion for a feature that locates to a line. An
-    empty `ends` means nothing survived -- the edge is not on the finished piece
-    -- which is worth knowing rather than an error.
-    """
-
-    line: Line
-    ends: Tuple[V3, ...]
-
-    @property
-    def is_empty(self) -> bool:
-        return len(self.ends) < 2
-
-    def midpoint(self) -> Optional[V3]:
-        """The middle of the edge, for a dimension to attach to."""
-        if self.is_empty:
-            return None
-        return (self.ends[0] + self.ends[1]) / scalar(2)
-
-    def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
-        """How far the segment reaches along any direction, as (min, max)."""
-        if self.is_empty:
-            return None
-        reach = [float((point.T * direction)[0, 0]) for point in self.ends]
-        return (min(reach), max(reach))
-
-
-def _unit(vector: V3) -> V3:
-    length = float((vector.T * vector)[0, 0]) ** 0.5
-    return vector / scalar(length) if length > 0 else vector
-
-
-def _perpendicular_axes(direction: V3) -> Tuple[V3, V3]:
-    """Two unit axes at right angles to a direction, and to each other.
-
-    Which two does not matter, so long as neither is parallel to the direction:
-    the world axis it leans on least is the safe one to start from.
-    """
-    forward = _unit(direction)
-    components = [abs(float(forward[i, 0])) for i in range(3)]
-    least = components.index(min(components))
-    seed = Matrix([scalar(1) if i == least else scalar(0) for i in range(3)])
-    u = _unit(seed - forward * (seed.T * forward)[0, 0])
-    v = Matrix([
-        forward[1, 0] * u[2, 0] - forward[2, 0] * u[1, 0],
-        forward[2, 0] * u[0, 0] - forward[0, 0] * u[2, 0],
-        forward[0, 0] * u[1, 0] - forward[1, 0] * u[0, 0],
-    ])
-    return u, _unit(v)
 
 
 def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
@@ -187,30 +83,6 @@ def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, f
     return lower[:-1] + upper[:-1]
 
 
-def frame_for_plane(plane: Plane, near: Optional[V3] = None) -> PlaneFrame:
-    """Two perpendicular axes lying in a plane, with an origin near something.
-
-    The first axis is whichever world axis the normal leans on least, made
-    perpendicular -- any choice does, so long as it is never parallel to the
-    normal.
-
-    The origin matters more than it looks. A plane's stored point is any point
-    on it, and for a face declared on a cutter extended far past the timber it
-    is far past the timber too. Working from there and clipping to the timber
-    leaves nothing, having started nowhere near it. So the caller says what the
-    region is expected to be near -- the timber -- and that is projected onto
-    the plane to start from.
-    """
-    normal = _unit(plane.normal)
-    u, v = _perpendicular_axes(normal)
-    origin = plane.point
-    if near is not None:
-        # Drop `near` onto the plane along the normal.
-        away = (near - plane.point).T * normal
-        origin = near - normal * away[0, 0]
-    return PlaneFrame(origin=origin, u=u, v=v)
-
-
 # A solid, as the half spaces that bound it: each an outward normal and a point
 # on its plane, so a point is inside when (p - point) . normal <= 0 for all.
 BoundingHalfSpaces = List[Tuple[V3, V3]]
@@ -229,7 +101,7 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
 
     if isinstance(csg, HalfSpace):
         # Inside is p . normal >= offset, so the outward normal is the other way.
-        normal = _unit(csg.normal)
+        normal = unit_vector(csg.normal)
         return [(-normal, normal * csg.offset)]
 
     if isinstance(csg, RectangularPrism):
@@ -255,8 +127,8 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         # the hexagon contains the cylinder. Outwards, per the rule at the top
         # of this file -- a region that contains the truth is one that can be
         # trusted to say a feature is NOT somewhere.
-        axis = _unit(csg.axis_direction)
-        across, up = _perpendicular_axes(axis)
+        axis = unit_vector(csg.axis_direction)
+        across, up = perpendicular_axes(axis)
         faces = []
         for step in range(6):
             angle = math.pi * step / 3
@@ -339,7 +211,7 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         normal = _cross(along, rising)
         if _length(normal) < 1e-12:
             return None
-        normal = _unit(normal)
+        normal = unit_vector(normal)
         # Outward, whichever way the profiles were wound.
         if float(((middle - bottom[index]).T * normal)[0, 0]) > 0:
             normal = -normal
@@ -459,7 +331,7 @@ def approximately_crop_plane_to_area_on_csg(
     seed_reach: Numeric,
 
     near: Optional[V3] = None,
-) -> Optional[FeatureRegion]:
+) -> Optional[PlanarRegion]:
     """The part of a plane left after clipping by a set of convex solids.
 
     APPROXIMATELY, and the name says so because the difference matters. This
@@ -507,13 +379,13 @@ def approximately_crop_plane_to_area_on_csg(
             if abs(a) < 1e-12 and abs(b) < 1e-12:
                 # Parallel to the plane: it either keeps all of it or none.
                 if c < 0:
-                    return FeatureRegion(plane=plane, boundary=())
+                    return PlanarRegion(plane=plane, boundary=())
                 continue
             corners = _clip_polygon(corners, a, b, c)
             if not corners:
-                return FeatureRegion(plane=plane, boundary=())
+                return PlanarRegion(plane=plane, boundary=())
 
-    return FeatureRegion(
+    return PlanarRegion(
         plane=plane,
         boundary=tuple(frame.to_3d(x, y) for x, y in corners),
     )
@@ -539,7 +411,7 @@ def _spans_within_primitive(
     an arris shared with a mortise wall is. Getting this backwards eats every
     edge a cut passes through the plane of.
     """
-    direction = _unit(line.direction)
+    direction = unit_vector(line.direction)
     origin = line.point
     low, high = seed
     for normal, point in faces:
@@ -669,7 +541,7 @@ def crop_line_to_segments_on_csg(
 
     near: Optional[V3] = None,
     tolerance: float = 0.0,
-) -> Optional[List[FeatureSegment]]:
+) -> Optional[List[Segment]]:
     """The parts of a line that lie on a CSG solid.
 
     The one-dimensional counterpart to approximately_crop_plane_to_area_on_csg,
@@ -711,7 +583,7 @@ def crop_line_to_segments_on_csg(
     not. Telling the two apart needs the surface either side of the line, not
     just the line.
     """
-    direction = _unit(line.direction)
+    direction = unit_vector(line.direction)
     origin = line.point
     reach = float(seed_reach)
     centre = 0.0 if near is None else float(((near - origin).T * direction)[0, 0])
@@ -720,7 +592,7 @@ def crop_line_to_segments_on_csg(
     if spans is None:
         return None
     return [
-        FeatureSegment(
+        Segment(
             line=line,
             ends=(origin + direction * scalar(low), origin + direction * scalar(high)),
         )

@@ -8,15 +8,12 @@ cropping that turns one into the other.
 import pytest
 
 from kumiki.cutcsg import HalfSpace, RectangularPrism
-from kumiki.geometry import Line, Plane
+from kumiki.geometry import Line, Plane, PlanarRegion, Segment, frame_for_plane
 from kumiki.csgconvexhull import (
-    FeatureRegion,
-    FeatureSegment,
+    approximately_crop_plane_to_area_on_csg,
     bounding_half_spaces,
     convex_hull_2d,
-    frame_for_plane,
     crop_line_to_segments_on_csg,
-    approximately_crop_plane_to_area_on_csg,
 )
 from kumiki.rule import Matrix, Transform, create_v2, create_v3, mm, scalar
 
@@ -153,7 +150,7 @@ class TestRegionInPlane:
         assert along[1] > along[0]
 
     def test_an_empty_region_has_no_centroid_to_offer(self):
-        assert FeatureRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
+        assert PlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
                              boundary=()).centroid() is None
 
 
@@ -300,7 +297,7 @@ class TestCropLineToSegmentsOnCsg:
             line, tree, seed_reach=10, near=_v(0, 0, 0)) is None
 
     def test_an_empty_segment_has_no_midpoint_to_offer(self):
-        assert FeatureSegment(line=Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)),
+        assert Segment(line=Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)),
                               ends=()).midpoint() is None
 
 

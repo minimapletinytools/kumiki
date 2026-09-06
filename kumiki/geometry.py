@@ -6,11 +6,16 @@ These live here rather than in measuring.py so that cutcsg.py can use them too:
 measuring.py imports timber.py which imports cutcsg.py, so anything cutcsg needs
 has to sit below that chain. They depend on nothing but rule.py.
 
-They are deliberately UNBOUNDED. A Line is an infinite line, not a segment; a
-Plane is an infinite plane, not a face. That is what measurement wants -- "the
-distance between two parallel edges" means the distance between the infinite
-lines they lie on -- and bounds, where they matter, are carried separately (see
-cutcsg.CSGFeatureExtent).
+The primitives are deliberately UNBOUNDED. A Line is an infinite line, not a
+segment; a Plane is an infinite plane, not a face. That is what measurement
+wants -- "the distance between two parallel edges" means the distance between
+the infinite lines they lie on.
+
+Their BOUNDED counterparts live here too, beside them: a Segment is the part of
+a Line that is actually there, a PlanarRegion the part of a Plane. They are what
+you get back from cropping an unbounded primitive to a solid (see
+kumiki.csgconvexhull), and they are plain geometry -- neither knows what a
+feature or a timber is.
 
 measuring.py re-exports all of these, so `from kumiki.measuring import Plane`
 keeps working.
@@ -18,12 +23,14 @@ keeps working.
 
 from dataclasses import dataclass
 
-from typing import Optional
+from typing import List, Optional, Sequence, Tuple
 
 from .rule import (
     Direction3D,
+    Matrix,
     Transform,
     V3,
+    scalar,
     are_vectors_parallel,
     cross_product,
     safe_dot_product,
@@ -120,6 +127,144 @@ class HalfPlane:
 
     def __repr__(self) -> str:
         return f"HalfPlane(normal={self.normal}, point_on_line={self.point_on_line}, line_direction={self.line_direction})"
+
+
+def unit_vector(vector: V3) -> V3:
+    """A vector scaled to length one, or left alone if it has no length."""
+    length = float((vector.T * vector)[0, 0]) ** 0.5
+    return vector / scalar(length) if length > 0 else vector
+
+
+def perpendicular_axes(direction: V3) -> Tuple[V3, V3]:
+    """Two unit axes at right angles to a direction, and to each other.
+
+    Which two does not matter, so long as neither is parallel to the direction:
+    the world axis it leans on least is the safe one to start from.
+    """
+    forward = unit_vector(direction)
+    components = [abs(float(forward[i, 0])) for i in range(3)]
+    least = components.index(min(components))
+    seed = Matrix([scalar(1) if i == least else scalar(0) for i in range(3)])
+    u = unit_vector(seed - forward * (seed.T * forward)[0, 0])
+    v = Matrix([
+        forward[1, 0] * u[2, 0] - forward[2, 0] * u[1, 0],
+        forward[2, 0] * u[0, 0] - forward[0, 0] * u[2, 0],
+        forward[0, 0] * u[1, 0] - forward[1, 0] * u[0, 0],
+    ])
+    return u, unit_vector(v)
+
+
+@dataclass(frozen=True)
+class PlaneFrame:
+    """Two axes on a plane, for working in it as if it were flat."""
+
+    origin: V3
+    u: V3
+    v: V3
+
+    def to_2d(self, point: V3) -> Tuple[float, float]:
+        offset = point - self.origin
+        return (
+            float((offset.T * self.u)[0, 0]),
+            float((offset.T * self.v)[0, 0]),
+        )
+
+    def to_3d(self, x: float, y: float) -> V3:
+        return self.origin + self.u * scalar(x) + self.v * scalar(y)
+
+
+def frame_for_plane(plane: 'Plane', near: Optional[V3] = None) -> PlaneFrame:
+    """Two perpendicular axes lying in a plane, with an origin near something.
+
+    The first axis is whichever world axis the normal leans on least, made
+    perpendicular -- any choice does, so long as it is never parallel to the
+    normal.
+
+    The origin matters more than it looks. A plane's stored point is any point
+    on it, and for a face declared on a cutter extended far past the timber it
+    is far past the timber too. Working from there and clipping to the timber
+    leaves nothing, having started nowhere near it. So the caller says what the
+    region is expected to be near -- the timber -- and that is projected onto
+    the plane to start from.
+    """
+    normal = unit_vector(plane.normal)
+    u, v = perpendicular_axes(normal)
+    origin = plane.point
+    if near is not None:
+        # Drop `near` onto the plane along the normal.
+        away = (near - plane.point).T * normal
+        origin = near - normal * away[0, 0]
+    return PlaneFrame(origin=origin, u=u, v=v)
+
+
+@dataclass(frozen=True)
+class Segment:
+    """The part of a Line that is actually there: a stretch between two ends.
+
+    What you get back from cropping an infinite line to a solid. An empty `ends`
+    means nothing survived -- the line is not on the solid at all -- which is
+    worth knowing rather than an error.
+    """
+
+    line: Line
+    ends: Tuple[V3, ...]
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self.ends) < 2
+
+    def midpoint(self) -> Optional[V3]:
+        """The middle of it, for a dimension to attach to."""
+        if self.is_empty:
+            return None
+        return (self.ends[0] + self.ends[1]) / scalar(2)
+
+    def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
+        """How far it reaches along any direction, as (min, max)."""
+        if self.is_empty:
+            return None
+        reach = [float((point.T * direction)[0, 0]) for point in self.ends]
+        return (min(reach), max(reach))
+
+
+@dataclass(frozen=True)
+class PlanarRegion:
+    """The part of a Plane that is actually there: a convex area lying in it.
+
+    `boundary` is in order around the region, and lies on `plane`. An empty
+    boundary means nothing survived cropping -- the plane meets the solid
+    nowhere -- which is a thing worth knowing rather than an error.
+
+    Convex because what produces one is half-space clipping, and a section of a
+    convex solid is convex.
+    """
+
+    plane: Plane
+    boundary: Tuple[V3, ...]
+
+    @property
+    def is_empty(self) -> bool:
+        return len(self.boundary) < 3
+
+    def centroid(self) -> Optional[V3]:
+        """A point in the middle of it, for a dimension to attach to."""
+        if not self.boundary:
+            return None
+        total = self.boundary[0]
+        for point in self.boundary[1:]:
+            total = total + point
+        return total / scalar(len(self.boundary))
+
+    def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
+        """How far it reaches along any direction, as (min, max).
+
+        This is what makes orienting to a viewport unnecessary: ask along the
+        viewport's own axes and the answer is the bounds in that view.
+        """
+        if not self.boundary:
+            return None
+        reach = [float((point.T * direction)[0, 0]) for point in self.boundary]
+        return (min(reach), max(reach))
 
 
 @dataclass(frozen=True)
