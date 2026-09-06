@@ -131,9 +131,15 @@ class HalfPlane:
 
 
 def unit_vector(vector: V3) -> V3:
-    """A vector scaled to length one, or left alone if it has no length."""
-    length = float((vector.T * vector)[0, 0]) ** 0.5
-    return vector / scalar(length) if length > 0 else vector
+    """A vector scaled to length one, or left alone if it has barely any.
+
+    safe_normalize_vector, under its own name. Kept as a thin alias because
+    "unit_vector" is what the geometry here is doing, and because dividing by
+    anything merely above zero -- which is what this used to do -- turns the
+    cross product of two nearly parallel edges into a direction made of
+    rounding noise.
+    """
+    return safe_normalize_vector(vector)
 
 
 def perpendicular_axes(direction: V3) -> Tuple[V3, V3]:

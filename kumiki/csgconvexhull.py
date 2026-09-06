@@ -54,7 +54,7 @@ from .geometry import (
     perpendicular_axes,
     unit_vector,
 )
-from .rule import V3, Matrix, Numeric, scalar
+from .rule import V3, Matrix, Numeric, safe_magnitude, scalar
 
 
 def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, float]]:
@@ -151,6 +151,12 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         # too small. That is the wrong direction for this file, which errs
         # outwards everywhere else. Fixing it means bounding the arc rather
         # than its endpoints. Left for later; it only bites on a curved path.
+        #
+        # Which way it is wrong now depends on what the solid is doing. Added,
+        # too small crops a feature shorter than it really is. SUBTRACTED, too
+        # small removes less than it should, which is the safe direction -- so
+        # a curved cutter is the milder half of this bug and a curved body the
+        # sharper one.
         points = [seg.start() for seg in csg.path.segments]
         return _extruded_hull_half_spaces(
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
@@ -209,7 +215,7 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         along = bottom[following] - bottom[index]
         rising = top[index] - bottom[index]
         normal = _cross(along, rising)
-        if _length(normal) < 1e-12:
+        if safe_magnitude(normal) < 1e-12:
             return None
         normal = unit_vector(normal)
         # Outward, whichever way the profiles were wound.
@@ -234,10 +240,6 @@ def _cross(a: V3, b: V3) -> V3:
         float(a[2, 0]) * float(b[0, 0]) - float(a[0, 0]) * float(b[2, 0]),
         float(a[0, 0]) * float(b[1, 0]) - float(a[1, 0]) * float(b[0, 0]),
     ])
-
-
-def _length(vector: V3) -> float:
-    return math.sqrt(sum(float(vector[i, 0]) ** 2 for i in range(3)))
 
 
 def _extrusion_caps(axis: V3, position: V3, start_distance, end_distance) -> BoundingHalfSpaces:
@@ -365,11 +367,12 @@ def approximately_crop_plane_to_area_on_csg(
 
     for solid in bounding:
         faces = bounding_half_spaces(solid)
-
-        # WHY? is this really necessary?
         if faces is None:
+            # Clipped by only the solids it understood, the region would be
+            # silently larger than the truth -- which is worse than no answer,
+            # because nothing downstream can tell.
             return None
-        
+
         for normal, point in faces:
             # The half space, written in the plane's own two axes.
             a = float((normal.T * frame.u)[0, 0])
