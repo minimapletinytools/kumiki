@@ -1541,13 +1541,14 @@ class KigumiViewerApp extends LitElement {
         
         // Setup selection listener
         this.selectionManager.onSelectionChanged((event) => {
-            if (event.type === 'clear-timbers' || event.type === 'timber-selected' || event.type === 'timbers-selected') {
-                // Only clear CSG when the timber change is a "fresh" user
-                // action (not caused by layers-view setting CSG first, which
-                // also selects the timber for opacity purposes).
-                if (!this.selectionManager.csgFocus) {
-                    this.removeCSGHighlight();
-                }
+            // Nothing is focused, so there is no CSG highlight to draw. The
+            // guard is the whole condition: when layers-view sets the focus and
+            // pulls its timber into the selection, csgFocus is set, so this
+            // leaves the highlight it just asked for alone. Listing the event
+            // types as well only ever missed a cleanup -- selecting a joint,
+            // or clearing the focus outright, left a stale mesh behind.
+            if (!this.selectionManager.csgFocus) {
+                this.removeCSGHighlight();
             }
             this.applySelectionOpacity();
             this.selectionPanel.updateInfo(this.currentFrameData);

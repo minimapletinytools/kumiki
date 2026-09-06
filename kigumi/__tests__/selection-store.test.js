@@ -142,15 +142,8 @@ describe('focus follows the timber it points at', () => {
         expect(store.csgFocus).toBeNull();
     });
 
-    test('deselecting a different timber leaves the focus alone', () => {
-        const store = new SelectionStore();
-        store.setCsgFocus(focusA);
-        store.selectTimber('B', true);
-
-        store.deselectTimber('B');
-        expect(store.csgFocus).not.toBeNull();
-        expect(store.getSelectedTimbers()).toEqual(['A']);
-    });
+    // There is no "deselect a different timber while focused" case any more:
+    // selecting that other timber is what drops the focus.
 
     test('replacing the selection outright drops the focus', () => {
         const store = new SelectionStore();
@@ -161,12 +154,54 @@ describe('focus follows the timber it points at', () => {
         expect(store.getSelectedTimbers()).toEqual(['B']);
     });
 
-    test('adding a timber to the selection keeps the focus', () => {
+    test('shift-adding a timber drops the focus', () => {
         const store = new SelectionStore();
         store.setCsgFocus(focusA);
+
         store.selectTimber('B', true);
 
+        expect(store.csgFocus).toBeNull();
+        expect(new Set(store.getSelectedTimbers())).toEqual(new Set(['A', 'B']));
+    });
+
+    test('a tag that widens the selection drops the focus', () => {
+        const store = new SelectionStore();
+        store.setCsgFocus(focusA);
+
+        store.selectTimbers(['B', 'C'], true);
+
+        expect(store.csgFocus).toBeNull();
+    });
+
+    test('a joint that widens the selection drops the focus', () => {
+        const store = new SelectionStore();
+        store.setCsgFocus(focusA);
+
+        store.selectJoint('j1', ['B', 'C'], true);
+
+        expect(store.csgFocus).toBeNull();
+    });
+
+    test('re-adding the focused timber alone keeps the focus', () => {
+        // The rule is about the selection widening, not about additive calls.
+        const store = new SelectionStore();
+        store.setCsgFocus(focusA);
+
+        store.selectTimber('A', true);
+
         expect(store.csgFocus).not.toBeNull();
+        expect(store.getSelectedTimbers()).toEqual(['A']);
+    });
+
+    test('a measurement focus survives a wider selection', () => {
+        // It is not about one timber, so the invariant does not apply to it.
+        const store = new SelectionStore();
+        store.selectTimber('A');
+        store.setMeasurementFocus({ viewportId: 'v1', measureKey: 'm1' });
+
+        store.selectTimber('B', true);
+
+        expect(store.measurementFocus).not.toBeNull();
     });
 
     test('clearing the timber selection drops the focus', () => {

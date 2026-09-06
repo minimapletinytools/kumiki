@@ -5,12 +5,13 @@
     //   selectedTimbers  a set, because timbers multi-select
     //   focus            at most one, because it is what you are looking at
     //
-    // Drilling into a CSG node narrows the selection to the timber it belongs
-    // to. The canvas has always drawn it that way -- it highlights the timber
-    // being drilled into and ghosts everything else -- so keeping the others
-    // selected left the trees and the canvas disagreeing about what was
-    // selected. Narrowing is the simpler rule of the two: it means the drilled
-    // timber is the selection, rather than "selected, but not highlighted".
+    // A CSG focus means exactly one timber is selected. Drilling in narrows the
+    // selection to that timber, and widening the selection again drops the
+    // focus. The canvas has always drawn it that way -- it highlights the
+    // timber being drilled into and ghosts everything else -- so any other
+    // rule left the trees and the canvas disagreeing about what was selected.
+    // It is also the simpler rule to hold: the drilled timber IS the
+    // selection, rather than "selected, but not highlighted".
     //
     // csgFocus is:
     //   { timberKey, path, featureLabel, cutIndex, context }
@@ -55,6 +56,7 @@
                 this.clearCsgFocus({ silent: true });
             }
             this.selectedTimbers.add(name);
+            this._dropCsgFocusIfSelectionWidened();
             this.emit({ type: 'timber-selected', timberName: name });
         }
 
@@ -92,6 +94,7 @@
             for (const key of keys) {
                 this.selectedTimbers.add(key);
             }
+            this._dropCsgFocusIfSelectionWidened();
             this.emit({ type: 'timbers-selected', timberNames: keys });
         }
 
@@ -102,6 +105,23 @@
             this.selectedTimbers.clear();
             this.clearCsgFocus({ silent: true });
             this.emit({ type: 'clear-timbers' });
+        }
+
+        /**
+         * Keep "a CSG focus means one selected timber" true.
+         *
+         * Enforced here, after the fact, rather than remembered by each of the
+         * three paths that can widen the selection -- shift-clicking a timber,
+         * clicking a tag, clicking a joint. A measurement focus is not about
+         * one timber, so it is left alone.
+         *
+         * Silent: the caller emits its own event, and every listener re-reads
+         * the store, so a second event would say nothing new.
+         */
+        _dropCsgFocusIfSelectionWidened() {
+            if (this.csgFocus && this.selectedTimbers.size > 1) {
+                this.clearCsgFocus({ silent: true });
+            }
         }
 
         isTimberSelected(name) {
@@ -195,6 +215,7 @@
             for (const key of timberKeys || []) {
                 this.selectedTimbers.add(key);
             }
+            this._dropCsgFocusIfSelectionWidened();
             this.emit({ type: 'joint-selected', jointId, timberKeys: timberKeys || [] });
         }
 
