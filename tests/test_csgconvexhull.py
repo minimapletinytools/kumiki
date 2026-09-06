@@ -13,7 +13,8 @@ from kumiki.geometry import (
 )
 from kumiki.csgconvexhull import (
     approximately_crop_plane_to_area_on_csg,
-    bounding_half_spaces,
+    BoundsKind,
+    solid_bounds,
     convex_hull_2d,
     crop_line_to_segments_on_csg,
 )
@@ -64,7 +65,7 @@ class TestPlaneFrame:
 
 class TestBoundingHalfSpaces:
     def test_a_half_space_bounds_with_one_plane(self):
-        faces = bounding_half_spaces(HalfSpace(normal=_v(0, 0, 1), offset=scalar(2)))
+        faces = solid_bounds(HalfSpace(normal=_v(0, 0, 1), offset=scalar(2))).faces
 
         assert len(faces) == 1
         normal, point = faces[0]
@@ -73,20 +74,40 @@ class TestBoundingHalfSpaces:
         assert float(point[2, 0]) == pytest.approx(2, abs=1e-9)
 
     def test_a_closed_prism_bounds_with_six(self):
-        assert len(bounding_half_spaces(_box())) == 6
+        assert len(solid_bounds(_box()).faces) == 6
 
     def test_an_end_that_runs_to_infinity_bounds_nothing(self):
         # The case that started all of this: a cutter extended so the cut comes
         # out clean has no face out there to bound anything.
-        assert len(bounding_half_spaces(_box(start=None))) == 5
-        assert len(bounding_half_spaces(_box(start=None, end=None))) == 4
+        assert len(solid_bounds(_box(start=None)).faces) == 5
+        assert len(solid_bounds(_box(start=None, end=None)).faces) == 4
 
     def test_a_shape_it_cannot_describe_says_so(self):
         # None rather than an empty list: "does not bound" and "cannot say"
         # are different answers, and only the second should stop a caller.
         from kumiki.cutcsg import EmptyCSG
 
-        assert bounding_half_spaces(EmptyCSG()) is None
+        assert solid_bounds(EmptyCSG()).is_empty
+
+    def test_the_three_answers_are_told_apart(self):
+        from kumiki.cutcsg import EmptyCSG
+
+        assert solid_bounds(_box()).kind is BoundsKind.HALF_SPACES
+        assert solid_bounds(EmptyCSG()).kind is BoundsKind.EMPTY
+        assert solid_bounds(_undescribable()).kind is BoundsKind.UNKNOWN
+
+    def test_ignoring_the_answer_fails_loudly_rather_than_quietly(self):
+        """faces is None unless there are faces, on purpose.
+
+        An empty list would have read as "no bounds", which is the opposite --
+        everything -- so a caller that forgot to check the tag would silently
+        return too much. This way it raises instead.
+        """
+        from kumiki.cutcsg import EmptyCSG
+
+        for csg in (EmptyCSG(), _undescribable()):
+            with pytest.raises(TypeError):
+                list(solid_bounds(csg).faces)
 
 
 class TestRegionInPlane:
@@ -198,7 +219,7 @@ class TestLoftedSolids:
         )
 
     def test_a_taper_is_bounded_by_four_sides_and_two_ends(self):
-        assert len(bounding_half_spaces(self._loft(self._square(0.1), self._square(0.05)))) == 6
+        assert len(solid_bounds(self._loft(self._square(0.1), self._square(0.05))).faces) == 6
 
     def test_a_twisted_loft_is_bounded_loosely_rather_than_refused(self):
         # Its sides are ruled surfaces with no plane of their own, so each
@@ -206,7 +227,7 @@ class TestLoftedSolids:
         # hull, which contains the loft -- loose, but the right direction.
         twisted = self._loft(self._square(0.1), self._turned(0.1, 30))
 
-        faces = bounding_half_spaces(twisted)
+        faces = solid_bounds(twisted).faces
 
         assert faces is not None and len(faces) == 6
         # Every corner of both profiles inside every face.
@@ -228,7 +249,7 @@ class TestLoftedSolids:
 
 
 def _undescribable():
-    """A solid bounding_half_spaces cannot describe: a loft running to infinity."""
+    """A solid solid_bounds cannot describe: a loft running to infinity."""
     from kumiki.cutcsg import ConvexPolygonSimpleLoft
 
     square = [(-0.05, -0.05), (0.05, -0.05), (0.05, 0.05), (-0.05, 0.05)]
@@ -616,10 +637,10 @@ class TestCurvedAndPointyPrimitives:
         )
 
     def test_a_cylinder_becomes_a_hexagonal_prism(self):
-        assert len(bounding_half_spaces(self._cylinder())) == 8  # six sides, two ends
+        assert len(solid_bounds(self._cylinder()).faces) == 8  # six sides, two ends
 
     def test_a_cylinder_running_to_infinity_has_no_ends(self):
-        assert len(bounding_half_spaces(self._cylinder(start=None, end=None))) == 6
+        assert len(solid_bounds(self._cylinder(start=None, end=None)).faces) == 6
 
     def test_the_hexagon_contains_the_cylinder(self):
         # Outwards, per the rule at the top of csgconvexhull: one direction,
@@ -652,13 +673,13 @@ class TestCurvedAndPointyPrimitives:
     def test_an_extrusion_bounds_with_a_plane_per_edge_and_its_ends(self):
         square = self._extrusion([(0, 0), (1, 0), (1, 1), (0, 1)])
 
-        assert len(bounding_half_spaces(square)) == 6
+        assert len(solid_bounds(square).faces) == 6
 
     def test_its_planes_come_from_the_hull_not_the_points_as_given(self):
         # A point inside the outline contributes no face of its own.
         with_inner = self._extrusion([(0, 0), (1, 0), (1, 1), (0, 1), (0.5, 0.5)])
 
-        assert len(bounding_half_spaces(with_inner)) == 6
+        assert len(solid_bounds(with_inner).faces) == 6
 
     def test_an_extrusion_sections_to_its_cross_section(self):
         square = self._extrusion([(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)])

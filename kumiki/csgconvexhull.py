@@ -18,7 +18,7 @@ included -- fall out of projecting the polygon's corners, so a polygon answers
 the question for every viewport at once, where a baked-in orientation answers it
 for one.
 
-Some primitives are described approximately -- see bounding_half_spaces -- the
+Some primitives are described approximately -- see solid_bounds -- the
 cylinder by a hexagon, a loft by planes pushed out to its corners. Those
 approximations are deliberately made *outwards*, so a region always CONTAINS
 the truth.
@@ -43,6 +43,8 @@ material.
 """
 
 import math
+from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional, Sequence, Tuple
 
 from .geometry import (
@@ -88,26 +90,70 @@ def convex_hull_2d(points: Sequence[Tuple[float, float]]) -> List[Tuple[float, f
 BoundingHalfSpaces = List[Tuple[V3, V3]]
 
 
-def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
-    """The planes that bound a convex primitive, or None if it is not one.
+class BoundsKind(Enum):
+    """Which of the three answers solid_bounds gave."""
 
-    None rather than an empty list, because "this solid does not bound the
-    region" and "this solid is not one I can describe" are different answers and
-    only the second should make a caller give up.
+    HALF_SPACES = 0
+    EMPTY = 1
+    UNKNOWN = 2
 
-    An EmptyCSG gets None too, which is the one case where None is not the whole
-    truth: it is perfectly describable, it just contains nothing, and half
-    spaces cannot say that -- no bounding planes already means the opposite,
-    everything. Both crop functions catch it before asking here.
+
+@dataclass(frozen=True)
+class SolidBounds:
+    """What can be said about a solid in half spaces. Three answers, not two.
+
+    Conflating any two of them has already cost something, so they are tagged
+    rather than encoded:
+
+      HALF_SPACES  the solid is the intersection of `faces`. An EMPTY list of
+                   them would mean no bounds at all, which is EVERYTHING.
+      EMPTY        describable, and contains nothing. The opposite of the line
+                   above, which is exactly why it cannot be said in faces.
+      UNKNOWN      not a solid this can describe. A caller must give up rather
+                   than carry on with a partial answer, which would be wrong in
+                   a direction nothing downstream can see.
+
+    `faces` is None unless the answer is HALF_SPACES, so a caller that forgets
+    to look at `kind` fails loudly instead of reading an empty list as
+    "unbounded" and quietly returning too much.
+    """
+
+    kind: BoundsKind
+    faces: Optional[BoundingHalfSpaces] = None
+
+    @staticmethod
+    def of(faces: BoundingHalfSpaces) -> 'SolidBounds':
+        return SolidBounds(kind=BoundsKind.HALF_SPACES, faces=faces)
+
+    @property
+    def is_empty(self) -> bool:
+        return self.kind is BoundsKind.EMPTY
+
+    @property
+    def is_unknown(self) -> bool:
+        return self.kind is BoundsKind.UNKNOWN
+
+
+EMPTY_BOUNDS = SolidBounds(kind=BoundsKind.EMPTY)
+UNKNOWN_BOUNDS = SolidBounds(kind=BoundsKind.UNKNOWN)
+
+
+def solid_bounds(csg) -> SolidBounds:
+    """How a solid is bounded: half spaces, nothing at all, or no idea.
+
+    See SolidBounds for what the three answers mean and why there are three.
     """
     from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
-                         HalfSpace, RectangularPrism)
+                         EmptyCSG, HalfSpace, RectangularPrism)
     from .pathcsg import PathExtrusion
+
+    if isinstance(csg, EmptyCSG):
+        return EMPTY_BOUNDS
 
     if isinstance(csg, HalfSpace):
         # Inside is p . normal >= offset, so the outward normal is the other way.
         normal = unit_vector(csg.normal)
-        return [(-normal, normal * csg.offset)]
+        return SolidBounds.of([(-normal, normal * csg.offset)])
 
     if isinstance(csg, RectangularPrism):
         width_dir, height_dir, length_dir = csg._local_axes()
@@ -125,7 +171,7 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
             faces.append((length_dir, centre + length_dir * csg.end_distance))
         if csg.start_distance is not None:
             faces.append((-length_dir, centre + length_dir * csg.start_distance))
-        return faces
+        return SolidBounds.of(faces)
 
     if isinstance(csg, Cylinder):
         # A hexagon circumscribing the circle: its faces are tangent to it, so
@@ -139,14 +185,14 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
             angle = math.pi * step / 3
             normal = across * scalar(math.cos(angle)) + up * scalar(math.sin(angle))
             faces.append((normal, csg.position + normal * csg.radius))
-        return faces + _extrusion_caps(axis, csg.position,
-                                       csg.start_distance, csg.end_distance)
+        return SolidBounds.of(faces + _extrusion_caps(
+            axis, csg.position, csg.start_distance, csg.end_distance))
 
     if isinstance(csg, ConvexPolygonExtrusion):
-        return _extruded_hull_half_spaces(
+        return _bounds_or_unknown(_extruded_hull_half_spaces(
             [(float(x), float(y)) for x, y in csg.points],
             csg.transform, csg.start_distance, csg.end_distance,
-        )
+        ))
 
     if isinstance(csg, PathExtrusion):
         # The hull of the points the path is built from.
@@ -167,15 +213,20 @@ def bounding_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
         # from all straight line extrusions. Proper support for curves is
         # unlikely to be added anytime soon.
         points = [seg.start() for seg in csg.path.segments]
-        return _extruded_hull_half_spaces(
+        return _bounds_or_unknown(_extruded_hull_half_spaces(
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
             csg.transform, csg.start_distance, csg.end_distance,
-        )
+        ))
 
     if isinstance(csg, ConvexPolygonSimpleLoft):
-        return _loft_half_spaces(csg)
+        return _bounds_or_unknown(_loft_half_spaces(csg))
 
-    return None
+    return UNKNOWN_BOUNDS
+
+
+def _bounds_or_unknown(faces: Optional[BoundingHalfSpaces]) -> SolidBounds:
+    """For the helpers that still answer None when they cannot describe a shape."""
+    return UNKNOWN_BOUNDS if faces is None else SolidBounds.of(faces)
 
 
 def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
@@ -372,31 +423,22 @@ def approximately_crop_plane_to_area_on_csg(
     solid is not one of those: it contains nothing, so it crops everything away
     and the region comes back empty -- the same answer the line crop gives.
     """
-    from .cutcsg import EmptyCSG
-
     frame = frame_for_plane(plane, near)
     reach = float(seed_reach)
     corners = [(-reach, -reach), (reach, -reach), (reach, reach), (-reach, reach)]
 
     for solid in bounding:
-        if isinstance(solid, EmptyCSG):
-            # Nothing is inside it, so nothing survives being clipped by it.
-            # Handled here rather than in bounding_half_spaces because that
-            # function answers in half spaces, and "contains nothing" is not
-            # something half spaces can say -- an empty list of them already
-            # means the opposite, everything. So it says None, meaning "not a
-            # solid I can describe", and the line crop has always caught this
-            # case first for the same reason.
-            return ConvexPlanarRegion(plane=plane, boundary=())
-
-        faces = bounding_half_spaces(solid)
-        if faces is None:
+        bounds = solid_bounds(solid)
+        if bounds.is_unknown:
             # Clipped by only the solids it understood, the region would be
             # silently larger than the truth -- which is worse than no answer,
             # because nothing downstream can tell.
             return None
+        if bounds.is_empty:
+            # Nothing is inside it, so nothing survives being clipped by it.
+            return ConvexPlanarRegion(plane=plane, boundary=())
 
-        for normal, point in faces:
+        for normal, point in bounds.faces:
             # The half space, written in the plane's own two axes.
             a = float((normal.T * frame.u)[0, 0])
             b = float((normal.T * frame.v)[0, 0])
@@ -516,11 +558,7 @@ def _spans_on_csg(
     onto would delete the arris it shares with it. Nesting takes care of itself:
     a difference inside a subtraction flips back and is additive again.
     """
-    from .cutcsg import Difference, EmptyCSG, Intersection, SolidUnion
-
-    if isinstance(csg, EmptyCSG):
-        # Bounds nothing and contains nothing -- an answer, not a failure.
-        return []
+    from .cutcsg import Difference, Intersection, SolidUnion
 
     if isinstance(csg, SolidUnion):
         out: List[Span] = []
@@ -552,10 +590,15 @@ def _spans_on_csg(
             removed.extend(spans)
         return _subtracted_spans(kept, removed)
 
-    faces = bounding_half_spaces(csg)
-    if faces is None:
+    bounds = solid_bounds(csg)
+    if bounds.is_unknown:
         return None
-    return _spans_within_primitive(faces, line, seed, tolerance, removing)
+    if bounds.is_empty:
+        # Contains nothing, so the line is nowhere on it. An answer, not a
+        # failure -- and not the same as no bounding planes, which would mean
+        # the line is everywhere on it.
+        return []
+    return _spans_within_primitive(bounds.faces, line, seed, tolerance, removing)
 
 
 def crop_line_to_segments_on_csg(
