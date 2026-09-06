@@ -426,6 +426,138 @@ class TestCropLineToSegmentsOnCsg:
             line, tree, seed_reach=10, near=_v(0, 0, 0)) is None
 
 
+class TestSolvingACylinderRatherThanBoundingIt:
+    """The hexagon circumscribes the cylinder, so it reports chords too long."""
+
+    def _cylinder(self, radius=1.0, start=0.0, end=10.0, axis=None):
+        from kumiki.cutcsg import Cylinder
+
+        return Cylinder(
+            axis_direction=axis if axis is not None else _v(0, 0, 1),
+            radius=scalar(radius),
+            position=_v(0, 0, 0),
+            start_distance=None if start is None else scalar(start),
+            end_distance=None if end is None else scalar(end),
+        )
+
+    def _across(self, offset):
+        """A line crossing the barrel, `offset` from the axis."""
+        return Line(direction=_v(1, 0, 0), point=_v(0, offset, 5))
+
+    def test_a_chord_is_the_length_the_circle_actually_gives(self):
+        # 2*sqrt(r^2 - offset^2), which is what a circle is and a hexagon is not.
+        import math
+
+        for offset in (0.0, 0.5, 0.9):
+            span = _span(crop_line_to_segments_on_csg(
+                self._across(offset), self._cylinder(radius=1.0),
+                seed_reach=50, near=_v(0, 0, 5)), _v(1, 0, 0))
+
+            expected = 2.0 * math.sqrt(1.0 - offset * offset)
+            assert span[1] - span[0] == pytest.approx(expected, abs=1e-9), offset
+
+    def test_the_hexagon_reports_a_grazing_chord_four_times_too_long(self):
+        """Pins how much the bound gave away, rather than assuming it gave any.
+
+        Worst where it matters most: a chord close to the rim runs between two
+        of the hexagon's flats and out towards a corner, so the bound keeps
+        most of a corner the cylinder does not have. Away from the rim the
+        two agree to about a percent, which is why this is easy to miss.
+        """
+        import math
+
+        from kumiki.csgconvexhull import _spans_within_primitive, solid_bounds
+
+        offset, angle = 0.99, math.radians(30)
+        along = _v(math.cos(angle), math.sin(angle), 0)
+        line = Line(direction=along,
+                    point=_v(-math.sin(angle) * offset, math.cos(angle) * offset, 5))
+        cylinder = self._cylinder(radius=1.0)
+
+        bounded = _spans_within_primitive(
+            solid_bounds(cylinder).faces, line, (-50.0, 50.0), 0.0, False)
+        solved = _span(crop_line_to_segments_on_csg(
+            line, cylinder, seed_reach=50, near=_v(0, 0, 5)), along)
+
+        exact = 2.0 * math.sqrt(1.0 - offset * offset)
+        assert solved[1] - solved[0] == pytest.approx(exact, abs=1e-9)
+        assert (bounded[0][1] - bounded[0][0]) > 4.0 * (solved[1] - solved[0])
+
+    def test_a_line_down_the_axis_runs_the_whole_length(self):
+        span = _span(crop_line_to_segments_on_csg(
+            Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)),
+            self._cylinder(start=0.0, end=10.0), seed_reach=50, near=_v(0, 0, 5)))
+
+        assert span == pytest.approx((0.0, 10.0), abs=1e-9)
+
+    def test_a_line_that_misses_the_barrel_is_not_on_it(self):
+        assert crop_line_to_segments_on_csg(
+            self._across(1.5), self._cylinder(radius=1.0),
+            seed_reach=50, near=_v(0, 0, 5)) == []
+
+    def test_a_tangent_line_touches_without_running_along_anything(self):
+        # One point is not a segment.
+        assert crop_line_to_segments_on_csg(
+            self._across(1.0), self._cylinder(radius=1.0),
+            seed_reach=50, near=_v(0, 0, 5)) == []
+
+    def test_a_line_on_the_barrel_survives_the_bore_it_lies_on(self):
+        """The reason the removing rule has to reach the curved surface too.
+
+        This line runs down the wall of a bore, parallel to its axis -- the
+        arris where the bore meets a face. Widening the bore to find it would
+        delete it instead.
+        """
+        from kumiki.cutcsg import Difference
+
+        body = _box(size=(4, 4), start=0.0, end=10.0)
+        bore = self._cylinder(radius=1.0, start=-1.0, end=11.0)
+        on_the_wall = Line(direction=_v(0, 0, 1), point=_v(1.0, 0, 0))
+
+        span = _span(crop_line_to_segments_on_csg(
+            on_the_wall, Difference(base=body, subtract=[bore]),
+            seed_reach=50, near=_v(0, 0, 5), tolerance=1e-3))
+
+        assert span[1] - span[0] == pytest.approx(10.0, abs=3e-3)
+
+    def test_a_bore_shortens_a_line_that_runs_through_it(self):
+        from kumiki.cutcsg import Difference
+
+        body = _box(size=(4, 4), start=0.0, end=10.0)
+        # Across the body, straight through the middle of the bore.
+        through = Line(direction=_v(1, 0, 0), point=_v(0, 0, 5))
+
+        segments = crop_line_to_segments_on_csg(
+            through, Difference(base=body, subtract=[self._cylinder(radius=1.0)]),
+            seed_reach=50, near=_v(0, 0, 5))
+
+        # Two pieces, the bore's diameter apart.
+        assert len(segments) == 2
+        gap = (segments[1].extent_along(_v(1, 0, 0))[0]
+               - segments[0].extent_along(_v(1, 0, 0))[1])
+        assert gap == pytest.approx(2.0, abs=1e-9)
+
+    def test_an_uncapped_cylinder_is_bounded_by_the_search_alone(self):
+        span = _span(crop_line_to_segments_on_csg(
+            Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)),
+            self._cylinder(start=None, end=None), seed_reach=7, near=_v(0, 0, 0)))
+
+        assert span == pytest.approx((-7.0, 7.0), abs=1e-9)
+
+    def test_it_solves_a_cylinder_at_any_angle(self):
+        import math
+
+        tilted = self._cylinder(radius=1.0, start=-20.0, end=20.0,
+                                axis=_v(1, 1, 0))
+        # Perpendicular to that axis, through its centre.
+        line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        span = _span(crop_line_to_segments_on_csg(
+            line, tilted, seed_reach=50, near=_v(0, 0, 0)))
+
+        assert span[1] - span[0] == pytest.approx(2.0, abs=1e-9)
+
+
 class TestCroppingThroughTheTree:
     """The point of walking it: what has been cut away is gone."""
 

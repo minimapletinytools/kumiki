@@ -1,4 +1,4 @@
-"""Where a feature actually is: convex hulls of the CSG, sectioned.
+"""Where a feature actually is: the CSG, sectioned by a line or a plane.
 
 A feature's declared extent is the extent of the primitive it was declared on,
 and primitives are deliberately not the finished piece: a half space is unbounded
@@ -18,10 +18,16 @@ included -- fall out of projecting the polygon's corners, so a polygon answers
 the question for every viewport at once, where a baked-in orientation answers it
 for one.
 
-Some primitives are described approximately -- see solid_bounds -- the
-cylinder by a hexagon, a loft by planes pushed out to its corners. Those
-approximations are deliberately made *outwards*, so a region always CONTAINS
-the truth.
+Some primitives are described approximately -- see solid_bounds -- a loft by
+planes pushed out to its corners, a path extrusion by the hull of the points
+its segments start at. Those approximations are deliberately made *outwards*,
+so a region always CONTAINS the truth.
+
+A line does better than that where a shape has been solved for outright rather
+than bounded: a cylinder is a quadratic along a line, and the answer is the
+chord that is really there rather than the hexagon's. The rest still go through
+the bound, which is why solving one more shape can only tighten the answer and
+never invalidate anything built on it.
 
 One direction, consistently, is the point. Subtractions are not accounted for
 either (see below), which already makes a region too large, so erring inwards
@@ -542,6 +548,87 @@ def _subtracted_spans(keep: Sequence[Span], remove: Sequence[Span]) -> List[Span
     return _merged_spans(out)
 
 
+def _cylinder_spans(
+    csg, line: Line, seed: Span, tolerance: float, removing: bool,
+) -> List[Span]:
+    """Where a line runs inside a cylinder, solved rather than approximated.
+
+    The barrel is a quadratic: the distance from the axis, measured in the
+    plane perpendicular to it, is |w_perp + t d_perp| and the line is inside
+    where that is at most the radius. The caps are two planes, so they go
+    through the same linear clipping every other primitive uses -- including
+    its handling of a line that runs parallel to them.
+
+    Beats the hexagon solid_bounds describes a cylinder with, which
+    circumscribes it and so reports a chord longer than the one that is there.
+    """
+    axis = unit_vector(csg.axis_direction)
+    direction = unit_vector(line.direction)
+    offset = line.point - csg.position
+
+    def perpendicular(vector: V3) -> V3:
+        return vector - axis * scalar(float((vector.T * axis)[0, 0]))
+
+    across = perpendicular(direction)
+    start = perpendicular(offset)
+    radius = float(csg.radius) + tolerance
+    if radius <= 0.0:
+        # Shrunk past nothing by a tolerance bigger than the bore itself.
+        return []
+
+    a = float((across.T * across)[0, 0])
+    b = 2.0 * float((start.T * across)[0, 0])
+    c = float((start.T * start)[0, 0]) - radius * radius
+
+    low, high = seed
+    if a < 1e-18:
+        # Parallel to the axis: either wholly within the barrel or wholly
+        # outside it, and a line lying exactly ON the barrel is kept when the
+        # cylinder is being added and left alone when it is being removed --
+        # the same rule the flat faces follow.
+        outside = c >= 0.0 if removing else c > 0.0
+        if outside:
+            return []
+    else:
+        discriminant = b * b - 4.0 * a * c
+        if discriminant <= 0.0:
+            # Misses it, or touches at a single point, which is no length.
+            return []
+        root = discriminant ** 0.5
+        low = max(low, (-b - root) / (2.0 * a))
+        high = min(high, (-b + root) / (2.0 * a))
+        if low >= high:
+            return []
+
+    caps = _extrusion_caps(axis, csg.position, csg.start_distance, csg.end_distance)
+    if not caps:
+        return [(low, high)] if high > low else []
+    return _spans_within_primitive(caps, line, (low, high), tolerance, removing)
+
+
+def _exact_spans(
+    csg, line: Line, seed: Span, tolerance: float, removing: bool,
+) -> Optional[List[Span]]:
+    """Where a line runs inside a primitive, worked out exactly.
+
+    None when there is no exact handler for this shape yet, and the caller
+    falls back to clipping by the half spaces that BOUND it. That fallback errs
+    outwards, so a tree with some shapes solved and others bounded still keeps
+    the guarantee the whole file rests on: what the answer says is not there,
+    really is not there. Solving one more shape only ever tightens it.
+
+    Still bounded rather than solved: ConvexPolygonSimpleLoft, whose sides are
+    ruled surfaces and are planar only for a pure taper -- which is the case it
+    exists for, so its bound is already exact there -- and PathExtrusion, which
+    needs the line intersected with the path in 2D, arcs included.
+    """
+    from .cutcsg import Cylinder
+
+    if isinstance(csg, Cylinder):
+        return _cylinder_spans(csg, line, seed, tolerance, removing)
+    return None
+
+
 def _spans_on_csg(
     csg, line: Line, seed: Span, tolerance: float, removing: bool = False,
 ) -> Optional[List[Span]]:
@@ -589,6 +676,10 @@ def _spans_on_csg(
                 return None
             removed.extend(spans)
         return _subtracted_spans(kept, removed)
+
+    exact = _exact_spans(csg, line, seed, tolerance, removing)
+    if exact is not None:
+        return exact
 
     bounds = solid_bounds(csg)
     if bounds.is_unknown:
