@@ -560,6 +560,24 @@ class CSGFeature(ABC):
         What it would buy is safety for a caller that uses this on its own,
         which today means one: the mesh-vertex fallback in kigumi's runner,
         already marked for deletion. If that stops being the only one, revisit.
+
+        ALSO CONSIDERED: two more optional arguments, a surface normal and a
+        line, so a caller that knows more about the point can say so. Several
+        features can claim one point -- two coincident parallel faces, or the
+        several that meet at a corner -- and a normal would tell them apart
+        where the point alone cannot.
+
+        Not done, because the caller cannot honestly supply either one for the
+        case that wants them most. Selecting an EDGE is the case: you would get
+        the edge's own line only by clicking exactly on a triangle edge of the
+        mesh, which is the one thing a human click never does. Every other click
+        lands on a triangle's face, so what is actually available is that
+        triangle's normal and a line lying on ONE of the two faces forming the
+        edge -- which is not the edge, and answers a slightly different question
+        with total confidence. Better nothing than that.
+
+        Worth revisiting if a picker ever hands back the analytic surface it hit
+        rather than the triangle, since then both arguments mean what they say.
         """
         ...
 
