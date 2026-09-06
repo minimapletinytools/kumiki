@@ -195,7 +195,7 @@ class TestCSGTreeSerialization:
         # B1: they meet joint geometry and not each other, since the arrises
         # they used to make by meeting are named outright now.
         authored = [f for f in base["features"] if not f["name"].startswith(
-            ("cap.", "side.", "arris.", "start_arris.", "end_arris."))]
+            ("cap.", "side.", "arris.", "corner."))]
         assert authored and all(f["group"] == "B1" for f in authored)
         # The prism's own defaults fill the slots the timber did not name --
         # here, the arrises at each end. They pair with nothing, which is what
@@ -459,8 +459,8 @@ class TestDetectFaceLabel:
         """The fallbacks are kept for the gap, not for the common case.
 
         PathExtrusion has no default_features() yet, so it is the one shape
-        that still reaches them. It warns, because a guessed label is
-        otherwise indistinguishable from a real one.
+        that still reaches them. It warns, because a label that is not a
+        feature's name is otherwise indistinguishable from one that is.
         """
         import warnings as warnings_module
 
@@ -485,7 +485,7 @@ class TestDetectFaceLabel:
             warnings_module.simplefilter("always")
             label = runner._detect_feature_label(extrusion, [2.0, 0.0, 50.0], PICK_EPS)
 
-        assert label == "right"
+        assert label == "unknown face feature"
         assert any("does not" in str(w.message) for w in caught)
 
     def test_a_half_space_answers_with_its_own_default(self):

@@ -74,28 +74,27 @@ class BoundingBox:
 class FeatureCategory(Enum):
     """What kind of place on a primitive's boundary a default feature names.
 
-    One vocabulary across every primitive, because they agree more than their
-    own key types make them look: a prism's TOP and a cylinder's TOP and an
-    extrusion's ExtrusionCap.TOP are the same idea, and a prism's four sides,
-    an extrusion's n sides and a cylinder's single barrel are the same idea
-    again. A cylinder is an extrusion with one curved side.
+    One vocabulary across every primitive for simplicity. OK to add primitive specific keys here rather than reuse.
 
-    Paired with an index, this addresses any of them: (SIDE, 2) means the third
-    side of whatever this is. Indices run in the primitive's own order -- for
-    an extrusion, side n runs from vertex n to vertex n+1, which is the meaning
-    ExtrusionFeatureKey already had.
-
-    ARRIS categories are split by which end they belong to rather than carrying
-    two indices, so a key is always a category and ONE number.
+    Some will be paired with an index, others may be one offs (index 0)
     """
 
-    CAP = 0           # 0 = the start end, 1 = the end end
-    SIDE = 1          # n = the nth side; a cylinder's barrel is side 0
-    ARRIS = 2         # n = where side n meets side n+1 -- a timber's long arris
-    START_ARRIS = 3   # n = where side n meets the start cap
-    END_ARRIS = 4     # n = where side n meets the end cap
-    START_CORNER = 5  # n = vertex n of the start profile
-    END_CORNER = 6
+    CAP = 0     # 0 = the start end, 1 = the end end
+    SIDE = 1    # n = the nth side;
+    ARRIS = 2   # every arris, in one run -- see below
+    CORNER = 3  # every corner, in one run -- see below
+
+    # ARRIS and CORNER each number all of their kind together rather than
+    # splitting by which end they belong to. For a shape with s sides:
+    #
+    #     ARRIS    0 .. s-1     side n against side n+1  -- a long arris
+    #              s .. 2s-1    side n against the start cap
+    #             2s .. 3s-1    side n against the end cap
+    #     CORNER   0 .. s-1     vertex n of the start profile
+    #              s .. 2s-1    vertex n of the end profile
+    #
+    # arris_against_cap and corner_on_cap below are the only things that know
+    # this, so a default and the key an override matches against cannot drift.
 
 
 # Where a default feature sits on a primitive: a category and an index within
@@ -112,6 +111,22 @@ END_CAP: FeatureKey = (FeatureCategory.CAP, 1)
 # RectangularPrism.default_features for why a default that pairs would be a
 # problem rather than a bonus.
 _DEFAULT_FEATURE_PROPERTIES: 'FeatureProperties'
+
+
+def arris_against_cap(side: int, sides: int, end: bool) -> FeatureKey:
+    """The arris where a side meets one of the caps.
+
+    One of the two places that know how the ARRIS run is laid out; see
+    FeatureCategory. Reading "arris.5" back needs the side count, which nothing
+    in the code has to do -- a key is matched and named, never decoded -- so
+    that cost falls on a person rather than on a caller.
+    """
+    return (FeatureCategory.ARRIS, sides * (2 if end else 1) + side)
+
+
+def corner_on_cap(vertex: int, vertices: int, end: bool) -> FeatureKey:
+    """Vertex n of the start or end profile, in the one CORNER run."""
+    return (FeatureCategory.CORNER, (vertices if end else 0) + vertex)
 
 
 def default_feature_name(key: FeatureKey) -> str:
@@ -923,9 +938,9 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
     def feature_key(self) -> Optional[FeatureKey]:
         """The arris between two adjacent sides, or None between a side and a cap.
 
-        ARRIS n is where side n meets side n+1, so only an adjacent PAIR of
-        sides has one. A side against a cap is a START_ARRIS or an END_ARRIS,
-        and opposite sides never meet at all.
+        The low run of ARRIS is side n against side n+1, so only an adjacent
+        PAIR of sides has one there; a side against a cap lands further along
+        the same run, and opposite sides never meet at all.
         """
         first, second = self.faces
         if first in _PRISM_CAP_KEYS or second in _PRISM_CAP_KEYS:
@@ -933,9 +948,9 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
                          else (second, first))
             if side in _PRISM_CAP_KEYS:
                 return None  # two caps never meet
-            category = (FeatureCategory.START_ARRIS if cap is PrismFace.BOTTOM
-                        else FeatureCategory.END_ARRIS)
-            return (category, _PRISM_SIDE_ORDER.index(side))
+            return arris_against_cap(
+                _PRISM_SIDE_ORDER.index(side), len(_PRISM_SIDE_ORDER),
+                end=cap is PrismFace.TOP)
         low, high = (_PRISM_SIDE_ORDER.index(first), _PRISM_SIDE_ORDER.index(second))
         low, high = min(low, high), max(low, high)
         sides = len(_PRISM_SIDE_ORDER)
@@ -1739,10 +1754,9 @@ class RectangularPrism(HasFeatures, CutCSG):
             named((FeatureCategory.ARRIS, index),
                   lambda name, pair=pair: SimpleRectangularPrismEdgeFeature(
                       name=name, faces=pair, properties=_DEFAULT_FEATURE_PROPERTIES))
-            for cap, category in ((PrismFace.BOTTOM, FeatureCategory.START_ARRIS),
-                                  (PrismFace.TOP, FeatureCategory.END_ARRIS)):
+            for cap in (PrismFace.BOTTOM, PrismFace.TOP):
                 ends = (cap, _PRISM_SIDE_ORDER[index])
-                named((category, index),
+                named(arris_against_cap(index, sides, end=cap is PrismFace.TOP),
                       lambda name, ends=ends: SimpleRectangularPrismEdgeFeature(
                           name=name, faces=ends, properties=_DEFAULT_FEATURE_PROPERTIES))
         return features
@@ -2070,7 +2084,8 @@ class Cylinder(HasFeatures, CutCSG):
         """Two caps and the barrel. See RectangularPrism for why the group is NONE.
 
         No arrises: a cylinder's rims are circles, and there is no feature class
-        for one yet. START_ARRIS 0 and END_ARRIS 0 are the slots they will take.
+        for one yet. Their slots are the two arrises against the caps, which
+        arris_against_cap names for a shape with a single side.
         """
         parts = ((START_CAP, CylinderPart.BOTTOM),
                  (END_CAP, CylinderPart.TOP),

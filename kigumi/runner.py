@@ -3513,8 +3513,7 @@ def _detect_feature_label(csg: Any, local_pt: List[float], eps: float = 1e-4) ->
     timber in scope. Left undone deliberately; the shape of that string is a
     decision, not a detail.
     """
-    from kumiki.cutcsg import Cylinder, FeatureTestTolerances, HalfSpace
-    from kumiki.rule import are_vectors_perpendicular
+    from kumiki.cutcsg import HalfSpace
 
     point = _to_v3(local_pt)
 
