@@ -11,7 +11,7 @@ get_outward_normal -- take an optional ``eps`` that widens that tolerance for
 the duration of the call.
 
 The feature queries -- get_all_features, find_feature, and CSGFeature.
-test_point -- take a *test tolerance* instead, which is a different thing
+test_point_unbounded -- take a *test tolerance* instead, which is a different
 wearing similar clothes. An epsilon absorbs float error; a test tolerance
 absorbs the gap between a raycast hit on the triangulated mesh and the
 analytic surface it stands for, and how far a click lands from an edge or a
@@ -523,19 +523,43 @@ class CSGFeature(ABC):
         return self.properties.priority
 
     @abstractmethod
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
-        """Whether *point* lies on this feature of *owner*.
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+        """Whether *point* lies on this feature's SURFACE, unbounded.
+
+        Unbounded is in the name because it is half a test and reads as a whole
+        one. A face feature answers for the face's whole PLANE: the RIGHT face
+        of a prism is x == half_width and nothing about y or z, so it says yes
+        a metre off the end of the timber. An edge built from two of these says
+        yes all the way along its line.
 
         Primitive level, and deliberately so: no root node is involved, so this
-        cannot know what the rest of the tree did to *owner*. A face feature
-        answers for the face's whole PLANE -- the bounding comes from the layer
-        above.
+        cannot know what the rest of the tree did to *owner*. The other half
+        comes from collect_feature_hits, which gates every real feature on
+        is_point_on_boundary of the node declaring it, and from each enclosing
+        compound node, which gates again on its own boundary. On the plane AND
+        on the boundary means on the face, so a point query IS bounded -- by
+        composition, at every level of the tree.
 
-        Which means this is half a test, and callers reach it through
-        owner.get_all_features(), which has already established that the point
-        is on the owner's boundary at all. Used on its own it says yes a long
-        way from the feature: an edge built from two of these answers yes all
-        the way along its line.
+        CONSIDERED: folding the bound in here, so this stands on its own.
+        Decided against, for now:
+
+        - it would not remove the gate. A face buried inside a sibling union is
+          still on its own primitive's boundary, so the compound levels have to
+          keep checking regardless.
+        - it costs more. The gate is computed once per node and shared by every
+          feature that node declares; bounding each feature separately does the
+          same work per feature -- ten times over for a prism with six faces and
+          four arrises, for the same answer.
+        - it duplicates the primitive's own extent inside every feature sitting
+          on it, which is the kind of thing that drifts apart.
+        - it fixes nothing that is broken. The bug this looks like it would fix
+          -- a highlight running past the end of an edge -- is an EXTENT
+          question, and no point test answers that however well bounded. That
+          is what crop_line_to_segments_on_csg is for.
+
+        What it would buy is safety for a caller that uses this on its own,
+        which today means one: the mesh-vertex fallback in kigumi's runner,
+        already marked for deletion. If that stops being the only one, revisit.
         """
         ...
 
@@ -559,7 +583,7 @@ class ProgrammableCSGFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return self.declared_type
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if self.predicate is None:
             return False
         return self.predicate(owner, point, test_tolerance)
@@ -594,11 +618,11 @@ class DerivedEdgeFeature(CSGFeature):
     def feature_type(self) -> CSGFeatureType:
         return CSGFeatureType.EDGE
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if self.a is None or self.b is None:
             return False
-        return (self.a.feature.test_point(self.a.owner, point, test_tolerance)
-                and self.b.feature.test_point(self.b.owner, point, test_tolerance))
+        return (self.a.feature.test_point_unbounded(self.a.owner, point, test_tolerance)
+                and self.b.feature.test_point_unbounded(self.b.owner, point, test_tolerance))
 
     def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
         if self.a is None or self.b is None:
@@ -613,7 +637,8 @@ class DerivedEdgeFeature(CSGFeature):
 
         `ends` is None and `anchor` is the point on the INFINITE line closest to
         the origin, which need not be anywhere near the stretch of edge that
-        actually exists. Harmless for picking, which only calls test_point, and
+        actually exists. Harmless for picking, which only calls
+        test_point_unbounded, and
         not good enough to hang a dimension line off.
 
         Measurement does the cropping instead, a level up where the enclosing
@@ -687,7 +712,7 @@ class HalfSpaceFeature(CSGFeature):
     # get_extent stays None: a half-space's plane is unbounded, so there is no
     # box to give and no midpoint that means anything.
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         return owner.is_point_on_boundary(point, eps=test_tolerance)
 
 
@@ -741,7 +766,7 @@ class SimpleRectangularPrismFeature(CSGFeature):
         _, centre = frame
         return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, RectangularPrism):
             return False
         x, y, z = owner._local_coords(point)
@@ -789,11 +814,11 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
             SimpleRectangularPrismFeature(name=self.name, face=self.faces[1]),
         )
 
-    def test_point(self, owner: 'CutCSG', point: V3,
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3,
                    test_tolerance: Optional[Numeric] = None) -> bool:
         first, second = self._sides()
-        return (first.test_point(owner, point, test_tolerance)
-                and second.test_point(owner, point, test_tolerance))
+        return (first.test_point_unbounded(owner, point, test_tolerance)
+                and second.test_point_unbounded(owner, point, test_tolerance))
 
     def locate(self, owner: 'CutCSG') -> Optional[LocatedGeometry]:
         """The line the two faces meet in, or None if they never do."""
@@ -847,7 +872,7 @@ class SimpleCylinderFeature(CSGFeature):
             return None
         return CSGFeatureExtent(anchor=owner.position + axis * distance)
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, Cylinder):
             return False
         axial, radial = owner._axial_and_radial(point)
@@ -916,7 +941,7 @@ class SimpleConvexPolygonExtrusionFeature(CSGFeature):
         _, centre = frame
         return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonExtrusion):
             return False
         x, y, z = owner._local_coords(point)
@@ -980,7 +1005,7 @@ class SimpleLoftFeature(CSGFeature):
             aabb=owner.get_aabb(),
         )
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, ConvexPolygonSimpleLoft):
             return False
         x, y, z = owner._local_coords(point)
@@ -1090,7 +1115,7 @@ class CutCSG(ABC):
         """
         return []
 
-    def collect_hits(
+    def collect_feature_hits(
         self,
         point: V3,
         tolerances: FeatureTestTolerances,
@@ -1122,7 +1147,7 @@ class CutCSG(ABC):
         on_boundary: Optional[bool] = None  # computed at most once, only if needed
         hits: List['OwnedFeatureHit'] = []
         for feature in declared:
-            if not feature.test_point(
+            if not feature.test_point_unbounded(
                 self, point, tolerances.for_type(feature.feature_type())
             ):
                 continue
@@ -1154,14 +1179,14 @@ class CutCSG(ABC):
         claim the point itself, but it can still form an edge that is
         selectable there, because you cannot click exactly on a line.
 
-        Derivation happens here rather than inside collect_hits, and so runs
+        Derivation happens here rather than inside collect_feature_hits, and so runs
         once, at whichever node the caller asked about. Putting it in the
         recursive gather would either recurse into itself or have every nested
         compound re-derive what its parent derives.
         """
         tolerances = DEFAULT_FEATURE_TEST_TOLERANCES if test_tolerances is None else test_tolerances
-        hits = self.collect_hits(point, tolerances)
-        at_edge_tolerance = self.collect_hits(
+        hits = self.collect_feature_hits(point, tolerances)
+        at_edge_tolerance = self.collect_feature_hits(
             point, FeatureTestTolerances.uniform(tolerances.edge))
         faces = [
             hit for hit in at_edge_tolerance
@@ -2044,10 +2069,10 @@ class SolidUnion(CutCSG):
                 return None
             return avg_normal / norm
 
-    def collect_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
-        hits = super().collect_hits(point, tolerances)
+    def collect_feature_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
+        hits = super().collect_feature_hits(point, tolerances)
         for child in self.children:
-            hits.extend(child.collect_hits(point, tolerances))
+            hits.extend(child.collect_feature_hits(point, tolerances))
         # A child's face can be buried inside a sibling, which is surface the
         # union does not have. is_point_on_boundary rejects exactly that case.
         return _drop_real_hits_off_boundary(self, hits, point, tolerances)
@@ -2128,10 +2153,10 @@ class Intersection(CutCSG):
 
         return None
 
-    def collect_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
-        hits = super().collect_hits(point, tolerances)
-        hits.extend(self.left.collect_hits(point, tolerances))
-        hits.extend(self.right.collect_hits(point, tolerances))
+    def collect_feature_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
+        hits = super().collect_feature_hits(point, tolerances)
+        hits.extend(self.left.collect_feature_hits(point, tolerances))
+        hits.extend(self.right.collect_feature_hits(point, tolerances))
         return _drop_real_hits_off_boundary(self, hits, point, tolerances)
 
     def get_aabb(self) -> BoundingBox:
@@ -2322,11 +2347,11 @@ class Difference(CutCSG):
                 return None
             return avg_normal / norm
 
-    def collect_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
-        hits = super().collect_hits(point, tolerances)
-        hits.extend(self.base.collect_hits(point, tolerances))
+    def collect_feature_hits(self, point: V3, tolerances: FeatureTestTolerances) -> List['OwnedFeatureHit']:
+        hits = super().collect_feature_hits(point, tolerances)
+        hits.extend(self.base.collect_feature_hits(point, tolerances))
         for sub_csg in self.subtract:
-            hits.extend(sub_csg.collect_hits(point, tolerances))
+            hits.extend(sub_csg.collect_feature_hits(point, tolerances))
         return _drop_real_hits_off_boundary(self, hits, point, tolerances)
 
     def get_aabb(self) -> BoundingBox:

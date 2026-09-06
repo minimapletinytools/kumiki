@@ -870,7 +870,7 @@ class SimplePathExtrusionFeature(CSGFeature):
             return Plane(normal=length_dir * sign, point=owner.transform.position + length_dir * distance)
         # A side is planar only if its path segment is straight. An arc's wall
         # is curved, so there is no plane to give -- the same graceful decline
-        # test_point already makes for curved segments.
+        # test_point_unbounded already makes for curved segments.
         segment = owner.path.segments[self.key]
         if not segment.is_planar():
             return None
@@ -902,7 +902,7 @@ class SimplePathExtrusionFeature(CSGFeature):
             aabb=owner.get_aabb(),
         )
 
-    def test_point(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
+    def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, PathExtrusion):
             return False
         x, y, z = owner._local_coords(point)

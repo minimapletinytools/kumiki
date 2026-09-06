@@ -1089,7 +1089,7 @@ class TestJointDisplayName:
 class TestEdgeHighlightSpan:
     """How far a selected edge's highlight runs.
 
-    A face feature's test_point checks the face's PLANE and nothing else, so an
+    A face feature's test_point_unbounded checks the face's PLANE and nothing
     edge built from two of them answers yes all the way along its line. Asking
     the mesh which vertices are on the edge therefore collected vertices a
     timber's length away, and the highlight stretched to match.

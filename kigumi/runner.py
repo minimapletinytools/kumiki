@@ -306,7 +306,7 @@ def prism_to_mesh(prism: Any) -> Dict[str, Any]:
 
     # 12 triangles with outward-facing CCW normals (verified via cross-product)
     # Face naming matches kumiki.timber.TimberFace: RIGHT=+X, FRONT=+Y, LEFT=-X, BACK=-Y
-    # (see RectangularPrismFeature.test_point in kumiki/cutcsg.py).
+    # (see RectangularPrismFeature.test_point_unbounded in kumiki/cutcsg.py).
     indices = [
         0, 2, 1,   0, 3, 2,  # bottom (-Z face)
         4, 5, 6,   4, 6, 7,  # top    (+Z face)
@@ -3678,7 +3678,7 @@ def _edge_highlight_segments(
     where they run.
 
     Cropped from the CSG, because asking the edge where it is does not bound
-    it: a face feature's test_point checks the face's PLANE and nothing else,
+    it: a face feature's test_point_unbounded checks the face's PLANE and nothing
     so an edge made of two of them answers yes all the way along its line --
     a metre past the joint that formed it. Picking never noticed, since a
     click is one point that is on the timber anyway.
@@ -4149,7 +4149,7 @@ def _extract_highlight_mesh(
     # and compares names; when the name is a declared feature we can ask that
     # one feature directly, which is the same answer without the search.
     #
-    # test_point is only meaningful for a point already known to be on the
+    # test_point_unbounded is only meaningful for a point already known to be on
     # owner's boundary -- which the loop below establishes before it gets here.
     wanted_feature = None
     if feature_label is not None and edge_feature is None:
@@ -4174,7 +4174,7 @@ def _extract_highlight_mesh(
                 if owner is not selected_ref:
                     continue
             if edge_feature is not None:
-                # The last fallback, and a poor one: it asks test_point per
+                # The last fallback, and a poor one: it asks test_point_unbounded
                 # vertex without the boundary check, so it lights the strip
                 # along the whole line rather than along the edge. Only reached
                 # when crop_line_to_segments_on_csg met a primitive it could not
@@ -4191,14 +4191,14 @@ def _extract_highlight_mesh(
                         mesh_vertices[corner * 3 + 1],
                         mesh_vertices[corner * 3 + 2],
                     ])
-                    if edge_feature.test_point(
+                    if edge_feature.test_point_unbounded(
                         target_csg, _to_v3(corner_local), _edge_tolerance()
                     ):
                         on_edge += 1
                 if on_edge < 2:
                     continue
             elif wanted_feature is not None:
-                if not wanted_feature.test_point(target_csg, _to_v3(local_c), eps):
+                if not wanted_feature.test_point_unbounded(target_csg, _to_v3(local_c), eps):
                     continue
             elif feature_label is not None:
                 # A generic name -- "left", "cylindrical_surface" -- which no

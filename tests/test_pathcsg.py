@@ -303,7 +303,7 @@ class TestPathExtrusionLocate:
         assert float(plane.point[2]) == pytest.approx(0.1)
 
     def test_a_curved_side_declines(self):
-        """An arc wall has no plane, the same way test_point never matches it."""
+        """An arc wall has no plane, the same way test_point_unbounded never matches."""
         radius = scalar(1, 20)
         centre = create_v2(scalar(0), scalar(0))
         circle = FancyPath(segments=[

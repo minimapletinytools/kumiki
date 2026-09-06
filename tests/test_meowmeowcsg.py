@@ -3146,7 +3146,7 @@ class TestCSGFeatureType:
     def test_a_new_feature_class_must_declare_its_kind(self):
         """feature_type is abstract, so it cannot be forgotten."""
         class Forgetful(CSGFeature):
-            def test_point(self, owner, point, test_tolerance=None):
+            def test_point_unbounded(self, owner, point, test_tolerance=None):
                 return True
 
         with pytest.raises(TypeError, match="abstract"):
@@ -3725,8 +3725,8 @@ class TestDerivedEdges:
         assert edge is not None
         on_arris = create_v3(scalar(2), scalar(3), scalar(5))
         on_one_face = create_v3(scalar(2), scalar(0), scalar(5))
-        assert edge.test_point(prism, on_arris, scalar(1, 100000))
-        assert not edge.test_point(prism, on_one_face, scalar(1, 100000))
+        assert edge.test_point_unbounded(prism, on_arris, scalar(1, 100000))
+        assert not edge.test_point_unbounded(prism, on_one_face, scalar(1, 100000))
 
 
 class TestDerivedEdgesInAQuery:
@@ -4179,9 +4179,9 @@ class TestANamedArris:
         arris = self._arris()
         prism = self._prism(arris)
 
-        assert arris.test_point(prism, create_v3(scalar(2), scalar(3), scalar(5)))
+        assert arris.test_point_unbounded(prism, create_v3(scalar(2), scalar(3), scalar(5)))
         # On the right face, not on the front one.
-        assert not arris.test_point(prism, create_v3(scalar(2), scalar(0), scalar(5)))
+        assert not arris.test_point_unbounded(prism, create_v3(scalar(2), scalar(0), scalar(5)))
 
     def test_it_has_an_extent_to_hang_an_annotation_from(self):
         arris = self._arris()
