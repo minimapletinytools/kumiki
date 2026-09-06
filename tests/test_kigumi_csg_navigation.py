@@ -418,7 +418,10 @@ class TestNonPrismPrimitivesArePickable:
         path, target, face = runner._navigate_csg_to_leaf(csg, [1.0, 0.0, 50.0], PICK_EPS)
         assert path == ["peg_hole"]
         assert isinstance(target, Cylinder)
-        assert face == "cylindrical_surface"
+        # The cylinder's own default for its barrel. It used to reach the
+        # "cylindrical_surface" fallback, which said the same thing more
+        # plainly -- the fallback is still there, it just no longer answers.
+        assert face == "side.0"
 
 
 class TestDetectFaceLabel:
@@ -435,23 +438,66 @@ class TestDetectFaceLabel:
             end_distance=scalar(100),
             _features=[SimpleRectangularPrismFeature("tenon_right", face=PrismFace.RIGHT)],
         )
-        assert runner._detect_face_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
+        assert runner._detect_feature_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "tenon_right"
 
-    def test_falls_back_to_the_timber_local_direction(self):
-        """An unnamed face is named by which timber face it points along."""
+    def test_a_face_nobody_named_answers_with_the_prisms_own_default(self):
+        """No longer the timber-local direction, because nothing is unnamed now.
+
+        A prism names its own boundary, so "side.0" is a true answer about the
+        shape that has the face. Less friendly than "right", which said where
+        the face is on the TIMBER -- see the note on _detect_feature_label
+        about composing the two.
+        """
         prism = _timber_prism(named=False)
-        assert runner._detect_face_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "right"
-        assert runner._detect_face_label(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "left"
-        assert runner._detect_face_label(prism, [0.0, 3.0, 50.0], PICK_EPS) == "front"
-        assert runner._detect_face_label(prism, [0.0, 0.0, 100.0], PICK_EPS) == "top"
 
-    def test_half_space_reports_a_cut_plane(self):
+        assert runner._detect_feature_label(prism, [2.0, 0.0, 50.0], PICK_EPS) == "side.0"
+        assert runner._detect_feature_label(prism, [-2.0, 0.0, 50.0], PICK_EPS) == "side.2"
+        assert runner._detect_feature_label(prism, [0.0, 3.0, 50.0], PICK_EPS) == "side.1"
+        assert runner._detect_feature_label(prism, [0.0, 0.0, 100.0], PICK_EPS) == "cap.1"
+
+    def test_a_shape_that_names_nothing_still_gets_a_label_and_a_warning(self):
+        """The fallbacks are kept for the gap, not for the common case.
+
+        PathExtrusion has no default_features() yet, so it is the one shape
+        that still reaches them. It warns, because a guessed label is
+        otherwise indistinguishable from a real one.
+        """
+        import warnings as warnings_module
+
+        from kumiki.pathcsg import FancyPath, PathExtrusion, StraightSegment
+        from kumiki.rule import create_v2
+
+        def corner(x, y):
+            return create_v2(scalar(x), scalar(y))
+
+        extrusion = PathExtrusion(
+            path=FancyPath(segments=[
+                StraightSegment(corner(-2, -2), corner(2, -2)),
+                StraightSegment(corner(2, -2), corner(2, 2)),
+                StraightSegment(corner(2, 2), corner(-2, 2)),
+                StraightSegment(corner(-2, 2), corner(-2, -2)),
+            ]),
+            transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(100),
+        )
+
+        with warnings_module.catch_warnings(record=True) as caught:
+            warnings_module.simplefilter("always")
+            label = runner._detect_feature_label(extrusion, [2.0, 0.0, 50.0], PICK_EPS)
+
+        assert label == "right"
+        assert any("does not" in str(w.message) for w in caught)
+
+    def test_a_half_space_answers_with_its_own_default(self):
+        # It used to reach the "cut_plane" fallback, which is a friendlier name
+        # than "side.0" -- see the note on _detect_feature_label. The fallback
+        # is still there, it is just no longer the thing that answers.
         from kumiki.cutcsg import HalfSpace
 
         plane = HalfSpace(
             normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(50)
         )
-        assert runner._detect_face_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "cut_plane"
+        assert runner._detect_feature_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "side.0"
 
     def test_half_space_named_feature_wins_over_cut_plane(self):
         from kumiki.cutcsg import HalfSpace
@@ -461,7 +507,7 @@ class TestDetectFaceLabel:
             offset=scalar(50),
             _features=[HalfSpaceFeature("shoulder")],
         )
-        assert runner._detect_face_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
+        assert runner._detect_feature_label(plane, [0.0, 0.0, 50.0], PICK_EPS) == "shoulder"
 
 
 class TestPickingToleranceIsPerCall:
@@ -788,7 +834,7 @@ class TestPickDescription:
     """What the selection display gets from one click.
 
     featureLabel / featureType / jointName / facesToward, computed once per
-    pick -- unlike _detect_face_label, which runs per triangle during highlight
+    pick -- unlike _detect_feature_label, which runs per triangle during highlight
     extraction and stays a cheap string lookup.
     """
 

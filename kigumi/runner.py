@@ -3461,47 +3461,57 @@ def _nearest_timber_local_face_name(normal: Any) -> str:
     return best_name
 
 
-def _authored_feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
-    """The best feature at a point that someone actually named.
+def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
+    """The best feature at a point, preferring one somebody named.
 
-    The whole hit list, filtered to the authored layer, rather than
-    find_feature -- which would hand back the primitive's own default when an
-    authored feature is a hair further away.
+    Two passes over the same hit list rather than find_feature, because the
+    ranking wanted here is not the one find_feature applies: it sorts by how
+    specific a feature is, and an anonymous default sits at the same
+    specificity as the authored feature covering the same surface. Asking for
+    the authored layer first says which of those two a person would rather
+    read.
     """
     from kumiki.cutcsg import FeatureSource, FeatureTestTolerances
 
+    hits = csg.get_all_features(point, FeatureTestTolerances(face=eps))
+    if not hits:
+        return None
     authored = {
         id(feature)
         for feature in csg.get_declared_features(FeatureSource.OVERRIDES)
     }
-    for hit in csg.get_all_features(point, FeatureTestTolerances(face=eps)):
+    for hit in hits:
         if id(hit.feature) in authored:
             return hit.feature
-    return None
+    return hits[0].feature
 
-
-def _detect_face_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> str:
+def _detect_feature_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> str:
     """Name the feature of primitive *csg* that *local_pt* lies on.
 
-    Two layers, in order:
+    Whatever names the point, preferring the name someone chose. An AUTHORED
+    feature wins outright -- a prism built in its own local frame (a tenon's
+    marking_space, say) has a "top" that is not the timber's top, so a name
+    written on purpose beats anything worked out from geometry. Failing that,
+    the primitive's own default: "side.0" says where the face is on the shape
+    that has it, which is a true answer even if it is not a friendly one.
 
-    1. The primitive's AUTHORED feature, via kumiki's CSGFeature lookup. This
-       is authoritative -- a prism built in its own local frame (a tenon's
-       marking_space, say) has a "top" that is not the timber's top, so a
-       declared name always beats a geometric guess.
-    2. Failing that, a generic label. Most joint geometry is still unnamed, so
-       this is the common path today: name the face by whichever of the
-       timber's own six directions its outward normal points along.
+    Everything after that is a fallback for a shape that names nothing, and
+    warns, because there should not be one. They are kept rather than removed
+    so a gap shows up as a poor label rather than as a crash.
 
-    Authored only, deliberately. Every primitive now names its own boundary by
-    default, so asking for both layers would always succeed at step 1 and this
-    would answer "side.0" where it used to answer "right". A default name says
-    where a face is on its own primitive; the fallback says where it is on the
-    TIMBER, which is the more useful of the two for a label a person reads.
+    WHAT THE FALLBACKS KNEW THAT THE DEFAULTS DO NOT. Each of them answered in
+    terms of something outside the primitive: "cut_plane" says what a half
+    space is FOR, "cylindrical_surface" says what shape the surface is, and the
+    timber-local direction says where the face is on the TIMBER rather than on
+    the little prism that happens to carry it. A default cannot say any of
+    that -- "side.0" is true, and about the wrong frame of reference.
 
-    HalfSpace and a cylinder's barrel get fixed names instead -- neither has a
-    "face" in the timber's sense, and naming them by direction would read as a
-    timber face that isn't there.
+    Which is an argument for composing, not for choosing. The name says which
+    surface; the outward normal, read in the timber's frame, says which way it
+    faces. "side.0 (facing timber top)" carries both, and neither the feature
+    nor the primitive is the right place to work that out -- only here is the
+    timber in scope. Left undone deliberately; the shape of that string is a
+    decision, not a detail.
     """
     from kumiki.cutcsg import Cylinder, FeatureTestTolerances, HalfSpace
     from kumiki.rule import are_vectors_perpendicular
@@ -3512,21 +3522,33 @@ def _detect_face_label(csg: Any, local_pt: List[float], eps: float = 1e-4) -> st
     # the analytic face and the triangulated mesh the ray actually hit. Edges
     # and points keep their (wider) defaults, since hitting one is a snap
     # rather than a direct hit.
-    feature = _authored_feature_at(csg, point, eps)
+    feature = _feature_at(csg, point, eps)
     if feature is not None:
         return feature.name
+
+    # Everything past here is a fallback, and every primitive names its own
+    # boundary now, so reaching one means a shape whose default_features() is
+    # still empty -- PathExtrusion, today. They are kept rather than deleted
+    # because a gap should show up as a poor label rather than as a crash, and
+    # they warn because a poor label is otherwise invisible.
+    warnings.warn(
+        f"No feature named the point on {type(csg).__name__}, so its label is "
+        "being guessed. Every primitive should name its own boundary through "
+        "default_features(); this one does not."
+    )
 
     if isinstance(csg, HalfSpace):
         return "cut_plane"
 
     normal = csg.get_outward_normal(point, eps)
     if normal is None:
-        return "face"
+        return "unknown feature"
 
     if isinstance(csg, Cylinder) and are_vectors_perpendicular(normal, csg.axis_direction):
         return "cylindrical_surface"
 
-    # TODO this needs to know face parity
+    # TODO this needs to know face parity: a normal alone cannot tell the front
+    # face from the back one when the primitive's frame is turned around.
     return _nearest_timber_local_face_name(normal)
 
 
@@ -3768,7 +3790,7 @@ def _describe_pick(
 ) -> Dict[str, Any]:
     """Everything the selection display wants to say about one click.
 
-    Kept separate from _detect_face_label, which runs per triangle during
+    Kept separate from _detect_feature_label, which runs per triangle during
     highlight extraction and must stay a cheap string lookup. This runs once.
 
     The three CSG-ish arguments are all about one timber and are easy to
@@ -3835,7 +3857,7 @@ def _describe_pick(
     return {
         **described,
         # featureLabel is only a name when the primitive declared one. Without
-        # that it is _detect_face_label's geometric guess, which the display
+        # that it is _detect_feature_label's geometric guess, which the display
         # must not present as a name -- it is a direction, and one that has not
         # been sign-corrected, unlike the normal below.
         "featureLabel": feature_label,
@@ -3994,7 +4016,7 @@ def _navigate_csg_one_level(
             return (current_path + [segment], child, None)
         if isinstance(child, (SolidUnion, Difference)):
             return _navigate_csg_one_level(child, local_pt, current_path, eps, segments)
-        return (current_path, child, _detect_face_label(child, local_pt, eps))
+        return (current_path, child, _detect_feature_label(child, local_pt, eps))
 
     if isinstance(node, Difference):
         for sub in node.subtract:
@@ -4011,7 +4033,7 @@ def _navigate_csg_one_level(
         return (current_path, node, "face")
 
     # Leaf primitive — report face
-    return (current_path, node, _detect_face_label(node, local_pt, eps))
+    return (current_path, node, _detect_feature_label(node, local_pt, eps))
 
 
 def _navigate_csg_to_leaf(
@@ -4170,7 +4192,7 @@ def _extract_highlight_mesh(
     inside_box = _aabb_filter(target_csg, eps)
 
     # The feature we are matching against, looked up once instead of once per
-    # triangle. _detect_face_label asks the node for EVERY feature at the point
+    # triangle. _detect_feature_label asks the node for EVERY feature at the point
     # and compares names; when the name is a declared feature we can ask that
     # one feature directly, which is the same answer without the search.
     #
@@ -4228,7 +4250,7 @@ def _extract_highlight_mesh(
             elif feature_label is not None:
                 # A generic name -- "left", "cylindrical_surface" -- which no
                 # declared feature answers to, so it has to be worked out.
-                tri_face_label = _detect_face_label(target_csg, local_c, eps)
+                tri_face_label = _detect_feature_label(target_csg, local_c, eps)
                 if tri_face_label != feature_label:
                     continue
             base = len(out_verts) // 3
