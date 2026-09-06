@@ -1423,12 +1423,13 @@ class CutCSG(ABC):
         ]
         return _sort_feature_hits(hits + derive_edge_hits(self, faces))
 
+    # TODO rename to find_first_feature
     def find_feature(
         self,
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> Optional['OwnedFeatureHit']:
-        """The best feature at *point*, or None.
+        """The best feature at *point*, or None. Uses default sorting rules.
 
         Non-real features win outright over real ones. They are lines and
         points inside or alongside the solid, so anything selecting one has

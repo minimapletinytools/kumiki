@@ -3544,13 +3544,7 @@ def _detect_feature_label(csg: Any, local_pt: List[float], eps: float = 1e-4) ->
     if normal is None:
         return "unknown feature"
 
-    if isinstance(csg, Cylinder) and are_vectors_perpendicular(normal, csg.axis_direction):
-        return "cylindrical_surface"
-
-    # TODO this needs to know face parity: a normal alone cannot tell the front
-    # face from the back one when the primitive's frame is turned around.
-    return _nearest_timber_local_face_name(normal)
-
+    return "unknown face feature"
 
 def _node_positions(root: 'CutCSG') -> Dict[int, Tuple[int, int, List[str]]]:
     """Every node in *root* keyed by id, as (depth, document order, label path).
