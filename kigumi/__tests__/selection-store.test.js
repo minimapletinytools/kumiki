@@ -54,16 +54,26 @@ describe('csg focus', () => {
         expect(store.csgFocus.path).toEqual(['mortise_and_tenon']);
     });
 
-    test('focusing leaves other selected timbers alone', () => {
-        // You can have several timbers selected and still drill into one.
+    test('focusing narrows the selection to the timber drilled into', () => {
+        // The canvas highlights the drilled timber and ghosts the rest, so
+        // leaving the others selected made the trees disagree with it.
         const store = new SelectionStore();
         store.selectTimber('A');
         store.selectTimber('B', true);
 
         store.setCsgFocus(focus({ timberKey: 'B' }));
 
-        expect(new Set(store.getSelectedTimbers())).toEqual(new Set(['A', 'B']));
+        expect(store.getSelectedTimbers()).toEqual(['B']);
         expect(store.csgFocus.timberKey).toBe('B');
+    });
+
+    test('drilling into another timber moves the selection to it', () => {
+        const store = new SelectionStore();
+        store.selectTimber('A');
+
+        store.setCsgFocus(focus({ timberKey: 'B' }));
+
+        expect(store.getSelectedTimbers()).toEqual(['B']);
     });
 
     test('only one node is focused at a time', () => {
@@ -134,11 +144,12 @@ describe('focus follows the timber it points at', () => {
 
     test('deselecting a different timber leaves the focus alone', () => {
         const store = new SelectionStore();
-        store.selectTimber('B');
         store.setCsgFocus(focusA);
+        store.selectTimber('B', true);
 
         store.deselectTimber('B');
         expect(store.csgFocus).not.toBeNull();
+        expect(store.getSelectedTimbers()).toEqual(['A']);
     });
 
     test('replacing the selection outright drops the focus', () => {

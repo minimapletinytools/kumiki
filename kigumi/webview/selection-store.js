@@ -5,9 +5,12 @@
     //   selectedTimbers  a set, because timbers multi-select
     //   focus            at most one, because it is what you are looking at
     //
-    // They coexist: several timbers can be selected while you drill into the
-    // CSG of exactly one of them. Focusing a CSG node pulls its timber into
-    // the selection but leaves the rest of the selection alone.
+    // Drilling into a CSG node narrows the selection to the timber it belongs
+    // to. The canvas has always drawn it that way -- it highlights the timber
+    // being drilled into and ghosts everything else -- so keeping the others
+    // selected left the trees and the canvas disagreeing about what was
+    // selected. Narrowing is the simpler rule of the two: it means the drilled
+    // timber is the selection, rather than "selected, but not highlighted".
     //
     // csgFocus is:
     //   { timberKey, path, featureLabel, cutIndex, context }
@@ -112,11 +115,13 @@
         // --- the one CSG focus ---------------------------------------------
 
         /**
-         * Focus a node in one of the CSG trees. The timber joins the selection
-         * if it is not already in it; any other selected timbers stay, since
-         * you can have several selected and still drill into one.
+         * Focus a node in one of the CSG trees.
+         *
+         * The selection narrows to this timber: you are looking at one timber's
+         * insides, and the canvas already draws it that way.
          */
         setCsgFocus({ timberKey, path, featureLabel, cutIndex, context }) {
+            this.selectedTimbers.clear();
             this.selectedTimbers.add(timberKey);
             this.focus = {
                 kind: 'csg',
