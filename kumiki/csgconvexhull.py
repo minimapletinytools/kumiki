@@ -48,8 +48,9 @@ from typing import List, Optional, Sequence, Tuple
 from .geometry import (
     Line,
     Plane,
+    LineSegment,
     PlanarRegion,
-    Segment,
+    SegmentedLine,
     frame_for_plane,
     perpendicular_axes,
     unit_vector,
@@ -541,7 +542,7 @@ def crop_line_to_segments_on_csg(
 
     near: Optional[V3] = None,
     tolerance: float = 0.0,
-) -> Optional[List[Segment]]:
+) -> Optional[SegmentedLine]:
     """The parts of a line that lie on a CSG solid.
 
     The one-dimensional counterpart to approximately_crop_plane_to_area_on_csg,
@@ -551,13 +552,15 @@ def crop_line_to_segments_on_csg(
     removes part of an edge shortens it, and a cut through the middle of one
     splits it in two -- which is why this returns a list.
 
-    Three different answers, so three return values:
+    Two different answers, so two return shapes:
 
-        None   a primitive in the tree cannot be described as half spaces, so
-               there is no answer -- the caller should not treat it as one.
-        []     the line is not on this solid at all. Worth knowing: two planes
-               can meet somewhere that is on neither face.
-        [...]  one segment per surviving piece, in order along the line.
+        None      a primitive in the tree cannot be described as half spaces,
+                  so there is no answer -- the caller should not treat it as
+                  one.
+        the line  with one segment per surviving piece, in order along it.
+                  Empty when the line is not on this solid at all, which is
+                  worth knowing: two planes can meet somewhere that is on
+                  neither face.
 
     `near` is where the edge is expected to be. A line's own point may be
     nowhere near the timber -- it is wherever the primitive that declared it put
@@ -591,10 +594,11 @@ def crop_line_to_segments_on_csg(
     spans = _spans_on_csg(csg, line, (centre - reach, centre + reach), tolerance)
     if spans is None:
         return None
-    return [
-        Segment(
+    return SegmentedLine(line=line, segments=tuple(
+        LineSegment(
             line=line,
-            ends=(origin + direction * scalar(low), origin + direction * scalar(high)),
+            start=origin + direction * scalar(low),
+            end=origin + direction * scalar(high),
         )
         for low, high in spans
-    ]
+    ))

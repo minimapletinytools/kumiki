@@ -11,11 +11,11 @@ segment; a Plane is an infinite plane, not a face. That is what measurement
 wants -- "the distance between two parallel edges" means the distance between
 the infinite lines they lie on.
 
-Their BOUNDED counterparts live here too, beside them: a Segment is the part of
-a Line that is actually there, a PlanarRegion the part of a Plane. They are what
-you get back from cropping an unbounded primitive to a solid (see
-kumiki.csgconvexhull), and they are plain geometry -- neither knows what a
-feature or a timber is.
+Their BOUNDED counterparts live here too, beside them: a LineSegment is a
+stretch of a Line, a SegmentedLine all the stretches of one that survived
+cropping, and a PlanarRegion the part of a Plane. They are what you get back
+from cropping an unbounded primitive to a solid (see kumiki.csgconvexhull), and
+they are plain geometry -- none of them knows what a feature or a timber is.
 
 measuring.py re-exports all of these, so `from kumiki.measuring import Plane`
 keeps working.
@@ -198,32 +198,80 @@ def frame_for_plane(plane: 'Plane', near: Optional[V3] = None) -> PlaneFrame:
 
 
 @dataclass(frozen=True)
-class Segment:
-    """The part of a Line that is actually there: a stretch between two ends.
+class LineSegment:
+    """One stretch of a Line: the bounded counterpart of it.
 
-    What you get back from cropping an infinite line to a solid. An empty `ends`
-    means nothing survived -- the line is not on the solid at all -- which is
-    worth knowing rather than an error.
+    Carries the line as well as the two ends, so it keeps the line's direction.
+    Working that out from the ends instead would flip it whenever the ends came
+    back in the other order, and for a cropped edge the parent line's
+    orientation is the one that means something.
     """
 
     line: Line
-    ends: Tuple[V3, ...]
+    start: V3
+    end: V3
+
+    def midpoint(self) -> V3:
+        """The middle of it, for a dimension to attach to."""
+        return (self.start + self.end) / scalar(2)
+
+    def length(self) -> float:
+        return float(sum(
+            (float(self.start[axis, 0]) - float(self.end[axis, 0])) ** 2
+            for axis in range(3)
+        )) ** 0.5
+
+    def extent_along(self, direction: V3) -> Tuple[float, float]:
+        """How far it reaches along any direction, as (min, max)."""
+        reach = [float((point.T * direction)[0, 0]) for point in (self.start, self.end)]
+        return (min(reach), max(reach))
+
+
+@dataclass(frozen=True)
+class SegmentedLine:
+    """A line, and the parts of it that are actually there.
+
+    What you get back from cropping an infinite line to a solid. Several parts,
+    because a solid can be non-convex: a cut through the middle of an edge
+    leaves a piece either side of it, and one segment spanning both would run
+    straight through the hole.
+
+    No segments means nothing survived -- the line is not on the solid at all --
+    which is worth knowing rather than an error. That is why emptiness lives
+    here and not on LineSegment: a segment with no ends was never a thing, only
+    a way of saying "none of them".
+    """
+
+    line: Line
+    segments: Tuple[LineSegment, ...] = ()
 
     @property
     def is_empty(self) -> bool:
-        return len(self.ends) < 2
+        return len(self.segments) == 0
 
-    def midpoint(self) -> Optional[V3]:
-        """The middle of it, for a dimension to attach to."""
+    def __len__(self) -> int:
+        return len(self.segments)
+
+    def __iter__(self):
+        return iter(self.segments)
+
+    def longest(self) -> Optional[LineSegment]:
+        """The biggest piece, for anything that has to pick just one."""
         if self.is_empty:
             return None
-        return (self.ends[0] + self.ends[1]) / scalar(2)
+        return max(self.segments, key=lambda segment: segment.length())
+
+    def total_length(self) -> float:
+        return sum(segment.length() for segment in self.segments)
 
     def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
-        """How far it reaches along any direction, as (min, max)."""
+        """How far the whole thing reaches, as (min, max). Gaps included."""
         if self.is_empty:
             return None
-        reach = [float((point.T * direction)[0, 0]) for point in self.ends]
+        reach = [
+            value for segment in self.segments
+            for value in segment.extent_along(direction)
+        ]
         return (min(reach), max(reach))
 
 

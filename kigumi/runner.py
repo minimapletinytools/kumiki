@@ -2337,14 +2337,6 @@ def _located_geometry_payload(located: Any, timber: Any) -> Optional[Dict[str, A
     return None
 
 
-def _segment_length(segment: Any) -> float:
-    """How long a cropped segment is, for choosing between pieces of one edge."""
-    start, end = segment.ends
-    return float(sum(
-        (float(start[axis, 0]) - float(end[axis, 0])) ** 2 for axis in range(3)
-    )) ** 0.5
-
-
 def _feature_anchor(
     feature: Any, node: Any, timber: Any, located: Any, root_csg: Any = None,
 ) -> Optional[List[float]]:
@@ -2386,15 +2378,14 @@ def _feature_anchor(
             )
             middle = cropped.centroid() if cropped is not None and not cropped.is_empty else None
         elif root_csg is not None:
-            segments = crop_line_to_segments_on_csg(
+            cropped = crop_line_to_segments_on_csg(
                 located, root_csg, seed_reach=reach, near=solid.transform.position,
             )
-            if segments:
+            if cropped is not None and not cropped.is_empty:
                 # The longest piece. A cut can leave an edge in several, and a
                 # dimension has to attach to one of them -- the biggest is the
                 # one a reader would point at.
-                longest = max(segments, key=lambda segment: _segment_length(segment))
-                middle = longest.midpoint()
+                middle = cropped.longest().midpoint()
         if middle is not None:
             return _vector3_to_floats(timber.transform.local_to_global(middle))
 
@@ -3655,23 +3646,22 @@ def _cropped_edge_segments(
     #
     # So take the exact spans where there are any, and fall back to the tolerant
     # ones only for the edge that exact clipping loses entirely.
-    segments = clipped(0.0)
-    if not segments:
-        segments = clipped(float(_edge_tolerance()))
-    if segments is None:
+    cropped = clipped(0.0)
+    if cropped is None or cropped.is_empty:
+        cropped = clipped(float(_edge_tolerance()))
+    if cropped is None:
         # A solid it cannot describe: no answer, rather than a wrong one.
         return (None, False)
-    if not segments:
+    if cropped.is_empty:
         return (None, True)
 
-    out = []
-    for segment in segments:
-        start, end = segment.ends
-        out.append({
-            "start": _vector3_to_floats(timber.transform.local_to_global(start)),
-            "end": _vector3_to_floats(timber.transform.local_to_global(end)),
-        })
-    return (out, False)
+    return ([
+        {
+            "start": _vector3_to_floats(timber.transform.local_to_global(segment.start)),
+            "end": _vector3_to_floats(timber.transform.local_to_global(segment.end)),
+        }
+        for segment in cropped
+    ], False)
 
 
 def _edge_highlight_segments(

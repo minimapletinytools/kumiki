@@ -8,7 +8,9 @@ cropping that turns one into the other.
 import pytest
 
 from kumiki.cutcsg import HalfSpace, RectangularPrism
-from kumiki.geometry import Line, Plane, PlanarRegion, Segment, frame_for_plane
+from kumiki.geometry import (
+    Line, LineSegment, Plane, PlanarRegion, SegmentedLine, frame_for_plane,
+)
 from kumiki.csgconvexhull import (
     approximately_crop_plane_to_area_on_csg,
     bounding_half_spaces,
@@ -225,10 +227,62 @@ def _undescribable():
     )
 
 
-def _span(segments, direction=None):
+def _span(cropped, direction=None):
     """The one span expected, as (low, high) along the line."""
-    assert len(segments) == 1, f"expected one segment, got {len(segments)}"
-    return segments[0].extent_along(direction if direction is not None else _v(0, 0, 1))
+    assert len(cropped) == 1, f"expected one segment, got {len(cropped)}"
+    return cropped.segments[0].extent_along(
+        direction if direction is not None else _v(0, 0, 1))
+
+
+class TestTheBoundedTypes:
+    """LineSegment and SegmentedLine, apart from what produces them."""
+
+    def _line(self):
+        return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
+
+    def _piece(self, low, high):
+        return LineSegment(line=self._line(), start=_v(0, 0, low), end=_v(0, 0, high))
+
+    def test_a_piece_knows_its_own_length_and_middle(self):
+        piece = self._piece(0.2, 0.8)
+
+        assert piece.length() == pytest.approx(0.6, abs=1e-9)
+        assert float(piece.midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-9)
+
+    def test_a_piece_keeps_the_line_direction_rather_than_deriving_it(self):
+        # Derived from the ends, this would point the other way whenever they
+        # came back in the other order. A cropped edge's direction is the parent
+        # line's, and that is the one that means something.
+        backwards = Line(direction=_v(0, 0, -1), point=_v(0, 0, 0))
+        piece = LineSegment(line=backwards, start=_v(0, 0, 0), end=_v(0, 0, 1))
+
+        assert float(piece.line.direction[2, 0]) == -1.0
+
+    def test_the_longest_piece_is_the_one_a_dimension_attaches_to(self):
+        line = SegmentedLine(line=self._line(), segments=(
+            self._piece(0.0, 0.1), self._piece(0.3, 0.9), self._piece(0.95, 1.0)))
+
+        assert line.longest().length() == pytest.approx(0.6, abs=1e-9)
+
+    def test_it_counts_and_iterates_its_pieces(self):
+        line = SegmentedLine(line=self._line(), segments=(
+            self._piece(0.0, 0.2), self._piece(0.5, 0.6)))
+
+        assert len(line) == 2
+        assert [round(piece.length(), 4) for piece in line] == [0.2, 0.1]
+        assert line.total_length() == pytest.approx(0.3, abs=1e-9)
+
+    def test_its_extent_spans_the_gaps_between_pieces(self):
+        # The reach of the whole thing, which is a different question from how
+        # much of it is solid.
+        line = SegmentedLine(line=self._line(), segments=(
+            self._piece(0.0, 0.2), self._piece(0.8, 1.0)))
+
+        assert line.extent_along(_v(0, 0, 1)) == pytest.approx((0.0, 1.0), abs=1e-9)
+        assert line.total_length() == pytest.approx(0.4, abs=1e-9)
+
+    def test_no_pieces_is_the_empty_answer(self):
+        assert SegmentedLine(line=self._line()).is_empty
 
 
 class TestCropLineToSegmentsOnCsg:
@@ -247,10 +301,10 @@ class TestCropLineToSegmentsOnCsg:
     def test_the_midpoint_is_the_middle_of_what_survives(self):
         line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
-        segments = crop_line_to_segments_on_csg(
+        cropped = crop_line_to_segments_on_csg(
             line, _box(size=(0.1, 0.2), start=0.0, end=1.0), seed_reach=10, near=_v(0, 0, 0))
 
-        assert float(segments[0].midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-9)
+        assert float(cropped.longest().midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-9)
 
     def test_an_edge_declared_far_away_still_crops_to_the_timber(self):
         # An edge declared on a cutter extended past the timber has its own
@@ -258,18 +312,18 @@ class TestCropLineToSegmentsOnCsg:
         # clipping leaves nothing, so the search starts near the timber.
         far = Line(direction=_v(0, 0, 1), point=_v(0.05, 0.1, 900))
 
-        segments = crop_line_to_segments_on_csg(
+        cropped = crop_line_to_segments_on_csg(
             far, _box(size=(0.1, 0.2), start=0.0, end=1.0),
             seed_reach=10, near=_v(0, 0, 0.5))
 
-        assert len(segments) == 1
-        assert float(segments[0].midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-6)
+        assert len(cropped) == 1
+        assert float(cropped.longest().midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-6)
 
     def test_a_line_that_misses_everything_leaves_nothing(self):
         line = Line(direction=_v(0, 0, 1), point=_v(5, 5, 0))
 
         assert crop_line_to_segments_on_csg(
-            line, _box(), seed_reach=10, near=_v(0, 0, 0)) == []
+            line, _box(), seed_reach=10, near=_v(0, 0, 0)).is_empty
 
     def test_a_line_running_along_a_face_it_is_outside_of_keeps_nothing(self):
         # Parallel to every bounding plane it is outside: no bound to compute,
@@ -277,7 +331,7 @@ class TestCropLineToSegmentsOnCsg:
         line = Line(direction=_v(0, 0, 1), point=_v(5, 0, 0))
 
         assert crop_line_to_segments_on_csg(
-            line, _box(), seed_reach=10, near=_v(0, 0, 0.5)) == []
+            line, _box(), seed_reach=10, near=_v(0, 0, 0.5)).is_empty
 
     def test_it_gives_up_rather_than_returning_too_much(self):
         line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
@@ -296,9 +350,12 @@ class TestCropLineToSegmentsOnCsg:
         assert crop_line_to_segments_on_csg(
             line, tree, seed_reach=10, near=_v(0, 0, 0)) is None
 
-    def test_an_empty_segment_has_no_midpoint_to_offer(self):
-        assert Segment(line=Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)),
-                              ends=()).midpoint() is None
+    def test_a_line_with_no_pieces_has_no_longest_one(self):
+        empty = SegmentedLine(line=Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)))
+
+        assert empty.is_empty
+        assert empty.longest() is None
+        assert empty.extent_along(_v(0, 0, 1)) is None
 
 
 class TestCroppingThroughTheTree:
@@ -332,8 +389,8 @@ class TestCroppingThroughTheTree:
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 2
-        assert segments[0].extent_along(_v(0, 0, 1)) == pytest.approx((0.0, 0.4), abs=1e-9)
-        assert segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.6, 1.0), abs=1e-9)
+        assert segments.segments[0].extent_along(_v(0, 0, 1)) == pytest.approx((0.0, 0.4), abs=1e-9)
+        assert segments.segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.6, 1.0), abs=1e-9)
 
     def test_two_cuts_leave_three_pieces(self):
         from kumiki.cutcsg import Difference
@@ -353,7 +410,7 @@ class TestCroppingThroughTheTree:
                           subtract=[_box(start=-1.0, end=2.0)])
 
         assert crop_line_to_segments_on_csg(
-            self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5)) == []
+            self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5)).is_empty
 
     def test_a_cut_flush_with_the_face_the_edge_lies_on_keeps_it(self):
         # The case that decides the sign of the tolerance. This arris runs along
@@ -435,7 +492,7 @@ class TestCroppingThroughTheTree:
         from kumiki.cutcsg import EmptyCSG
 
         assert crop_line_to_segments_on_csg(
-            self._line(), EmptyCSG(), seed_reach=10, near=_v(0, 0, 0)) == []
+            self._line(), EmptyCSG(), seed_reach=10, near=_v(0, 0, 0)).is_empty
 
     def test_subtracting_nothing_changes_nothing(self):
         from kumiki.cutcsg import Difference, EmptyCSG
@@ -463,7 +520,7 @@ class TestCroppingThroughTheTree:
 
         assert crop_line_to_segments_on_csg(
             axis, Difference(base=body, subtract=[bore]),
-            seed_reach=50, near=_v(0, 0, 5)) == []
+            seed_reach=50, near=_v(0, 0, 5)).is_empty
 
         low, high = _span(crop_line_to_segments_on_csg(
             axis, body, seed_reach=50, near=_v(0, 0, 5)))
@@ -482,7 +539,7 @@ class TestCroppingThroughTheTree:
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 3
-        assert segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.4, 0.6), abs=1e-9)
+        assert segments.segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.4, 0.6), abs=1e-9)
 
 
 class TestConvexHull:
