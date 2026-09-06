@@ -558,6 +558,150 @@ class TestSolvingACylinderRatherThanBoundingIt:
         assert span[1] - span[0] == pytest.approx(2.0, abs=1e-9)
 
 
+class TestALineOnABoundaryIsKept:
+    """The rule, both ways round.
+
+    Added, "on the face" means on the solid. Removed, "on the wall" means on
+    the surface of the void rather than inside it. Opposite comparisons, one
+    outcome: the line stays. Get it backwards for the removing case and every
+    arris a cut passes through the plane of disappears.
+    """
+
+    def _kept(self, line, csg, tolerance=0.0):
+        segments = crop_line_to_segments_on_csg(
+            line, csg, seed_reach=50, near=_v(0, 0, 5), tolerance=tolerance)
+        return sum(segment.length() for segment in (segments or []))
+
+    def _bore(self, radius=1.0, start=-1.0, end=11.0):
+        from kumiki.cutcsg import Cylinder
+
+        return Cylinder(axis_direction=_v(0, 0, 1), radius=scalar(radius),
+                        position=_v(0, 0, 0), start_distance=scalar(start),
+                        end_distance=scalar(end))
+
+    def test_on_a_flat_face_being_added(self):
+        assert self._kept(Line(direction=_v(0, 0, 1), point=_v(2, 0, 0)),
+                          _box(size=(4, 4), start=0, end=10)) == pytest.approx(10.0)
+
+    def test_on_a_flat_face_being_removed(self):
+        from kumiki.cutcsg import Difference
+
+        tree = Difference(base=_box(size=(8, 4), start=0, end=10),
+                          subtract=[_box(size=(4, 4), start=0, end=10, position=(4, 0, 0))])
+
+        assert self._kept(Line(direction=_v(0, 0, 1), point=_v(2, 0, 0)),
+                          tree) == pytest.approx(10.0)
+
+    def test_on_a_barrel_being_added(self):
+        assert self._kept(Line(direction=_v(0, 0, 1), point=_v(1, 0, 0)),
+                          self._bore(start=0.0, end=10.0)) == pytest.approx(10.0)
+
+    def test_on_a_barrel_being_removed(self):
+        # The arris down the wall of a bore. Widening the bore to find it would
+        # be the one thing that deletes it.
+        from kumiki.cutcsg import Difference
+
+        tree = Difference(base=_box(size=(4, 4), start=0, end=10), subtract=[self._bore()])
+
+        assert self._kept(Line(direction=_v(0, 0, 1), point=_v(1, 0, 0)),
+                          tree) == pytest.approx(10.0)
+
+    def test_on_a_cap_of_something_being_removed(self):
+        from kumiki.cutcsg import Difference
+
+        tree = Difference(base=_box(size=(4, 4), start=0, end=10),
+                          subtract=[_box(size=(4, 4), start=5, end=20)])
+
+        assert self._kept(Line(direction=_v(1, 0, 0), point=_v(0, 0, 5)),
+                          tree) == pytest.approx(4.0)
+
+    def test_and_still_with_a_tolerance_in_play(self):
+        from kumiki.cutcsg import Difference
+
+        tree = Difference(base=_box(size=(4, 4), start=0, end=10), subtract=[self._bore()])
+
+        assert self._kept(Line(direction=_v(0, 0, 1), point=_v(1, 0, 0)),
+                          tree, tolerance=1e-3) == pytest.approx(10.0, abs=3e-3)
+
+
+class TestWhatIsSolvedAndWhatIsBounded:
+    """Shapes that ARE their half spaces say so, rather than falling through.
+
+    The fallback is for shapes nobody has solved yet. A prism reaching it read
+    as one of those, when clipping a prism by its own six planes is not an
+    approximation of the answer -- it is the answer.
+    """
+
+    def _line(self):
+        return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
+
+    def _solved(self, csg):
+        from kumiki.csgconvexhull import _exact_spans
+
+        return _exact_spans(csg, self._line(), (-10.0, 10.0), 0.0, False) is not None
+
+    def _loft(self, bottom, top):
+        from kumiki.cutcsg import ConvexPolygonSimpleLoft
+
+        return ConvexPolygonSimpleLoft(
+            bottom_points=bottom, top_points=top,
+            transform=Transform(position=_v(0, 0, 0),
+                                orientation=Transform.identity().orientation),
+            start_distance=scalar(0), end_distance=scalar(1))
+
+    def test_the_shapes_that_are_their_own_half_spaces(self):
+        from kumiki.cutcsg import ConvexPolygonExtrusion, HalfSpace
+
+        square = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+        assert self._solved(HalfSpace(normal=_v(0, 0, 1), offset=scalar(0)))
+        assert self._solved(_box())
+        assert self._solved(ConvexPolygonExtrusion(
+            points=square,
+            transform=Transform(position=_v(0, 0, 0),
+                                orientation=Transform.identity().orientation),
+            start_distance=scalar(0), end_distance=scalar(1)))
+
+    def test_a_loft_is_solved_only_where_its_sides_come_out_flat(self):
+        import math
+
+        square = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+        hexagon = [(math.cos(math.radians(60 * i)), math.sin(math.radians(60 * i)))
+                   for i in range(6)]
+        turn = math.radians(20)
+
+        # Edges along the axes being scaled, so per-axis scaling keeps them flat.
+        assert self._solved(self._loft(square, [(x * 0.5, y * 0.8) for x, y in square]))
+        # Any profile survives a uniform scale.
+        assert self._solved(self._loft(hexagon, [(x * 0.5, y * 0.5) for x, y in hexagon]))
+        # A hexagon's edges do not run along the axes, so per-axis scaling bends
+        # its sides -- which the old rule of thumb said it would not.
+        assert not self._solved(self._loft(hexagon, [(x * 0.5, y * 0.8) for x, y in hexagon]))
+        # And a twist bends them however the profile is shaped.
+        assert not self._solved(self._loft(square, [
+            (math.cos(turn) * x - math.sin(turn) * y,
+             math.sin(turn) * x + math.cos(turn) * y) for x, y in square]))
+
+    def test_a_path_extrusion_still_falls_through_to_the_bound(self):
+        from kumiki.pathcsg import FancyPath, PathExtrusion, StraightSegment
+        from kumiki.rule import create_v2
+
+        def corner(x, y):
+            return create_v2(scalar(x), scalar(y))
+
+        path = FancyPath(segments=[
+            StraightSegment(corner(0, 0), corner(1, 0)),
+            StraightSegment(corner(1, 0), corner(1, 1)),
+            StraightSegment(corner(1, 1), corner(0, 0)),
+        ])
+        extrusion = PathExtrusion(
+            path=path,
+            transform=Transform(position=_v(0, 0, 0),
+                                orientation=Transform.identity().orientation),
+            start_distance=scalar(0), end_distance=scalar(1))
+
+        assert not self._solved(extrusion)
+
+
 class TestCroppingThroughTheTree:
     """The point of walking it: what has been cut away is gone."""
 

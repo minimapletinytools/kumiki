@@ -238,10 +238,14 @@ def _bounds_or_unknown(faces: Optional[BoundingHalfSpaces]) -> SolidBounds:
 def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
     """The planes bounding a loft between two convex profiles.
 
-    A loft's side faces are ruled surfaces, and planar only when the taper is a
-    pure per-axis scale -- which is the case the primitive is actually for, a
-    taper or a relief pocket. There, each side quad lies in one plane and those
-    planes bound the solid exactly.
+    A loft's side faces are ruled surfaces, and planar only when each pair of
+    matching edges happens to come out parallel. A pure per-axis scale does
+    that for a profile whose edges RUN ALONG the axes being scaled -- a
+    rectangle, which is the case the primitive is actually for -- and a uniform
+    scale does it for any profile. Scale a hexagon per axis and its sides bend.
+    _loft_sides_are_planar tests the quads rather than trusting the taper,
+    because that is the property, and the two part company more easily than
+    they look like they should.
 
     Twist the correspondence and a side stops being planar. Each plane is then
     pushed out to the furthest corner, which bounds the corners' hull -- larger
@@ -478,12 +482,14 @@ def _spans_within_primitive(
 ) -> List[Span]:
     """Clip `seed` by one convex solid's half spaces. One span, or none.
 
-    `removing` says this solid is being taken away rather than added, which
-    changes only the degenerate case: a line lying exactly IN one of the faces.
-    Added, such a line is on the solid and is kept. Removed, it lies in the wall
-    of the void rather than inside it, so it survives the cut -- which is what
-    an arris shared with a mortise wall is. Getting this backwards eats every
-    edge a cut passes through the plane of.
+    A LINE ON A BOUNDARY IS ALWAYS KEPT, whichever role the solid has. That is
+    the rule; `removing` is how it is enforced, and it needs the opposite
+    comparison to reach the same answer. Added, "on the face" means on the
+    solid, so only a line strictly outside is dropped. Removed, "on the wall"
+    means on the surface of the void rather than inside it, so a line merely
+    touching it must not be taken away -- which is what an arris shared with a
+    mortise wall is. Getting this backwards eats every edge a cut passes
+    through the plane of.
     """
     direction = unit_vector(line.direction)
     origin = line.point
@@ -606,27 +612,109 @@ def _cylinder_spans(
     return _spans_within_primitive(caps, line, (low, high), tolerance, removing)
 
 
+def _loft_sides_are_planar(csg) -> bool:
+    """Whether a loft's sides are flat, so its half spaces describe it exactly.
+
+    A side is the quad between one edge of the bottom profile and the matching
+    edge of the top, and it is a ruled surface in general -- flat only when
+    those two edges happen to be parallel. Which is a property of the shape, not
+    a promise the primitive makes: a rectangle scaled per axis keeps its sides
+    flat because its edges run along the axes being scaled, and the same scaling
+    applied to any other polygon does not.
+
+    So the quads are tested rather than the taper inferred. Relative, because
+    the check is an angle: the same rounding noise is huge on a 5mm loft and
+    invisible on a 5m one.
+    """
+    bottom, top = csg.bottom_points, csg.top_points
+    if csg.start_distance is None or csg.end_distance is None:
+        return False
+    if len(bottom) < 3 or len(bottom) != len(top):
+        return False
+
+    matrix = csg.transform.orientation.matrix
+    across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
+    up = Matrix([matrix[0, 1], matrix[1, 1], matrix[2, 1]])
+    axis = Matrix([matrix[0, 2], matrix[1, 2], matrix[2, 2]])
+    origin = csg.transform.position
+
+    def lift(point, distance) -> V3:
+        return (origin + axis * distance
+                + across * scalar(float(point[0]))
+                + up * scalar(float(point[1])))
+
+    for index in range(len(bottom)):
+        following = (index + 1) % len(bottom)
+        corners = [
+            lift(bottom[index], csg.start_distance),
+            lift(bottom[following], csg.start_distance),
+            lift(top[following], csg.end_distance),
+            lift(top[index], csg.end_distance),
+        ]
+        first = corners[1] - corners[0]
+        second = corners[2] - corners[0]
+        third = corners[3] - corners[0]
+        normal = _cross(first, second)
+        scale = safe_magnitude(normal) * safe_magnitude(third)
+        if scale == 0.0:
+            # A degenerate side -- a repeated corner, or a profile collapsed to
+            # a point. Nothing to be non-planar about.
+            continue
+        if abs(float((third.T * normal)[0, 0])) / scale > _PLANAR_ENOUGH:
+            return False
+    return True
+
+
+# The sine of the angle by which a quad's fourth corner may miss the plane of
+# the other three and still count as flat. Dimensionless, so it means the same
+# on a loft of any size.
+_PLANAR_ENOUGH = 1e-9
+
+
 def _exact_spans(
     csg, line: Line, seed: Span, tolerance: float, removing: bool,
 ) -> Optional[List[Span]]:
     """Where a line runs inside a primitive, worked out exactly.
 
-    None when there is no exact handler for this shape yet, and the caller
-    falls back to clipping by the half spaces that BOUND it. That fallback errs
-    outwards, so a tree with some shapes solved and others bounded still keeps
-    the guarantee the whole file rests on: what the answer says is not there,
-    really is not there. Solving one more shape only ever tightens it.
+    None when this shape cannot be solved yet, and the caller falls back to
+    clipping by the half spaces that BOUND it. That fallback errs outwards, so a
+    tree with some shapes solved and others bounded still keeps the guarantee
+    the whole file rests on: what the answer says is not there, really is not
+    there. Solving one more shape only ever tightens it.
 
-    Still bounded rather than solved: ConvexPolygonSimpleLoft, whose sides are
-    ruled surfaces and are planar only for a pure taper -- which is the case it
-    exists for, so its bound is already exact there -- and PathExtrusion, which
-    needs the line intersected with the path in 2D, arcs included.
+    Most shapes are solved BY their half spaces rather than despite them. A
+    prism, a half space and a convex polygon extrusion are each exactly the
+    intersection of their bounding planes, so clipping by those planes is not an
+    approximation of the answer, it IS the answer -- and saying so here is worth
+    a line of code, because otherwise they reach the fallback and read as shapes
+    nobody has got round to.
+
+    Not solved: PathExtrusion, which needs the line intersected with the path in
+    2D with arcs included, and a loft whose sides are not flat.
     """
-    from .cutcsg import Cylinder
+    from .cutcsg import (ConvexPolygonExtrusion, ConvexPolygonSimpleLoft, Cylinder,
+                         HalfSpace, RectangularPrism)
 
     if isinstance(csg, Cylinder):
         return _cylinder_spans(csg, line, seed, tolerance, removing)
-    return None
+
+    # Exactly its own half spaces. The extrusion counts because its points are
+    # a convex polygon by the primitive's own contract, so the hull taken of
+    # them is the polygon itself rather than something larger.
+    exactly_bounded = isinstance(csg, (HalfSpace, RectangularPrism, ConvexPolygonExtrusion))
+    if isinstance(csg, ConvexPolygonSimpleLoft):
+        exactly_bounded = _loft_sides_are_planar(csg)
+
+    if not exactly_bounded:
+        return None
+
+    bounds = solid_bounds(csg)
+    if bounds.is_unknown:
+        # A shape that says it is exactly its half spaces, and then has none.
+        return None
+    if bounds.is_empty:
+        return []
+    return _spans_within_primitive(bounds.faces, line, seed, tolerance, removing)
 
 
 def _spans_on_csg(
@@ -644,6 +732,9 @@ def _spans_on_csg(
     eat the very edge it forms -- a mortise wall flush with the face it opens
     onto would delete the arris it shares with it. Nesting takes care of itself:
     a difference inside a subtraction flips back and is additive again.
+
+    `removing` flips with it, and enforces the rule that a line lying ON a
+    boundary is kept whichever role the solid has. See _spans_within_primitive.
     """
     from .cutcsg import Difference, Intersection, SolidUnion
 
