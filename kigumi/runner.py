@@ -2381,11 +2381,11 @@ def _feature_anchor(
             cropped = crop_line_to_segments_on_csg(
                 located, root_csg, seed_reach=reach, near=solid.transform.position,
             )
-            if cropped is not None and not cropped.is_empty:
+            if cropped:
                 # The longest piece. A cut can leave an edge in several, and a
                 # dimension has to attach to one of them -- the biggest is the
                 # one a reader would point at.
-                middle = cropped.longest().midpoint()
+                middle = max(cropped, key=lambda segment: segment.length()).midpoint()
         if middle is not None:
             return _vector3_to_floats(timber.transform.local_to_global(middle))
 
@@ -3647,12 +3647,12 @@ def _cropped_edge_segments(
     # So take the exact spans where there are any, and fall back to the tolerant
     # ones only for the edge that exact clipping loses entirely.
     cropped = clipped(0.0)
-    if cropped is None or cropped.is_empty:
+    if not cropped:
         cropped = clipped(float(_edge_tolerance()))
     if cropped is None:
         # A solid it cannot describe: no answer, rather than a wrong one.
         return (None, False)
-    if cropped.is_empty:
+    if not cropped:
         return (None, True)
 
     return ([

@@ -12,10 +12,11 @@ wants -- "the distance between two parallel edges" means the distance between
 the infinite lines they lie on.
 
 Their BOUNDED counterparts live here too, beside them: a LineSegment is a
-stretch of a Line, a SegmentedLine all the stretches of one that survived
-cropping, and a PlanarRegion the part of a Plane. They are what you get back
-from cropping an unbounded primitive to a solid (see kumiki.csgconvexhull), and
-they are plain geometry -- none of them knows what a feature or a timber is.
+stretch of a Line, a ConvexPlanarRegion an area of a Plane. They are what you
+get back from cropping an unbounded primitive to a solid (see
+kumiki.csgconvexhull) -- a line comes back as a list of LineSegments, since a
+cut through the middle of one leaves a piece either side. Both are plain
+geometry: neither knows what a feature or a timber is.
 
 measuring.py re-exports all of these, so `from kumiki.measuring import Plane`
 keeps working.
@@ -23,7 +24,7 @@ keeps working.
 
 from dataclasses import dataclass
 
-from typing import List, Optional, Sequence, Tuple
+from typing import Optional, Tuple
 
 from .rule import (
     Direction3D,
@@ -228,67 +229,53 @@ class LineSegment:
 
 
 @dataclass(frozen=True)
-class SegmentedLine:
-    """A line, and the parts of it that are actually there.
-
-    What you get back from cropping an infinite line to a solid. Several parts,
-    because a solid can be non-convex: a cut through the middle of an edge
-    leaves a piece either side of it, and one segment spanning both would run
-    straight through the hole.
-
-    No segments means nothing survived -- the line is not on the solid at all --
-    which is worth knowing rather than an error. That is why emptiness lives
-    here and not on LineSegment: a segment with no ends was never a thing, only
-    a way of saying "none of them".
-    """
-
-    line: Line
-    segments: Tuple[LineSegment, ...] = ()
-
-    @property
-    def is_empty(self) -> bool:
-        return len(self.segments) == 0
-
-    def __len__(self) -> int:
-        return len(self.segments)
-
-    def __iter__(self):
-        return iter(self.segments)
-
-    def longest(self) -> Optional[LineSegment]:
-        """The biggest piece, for anything that has to pick just one."""
-        if self.is_empty:
-            return None
-        return max(self.segments, key=lambda segment: segment.length())
-
-    def total_length(self) -> float:
-        return sum(segment.length() for segment in self.segments)
-
-    def extent_along(self, direction: V3) -> Optional[Tuple[float, float]]:
-        """How far the whole thing reaches, as (min, max). Gaps included."""
-        if self.is_empty:
-            return None
-        reach = [
-            value for segment in self.segments
-            for value in segment.extent_along(direction)
-        ]
-        return (min(reach), max(reach))
-
-
-@dataclass(frozen=True)
-class PlanarRegion:
-    """The part of a Plane that is actually there: a convex area lying in it.
+class ConvexPlanarRegion:
+    """An area of a Plane, bounded by a convex outline lying in it.
 
     `boundary` is in order around the region, and lies on `plane`. An empty
     boundary means nothing survived cropping -- the plane meets the solid
     nowhere -- which is a thing worth knowing rather than an error.
 
-    Convex because what produces one is half-space clipping, and a section of a
-    convex solid is convex.
+    Convex is in the name because it is a promise the readers rely on, not a
+    description of how it usually turns out. centroid() averages the corners,
+    which is the centre only of a convex outline; extent_along() reads the
+    corners alone, which bounds the area only if nothing bulges between them.
+    Hand either a concave outline and it answers confidently and wrongly, so
+    the outline is checked once here instead.
     """
 
     plane: Plane
     boundary: Tuple[V3, ...]
+
+    def __post_init__(self) -> None:
+        corners = self.boundary
+        if len(corners) < 3:
+            # Nothing to be concave about: empty, a point, or an edge.
+            return
+        normal = unit_vector(self.plane.normal)
+        edges = [corners[(i + 1) % len(corners)] - corners[i] for i in range(len(corners))]
+        longest = max(
+            float((edge.T * edge)[0, 0]) for edge in edges
+        ) ** 0.5
+        # A turn is an area, so the slack has to scale with the region: the same
+        # rounding noise is huge on a 5mm face and invisible on a 5m one.
+        slack = 1e-9 * longest * longest
+        turning = 0
+        for i in range(len(corners)):
+            turn = float(
+                (cross_product(edges[i], edges[(i + 1) % len(corners)]).T * normal)[0, 0]
+            )
+            if abs(turn) <= slack:
+                # Straight on, or a repeated corner. Neither way of turning.
+                continue
+            direction = 1 if turn > 0 else -1
+            if turning == 0:
+                turning = direction
+            elif direction != turning:
+                raise ValueError(
+                    "ConvexPlanarRegion boundary turns both ways, so it is not "
+                    f"convex: corner {i} reverses. Boundary: {corners}"
+                )
 
     @property
     def is_empty(self) -> bool:

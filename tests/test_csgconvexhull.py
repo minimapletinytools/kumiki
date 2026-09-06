@@ -9,7 +9,7 @@ import pytest
 
 from kumiki.cutcsg import HalfSpace, RectangularPrism
 from kumiki.geometry import (
-    Line, LineSegment, Plane, PlanarRegion, SegmentedLine, frame_for_plane,
+    ConvexPlanarRegion, Line, LineSegment, Plane, frame_for_plane,
 )
 from kumiki.csgconvexhull import (
     approximately_crop_plane_to_area_on_csg,
@@ -152,7 +152,7 @@ class TestRegionInPlane:
         assert along[1] > along[0]
 
     def test_an_empty_region_has_no_centroid_to_offer(self):
-        assert PlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
+        assert ConvexPlanarRegion(plane=Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0)),
                              boundary=()).centroid() is None
 
 
@@ -227,15 +227,14 @@ def _undescribable():
     )
 
 
-def _span(cropped, direction=None):
+def _span(segments, direction=None):
     """The one span expected, as (low, high) along the line."""
-    assert len(cropped) == 1, f"expected one segment, got {len(cropped)}"
-    return cropped.segments[0].extent_along(
-        direction if direction is not None else _v(0, 0, 1))
+    assert len(segments) == 1, f"expected one segment, got {len(segments)}"
+    return segments[0].extent_along(direction if direction is not None else _v(0, 0, 1))
 
 
 class TestTheBoundedTypes:
-    """LineSegment and SegmentedLine, apart from what produces them."""
+    """LineSegment and ConvexPlanarRegion, apart from what produces them."""
 
     def _line(self):
         return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
@@ -258,31 +257,47 @@ class TestTheBoundedTypes:
 
         assert float(piece.line.direction[2, 0]) == -1.0
 
-    def test_the_longest_piece_is_the_one_a_dimension_attaches_to(self):
-        line = SegmentedLine(line=self._line(), segments=(
-            self._piece(0.0, 0.1), self._piece(0.3, 0.9), self._piece(0.95, 1.0)))
+    def test_a_convex_outline_is_accepted(self):
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
-        assert line.longest().length() == pytest.approx(0.6, abs=1e-9)
+        region = ConvexPlanarRegion(plane=plane, boundary=(
+            _v(0, 0, 0), _v(1, 0, 0), _v(1, 1, 0), _v(0, 1, 0)))
 
-    def test_it_counts_and_iterates_its_pieces(self):
-        line = SegmentedLine(line=self._line(), segments=(
-            self._piece(0.0, 0.2), self._piece(0.5, 0.6)))
+        assert not region.is_empty
 
-        assert len(line) == 2
-        assert [round(piece.length(), 4) for piece in line] == [0.2, 0.1]
-        assert line.total_length() == pytest.approx(0.3, abs=1e-9)
+    def test_a_concave_outline_is_refused_on_the_spot(self):
+        # Rather than answering confidently and wrongly later: centroid()
+        # averages the corners and extent_along() reads only the corners, and
+        # both of those are the centre and the bounds of a CONVEX outline.
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
-    def test_its_extent_spans_the_gaps_between_pieces(self):
-        # The reach of the whole thing, which is a different question from how
-        # much of it is solid.
-        line = SegmentedLine(line=self._line(), segments=(
-            self._piece(0.0, 0.2), self._piece(0.8, 1.0)))
+        with pytest.raises(ValueError, match="not convex"):
+            ConvexPlanarRegion(plane=plane, boundary=(
+                _v(0, 0, 0), _v(2, 0, 0), _v(1, 1, 0), _v(2, 2, 0), _v(0, 2, 0)))
 
-        assert line.extent_along(_v(0, 0, 1)) == pytest.approx((0.0, 1.0), abs=1e-9)
-        assert line.total_length() == pytest.approx(0.4, abs=1e-9)
+    def test_a_straight_corner_is_not_a_reversal(self):
+        # Three points in a row turn neither way, and clipping produces them
+        # whenever a cut passes exactly through a corner.
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
-    def test_no_pieces_is_the_empty_answer(self):
-        assert SegmentedLine(line=self._line()).is_empty
+        ConvexPlanarRegion(plane=plane, boundary=(
+            _v(0, 0, 0), _v(1, 0, 0), _v(2, 0, 0), _v(2, 1, 0), _v(0, 1, 0)))
+
+    def test_too_few_corners_to_be_concave_is_allowed(self):
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        assert ConvexPlanarRegion(plane=plane, boundary=()).is_empty
+        assert ConvexPlanarRegion(plane=plane, boundary=(_v(0, 0, 0), _v(1, 0, 0))).is_empty
+
+    def test_the_check_scales_with_the_region(self):
+        # A tiny face's corners are the same rounding noise as a big one's, so
+        # a fixed slack would reject millimetre-sized faces or accept bent
+        # metre-sized ones.
+        plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
+
+        for size in (0.005, 5.0):
+            ConvexPlanarRegion(plane=plane, boundary=(
+                _v(0, 0, 0), _v(size, 0, 0), _v(size, size, 0), _v(0, size, 0)))
 
 
 class TestCropLineToSegmentsOnCsg:
@@ -304,7 +319,7 @@ class TestCropLineToSegmentsOnCsg:
         cropped = crop_line_to_segments_on_csg(
             line, _box(size=(0.1, 0.2), start=0.0, end=1.0), seed_reach=10, near=_v(0, 0, 0))
 
-        assert float(cropped.longest().midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-9)
+        assert float(max(cropped, key=lambda s: s.length()).midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-9)
 
     def test_an_edge_declared_far_away_still_crops_to_the_timber(self):
         # An edge declared on a cutter extended past the timber has its own
@@ -317,13 +332,13 @@ class TestCropLineToSegmentsOnCsg:
             seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(cropped) == 1
-        assert float(cropped.longest().midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-6)
+        assert float(max(cropped, key=lambda s: s.length()).midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-6)
 
     def test_a_line_that_misses_everything_leaves_nothing(self):
         line = Line(direction=_v(0, 0, 1), point=_v(5, 5, 0))
 
         assert crop_line_to_segments_on_csg(
-            line, _box(), seed_reach=10, near=_v(0, 0, 0)).is_empty
+            line, _box(), seed_reach=10, near=_v(0, 0, 0)) == []
 
     def test_a_line_running_along_a_face_it_is_outside_of_keeps_nothing(self):
         # Parallel to every bounding plane it is outside: no bound to compute,
@@ -331,7 +346,7 @@ class TestCropLineToSegmentsOnCsg:
         line = Line(direction=_v(0, 0, 1), point=_v(5, 0, 0))
 
         assert crop_line_to_segments_on_csg(
-            line, _box(), seed_reach=10, near=_v(0, 0, 0.5)).is_empty
+            line, _box(), seed_reach=10, near=_v(0, 0, 0.5)) == []
 
     def test_it_gives_up_rather_than_returning_too_much(self):
         line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
@@ -349,13 +364,6 @@ class TestCropLineToSegmentsOnCsg:
 
         assert crop_line_to_segments_on_csg(
             line, tree, seed_reach=10, near=_v(0, 0, 0)) is None
-
-    def test_a_line_with_no_pieces_has_no_longest_one(self):
-        empty = SegmentedLine(line=Line(direction=_v(0, 0, 1), point=_v(0, 0, 0)))
-
-        assert empty.is_empty
-        assert empty.longest() is None
-        assert empty.extent_along(_v(0, 0, 1)) is None
 
 
 class TestCroppingThroughTheTree:
@@ -389,8 +397,8 @@ class TestCroppingThroughTheTree:
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 2
-        assert segments.segments[0].extent_along(_v(0, 0, 1)) == pytest.approx((0.0, 0.4), abs=1e-9)
-        assert segments.segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.6, 1.0), abs=1e-9)
+        assert segments[0].extent_along(_v(0, 0, 1)) == pytest.approx((0.0, 0.4), abs=1e-9)
+        assert segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.6, 1.0), abs=1e-9)
 
     def test_two_cuts_leave_three_pieces(self):
         from kumiki.cutcsg import Difference
@@ -410,7 +418,7 @@ class TestCroppingThroughTheTree:
                           subtract=[_box(start=-1.0, end=2.0)])
 
         assert crop_line_to_segments_on_csg(
-            self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5)).is_empty
+            self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5)) == []
 
     def test_a_cut_flush_with_the_face_the_edge_lies_on_keeps_it(self):
         # The case that decides the sign of the tolerance. This arris runs along
@@ -492,7 +500,7 @@ class TestCroppingThroughTheTree:
         from kumiki.cutcsg import EmptyCSG
 
         assert crop_line_to_segments_on_csg(
-            self._line(), EmptyCSG(), seed_reach=10, near=_v(0, 0, 0)).is_empty
+            self._line(), EmptyCSG(), seed_reach=10, near=_v(0, 0, 0)) == []
 
     def test_subtracting_nothing_changes_nothing(self):
         from kumiki.cutcsg import Difference, EmptyCSG
@@ -520,7 +528,7 @@ class TestCroppingThroughTheTree:
 
         assert crop_line_to_segments_on_csg(
             axis, Difference(base=body, subtract=[bore]),
-            seed_reach=50, near=_v(0, 0, 5)).is_empty
+            seed_reach=50, near=_v(0, 0, 5)) == []
 
         low, high = _span(crop_line_to_segments_on_csg(
             axis, body, seed_reach=50, near=_v(0, 0, 5)))
@@ -539,7 +547,7 @@ class TestCroppingThroughTheTree:
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 3
-        assert segments.segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.4, 0.6), abs=1e-9)
+        assert segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.4, 0.6), abs=1e-9)
 
 
 class TestConvexHull:
