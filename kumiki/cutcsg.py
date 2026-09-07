@@ -2624,13 +2624,53 @@ class Difference(CutCSG):
         if in_subtract_interior:
             return False
         
-        # If point is on subtract boundary, it's on the difference boundary
+        # On a subtract's surface: the wall of the hole it made. That is this
+        # solid's boundary only if the hole HAS a wall -- if there is material
+        # of this difference on the near side of it. Two cases say otherwise:
+        # a subtract that only touches the base, taking nothing, and a cut made
+        # flush with the base's own surface, whose "wall" is the open mouth of
+        # the cut with nothing behind it.
         if on_subtract_boundary:
-            return True
+            return self._material_outside_the_hole(point, eps=eps)
         
         # Otherwise, check if it's on the base boundary
         return self.base.is_point_on_boundary(point, eps=eps)
     
+    def _material_outside_the_hole(self, point: V3, eps: Optional[Numeric] = None) -> bool:
+        """Whether this solid has material just outside a subtract's surface.
+
+        For a point already known to be on some subtract's surface, and in the
+        base. A hole's wall is boundary because there is something on the near
+        side of it; step out of the subtract along its own outward normal and
+        ask whether that is still in this difference.
+
+        - A mortise wall inside a timber: outside the mortise is timber, so the
+          wall is boundary.
+        - A cut flush with the base's face: outside the cut is outside the piece
+          as well, so the "wall" is the mouth of the cut and holds nothing.
+        - A subtract that only touches the base: outside it is the base's own
+          interior, so the base's face survives and is still boundary.
+
+        The step is a micron at least -- smaller than any joint feature, large
+        enough to leave the surface it started on -- because a step scaled to
+        eps alone lands back on the boundary it was trying to leave.
+
+        With no normal to step along, the answer stays True: refusing to call a
+        real wall boundary is the more damaging way to be wrong.
+        """
+        step = max(float(eps) * 10 if eps is not None else 0.0, 1e-6)
+        for sub in self.subtract:
+            if not sub.contains_point(point, eps=eps):
+                continue
+            if not sub.is_point_on_boundary(point, eps=eps):
+                continue
+            outward = sub.get_outward_normal(point, eps=eps)
+            if outward is None:
+                return True
+            if self.contains_point(point + outward * scalar(step), eps=eps):
+                return True
+        return False
+
     def get_outward_normal(self, point: V3, eps: Optional[Numeric] = None) -> Optional[Direction3D]:
         """
         Get the outward normal vector at a boundary point.

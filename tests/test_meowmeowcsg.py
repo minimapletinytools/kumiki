@@ -1019,8 +1019,9 @@ class TestDifferenceContainsPoint:
         # Create a nested difference (prism with hole in center)
         inner_diff = Difference(base, [subtract_inner])
         
-        # Now subtract another prism from a different location
-        # Place it off to the side so it doesn't overlap with subtract_inner
+        # Now subtract another prism from a different location. It reaches x = 5,
+        # which IS the base's right face, so this is a notch open to the outside
+        # rather than a second hole -- which is what makes it worth testing.
         subtract_outer = RectangularPrism(size=Matrix([scalar(2), scalar(2)]), transform=Transform(position=Matrix([scalar(4), scalar(0), scalar(0)]), orientation=orientation),
                               start_distance=1, end_distance=9)
         
@@ -1030,8 +1031,15 @@ class TestDifferenceContainsPoint:
         # This should still be on boundary in outer_diff
         assert outer_diff.is_point_on_boundary(Matrix([scalar(1), scalar(0), scalar(5)])) == True
         
-        # Point on outer subtract boundary (the side hole)
-        assert outer_diff.is_point_on_boundary(Matrix([scalar(5), scalar(0), scalar(5)])) == True
+        # The notch's WALL, which has material behind it and so is surface.
+        assert outer_diff.is_point_on_boundary(Matrix([scalar(3), scalar(0), scalar(5)])) == True
+        
+        # The notch's MOUTH, where the cut runs out flush with the base's own
+        # face. Nothing on either side of it: the cut took everything inward of
+        # x = 5, and outward is off the piece. This used to answer True, on the
+        # grounds that a point on a subtract's surface is the wall of a hole --
+        # but a hole needs material to have a wall, and here there is none.
+        assert outer_diff.is_point_on_boundary(Matrix([scalar(5), scalar(0), scalar(5)])) == False
         
         # Point in the remaining material (not on any boundary)
         assert outer_diff.is_point_on_boundary(Matrix([scalar(-7, 2), 0, 5])) == False
