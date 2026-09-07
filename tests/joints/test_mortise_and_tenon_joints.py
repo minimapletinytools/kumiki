@@ -1346,7 +1346,7 @@ class TestMortiseAndTenonFeatures:
             ]
             points.append([sum(v[i] for v in triangle) / 3 for i in range(3)])
             for point in points:
-                hit = rendered.find_feature(create_v3(*point))
+                hit = rendered.find_first_feature(create_v3(*point))
                 if hit is not None and hit.feature.feature_type() == feature_type:
                     found.add(hit.feature.name)
         return found

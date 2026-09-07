@@ -1,6 +1,4 @@
-# TODO rename this file, not just convex hull testing
-
-"""Where a feature actually is: the CSG, sectioned by a line or a plane.
+"""Cropping unbounded geometry to a CSG solid: where a feature actually is.
 
 A feature's declared extent is the extent of the primitive it was declared on,
 and primitives are deliberately not the finished piece: a half space is unbounded

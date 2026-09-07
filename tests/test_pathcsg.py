@@ -184,14 +184,14 @@ class TestPathCSG:
         )
 
         on_foot = create_v3(scalar(1, 100), scalar(0), scalar(1, 50))
-        assert [f.name for f in extrusion.get_all_features(on_foot)] == ["foot"]
+        assert [f.name for f in extrusion.find_all_features(on_foot)] == ["foot"]
 
         knee_mid_local = path.segments[1].closest_point(create_v2(scalar(6, 100), scalar(2, 100)))
         on_knee = create_v3(knee_mid_local[0], knee_mid_local[1], scalar(1, 50))
-        assert extrusion.get_all_features(on_knee) == []
+        assert extrusion.find_all_features(on_knee) == []
 
         on_top = create_v3(scalar(1, 100), scalar(15, 100), scalar(1, 25))
-        assert [f.name for f in extrusion.get_all_features(on_top)] == ["top"]
+        assert [f.name for f in extrusion.find_all_features(on_top)] == ["top"]
 
 
 class TestPathExtrusionTolerance:

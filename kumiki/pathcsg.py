@@ -9,7 +9,7 @@ ankle -- at the cost of a more expensive containment test (general ray-casting
 instead of a half-plane scan) and a more expensive cap-triangulation path (see
 decompose_path_into_convex_pieces). Side faces that come from a non-planar
 segment (e.g. ArcSegment) never register a CSGFeature -- PathExtrusion.
-get_all_features simply has nothing to emit for them, the same graceful-
+find_all_features simply has nothing to emit for them, the same graceful-
 omission behavior Cylinder's lateral surface and ConvexPolygonSimpleLoft's
 tapered side faces already have today.
 """
@@ -65,7 +65,7 @@ class PathSegment(ABC):
         """
         True if extruding this segment produces a flat side face -- i.e. it's
         eligible to ever carry a plane/feature. False (ArcSegment) means
-        PathExtrusion.get_all_features simply has nothing to emit for it when
+        PathExtrusion.find_all_features simply has nothing to emit for it when
         it's named -- not a special case that needs handling, just an absence.
         """
 

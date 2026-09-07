@@ -707,7 +707,7 @@ class TestEdgePicking:
             ]
             candidates.append([sum(v[i] for v in triangle) / 3 for i in range(3)])
             for point in candidates:
-                hit = local_csg.find_feature(runner._to_v3(point))
+                hit = local_csg.find_first_feature(runner._to_v3(point))
                 if hit is not None and predicate(hit.feature):
                     return point
         raise AssertionError("no matching point found")
@@ -1320,7 +1320,7 @@ class TestEdgeHighlightSpan:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 point = runner._to_v3([float(vertex[i]) for i in range(3)])
-                for hit in local.get_all_features(point):
+                for hit in local.find_all_features(point):
                     if hit.feature.feature_type() != CSGFeatureType.EDGE:
                         continue
                     segment, absent = runner._edge_highlight_segments(
@@ -1408,7 +1408,7 @@ class TestResolvingADerivedEdge:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 point = runner._to_v3([float(vertex[i]) for i in range(3)])
-                for hit in local.get_all_features(point):
+                for hit in local.find_all_features(point):
                     # Derived specifically: a timber's own arris is an edge as
                     # well, and a declared one, with no parents to name.
                     if (hit.feature.feature_type() == CSGFeatureType.EDGE
@@ -1545,7 +1545,7 @@ class TestPickYieldsAMeasurementReference:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 point = runner._to_v3([float(vertex[i]) for i in range(3)])
-                for hit in local.get_all_features(point):
+                for hit in local.find_all_features(point):
                     if predicate(hit.feature):
                         return local, hit.feature
         raise AssertionError("no such feature on the finished surface")
@@ -1639,7 +1639,7 @@ class TestHoveringOverAFeature:
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
                 local_pt = [float(vertex[i]) for i in range(3)]
-                for hit in local.get_all_features(runner._to_v3(local_pt)):
+                for hit in local.find_all_features(runner._to_v3(local_pt)):
                     if predicate(hit.feature):
                         world = timber.transform.local_to_global(runner._to_v3(local_pt))
                         return [float(world[i, 0]) for i in range(3)]

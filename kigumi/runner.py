@@ -2352,7 +2352,7 @@ def _feature_anchor(
     primitive, say -- since somewhere approximate beats nowhere.
     """
     from kumiki.geometry import Line, Plane, Point
-    from kumiki.csgconvexhull import (
+    from kumiki.cropcsg import (
         approximately_crop_plane_to_area_on_csg,
         crop_line_to_segments_on_csg,
     )
@@ -3464,8 +3464,8 @@ def _nearest_timber_local_face_name(normal: Any) -> str:
 def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
     """The best feature at a point, preferring one somebody named.
 
-    Two passes over the same hit list rather than find_feature, because the
-    ranking wanted here is not the one find_feature applies: it sorts by how
+    Two passes over the same hit list rather than find_first_feature, because the
+    ranking wanted here is not the one find_first_feature applies: it sorts by how
     specific a feature is, and an anonymous default sits at the same
     specificity as the authored feature covering the same surface. Asking for
     the authored layer first says which of those two a person would rather
@@ -3473,7 +3473,7 @@ def _feature_at(csg: Any, point: Any, eps: float) -> Optional[Any]:
     """
     from kumiki.cutcsg import FeatureSource, FeatureTestTolerances
 
-    hits = csg.get_all_features(point, FeatureTestTolerances(face=eps))
+    hits = csg.find_all_features(point, FeatureTestTolerances(face=eps))
     if not hits:
         return None
     authored = {
@@ -3662,7 +3662,7 @@ def _cropped_edge_segments(
     Not the perfect-timber box, which used to stand in for the body -- rough
     stock is larger than it, so every rough arris clipped away to nothing.
     """
-    from kumiki.csgconvexhull import crop_line_to_segments_on_csg
+    from kumiki.cropcsg import crop_line_to_segments_on_csg
     from kumiki.cutcsg import Intersection
 
     # A derived edge is bounded by the two solids its parent faces belong to.
@@ -3738,7 +3738,7 @@ def _edge_highlight_segments(
     click is one point that is on the timber anyway.
 
     A list, because a cut through the middle of an edge leaves a piece either
-    side of it. None when the tree holds a primitive csgconvexhull cannot
+    side of it. None when the tree holds a primitive cropcsg cannot
     describe, and the caller falls back to lighting triangles.
 
     The second return says the edge was cropped away entirely. The caller wants
@@ -3765,7 +3765,7 @@ def _features_at_point(
     """
     from kumiki.cutcsg import FeatureTestTolerances
 
-    return root.get_all_features(
+    return root.find_all_features(
         _to_v3(local_pt), tolerances or FeatureTestTolerances(face=eps))
 
 
@@ -3859,7 +3859,7 @@ def _describe_pick(
         }
 
     point = _to_v3(local_pt)
-    hit = target.find_feature(point, FeatureTestTolerances(face=eps))
+    hit = target.find_first_feature(point, FeatureTestTolerances(face=eps))
     resolved_type = feature_type
     if resolved_type is None and hit is not None:
         resolved_type = hit.feature_type().name

@@ -10,7 +10,7 @@ The low-level point tests -- contains_point, is_point_on_boundary,
 get_outward_normal -- take an optional ``eps`` that widens that tolerance for
 the duration of the call.
 
-The feature queries -- get_all_features, find_feature, and CSGFeature.
+The feature queries -- find_all_features, find_first_feature, and CSGFeature.
 test_point_unbounded -- take a *test tolerance* instead, which is a different
 wearing similar clothes. An epsilon absorbs float error; a test tolerance
 absorbs the gap between a raycast hit on the triangulated mesh and the
@@ -775,7 +775,7 @@ class DerivedEdgeFeature(CSGFeature):
 
         Measurement does the cropping instead, a level up where the enclosing
         timber is known -- this feature cannot see it, since its owner is
-        whichever node derived it. See csgconvexhull.segment_on_line, called
+        whichever node derived it. See cropcsg.segment_on_line, called
         from the runner's _feature_anchor.
         """
         if self.a is None or self.b is None:
@@ -1020,7 +1020,7 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
 
         `ends` is None and `anchor` is the point on the INFINITE line closest to
         the origin. Cropping it to the timber is measurement's job, a level up
-        where the enclosing solid is known; see csgconvexhull.segment_on_line.
+        where the enclosing solid is known; see cropcsg.segment_on_line.
         """
         line = self.locate(owner)
         if not isinstance(line, Line):
@@ -1440,17 +1440,13 @@ class CutCSG(ABC):
             hits.append(OwnedFeatureHit(feature=feature, owner=self))
         return hits
 
-    def get_all_features(
+    def find_all_features(
         self,
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
     ) -> List['OwnedFeatureHit']:
         """Every feature at *point*: those declared in this subtree, plus the
         edges they form with each other.
-
-        TODO rename to find_all_features: this is a query at a point, not a
-        listing, and the "get" reads like get_declared_features -- which is the
-        one that does NOT include derived edges. The two get confused.
 
         Two gathers, because "near enough to count" means a different distance
         depending on what is being asked. The first collects features at the
@@ -1475,8 +1471,7 @@ class CutCSG(ABC):
         ]
         return _sort_feature_hits(hits + derive_edge_hits(self, faces))
 
-    # TODO rename to find_first_feature
-    def find_feature(
+    def find_first_feature(
         self,
         point: V3,
         test_tolerances: Optional[FeatureTestTolerances] = None,
@@ -1488,7 +1483,7 @@ class CutCSG(ABC):
         deliberately snapped to it, and a surface it happens to sit on should
         not steal the click. Priority breaks ties within each of the two.
         """
-        hits = self.get_all_features(point, test_tolerances=test_tolerances)
+        hits = self.find_all_features(point, test_tolerances=test_tolerances)
         if not hits:
             return None
         return _sort_feature_hits(hits)[0]

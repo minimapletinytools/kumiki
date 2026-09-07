@@ -1,4 +1,4 @@
-"""Tests for where a feature actually is (kumiki/csgconvexhull.py).
+"""Tests for where a feature actually is (kumiki/cropcsg.py).
 
 The declared extent of a feature is the extent of the primitive it was declared
 on, and primitives are deliberately not the finished piece. These pin the
@@ -11,7 +11,7 @@ from kumiki.cutcsg import HalfSpace, RectangularPrism
 from kumiki.geometry import (
     ConvexPlanarRegion, Line, LineSegment, Plane, frame_for_plane,
 )
-from kumiki.csgconvexhull import (
+from kumiki.cropcsg import (
     approximately_crop_plane_to_area_on_csg,
     BoundsKind,
     solid_bounds,
@@ -466,7 +466,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         """
         import math
 
-        from kumiki.csgconvexhull import _spans_within_primitive, solid_bounds
+        from kumiki.cropcsg import _spans_within_primitive, solid_bounds
 
         offset, angle = 0.99, math.radians(30)
         along = _v(math.cos(angle), math.sin(angle), 0)
@@ -636,7 +636,7 @@ class TestWhatIsSolvedAndWhatIsBounded:
         return Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
     def _solved(self, csg):
-        from kumiki.csgconvexhull import _exact_spans
+        from kumiki.cropcsg import _exact_spans
 
         return _exact_spans(csg, self._line(), (-10.0, 10.0), 0.0, False) is not None
 
@@ -946,7 +946,7 @@ class TestCurvedAndPointyPrimitives:
         assert len(solid_bounds(self._cylinder(start=None, end=None)).faces) == 6
 
     def test_the_hexagon_contains_the_cylinder(self):
-        # Outwards, per the rule at the top of csgconvexhull: one direction,
+        # Outwards, per the rule at the top of cropcsg: one direction,
         # consistently, so that what a region excludes really is excluded.
         region = approximately_crop_plane_to_area_on_csg(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
                                  [self._cylinder(radius=0.05)], seed_reach=10, near=_v(0, 0, 0))

@@ -2532,19 +2532,19 @@ class TestCSGFeatures:
         on_boundary = create_v3(scalar(0), scalar(0), scalar(5))
         off_boundary = create_v3(scalar(0), scalar(0), scalar(6))
 
-        hit = hs.find_feature(on_boundary)
+        hit = hs.find_first_feature(on_boundary)
         assert hit is not None
         assert isinstance(hit.feature, HalfSpaceFeature)
         assert hit.name == "shoulder"
         assert hit.owner is hs
 
-        assert hs.find_feature(off_boundary) is None
+        assert hs.find_first_feature(off_boundary) is None
 
     def test_halfspace_names_its_one_surface_by_default(self):
         hs = HalfSpace(normal=Matrix([scalar(0), scalar(0), scalar(1)]), offset=scalar(5))
         on_boundary = create_v3(scalar(0), scalar(0), scalar(5))
 
-        found = hs.find_feature(on_boundary)
+        found = hs.find_first_feature(on_boundary)
 
         assert found is not None and found.name == "side.0"
         assert hs.get_declared_features(FeatureSource.OVERRIDES) == []
@@ -2561,7 +2561,7 @@ class TestCSGFeatures:
         )
         # Point on right face (x = +2, within height and length bounds)
         right_pt = create_v3(scalar(2), scalar(0), scalar(5))
-        hit = prism.find_feature(right_pt)
+        hit = prism.find_first_feature(right_pt)
         assert hit is not None
         assert isinstance(hit.feature, SimpleRectangularPrismFeature)
         assert hit.name == "my_right"
@@ -2570,7 +2570,7 @@ class TestCSGFeatures:
 
         # Point on top face (z = 10)
         top_pt = create_v3(scalar(0), scalar(0), scalar(10))
-        hit = prism.find_feature(top_pt)
+        hit = prism.find_first_feature(top_pt)
         assert hit is not None
         assert isinstance(hit.feature, SimpleRectangularPrismFeature)
         assert hit.name == "my_top"
@@ -2581,7 +2581,7 @@ class TestCSGFeatures:
         # names still win where they were given -- an override at a default's
         # key replaces it, so "my_right" did not leave "side.0" behind.
         left_pt = create_v3(scalar(-2), scalar(0), scalar(5))
-        left = prism.find_feature(left_pt)
+        left = prism.find_first_feature(left_pt)
         assert left is not None and left.name == "side.2"
         assert {f.name for f in prism.get_declared_features()} >= {"my_right", "my_top"}
         assert "side.0" not in {f.name for f in prism.get_declared_features()}
@@ -2601,7 +2601,7 @@ class TestCSGFeatures:
         )
         right_pt = create_v3(scalar(2), scalar(0), scalar(5))
 
-        found = prism.find_feature(right_pt)
+        found = prism.find_first_feature(right_pt)
 
         assert found is not None
         assert found.feature.name == "side.0"
@@ -2617,7 +2617,7 @@ class TestCSGFeatures:
             end_distance=scalar(10),
         )
         on_boundary = create_v3(scalar(3), scalar(0), scalar(5))
-        assert {h.name for h in cyl.get_all_features(on_boundary)} == {"side.0"}
+        assert {h.name for h in cyl.find_all_features(on_boundary)} == {"side.0"}
 
     def test_solid_union_collects_child_features(self):
         """SolidUnion collects features from children that have named features."""
@@ -2634,7 +2634,7 @@ class TestCSGFeatures:
 
         # Point on the halfspace boundary (z=0) and inside prism bottom face
         pt = create_v3(scalar(0), scalar(0), scalar(0))
-        features = union.get_all_features(pt)
+        features = union.find_all_features(pt)
         names = [f.name for f in features]
         assert "floor" in names
 
@@ -2656,7 +2656,7 @@ class TestCSGFeatures:
 
         # Point on the cut plane (z=15) which is now a boundary of the difference
         pt = create_v3(scalar(0), scalar(0), scalar(15))
-        features = diff.get_all_features(pt)
+        features = diff.find_all_features(pt)
         names = [f.name for f in features]
         assert "cut_plane" in names
 
@@ -2823,15 +2823,15 @@ class TestPointQueryTolerance:
         """
         prism = self._prism()
         near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
-        hit = prism.find_feature(near_miss)
+        hit = prism.find_first_feature(near_miss)
         assert hit is not None and hit.name == "my_right"
 
     def test_exact_epsilons_are_available_for_analytic_work(self):
         prism = self._prism()
         near_miss = create_v3(scalar(2) + 1e-6, scalar(0), scalar(5))
-        assert prism.find_feature(near_miss, FeatureTestTolerances.exact()) is None
+        assert prism.find_first_feature(near_miss, FeatureTestTolerances.exact()) is None
         on_face = create_v3(scalar(2), scalar(0), scalar(5))
-        assert prism.find_feature(on_face, FeatureTestTolerances.exact()) is not None
+        assert prism.find_first_feature(on_face, FeatureTestTolerances.exact()) is not None
 
     def test_eps_does_not_persist_into_later_calls(self):
         """The tolerance is per-call, not sticky."""
@@ -2924,7 +2924,7 @@ class TestFeatureProperties:
                 ),
             ],
         )
-        hit = prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        hit = prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert hit is not None
         assert hit.name == "body_right"
         assert hit.feature.group == FeatureGroup.B1
@@ -2933,7 +2933,7 @@ class TestFeatureProperties:
         assert hit.properties.group == FeatureGroup.B1
 
     def test_priority_orders_competing_features(self):
-        """find_feature returns the lowest-priority claimant at a point."""
+        """find_first_feature returns the lowest-priority claimant at a point."""
         prism = RectangularPrism(
             size=Matrix([scalar(4), scalar(6)]),
             transform=Transform.identity(),
@@ -2946,7 +2946,7 @@ class TestFeatureProperties:
                                               properties=FeatureProperties(priority=1)),
             ],
         )
-        feature = prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        feature = prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert feature is not None and feature.name == "winner"
 
 
@@ -2968,7 +2968,7 @@ class TestCylinderFeatures:
             SimpleCylinderFeature("peg_hole_wall", part=CylinderPart.BARREL),
         ])
         on_wall = create_v3(scalar(2), scalar(0), scalar(5))
-        feature = bore.find_feature(on_wall)
+        feature = bore.find_first_feature(on_wall)
         assert feature is not None and feature.name == "peg_hole_wall"
 
     def test_end_caps_resolve_separately_from_the_barrel(self):
@@ -2977,13 +2977,13 @@ class TestCylinderFeatures:
             SimpleCylinderFeature("bore_bottom", part=CylinderPart.BOTTOM),
             SimpleCylinderFeature("bore_top", part=CylinderPart.TOP),
         ])
-        assert bore.find_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "bore_bottom"
-        assert bore.find_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "bore_top"
-        assert bore.find_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "wall"
+        assert bore.find_first_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "bore_bottom"
+        assert bore.find_first_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "bore_top"
+        assert bore.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "wall"
 
     def test_an_unnamed_cylinder_still_names_its_barrel(self):
         names = {h.name for h in
-                 self._bore().get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))}
+                 self._bore().find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))}
 
         assert names == {"side.0"}
 
@@ -2992,7 +2992,7 @@ class TestCylinderFeatures:
 
         # The authored name is the barrel's and stays there. The cap answers
         # with the cylinder's own default rather than borrowing it.
-        cap = bore.find_feature(create_v3(scalar(0), scalar(0), scalar(0)))
+        cap = bore.find_first_feature(create_v3(scalar(0), scalar(0), scalar(0)))
         assert cap is not None and cap.name == "cap.0"
 
 
@@ -3020,8 +3020,8 @@ class TestLoftFeatures:
             SimpleLoftFeature("wide_end", key=ExtrusionCap.BOTTOM),
             SimpleLoftFeature("narrow_end", key=ExtrusionCap.TOP),
         ])
-        assert loft.find_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "wide_end"
-        assert loft.find_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "narrow_end"
+        assert loft.find_first_feature(create_v3(scalar(0), scalar(0), scalar(0))).name == "wide_end"
+        assert loft.find_first_feature(create_v3(scalar(0), scalar(0), scalar(10))).name == "narrow_end"
 
     def test_a_tapered_side_resolves_at_its_own_height(self):
         """Sides are ruled surfaces, so the test tracks the cross-section."""
@@ -3029,12 +3029,12 @@ class TestLoftFeatures:
         # Side 0 runs from (-2,-2) to (2,-2) at the bottom, narrowing to y=-1
         # at the top. Halfway up, that edge sits at y = -1.5.
         midway = create_v3(scalar(0), scalar(-3, 2), scalar(5))
-        feature = loft.find_feature(midway)
+        feature = loft.find_first_feature(midway)
         assert feature is not None and feature.name == "front_face"
 
     def test_an_unnamed_loft_still_names_its_own_faces(self):
         names = {h.name for h in
-                 self._taper().get_all_features(create_v3(scalar(0), scalar(0), scalar(0)))}
+                 self._taper().find_all_features(create_v3(scalar(0), scalar(0), scalar(0)))}
 
         assert names == {"cap.0"}
 
@@ -3068,7 +3068,7 @@ class TestProgrammableCSGFeature:
         prism = self._prism(lower_right)
 
         def claimed_by_predicate(point):
-            return "lower_right_half" in {h.name for h in prism.get_all_features(point)}
+            return "lower_right_half" in {h.name for h in prism.find_all_features(point)}
 
         # The prism's own default names the whole right face either way, so the
         # question is whether the PREDICATE claims the point, not whether
@@ -3081,9 +3081,9 @@ class TestProgrammableCSGFeature:
         always = ProgrammableCSGFeature("always", predicate=lambda owner, point, eps: True)
         prism = self._prism(always)
 
-        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5))) is not None
+        assert prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5))) is not None
         # Dead centre of the solid -- on no face at all.
-        assert prism.find_feature(create_v3(scalar(0), scalar(0), scalar(5))) is None
+        assert prism.find_first_feature(create_v3(scalar(0), scalar(0), scalar(5))) is None
 
     def test_it_is_tested_at_the_tolerance_its_own_type_calls_for(self):
         """A feature is refined to its own type's tolerance.
@@ -3103,7 +3103,7 @@ class TestProgrammableCSGFeature:
 
         face_tolerance, edge_tolerance = scalar(1, 1000), scalar(1, 100)
         prism = self._prism(spy("f", CSGFeatureType.FACE), spy("e", CSGFeatureType.EDGE))
-        prism.get_all_features(
+        prism.find_all_features(
             create_v3(scalar(2), scalar(0), scalar(5)),
             FeatureTestTolerances(face=face_tolerance, edge=edge_tolerance),
         )
@@ -3122,7 +3122,7 @@ class TestProgrammableCSGFeature:
     def test_a_predicateless_feature_matches_nothing(self):
         prism = self._prism(ProgrammableCSGFeature("inert"))
 
-        names = {h.name for h in prism.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))}
+        names = {h.name for h in prism.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))}
 
         assert "inert" not in names
         assert names  # the prism's own default is still there to be found
@@ -3136,9 +3136,9 @@ class TestProgrammableCSGFeature:
                                    predicate=lambda owner, point, eps: safe_equality_test(
                                        owner._local_coords(point)[0], owner.size[0] / 2, eps=eps)),
         )
-        hits = prism.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
+        hits = prism.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
         assert {h.name for h in hits} == {"plain_right", "computed_right"}
-        assert prism.find_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "computed_right"
+        assert prism.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5))).name == "computed_right"
 
 
 class TestDefaultOrderFollowsTimberFeature:
@@ -3309,7 +3309,7 @@ class TestCSGFeatureType:
             properties=FeatureProperties(real=False),
             predicate=lambda owner, point, eps: True,
         )
-        hit = self._prism(axis).find_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        hit = self._prism(axis).find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert hit is not None
         assert hit.feature_type() == CSGFeatureType.EDGE
         assert hit.feature.feature_type() == CSGFeatureType.EDGE
@@ -3508,7 +3508,7 @@ class TestNonRealFeatures:
         solid = self._bore_in_a_timber(self._axis_feature())
         on_axis = create_v3(scalar(0), scalar(0), scalar(5))
         assert not solid.is_point_on_boundary(on_axis)
-        hit = solid.find_feature(on_axis, FeatureTestTolerances.uniform(scalar(1, 1000000)))
+        hit = solid.find_first_feature(on_axis, FeatureTestTolerances.uniform(scalar(1, 1000000)))
         assert hit is not None and hit.name == "peg_axis"
 
     def test_a_real_feature_off_the_boundary_is_still_dropped(self):
@@ -3516,7 +3516,7 @@ class TestNonRealFeatures:
         solid = self._bore_in_a_timber(self._axis_feature())
         # Inside the solid, off the axis: no surface here, and no axis either.
         interior = create_v3(scalar(0), scalar(2), scalar(2))
-        assert solid.find_feature(interior, FeatureTestTolerances.uniform(scalar(1, 1000000))) is None
+        assert solid.find_first_feature(interior, FeatureTestTolerances.uniform(scalar(1, 1000000))) is None
 
     def test_a_non_real_feature_outranks_a_real_one_at_the_same_point(self):
         prism = RectangularPrism(
@@ -3533,9 +3533,9 @@ class TestNonRealFeatures:
             ],
         )
         on_face = create_v3(scalar(2), scalar(0), scalar(5))
-        assert {h.name for h in prism.get_all_features(on_face)} == {"the_face", "the_axis"}
+        assert {h.name for h in prism.find_all_features(on_face)} == {"the_face", "the_axis"}
         # ... and the non-real one wins despite the far worse priority
-        best = prism.find_feature(on_face)
+        best = prism.find_first_feature(on_face)
         assert best is not None and best.name == "the_axis"
 
     def test_the_edge_tolerance_is_what_widens_an_axis(self):
@@ -3556,8 +3556,8 @@ class TestNonRealFeatures:
             ],
         )
         near_axis = create_v3(scalar(1, 100), scalar(0), scalar(5))
-        assert prism.find_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 1000))) is None
-        assert prism.find_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 10))) is not None
+        assert prism.find_first_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 1000))) is None
+        assert prism.find_first_feature(near_axis, FeatureTestTolerances(edge=scalar(1, 10))) is not None
 
 
 class TestCompoundNodesOwnNoFeatures:
@@ -3608,7 +3608,7 @@ class TestCompoundNodesOwnNoFeatures:
             _features=[SimpleRectangularPrismFeature("wall", face=PrismFace.RIGHT)],
         )
         union = SolidUnion(children=[named])
-        hits = union.get_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
+        hits = union.find_all_features(create_v3(scalar(2), scalar(0), scalar(5)))
         assert [h.name for h in hits] == ["wall"]
 
 
@@ -3641,14 +3641,14 @@ class TestDegeneracyGuardsIgnoreQueryTolerance:
     def test_a_small_face_still_resolves_at_the_default_tolerance(self):
         extrusion = self._small_extrusion()
         on_east = create_v3(scalar(2, 100), scalar(1, 100), scalar(5, 100))
-        hit = extrusion.find_feature(on_east)
+        hit = extrusion.find_first_feature(on_east)
         assert hit is not None and hit.name == "east"
 
     def test_a_small_face_resolves_at_a_deliberately_huge_tolerance(self):
         """Even an absurd pick eps must not make the edge look degenerate."""
         extrusion = self._small_extrusion()
         on_east = create_v3(scalar(2, 100), scalar(1, 100), scalar(5, 100))
-        hit = extrusion.find_feature(on_east, FeatureTestTolerances.uniform(scalar(1, 100)))
+        hit = extrusion.find_first_feature(on_east, FeatureTestTolerances.uniform(scalar(1, 100)))
         assert hit is not None and hit.name == "east"
 
 
@@ -3695,8 +3695,8 @@ class TestFeatureTestTolerancesScaling:
         )
         tight = FeatureTestTolerances.uniform(scalar(1, 100000))
         near_miss = create_v3(scalar(2) + 1e-4, scalar(0), scalar(5))
-        assert prism.find_feature(near_miss, tight) is None
-        assert prism.find_feature(near_miss, tight * scalar(1000)) is not None
+        assert prism.find_first_feature(near_miss, tight) is None
+        assert prism.find_first_feature(near_miss, tight * scalar(1000)) is not None
 
 
 class TestSafeZeroTestSq:
@@ -3874,7 +3874,7 @@ class TestDerivedEdges:
 
 
 class TestDerivedEdgesInAQuery:
-    """Edges surface through get_all_features on a compound node."""
+    """Edges surface through find_all_features on a compound node."""
 
     def _cut_timber(self):
         body = RectangularPrism(
@@ -3894,21 +3894,21 @@ class TestDerivedEdgesInAQuery:
     def test_an_edge_appears_alongside_its_faces(self):
         csg = self._cut_timber()
         on_arris = create_v3(scalar(2), scalar(3), scalar(5))
-        names = {h.name for h in csg.get_all_features(on_arris)}
+        names = {h.name for h in csg.find_all_features(on_arris)}
         assert "rough.front×rough.right" in names
         assert {"rough.right", "rough.front"} <= names
 
     def test_the_edge_outranks_its_own_faces(self):
         """A point on an edge is more specifically the edge than either face."""
         csg = self._cut_timber()
-        best = csg.find_feature(create_v3(scalar(2), scalar(3), scalar(5)))
+        best = csg.find_first_feature(create_v3(scalar(2), scalar(3), scalar(5)))
         assert best is not None
         assert best.feature_type() == CSGFeatureType.EDGE
         assert best.name == "rough.front×rough.right"
 
     def test_mid_face_yields_no_edge(self):
         csg = self._cut_timber()
-        best = csg.find_feature(create_v3(scalar(2), scalar(0), scalar(5)))
+        best = csg.find_first_feature(create_v3(scalar(2), scalar(0), scalar(5)))
         assert best is not None and best.name == "rough.right"
 
     def test_the_edge_tolerance_governs_the_snap(self):
@@ -3917,23 +3917,23 @@ class TestDerivedEdgesInAQuery:
         # On the right face, 1.5mm shy of the arris: outside a 0.5mm face
         # tolerance for rough.front, inside a 2mm edge tolerance.
         near = create_v3(scalar(2), scalar(3) - scalar(15, 10000), scalar(5))
-        best = csg.find_feature(near)
+        best = csg.find_first_feature(near)
         assert best is not None and best.feature_type() == CSGFeatureType.EDGE
 
         tight = FeatureTestTolerances(edge=scalar(1, 10000))
-        best_tight = csg.find_feature(near, tight)
+        best_tight = csg.find_first_feature(near, tight)
         assert best_tight is None or best_tight.feature_type() == CSGFeatureType.FACE
 
     def test_the_owner_is_the_compound_node(self):
         csg = self._cut_timber()
-        best = csg.find_feature(create_v3(scalar(2), scalar(3), scalar(5)))
+        best = csg.find_first_feature(create_v3(scalar(2), scalar(3), scalar(5)))
         assert best.owner is csg
 
     def test_an_edge_is_reported_once_however_deeply_nested(self):
         """Derivation runs at the queried node, not at every level below it."""
         inner = self._cut_timber()
         outer = SolidUnion(children=[SolidUnion(children=[inner])])
-        names = [h.name for h in outer.get_all_features(create_v3(scalar(2), scalar(3), scalar(5)))]
+        names = [h.name for h in outer.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))]
         assert names.count("rough.front×rough.right") == 1
 
     def test_a_primitive_derives_its_own_arrises(self):
@@ -3955,7 +3955,7 @@ class TestDerivedEdgesInAQuery:
                                               properties=FeatureProperties(group=FeatureGroup.B2)),
             ],
         )
-        best = prism.find_feature(create_v3(scalar(2), scalar(3), scalar(5)))
+        best = prism.find_first_feature(create_v3(scalar(2), scalar(3), scalar(5)))
         assert best is not None
         assert best.feature_type() == CSGFeatureType.EDGE
         assert best.owner is prism
@@ -3983,7 +3983,7 @@ class TestDerivedEdgesInAQuery:
         # for -- so the count is more than two. What matters is that nothing
         # collapses them: they are distinct edges that share a name.
         union = SolidUnion(children=[prism(scalar(0)), prism(scalar(0))])
-        names = [h.name for h in union.get_all_features(create_v3(scalar(1), scalar(1), scalar(5)))]
+        names = [h.name for h in union.find_all_features(create_v3(scalar(1), scalar(1), scalar(5)))]
         assert names.count("tenon_front×tenon_right") > 1
 
 
@@ -4018,17 +4018,17 @@ class TestGatherRefineIsolation:
     def test_the_edge_tolerance_sets_the_snap_distance(self):
         csg = self._cut_timber()
         tolerances = FeatureTestTolerances(edge=scalar(2, 1000))
-        inside = csg.find_feature(self._near_arris(scalar(15, 10000)), tolerances)
-        outside = csg.find_feature(self._near_arris(scalar(3, 1000)), tolerances)
+        inside = csg.find_first_feature(self._near_arris(scalar(15, 10000)), tolerances)
+        outside = csg.find_first_feature(self._near_arris(scalar(3, 1000)), tolerances)
         assert inside is not None and inside.feature_type() == CSGFeatureType.EDGE
         assert outside is not None and outside.feature_type() == CSGFeatureType.FACE
 
     def test_a_wider_edge_tolerance_snaps_from_further(self):
         csg = self._cut_timber()
         gap = scalar(3, 1000)
-        assert csg.find_feature(self._near_arris(gap),
+        assert csg.find_first_feature(self._near_arris(gap),
                                 FeatureTestTolerances(edge=scalar(2, 1000))).feature_type() == CSGFeatureType.FACE
-        assert csg.find_feature(self._near_arris(gap),
+        assert csg.find_first_feature(self._near_arris(gap),
                                 FeatureTestTolerances(edge=scalar(5, 1000))).feature_type() == CSGFeatureType.EDGE
 
     def test_the_point_tolerance_does_not_widen_the_edge_snap(self):
@@ -4036,14 +4036,14 @@ class TestGatherRefineIsolation:
         csg = self._cut_timber()
         gap = scalar(3, 1000)
         wide_points = FeatureTestTolerances(edge=scalar(2, 1000), point=scalar(40, 1000))
-        best = csg.find_feature(self._near_arris(gap), wide_points)
+        best = csg.find_first_feature(self._near_arris(gap), wide_points)
         assert best is not None and best.feature_type() == CSGFeatureType.FACE
 
     def test_the_edge_tolerance_does_not_widen_the_face_claim(self):
         """A face 1.5mm away pairs into an edge but cannot claim the point."""
         csg = self._cut_timber()
         tolerances = FeatureTestTolerances(face=scalar(5, 10000), edge=scalar(2, 1000))
-        names = {h.name for h in csg.get_all_features(self._near_arris(scalar(15, 10000)), tolerances)}
+        names = {h.name for h in csg.find_all_features(self._near_arris(scalar(15, 10000)), tolerances)}
         assert "rough.right" in names          # the face the point is on
         assert "rough.front" not in names      # 1.5mm away: too far to claim
         assert "rough.front×rough.right" in names  # but near enough to pair
@@ -4084,19 +4084,19 @@ class TestBuriedFacesAreNotReported:
         union = SolidUnion(children=[self._small(), self._swallowing()])
         buried = create_v3(scalar(2), scalar(3), scalar(5))
         assert not union.is_point_on_boundary(buried, 5e-4)
-        assert union.get_all_features(buried) == []
+        assert union.find_all_features(buried) == []
 
     def test_nor_is_an_edge_derived_from_buried_faces(self):
         union = SolidUnion(children=[self._small(), self._swallowing()])
         buried = create_v3(scalar(2), scalar(3), scalar(5))
         assert not any(h.feature_type() == CSGFeatureType.EDGE
-                       for h in union.get_all_features(buried))
+                       for h in union.find_all_features(buried))
 
     def test_the_same_faces_report_fine_on_their_own(self):
         """The gate is about the union, not about the faces being wrong."""
         small = self._small()
         on_arris = create_v3(scalar(2), scalar(3), scalar(5))
-        names = {h.name for h in small.get_all_features(on_arris)}
+        names = {h.name for h in small.find_all_features(on_arris)}
         assert {"small.right", "small.front", "small.front×small.right"} <= names
 
 
@@ -4281,7 +4281,7 @@ class TestAFeatureThatFormsNoEdges:
         prism = self._prism(self._face("quiet", PrismFace.RIGHT, FeatureGroup.NONE))
 
         on_the_face = create_v3(scalar(2), scalar(0), scalar(5))
-        hits = prism.get_all_features(on_the_face)
+        hits = prism.find_all_features(on_the_face)
 
         assert [hit.feature.name for hit in hits] == ["quiet"]
 
@@ -4338,6 +4338,6 @@ class TestANamedArris:
         arris = self._arris()
         prism = self._prism(arris)
 
-        hits = prism.get_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
+        hits = prism.find_all_features(create_v3(scalar(2), scalar(3), scalar(5)))
 
         assert arris.name in [hit.feature.name for hit in hits]

@@ -14,7 +14,7 @@ the infinite lines they lie on.
 Their BOUNDED counterparts live here too, beside them: a LineSegment is a
 stretch of a Line, a ConvexPlanarRegion an area of a Plane. They are what you
 get back from cropping an unbounded primitive to a solid (see
-kumiki.csgconvexhull) -- a line comes back as a list of LineSegments, since a
+kumiki.cropcsg) -- a line comes back as a list of LineSegments, since a
 cut through the middle of one leaves a piece either side. Both are plain
 geometry: neither knows what a feature or a timber is.
 
@@ -116,18 +116,28 @@ class UnsignedPlane(Plane):
         return UnsignedPlane(safe_transform_vector(transform.orientation.matrix, direction), transform.position)
 
 
-# TODO rename to LineOnPlane
 @dataclass(frozen=True)
-class HalfPlane:
+class LineOnPlane:
+    """A line lying in a plane, with a direction to measure in.
+
+    Three things, not two: the line itself (a point on it and its direction),
+    and the plane's normal, which says which way is positive for anything
+    measured from the line. What locate_edge_on_face gives back -- an edge as
+    seen ON one of the faces that meets there, which is how a mark gets
+    squared across a piece.
+
+    Called LineOnPlane once, which named the wrong thing: a half plane is a 2D
+    REGION bounded by a line, and this is the line and an orientation, with no
+    region at all.
     """
-    Represents an oriented half-plane with origin in 3D space.
-    """
+
     normal: Direction3D  # this is the + direction of any measurements
     point_on_line: V3
     line_direction: Direction3D  # MUST be perpendicular to the normal
 
     def __repr__(self) -> str:
-        return f"HalfPlane(normal={self.normal}, point_on_line={self.point_on_line}, line_direction={self.line_direction})"
+        return (f"LineOnPlane(normal={self.normal}, point_on_line={self.point_on_line}, "
+                f"line_direction={self.line_direction})")
 
 
 def unit_vector(vector: V3) -> V3:
