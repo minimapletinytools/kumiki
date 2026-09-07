@@ -410,7 +410,13 @@ class FeatureProperties:
     """Metadata every feature carries, independent of how it is identified.
 
     Args:
-        group: which other features this one may form an edge with.
+        group: which other features this one may form an edge with. NONE by
+            default, so a feature pairs with nothing unless someone says it
+            should. Deriving an edge is the expensive, noisy thing the feature
+            system does -- every pairing is a line that has to be worth
+            selecting -- so it is opted into rather than out of. Today the only
+            pairing anyone wants is a shoulder plane against the timber's own
+            prism.
         priority: lower wins when several features claim the same point.
         real: False for a feature that names no actual surface (a bore's centre
             axis, a reference plane). Real features can be cropped away by the
@@ -424,7 +430,7 @@ class FeatureProperties:
             cheek is. TODO integrate: carried, never read.
     """
 
-    group: FeatureGroup = FeatureGroup.A
+    group: FeatureGroup = FeatureGroup.NONE
     priority: int = 0
     real: bool = True
     marking_override: Optional[FeatureMarkingSpec] = None
@@ -784,8 +790,22 @@ class DerivedEdgeFeature(CSGFeature):
         """The edge where *a* and *b* meet, or None if they form none.
 
         None when: either is not a face; their groups are not allowed to meet;
-        or their planes are parallel (which includes being the same plane --
-        coincident faces share a whole plane, not a line).
+        either names a face that is not THERE; or their planes are parallel
+        (which includes being the same plane -- coincident faces share a whole
+        plane, not a line).
+
+        Not planar is a different thing from not there, and only the second
+        stops an edge existing. A cylinder's barrel and a lofted side are real
+        surfaces with no single plane, and the edge where one meets a flat face
+        is real too -- pickable, just not measurable as a line, which is what
+        locate() returning None means for it. The top of a prism extended to
+        infinity is not a surface at all, and an edge against it is nothing.
+
+        It takes both questions to tell those apart, because each alone gets
+        one of them wrong. A barrel has no plane but has an extent; a half
+        space has a plane but no extent, being unbounded; a face that is not
+        there has neither. So neither answer on its own means absent -- both
+        do.
         """
         if a.feature.feature_type() != CSGFeatureType.FACE:
             return None
@@ -793,6 +813,16 @@ class DerivedEdgeFeature(CSGFeature):
             return None
         if not feature_groups_intersect(a.feature.group, b.feature.group):
             return None
+
+        # A face that is not there forms no edge. The top of a prism extended
+        # to infinity is the case that turns this up -- a timber's rough stock
+        # is exactly that -- and without the check the pair was accepted and
+        # the edge then located to nothing, which reads downstream as "cannot
+        # say" rather than "not an edge".
+        for hit in (a, b):
+            if (hit.feature.locate(hit.owner) is None
+                    and hit.feature.get_extent(hit.owner) is None):
+                return None
         if planes_are_parallel(_as_plane(a.locate()), _as_plane(b.locate())):
             return None
 

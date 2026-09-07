@@ -2896,7 +2896,10 @@ class TestFeatureProperties:
 
     def test_defaults(self):
         feature = HalfSpaceFeature("shoulder")
-        assert feature.group == FeatureGroup.A
+
+        # NONE: pairing into a derived edge is opted into, not out of. Every
+        # pairing is a line somebody has to want to select.
+        assert feature.group == FeatureGroup.NONE
         assert feature.real is True
         assert feature.priority == 0
 

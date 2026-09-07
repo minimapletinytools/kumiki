@@ -422,7 +422,12 @@ def cut_mortise_and_tenon_joint(
         # Declared so the shoulder can be selected and, more to the point, so it
         # forms edges with the timber's own faces: shoulder x rough.front and
         # its three siblings are the line you knife around the timber.
-        _features=[HalfSpaceFeature("shoulder")],
+        # Group A against the timber's B1 faces, and the only pairing in the
+        # library that is asked for on purpose. The shoulder meeting the
+        # timber's own face IS the line a person measures a tenon from; every
+        # other pairing produces arrises nobody dimensions.
+        _features=[HalfSpaceFeature(
+            "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
         label=CutCSGLabel("shoulder"),
     )
 

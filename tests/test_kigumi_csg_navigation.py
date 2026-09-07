@@ -1149,10 +1149,13 @@ class TestEdgeHighlightSpan:
     timber's length away, and the highlight stretched to match.
     """
 
-    def _edge(self, frame, a_name, b_name):
+    def _edge(self, frame, a_name, b_name, member="butt_timber"):
         from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
 
-        cut_timber = _cut_timber_by_name(frame, "receiving_timber")
+        # The tenon timber by default: a derived edge needs two features whose
+        # groups pair, and the shoulder against the timber's own faces is the
+        # only such pairing there is.
+        cut_timber = _cut_timber_by_name(frame, member)
         local = cut_timber.render_timber_with_cuts_csg_local()
         nodes = {}
         stack = [local]
@@ -1193,28 +1196,62 @@ class TestEdgeHighlightSpan:
     def _total_mm(self, segments):
         return sum(math.dist(s["start"], s["end"]) for s in segments) * 1000
 
-    def test_a_real_edge_is_the_width_of_the_mortise(self, mortise_and_tenon_frame):
+    def test_a_real_edge_is_the_width_of_the_face_it_crosses(self, mortise_and_tenon_frame):
+        # The shoulder against the timber's own front face: the line you would
+        # square across before sawing, and the one pairing the library asks for.
         edge, owner, timber, root = self._edge(
-            mortise_and_tenon_frame, "mortise_right", "rough.front")
+            mortise_and_tenon_frame, "shoulder", "rough.front")
 
         segment, absent = runner._edge_highlight_segments(edge, owner, timber, root)
 
         assert not absent
-        # Exactly the fixture's tenon_width_relative_to_joint, which is what the
-        # mortise is that way. No slack: the tolerance decides WHETHER an edge is
-        # there, and widening the clip to answer that also pushed both ends out
-        # by it, so an edge was drawn long at each end.
-        assert self._span_mm(segment) == pytest.approx(float(inches(3)) * 1000, abs=0.5)
+        # Exactly the timber's width. No slack: the tolerance decides WHETHER an
+        # edge is there, and widening the clip to answer that also pushed both
+        # ends out by it, so an edge was drawn long at each end.
+        assert self._span_mm(segment) == pytest.approx(float(timber.size[0]) * 1000, abs=0.5)
         # And nowhere near the timber's own length, which is what it used to say.
         assert self._span_mm(segment) < float(timber.length) * 1000 / 10
 
-    def test_an_edge_that_is_not_there_says_so(self, mortise_and_tenon_frame):
-        # The mortise floor's plane, run sideways, crosses the timber's own side
-        # a foot from the mortise. Two planes cross there; no two faces do.
-        edge, owner, timber, root = self._edge(
-            mortise_and_tenon_frame, "mortise_bottom", "rough.left")
+    def test_an_edge_that_is_not_there_says_so(self):
+        """Two planes crossing is not two faces meeting.
 
-        segment, absent = runner._edge_highlight_segments(edge, owner, timber, root)
+        Built rather than taken from a fixture: the only pairing the library
+        still asks for is a shoulder against the timber's own faces, and those
+        all meet on the piece. This is the case that has to keep working
+        anyway -- a plane run far enough sideways crosses another plane
+        somewhere, and that somewhere is on neither face.
+        """
+        from kumiki.cutcsg import (DerivedEdgeFeature, FeatureGroup, FeatureProperties,
+                                   HalfSpace, HalfSpaceFeature, OwnedFeatureHit,
+                                   PrismFace, RectangularPrism,
+                                   SimpleRectangularPrismFeature)
+        from kumiki.timber import Timber
+        from kumiki.rule import Transform, create_v2
+
+        body = RectangularPrism(
+            size=create_v2(scalar(0.1), scalar(0.2)),
+            transform=Transform.identity(),
+            start_distance=scalar(0), end_distance=scalar(1),
+            _features=[SimpleRectangularPrismFeature(
+                "rough.right", face=PrismFace.RIGHT,
+                properties=FeatureProperties(group=FeatureGroup.B1))],
+        )
+        # Parallel to the length and far past the end of it, so the line where
+        # the two planes cross runs nowhere near the solid.
+        far = HalfSpace(
+            normal=create_v3(scalar(0), scalar(0), scalar(1)), offset=scalar(9),
+            _features=[HalfSpaceFeature(
+                "shoulder", properties=FeatureProperties(group=FeatureGroup.A))],
+        )
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(feature=body.get_declared_features()[0], owner=body),
+            OwnedFeatureHit(feature=far.get_declared_features()[0], owner=far),
+        )
+        assert edge is not None, "the two planes do cross; that is the point"
+        timber = Timber(length=scalar(1), size=create_v2(scalar(0.1), scalar(0.2)),
+                        transform=Transform.identity())
+
+        segment, absent = runner._edge_highlight_segments(edge, body, timber, body)
 
         assert segment is None
         assert absent, "an edge cropped away to nothing is not merely unknown"
@@ -1271,7 +1308,7 @@ class TestEdgeHighlightSpan:
         """
         from kumiki.cutcsg import DerivedEdgeFeature, OwnedFeatureHit, csg_children
 
-        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "receiving_timber")
+        cut_timber = _cut_timber_by_name(mortise_and_tenon_frame, "butt_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
         nodes = {}
         stack = [local]
@@ -1298,7 +1335,11 @@ class TestEdgeHighlightSpan:
                     f"{a_name} x {b_name} could not be cropped at all")
                 checked += 1
 
-        assert checked > 10, f"expected plenty of edges to check, got {checked}"
+        # The shoulder against each of the timber's four long faces. Not its
+        # top: the rough prism runs to infinity that way, so there is no face
+        # there for an edge to be against, and derive says so rather than
+        # handing back an edge that locates to nothing.
+        assert checked == 4, f"expected the four shoulder edges, got {checked}"
 
 
 class TestResolvingADerivedEdge:
@@ -1313,7 +1354,10 @@ class TestResolvingADerivedEdge:
         from kumiki.cutcsg import CSGFeatureType
         from kumiki.triangles import triangulate_cutcsg
 
-        cut_timber = _cut_timber_by_name(frame, "receiving_timber")
+        # The tenon timber: a derived edge needs two features whose groups
+        # pair, and the shoulder against the timber's own faces is the only
+        # such pairing in the library.
+        cut_timber = _cut_timber_by_name(frame, "butt_timber")
         local = cut_timber.render_timber_with_cuts_csg_local()
         for triangle in triangulate_cutcsg(local).mesh.triangles:
             for vertex in triangle:
@@ -1338,7 +1382,9 @@ class TestResolvingADerivedEdge:
 
     def test_a_picked_edge_resolves_to_a_place(self, mortise_and_tenon_frame):
         entries, _ = runner._assign_member_keys(mortise_and_tenon_frame)
-        entry = next(e for e in entries if "receiving" in e["memberKey"])
+        # The same timber _picked_edge took the edge from, or the reference
+        # names a tree the edge is not in.
+        entry = next(e for e in entries if "butt" in e["memberKey"])
         local, edge = self._picked_edge(mortise_and_tenon_frame)
         reference = self._reference(mortise_and_tenon_frame, local, edge, entry["memberKey"])
 
@@ -1477,12 +1523,12 @@ class TestPickYieldsAMeasurementReference:
         from kumiki.cutcsg import CSGFeatureType
 
         local, edge = self._pick_at(
-            mortise_and_tenon_frame, "receiving_timber",
+            mortise_and_tenon_frame, "butt_timber",
             lambda f: (f.feature_type() == CSGFeatureType.EDGE
                        and getattr(f, "a", None) is not None))
 
         reference = runner._pick_reference(
-            local, "receiving_timber#0", [], edge.name, "EDGE", edge)
+            local, "butt_timber#0", [], edge.name, "EDGE", edge)
 
         assert reference["kind"] == "edge"
         assert {reference["a"]["feature"], reference["b"]["feature"]} == {
@@ -1494,11 +1540,11 @@ class TestPickYieldsAMeasurementReference:
         from kumiki.cutcsg import CSGFeatureType
 
         local, edge = self._pick_at(
-            mortise_and_tenon_frame, "receiving_timber",
+            mortise_and_tenon_frame, "butt_timber",
             lambda f: (f.feature_type() == CSGFeatureType.EDGE
                        and getattr(f, "a", None) is not None))
         reference = runner._pick_reference(
-            local, "receiving_timber#0", [], edge.name, "EDGE", edge)
+            local, "butt_timber#0", [], edge.name, "EDGE", edge)
 
         resolved = runner.resolve_anchor(mortise_and_tenon_frame, reference)
 

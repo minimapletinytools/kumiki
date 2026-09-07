@@ -1373,13 +1373,24 @@ class TestMortiseAndTenonFeatures:
                              CSGFeatureType.FACE)
         assert {"mortise_front", "mortise_back", "mortise_left", "mortise_right"} <= faces
 
-    def test_the_mortise_mouth_is_an_edge(self, simple_T_configuration):
+    def test_the_mortise_mouth_is_not_derived_any_more(self, simple_T_configuration):
+        """The outline round the mouth used to come from mortise faces pairing
+        with the timber's own, and does not now.
+
+        A pairing has to be worth selecting, and this one was not: the mouth is
+        already the boundary of the mortise faces you can select directly, so
+        deriving it again added lines nobody dimensions. The mortise faces are
+        still there and still pickable -- only the derived edges between them
+        and the timber body are gone.
+        """
         from kumiki.cutcsg import CSGFeatureType
 
-        edges = self._picked(self._rendered(simple_T_configuration)["mortise_timber"],
-                             CSGFeatureType.EDGE)
-        # The outline you would mark on the face before chopping.
-        assert {edge for edge in edges if edge.startswith("mortise_")}
+        rendered = self._rendered(simple_T_configuration)["mortise_timber"]
+        edges = self._picked(rendered, CSGFeatureType.EDGE)
+        faces = self._picked(rendered, CSGFeatureType.FACE)
+
+        assert not {edge for edge in edges if "\u00d7" in edge}
+        assert {face for face in faces if face.startswith("mortise_")}
 
     def test_the_timbers_own_arrises_are_still_reachable(self, simple_T_configuration):
         # They used to come from two rough faces meeting. They are declared now
