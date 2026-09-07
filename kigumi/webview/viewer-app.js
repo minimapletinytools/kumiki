@@ -279,7 +279,9 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 // well as a different shape -- an outline rather than a fill -- so the two
 // never read as the same state.
 const HOVER_COLOR = 0xffa726;
-const HOVER_OPACITY = 0.55;
+// Opaque enough to hold its own over a selected face rather than
+// tinting it. Under a fill this washed out to nothing.
+const HOVER_OPACITY = 0.8;
 
 // A selected edge is drawn as a line rather than shaded like a face, so it
 // needs a width of its own -- several times the timbers' own edge lines, or the
@@ -3103,6 +3105,9 @@ class KigumiViewerApp extends LitElement {
             currentPath,
             ctrlClick: false,
             request: due.request,
+            // The same tolerances a click would use, or hover lights something
+            // a click then refuses to select.
+            tolerances: this._pickTolerances(target.point),
         });
     }
 
@@ -3143,10 +3148,15 @@ class KigumiViewerApp extends LitElement {
             this._buildHighlightMesh(
                 mesh.vertices, mesh.indices, HOVER_COLOR, HOVER_OPACITY, '_hoverHighlightMesh',
             );
-            // Under the selection's own highlight, which sits at 999: what is
-            // selected outranks what is merely under the pointer.
+            // OVER the selection's own highlight, which sits at 999. It used
+            // to go under, on the grounds that what is selected outranks what
+            // is merely under the pointer -- but hovering over something
+            // already selected then blended orange under blue into a muddy
+            // colour that read as neither, which is the one moment the hover
+            // has a job to do. What is selected does not stop being selected
+            // for the moment the pointer is on it.
             if (this._hoverHighlightMesh) {
-                this._hoverHighlightMesh.renderOrder = 900;
+                this._hoverHighlightMesh.renderOrder = 1100;
             }
         }
     }
@@ -3164,7 +3174,7 @@ class KigumiViewerApp extends LitElement {
         });
         const line = new THREE.LineSegments2(geometry, material);
         line.computeLineDistances();
-        line.renderOrder = 901;
+        line.renderOrder = 1101;   // over the selection, see drawHoverHighlight
         this.scene.add(line);
         this._hoverHighlightEdge = line;
     }
@@ -3220,6 +3230,7 @@ class KigumiViewerApp extends LitElement {
                     point,
                     currentPath,
                     ctrlClick: !!event.ctrlKey || !!event.metaKey,
+                    tolerances: this._pickTolerances(point),
                 });
             }
         } else {
@@ -4522,6 +4533,12 @@ class KigumiViewerApp extends LitElement {
     // THREE.LineMaterial's resolution uniform needs the actual canvas size in
     // pixels; falls back to a 1x1 placeholder before the renderer exists
     // (onWindowResize() and setEdgeLineThicknessPx() keep it correct afterwards).
+    /** The pick tolerances a click at *worldPoint* should be judged by. */
+    _pickTolerances(worldPoint) {
+        return window.KigumiPickTolerances.pickTolerances(
+            this.camera, this._getRendererResolution().y, worldPoint);
+    }
+
     _getRendererResolution() {
         return this.renderer ? this.renderer.getSize(new THREE.Vector2()) : new THREE.Vector2(1, 1);
     }

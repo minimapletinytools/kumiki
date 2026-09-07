@@ -425,6 +425,51 @@ class TestNonPrismPrimitivesArePickable:
         assert face == "side.0"
 
 
+class TestPickTolerancesScaleWithTheView:
+    """How close a click has to be depends on how big the timber looks.
+
+    A face is clicked directly, so its slack is the gap between the analytic
+    surface and the mesh -- fixed. An edge or a vertex is SNAPPED to, and how
+    much slack that wants is a matter of what the eye sees: a millimetre is
+    generous on a timber filling the screen and unusable on a whole frame
+    zoomed out. The viewer converts pixels to world units and sends them.
+    """
+
+    def test_without_them_the_built_in_defaults_stand(self):
+        from kumiki.cutcsg import FeatureTestTolerances
+
+        tolerances = runner._pick_tolerances({}, 5e-4)
+
+        assert float(tolerances.face) == pytest.approx(5e-4)
+        assert float(tolerances.edge) == pytest.approx(float(FeatureTestTolerances().edge))
+        assert float(tolerances.point) == pytest.approx(float(FeatureTestTolerances().point))
+
+    def test_what_the_viewer_sends_is_used(self):
+        tolerances = runner._pick_tolerances(
+            {"tolerances": {"edge": 0.02, "point": 0.05}}, 5e-4)
+
+        assert float(tolerances.edge) == pytest.approx(0.02)
+        assert float(tolerances.point) == pytest.approx(0.05)
+        # The face is not scaled: clicking one is not a snap.
+        assert float(tolerances.face) == pytest.approx(5e-4)
+
+    def test_zooming_in_never_makes_a_snap_tighter_than_the_mesh(self):
+        # The surface tolerance is the floor. Below it a click could land
+        # between the analytic edge and the triangle the ray actually struck.
+        tolerances = runner._pick_tolerances(
+            {"tolerances": {"edge": 1e-9, "point": 1e-9}}, 5e-4)
+
+        assert float(tolerances.edge) == pytest.approx(5e-4)
+        assert float(tolerances.point) == pytest.approx(5e-4)
+
+    def test_nonsense_is_ignored_rather_than_trusted(self):
+        from kumiki.cutcsg import FeatureTestTolerances
+
+        for sent in ({"edge": 0, "point": -1}, {"edge": "wide"}, {"tolerances": None}):
+            tolerances = runner._pick_tolerances({"tolerances": sent}, 5e-4)
+            assert float(tolerances.edge) == pytest.approx(float(FeatureTestTolerances().edge))
+
+
 class TestDescribeLeafCsg:
     def test_prefers_a_declared_named_feature(self):
         """A declared name beats the geometric guess.

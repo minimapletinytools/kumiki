@@ -115,6 +115,16 @@
                 bundle.mesh.visible = visible;
                 bundle.mesh.material.transparent = transparent;
                 bundle.mesh.material.opacity = appearance.opacity;
+                // A see-through member must not fill the depth buffer, or
+                // whatever is behind it is discarded before it is ever blended
+                // and the member reads as opaque after all. That is why a
+                // selected timber vanished behind its neighbours as soon as a
+                // feature was selected on it: selecting the timber alone left
+                // it at opacity 1 and it drew in the opaque pass, while
+                // selecting a feature drops it to 0.62 and moved it into the
+                // transparent one, where the neighbours' depth was already
+                // written.
+                bundle.mesh.material.depthWrite = !transparent;
                 // A transparent member casts no shadow: it would be a solid
                 // shadow under something you can see through.
                 bundle.mesh.castShadow = visible && !transparent;

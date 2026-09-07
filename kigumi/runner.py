@@ -3753,7 +3753,9 @@ def _edge_highlight_segments(
     return _cropped_edge_segments(edge_feature, line, timber, root_csg, owner)
 
 
-def _features_at_point(root: 'CutCSG', local_pt: List[float], eps: float) -> List[Any]:
+def _features_at_point(
+    root: 'CutCSG', local_pt: List[float], eps: float, tolerances: Any = None,
+) -> List[Any]:
     """Every feature the WHOLE tree sees at the click, best first.
 
     Asked of the root rather than the node navigation landed on: a derived edge
@@ -3763,7 +3765,8 @@ def _features_at_point(root: 'CutCSG', local_pt: List[float], eps: float) -> Lis
     """
     from kumiki.cutcsg import FeatureTestTolerances
 
-    return root.get_all_features(_to_v3(local_pt), FeatureTestTolerances(face=eps))
+    return root.get_all_features(
+        _to_v3(local_pt), tolerances or FeatureTestTolerances(face=eps))
 
 
 def _resolve_derived_edge(hits: List[Any]) -> Optional[Any]:
@@ -4291,6 +4294,38 @@ def _handle_hover_feature_at_point(
     return _handle_find_csg_at_point(state, payload, slot_state)
 
 
+def _pick_tolerances(payload: Dict[str, Any], eps: float) -> Any:
+    """How close a click has to be, given what the viewer says a pixel is worth.
+
+    A face is clicked directly, so its slack is the gap between the analytic
+    surface and the triangulated mesh the ray hit -- a fixed distance, and eps
+    is it. An edge or a vertex cannot be clicked exactly at all: selecting one
+    means snapping, and how much slack that wants depends on how big the timber
+    looks, not on how big it is. The viewer sends those two already converted
+    from pixels to world units; without them the built-in defaults stand.
+
+    Clamped at the bottom by eps, since no amount of zooming in makes a snap
+    tighter than the mesh it is snapping on.
+    """
+    from kumiki.cutcsg import FeatureTestTolerances
+
+    sent = payload.get("tolerances")
+    if not isinstance(sent, dict):
+        return FeatureTestTolerances(face=eps)
+
+    def scaled(name: str, fallback: Any) -> Any:
+        value = sent.get(name)
+        if not isinstance(value, (int, float)) or value <= 0:
+            return fallback
+        return max(float(value), eps)
+
+    return FeatureTestTolerances(
+        face=eps,
+        edge=scaled("edge", FeatureTestTolerances().edge),
+        point=scaled("point", FeatureTestTolerances().point),
+    )
+
+
 def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
     """Process a find_csg_at_point request and return the result dict."""
     ss = slot_state if slot_state is not None else state._active
@@ -4299,6 +4334,9 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     current_path = payload.get("currentPath") or []
     ctrl_click = payload.get("ctrlClick", False)
     eps = 5e-4  # generous epsilon for raycast-based click points
+    # Edge and vertex slack scaled to what a pixel is worth where the click
+    # landed, which the viewer works out and sends. See _pick_tolerances.
+    tolerances = _pick_tolerances(payload, eps)
 
     if not isinstance(member_key, str) or member_key not in ss.mesh_cache:
         raise ValueError(f"Unknown memberKey: {member_key}")
@@ -4346,7 +4384,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     # jumping to an edge deep inside would skip the levels between.
     feature_type = None
     declared_edge = None
-    feature_hits = _features_at_point(local_csg, local_pt, eps)
+    feature_hits = _features_at_point(local_csg, local_pt, eps, tolerances)
     edge = _resolve_derived_edge(feature_hits) if feature_label is not None else None
     if edge is not None:
         owned = _edge_owner(local_csg, edge)
