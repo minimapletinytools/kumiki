@@ -475,6 +475,11 @@ def approximately_crop_plane_to_area_on_csg(
 # A stretch of the line, as the two parameter values bounding it.
 Span = Tuple[float, float]
 
+# How close to the surface a verification point may be and still count as on
+# the solid. Small: the midpoint of a doubtful stretch is nowhere near an end,
+# so the only nearness that matters is to the surface the line lies in.
+_VERIFY_EPS = 1e-9
+
 
 def _spans_within_primitive(
     faces: BoundingHalfSpaces,
@@ -720,37 +725,9 @@ def _exact_spans(
     return _spans_within_primitive(bounds.faces, line, seed, tolerance, removing)
 
 
-def _solids_overlap(a, b) -> bool:
-    """Whether two solids share any volume, judged by their bounding boxes.
-
-    Used to tell a cut that TAKES something from the base apart from one that
-    merely touches it along a plane. A conservative yes -- boxes can overlap
-    where the solids only touch -- which is the safe direction: it only ever
-    keeps the old behaviour for a case this cannot rule out.
-
-    None on either box means unbounded in that direction, which cannot rule an
-    overlap out either.
-    """
-    with warnings.catch_warnings():
-        # get_aabb warns on an unbounded solid, and unbounded is a normal
-        # answer here -- a half space or an extended prism. None bounds are
-        # handled below as "cannot rule an overlap out".
-        warnings.simplefilter("ignore")
-        first, second = a.get_aabb(), b.get_aabb()
-    if first.is_empty or second.is_empty:
-        return False
-    for low, high in (("min_x", "max_x"), ("min_y", "max_y"), ("min_z", "max_z")):
-        a_low, a_high = getattr(first, low), getattr(first, high)
-        b_low, b_high = getattr(second, low), getattr(second, high)
-        if a_high is not None and b_low is not None and float(a_high) <= float(b_low):
-            return False
-        if b_high is not None and a_low is not None and float(b_high) <= float(a_low):
-            return False
-    return True
-
-
 def _spans_on_csg(
     csg, line: Line, seed: Span, tolerance: float, removing: bool = False,
+    flush_removes: bool = True,
 ) -> Optional[List[Span]]:
     """Where a line runs inside a whole CSG tree, as spans of its parameter.
 
@@ -773,37 +750,37 @@ def _spans_on_csg(
     if isinstance(csg, SolidUnion):
         out: List[Span] = []
         for child in csg.children:
-            spans = _spans_on_csg(child, line, seed, tolerance, removing)
+            spans = _spans_on_csg(child, line, seed, tolerance, removing, flush_removes)
             if spans is None:
                 return None
             out.extend(spans)
         return _merged_spans(out)
 
     if isinstance(csg, Intersection):
-        left = _spans_on_csg(csg.left, line, seed, tolerance, removing)
+        left = _spans_on_csg(csg.left, line, seed, tolerance, removing, flush_removes)
         if left is None:
             return None
-        right = _spans_on_csg(csg.right, line, seed, tolerance, removing)
+        right = _spans_on_csg(csg.right, line, seed, tolerance, removing, flush_removes)
         if right is None:
             return None
         return _intersected_spans(left, right)
 
     if isinstance(csg, Difference):
-        kept = _spans_on_csg(csg.base, line, seed, tolerance, removing)
+        kept = _spans_on_csg(csg.base, line, seed, tolerance, removing, flush_removes)
         if kept is None:
             return None
 
         # Where the line lies ON the base's own surface rather than inside it:
         # what the closed reading keeps and the strict one does not. An arris is
         # this everywhere, which is what makes the distinction matter.
-        inside = _spans_on_csg(csg.base, line, seed, tolerance, not removing)
+        inside = _spans_on_csg(csg.base, line, seed, tolerance, not removing, flush_removes)
         if inside is None:
             return None
         on_surface = _subtracted_spans(kept, inside)
 
         removed: List[Span] = []
         for solid in csg.subtract:
-            strictly_in = _spans_on_csg(solid, line, seed, -tolerance, not removing)
+            strictly_in = _spans_on_csg(solid, line, seed, -tolerance, not removing, flush_removes)
             if strictly_in is None:
                 return None
             removed.extend(strictly_in)
@@ -814,12 +791,9 @@ def _spans_on_csg(
             # stay. On the base's surface it is a face being planed away flush,
             # and keeping it drew the arris straight through the notch.
             #
-            # Unless the cut takes nothing from the base at all. Two solids
-            # sharing only a plane remove nothing from each other, and the
-            # base's own arris along that plane has to survive them.
-            if not _solids_overlap(csg.base, solid):
+            if not flush_removes:
                 continue
-            touching = _spans_on_csg(solid, line, seed, -tolerance, removing)
+            touching = _spans_on_csg(solid, line, seed, -tolerance, removing, flush_removes)
             if touching is None:
                 return None
             removed.extend(_intersected_spans(touching, on_surface))
@@ -881,25 +855,45 @@ def crop_line_to_segments_on_csg(
     this up. Clipped exactly, a real edge comes back empty and reads as not
     being on the piece at all.
 
-    KNOWN OVER-REPORT, and a deliberate one. A line lying exactly IN a
-    subtracted solid's face is kept, because that is what an arris shared with
-    a flush cut is -- a mortise wall meeting the face it opens onto forms a real
-    edge, and removing it would delete every such edge on the piece. Along one
-    dimension there is no way to tell that case from a cut that grazes the line
-    while eating the material behind it, so the second is kept too, and shows up
-    as a short extra piece where a cut has taken a corner off. Outwards, per the
-    rule at the top of this file: what the answer says is NOT there really is
-    not. Telling the two apart needs the surface either side of the line, not
-    just the line.
+    A line lying exactly IN a subtracted solid's face is the one case the line
+    cannot answer on its own. It is either the arris that cut just made -- a
+    mortise wall meeting the face it opens onto -- or an arris the cut planed
+    away, and along one dimension those are the same fact. So it is not decided
+    on the line: both readings are computed, and where they disagree the SOLID
+    is asked, at the midpoint of each doubtful stretch. See the end of this
+    function.
     """
     direction = unit_vector(line.direction)
     origin = line.point
     reach = float(seed_reach)
     centre = 0.0 if near is None else float(((near - origin).T * direction)[0, 0])
 
-    spans = _spans_on_csg(csg, line, (centre - reach, centre + reach), tolerance)
-    if spans is None:
+    seed = (centre - reach, centre + reach)
+
+    # Two readings of the one ambiguous case, and the solid itself to settle it.
+    #
+    # A line lying IN a cut's wall is either an arris that cut just made, or an
+    # arris it planed away -- and along one dimension those look identical. So
+    # both answers are computed: the permissive one keeps every such line, the
+    # strict one lets a flush cut take it. Where they differ is exactly the set
+    # of doubtful stretches, and each is put to contains_point at its midpoint,
+    # which is a real question about the solid rather than a guess about the
+    # line. A handful of point tests per edge, only where there is doubt.
+    permissive = _spans_on_csg(csg, line, seed, tolerance, flush_removes=False)
+    if permissive is None:
         return None
+    strict = _spans_on_csg(csg, line, seed, tolerance, flush_removes=True)
+    if strict is None:
+        return None
+
+    doubtful = _subtracted_spans(permissive, strict)
+    gone = []
+    for low, high in doubtful:
+        middle = origin + direction * scalar((low + high) / 2.0)
+        if not csg.contains_point(middle, eps=scalar(_VERIFY_EPS)):
+            gone.append((low, high))
+    spans = _subtracted_spans(permissive, gone)
+
     return [
         LineSegment(
             line=line,

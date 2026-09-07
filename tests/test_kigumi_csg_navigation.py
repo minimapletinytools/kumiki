@@ -1205,17 +1205,11 @@ class TestEdgeHighlightSpan:
         segment, absent = runner._edge_highlight_segments(edge, owner, timber, root)
 
         assert not absent
-        # KNOWN REGRESSION, and the cost of the rule that stopped an arris being
-        # drawn through a notch. This edge lies IN the shoulder's cutting plane
-        # and ON the timber's front face, which is the same pair of facts as an
-        # arris a cut has planed away -- so the exact pass now drops it and the
-        # tolerant one answers instead, two tolerances long. Telling the two
-        # apart needs to know that the shoulder plane is PERPENDICULAR to the
-        # face it crosses while a notch's is FLUSH with it, which is a fact
-        # about surfaces and not about the line.
-        edge_tolerance = float(runner._edge_tolerance()) * 1000
-        assert self._span_mm(segment) == pytest.approx(
-            float(timber.size[0]) * 1000 + 2 * edge_tolerance, abs=0.5)
+        # Exactly the timber's width. This edge lies IN the shoulder's cutting
+        # plane and ON the timber's front face -- the same pair of facts as an
+        # arris a cut has planed away, which is why the line alone cannot tell
+        # them apart. contains_point can, and does.
+        assert self._span_mm(segment) == pytest.approx(float(timber.size[0]) * 1000, abs=0.5)
         # And nowhere near the timber's own length, which is what it used to say.
         assert self._span_mm(segment) < float(timber.length) * 1000 / 10
 

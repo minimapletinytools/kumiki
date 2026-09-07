@@ -781,13 +781,14 @@ class TestCroppingThroughTheTree:
             low, high = _span(segments)
             assert high - low == pytest.approx(1.0, abs=3e-3), tolerance
 
-    def test_a_cut_that_grazes_the_line_keeps_it_even_having_eaten_the_corner(self):
-        """The deliberate over-report, pinned so it stays deliberate.
+    def test_a_cut_that_only_touches_the_line_does_not_take_it(self):
+        """A cut lying against the base takes nothing from it.
 
-        This cut's wall lies exactly in the line, and its body covers the
-        material behind it. Along one dimension that is indistinguishable from
-        a flush cut forming a real arris, and keeping it is the outward
-        direction -- the direction the whole file errs in.
+        This one reaches past the corner in y, but in x it stops exactly at the
+        base's own face -- so the two share a plane and nothing else, and the
+        arris along that plane survives. Decided by asking the solid, not by
+        reading the line: on the line alone this is indistinguishable from a
+        cut that planes the arris away.
         """
         from kumiki.cutcsg import Difference
 
@@ -801,6 +802,32 @@ class TestCroppingThroughTheTree:
             arris, tree, seed_reach=10, near=_v(0, 0, 0.5)))
 
         assert (low, high) == pytest.approx((0.0, 1.0), abs=1e-9)
+
+    def test_a_cut_flush_with_a_face_does_take_the_arris_in_it(self):
+        """The other side of the same ambiguity, and the bug it caused.
+
+        Here the cut genuinely reaches into the base -- it is a notch, not a
+        neighbour -- and its wall is flush with the face the arris lies in. The
+        arris through the notch is gone, and saying otherwise drew a line
+        straight across the opening. On a cross lap that was 127mm of edge
+        drawn through thin air.
+        """
+        from kumiki.cutcsg import Difference
+
+        arris = Line(direction=_v(0, 0, 1), point=_v(0.05, 0.1, 0))
+        # Reaching past the base's front face rather than stopping on it, which
+        # is how a cutter is always built -- extended, so the cut comes out
+        # clean. That is what puts the arris strictly INSIDE the cutter and
+        # settles the question.
+        notch = _box(size=(0.06, 0.1), start=0.4, end=0.6, position=(0.03, 0.08, 0.0))
+        tree = Difference(base=_box(size=(0.1, 0.2), start=0.0, end=1.0), subtract=[notch])
+
+        segments = crop_line_to_segments_on_csg(
+            arris, tree, seed_reach=10, near=_v(0, 0, 0.5))
+
+        assert len(segments) == 2
+        assert segments[0].extent_along(_v(0, 0, 1)) == pytest.approx((0.0, 0.4), abs=1e-9)
+        assert segments[1].extent_along(_v(0, 0, 1)) == pytest.approx((0.6, 1.0), abs=1e-9)
 
     def test_a_union_joins_what_each_child_covers(self):
         from kumiki.cutcsg import SolidUnion
