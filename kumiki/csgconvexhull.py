@@ -53,6 +53,7 @@ material.
 import math
 from dataclasses import dataclass
 from enum import Enum
+import warnings
 from typing import List, Optional, Sequence, Tuple
 
 from .geometry import (
@@ -220,7 +221,7 @@ def solid_bounds(csg) -> SolidBounds:
         # For analytic purposes, treat a path extrusion as if it was created
         # from all straight line extrusions. Proper support for curves is
         # unlikely to be added anytime soon.
-        points = [seg.start() for seg in csg.path.segments]
+        points = [seg.start for seg in csg.path.segments]
         return _bounds_or_unknown(_extruded_hull_half_spaces(
             [(float(point[0, 0]), float(point[1, 0])) for point in points],
             csg.transform, csg.start_distance, csg.end_distance,
@@ -719,6 +720,35 @@ def _exact_spans(
     return _spans_within_primitive(bounds.faces, line, seed, tolerance, removing)
 
 
+def _solids_overlap(a, b) -> bool:
+    """Whether two solids share any volume, judged by their bounding boxes.
+
+    Used to tell a cut that TAKES something from the base apart from one that
+    merely touches it along a plane. A conservative yes -- boxes can overlap
+    where the solids only touch -- which is the safe direction: it only ever
+    keeps the old behaviour for a case this cannot rule out.
+
+    None on either box means unbounded in that direction, which cannot rule an
+    overlap out either.
+    """
+    with warnings.catch_warnings():
+        # get_aabb warns on an unbounded solid, and unbounded is a normal
+        # answer here -- a half space or an extended prism. None bounds are
+        # handled below as "cannot rule an overlap out".
+        warnings.simplefilter("ignore")
+        first, second = a.get_aabb(), b.get_aabb()
+    if first.is_empty or second.is_empty:
+        return False
+    for low, high in (("min_x", "max_x"), ("min_y", "max_y"), ("min_z", "max_z")):
+        a_low, a_high = getattr(first, low), getattr(first, high)
+        b_low, b_high = getattr(second, low), getattr(second, high)
+        if a_high is not None and b_low is not None and float(a_high) <= float(b_low):
+            return False
+        if b_high is not None and a_low is not None and float(b_high) <= float(a_low):
+            return False
+    return True
+
+
 def _spans_on_csg(
     csg, line: Line, seed: Span, tolerance: float, removing: bool = False,
 ) -> Optional[List[Span]]:
@@ -762,12 +792,38 @@ def _spans_on_csg(
         kept = _spans_on_csg(csg.base, line, seed, tolerance, removing)
         if kept is None:
             return None
+
+        # Where the line lies ON the base's own surface rather than inside it:
+        # what the closed reading keeps and the strict one does not. An arris is
+        # this everywhere, which is what makes the distinction matter.
+        inside = _spans_on_csg(csg.base, line, seed, tolerance, not removing)
+        if inside is None:
+            return None
+        on_surface = _subtracted_spans(kept, inside)
+
         removed: List[Span] = []
         for solid in csg.subtract:
-            spans = _spans_on_csg(solid, line, seed, -tolerance, not removing)
-            if spans is None:
+            strictly_in = _spans_on_csg(solid, line, seed, -tolerance, not removing)
+            if strictly_in is None:
                 return None
-            removed.extend(spans)
+            removed.extend(strictly_in)
+
+            # A line ON a cut's wall is taken away only where it is also on the
+            # base's surface. Inside the base it is the arris the cut just made
+            # -- a mortise wall meeting the material it was cut from -- and must
+            # stay. On the base's surface it is a face being planed away flush,
+            # and keeping it drew the arris straight through the notch.
+            #
+            # Unless the cut takes nothing from the base at all. Two solids
+            # sharing only a plane remove nothing from each other, and the
+            # base's own arris along that plane has to survive them.
+            if not _solids_overlap(csg.base, solid):
+                continue
+            touching = _spans_on_csg(solid, line, seed, -tolerance, removing)
+            if touching is None:
+                return None
+            removed.extend(_intersected_spans(touching, on_surface))
+
         return _subtracted_spans(kept, removed)
 
     exact = _exact_spans(csg, line, seed, tolerance, removing)
