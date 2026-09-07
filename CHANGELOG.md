@@ -8,6 +8,66 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-07
+
+### kumiki
+
+#### Added
+
+- Every CSG primitive now names its own boundary. `default_features()` returns the faces, arrises and corners a shape has whether or not anyone wrote them down, addressed by a `FeatureKey` -- a `FeatureCategory` (`CAP`, `SIDE`, `ARRIS`, `CORNER`) and an index -- and an authored feature at the same key replaces the default rather than joining it. `FeatureSource` says which layer a query wants: `DEFAULTS`, `OVERRIDES`, or `BOTH`. Storage moved to a shared `HasFeatures` mixin, replacing six identical copies of the same field and accessor.
+- All defaults are in `FeatureGroup.NONE` and pair with nothing. Deriving an edge is the expensive, noisy thing the feature system does, so it is opted into rather than out of.
+- `cropcsg.crop_line_to_segments_on_csg` crops a line against a whole CSG tree rather than against the convex solids around it. Cuts are honoured, so an edge a mortise crosses comes back as the two pieces either side of it rather than one run through the hole. A cylinder is solved outright rather than approximated by a circumscribing hexagon, which reported a grazing chord four times too long.
+- `geometry` gained the bounded counterparts of its primitives -- `LineSegment` and `ConvexPlanarRegion` -- plus `PlaneFrame`, `frame_for_plane`, `unit_vector` and `perpendicular_axes`. `ConvexPlanarRegion` checks its outline really is convex, since `centroid()` and `extent_along()` are only meaningful for one.
+- A timber's twelve arrises are named: `ptw.front_left` and the rest as before, and now `ptw.bottom_right` through `ptw.top_back` at the two ends, on both the PTW and rough prisms. Between faces and arrises a timber's body carries no anonymous defaults at all.
+- `identity` gained `FeaturePath`, `SingleFeaturePath`, `DerivedFeaturePath` and `identity_order`, so a derived edge can be written down as its two parent faces and found again.
+- `drawing` gained the measurement model: `MeasurementKind` composed from `MeasurementSpace`, `MeasurementOperation` and `MeasurementDirection`, plus `MeasurementFeature`, `MeasurementPlacement`, `MeasurementSource` and `does_override`, which says which of two measurements wins across three tiers of provenance.
+
+#### Changed
+
+- **Breaking:** `csgconvexhull` is now `cropcsg`. Convex hulls are how it describes a primitive, not what it does, and it now intersects lines exactly.
+  **Migrate:** `from kumiki.cropcsg import ...`.
+- **Breaking:** `bounding_half_spaces` is `solid_bounds` and returns a `SolidBounds` with three answers -- `HALF_SPACES` with the faces, `EMPTY`, or `UNKNOWN` -- rather than `Optional[List]`. Two answers for three situations meant "contains nothing" had to borrow one of the others, and the two crop functions then disagreed about what it meant.
+  **Migrate:** branch on `bounds.kind` (or `bounds.is_empty` / `bounds.is_unknown`) and read `bounds.faces`. `faces` is `None` unless the answer is `HALF_SPACES`, so a caller that forgets raises instead of reading an empty list as "unbounded".
+- **Breaking:** `region_in_plane` is `approximately_crop_plane_to_area_on_csg`, and `segment_on_line` is `crop_line_to_segments_on_csg`. The plane version still does not subtract, and its name now says so; the line version takes one tree rather than a list of solids and returns a LIST of segments, since a cut through the middle of an edge leaves a piece either side.
+  **Migrate:** pass the tree instead of `[node, solid]`; take `max(segments, key=lambda s: s.length())` where you took the one segment.
+- **Breaking:** `crop_line_to_csg` is removed. `crop_line_to_segments_on_csg` does the same job analytically, and handles the subtractions that were the sampler's only remaining advantage.
+- **Breaking:** `CutCSG.get_all_features` is `find_all_features` and `find_feature` is `find_first_feature`. Both are queries at a point, and `get_` read like `get_declared_features`, which is the one that does NOT include derived edges.
+- **Breaking:** `CSGFeature.test_point` is `test_point_unbounded`, and `CutCSG.collect_hits` is `collect_feature_hits`. The first is half a test that read as a whole one: it answers for a face's whole PLANE, and the bounding comes from `collect_feature_hits` and each enclosing node.
+- **Breaking:** `FeatureProperties.group` defaults to `FeatureGroup.NONE` rather than `FeatureGroup.A`, so a feature pairs with nothing unless asked. The only pairing the library wants today is a shoulder plane against the timber's own prism, which now says `FeatureGroup.A` explicitly.
+  **Migrate:** any feature that should form derived edges needs its group set on purpose.
+- **Breaking:** `geometry.HalfPlane` is `LineOnPlane`. A half plane is a 2D region bounded by a line; this is a line plus an orientation, with no region.
+- **Breaking:** `pathcsg.LineSegment` is `StraightSegment`, pairing with `ArcSegment` by what the segment does and leaving the name free for `geometry.LineSegment`, which is a different thing -- a bounded stretch of an infinite 3D line.
+- **Breaking:** `FeatureRegion` and `FeatureSegment` are gone, promoted to `geometry.ConvexPlanarRegion` and `geometry.LineSegment`. Neither knew what a feature was.
+- A prism's default `SIDE` and `ARRIS` indices follow `TimberFeature`'s order, so `arris.5` and `BOTTOM_FRONT_EDGE` pick out the same line. The caps are the one place they cannot agree: `CAP 0` has to mean the start end.
+
+#### Fixed
+
+- `is_point_on_boundary` answered True for points with no material within 5mm of them in any direction. A point on a subtract's surface was taken to be the wall of the hole it made, without checking the hole has a wall -- which a cut made flush with the base's own face does not, its "wall" being the open mouth of the cut.
+- An edge could be drawn straight through a notch. A cut flush with the face an arris lies in is indistinguishable, along the line alone, from a cut that formed that arris; both readings are computed now and the solid is asked where they disagree.
+- `solid_bounds` raised `TypeError` on any `PathExtrusion`, calling `seg.start()` where `start` is a property. Its bound had never once been computed.
+- `DerivedEdgeFeature.derive` accepted a parent naming a face that is not there -- the top of a prism extended to infinity, which rough stock is -- and produced an edge that then located to nothing.
+- The convexity check on a cropped region crashed on real joinery, where clipping routinely leaves two corners a rounding error apart.
+
+### kigumi
+
+#### Added
+
+- Hover highlighting, in both 3D and drawing views: what a click would take, drawn in another colour, using the click's own code rather than a cheaper likeness of it.
+- Measurement picking: selecting two features writes a measurement, with the second pick deciding the viewport and invalid picks refused rather than silently accepted.
+- Pick tolerances scale with the view. An edge or a vertex is snapped to rather than clicked, so the slack is specified in pixels -- 6 for an edge, 10 for a vertex -- and converted to world units at the clicked point.
+
+#### Changed
+
+- **Breaking (wire):** a selected edge comes back as `highlightEdgeSegments`, a list, rather than `highlightEdge`. A cut through the middle of an edge leaves a piece either side, and one line across both draws through the hole.
+- Drilling into a CSG node narrows the selection to that timber, and widening the selection again drops the focus. A CSG focus means exactly one selected timber.
+- Save-settings moved to the panel header, and debug drawing is a button rather than a checkbox.
+
+#### Fixed
+
+- Selected edges were drawn past their real boundaries, and could not be selected at all on a zoomed-out view: the tolerances the viewer worked out were dropped by the session, which rebuilds the runner payload field by field.
+- A selected timber vanished behind its neighbours as soon as a feature was selected on it -- at full opacity it drew in the opaque pass, and at 0.62 it moved into the transparent one where the neighbours had already written depth. A see-through member no longer writes depth.
+- Hovering over an already-selected feature blended into it. The hover draws over the selection now rather than under it.
+
 ## [0.5.0] - 2026-08-30
 
 ### kumiki
