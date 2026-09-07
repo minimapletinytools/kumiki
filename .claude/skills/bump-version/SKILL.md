@@ -142,20 +142,37 @@ kumiki version from the *old* major.minor line.** This has caused CI failures be
 0.4.0 release: tests mocked a `python -c ... m.version("kumiki")` response of `0.3.2`/`0.3.0`,
 which failed the coupling check against the new `0.4` line).
 
-Before committing, on any `minor`/`major` bump:
+Before committing, on any `minor`/`major` bump, grep for the **old** major.minor line across
+the whole test directory — not just near the mock:
 
 ```bash
-grep -rn "m\.version(\"kumiki\")" -A3 kigumi/__tests__/ | grep -oE "[0-9]+\.[0-9]+\.[0-9]+"
+OLD="0.5"   # the major.minor being replaced
+grep -rn "\b${OLD}\.[0-9]\+" kigumi/__tests__/
 ```
 
-This surfaces version strings returned by mocked `spawn`/subprocess calls simulating an
-installed kumiki (typically in `kigumi/__tests__/project-initializer.test.js`, near
-`createMockChildProcess({ stdoutText: '<version>\n' })` following a
-`snippet.includes('m.version("kumiki")')` check). Any fixture version whose major.minor doesn't
-match the **new** kumiki version must be bumped to the new major.minor line (e.g. `0.3.2` →
-`0.4.0`), preserving relative ordering where a test asserts an upgrade from one version to a
-later one (e.g. `0.3.0` → `0.3.2` becomes `0.4.0` → `0.4.1`, not both the same value, if the
-test is specifically checking that an upgrade path works).
+Do NOT use `grep "m\.version(\"kumiki\")" -A3` on its own. That was the instruction here
+until the 0.6.0 release, and it finds only half of what needs changing: the mocked
+`createMockChildProcess({ stdoutText: '<version>\n' })` responses that follow a
+`snippet.includes('m.version("kumiki")')` check. The **assertions** on those same versions sit
+further down the same test, well outside a 3-line window —
+
+```js
+expect(initResult.kumikiVersion).toBe('0.5.0');     // ~8 lines below the mock
+expect(updateResult.kumikiVersion).toBe('0.5.1');   // ~19 lines below
+```
+
+— so the mocks get bumped, the expectations do not, and the suite fails. Grepping the old
+major.minor catches both, and anything else keyed to it.
+
+Any version whose major.minor doesn't match the **new** kumiki version must move to the new
+line (e.g. `0.3.2` → `0.4.0`), preserving relative ordering where a test asserts an upgrade
+from one version to a later one (e.g. `0.5.0` → `0.5.1` becomes `0.6.0` → `0.6.1`, not both the
+same value — the test is specifically checking that an upgrade path works, and collapsing them
+makes it pass while testing nothing).
+
+This has bitten twice: the 0.4.0 release (mocked `0.3.2`/`0.3.0` failed the coupling check
+against the new `0.4` line) and the 0.6.0 release (mocks updated, assertions missed). Both were
+caught by the mandated test run below rather than by the grep, which is the point of running it.
 
 After editing, run the kigumi unit tests locally before committing:
 
