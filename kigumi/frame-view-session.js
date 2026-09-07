@@ -970,6 +970,12 @@ class FrameViewSession {
             point: message.point,
             currentPath: message.currentPath || [],
             ctrlClick: !!message.ctrlClick,
+            // How close counts, in world units, worked out by the viewer from
+            // what a pixel is worth where the click landed. Rebuilt field by
+            // field rather than forwarded, so anything added to the message
+            // has to be added here too -- which is how this arrived empty and
+            // edges stopped being selectable while still highlighting.
+            tolerances: message.tolerances || null,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
@@ -982,6 +988,9 @@ class FrameViewSession {
         const result = await this.runnerSession.slotRequest('hover_feature_at_point', this.slotName, {
             memberKey: message.memberKey,
             point: message.point,
+            // The same tolerances the click will use. Hover that answers by a
+            // different rule lights things a click then refuses.
+            tolerances: message.tolerances || null,
         });
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about
