@@ -876,8 +876,9 @@ def crop_line_to_segments_on_csg(
     # arris it planed away -- and along one dimension those look identical. So
     # both answers are computed: the permissive one keeps every such line, the
     # strict one lets a flush cut take it. Where they differ is exactly the set
-    # of doubtful stretches, and each is put to contains_point at its midpoint,
-    # which is a real question about the solid rather than a guess about the
+    # of doubtful stretches, and each is put to is_point_on_boundary at its
+    # midpoint -- "is this still on the surface of the piece", which is what an
+    # edge highlight means, asked of the solid rather than guessed from the
     # line. A handful of point tests per edge, only where there is doubt.
     permissive = _spans_on_csg(csg, line, seed, tolerance, flush_removes=False)
     if permissive is None:
@@ -890,7 +891,7 @@ def crop_line_to_segments_on_csg(
     gone = []
     for low, high in doubtful:
         middle = origin + direction * scalar((low + high) / 2.0)
-        if not csg.contains_point(middle, eps=scalar(_VERIFY_EPS)):
+        if not csg.is_point_on_boundary(middle, eps=scalar(_VERIFY_EPS)):
             gone.append((low, high))
     spans = _subtracted_spans(permissive, gone)
 
