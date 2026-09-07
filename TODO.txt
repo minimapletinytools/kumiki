@@ -212,8 +212,17 @@ DONE-selected edges still going past their boundaries
 DONE-feature highlightnig is too hard to see on already selected CSG, as the yellow and blue don't mix, so make it more clear
 DONE-BUG when a timber has features selected, the unselected features no longer render through timbers tha cover them. When a timber is plainly selecetd, it will render through timbers that cover them. plesae fix
 DONE-edge highlighting/selecting tolerance got really small again.. fix it
+DONE-can't seem to select edges anymroe (highlight possible, select always goes to face)
 
--highlight nedes to be more aggressive. I tihnk there's some debouncing right now on already highligted features or something cuz if you mouse around an already highlighted featuer it's unwilling to highlight nearbye stuff. IDK something is stil werid
+-highlight is kind aweird. I tihnk there's some debouncing right now on already highligted features or something cuz if you mouse around an already highlighted featuer it's unwilling to highlight nearbye stuff. IDK something is stil werid
+  -Issue 2 — I ruled two things out but haven't confirmed the cause.
+    Not the dedup: HoverState.sameFeature compares memberKey + path + featureLabel, and moving between features changes at least one, so it redraws correctly. Not the resolution either — the sweep above shows neighbouring points resolving to different features cleanly.
+
+    What I did measure: feature resolution costs 0.77ms on a 28-triangle test timber, and earlier today I measured it doubling (0.40 → 0.81ms) when default features landed — every primitive now names ~18 things instead of 0. A hover answer is a full pick, including the triangle walk for the highlight mesh, and HoverState deliberately allows only one question in flight, so the highlight refreshes at exactly the rate the runner answers. If that rate roughly halved, "unwilling to highlight nearby stuff" is what a lagging highlight feels like — it's behind you, not stuck.
+
+    That's a plausible mechanism, not a confirmed one, and I'd rather not repeat today's pattern of a confident wrong answer. The decisive test is a live profile of one hover round-trip in the running extension. If it confirms, the fix is a cheaper hover path — resolve the feature but skip the triangle walk until the pointer rests — which is roughly what the original design intended before hover was made byte-identical to a click.
+
+    Want me to add that timing to the hover result so it shows up in the viewer log?
 
 
 -add instructions for model house building
