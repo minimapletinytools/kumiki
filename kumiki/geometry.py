@@ -240,6 +240,10 @@ class LineSegment:
 # leaves a corner that should be exactly straight at around 1e-15.
 STRAIGHT_ENOUGH = 1e-9
 
+# How short an edge may be, as a fraction of the outline's longest, before it
+# counts as no edge at all.
+_DEGENERATE_EDGE = 1e-9
+
 
 @dataclass(frozen=True)
 class ConvexPlanarRegion:
@@ -268,6 +272,13 @@ class ConvexPlanarRegion:
         normal = unit_vector(self.plane.normal)
         edges = [corners[(i + 1) % len(corners)] - corners[i] for i in range(len(corners))]
         lengths = [float((edge.T * edge)[0, 0]) ** 0.5 for edge in edges]
+        # An edge of no length has no direction, so no corner it touches turns.
+        # Negligible RELATIVE to the outline rather than absolutely zero:
+        # clipping a polygon routinely lands two corners a rounding error apart,
+        # and dividing by that length turns the noise between them into an
+        # arbitrary angle. This used to crash on real joinery.
+        longest = max(lengths) if lengths else 0.0
+        too_short = longest * _DEGENERATE_EDGE
         turning = 0
         for i in range(len(corners)):
             after = (i + 1) % len(corners)
@@ -279,10 +290,11 @@ class ConvexPlanarRegion:
             # this corner's edges happen to be or how long the longest one is.
             # Measured absolutely, a real reflex corner between two 14um edges
             # sits below the slack a 1m edge sets, and passes as convex.
-            scale = lengths[i] * lengths[after]
-            if scale == 0.0:
-                # A repeated corner: no edge, so no direction, so no turn.
+            if lengths[i] <= too_short or lengths[after] <= too_short:
+                # A repeated corner, or one the clip left a rounding error away
+                # from its neighbour.
                 continue
+            scale = lengths[i] * lengths[after]
             turn = float(
                 (cross_product(edges[i], edges[after]).T * normal)[0, 0]
             ) / scale
