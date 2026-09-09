@@ -1,4 +1,62 @@
 
+:: 9/8/2026 project notes
+
+Subject: Kumiki Project Ideas — Disassembly Solver + 3D-to-Code “Pullbacks”
+
+1. Improved disassembly solver
+Goal: Expand Kumiki’s current disassembly system from simple one-axis separation into a general system capable of planning and visualizing multi-step disassemblies.
+
+Solver requirements:
+
+Basic: Continue supporting existing single step disassembly.
+Multi-step motion: Support joints where one motion unlocks another degree of freedom.
+Three-piece interlocking “3D plus” Kumiki puzzle, where a piece must first twist before the others can separate. (3 piece burr puzzle https://www.instructables.com/3-Piece-Burr-Puzzle/)
+Kanawa Tsugi and similar joints where pieces must first move along one axis and then separate along another.
+Stretch goal — complex Kumiki puzzles: Handle highly interlocking assemblies where the available degrees of freedom change continuously based on the positions of multiple pieces. The constraints may effectively be functions of the geometry/state of several interacting timbers and need to be incorporated into the solver.   (do the gordian knot puzzle and a puzzle box example)
+Visualization / UX requirements:
+
+Allow timbers to be grouped into disassembly stages, so an assembly can be demonstrated step-by-step.
+Support symmetric disassembly. For example, the four sides of a frame should move outward simultaneously at equal speeds/distances rather than arbitrarily moving one at a time.
+Ideally symmetry can be auto-discovered.
+Users could also explicitly specify symmetry/grouping when necessary.
+Once a piece has moved far enough to become unconstrained, continue moving it a little farther to create a visually clean exploded/disassembled view.
+
+you should also be able to manually override any dissably, either becaues yo uwant it solevd in your own way or because it can't besolved or sometihng.
+
+2. 3D-to-code “pullbacks”
+Goal: Make the 3D viewer an interactive interface for discovering and modifying the code that generated the model, without trying to turn Kumiki into a conventional GUI CAD system.
+
+Many useful dimensions in programmatic CAD ultimately come from simple literals or constants—for example, tenon width, timber length, or timber position. When that is the case, Kumiki should be able to connect geometry in the viewer back to the relevant source code. If a value is derived in a way that can’t reasonably be traced/editable, it’s fine for the feature simply not to be available.
+
+Source metadata:
+
+Timber and joint creation should retain metadata identifying the relevant source location (file/line, etc.).
+This lets the viewer connect rendered geometry back to the code responsible for it.
+Editable properties / gizmos:
+
+Timber and joint definitions should be able to expose specific modifier capabilities, such as:
+Change timber length.
+Change timber position between two posts.
+Change tenon width.
+Change a joint dimension.
+When authoring a timber or joint, these properties can be associated with geometric features in the resulting model.
+For example, “tenon width” could be associated with the two sides/faces that define the tenon’s width.
+Phase 1 — viewer → source code:
+
+The viewer exposes/highlights these editable features.
+Hovering/selecting a modifier visually shows exactly which geometry the property controls.
+The user can select something like “Change tenon width.”
+A Go to source action jumps directly to the relevant parameter in the code.
+This gives useful visual editing affordances without requiring Kumiki to actually modify the program automatically.
+Phase 2 / stretch goal — direct manipulation:
+
+Add conventional CAD-like handles/gizmos that can be dragged directly in the 3D viewer.
+Dragging changes the corresponding literal/constant in the source code and reruns/re-renders the model.
+Ideally this feels close to real-time, although this depends on whether Kumiki’s code → geometry update loop can be made fast enough.
+The key idea is that the code remains the source of truth. The 3D viewer becomes a visual interface into that code rather than a separate modeling system.
+
+
+
 :: 9/6/2026 house model notes
 
 Sometimes it may be helpful to have supporting / reference structures in your models, usually of another building. These models DO NOT need to be detailed technical models, they just need to "look about right". For buliding-like supporting structures, follow the procedure
