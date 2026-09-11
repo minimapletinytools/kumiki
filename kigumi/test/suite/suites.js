@@ -11,6 +11,7 @@ const SUITE_FILES = {
     'extension-assembly-drive.test.js',
     'extension-complex-validation.test.js',
     'extension-initialization-workflow.test.js',
+    'extension-kiwari-panel.test.js',
   ],
 };
 

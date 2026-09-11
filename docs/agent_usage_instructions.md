@@ -155,7 +155,53 @@ def example() -> Frame:
 
 The `example` function name is special, it is what kigumi will scan for and render when opening your file.
 
-Supported arguments types added to the `example` function will be displayed in the parametrization section in Kigumi. However remember that since the update flow is agentic, having constants in the example file is often better. All arguments to the `example` function must have default values.
+## Parameters (kiwari)
+
+A frame can expose numbers for the user to adjust in Kigumi's parameters panel.
+Declare them with a **kiwari** (木割 -- the traditional system that sets every
+member's dimension from a small set of base numbers) inside the function, and
+hand it back on the Frame:
+
+```python
+def example(k: Optional[Kiwari] = None) -> Frame:
+    k = kiwari(
+        legs=kiwari.count(4, minimum=3, maximum=12, about="How many legs"),
+        seat_height=kiwari.length(mm(450), about="Floor to the top of the seat"),
+        splay=kiwari.angle(degrees(10)),
+        butt_end=kiwari.choice(TimberEnd, TimberEnd.TOP),
+    ).resolve(k)
+
+    for i in range(k.count("legs")):
+        ...
+    return Frame.from_joints(joints, name="stool", kiwari=k)
+```
+
+`.resolve(k)` lays whatever Kigumi sent over your defaults and checks it against
+the declarations above, so `example()` with no argument still builds the
+defaults -- which is what a script or a test wants.
+
+Declare with `kiwari.length`, `.angle`, `.count`, `.number`, `.flag`, `.text`,
+`.choice` (pass the Enum class), `.point2` and `.point3`. Read back with the
+matching accessor: `k.length("seat_height")`, `k.count("legs")`,
+`k.choice("butt_end")`. Asking for the wrong one raises where you asked, which
+is the point of reading them by kind rather than by a single `get`.
+
+The helpers live on `kiwari` rather than as bare names because `length`,
+`count` and `angle` are ordinary local variable names -- a local one shadows a
+module-level function for the whole function body, including the line above
+that tried to call it.
+
+Lengths are metres and angles are radians, as everywhere else in kumiki. The
+user types `450mm`, `18in`, `1 1/4"` or `2'6"` and the panel reads it; a bare
+number takes whichever unit the viewer is set to. Formulas are not supported.
+
+Since the update flow is agentic, a constant in the file is often still better
+than a parameter -- reach for a kiwari when the user genuinely wants to try
+values themselves, not for everything that happens to be a number.
+
+Changing parameters in Kigumi does not edit your file. Saving them writes
+`<yourfile>.parameters.json` beside it, holding only the values that differ
+from what the code says, and it is loaded automatically next time.
 
 # Code Style Guide
 

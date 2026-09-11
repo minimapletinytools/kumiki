@@ -2712,6 +2712,19 @@ class KigumiViewerApp extends LitElement {
                     rawPythonOutputPanelIndex: rawPanelIndex,
                     isRawPythonOutputPanelLast: rawPanelIndex >= 0 && rawPanelIndex === titles.length - 1,
                     hasRenderControls: Boolean(this.renderRoot.querySelector('#render-controls')),
+                    hasKiwariControls: Boolean(this.renderRoot.querySelector('#kiwari-controls')),
+                    kiwariKeys: Array.from(this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-key'))
+                        .map((element) => (element.textContent || '').trim()),
+                    kiwariChangedKeys: Array.from(
+                        this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-row-changed .kiwari-key'),
+                    ).map((element) => (element.textContent || '').trim()),
+                    kiwariBadKeys: Array.from(this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-row'))
+                        .filter((row) => row.querySelector('.kiwari-box-bad'))
+                        .map((row) => (row.querySelector('.kiwari-key').textContent || '').trim()),
+                    kiwariBuildDisabled: (() => {
+                        const button = this.renderRoot.querySelector('#kiwari-build-btn');
+                        return button ? button.disabled : null;
+                    })(),
                     memberRowCount: memberRows,
                     logTextLength: logText.length,
                 },

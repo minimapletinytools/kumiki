@@ -74,6 +74,11 @@ Math types, units, and math-related utilities. All math code must use these type
 ### kumiki/measuring.py
 Measure/mark pattern for locating features on timbers and marking things relative to features.
 
+### kumiki/kiwari.py
+`Kiwari` — the numbers a frame or pattern may be adjusted by in Kigumi: what
+they are, what they default to, and what they are allowed to be. Declared
+inside the builder and handed back on the `Frame`, or declared on a `Pattern`.
+
 ## Understanding Kumiki
 
 Please see docs/concepts.md to understand the core concepts and architecture of Kumiki.
@@ -257,6 +262,21 @@ Patterns are simple examples demonstrating joints or other deconstruted concepts
 - pattern should always use canonical arrangement in example_shavings.py when possible. 
 - each joint should have at least one pattern
 - if a joint has multiple patterns, they should all be in a subfolder named after the joint
+- a pattern takes exactly one argument, the `center` it is raised at. Anything
+  else the user may adjust is declared in a kiwari on the `Pattern` itself:
+
+  ```python
+  Pattern(
+      path="butt_joints/plain_butt_joint",
+      lambda_=make_pattern_from_frame(make_butt_joint_example),
+      kiwari=kiwari(angle=kiwari.angle(degrees(90), minimum=degrees(30))),
+  )
+  ```
+
+  The lambda is then called with `(center, kiwari)`; a pattern that declares
+  none is called with `(center)` alone. Prefer a second `Pattern` over a
+  parameter where the variants are worth seeing side by side in the sidebar —
+  a round-timber version of a joint is a pattern, not a toggle.
 
 Kumiki also ships with a few example Frames that demonstrate how to put everything together. In general, follow agent_usage_instructions.md for authoring patterns and example frames.
 
