@@ -295,17 +295,22 @@ IGNORE-consider refactoring runner.py
 
 -DRAWING NONSENSE
   DONE-fix lighting in ortho drawing
+  DONE-following up on viewports, lets create a proper viewport class in DRawing.py that matches the viewport topology we had worked on earlier. The viewport class holds its label, sizing informatio and eventually other viewport specific info. It is unaware of its own position in the hierarchy but is aware of its chlidren. in order to get its ID, it must be queried from the DRawing objec tthat owns the viewport. can you propose a plan to refactor drawing.py so thta viweport info is contained as such
+  DONE-reflects should not render in drawing moed
+
   
-  -reflects should not redner in drawing moed
-  -do the viewport refactor
-  -give viewports labels
-  -add background border for drawing...
+
+  -do the drawing border and meta info stuff
+    -add background border for drawing...
+    -add meta info stuff for drawing.... (some way to prevent projects from intersecting with it?)
+
   -and you should highlight the refreence edge as wel if there is one in drawing mode
       -or just add an option in general to highlight the reference edge for 3d view mode as well
   -make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
     -welly oush ould force show lines for PTW faces (maybe light grey)
     -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
       for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
+      
   -conisder just shippingthe defalut drawing with every frame by default 
   -add support for 3d measurements
     -maybe there should be a spceial drawing that's available in regular view mode...
