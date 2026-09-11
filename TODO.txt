@@ -1,3 +1,39 @@
+:: 9/10/2026
+
+Frames parameter refactor. 
+
+Frames expose parameters that can be adjusted in the kigumi UI. 
+There are a few major components
+
+
+Parameters input UI overhaul
+- determine the set of supported parameter types and create easy UI for each of them
+  - support "10in" "20mm" "1 1/4"" string parsing syntax for dimensioned numbers
+  - enums should come from a dropdown that you can type to search as well
+  - special UI for V2 V3 types
+-integer/float dimensionless number types
+-formulas explicityl not supported yet
+-sensible UI for rejecting invalid inputs when typed in
+
+
+Overhaul the way parameters are exposed:
+-first step is to get rid of the current frame function argument reflection system (don't mind that this is a breaking change)
+-create some new FrameParameter object (or come up with a cuter in-theme name for this, IDK what it could be)
+  -the FrameParameter has function to pull out typed values from keys
+  -if a the key/type/dimeniosn that's pulled out of it that does not match FrameParameterConfiguration raise an error or warning or something
+-Frame function may optionally take this object
+-Frames now include a FrameParameterConfiguration object which defines a list of parameter,s their type,s if they have dimensions, their default values, etc
+-kigumi picks up this object, loads up the configuration panel based on its contents, and then writes it back to the FrameParameter when updating the frame if there were any changes
+-update all the configureable patterns to use this new pattern to set parameters. The center argument is still provided explicitly, this is a unique feature of patterns sa they can be repositioned and we do not leverage the FrameParameter object for this.
+
+
+Additional UI changes
+- parameters that aren't default should be highlighted so it's clear which ones have been modified
+- add a "save to companion file"
+  - if you change parameters on myframe.py it saves parameters to myframe.parameters.json or osmething like that
+  - auto loads
+  - this option is not available when viewing patterns since we shouldn't write to library folders
+
 
 :: 9/8/2026 project notes
 
@@ -248,38 +284,44 @@ DONE-highlight is kind aweird. I tihnk there's some debouncing right now on alre
 
     Want me to add that timing to the hover result so it shows up in the viewer log?
 DONE-finish halfspace decorative cut 
+DONE/IGNORE-fix tusk failing from other direction bug
+DONE-test out roundover on bottom stretchers again on coffee table
+DONE-figure out why roundovers break on stretcher sin coffe tabel (I tihnk ivene if you don't do the hous ejoint)
+IGNORE-consider refactoring runner.py
 
+-consider doing the big 1 joint per file reorg
+  -decide how to reorg examples too...
+  -maybe get ird of folder + example support, examples are always leaf nodes?
 
 -DRAWING NONSENSE
+  DONE-fix lighting in ortho drawing
+  -"draw" button should say "new drawing" instead
+  -reflects should not redner in drawing moed
+  -do the viewport refactor
+  -give viewports labels
+  -add background border for drawing...
+  -and you should highlight the refreence edge as wel if there is one in drawing mode
+      -or just add an option in general to highlight the reference edge for 3d view mode as well
   -make sure drawings only intersect with PTW, in regular view mode mode they intersect with whatever, but if you neter draw mode you can only intersect with PTW faces even if they dont' show 
     -welly oush ould force show lines for PTW faces (maybe light grey)
-    -and you should highlight the refreence edge as wel if there is one in drawing mode
-    -or just add an option in general to highlight the reference edge for 3d view mode as well
     -right now edges are intersecting with rough surface (which may line up with perfect)... but we should probably perfer perfect... figure out the rule for this
       for rough vs ptw, the rule is acutally when cilkcing in the editor, it's fine, if its showing rough it's rough if it's showing ptw it's ptw based on render settings. for drawings, we should actually raycast onto both ptw and rough, if they hapen to coincide prefer ptw, and then if you ever have ae measurement against rough, put an asterix on it or osmetihng in tree view to indicate it's being measured froma rough surface. what dyou think about that?
-  -conisder just shippingthe defalut drawing with every frame by fdefault
+  -conisder just shippingthe defalut drawing with every frame by default 
   -add support for 3d measurements
     -maybe there should be a spceial drawing that's available in regular view mode...
   -revisit how to do LHS menu for drawing mode...
-  -get rid of the "draw" button, instead it should show up in the selection view and probabyl show a warning indicating "kumiki prefers that drawings are written with code, but manual drawing issuppotr here..."
-  -give viewports labels
-  -add background border for drawing...
-  -fix lighting in ortho drawing
+  
+  
+  
 
-
--consider refactoring runner.py
-
--do notes for cross_lap_butt_joint
-  -make 1 prompt video of the coding of the joint
-  -make 1 prompt video to make the sawhorse with this joint
-DONE-test out roundover on bottom stretchers again on coffee table
--figure out why roundovers break on stretcher sin coffe tabel (I tihnk ivene if you don't do the hous ejoint)
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
 
--do a pass on parametric parameters that show up in kigumi so they are human readbels and useable..
--fix tusk failing from other direction bug
+-DO THE PARAMETRIC PARAMETER REFACTOR
+
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
+
+
 -rename/reorg all mortise and tenon joints
   DONE-mortise_and_tenon_join/...
   DONE-delete 45 degree relative tenon size, basic, 
@@ -295,9 +337,6 @@ DONE-test out roundover on bottom stretchers again on coffee table
 -add STL mesh support shouldn't be hard :O
   -make a cabriole leg table example 
     -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
--consider doing the big 1 joint per file reorg
-  -decide how to reorg examples too...
-  -maybe get ird of folder + example support, examples are always leaf nodes?
 -do joint rename to match what's in your new book
 -add shouder to cross lap joint
   -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
@@ -363,6 +402,10 @@ DONE-test out roundover on bottom stretchers again on coffee table
     -where 1 CutTimber is just substracted from another timber, useful for making modifications not readily supported... 
     -may as well do a union joint then? (these would really be decorative joints...)
     -or would it be better just to have folsk make custom joints
+  -do notes for cross_lap_butt_joint
+  -make 1 prompt video of the coding of the joint
+  -make 1 prompt video to make the sawhorse with this joint
+  -finish dovetail jonit
   -finish cut_board_in_dado_joint_on_plane_aligned_timbers
   -do router joint stuff
   -add wedges to mortise and tenon
