@@ -155,6 +155,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const hoverStateJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'hover-state.js'))).toString();
     const measureModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measure-mode.js'))).toString();
     const pickTolerancesJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'pick-tolerances.js'))).toString();
+    const renderModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'render-mode.js'))).toString();
     const drawingPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'drawing-panel.js'))).toString();
     const geometryModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'geometry-mode.js'))).toString();
     const csgTreeViewJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'csg-tree-view.js'))).toString();
@@ -210,6 +211,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__HOVER_STATE_JS_URI__', hoverStateJsUri)
         .replace('__MEASURE_MODE_JS_URI__', measureModeJsUri)
         .replace('__PICK_TOLERANCES_JS_URI__', pickTolerancesJsUri)
+        .replace('__RENDER_MODE_JS_URI__', renderModeJsUri)
         .replace('__DRAWING_PANEL_JS_URI__', drawingPanelJsUri)
         .replace('__GEOMETRY_MODE_JS_URI__', geometryModeJsUri)
         .replace('__CSG_TREE_VIEW_JS_URI__', csgTreeViewJsUri)

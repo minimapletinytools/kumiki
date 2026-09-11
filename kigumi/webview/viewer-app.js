@@ -144,6 +144,7 @@ const MEASUREMENT_ANGLE_RADIUS_PX = 34;
 // piece among its neighbours, not enough to be mistaken for part of the sheet.
 const DRAWING_CONTEXT_OPACITY = 0.05;
 
+
 // Turning a piece about its own axis covers a full turn in about the width of
 // the viewport, which is roughly how fast a free orbit yaws.
 const DEFAULT_AXIS_ORBIT_SPEED = 0.008;
@@ -1392,6 +1393,9 @@ class KigumiViewerApp extends LitElement {
         this.tempPlaneHit = new THREE.Vector3();
 
         this.sun = null;
+        this.ambient = null;
+        this.fill = null;
+        this.viewLight = null;
         this.shadowCatcher = null;
         this.orbitCenterGizmo = null;
 
@@ -1856,16 +1860,31 @@ class KigumiViewerApp extends LitElement {
 
         this.rebuildViewports();
 
-        this.scene.add(new THREE.AmbientLight(0xffffff, 0.61));
-        this.sun = new THREE.DirectionalLight(0xffffff, 0.62);
+        // Intensities are not set here: applyRenderMode writes all four every
+        // frame, so whatever they are built with is overwritten before the
+        // first paint. Setting them twice would only invite the two to drift.
+        this.ambient = new THREE.AmbientLight(0xffffff, 0);
+        this.scene.add(this.ambient);
+        this.sun = new THREE.DirectionalLight(0xffffff, 0);
         this.sun.position.set(2, 1, 18);
         this.sun.castShadow = true;
         this.sun.shadow.bias = -0.00008;
         this.sun.shadow.mapSize.set(2048, 2048);
         this.scene.add(this.sun);
-        const fill = new THREE.DirectionalLight(0xd8e3f5, 0.34);
-        fill.position.set(-4, 3, -6);
-        this.scene.add(fill);
+        this.fill = new THREE.DirectionalLight(0xd8e3f5, 0);
+        this.fill.position.set(-4, 3, -6);
+        this.scene.add(this.fill);
+
+        // The sheet's light. Added once and dimmed rather than added and
+        // removed, because three.js keys its shader programs on how many lights
+        // of each kind a scene has: taking one out recompiles every material in
+        // the viewer, and switching between the model and a sheet would do it
+        // each way.
+        this.viewLight = new THREE.DirectionalLight(0xffffff, 0);
+        this.viewLight.castShadow = false;
+        this.scene.add(this.viewLight);
+        this.scene.add(this.viewLight.target);
+        this._viewLightAim = new THREE.Vector3();
 
         this.createOrUpdateShadowCatcher(this.lastBounds);
         this.syncCameraControls();
@@ -2041,16 +2060,16 @@ class KigumiViewerApp extends LitElement {
         }
         const size = this.renderer.getSize(new THREE.Vector2());
         const pageRect = this.pageScreenRect(size.x, size.y);
-        const onPaper = Boolean(this.sceneStore.activeScene().page);
+        // Before anything is drawn, and before onPaper is read: the mode is the
+        // one answer to "sheet or model", so nothing below asks it again.
+        const { onPaper } = this.applyRenderMode();
         if (onPaper) {
             this.paintSheet(pageRect, size.y);
         }
-        // A viewport on a sheet draws on nothing: clearing colour would erase
-        // the paper and any neighbour it overlaps, which is exactly what
-        // floating means. Depth is a different matter and must still go, or a
-        // viewport depth-tests against whatever the last one left and loses
-        // geometry behind a neighbour it has no spatial relationship to.
-        this.renderer.autoClear = !onPaper;
+        // Depth is a different matter from colour (see the mode's autoClear)
+        // and must still go per viewport, or one depth-tests against whatever
+        // the last left and loses geometry behind a neighbour it has no
+        // spatial relationship to.
         // Scissoring costs nothing to skip while one viewport covers the
         // canvas, which is the 3D scene and every session before drawings.
         const scissored = onPaper || this.viewports.length > 1;
@@ -2063,12 +2082,73 @@ class KigumiViewerApp extends LitElement {
             }
             if (onPaper) {
                 this.renderer.clearDepth();
+                // Per viewport, not per sheet: each view looks a different way,
+                // and a light aimed down one of them would shade the others by
+                // how far round they are from it -- the same thing the sun was
+                // doing, just with a nearer sun.
+                this.aimViewLight(viewport.camera);
             }
             this.renderer.render(this.scene, viewport.camera);
         }
-        this.renderer.autoClear = true;
         // After the scene, so dimensions sit over what they measure.
         this.renderMeasurements();
+    }
+
+    /**
+     * Put the renderer into the mode the active scene wants. Every frame.
+     *
+     * Writes every property renderModeFor names, unconditionally, with no
+     * check for whether it already holds that value. That is the whole point:
+     * a guard is what lets a second writer drift, and a mode applied as a
+     * difference from the one before it is a mode that depends on history.
+     * Applied in full from a value derived only from the scene and the
+     * reader's settings, nothing can carry over a switch.
+     *
+     * It reads the reader's settings and never writes them, so asking for
+     * shadows while a sheet is open is remembered and takes effect on the way
+     * back out.
+     */
+    applyRenderMode() {
+        const mode = window.KigumiRenderMode.renderModeFor({
+            page: this.sceneStore.activeScene().page,
+            shadowsEnabled: this.shadowsEnabled,
+        });
+        if (this.ambient) {
+            this.ambient.intensity = mode.lights.ambient;
+            this.sun.intensity = mode.lights.sun;
+            this.fill.intensity = mode.lights.fill;
+            this.viewLight.intensity = mode.lights.viewLight;
+            this.sun.castShadow = mode.sunCastsShadow;
+        }
+        if (this.shadowCatcher) {
+            this.shadowCatcher.visible = mode.shadowCatcherVisible;
+        }
+        if (this.renderer) {
+            this.renderer.shadowMap.enabled = mode.shadowMapEnabled;
+            this.renderer.autoClear = mode.autoClear;
+        }
+        if (this.scene) {
+            this.scene.background = mode.useThemeBackground
+                ? (this._themeBackground || null)
+                : null;
+        }
+        return mode;
+    }
+
+    /**
+     * Point the sheet's light exactly where *camera* points.
+     *
+     * A directional light is only a direction -- where it sits does not matter,
+     * so this puts it at the camera and aims it one unit further along, which
+     * is the shortest way to say "from the reader's eye".
+     */
+    aimViewLight(camera) {
+        if (!this.viewLight) {
+            return;
+        }
+        camera.getWorldDirection(this._viewLightAim);
+        this.viewLight.position.copy(camera.position);
+        this.viewLight.target.position.copy(camera.position).add(this._viewLightAim);
     }
 
     /**
@@ -2118,23 +2198,6 @@ class KigumiViewerApp extends LitElement {
             };
         }
         return this._sheetColors;
-    }
-
-    /**
-     * Give the scene the background it should have.
-     *
-     * three paints a scene background as a full pass inside the active
-     * viewport, whatever the clear flags say, so on a sheet it would repaint
-     * the gradient over every neighbour and nothing would float. The page
-     * paints the paper there instead.
-     */
-    applySceneBackground() {
-        if (!this.scene) {
-            return;
-        }
-        this.scene.background = this.sceneStore.activeScene().page
-            ? null
-            : (this._themeBackground || null);
     }
 
     emitViewerLog(eventName, details = {}) {
@@ -3027,16 +3090,22 @@ class KigumiViewerApp extends LitElement {
             this.navigationRaycaster.setFromCamera(this.navigationPointer, resolved.viewport.camera);
             const hits = this.sceneManager.memberAtRay(this.navigationRaycaster, { isPickable });
             if (hits.length > 0) {
-                return hits;
+                // The camera travels with the hits, and is not looked up again
+                // later. A sheet has several viewports at different scales, and
+                // the one the ray went through is not always the one the reader
+                // last clicked in -- pick tolerances read from the active
+                // viewport instead of this one were computed at the wrong scale
+                // for every hover that had not been clicked in first.
+                return { hits, camera: resolved.viewport.camera };
             }
         }
-        return [];
+        return { hits: [], camera: this.camera };
     }
 
     // The closest visible, unlocked member hit, or null. Used where only the
     // frontmost thing matters, such as the right-click context menu.
     _findMemberAtClientPoint(clientX, clientY) {
-        return this._findMembersAlongRay(clientX, clientY)[0] || null;
+        return this._findMembersAlongRay(clientX, clientY).hits[0] || null;
     }
 
     /** Drop the CSG focus and everything that hangs off it. */
@@ -3081,8 +3150,9 @@ class KigumiViewerApp extends LitElement {
         //
         // The decision also says WHICH member, which is not the nearest one: a
         // click drills into the selected timber wherever it sits along the ray.
+        const along = this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y);
         const decision = choosePickAction({
-            hits: this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y),
+            hits: along.hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: false,
         });
@@ -3106,8 +3176,10 @@ class KigumiViewerApp extends LitElement {
             ctrlClick: false,
             request: due.request,
             // The same tolerances a click would use, or hover lights something
-            // a click then refuses to select.
-            tolerances: this._pickTolerances(target.point),
+            // a click then refuses to select -- and through the camera the ray
+            // actually went through, which on a sheet need not be the active
+            // viewport's.
+            tolerances: this._pickTolerances(target.point, along.camera),
         });
     }
 
@@ -3198,7 +3270,7 @@ class KigumiViewerApp extends LitElement {
         if (!event) {
             return;
         }
-        const hits = this._findMembersAlongRay(event.clientX, event.clientY);
+        const { hits, camera: pickCamera } = this._findMembersAlongRay(event.clientX, event.clientY);
         const decision = choosePickAction({
             hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
@@ -3230,7 +3302,7 @@ class KigumiViewerApp extends LitElement {
                     point,
                     currentPath,
                     ctrlClick: !!event.ctrlKey || !!event.metaKey,
-                    tolerances: this._pickTolerances(point),
+                    tolerances: this._pickTolerances(point, pickCamera),
                 });
             }
         } else {
@@ -3665,7 +3737,8 @@ class KigumiViewerApp extends LitElement {
             }
             this._themeBackground = tex;
             this._sheetColors = null;
-            this.applySceneBackground();
+            // Not applied here: the background is one of the things a mode
+            // says, and applyRenderMode writes it on the frame requested below.
         }
         this.style.background = this._buildCssBg(theme);
         this.applyRenderProfilesToScene();
@@ -4322,17 +4395,13 @@ class KigumiViewerApp extends LitElement {
     }
 
     setShadowsEnabled(enabled) {
+        // Records the ASK and nothing else. What it turns into -- the shadow
+        // map, the sun's castShadow, whether the catcher is drawn -- depends on
+        // whether a sheet is open as well, so it is applyRenderMode's to
+        // derive. Writing it from here too is how the two used to disagree
+        // about a sheet.
         this.displayOptions.set('shadowsEnabled', enabled);
-        const on = this.shadowsEnabled;
-        if (this.renderer) {
-            this.renderer.shadowMap.enabled = on;
-        }
-        if (this.sun) {
-            this.sun.castShadow = on;
-        }
-        if (this.shadowCatcher) {
-            this.shadowCatcher.visible = on;
-        }
+        this.requestUpdate();
     }
 
     setReflectionsEnabled(enabled) {
@@ -4533,10 +4602,19 @@ class KigumiViewerApp extends LitElement {
     // THREE.LineMaterial's resolution uniform needs the actual canvas size in
     // pixels; falls back to a 1x1 placeholder before the renderer exists
     // (onWindowResize() and setEdgeLineThicknessPx() keep it correct afterwards).
-    /** The pick tolerances a click at *worldPoint* should be judged by. */
-    _pickTolerances(worldPoint) {
+    /**
+     * The pick tolerances a click at *worldPoint* should be judged by.
+     *
+     * The camera is an argument rather than a lookup. Slack is specified in
+     * pixels and converted to world units through the camera's scale, so it
+     * belongs to the view the ray went through -- and on a sheet that is
+     * whichever viewport the pointer is over, not the one that happens to be
+     * active. Reading `this.camera` here silently used the wrong scale for
+     * every hover over a viewport the reader had not clicked in.
+     */
+    _pickTolerances(worldPoint, camera) {
         return window.KigumiPickTolerances.pickTolerances(
-            this.camera, this._getRendererResolution().y, worldPoint);
+            camera || this.camera, this._getRendererResolution().y, worldPoint);
     }
 
     _getRendererResolution() {
@@ -4610,7 +4688,8 @@ class KigumiViewerApp extends LitElement {
 
         this.shadowCatcher.position.set(centerX, centerY, groundZ + 0.0001);
         this.shadowCatcher.scale.set(this.shadowSize, this.shadowSize, 1);
-        this.shadowCatcher.visible = this.shadowsEnabled;
+        // Whether it is drawn is applyRenderMode's, on the next frame. This
+        // builds the thing; it does not decide when it is wanted.
         this.updateReflectionTransforms();
         this.configureShadowCamera(bounds, this.shadowSize);
     }
@@ -5779,7 +5858,6 @@ class KigumiViewerApp extends LitElement {
         }
         this.rebuildViewports();
         this.syncCameraControls();
-        this.applySceneBackground();
         this.applyFootprintVisibility();
         this._layersDrawingsChanged();
         this._syncDrawingPanel();
