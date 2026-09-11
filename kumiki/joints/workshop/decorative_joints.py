@@ -6,8 +6,8 @@ import warnings
 from typing import Dict, List, Optional, Tuple, Union
 
 from kumiki.timber import BlockLike, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge, Cutting, Joint, JointTicket
-from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation, Abs, Matrix, degrees
-from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg, CutCSGLabel
+from kumiki.rule import Numeric, Comparison, safe_compare, safe_zero_test, scalar, create_v2, Transform, Orientation, Abs, Matrix, degrees, safe_normalize_vector, safe_dot_product, cos, sin
+from kumiki.cutcsg import RectangularPrism, Cylinder, Difference, SolidUnion, adopt_csg, CutCSGLabel, HalfSpace
 from kumiki.pathcsg import PathSegment, StraightSegment, Path, PathExtrusion
 from kumiki.measuring import get_center_point_on_face_global
 
@@ -474,13 +474,19 @@ def cut_practice_path_extrusion_corner_end_decoration(
 
 
 def cut_practice_straight_angled_end_cut_decoration(
-        timber: BlockLike, 
-        front_face: TimberFace, 
-        position_from_end: Numeric,
-        angle: Numeric = degrees(0),
-        angle_towards_face: Optional[TimberFace] = None
-    ) -> Joint:
+    timber: BlockLike,
+    front_face: TimberFace,
+    position_from_end: Numeric,
+    angle: Numeric = degrees(0),
+    angle_towards_face: Optional[TimberFace] = None,
+    timber_end: Union[TimberEnd, TimberFace] = TimberEnd.TOP,
+) -> Joint:
     """
+    Cuts a straight angled cut on `timber_end` of `timber`.
+
+    Looking straight at `front_face` (the face from which the angled cut outline
+    is visible), the cut is angled by `angle` (0 is perpendicular to the length axis)
+    and passes through `timber`'s centerline at distance `position_from_end` from `timber_end`.
 
     ____________
     front_face  \\      <-timber_end
@@ -488,10 +494,66 @@ def cut_practice_straight_angled_end_cut_decoration(
 
     Args:
         timber: the timber to have the decoration cut on it
-        timber_end: the end of the timber the decoration is cut on
-        position_from_end: distance from timber_end along the timber's centerline where the angle cut plane lies 
-        angle: angle to make the cut, 0 is perpendicular, angle is in the front_face axis
         front_face: the face that the angle cut is visible from
+        position_from_end: distance from timber_end along the timber's centerline where the angle cut plane lies
+        angle: angle to make the cut, 0 is perpendicular, angle is in the front_face axis
+        angle_towards_face: optional face towards which positive angle tilts
+        timber_end: the end of the timber the decoration is cut on (defaults to TimberEnd.TOP)
+
+    Returns:
+        Joint containing the decorative cutting
     """
-    # TODO finish
-    pass
+    timber_end_face = timber_end.to.face()
+    assert timber_end_face in (TimberFace.TOP, TimberFace.BOTTOM), (
+        f"timber_end must be TOP or BOTTOM, got {timber_end}"
+    )
+
+    front_face_val = front_face.to.face()
+    assert front_face_val in (TimberFace.RIGHT, TimberFace.FRONT, TimberFace.LEFT, TimberFace.BACK), (
+        f"front_face must be a long face (RIGHT, FRONT, LEFT, BACK), got {front_face}"
+    )
+
+    span_face = timber_end_face.rotate_about(front_face_val)
+    if angle_towards_face is None:
+        towards_face = span_face
+    else:
+        towards_face = angle_towards_face.to.face()
+        assert towards_face in (span_face, span_face.get_opposite_face()), (
+            f"angle_towards_face must be one of the faces perpendicular to front_face and length axis "
+            f"({span_face.name} or {span_face.get_opposite_face().name}), got {towards_face.name}"
+        )
+
+    assert safe_compare(Abs(angle), degrees(90), Comparison.LT), (
+        f"angle ({angle}) must be strictly between -90 and +90 degrees"
+    )
+    assert safe_compare(position_from_end, 0, Comparison.GE), (
+        f"position_from_end ({position_from_end}) must be non-negative"
+    )
+    assert safe_compare(position_from_end, timber.length, Comparison.LE), (
+        f"position_from_end ({position_from_end}) cannot exceed timber length ({timber.length})"
+    )
+
+    end_dir = timber.get_face_direction_global(timber_end_face)
+    towards_dir = timber.get_face_direction_global(towards_face)
+    end_center_global = get_center_point_on_face_global(timber_end_face, timber)
+    pivot_global = end_center_global - end_dir * position_from_end
+
+    cut_normal_global = safe_normalize_vector(cos(angle) * end_dir + sin(angle) * towards_dir)
+    offset_global = safe_dot_product(pivot_global, cut_normal_global)
+
+    half_space_global = HalfSpace(
+        normal=cut_normal_global,
+        offset=offset_global,
+        label=CutCSGLabel("straight_angled_end_cut"),
+    )
+
+    negative_csg = adopt_csg(None, timber.transform, half_space_global)
+    cutting = Cutting(
+        timber=timber,
+        negative_csg=negative_csg,
+        label=CutCSGLabel("straight_angled_end_cut_decoration"),
+    )
+    return Joint(
+        cuttings={timber.ticket.path: cutting},
+        ticket=JointTicket(joint_type="straight_angled_end_cut_decoration"),
+    )

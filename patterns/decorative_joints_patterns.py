@@ -102,6 +102,24 @@ def example_path_extrusion_corner_end_decoration() -> Joint:
     )
 
 
+def example_straight_angled_end_cut_decoration() -> Joint:
+    """A single timber with an angled cut decoration on its top end."""
+    timber = Timber(
+        length=feet(4),
+        size=Matrix([inches(4), inches(6)]),
+        transform=Transform.identity(),
+        ticket=TimberTicket(path="timber"),
+    )
+    return cut_practice_straight_angled_end_cut_decoration(
+        timber=timber,
+        front_face=TimberFace.FRONT,
+        position_from_end=inches(3),
+        angle=degrees(30),
+        angle_towards_face=TimberFace.RIGHT,
+        timber_end=TimberEnd.TOP,
+    )
+
+
 patterns = [
     Pattern(
         path="decorative_joints/roundover",
@@ -124,6 +142,12 @@ patterns = [
     Pattern(
         path="decorative_joints/path_extrusion_corner_end",
         lambda_=make_pattern_from_joint(example_path_extrusion_corner_end_decoration),
+        pattern_type='frame',
+        tags=['main'],
+    ),
+    Pattern(
+        path="decorative_joints/straight_angled_end_cut",
+        lambda_=make_pattern_from_joint(example_straight_angled_end_cut_decoration),
         pattern_type='frame',
         tags=['main'],
     ),

@@ -9,9 +9,10 @@ from kumiki.joints.workshop.decorative_joints import (
     cut_practice_roundover_decoration,
     cut_practice_rafter_tail_scallop_corner_end_decoration,
     cut_practice_rounded_end_decoration,
+    cut_practice_straight_angled_end_cut_decoration,
 )
 from kumiki.ticket import TimberTicket
-from kumiki.rule import scalar, Transform, Matrix
+from kumiki.rule import scalar, Transform, Matrix, degrees
 from kumiki.timber import Timber, TimberEdge, TimberEnd, TimberFace, TimberLongFace, TimberShortEdge
 from kumiki.cutcsg import Difference, Cylinder
 from kumiki.triangles import triangulate_cutcsg
@@ -288,3 +289,108 @@ class TestRoundedEndDecoration:
                 radius=scalar(1),  # half-extent along Y is 3 > radius
                 distance_from_end=scalar(1),
             )
+
+
+class TestStraightAngledEndCutDecoration:
+    """Tests for cut_practice_straight_angled_end_cut_decoration."""
+
+    def test_joint_structure(self):
+        timber = _make_timber()
+        joint = cut_practice_straight_angled_end_cut_decoration(
+            timber,
+            front_face=TimberFace.FRONT,
+            position_from_end=scalar(2),
+            angle=degrees(45),
+            angle_towards_face=TimberFace.RIGHT,
+            timber_end=TimberEnd.TOP,
+        )
+
+        assert joint.ticket.joint_type == "straight_angled_end_cut_decoration"
+        assert joint.is_decorative()
+        assert set(joint.cuttings.keys()) == {"timber"}
+        cutting = joint.cuttings["timber"]
+        assert cutting.label.name == "straight_angled_end_cut_decoration"
+        assert cutting.negative_csg is not None
+
+    def test_angled_cut_geometry_and_watertight(self):
+        timber = _make_timber()
+        joint = cut_practice_straight_angled_end_cut_decoration(
+            timber,
+            front_face=TimberFace.FRONT,
+            position_from_end=scalar(2),
+            angle=degrees(45),
+            angle_towards_face=TimberFace.RIGHT,
+            timber_end=TimberEnd.TOP,
+        )
+        cutting = joint.cuttings["timber"]
+        assert cutting.negative_csg is not None
+        full_prism = timber.get_perfect_timber_within_csg_local()
+        result_csg = Difference(base=full_prism, subtract=[cutting.negative_csg])
+        mesh = triangulate_cutcsg(result_csg).mesh
+        assert mesh.is_watertight
+
+        original_volume = float(WIDTH) * float(HEIGHT) * float(LENGTH)
+        # Symmetrical 45-degree angle about Z=10 across X in [-2, 2]
+        expected_remaining_volume = float(WIDTH) * float(HEIGHT) * 10.0
+        assert mesh.volume == pytest.approx(expected_remaining_volume, rel=1e-3)
+
+        # Centerline (X=0) boundary is at Z=10
+        assert result_csg.contains_point(Matrix([0.0, 0.0, 9.9]))
+        assert not result_csg.contains_point(Matrix([0.0, 0.0, 10.1]))
+
+        # RIGHT edge (X=+2) boundary is at Z=8
+        assert result_csg.contains_point(Matrix([2.0, 0.0, 7.9]))
+        assert not result_csg.contains_point(Matrix([2.0, 0.0, 8.1]))
+
+        # LEFT edge (X=-2) boundary is at Z=12
+        assert result_csg.contains_point(Matrix([-2.0, 0.0, 11.9]))
+
+    def test_bottom_end_and_reversed_angle(self):
+        timber = _make_timber()
+        joint = cut_practice_straight_angled_end_cut_decoration(
+            timber,
+            front_face=TimberFace.FRONT,
+            position_from_end=scalar(2),
+            angle=degrees(45),
+            angle_towards_face=TimberFace.LEFT,
+            timber_end=TimberEnd.BOTTOM,
+        )
+        cutting = joint.cuttings["timber"]
+        assert cutting.negative_csg is not None
+        full_prism = timber.get_perfect_timber_within_csg_local()
+        result_csg = Difference(base=full_prism, subtract=[cutting.negative_csg])
+        mesh = triangulate_cutcsg(result_csg).mesh
+        assert mesh.is_watertight
+
+        expected_remaining_volume = float(WIDTH) * float(HEIGHT) * 10.0
+        assert mesh.volume == pytest.approx(expected_remaining_volume, rel=1e-3)
+
+        # Centerline (X=0) boundary is at Z=2
+        assert not result_csg.contains_point(Matrix([0.0, 0.0, 1.9]))
+        assert result_csg.contains_point(Matrix([0.0, 0.0, 2.1]))
+
+    def test_validation_errors(self):
+        timber = _make_timber()
+        with pytest.raises(AssertionError, match="must be strictly between"):
+            cut_practice_straight_angled_end_cut_decoration(
+                timber,
+                front_face=TimberFace.FRONT,
+                position_from_end=scalar(2),
+                angle=degrees(90),
+            )
+
+        with pytest.raises(AssertionError, match="must be a long face"):
+            cut_practice_straight_angled_end_cut_decoration(
+                timber,
+                front_face=TimberFace.TOP,
+                position_from_end=scalar(2),
+            )
+
+        with pytest.raises(AssertionError, match="must be TOP or BOTTOM"):
+            cut_practice_straight_angled_end_cut_decoration(
+                timber,
+                front_face=TimberFace.FRONT,
+                position_from_end=scalar(2),
+                timber_end=TimberFace.RIGHT,
+            )
+

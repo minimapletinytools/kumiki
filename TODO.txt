@@ -232,7 +232,16 @@ DONE-add proper reference face/edge support to timbers
      measurement anchor, needs the "render PTW as an overlay alongside the actual geometry"
      work first. the old coincidence assert is what let us dodge that question.
     -consider whether an empty list should default to the perfect long faces
-    
+
+
+
+DONE-fix website non blocking failure: There's a git failed with exit code 128 annotation on the build job, but it's non-fatal — the run is green and the site is correct. It's from the docs step (mkdocs gen_ref_pages),
+  -it was NOT the docs step. mkdocs runs no git at all during a build. An agent worktree had
+   been committed at .claude/worktrees/agent-a2f3ab6060436522d, which git recorded as a
+   gitlink with no .gitmodules entry, so `git submodule foreach` failed -- and
+   actions/checkout runs one in post-job cleanup. It was on EVERY workflow, not just this one.
+   Untracked it and added .claude/worktrees/ to .gitignore.
+
 
 -highlight is kind aweird. I tihnk there's some debouncing right now on already highligted features or something cuz if you mouse around an already highlighted featuer it's unwilling to highlight nearbye stuff. IDK something is stil werid
   -Issue 2 — I ruled two things out but haven't confirmed the cause.
@@ -247,10 +256,7 @@ DONE-add proper reference face/edge support to timbers
 
 
 
-
--fix website non blocking failure: There's a git failed with exit code 128 annotation on the build job, but it's non-fatal — the run is green and the site is correct. It's from the docs step (mkdocs gen_ref_pages),
-
-
+DONE-finish halfspace decorative cut 
 
 
 -DRAWING NONSENSE
@@ -271,13 +277,14 @@ DONE-add proper reference face/edge support to timbers
 
 
 -consider refactoring runner.py
+
 -do notes for cross_lap_butt_joint
   -make 1 prompt video of the coding of the joint
   -make 1 prompt video to make the sawhorse with this joint
-
--test out roundover on bottom stretchers again on coffee table
+DONE-test out roundover on bottom stretchers again on coffee table
+-figure out why roundovers break on stretcher sin coffe tabel (I tihnk ivene if you don't do the hous ejoint)
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
--finish halfspace decorative cut 
+
 -do a pass on parametric parameters that show up in kigumi so they are human readbels and useable..
 -fix tusk failing from other direction bug
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
