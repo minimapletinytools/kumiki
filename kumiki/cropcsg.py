@@ -270,9 +270,6 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
     than the loft, and containing it. The primitive already calls a twisted loft
     undefined behaviour, so a loose bound there is the honest answer.
     """
-    if csg.start_distance is None or csg.end_distance is None:
-        return None
-
     matrix = csg.transform.orientation.matrix
     across = Matrix([matrix[0, 0], matrix[1, 0], matrix[2, 0]])
     up = Matrix([matrix[0, 1], matrix[1, 1], matrix[2, 1]])
@@ -286,6 +283,10 @@ def _loft_half_spaces(csg) -> Optional[BoundingHalfSpaces]:
 
     bottom = [lift(point, csg.start_distance) for point in csg.bottom_points]
     top = [lift(point, csg.end_distance) for point in csg.top_points]
+    # Profiles of different lengths are not a loft. The primitive says so and
+    # is_valid() checks it, but nothing in the TYPE does -- both are just
+    # profiles -- so this stays where a check against a state the dataclass
+    # already forbids would not.
     if len(bottom) < 3 or len(bottom) != len(top):
         return None
 
