@@ -271,3 +271,41 @@ class TestTriangles:
         )
 
         assert hit is None
+
+    def test_triangulate_timber_with_roundover_and_miter_cuts(self):
+        from kumiki.construction import Frame, CornerJointTimberArrangement
+        from kumiki.joints.workshop.basic_joints import cut_basic_plain_miter_joint
+        from kumiki.joints.workshop.decorative_joints import cut_practice_roundover_decoration
+        from kumiki.rule import inches
+        from kumiki.ticket import normalize_timber_tags
+        from kumiki.timber import Timber, TimberTicket, compute_timber_orientation, TimberEdge, TimberEnd
+
+        t1 = Timber(
+            length=inches(30),
+            size=create_v2(inches(1.5), inches(1.0)),
+            transform=Transform(position=create_v3(0, 0, 0), orientation=compute_timber_orientation(create_v3(1, 0, 0), create_v3(0, 0, 1))),
+            ticket=TimberTicket(path="t1", tags=normalize_timber_tags(("stretcher",))),
+        )
+        t2 = Timber(
+            length=inches(15),
+            size=create_v2(inches(1.5), inches(1.0)),
+            transform=Transform(position=create_v3(0, 0, 0), orientation=compute_timber_orientation(create_v3(0, 1, 0), create_v3(0, 0, 1))),
+            ticket=TimberTicket(path="t2", tags=normalize_timber_tags(("stretcher",))),
+        )
+        miter = cut_basic_plain_miter_joint(
+            arrangement=CornerJointTimberArrangement(timber1=t1, timber2=t2, timber1_end=TimberEnd.BOTTOM, timber2_end=TimberEnd.BOTTOM)
+        )
+        ro = cut_practice_roundover_decoration(
+            timber=t1,
+            edges=[TimberEdge.RIGHT_FRONT, TimberEdge.FRONT_LEFT, TimberEdge.LEFT_BACK, TimberEdge.BACK_RIGHT],
+            radius=inches(0.5),
+        )
+        frame = Frame.from_joints([miter, ro], [], name="test_frame")
+        ct1 = [ct for ct in frame.cut_timbers if ct.timber.ticket.path == "t1"][0]
+        mesh = triangulate_cutcsg(ct1.render_timber_with_cuts_csg_local()).mesh
+
+        assert mesh.is_watertight
+        # Nominal volume of 1.5" x 1.0" x 30" is ~0.000737 m^3.
+        # With roundovers and a miter end cut, volume should be around ~0.0006 m^3 (not dropped to 0 or sliver).
+        assert mesh.volume > 0.0005
+        assert len(mesh.faces) > 0

@@ -85,14 +85,18 @@ def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric
     edge_dir = timber.get_face_direction_global(direction_face)
 
     perfect_corner_start = timber.get_corner_position_global(start_corner)
-    edge_length = timber.get_size_in_face_normal_axis(direction_face)
+
+    # due to maybe end cuts, the actual timber may be longer than the timber length
+    # for convenience (so we don't need to pass in the CutTimber object into this function) just make the cuts infinite in these cases.
+    start_distance = None
+    end_distance = None
 
     cylinder = Cylinder(
         axis_direction=edge_dir,
         radius=radius,
         position=perfect_corner_start - dir_a * radius - dir_b * radius,
-        start_distance=scalar(0),
-        end_distance=edge_length,
+        start_distance=start_distance,
+        end_distance=end_distance,
         label=CutCSGLabel("roundover_fillet"),
     )
 
@@ -114,8 +118,8 @@ def _roundover_cut_for_edge(timber: BlockLike, edge: TimberEdge, radius: Numeric
             ),
             orientation=profile_orientation,
         ),
-        start_distance=scalar(0),
-        end_distance=edge_length,
+        start_distance=start_distance,
+        end_distance=end_distance,
         label=CutCSGLabel("roundover_corner_waste"),
     )
 

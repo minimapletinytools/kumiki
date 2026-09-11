@@ -673,9 +673,14 @@ def _remove_tiny_disconnected_components(mesh: trimesh.Trimesh) -> trimesh.Trime
             process=False,
         )
         part.remove_unreferenced_vertices()
-        volume = abs(float(part.volume)) if part.is_watertight else 0.0
+        try:
+            vol = abs(float(part.volume))
+            if np.isnan(vol):
+                vol = 0.0
+        except Exception:
+            vol = 0.0
         parts.append(part)
-        volumes.append(volume)
+        volumes.append(vol)
 
     max_volume = max(volumes)
     if max_volume <= 0.0:
@@ -697,9 +702,10 @@ def _remove_tiny_disconnected_components(mesh: trimesh.Trimesh) -> trimesh.Trime
 
 def _finalize_mesh(mesh: trimesh.Trimesh) -> trimesh.Trimesh:
     mesh.remove_unreferenced_vertices()
-    mesh.merge_vertices()
-    mesh = _remove_tiny_disconnected_components(mesh)
-    mesh = _remove_nonmanifold_faces(mesh)
+    if not mesh.is_watertight:
+        mesh.merge_vertices()
+        mesh = _remove_tiny_disconnected_components(mesh)
+        mesh = _remove_nonmanifold_faces(mesh)
     mesh.fix_normals(multibody=False)
     return mesh
 

@@ -426,62 +426,59 @@ def build_frame() -> Frame:
         )
     )
 
-    # TODO: disabled for now -- causes a rendering issue when included in the house
-    # joints' housed bodies below. Re-enable (and pass into the CutTimber.from_joints
-    # calls + the frame's joint list) once that's root-caused.
-    # n_bot_roundover = cut_practice_roundover_decoration(
-    #     timber = bot_stretcher_n,
-    #     edges = all_long_edges,
-    #     radius = roundover_radius
-    # )
-    # s_bot_roundover = cut_practice_roundover_decoration(
-    #     timber = bot_stretcher_s,
-    #     edges = all_long_edges,
-    #     radius = roundover_radius
-    # )
-    # e_bot_roundover = cut_practice_roundover_decoration(
-    #     timber = bot_stretcher_e,
-    #     edges = all_long_edges,
-    #     radius = roundover_radius
-    # )
-    # w_bot_roundover = cut_practice_roundover_decoration(
-    #     timber = bot_stretcher_w,
-    #     edges = all_long_edges,
-    #     radius = roundover_radius
-    # )
+    n_bot_roundover = cut_practice_roundover_decoration(
+        timber = bot_stretcher_n,
+        edges = all_long_edges,
+        radius = roundover_radius
+    )
+    s_bot_roundover = cut_practice_roundover_decoration(
+        timber = bot_stretcher_s,
+        edges = all_long_edges,
+        radius = roundover_radius
+    )
+    e_bot_roundover = cut_practice_roundover_decoration(
+        timber = bot_stretcher_e,
+        edges = all_long_edges,
+        radius = roundover_radius
+    )
+    w_bot_roundover = cut_practice_roundover_decoration(
+        timber = bot_stretcher_w,
+        edges = all_long_edges,
+        radius = roundover_radius
+    )
 
     # Each stretcher is housed using its actual body so far -- both corner miters it
-    # participates in -- via CutTimber.from_joints, rather than hand-picking a
-    # Joint.cuttings["timberA"/"timberB"] key (easy to pair with the wrong timber).
+    # participates in, plus its edge roundovers -- via CutTimber.from_joints, rather than
+    # hand-picking a Joint.cuttings["timberA"/"timberB"] key (easy to pair with the wrong timber).
     # Irrelevant cuts (e.g. the miter at the timber's other, far-away end) are pruned
     # automatically by cut_free_house_joint based on whether they actually reach the
     # housing's cross section.
     sw_house_joint = cut_free_house_joint(
         housing_timber = leg_sw,
         housed_timbers = [
-            CutTimber.from_joints(bot_stretcher_w, [sw_bot_joint, nw_bot_joint]),
-            CutTimber.from_joints(bot_stretcher_s, [sw_bot_joint, se_bot_joint]),
+            CutTimber.from_joints(bot_stretcher_w, [sw_bot_joint, nw_bot_joint, w_bot_roundover]),
+            CutTimber.from_joints(bot_stretcher_s, [sw_bot_joint, se_bot_joint, s_bot_roundover]),
         ]
     )
     nw_house_joint = cut_free_house_joint(
         housing_timber = leg_nw,
         housed_timbers = [
-            CutTimber.from_joints(bot_stretcher_n, [nw_bot_joint, ne_bot_joint]),
-            CutTimber.from_joints(bot_stretcher_w, [sw_bot_joint, nw_bot_joint]),
+            CutTimber.from_joints(bot_stretcher_n, [nw_bot_joint, ne_bot_joint, n_bot_roundover]),
+            CutTimber.from_joints(bot_stretcher_w, [sw_bot_joint, nw_bot_joint, w_bot_roundover]),
         ]
     )
     ne_house_joint = cut_free_house_joint(
         housing_timber = leg_ne,
         housed_timbers = [
-            CutTimber.from_joints(bot_stretcher_n, [nw_bot_joint, ne_bot_joint]),
-            CutTimber.from_joints(bot_stretcher_e, [ne_bot_joint, se_bot_joint]),
+            CutTimber.from_joints(bot_stretcher_n, [nw_bot_joint, ne_bot_joint, n_bot_roundover]),
+            CutTimber.from_joints(bot_stretcher_e, [ne_bot_joint, se_bot_joint, e_bot_roundover]),
         ]
     )
     se_house_joint = cut_free_house_joint(
         housing_timber = leg_se,
         housed_timbers = [
-            CutTimber.from_joints(bot_stretcher_s, [sw_bot_joint, se_bot_joint]),
-            CutTimber.from_joints(bot_stretcher_e, [ne_bot_joint, se_bot_joint]),
+            CutTimber.from_joints(bot_stretcher_s, [sw_bot_joint, se_bot_joint, s_bot_roundover]),
+            CutTimber.from_joints(bot_stretcher_e, [ne_bot_joint, se_bot_joint, e_bot_roundover]),
         ]
     )
 
@@ -492,6 +489,7 @@ def build_frame() -> Frame:
         se_to_e_stretcher_joint, ne_to_e_stretcher_joint,
         ne_table_joint, se_table_joint, nw_table_joint, sw_table_joint,
         nw_bot_joint, ne_bot_joint, sw_bot_joint, se_bot_joint,
+        n_bot_roundover, s_bot_roundover, e_bot_roundover, w_bot_roundover,
         sw_house_joint, nw_house_joint, ne_house_joint, se_house_joint,
         south_table_top_round_bottom, south_table_top_round_top,
         north_table_top_round_bottom, north_table_top_round_top,
