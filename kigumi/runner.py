@@ -984,66 +984,21 @@ _DEBUG_DRAWING_VIEWS: List[Tuple[str, List[float], List[float], List[float]]] = 
 # is scaffolding, so it just picks a common sheet.
 _DEBUG_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
 
-def _quadrant_viewport_tree():
-    """Three world elevations and a preview, a quadrant each.
-
-    Two rows of two columns rather than four rects: the rows are what make the
-    elevations line up across the sheet, and saying so means a change to one
-    moves its neighbour instead of leaving a gap.
-
-    Returns the tree and the leaves by role. The roles are this file's own
-    vocabulary for which view is which; the viewports themselves carry only a
-    label, and where each one ends up is the tree's business.
-    """
-    from kumiki.drawing import Viewport, columns, covering_page, rows
-
-    views = {role: Viewport(label=label) for role, label in (
-        ("front", "Front"), ("top", "Top"), ("right", "Right"), ("preview", "Preview"))}
-    tree = covering_page(rows(
-        columns(views["front"], views["top"]),
-        columns(views["right"], views["preview"]),
-    ))
-    return tree, views
-
-
-def _long_face_viewport_tree():
-    """One piece's four long faces down the left, a preview beside them.
-
-    The shop drawing: two columns, the left one divided into four rows. Written
-    as the tree it is, so the quarters stay quarters when a face is added or
-    dropped.
-    """
-    from kumiki.drawing import Viewport, columns, covering_page, rows
-
-    views = {role: Viewport(label=label) for role, label in (
-        ("front", "Front"), ("right", "Right"), ("back", "Back"),
-        ("left", "Left"), ("preview", "Preview"))}
-    tree = covering_page(columns(
-        rows(views["front"], views["right"], views["back"], views["left"]),
-        views["preview"],
-    ))
-    return tree, views
-
-
-def _placed_by_role(built, page: Dict[str, float]) -> Dict[str, Any]:
-    """Resolve a viewport tree against a page, keyed by what each view is for.
+def _placed_by_role(viewports, ids, page: Dict[str, float]) -> Dict[str, Any]:
+    """Resolve a drawing's viewports against a page, keyed by what each is for.
 
     By role rather than by id, because the code below knows which view it is
     pointing and not where the tree put it -- which is the whole point of ids
-    being positional. Move the preview to the other column and nothing here
-    changes.
-
-    The join is by viewport IDENTITY: a Viewport compares by object rather than
-    by value, so the very ones built above are the keys, and two views sharing
-    a label cannot be confused for each other.
+    being positional. `ids` is the role-to-id map kumiki publishes beside each
+    default layout, so moving a view within one changes that map and nothing
+    here.
     """
     from kumiki.drawing import Page
     from kumiki.layout import resolve_viewports
 
-    tree, views = built
-    placed = {view.viewport: view
-              for view in resolve_viewports([tree], Page(page["width"], page["height"]))}
-    return {role: placed[viewport] for role, viewport in views.items()}
+    placed = {str(view.id): view
+              for view in resolve_viewports(viewports, Page(page["width"], page["height"]))}
+    return {role: placed[str(viewport_id)] for role, viewport_id in ids.items()}
 
 
 def _viewport_spec(placed, **rest: Any) -> Dict[str, Any]:
@@ -1177,7 +1132,8 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
     the same kind of viewport the default 3D scene uses.
     """
     centre, half_size = _frame_world_bounds(frame)
-    placed = _placed_by_role(_quadrant_viewport_tree(), _DEBUG_DRAWING_PAGE)
+    from kumiki.drawing import ELEVATION_IDS, elevation_viewports
+    placed = _placed_by_role(elevation_viewports(), ELEVATION_IDS, _DEBUG_DRAWING_PAGE)
     viewports: List[Dict[str, Any]] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
         rect = list(placed[view_id].rect)
@@ -1613,7 +1569,9 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     centre, half_size = _members_world_bounds(drawn)
 
     if len(entries) == 1:
-        placed = _placed_by_role(_long_face_viewport_tree(), page)
+        from kumiki.drawing import SHOP_DRAWING_IDS, shop_drawing_viewports
+        viewports = shop_drawing_viewports()
+        placed = _placed_by_role(viewports, SHOP_DRAWING_IDS, page)
         viewports = _long_face_viewports(entries[0], page, placed)
         # One piece: oriented from its own box rather than the world box it
         # happens to occupy, and turned about its own length, so it can be
@@ -1625,7 +1583,9 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     else:
         # No selection is treated as the whole frame, so asking for a drawing
         # before selecting anything gives you something rather than nothing.
-        placed = _placed_by_role(_quadrant_viewport_tree(), page)
+        from kumiki.drawing import ELEVATION_IDS, elevation_viewports
+        viewports = elevation_viewports()
+        placed = _placed_by_role(viewports, ELEVATION_IDS, page)
         viewports = _world_elevation_viewports(entries or timber_entries, page, placed)
         # Several pieces have no length of their own to speak of, so the angle
         # is searched for -- and kept upright, since which way is up is part of
