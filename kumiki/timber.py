@@ -29,6 +29,15 @@ from abc import ABC, abstractmethod
 from typing_extensions import deprecated
 import warnings
 
+if TYPE_CHECKING:
+    # Annotations only. The runtime imports stay inside the three methods that
+    # use these -- identity.py is below timber.py in the import order and
+    # reaching for it at module level would close the loop -- but a string
+    # annotation naming a type nothing has imported is unresolvable, which is
+    # what the type checker was reporting on each of them.
+    from .identity import (JointPath, ResolvedJointPath, ResolvedTimberPath,
+                           TimberPath)
+
 # TODO DELETE ME
 # Aliases for backwards compatibility
 CSGUnion = SolidUnion

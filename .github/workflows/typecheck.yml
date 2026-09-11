@@ -16,25 +16,21 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-        
-    - name: Install uv
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v5
 
-    - name: Cache uv packages
+    - name: Set up Python
+      run: uv python install 3.12
+
+    - name: Cache uv artifacts
       uses: actions/cache@v4
       with:
         path: |
           ~/.cache/uv
           .venv
-        key: uv-${{ runner.os }}-py3.9-${{ hashFiles('pyproject.toml', 'uv.lock') }}
+        key: uv-${{ runner.os }}-py3.12-${{ hashFiles('pyproject.toml', 'uv.lock') }}
         restore-keys: |
-          uv-${{ runner.os }}-py3.9-
+          uv-${{ runner.os }}-py3.12-
 
     - name: Install ty and dependencies
       run: |

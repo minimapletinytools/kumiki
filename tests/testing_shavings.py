@@ -10,10 +10,12 @@ This module contains:
 - Pytest fixtures
 """
 
+from importlib.util import module_from_spec, spec_from_file_location
+import math
 import pytest
 import random
-import math
-from typing import Optional, Tuple
+import sys
+from typing import Optional, Tuple, TypeVar
 from kumiki.rule import *
 from kumiki import *
 
@@ -144,6 +146,40 @@ def create_centered_horizontal_timber(
 # ============================================================================
 # Assertion Helpers
 # ============================================================================
+
+_T = TypeVar("_T")
+
+
+def present(value: Optional[_T], what: str = "a value") -> _T:
+    """The value, having checked there is one.
+
+    For the library functions that answer Optional on purpose -- solid_bounds
+    leaving `faces` None unless the solid really is bounded, extent_along
+    declining on a direction it cannot measure. A test usually knows which
+    answer it expects; saying so here fails with that sentence instead of a
+    TypeError three lines later where None was subscripted, and it is what lets
+    the Optional stay honest in the library rather than being widened to keep
+    the tests quiet.
+    """
+    assert value is not None, f"expected {what}, got None"
+    return value
+
+
+def load_module(name: str, path):
+    """Import a python file as a module, the way these tests reach fixtures.
+
+    Four lines of importlib in one place. spec_from_file_location and
+    ModuleSpec.loader are both Optional -- a finder that cannot handle the path
+    answers None -- and every test that spelled this out inline was quietly
+    carrying that Optional into an attribute access.
+    """
+    spec = present(spec_from_file_location(name, str(path)),
+                   f"an import spec for {path}")
+    module = module_from_spec(spec)
+    sys.modules[name] = module
+    present(spec.loader, f"a loader for {path}").exec_module(module)
+    return module
+
 
 def assert_is_valid_rotation_matrix(matrix: Matrix, tolerance: float = TOLERANCE):
     """

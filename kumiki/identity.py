@@ -13,7 +13,7 @@ keep the two apart instead of blending them into one opaque string.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Optional, Tuple
+from typing import Any, Optional, Sequence, Tuple
 
 
 @dataclass(frozen=True)
@@ -184,7 +184,9 @@ class FeatureRef:
     exactly one between them, however many features they name.
     """
 
-    csg_path: Tuple[str, ...] = ()
+    #: Held as a tuple; any sequence may be given, which is what reading one
+    #: off the wire hands over.
+    csg_path: Sequence[str] = ()
     feature: Optional[str] = None
 
     def __post_init__(self):
@@ -192,7 +194,7 @@ class FeatureRef:
             object.__setattr__(self, 'csg_path', tuple(self.csg_path))
 
     def identity(self) -> Tuple[Tuple[str, ...], str]:
-        return (self.csg_path, self.feature or "")
+        return (tuple(self.csg_path), self.feature or "")
 
     def describe(self) -> str:
         trail = " > ".join(self.csg_path)
@@ -249,13 +251,9 @@ class SingleFeaturePath(FeaturePath):
     ref: FeatureRef = field(default_factory=FeatureRef)
     feature_type: Optional[str] = None
 
-    def __post_init__(self):
-        if isinstance(self.timber, str):
-            object.__setattr__(self, 'timber', ResolvedTimberPath.parse(self.timber))
-
     @property
     def csg_path(self) -> Tuple[str, ...]:
-        return self.ref.csg_path
+        return tuple(self.ref.csg_path)
 
     @property
     def feature(self) -> Optional[str]:
@@ -293,8 +291,6 @@ class DerivedFeaturePath(FeaturePath):
     b: FeatureRef = field(default_factory=FeatureRef)
 
     def __post_init__(self):
-        if isinstance(self.timber, str):
-            object.__setattr__(self, 'timber', ResolvedTimberPath.parse(self.timber))
         first, second = sorted((self.a, self.b), key=lambda ref: ref.identity())
         object.__setattr__(self, 'a', first)
         object.__setattr__(self, 'b', second)
