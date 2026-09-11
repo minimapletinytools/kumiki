@@ -346,6 +346,28 @@ TODO
 
 TODO
 
+# Creating supporting "Models"
+
+Sometimes it may be helpful to have supporting / reference structures in your models, usually of another building. These models DO NOT need to be detailed technical models, they just need to "look about right". For buliding-like supporting structures, follow the procedure
+
+Simple walls:
+
+Buildings are modeled by massive vertical timbers filling its rectangular footprint. 
+
+Fancy Walls:
+
+Bulidings are made using continuous wall panels (like SIPs). Determine the wall width, and then model the house by making massive vertical walls around the bulidings footprint (assuming it matches its exterior walls). You can optionall joint walls with board_butt_joint (TODO amke this joint)
+
+Roof:
+Then a roof is modeled with boards slanted boards, and the previous vertical timbers are connected to the roof using plain butt joints. 
+
+Windows:
+
+You can model windows by using free_difference_joint to cut recesses or holes the wall  (todo make this joint, just free house joint except the housed timber isn't included in the final joint (or alternatively, include it but cut it away entirely))
+
+
+
+
 # Creating new Patterns
 
 TODO
