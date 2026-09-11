@@ -582,6 +582,7 @@ def convert_mortise_shoulder_inset_to_centerline_distance(
 # ============================================================================
 
 
+# TODO rewrite this to take a small width and an angle rather the small/large width
 def cut_dropin_dovetail_butt_joint_on_face_aligned_timbers(
     arrangement: ButtJointTimberArrangement,
     receiving_timber_shoulder_inset: Numeric,
