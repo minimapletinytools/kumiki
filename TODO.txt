@@ -232,18 +232,13 @@ DONE-add proper reference face/edge support to timbers
      measurement anchor, needs the "render PTW as an overlay alongside the actual geometry"
      work first. the old coincidence assert is what let us dodge that question.
     -consider whether an empty list should default to the perfect long faces
-
-
-
 DONE-fix website non blocking failure: There's a git failed with exit code 128 annotation on the build job, but it's non-fatal — the run is green and the site is correct. It's from the docs step (mkdocs gen_ref_pages),
   -it was NOT the docs step. mkdocs runs no git at all during a build. An agent worktree had
    been committed at .claude/worktrees/agent-a2f3ab6060436522d, which git recorded as a
    gitlink with no .gitmodules entry, so `git submodule foreach` failed -- and
    actions/checkout runs one in post-job cleanup. It was on EVERY workflow, not just this one.
    Untracked it and added .claude/worktrees/ to .gitignore.
-
-
--highlight is kind aweird. I tihnk there's some debouncing right now on already highligted features or something cuz if you mouse around an already highlighted featuer it's unwilling to highlight nearbye stuff. IDK something is stil werid
+DONE-highlight is kind aweird. I tihnk there's some debouncing right now on already highligted features or something cuz if you mouse around an already highlighted featuer it's unwilling to highlight nearbye stuff. IDK something is stil werid
   -Issue 2 — I ruled two things out but haven't confirmed the cause.
     Not the dedup: HoverState.sameFeature compares memberKey + path + featureLabel, and moving between features changes at least one, so it redraws correctly. Not the resolution either — the sweep above shows neighbouring points resolving to different features cleanly.
 
@@ -252,10 +247,6 @@ DONE-fix website non blocking failure: There's a git failed with exit code 128 a
     That's a plausible mechanism, not a confirmed one, and I'd rather not repeat today's pattern of a confident wrong answer. The decisive test is a live profile of one hover round-trip in the running extension. If it confirms, the fix is a cheaper hover path — resolve the feature but skip the triangle walk until the pointer rests — which is roughly what the original design intended before hover was made byte-identical to a click.
 
     Want me to add that timing to the hover result so it shows up in the viewer log?
-
-
-
-
 DONE-finish halfspace decorative cut 
 
 

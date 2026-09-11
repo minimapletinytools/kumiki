@@ -76,14 +76,24 @@
          * The pointer moved. Returns whether it is worth asking about.
          *
          * `now` is passed in rather than read, so a test can drive time.
+         *
+         * `at` is the last point that COUNTED, not the last point seen, so the
+         * slop measures travel since the last question rather than the size of
+         * one mouse event. Advancing it on a rejected move instead made the
+         * test per-event, and a pointer moving slowly never cleared it: sixty
+         * pixels travelled three at a time asked nothing at all. Easing across
+         * a face onto the arris beside it is exactly that movement, which is
+         * why the highlight looked stuck on whatever it was already on --
+         * while arriving from off the timber lit the same arris at once, that
+         * path going through clear() and so starting with no `at` to be near.
          */
         moved(x, y) {
             const far = this.at === null
                 || Math.abs(x - this.at.x) + Math.abs(y - this.at.y) > this.slop;
-            this.at = { x, y };
             if (!far) {
                 return { ask: false, reason: 'barely-moved' };
             }
+            this.at = { x, y };
             this._pending = { x, y };
             this._stillFrames = 0;
             return { ask: false, reason: 'pending' };

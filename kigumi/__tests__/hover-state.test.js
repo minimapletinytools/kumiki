@@ -20,6 +20,48 @@ describe('hover pacing', () => {
         expect(result.reason).toBe('barely-moved');
     });
 
+    it('small moves add up, so a slow pointer is still asked about', () => {
+        // The slop is travel since the last question, not the size of one
+        // mouse event. When it was per-event, a pointer easing along at 2px a
+        // frame never cleared it and nothing was ever asked, however far it
+        // went -- which is what made the highlight look stuck on the face
+        // while you tried to reach the arris beside it.
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        hover.answered(hover.due().request, answer('face'));
+
+        let asked = 0;
+        for (let step = 1; step <= 10; step += 1) {
+            hover.moved(100 + step * 2, 100);
+            const due = hover.due();
+            if (due) {
+                asked += 1;
+                hover.answered(due.request, answer('arris'));
+            }
+        }
+
+        expect(asked).toBeGreaterThan(0);
+        expect(hover.feature.featureLabel).toBe('arris');
+    });
+
+    it('a pointer wobbling in place is still not worth asking about', () => {
+        // The other half of the same rule: accumulating travel must not turn
+        // jitter into a question, or the slop would buy nothing.
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        hover.answered(hover.due().request, answer('face'));
+
+        let asked = 0;
+        for (let tick = 0; tick < 20; tick += 1) {
+            hover.moved(100 + (tick % 2 ? 2 : 0), 100);
+            if (hover.due()) {
+                asked += 1;
+            }
+        }
+
+        expect(asked).toBe(0);
+    });
+
     it('asks straight away, with nothing to wait for', () => {
         const hover = new HoverState();
         hover.moved(100, 100);
