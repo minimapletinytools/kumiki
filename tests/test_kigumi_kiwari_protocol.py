@@ -1,14 +1,27 @@
 """How a kiwari reaches the viewer and comes back, including the saved file."""
 from __future__ import annotations
 
+import importlib.util
 import json
 import sys
 from pathlib import Path
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "kigumi"))
-import runner  # noqa: E402
+
+
+def _load_runner():
+    """Import kigumi/runner.py by path -- kigumi is not an installed package."""
+    runner_path = Path(__file__).resolve().parent.parent / "kigumi" / "runner.py"
+    spec = importlib.util.spec_from_file_location("kigumi_runner_kiwari", runner_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules["kigumi_runner_kiwari"] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+runner = _load_runner()
 
 
 FRAME_SOURCE = '''

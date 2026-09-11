@@ -31,7 +31,7 @@ floats -- there is no lazy/symbolic expression tree, and no separate
 import math
 import re
 import numpy as np
-from typing import Optional, Union, List, Tuple
+from typing import Mapping, Optional, Union, List, Tuple
 from dataclasses import dataclass, field
 from enum import Enum
 
@@ -920,8 +920,10 @@ _ANGLE_UNITS = {
 _NUMBER = r"(?:\d+[\s-]\d+/\d+|\d+/\d+|\d*\.\d+|\d+\.?)"
 
 
-def _units_pattern(units) -> str:
-    return "|".join(re.escape(u) for u in sorted(units, key=len, reverse=True))
+def _units_pattern(units: Mapping[str, float]) -> str:
+    # Longest first, so 'mm' wins over 'm' and 'inches' over 'in'.
+    longest_first = sorted(units, key=lambda unit: len(unit), reverse=True)
+    return "|".join(re.escape(unit) for unit in longest_first)
 
 
 def _parse_number(text: str) -> float:

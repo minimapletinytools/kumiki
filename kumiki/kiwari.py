@@ -41,7 +41,7 @@ import warnings
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from types import MappingProxyType
-from typing import Any, Dict, Iterable, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, Mapping, Optional, Tuple, Type, Union
 
 from .rule import (
     V2,
@@ -109,7 +109,7 @@ class Declaration:
     optional: bool = False
     minimum: Optional[float] = None
     maximum: Optional[float] = None
-    choices: Optional[type] = None
+    choices: Optional[Type[Enum]] = None
 
     def __post_init__(self) -> None:
         if self.kind not in _KINDS:
@@ -139,59 +139,6 @@ def _default_or_nothing(default: Any, optional: bool) -> Any:
         "a parameter needs a default to build with. Pass one, or optional=True "
         "if it is genuinely allowed to be nothing."
     )
-
-
-def length(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
-    """A distance, in metres. Written and read as "450mm", "18in", "1 1/4"."""
-    return Declaration(LENGTH, _default_or_nothing(default, optional), about, optional, minimum, maximum)
-
-
-def angle(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
-    """An angle, in radians. Written and read as "30deg", "1.5rad"."""
-    return Declaration(ANGLE, _default_or_nothing(default, optional), about, optional, minimum, maximum)
-
-
-def count(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
-    """A whole number of things -- legs, bays, pegs."""
-    return Declaration(COUNT, _default_or_nothing(default, optional), about, optional, minimum, maximum)
-
-
-def number(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
-    """A plain number with no dimension -- a ratio, a factor."""
-    return Declaration(NUMBER, _default_or_nothing(default, optional), about, optional, minimum, maximum)
-
-
-def flag(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
-    """On or off."""
-    return Declaration(FLAG, _default_or_nothing(default, optional), about, optional)
-
-
-def text(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
-    """Free text -- a name, a label."""
-    return Declaration(TEXT, _default_or_nothing(default, optional), about, optional)
-
-
-def choice(choices: type, default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
-    """One of an Enum's members.
-
-    With no default: the first member declared, or nothing at all when the
-    parameter is optional.
-    """
-    if not (isinstance(choices, type) and issubclass(choices, Enum)):
-        raise ValueError("a choice must name the Enum class its options come from")
-    if default is NOTHING:
-        default = None if optional else next(iter(choices))
-    return Declaration(CHOICE, default, about, optional, choices=choices)
-
-
-def point2(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
-    """Two lengths -- a cross section, a point on a face."""
-    return Declaration(POINT2, _default_or_nothing(default, optional), about, optional)
-
-
-def point3(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
-    """Three lengths -- a position, an offset."""
-    return Declaration(POINT3, _default_or_nothing(default, optional), about, optional)
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +173,7 @@ def _coerce(key: str, declaration: Declaration, value: Any) -> Any:
 
     if kind == CHOICE:
         options = declaration.choices
+        assert options is not None, "a choice always names its Enum -- Declaration checks that"
         if isinstance(value, options):
             return value
         wanted = str(getattr(value, "name", value))
@@ -355,19 +303,19 @@ class Kiwari:
         """Free text."""
         return self._look_up(key, TEXT)
 
-    def choice(self, key: str, choices: Optional[type] = None) -> Any:
+    def choice(self, key: str, choices: Optional[Type[Enum]] = None) -> Any:
         """One of an Enum's members.
 
         Pass the Enum class to be told at the call site if the declaration has
         changed under you.
         """
         value = self._look_up(key, CHOICE)
-        if choices is not None:
-            declared = self.declarations[key].choices
-            if declared is not choices:
-                raise TypeError(
-                    f"{key!r} chooses from {declared.__name__}, not {choices.__name__}"
-                )
+        declared = self.declarations[key].choices
+        if choices is not None and declared is not choices:
+            raise TypeError(
+                f"{key!r} chooses from {declared.__name__ if declared else 'nothing'}, "
+                f"not {choices.__name__}"
+            )
         return value
 
     def v2(self, key: str) -> V2:
@@ -401,8 +349,11 @@ class Kiwari:
         # re-imports kumiki on every reload so source edits take effect, which
         # makes the Kiwari held from the previous build a different class
         # object from this one. It is still a kiwari.
-        if hasattr(incoming, "declarations") and hasattr(incoming, "values"):
-            arriving = dict(incoming.values)
+        if hasattr(incoming, "declarations"):
+            # `declarations` alone, because a plain dict has `.values` too --
+            # as a method, which would read as an empty set of values rather
+            # than failing loudly.
+            arriving = dict(getattr(incoming, "values"))
             arriving_texts = dict(getattr(incoming, "texts", {}))
         elif isinstance(incoming, Mapping):
             arriving, arriving_texts = _split_values_and_texts(incoming)
@@ -522,21 +473,83 @@ class _KiwariFactory:
     """``kiwari(...)`` to declare, ``kiwari.length(...)`` and friends to say what
     each one is.
 
-    The helpers live here rather than as bare names so that a builder's own
-    local variables -- ``length``, ``angle``, ``count`` -- cannot shadow them.
+    The helpers are defined here rather than as bare module-level names so that
+    a builder's own local variables -- ``length``, ``angle``, ``count`` -- cannot
+    shadow them.
     """
 
-    __call__ = staticmethod(_kiwari)
+    def __call__(self, **declarations: Declaration) -> Kiwari:
+        """Declare what a frame is proportioned from.
 
-    length = staticmethod(length)
-    angle = staticmethod(angle)
-    count = staticmethod(count)
-    number = staticmethod(number)
-    flag = staticmethod(flag)
-    text = staticmethod(text)
-    choice = staticmethod(choice)
-    point2 = staticmethod(point2)
-    point3 = staticmethod(point3)
+        Each keyword is a parameter's key and each value is a declaration::
+
+            kiwari(
+                legs=kiwari.count(4, minimum=3),
+                seat_height=kiwari.length(mm(450)),
+            )
+        """
+        return _kiwari(**declarations)
+
+    @staticmethod
+    def length(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+        """A distance, in metres. Written and read as "450mm", "18in", "1 1/4"."""
+        return Declaration(LENGTH, _default_or_nothing(default, optional), about, optional, minimum, maximum)
+
+
+    @staticmethod
+    def angle(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+        """An angle, in radians. Written and read as "30deg", "1.5rad"."""
+        return Declaration(ANGLE, _default_or_nothing(default, optional), about, optional, minimum, maximum)
+
+
+    @staticmethod
+    def count(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+        """A whole number of things -- legs, bays, pegs."""
+        return Declaration(COUNT, _default_or_nothing(default, optional), about, optional, minimum, maximum)
+
+
+    @staticmethod
+    def number(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+        """A plain number with no dimension -- a ratio, a factor."""
+        return Declaration(NUMBER, _default_or_nothing(default, optional), about, optional, minimum, maximum)
+
+
+    @staticmethod
+    def flag(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
+        """On or off."""
+        return Declaration(FLAG, _default_or_nothing(default, optional), about, optional)
+
+
+    @staticmethod
+    def text(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
+        """Free text -- a name, a label."""
+        return Declaration(TEXT, _default_or_nothing(default, optional), about, optional)
+
+
+    @staticmethod
+    def choice(choices: Type[Enum], default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
+        """One of an Enum's members.
+
+        With no default: the first member declared, or nothing at all when the
+        parameter is optional.
+        """
+        if not (isinstance(choices, type) and issubclass(choices, Enum)):
+            raise ValueError("a choice must name the Enum class its options come from")
+        if default is NOTHING:
+            default = None if optional else next(iter(choices))
+        return Declaration(CHOICE, default, about, optional, choices=choices)
+
+
+    @staticmethod
+    def point2(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
+        """Two lengths -- a cross section, a point on a face."""
+        return Declaration(POINT2, _default_or_nothing(default, optional), about, optional)
+
+
+    @staticmethod
+    def point3(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
+        """Three lengths -- a position, an offset."""
+        return Declaration(POINT3, _default_or_nothing(default, optional), about, optional)
 
     def __repr__(self) -> str:
         return "<kiwari: declare with kiwari(key=kiwari.length(...), ...)>"

@@ -121,7 +121,7 @@ def test_a_declaration_made_fresh_this_run_wins_over_a_stale_value() -> None:
 
 def test_resolving_refuses_something_that_is_not_values_at_all() -> None:
     with pytest.raises(TypeError):
-        a_kiwari().resolve(["legs", 6])
+        a_kiwari().resolve(["legs", 6])  # type: ignore[invalid-argument-type]
 
 
 # --- what a value is allowed to be -------------------------------------------
@@ -195,12 +195,12 @@ def test_a_default_that_is_not_what_it_claims_fails_where_it_was_written() -> No
 
 def test_a_declaration_has_to_be_one() -> None:
     with pytest.raises(TypeError, match="must be declared with"):
-        kiwari(legs=4)
+        kiwari(legs=4)  # type: ignore[invalid-argument-type]
 
 
 def test_a_choice_must_name_an_enum() -> None:
     with pytest.raises(ValueError, match="Enum"):
-        kiwari.choice(str)
+        kiwari.choice(str)  # type: ignore[invalid-argument-type]
 
 
 def test_a_choice_with_no_default_takes_the_first_member_declared() -> None:
@@ -252,6 +252,7 @@ def test_the_payload_is_json() -> None:
 def test_a_frame_carries_what_it_was_built_from() -> None:
     k = a_kiwari().resolve({"legs": 6})
     frame = Frame(cut_timbers=[], kiwari=k)
+    assert frame.kiwari is not None
     assert frame.kiwari.count("legs") == 6
 
 
