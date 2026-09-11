@@ -137,7 +137,16 @@
 
             if (bundle.reflection && bundle.reflection.material) {
                 bundle.reflection.material.opacity = appearance.reflectionOpacity;
-                bundle.reflection.visible = visible && appearance.reflectionsVisible;
+                // Hides, never shows. Whether a reflection is wanted at all is
+                // the render mode's -- it turns on a sheet being open as well
+                // as on the setting, and two writers that can both SHOW one
+                // would fight over it. Hiding is safe from either: a hidden
+                // member has no reflection whoever noticed first, and doing it
+                // here means no frame where a member is gone and its
+                // reflection is not.
+                if (!visible) {
+                    bundle.reflection.visible = false;
+                }
             }
         }
 

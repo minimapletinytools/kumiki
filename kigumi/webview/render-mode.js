@@ -59,7 +59,7 @@
      * derived from them, so asking for shadows while on a sheet is remembered
      * and applied again on the way out.
      */
-    function renderModeFor({ page, shadowsEnabled = false } = {}) {
+    function renderModeFor({ page, shadowsEnabled = false, reflectionsEnabled = false } = {}) {
         const onPaper = Boolean(page);
         return {
             onPaper,
@@ -71,6 +71,11 @@
             // a sheet, so it is not merely invisible there, it is not run.
             shadowMapEnabled: !onPaper && Boolean(shadowsEnabled),
             sunCastsShadow: !onPaper && Boolean(shadowsEnabled),
+            // A reflection is the piece mirrored in the ground it is standing
+            // on. A sheet has no ground -- it is a projection onto paper, and
+            // there is nothing under the piece to catch one -- so a drawing
+            // showing one is showing something that is not there.
+            reflectionsVisible: !onPaper && Boolean(reflectionsEnabled),
             // three paints a scene background as a full pass inside the active
             // viewport whatever the clear flags say, so on a sheet it would
             // repaint the gradient over every neighbour and nothing would

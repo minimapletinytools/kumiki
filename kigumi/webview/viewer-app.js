@@ -2112,6 +2112,7 @@ class KigumiViewerApp extends LitElement {
         const mode = window.KigumiRenderMode.renderModeFor({
             page: this.sceneStore.activeScene().page,
             shadowsEnabled: this.shadowsEnabled,
+            reflectionsEnabled: this.reflectionsEnabled,
         });
         if (this.ambient) {
             this.ambient.intensity = mode.lights.ambient;
@@ -2131,6 +2132,17 @@ class KigumiViewerApp extends LitElement {
             this.scene.background = mode.useThemeBackground
                 ? (this._themeBackground || null)
                 : null;
+        }
+        // Whether a reflection shows takes two answers -- the mode's, and
+        // whether the member itself is hidden -- so it is written here, where
+        // both are in hand, rather than half here and half in two other places
+        // that each had to remember the mode. The loop costs what
+        // updateCylinderSilhouettes already costs, which the frame pays anyway.
+        for (const [memberKey, bundle] of this.sceneManager.entries()) {
+            if (bundle.reflection) {
+                bundle.reflection.visible =
+                    mode.reflectionsVisible && !this.isMemberHidden(memberKey);
+            }
         }
         return mode;
     }
@@ -3614,9 +3626,10 @@ class KigumiViewerApp extends LitElement {
             opacity,
             edgeOpacity,
             edgesVisible: this.edgeMode !== 'none',
-            // Reflections fade together with face opacity.
+            // Reflections fade together with face opacity. Whether one shows
+            // at all is applyRenderMode's, since it also turns on whether a
+            // sheet is open.
             reflectionOpacity: (profile ? profile.reflectionOpacity : 0.14) * opacity,
-            reflectionsVisible: this.reflectionsEnabled,
         };
     }
 
@@ -4081,7 +4094,7 @@ class KigumiViewerApp extends LitElement {
             const offset = this._assemblyOffsetsByKey.get(memberKey) || [0, 0, 0];
             bundle.reflection.position.set(offset[0], offset[1], reflectionOffsetZ - offset[2]);
             bundle.reflection.scale.set(1, 1, -1);
-            bundle.reflection.visible = this.reflectionsEnabled && !this.isMemberHidden(memberKey);
+            // Where it goes, not whether it shows. applyRenderMode owns that.
         }
     }
 
@@ -4405,8 +4418,11 @@ class KigumiViewerApp extends LitElement {
     }
 
     setReflectionsEnabled(enabled) {
+        // Records the ASK and nothing else, as setShadowsEnabled does. What it
+        // turns into depends on whether a sheet is open as well, so it is
+        // applyRenderMode's to derive on the frame requested below.
         this.displayOptions.set('reflectionsEnabled', enabled);
-        this.updateReflectionTransforms();
+        this.requestUpdate();
     }
 
     setFootprintColor(color) {
@@ -5216,7 +5232,7 @@ class KigumiViewerApp extends LitElement {
             edgeMesh.visible = this.edgeMode !== 'none';
             reflectionMesh.castShadow = false;
             reflectionMesh.receiveShadow = false;
-            reflectionMesh.visible = this.reflectionsEnabled;
+            reflectionMesh.visible = false;   // applyRenderMode decides, next frame
 
             // Round accessories (pegs, dowels, ...) come with cylinderAxis: their
             // barrel is a faceted polygon under the hood, so EdgesGeometry's fixed

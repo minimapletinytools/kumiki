@@ -116,6 +116,30 @@ describe('shadows', () => {
     });
 });
 
+describe('reflections', () => {
+    it('a sheet never shows one, however the reader has it set', () => {
+        // A reflection is the piece mirrored in the ground it stands on. A
+        // sheet has no ground -- it is a projection onto paper -- so one there
+        // is showing something that is not in front of the reader at all.
+        expect(renderModeFor({ ...SHEET, reflectionsEnabled: true })
+            .reflectionsVisible).toBe(false);
+    });
+
+    it('the ask survives a trip to a sheet and back', () => {
+        expect(renderModeFor({ ...MODEL, reflectionsEnabled: true })
+            .reflectionsVisible).toBe(true);
+        expect(renderModeFor({ ...SHEET, reflectionsEnabled: true })
+            .reflectionsVisible).toBe(false);
+        expect(renderModeFor({ ...MODEL, reflectionsEnabled: true })
+            .reflectionsVisible).toBe(true);
+    });
+
+    it('off is off in the model too', () => {
+        expect(renderModeFor({ ...MODEL, reflectionsEnabled: false })
+            .reflectionsVisible).toBe(false);
+    });
+});
+
 describe('clearing and the background', () => {
     it('a sheet neither clears colour nor paints a background', () => {
         // A viewport on a sheet draws on nothing: clearing would erase the

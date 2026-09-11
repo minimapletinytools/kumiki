@@ -150,17 +150,30 @@ describe('appearance, which takes a class as well as numbers', () => {
         expect(bundle.reflection.visible).toBe(false);
     });
 
-    test('edges and reflections can be off without the member being hidden', () => {
+    test('edges can be off without the member being hidden', () => {
         const { sceneManager } = manager();
         const bundle = fakeBundle('post');
         sceneManager.register('post#0', bundle);
 
         sceneManager.setMemberAppearance('post#0', {
-            ...APPEARANCE, name: 'normal', edgesVisible: false, reflectionsVisible: false,
+            ...APPEARANCE, name: 'normal', edgesVisible: false,
         });
 
         expect(bundle.mesh.visible).toBe(true);
         expect(bundle.edges.visible).toBe(false);
+    });
+
+    test('appearance never turns a reflection on', () => {
+        // Whether one is wanted turns on a sheet being open as well as on the
+        // setting, so it is the render mode's to decide -- see render-mode.js.
+        // Appearance only ever hides, which is safe from any writer.
+        const { sceneManager } = manager();
+        const bundle = fakeBundle('post');
+        bundle.reflection.visible = false;
+        sceneManager.register('post#0', bundle);
+
+        sceneManager.setMemberAppearance('post#0', { ...APPEARANCE, name: 'normal' });
+
         expect(bundle.reflection.visible).toBe(false);
     });
 
