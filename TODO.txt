@@ -295,7 +295,7 @@ IGNORE-consider refactoring runner.py
 
 -DRAWING NONSENSE
   DONE-fix lighting in ortho drawing
-  -"draw" button should say "new drawing" instead
+  
   -reflects should not redner in drawing moed
   -do the viewport refactor
   -give viewports labels
@@ -309,7 +309,10 @@ IGNORE-consider refactoring runner.py
   -conisder just shippingthe defalut drawing with every frame by default 
   -add support for 3d measurements
     -maybe there should be a spceial drawing that's available in regular view mode...
+  -"draw" button should say "new drawing" instead
+  -the LHS button states are kinda screwy right now
   -revisit how to do LHS menu for drawing mode...
+    
   
   
   

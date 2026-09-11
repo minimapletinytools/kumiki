@@ -1,11 +1,5 @@
 """How things are named, and how much a name can be trusted.
 
-Identity here comes from what the author wrote. Position -- "the third cut",
-"the second post" -- is a fallback used only where the author did not
-distinguish two things, and where it is used it is a field of its own rather
-than something folded into a string, so that code and people can both see which
-references are order-dependent and which are not.
-
 There are three grades of stability worth keeping apart:
 
 1. the same code produces the same name on every run;
