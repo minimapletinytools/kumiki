@@ -7,7 +7,9 @@ cropping that turns one into the other.
 
 import pytest
 
-from kumiki.cutcsg import HalfSpace, RectangularPrism
+from dataclasses import dataclass
+
+from kumiki.cutcsg import BoundingBox, CutCSG, HalfSpace, RectangularPrism
 from kumiki.geometry import (
     ConvexPlanarRegion, Line, LineSegment, Plane, frame_for_plane,
 )
@@ -275,26 +277,41 @@ class TestLoftedSolids:
             assert high - low == pytest.approx(width, abs=1e-9), height
 
 
-def _undescribable():
-    """A solid solid_bounds cannot describe: a loft running to infinity.
+@dataclass(frozen=True)
+class _UnknownShape(CutCSG):
+    """A solid solid_bounds has never been taught.
 
-    Deliberately out of contract, and the type checker is told so rather than
-    worked around. ConvexPolygonSimpleLoft REQUIRES both distances -- its
-    contains_point, is_point_on_boundary and _height_fraction all do arithmetic
-    with them and would raise on None -- but cropcsg._loft_half_spaces defends
-    against one anyway, answering UNKNOWN. This is the only thing that reaches
-    that defence, and a compound solid will not do instead: unions and
-    differences are walked, not described, so they are describable after all.
+    Every primitive kumiki ships IS describable, and the compound nodes are
+    walked rather than described, so nothing in the library reaches the
+    fallthrough that answers UNKNOWN. This does -- which is the point: UNKNOWN
+    is the answer waiting for the next primitive someone adds, and the
+    behaviour that protects a caller from a partial one is worth pinning
+    before then rather than after.
+
+    It used to be a loft with both distances None, which reached the same
+    answer by being INVALID: ConvexPolygonSimpleLoft requires both distances
+    (its contains_point and _height_fraction do arithmetic with them), so the
+    fixture was a shape that would have raised anywhere but there.
     """
-    from kumiki.cutcsg import ConvexPolygonSimpleLoft
 
-    square = [_p(-0.05, -0.05), _p(0.05, -0.05), _p(0.05, 0.05), _p(-0.05, 0.05)]
-    return ConvexPolygonSimpleLoft(
-        bottom_points=square, top_points=square,
-        transform=Transform(position=_v(0, 0, 0),
-                            orientation=Transform.identity().orientation),
-        start_distance=None, end_distance=None,  # ty: ignore[invalid-argument-type]
-    )
+    def __repr__(self) -> str:
+        return "_UnknownShape()"
+
+    def contains_point(self, point, eps=None) -> bool:
+        return False
+
+    def is_point_on_boundary(self, point, eps=None) -> bool:
+        return False
+
+    def get_outward_normal(self, point, eps=None):
+        return None
+
+    def get_aabb(self):
+        return BoundingBox(min_x=0, min_y=0, min_z=0, max_x=1, max_y=1, max_z=1)
+
+
+def _undescribable():
+    return _UnknownShape()
 
 
 def _span(segments, direction=None):
