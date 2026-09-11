@@ -1248,7 +1248,7 @@ def build_pattern_grid_frame(pattern_list: List[Any], padding: float = 0.5) -> A
     for p in pattern_list:
         try:
             with contextlib.redirect_stdout(sys.stderr):
-                result = p.lambda_(origin)
+                result = p.raise_at(origin)
             if hasattr(result, "cut_timbers") and hasattr(result, "accessories"):
                 frames.append(result)
             else:

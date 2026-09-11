@@ -374,9 +374,13 @@ class Kiwari:
         if incoming is None:
             return self
 
-        if isinstance(incoming, Kiwari):
+        # Recognised by shape, not by isinstance: the runner purges and
+        # re-imports kumiki on every reload so source edits take effect, which
+        # makes the Kiwari held from the previous build a different class
+        # object from this one. It is still a kiwari.
+        if hasattr(incoming, "declarations") and hasattr(incoming, "values"):
             arriving = dict(incoming.values)
-            arriving_texts = dict(incoming.texts)
+            arriving_texts = dict(getattr(incoming, "texts", {}))
         elif isinstance(incoming, Mapping):
             arriving, arriving_texts = _split_values_and_texts(incoming)
         else:
