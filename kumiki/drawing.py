@@ -726,6 +726,72 @@ def covering_page(subdivision_or_viewport: Union[Viewport, Subdivision],
     return replace(subdivision_or_viewport, rect=(0.0, 0.0, 1.0, 1.0), **options)
 
 
+# ---------------------------------------------------------------------------
+# The layouts a drawing gets when it does not name one
+# ---------------------------------------------------------------------------
+#
+# Here rather than in kigumi/runner.py because they are what a DRAWING is,
+# not what a viewer does with one -- and because Drawing reaches for them
+# itself when it is given no viewports of its own.
+#
+# The ids are spelled out beside each. They are positional, so they follow
+# from the shape and nothing else; writing them down is what lets code find a
+# view by what it is for without reading a label, and what makes a change to
+# either shape fail a test rather than move someone's measurements in silence.
+
+
+def shop_drawing_viewports() -> Tuple[Viewport, ...]:
+    """One piece's four long faces down the left, a preview beside them.
+
+    How a piece is drawn for the shop: every long side rolled out, square on,
+    with a live view of the whole thing to read them against.
+    """
+    return (covering_page(columns(
+        rows(Viewport(label="Front"), Viewport(label="Right"),
+             Viewport(label="Back"), Viewport(label="Left")),
+        Viewport(label="Preview"),
+    )),)
+
+
+SHOP_DRAWING_IDS: Mapping[str, ViewportId] = {
+    "front": ViewportId("0.0.0"),
+    "right": ViewportId("0.0.1"),
+    "back": ViewportId("0.0.2"),
+    "left": ViewportId("0.0.3"),
+    "preview": ViewportId("0.1"),
+}
+
+
+def elevation_viewports() -> Tuple[Viewport, ...]:
+    """Three world elevations and a preview, a quadrant each.
+
+    For several pieces at once, which have no single piece whose faces the
+    sheet could be about. Two rows of two columns rather than four rects: the
+    rows are what make the elevations line up across the sheet.
+    """
+    return (covering_page(rows(
+        columns(Viewport(label="Front"), Viewport(label="Top")),
+        columns(Viewport(label="Right"), Viewport(label="Preview")),
+    )),)
+
+
+ELEVATION_IDS: Mapping[str, ViewportId] = {
+    "front": ViewportId("0.0.0"),
+    "top": ViewportId("0.0.1"),
+    "right": ViewportId("0.1.0"),
+    "preview": ViewportId("0.1.1"),
+}
+
+
+def default_viewports_for(timber_count: int) -> Tuple[Viewport, ...]:
+    """The viewports a drawing gets when it names timbers and no layout.
+
+    One piece is drawn as a shop drawing of that piece. Several have no single
+    piece whose faces the sheet could be about, so they get world elevations.
+    """
+    return shop_drawing_viewports() if timber_count == 1 else elevation_viewports()
+
+
 @dataclass(frozen=True)
 class Drawing:
     """A drawing the frame asks for: a name, and which timbers it is of.
@@ -756,19 +822,20 @@ class Drawing:
     #: The sheet these sit on. A Length anywhere in the tree is measured
     #: against it.
     page: Optional[Page] = None
-    #: Dimensions for viewports this drawing did NOT build, keyed by viewport
-    #: id -- which is a position, "0.0.1" being the second row of the first
-    #: column of the first floating viewport.
+    #: Dimensions named by the id of the view they are drawn in -- a position,
+    #: "0.0.1" being the second row of the first column of the first floating
+    #: viewport.
     #:
-    #: For when the layout is not the drawing's: a drawing that names only its
-    #: timbers has its viewports chosen for it, so there is no viewport object
-    #: to hang a measurement on and an id is the only way to say which view is
-    #: meant. When the drawing DOES supply its viewports, put the measurement
-    #: on the viewport instead and no counting is involved.
+    #: For a drawing that took the default layout: it has viewports like any
+    #: other, but they were made for it, so there is no object in hand to put a
+    #: measurement on and an id is the only way to say which view is meant.
+    #: A drawing that writes its own viewports should put the measurement on
+    #: the viewport instead, where no counting is involved and moving the view
+    #: takes the dimension with it.
     #:
     #: Either way the runner reads measurements_by_viewport(), which is the two
     #: together.
-    measurements: Mapping[str, Sequence[Measure]] = field(default_factory=dict)
+    measurements: Mapping[ViewportId, Sequence[Measure]] = field(default_factory=dict)
 
     def __post_init__(self):
         object.__setattr__(self, 'timber_paths', tuple(
@@ -780,10 +847,15 @@ class Drawing:
         elif isinstance(self.drawing_id, str):
             object.__setattr__(self, 'drawing_id', DrawingId(self.drawing_id))
         object.__setattr__(self, 'measurements', {
-            str(viewport): tuple(measures)
+            viewport: tuple(measures)
             for viewport, measures in dict(self.measurements or {}).items()
         })
-        object.__setattr__(self, 'viewports', tuple(self.viewports))
+        # A drawing always has viewports. One that names only its timbers gets
+        # the default layout for what it draws, made here and held like any
+        # other -- so there is no second kind of drawing whose views exist only
+        # once something else has laid it out.
+        viewports = tuple(self.viewports) or default_viewports_for(len(self.timber_paths))
+        object.__setattr__(self, 'viewports', viewports)
         self._check_placement()
         self._check_each_viewport_appears_once()
 
@@ -821,7 +893,8 @@ class Drawing:
             if viewport.measurements:
                 collected[str(viewport_id)] = tuple(viewport.measurements)
         for viewport_id, measures in self.measurements.items():
-            collected[viewport_id] = collected.get(viewport_id, ()) + tuple(measures)
+            key = str(viewport_id)
+            collected[key] = collected.get(key, ()) + tuple(measures)
         return collected
 
     def leaves(self) -> Iterator[Tuple[ViewportId, 'Viewport']]:

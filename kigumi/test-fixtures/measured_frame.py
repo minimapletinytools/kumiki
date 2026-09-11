@@ -14,7 +14,8 @@ project_root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(project_root))
 
 from kumiki.drawing import Drawing, Measure
-from kumiki.identity import FeatureRef, ResolvedTimberPath, SingleFeaturePath
+from kumiki.identity import (FeatureRef, ResolvedTimberPath, SingleFeaturePath,
+                             ViewportId)
 from kumiki.timber import Frame
 from patterns.basic_joints_patterns import example_basic_mortise_and_tenon_joint
 
@@ -46,7 +47,7 @@ def build_frame():
             Drawing(
                 name="tenon",
                 timber_paths=["butt_timber"],
-                measurements={"0.0.0": [Measure(anchor_a=tenon_top, anchor_b=shoulder)]},
+                measurements={ViewportId("0.0.0"): [Measure(anchor_a=tenon_top, anchor_b=shoulder)]},
             ),
             # The mortise it goes into, measured in two viewports, to show that
             # the same drawing carries different dimensions in different views.
@@ -58,8 +59,8 @@ def build_frame():
                     # see kumiki/layout.py. "0.0.0" and "0.0.1" are the first two
                     # rows of the left column, the front and right elevations of
                     # the long-face layout one timber gets.
-                    "0.0.0": [Measure(anchor_a=mortise_bottom, anchor_b=mortise_front)],
-                    "0.0.1": [Measure(anchor_a=mortise_front, anchor_b=mortise_bottom)],
+                    ViewportId("0.0.0"): [Measure(anchor_a=mortise_bottom, anchor_b=mortise_front)],
+                    ViewportId("0.0.1"): [Measure(anchor_a=mortise_front, anchor_b=mortise_bottom)],
                 },
             ),
             # Both pieces, so world elevations rather than long faces. From the
@@ -73,7 +74,7 @@ def build_frame():
             Drawing(
                 name="the joint",
                 timber_paths=["butt_timber", "receiving_timber"],
-                measurements={"0.0.1": [Measure(anchor_a=shoulder, anchor_b=mortise_bottom)]},
+                measurements={ViewportId("0.0.1"): [Measure(anchor_a=shoulder, anchor_b=mortise_bottom)]},
             ),
         ],
     )

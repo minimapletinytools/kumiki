@@ -10,13 +10,15 @@ is compared by object rather than by value.
 
 import pytest
 
-from kumiki.drawing import (Drawing, Length, Measure, Page, Portion, Share,
+from kumiki.drawing import (Drawing, ELEVATION_IDS, Length, Measure, Page,
+                            Portion, SHOP_DRAWING_IDS, Share,
                             SplitDirection, Subdivision, Viewport, columns,
                             covering_page, rows)
 from kumiki.identity import (FeatureRef, ResolvedTimberPath, SingleFeaturePath,
                              TimberPath, ViewportId)
 from kumiki.layout import resolve_drawing, resolve_viewports
 from kumiki.rule import mm
+from tests.testing_shavings import present
 
 A3 = Page(0.420, 0.297)
 
@@ -62,6 +64,54 @@ class TestTheLayoutsThatShip:
             "0.1.0": (0.0, 0.5, 0.5, 0.5),
             "0.1.1": (0.5, 0.5, 0.5, 0.5),
         }
+
+
+class TestEveryDrawingHasViewports:
+    """There is no drawing whose views exist only once something lays it out."""
+
+    def test_one_timber_gets_the_shop_drawing(self):
+        drawing = Drawing(name="d", timber_paths=[TimberPath("posts/fl")])
+
+        assert [str(i) for i, _ in drawing.leaves()] == [
+            "0.0.0", "0.0.1", "0.0.2", "0.0.3", "0.1"]
+        assert [v.label for _, v in drawing.leaves()] == [
+            "Front", "Right", "Back", "Left", "Preview"]
+
+    def test_several_timbers_get_world_elevations(self):
+        # No single piece whose faces the sheet could be about.
+        drawing = Drawing(name="d", timber_paths=[TimberPath("a"), TimberPath("b")])
+
+        assert [v.label for _, v in drawing.leaves()] == ["Front", "Top", "Right", "Preview"]
+
+    def test_the_published_ids_match_the_shapes_they_describe(self):
+        # These are what code finds a view by, so a change to either shape has
+        # to fail here rather than move someone's measurements in silence.
+        shop = Drawing(name="d", timber_paths=[TimberPath("one")])
+        elevations = Drawing(name="d", timber_paths=[TimberPath("a"), TimberPath("b")])
+
+        assert {role: present(shop.viewport_at(vid), role).label
+                for role, vid in SHOP_DRAWING_IDS.items()} == {
+            "front": "Front", "right": "Right", "back": "Back",
+            "left": "Left", "preview": "Preview"}
+        assert {role: present(elevations.viewport_at(vid), role).label
+                for role, vid in ELEVATION_IDS.items()} == {
+            "front": "Front", "top": "Top", "right": "Right", "preview": "Preview"}
+
+    def test_a_drawing_that_names_its_own_keeps_them(self):
+        mine = _view("Only")
+        drawing = Drawing(name="d", page=A3, timber_paths=[TimberPath("posts/fl")],
+                          viewports=[covering_page(rows(mine))])
+
+        assert [v.label for _, v in drawing.leaves()] == ["Only"]
+
+    def test_the_default_viewports_belong_to_the_one_drawing(self):
+        # Made per drawing, not shared: two drawings that took the same default
+        # must not end up holding the same viewport objects, or a measurement
+        # written on one would appear on the other.
+        one = Drawing(name="a", timber_paths=[TimberPath("x")])
+        other = Drawing(name="b", timber_paths=[TimberPath("x")])
+
+        assert one.viewport_at(ViewportId("0.0.0")) is not other.viewport_at(ViewportId("0.0.0"))
 
 
 class TestAViewportDoesNotKnowWhereItIs:
@@ -303,14 +353,14 @@ class TestWhereAMeasurementIsWritten:
         # A drawing that names only its timbers has its viewports chosen for
         # it, so there is no viewport object to hang one on.
         drawing = Drawing(name="d", timber_paths=[TimberPath("posts/fl")],
-                          measurements={"0.0.1": [self._measure()]})
+                          measurements={ViewportId("0.0.1"): [self._measure()]})
 
         assert list(drawing.measurements_by_viewport()) == ["0.0.1"]
 
     def test_a_viewport_with_both_gets_both(self):
         front = Viewport(label="Front", measurements=[self._measure("own")])
         drawing = Drawing(name="d", page=A3, viewports=[covering_page(rows(front))],
-                          measurements={"0.0": [self._measure("keyed")]})
+                          measurements={ViewportId("0.0"): [self._measure("keyed")]})
 
         assert len(drawing.measurements_by_viewport()["0.0"]) == 2
 
