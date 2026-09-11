@@ -275,7 +275,7 @@ class TestTriangles:
     def test_triangulate_timber_with_roundover_and_miter_cuts(self):
         from kumiki.construction import Frame, CornerJointTimberArrangement
         from kumiki.joints.workshop.basic_joints import cut_basic_plain_miter_joint
-        from kumiki.joints.workshop.decorative_joints import cut_practice_roundover_decoration
+        from kumiki.joints.workshop.decorative import cut_practice_roundover_decoration
         from kumiki.rule import inches
         from kumiki.ticket import normalize_timber_tags
         from kumiki.timber import Timber, TimberTicket, compute_timber_orientation, TimberEdge, TimberEnd

@@ -791,7 +791,7 @@ class TestTellingIdenticalJointsApart:
     INNER = ("tenon_cut", "tenon_waste", "tenon_cropped", "tenon")
 
     def _frame(self):
-        from patterns.mortise_and_tenon_joints_patterns import example_brace_joint
+        from patterns.mixed.mortise_and_tenon_joints_patterns import example_brace_joint
 
         return example_brace_joint()
 

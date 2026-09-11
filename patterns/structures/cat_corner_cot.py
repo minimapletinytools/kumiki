@@ -72,11 +72,11 @@ Defines:
 import math
 from kumiki import *
 from kumiki.cutcsg import HalfSpace, adopt_csg
-from kumiki.joints.workshop.free_joints import cut_free_house_joint
+from kumiki.joints.workshop.free import cut_free_house_joint
 from kumiki.construction import ButtJointTimberArrangement, CrossJointTimberArrangement
-from kumiki.joints.workshop.mortise_and_tenon_joints import cut_mortise_and_tenon_joint_on_face_aligned_timbers
-from kumiki.joints.workshop.butt_joints import cut_dropin_housed_butt_joint_on_face_aligned_timbers
-from kumiki.joints.workshop.cross_joints import cut_plain_cross_lap_house_joint
+from kumiki.joints.workshop.mixed import cut_mortise_and_tenon_joint_on_face_aligned_timbers
+from kumiki.joints.workshop.butt import cut_dropin_housed_butt_joint_on_face_aligned_timbers
+from kumiki.joints.workshop.cross import cut_plain_cross_lap_house_joint
 from kumiki.joints.workshop.shavings.build_a_butt import SimplePegParameters, PegShape
 
 

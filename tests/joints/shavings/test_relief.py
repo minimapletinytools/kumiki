@@ -30,7 +30,7 @@ from kumiki.joints.workshop.shavings.relief import (
     chop_shoulder_notch_aligned_with_timber,
     does_shoulder_plane_need_notching,
 )
-from kumiki.joints.workshop.mortise_and_tenon_joints import (
+from kumiki.joints.workshop.mixed import (
     InsetShoulderReliefStyle,
     cut_mortise_and_tenon_joint,
 )

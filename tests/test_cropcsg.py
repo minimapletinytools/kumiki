@@ -1097,7 +1097,7 @@ class TestObliqueJointStillBuilds:
         from pathlib import Path as _Path
 
         sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
-        from patterns.mortise_and_tenon_joints_patterns import example_brace_joint
+        from patterns.mixed.mortise_and_tenon_joints_patterns import example_brace_joint
 
         # A brace: oblique, and plane-aligned enough to be bored perpendicular
         # to the face, which is what turns the lengthwise cropping on.

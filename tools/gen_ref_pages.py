@@ -54,16 +54,14 @@ CORE_ORDER = ["footprint", "timber", "construction", "measuring", "rule"]
 # joints first.
 JOINTS_ORDER = [
     "basic_joints",
-    "mortise_and_tenon_joints",
-    "butt_joints",
-    "corner_joints",
-    "cross_joints",
-    "splice_joints",
-    "board_joints",
-    "multi_butt_joints",
-    "compound_joints",
-    "free_joints",
-    "decorative_joints",
+    "mixed",
+    "butt",
+    "corner",
+    "cross",
+    "splice",
+    "board",
+    "free",
+    "decorative",
     "shavings",
 ]
 
@@ -77,8 +75,14 @@ DISPLAY_NAMES = {
     # "Pattern Book" (no suffix) is docs/patternbook.md's own top-level nav entry -- this is
     # the patternbook.py *module*'s API reference page, kept distinguishable from that.
     "patternbook": "Pattern Book (API)",
-    "mortise_and_tenon_joints": "Mortise and Tenon Joints",
-    "multi_butt_joints": "Multi-Butt Joints",
+    "mixed": "Mortise and Tenon (Mixed)",
+    "butt": "Butt Joints",
+    "corner": "Corner Joints",
+    "cross": "Cross Joints",
+    "splice": "Splice Joints",
+    "board": "Board Joints",
+    "free": "Free Joints",
+    "decorative": "Decorative Joints",
 }
 
 

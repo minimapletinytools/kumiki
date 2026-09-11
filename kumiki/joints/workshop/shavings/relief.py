@@ -1513,3 +1513,25 @@ def chop_scribe_relief_and_apply_for_butt_joint_arrangement(
         return updated_scribed_cutting, updated_cut_cutting
     else:
         return updated_cut_cutting, updated_scribed_cutting
+
+
+def apply_scribe_relief_if_configured(
+    relief: Optional[ButtJointScribeReliefConfig],
+    butt_cut: Cutting,
+    receiving_cut: Cutting,
+) -> tuple[Cutting, Cutting]:
+    """
+    Wrapper around ``chop_scribe_relief_and_apply_for_butt_joint_arrangement``:
+    passes ``butt_cut``/``receiving_cut`` through unchanged when ``relief`` is None, otherwise
+    delegates to apply the configured scribe relief.
+    """
+    if relief is None:
+        return butt_cut, receiving_cut
+    return chop_scribe_relief_and_apply_for_butt_joint_arrangement(
+        relief=relief,
+        butt_cut=butt_cut,
+        receiving_cut=receiving_cut,
+    )
+
+
+_apply_scribe_relief_if_configured = apply_scribe_relief_if_configured

@@ -23,8 +23,10 @@ from kumiki.measuring import (
     Line,
     locate_centerline,
     locate_face,
+    locate_into_face,
     locate_plane_from_edge_in_direction,
     mark_distance_from_end_along_centerline,
+    mark_plane_from_edge_in_direction,
     Space,
     Plane,
 )
@@ -1174,3 +1176,29 @@ def compute_peg_positions(
         ))
 
     return results
+
+
+def convert_mortise_shoulder_inset_to_centerline_distance(
+    mortise_shoulder_inset: Numeric,
+    mortise_face: TimberFace,
+    receiving_timber: TimberLike,
+) -> Numeric:
+    """
+    Convert user-facing mortise shoulder inset parameter to centerline-relative distance.
+
+    Inset is measured from the mortise entry face surface toward the centerline (inward).
+    This function converts it to the signed distance from centerline (measured toward the tenon).
+
+    Args:
+        mortise_shoulder_inset: Distance from mortise entry face inward. 0 = shoulder flush
+            with the entry face. Positive = shoulder deeper into the timber.
+        mortise_face: The face of the receiving timber where the mortise enters.
+        receiving_timber: The receiving timber.
+
+    Returns:
+        Signed distance from the timber centerline to the shoulder plane, measured toward
+        the tenon side. 0 = shoulder at centerline.
+    """
+    inset_plane = locate_into_face(mortise_shoulder_inset, mortise_face, receiving_timber)
+    inset_marking = mark_plane_from_edge_in_direction(inset_plane, receiving_timber, TimberCenterline.CENTERLINE)
+    return inset_marking.distance

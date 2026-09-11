@@ -15,10 +15,10 @@ from kumiki.construction import (
 from kumiki.footprint import Footprint, FootprintLocation
 from kumiki.ticket import TimberTicket
 from kumiki.joints.workshop.shavings import SimplePegParameters
-from kumiki.joints.workshop.butt_joints import (
+from kumiki.joints.workshop.butt import (
     cut_dropin_housed_butt_joint_on_face_aligned_timbers
 )
-from kumiki.joints.workshop.mortise_and_tenon_joints import (
+from kumiki.joints.workshop.mixed import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
 )
 from kumiki.timber import Timber, TimberLongEdge, TimberLongFace, SomeTimberFace
@@ -1332,11 +1332,11 @@ def build_shed_frame() -> Frame:
     #  - Plate Housing Joint: Generic housing cut on West/East Top Plates receiving the crossing rafters.
 
     from kumiki.rule import Orientation
-    from kumiki.joints.workshop.corner_joints import (
+    from kumiki.construction import CornerJointTimberArrangement
+    from kumiki.joints.workshop.corner import (
         cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
-        CornerJointTimberArrangement,
     )
-    from kumiki.joints.workshop.free_joints import cut_free_house_joint
+    from kumiki.joints.workshop.free import cut_free_house_joint
 
     if num_rafter_pairs < 4:
         raise ValueError("num_rafter_pairs must be >= 4 (2 aligned rafter pairs on each side)")

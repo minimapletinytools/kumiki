@@ -4212,7 +4212,7 @@ class TestCSGParity:
 
     def test_every_node_of_a_real_joint_is_reached_once(self):
         from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
-        from kumiki.joints.workshop.mortise_and_tenon_joints import (
+        from kumiki.joints.workshop.mixed import (
             cut_mortise_and_tenon_joint_on_face_aligned_timbers,
         )
         from kumiki.rule import inches

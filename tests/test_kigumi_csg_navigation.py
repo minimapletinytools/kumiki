@@ -35,7 +35,7 @@ from kumiki.cutcsg import (
     RectangularPrism,
 )
 from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
-from kumiki.joints.workshop.mortise_and_tenon_joints import (
+from kumiki.joints.workshop.mixed import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
 )
 from kumiki.rule import Matrix, Transform, create_v3, inches, scalar
@@ -1482,7 +1482,7 @@ class TestSameNamedSiblings:
         from pathlib import Path as _Path
 
         sys.path.insert(0, str(_Path(__file__).resolve().parent.parent))
-        from patterns.corner_joints_patterns import create_mitered_and_keyed_lap_joint_example
+        from patterns.corner.mitered_and_keyed_lap_joint_patterns import create_mitered_and_keyed_lap_joint_example
 
         return create_mitered_and_keyed_lap_joint_example()
 

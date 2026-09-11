@@ -13,36 +13,36 @@ from typing import Optional, List, Tuple, cast
 from typing_extensions import deprecated
 from kumiki.timber import *
 from kumiki.rule import *
-from .corner_joints import (
+from .corner import (
     cut_plain_miter_joint,
     cut_plain_miter_joint_on_face_aligned_timbers,
     cut_tongue_and_fork_corner_joint_on_plane_aligned_timbers,
     cut_mitered_and_keyed_lap_joint_on_plane_aligned_timbers,
 )
-from .butt_joints import (
+from .butt import (
     cut_plain_butt_joint,
     cut_plain_butt_joint_on_face_aligned_timbers,
     cut_tongue_and_fork_butt_joint_on_plane_aligned_timbers,
     cut_dropin_dovetail_butt_joint_on_face_aligned_timbers,
     cut_dropin_housed_butt_joint_on_face_aligned_timbers,
+    cut_wedged_half_dovetail_joint_on_face_aligned_timbers as cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
+    cut_splined_opposing_double_butt_joint_on_face_aligned_timbers,
 )
-from .mortise_and_tenon_joints import (
+from .mixed import (
     cut_mortise_and_tenon_joint_on_face_aligned_timbers,
-    cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers,
     cut_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers,
     TuskParameters,
 )
-from .splice_joints import (
+from .splice import (
     cut_plain_butt_splice_joint_on_aligned_timbers,
     cut_plain_splice_lap_joint_on_aligned_timbers,
     cut_lapped_gooseneck_joint_on_aligned_timbers,
     cut_half_blind_tenoned_dadoed_rabbeted_scarf_joint_on_aligned_timbers,
 )
-from .cross_joints import (
+from .cross import (
     cut_plain_cross_lap_joint,
     cut_plain_cross_lap_house_joint,
 )
-from .multi_butt_joints import cut_splined_opposing_double_butt_joint_on_face_aligned_timbers
 from kumiki.construction import (
     ButtJointTimberArrangement,
     SpliceJointTimberArrangement,
