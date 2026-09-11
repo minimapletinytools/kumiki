@@ -36,10 +36,10 @@ from .identity import (
     TimberPath,
     ViewportId,
 )
-from .layout import (FloatingPane, Layout, Page, PlacedView, Share, Split,
-                     SplitDirection, View, columns, covering_page,
-                     resolve_layout, rows)
-from .drawing import (Drawing, Measure, MeasurementDirection, MeasurementFeature,
+from .layout import PlacedViewport, resolve_drawing, resolve_viewports
+from .drawing import (Drawing, Length, Page, Portion, Share, SplitDirection,
+                      Subdivision, Viewport, columns, covering_page, rows,
+                      Measure, MeasurementDirection, MeasurementFeature,
                       MeasurementKind, MeasurementOperation, MeasurementPlacement,
                       MeasurementSpace, kinds_for)
 from .timber import *
