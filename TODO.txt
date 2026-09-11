@@ -1,3 +1,12 @@
+:: 9/11/2025
+
+lets look into refactoring kigumi into a STANDALONE viewer (i.e. not a VScode extensions)
+
+the same code should still work as the VSCode extension as it is right now, so basicayl there rae 2 build paths, one to make the extension and one tom ake a standalone app.
+
+We do need to recreate the kigumi sidebar in the app though, so that part needs to refactored out so as much code is shared as possible, the in app sidebar is not used in the vs code extension
+
+
 :: 9/10/2026
 
 Frames parameter refactor. 
@@ -288,10 +297,19 @@ DONE/IGNORE-fix tusk failing from other direction bug
 DONE-test out roundover on bottom stretchers again on coffee table
 DONE-figure out why roundovers break on stretcher sin coffe tabel (I tihnk ivene if you don't do the hous ejoint)
 IGNORE-consider refactoring runner.py
-
--consider doing the big 1 joint per file reorg
+DONE-consider doing the big 1 joint per file reorg
   -decide how to reorg examples too...
   -maybe get ird of folder + example support, examples are always leaf nodes?
+
+DONE-DO THE PARAMETRIC PARAMETER REFACTOR
+DONE-add support for optionla parameters in kiwari (gets a check box to enabel or disable them) which can take the None value which will often (or always if that mkes it esaier) be the default.
+
+-consider renaming kiwari methods
+
+-update patterns to be sensible with parameters.. do thec leanup!!
+-do joint rename to match what's in your new book
+
+
 
 -DRAWING NONSENSE
   DONE-fix lighting in ortho drawing
@@ -324,7 +342,8 @@ IGNORE-consider refactoring runner.py
 
 -maybe change attach face aligned timber to have better orientation choices or document the created timber orientation better
 
--DO THE PARAMETRIC PARAMETER REFACTOR
+-add support for multilpe frames in jigumi (returns list of frames but you'll need to figure out how to do kiwari...)
+-create a header for the are below the 3d view main panel in kigumi so it appears a littlem or esensible. it should says "scroll here for more" as well. amybe you can stick some doc information there too.
 
 -add expand_butt_timber_shoulder_footprint_for_notching_by argument to ButtJointNotchReliefConfig, comment should say "notching cuts a relief between the butt and receiving timber by cutting along the bisecting plane between the butt timber faces and the shoulder plane. By default, these planes are drawn from the intersection of the perfect timber within of the butt timber and the shoulder plane. You can uniformly expand the position where the planes are drawn from using this parameter.
 -would be nice to have a slightly recessed relief cut on the tenon timber like they have in most of the timber frame CAD drawings I've seen.
@@ -345,7 +364,7 @@ IGNORE-consider refactoring runner.py
 -add STL mesh support shouldn't be hard :O
   -make a cabriole leg table example 
     -(although teh cabriol leg could hav ebeen done with decorative joints so maybe do like a sick eagle or something)
--do joint rename to match what's in your new book
+
 -add shouder to cross lap joint
   -the way to do this is to make a fake timber with a smaller PTW and reapply the cut with notching
   -you basically just need to do notching properly... create 2x planes that cross the corners of the lap (to the perfect or roguh corners?) do decide what gets cut from what on what side
