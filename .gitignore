@@ -184,3 +184,8 @@ step_test_output
 # kumiki/_pattern_index.json is checked in as a placeholder; regenerate with make pattern-index
 kigumi_exports/
 kigumi/.artifacts
+# Agent worktrees. .claude/plans and .claude/skills are checked in; these are
+# not -- each is a git worktree of this repo, so committing one lands a gitlink
+# with no .gitmodules entry, and every `git submodule foreach` after that
+# (actions/checkout's post-job cleanup runs one) fails with exit code 128.
+.claude/worktrees/
