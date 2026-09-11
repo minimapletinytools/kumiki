@@ -66,19 +66,71 @@ def _orthographic_viewports(drawing):
     return [v for v in drawing["viewports"] if v["projection"] == "orthographic"]
 
 
+# A viewport is identified by WHERE IT IS -- see kumiki/layout.py -- so these
+# are the two layouts written out, and TestViewportIds below is what catches
+# either changing under the rest of these tests. Looking a viewport up by its
+# label would be the one thing layout.py says nothing may do.
+QUADRANTS = {"front": "0.0.0", "top": "0.0.1", "right": "0.1.0", "preview": "0.1.1"}
+LONG_FACES = {"front": "0.0.0", "right": "0.0.1", "back": "0.0.2",
+              "left": "0.0.3", "preview": "0.1"}
+
+
+def _by_id(drawing):
+    return {viewport["id"]: viewport for viewport in drawing["viewports"]}
+
+
+def _at(drawing, ids, label):
+    """The viewport the layout puts `label` at. Positional, via the tables above."""
+    return _by_id(drawing)[ids[label]]
+
+
+class TestViewportIds:
+    """The layouts, written out.
+
+    A viewport is identified by its position -- the index of its floating pane,
+    then of each child stepped through to reach it. So the tables above are the
+    layout, and if either layout is rearranged these fail first and plainly,
+    instead of every camera test failing with a KeyError and no clue why.
+
+    The label is asserted alongside the id on purpose: it is what says WHICH
+    view is at that position, and it is the one thing nothing in the viewer may
+    look a viewport up by.
+    """
+
+    def test_the_quadrant_layout_is_two_rows_of_two(self):
+        by_id = _by_id(_drawing(_post(create_v3(mm(0), mm(0), mm(0)))))
+
+        assert {vid: v["name"] for vid, v in by_id.items()} == {
+            "0.0.0": "Front", "0.0.1": "Top", "0.1.0": "Right", "0.1.1": "Preview"}
+
+    def test_the_long_face_layout_is_four_rows_beside_a_preview(self):
+        by_id = _by_id(_selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"]))
+
+        assert {vid: v["name"] for vid, v in by_id.items()} == {
+            "0.0.0": "Front", "0.0.1": "Right", "0.0.2": "Back",
+            "0.0.3": "Left", "0.1": "Preview"}
+
+    def test_a_label_is_not_an_id(self):
+        # The whole rule in one assertion: what a view is called and what it is
+        # are different strings, and only one of them is looked up by.
+        for viewport in _drawing(_post(create_v3(mm(0), mm(0), mm(0))))["viewports"]:
+            assert viewport["name"] and viewport["id"]
+            assert viewport["name"] != viewport["id"]
+
+
 class TestDefaultDebugDrawing:
     def test_it_has_three_elevations_and_one_preview(self):
         drawing = _drawing(_post(create_v3(mm(0), mm(0), mm(0))))
 
         ids = [viewport["id"] for viewport in drawing["viewports"]]
-        assert ids == ["front", "top", "right", "preview"]
+        assert ids == [QUADRANTS[label] for label in ("front", "top", "right", "preview")]
 
     def test_the_elevations_are_locked_and_the_preview_is_not(self):
         drawing = _drawing(_post(create_v3(mm(0), mm(0), mm(0))))
 
-        by_id = {viewport["id"]: viewport for viewport in drawing["viewports"]}
-        assert all(by_id[name]["locked"] for name in ("front", "top", "right"))
-        assert by_id["preview"]["locked"] is False
+        by_id = _by_id(drawing)
+        assert all(by_id[QUADRANTS[label]]["locked"] for label in ("front", "top", "right"))
+        assert by_id[QUADRANTS["preview"]]["locked"] is False
 
     def test_a_drawing_asks_for_no_camera_gizmos(self):
         assert _drawing(_post(create_v3(mm(0), mm(0), mm(0))))["cameraControls"] == []
@@ -134,10 +186,10 @@ class TestDefaultDebugDrawing:
             for viewport in _orthographic_viewports(_drawing(_post(create_v3(mm(0), mm(0), mm(0)))))
         }
 
-        assert by_id["front"]["look"] == [0.0, 1.0, 0.0]
-        assert by_id["front"]["up"] == [0.0, 0.0, 1.0]
-        assert by_id["top"]["look"] == [0.0, 0.0, -1.0]
-        assert by_id["right"]["look"] == [-1.0, 0.0, 0.0]
+        assert by_id[QUADRANTS["front"]]["look"] == [0.0, 1.0, 0.0]
+        assert by_id[QUADRANTS["front"]]["up"] == [0.0, 0.0, 1.0]
+        assert by_id[QUADRANTS["top"]]["look"] == [0.0, 0.0, -1.0]
+        assert by_id[QUADRANTS["right"]]["look"] == [-1.0, 0.0, 0.0]
 
     def test_the_target_is_the_centre_of_everything(self):
         drawing = _drawing(
@@ -186,7 +238,7 @@ class TestDefaultDebugDrawing:
             _post(create_v3(mm(0), mm(0), mm(0))),
             _post(create_v3(mm(4000), mm(0), mm(0))),
         )
-        front = next(v for v in _orthographic_viewports(drawing) if v["id"] == "front")
+        front = _at(drawing, QUADRANTS, "front")
 
         assert front["camera"]["extent"] < 2.0
 
@@ -232,7 +284,8 @@ class TestDrawingFromSelection:
         # The shop drawing for a single piece: every long side, rolled out.
         drawing = _selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"])
 
-        assert [v["id"] for v in drawing["viewports"]] == ["front", "right", "back", "left", "preview"]
+        assert [v["id"] for v in drawing["viewports"]] == [
+            LONG_FACES[label] for label in ("front", "right", "back", "left", "preview")]
 
     def test_the_four_faces_look_at_four_different_sides(self):
         drawing = _selection([_beam(create_v3(mm(0), mm(0), mm(0)))], ["beam#0"])
@@ -287,7 +340,8 @@ class TestDrawingFromSelection:
         timbers = [_beam(create_v3(mm(0), mm(0), mm(0))), _post(create_v3(mm(0), mm(0), mm(0)))]
         drawing = _selection(timbers, ["beam#0", "post#0"])
 
-        assert [v["id"] for v in drawing["viewports"]] == ["front", "top", "right", "preview"]
+        assert [v["id"] for v in drawing["viewports"]] == [
+            QUADRANTS[label] for label in ("front", "top", "right", "preview")]
 
     def test_the_drawing_names_the_members_it_is_about(self):
         timbers = [_beam(create_v3(mm(0), mm(0), mm(0))), _post(create_v3(mm(0), mm(0), mm(0)))]
@@ -323,7 +377,7 @@ class TestDrawingFromSelection:
         preview = drawing["viewports"][-1]
 
         assert drawing["page"]["width"] > 0
-        assert preview["id"] == "preview"
+        assert preview["id"] == LONG_FACES["preview"]
         assert preview["locked"] is False
         assert preview["projection"] == "perspective"
 
@@ -355,7 +409,7 @@ class TestPreviewCamera:
     """The 3D preview beside the elevations, and how far it may be turned."""
 
     def _preview(self, drawing):
-        return next(v for v in drawing["viewports"] if v["id"] == "preview")
+        return next(v for v in drawing["viewports"] if v["projection"] == "perspective")
 
     def _off_axis_degrees(self, look, axis):
         import math
@@ -529,6 +583,6 @@ class TestOrientationStrategies:
         spec.loader.exec_module(module)
         drawing = runner.create_drawing_from_selection(module.build_frame(), ["A#0"])
 
-        preview = next(v for v in drawing["viewports"] if v["id"] == "preview")
+        preview = next(v for v in drawing["viewports"] if v["projection"] == "perspective")
         # The post is 1000mm of stock cut at 900, so its box centres on 450mm.
         assert preview["camera"]["target"][2] == pytest.approx(0.45, abs=1e-6)

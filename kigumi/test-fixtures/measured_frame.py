@@ -46,7 +46,7 @@ def build_frame():
             Drawing(
                 name="tenon",
                 timber_paths=["butt_timber"],
-                measurements={"front": [Measure(anchor_a=tenon_top, anchor_b=shoulder)]},
+                measurements={"0.0.0": [Measure(anchor_a=tenon_top, anchor_b=shoulder)]},
             ),
             # The mortise it goes into, measured in two viewports, to show that
             # the same drawing carries different dimensions in different views.
@@ -54,8 +54,12 @@ def build_frame():
                 name="mortise",
                 timber_paths=["receiving_timber"],
                 measurements={
-                    "front": [Measure(anchor_a=mortise_bottom, anchor_b=mortise_front)],
-                    "right": [Measure(anchor_a=mortise_front, anchor_b=mortise_bottom)],
+                    # Keyed by viewport id, which is a POSITION in the layout --
+                    # see kumiki/layout.py. "0.0.0" and "0.0.1" are the first two
+                    # rows of the left column, the front and right elevations of
+                    # the long-face layout one timber gets.
+                    "0.0.0": [Measure(anchor_a=mortise_bottom, anchor_b=mortise_front)],
+                    "0.0.1": [Measure(anchor_a=mortise_front, anchor_b=mortise_bottom)],
                 },
             ),
             # Both pieces, so world elevations rather than long faces. From the
@@ -69,7 +73,7 @@ def build_frame():
             Drawing(
                 name="the joint",
                 timber_paths=["butt_timber", "receiving_timber"],
-                measurements={"top": [Measure(anchor_a=shoulder, anchor_b=mortise_bottom)]},
+                measurements={"0.0.1": [Measure(anchor_a=shoulder, anchor_b=mortise_bottom)]},
             ),
         ],
     )

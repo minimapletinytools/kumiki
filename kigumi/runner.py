@@ -984,14 +984,58 @@ _DEBUG_DRAWING_VIEWS: List[Tuple[str, List[float], List[float], List[float]]] = 
 # is scaffolding, so it just picks a common sheet.
 _DEBUG_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
 
-# Quadrants of the page, as normalized [x, y, width, height] with a top-left
-# origin.
-_DEBUG_DRAWING_RECTS: Dict[str, List[float]] = {
-    "front": [0.0, 0.0, 0.5, 0.5],
-    "top": [0.5, 0.0, 0.5, 0.5],
-    "right": [0.0, 0.5, 0.5, 0.5],
-    "preview": [0.5, 0.5, 0.5, 0.5],
-}
+def _quadrant_layout():
+    """Three world elevations and a preview, a quadrant each.
+
+    Two rows of two columns rather than four rects: the rows are what make the
+    elevations line up across the sheet, and saying so means a change to one
+    moves its neighbour instead of leaving a gap.
+    """
+    from kumiki.layout import View, columns, covering_page, rows
+
+    return covering_page(rows(
+        columns(View(role="front", name="Front"), View(role="top", name="Top")),
+        columns(View(role="right", name="Right"), View(role="preview", name="Preview")),
+    ))
+
+
+def _long_face_layout():
+    """One piece's four long faces down the left, a preview beside them.
+
+    The shop drawing: two columns, the left one divided into four rows. Written
+    as the tree it is, so the quarters stay quarters when a face is added or
+    dropped.
+    """
+    from kumiki.layout import View, columns, covering_page, rows
+
+    return covering_page(columns(
+        rows(View(role="front", name="Front"), View(role="right", name="Right"),
+             View(role="back", name="Back"), View(role="left", name="Left")),
+        View(role="preview", name="Preview"),
+    ))
+
+
+def _placed_by_role(layout, page: Dict[str, float]) -> Dict[str, Any]:
+    """Resolve a layout against a page, keyed by what each view is for.
+
+    By role rather than by id, because the code below knows which view it is
+    pointing at and not where the layout put it -- which is the whole point of
+    ids being positional. Move the preview to the other column and nothing here
+    changes.
+    """
+    from kumiki.layout import Page, resolve_layout
+
+    resolved = resolve_layout(layout, Page(page["width"], page["height"]))
+    return {view.role: view for view in resolved}
+
+
+def _viewport_spec(placed, **rest: Any) -> Dict[str, Any]:
+    """The wire form of one placed view.
+
+    The id is the layout's -- a position, "0.1.2" -- and the name is a label
+    that nothing looks anything up by. See kumiki/layout.py.
+    """
+    return {"id": str(placed.id), "name": placed.name, "rect": list(placed.rect), **rest}
 
 # Leaves a margin around the model rather than framing it edge to edge.
 _DRAWING_EXTENT_PADDING = 1.15
@@ -1116,15 +1160,15 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
     the same kind of viewport the default 3D scene uses.
     """
     centre, half_size = _frame_world_bounds(frame)
+    placed = _placed_by_role(_quadrant_layout(), _DEBUG_DRAWING_PAGE)
     viewports: List[Dict[str, Any]] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
-        rect = _DEBUG_DRAWING_RECTS[view_id]
-        viewports.append({
-            "id": view_id,
-            "rect": rect,
-            "locked": True,
-            "projection": "orthographic",
-            "camera": {
+        rect = list(placed[view_id].rect)
+        viewports.append(_viewport_spec(
+            placed[view_id],
+            locked=True,
+            projection="orthographic",
+            camera={
                 "right": right,
                 "up": up,
                 "look": look,
@@ -1133,13 +1177,13 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
             },
             # Every timber, which is also what a scene defaults to; spelled out
             # because a real drawing is the interesting case and would not.
-            "members": None,
-            "ghostOthers": True,
-            "measurements": [],
-        })
+            members=None,
+            ghostOthers=True,
+            measurements=[],
+        ))
 
     viewports.append(_preview_viewport(
-        _DEBUG_DRAWING_RECTS["preview"], _world_box(centre, half_size), _DEBUG_DRAWING_PAGE,
+        placed["preview"], _world_box(centre, half_size), _DEBUG_DRAWING_PAGE,
         {"mode": "free"}, orient_by_search,
     ))
 
@@ -1171,22 +1215,6 @@ _LONG_FACE_VIEWS: List[Tuple[str, str, int]] = [
     ("left", "width", -1),
 ]
 
-_LONG_FACE_RECTS: Dict[str, List[float]] = {
-    "front": [0.0, 0.0, 0.5, 0.25],
-    "right": [0.0, 0.25, 0.5, 0.25],
-    "back": [0.0, 0.5, 0.5, 0.25],
-    "left": [0.0, 0.75, 0.5, 0.25],
-    "preview": [0.5, 0.0, 0.5, 1.0],
-}
-
-# Several members are drawn as world elevations instead: there is no single
-# piece whose faces the sheet could be about.
-_SELECTION_QUADRANTS: Dict[str, List[float]] = {
-    "front": [0.0, 0.0, 0.5, 0.5],
-    "top": [0.5, 0.0, 0.5, 0.5],
-    "right": [0.0, 0.5, 0.5, 0.5],
-    "preview": [0.5, 0.5, 0.5, 0.5],
-}
 
 
 def _members_world_bounds(entries: List[Dict[str, Any]]) -> Tuple[List[float], List[float]]:
@@ -1437,7 +1465,7 @@ def _frame_from_look_and_up(look: List[float], up_hint: List[float]) -> Dict[str
 
 
 def _preview_viewport(
-    rect: List[float],
+    placed,
     box: OrientedBox,
     page: Dict[str, Any],
     orbit: Dict[str, Any],
@@ -1450,24 +1478,25 @@ def _preview_viewport(
     empty preview. `orient` is the strategy that picks the angle and `orbit`
     says how far it may be turned afterwards.
     """
+    rect = list(placed.rect)
     aspect = _viewport_aspect(rect, page)
     frame = orient(box, aspect)
     centre = box.centre
-    return {
-        "id": "preview",
-        "rect": rect,
-        "locked": False,
-        "projection": "perspective",
-        "orbit": orbit,
-        "camera": {
+    return _viewport_spec(
+        placed,
+        locked=False,
+        projection="perspective",
+        orbit=orbit,
+        camera={
             **frame,
             "target": centre,
             "extent": _preview_extent(box, frame, aspect),
         },
-    }
+    )
 
 
-def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any]) -> List[Dict[str, Any]]:
+def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any],
+                         placed_by_role: Dict[str, Any]) -> List[Dict[str, Any]]:
     """The four long sides of one timber, stacked, each square-on to its face."""
     timber = entry["timber"]
     along = _vector3_to_floats(timber.get_length_direction_global())
@@ -1481,44 +1510,44 @@ def _long_face_viewports(entry: Dict[str, Any], page: Dict[str, Any]) -> List[Di
     for view_id, axis_name, sign in _LONG_FACE_VIEWS:
         normal = [component * sign for component in axes[axis_name]]
         frame = _camera_looking_at_face(normal, along)
-        rect = _LONG_FACE_RECTS[view_id]
-        viewports.append({
-            "id": view_id,
-            "rect": rect,
-            "locked": True,
-            "projection": "orthographic",
-            "camera": {
+        placed = placed_by_role[view_id]
+        rect = list(placed.rect)
+        viewports.append(_viewport_spec(
+            placed,
+            locked=True,
+            projection="orthographic",
+            camera={
                 **frame,
                 "target": centre,
                 "extent": _view_extent(
                     half_size, frame["right"], frame["up"], _viewport_aspect(rect, page),
                 ),
             },
-        })
+        ))
     return viewports
 
 
 def _world_elevation_viewports(
-    entries: List[Dict[str, Any]], page: Dict[str, Any],
+    entries: List[Dict[str, Any]], page: Dict[str, Any], placed_by_role: Dict[str, Any],
 ) -> List[Dict[str, Any]]:
     """Front, top and right elevations in world axes, for a group of members."""
     centre, half_size = _members_world_bounds(entries)
     viewports: List[Dict[str, Any]] = []
     for view_id, right, up, look in _DEBUG_DRAWING_VIEWS:
-        rect = _SELECTION_QUADRANTS[view_id]
-        viewports.append({
-            "id": view_id,
-            "rect": rect,
-            "locked": True,
-            "projection": "orthographic",
-            "camera": {
+        placed = placed_by_role[view_id]
+        rect = list(placed.rect)
+        viewports.append(_viewport_spec(
+            placed,
+            locked=True,
+            projection="orthographic",
+            camera={
                 "right": right,
                 "up": up,
                 "look": look,
                 "target": centre,
                 "extent": _view_extent(half_size, right, up, _viewport_aspect(rect, page)),
             },
-        })
+        ))
     return viewports
 
 
@@ -1567,8 +1596,8 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     centre, half_size = _members_world_bounds(drawn)
 
     if len(entries) == 1:
-        viewports = _long_face_viewports(entries[0], page)
-        preview_rect = _LONG_FACE_RECTS["preview"]
+        placed = _placed_by_role(_long_face_layout(), page)
+        viewports = _long_face_viewports(entries[0], page, placed)
         # One piece: oriented from its own box rather than the world box it
         # happens to occupy, and turned about its own length, so it can be
         # looked at from every side without ever being tumbled out of the
@@ -1579,8 +1608,8 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
     else:
         # No selection is treated as the whole frame, so asking for a drawing
         # before selecting anything gives you something rather than nothing.
-        viewports = _world_elevation_viewports(entries or timber_entries, page)
-        preview_rect = _SELECTION_QUADRANTS["preview"]
+        placed = _placed_by_role(_quadrant_layout(), page)
+        viewports = _world_elevation_viewports(entries or timber_entries, page, placed)
         # Several pieces have no length of their own to speak of, so the angle
         # is searched for -- and kept upright, since which way is up is part of
         # what a preview of an assembly is telling you.
@@ -1593,7 +1622,7 @@ def create_drawing_from_selection(frame: Any, member_keys: List[str]) -> Dict[st
         viewport["members"] = members or None
         viewport["ghostOthers"] = True
         viewport["measurements"] = []
-    viewports.append(_preview_viewport(preview_rect, preview_box, page, orbit, orient))
+    viewports.append(_preview_viewport(placed["preview"], preview_box, page, orbit, orient))
 
     return {
         "id": SELECTION_DRAWING_ID,

@@ -330,14 +330,20 @@ class TestMergeMeasurements:
         assert _feature_names(merged) == [("a", "b"), ("c", "d"), ("e", "f")]
 
 
+# A viewport's id is its position in the layout -- see kumiki/layout.py -- so a
+# drawing keys its measurements by one of these, not by what the view is called.
+# These are the long-face layout one timber gets.
+FRONT, RIGHT = "0.0.0", "0.0.1"
+
+
 class TestMeasurementsThroughADrawing:
     def _front(self, drawing):
-        return next(v for v in drawing["viewports"] if v["id"] == "front")["measurements"]
+        return next(v for v in drawing["viewports"] if v["id"] == FRONT)["measurements"]
 
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
-            measurements={"front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
+            measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -345,7 +351,7 @@ class TestMeasurementsThroughADrawing:
         assert [m["origin"] for m in self._front(drawing)] == [runner.ORIGIN_CODE]
         # And nowhere else: the same anchors elsewhere would be another dimension.
         for viewport in drawing["viewports"]:
-            if viewport["id"] != "front":
+            if viewport["id"] != FRONT:
                 assert viewport["measurements"] == []
 
     def test_the_same_pair_in_two_viewports_are_two_measurements(self, example):
@@ -353,44 +359,44 @@ class TestMeasurementsThroughADrawing:
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={
-                "front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
-                "right": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
             },
         )])
 
         drawing = runner.collect_drawings(frame, example)[0]
         by_id = {v["id"]: v["measurements"] for v in drawing["viewports"]}
 
-        assert len(by_id["front"]) == 1
-        assert len(by_id["right"]) == 1
+        assert len(by_id[FRONT]) == 1
+        assert len(by_id[RIGHT]) == 1
 
     def test_an_override_only_reaches_its_own_viewport(self, example):
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
             measurements={
-                "front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
-                "right": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
+                RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
             },
         )])
         _write_file(example, [_override("sheet", "post", [
-            {"id": "front", "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
+            {"id": FRONT, "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
         by_id = {v["id"]: v["measurements"] for v in drawing["viewports"]}
 
-        assert by_id["front"][0]["origin"] == runner.ORIGIN_OVERRIDDEN
-        assert by_id["right"][0]["origin"] == runner.ORIGIN_CODE
+        assert by_id[FRONT][0]["origin"] == runner.ORIGIN_OVERRIDDEN
+        assert by_id[RIGHT][0]["origin"] == runner.ORIGIN_CODE
 
     def test_adding_a_measurement_does_not_freeze_the_drawing(self, example):
         # The reason measurements merge where everything else replaces: an
         # override of the whole drawing would take its layout with it.
         frame = _frame([Drawing(
             name="post", timber_paths=["posts/fl"],
-            measurements={"front": [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
+            measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
-            {"id": "front", "measurements": [{"a": _ref("p"), "b": _ref("q")}]},
+            {"id": FRONT, "measurements": [{"a": _ref("p"), "b": _ref("q")}]},
         ])])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -741,7 +747,7 @@ class TestResolvingAnchors:
     def test_a_drawing_carries_its_measurements_resolved(self, measured):
         drawings = runner.collect_drawings(measured, None)
         tenon = next(d for d in drawings if d["id"] == "tenon")
-        front = next(v for v in tenon["viewports"] if v["id"] == "front")
+        front = next(v for v in tenon["viewports"] if v["id"] == FRONT)
 
         assert len(front["measurements"]) == 1
         assert "unresolved" not in front["measurements"][0]

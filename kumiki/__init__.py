@@ -36,6 +36,9 @@ from .identity import (
     TimberPath,
     ViewportId,
 )
+from .layout import (FloatingPane, Layout, Page, PlacedView, Share, Split,
+                     SplitDirection, View, columns, covering_page,
+                     resolve_layout, rows)
 from .drawing import (Drawing, Measure, MeasurementDirection, MeasurementFeature,
                       MeasurementKind, MeasurementOperation, MeasurementPlacement,
                       MeasurementSpace, kinds_for)
