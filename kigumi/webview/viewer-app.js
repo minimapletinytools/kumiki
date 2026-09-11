@@ -160,75 +160,6 @@ const PAINT_WAIT_FALLBACK_MS = 100;
 
 const DEFAULT_FOOTPRINT_COLOR = 'orange';
 
-function normalizeV3RenderParameterValue(value) {
-    if (value && typeof value === 'object' && !Array.isArray(value)) {
-        return {
-            x: value.x == null ? '' : String(value.x),
-            y: value.y == null ? '' : String(value.y),
-            z: value.z == null ? '' : String(value.z),
-        };
-    }
-    if (Array.isArray(value) && value.length === 3) {
-        return {
-            x: value[0] == null ? '' : String(value[0]),
-            y: value[1] == null ? '' : String(value[1]),
-            z: value[2] == null ? '' : String(value[2]),
-        };
-    }
-    return { x: '0', y: '0', z: '0' };
-}
-
-function createRenderParameterEditorFallback(parameter) {
-    if (parameter.kind === 'boolean') {
-        return false;
-    }
-    if (parameter.kind === 'enum') {
-        return Array.isArray(parameter.options) && parameter.options.length > 0 ? parameter.options[0] : '';
-    }
-    if (parameter.kind === 'v3') {
-        return { x: '0', y: '0', z: '0' };
-    }
-    return '';
-}
-
-function normalizeRenderParameterEditorValue(parameter, value) {
-    if (value == null) {
-        return createRenderParameterEditorFallback(parameter);
-    }
-    if (parameter.kind === 'v3') {
-        return normalizeV3RenderParameterValue(value);
-    }
-    if (parameter.kind === 'boolean') {
-        return Boolean(value);
-    }
-    return value;
-}
-
-function normalizeComparableRenderParameterValue(parameter, value) {
-    if (value == null) {
-        return null;
-    }
-    if (parameter.kind === 'v3') {
-        const vector = normalizeV3RenderParameterValue(value);
-        return { x: vector.x, y: vector.y, z: vector.z };
-    }
-    if (parameter.kind === 'boolean') {
-        return Boolean(value);
-    }
-    return String(value);
-}
-
-function cloneRenderParameterValue(parameter, value) {
-    if (value == null) {
-        return value;
-    }
-    if (parameter.kind === 'v3') {
-        const vector = normalizeV3RenderParameterValue(value);
-        return { x: vector.x, y: vector.y, z: vector.z };
-    }
-    return value;
-}
-
 function normalizeViewerOptions(viewerOptions) {
     const opts = (viewerOptions && typeof viewerOptions === 'object') ? viewerOptions : {};
     const geometryMode = GeometryMode.VALID_MODES.has(opts.geometryMode) ? opts.geometryMode : GeometryMode.DEFAULT_MODE;
@@ -1149,171 +1080,6 @@ class ViewerSettingsPanel {
     }
 }
 
-class ViewerParameterPanel {
-    constructor(app) {
-        this.app = app;
-    }
-
-    formatV3Display(value) {
-        const vector = normalizeV3RenderParameterValue(value);
-        return `[${vector.x},${vector.y},${vector.z}]`;
-    }
-
-    getParameterTypeLabel(param) {
-        if (param.kind === 'v3') return '(x,y,z)';
-        if (param.kind === 'enum') return '(enum)';
-        if (param.kind === 'boolean') return '(bool)';
-        if (param.kind === 'number') return '(number)';
-        return '(string)';
-    }
-
-    renderVector3Input(param, inputId, value, disabled) {
-        const vector = normalizeV3RenderParameterValue(value);
-        return html`
-            <div class="parameter-vector3" style=${disabled ? 'opacity:0.52;' : 'opacity:1;'}>
-                ${['x', 'y', 'z'].map((axis) => html`
-                    <input
-                        id=${`${inputId}-${axis}`}
-                        class="parameter-vector3-component"
-                        type="text"
-                        placeholder=${axis}
-                        .value=${vector[axis]}
-                        ?disabled=${disabled}
-                        @input=${(event) => this.app.setPendingRenderParameterComponentValue(param, axis, event.target.value)}>
-                `)}
-            </div>
-        `;
-    }
-
-    renderParameterControl(param, inputId, value, options = {}) {
-        const { disabled = false, inline = false } = options;
-
-        if (param.kind === 'boolean') {
-            return html`
-                <label class="parameter-control-boolean">
-                    <input
-                        id=${inputId}
-                        type="checkbox"
-                        ?checked=${Boolean(value)}
-                        ?disabled=${disabled}
-                        @change=${(event) => this.app.setPendingRenderParameterValue(param.name, Boolean(event.target.checked))}>
-                    <span>${t('common.enabled')}</span>
-                </label>
-            `;
-        }
-
-        if (param.kind === 'enum') {
-            const optionsList = Array.isArray(param.options) ? param.options : [];
-            return html`
-                <select
-                    id=${inputId}
-                    class="parameter-control-select"
-                    .value=${String(value ?? '')}
-                    ?disabled=${disabled}
-                    @change=${(event) => this.app.setPendingRenderParameterValue(param.name, String(event.target.value))}>
-                    ${optionsList.map((option) => html`<option value=${option}>${option}</option>`)}
-                </select>
-            `;
-        }
-
-        if (param.kind === 'v3') {
-            return this.renderVector3Input(param, inputId, value, disabled);
-        }
-
-        return html`
-            <input
-                id=${inputId}
-                class="parameter-control-text"
-                type="text"
-                .value=${String(value ?? '')}
-                ?disabled=${disabled}
-                @input=${(event) => this.app.setPendingRenderParameterValue(param.name, event.target.value)}>
-        `;
-    }
-
-    renderParameterInput(param, index) {
-        const inputId = `render-param-${index}-${param.name}`;
-        const value = this.app.getPendingRenderParameterValue(param);
-        const typeLabel = this.getParameterTypeLabel(param);
-        
-        if (!param.optional) {
-            const displayValue = param.kind === 'v3' ? this.formatV3Display(value) : String(value ?? '');
-            return html`
-                <div class="parameter-row">
-                    <div class="parameter-row-header">
-                        <span class="parameter-name">${param.name}</span>
-                        <span class="parameter-type">${typeLabel}</span>
-                        <span class="parameter-value">${displayValue}</span>
-                    </div>
-                    <div class="parameter-row-control">
-                        ${this.renderParameterControl(param, inputId, value)}
-                    </div>
-                </div>
-            `;
-        }
-
-        const enabled = this.app.isOptionalRenderParameterEnabled(param);
-        const editorValue = this.app.getRenderParameterEditorValue(param);
-        const displayValue = enabled ? (param.kind === 'v3' ? this.formatV3Display(editorValue) : String(editorValue ?? '')) : t('viewer.frameParams.optionalDisabledValue');
-        
-        return html`
-            <div class="parameter-row parameter-row-optional" style=${enabled ? 'opacity:1;' : 'opacity:0.62;'}>
-                <div class="parameter-row-header">
-                    <label class="parameter-checkbox" for=${`${inputId}-enabled`}>
-                        <input
-                            id=${`${inputId}-enabled`}
-                            type="checkbox"
-                            ?checked=${enabled}
-                            @change=${(event) => this.app.setOptionalRenderParameterEnabled(param, Boolean(event.target.checked))}>
-                        <span class="parameter-name">${param.name}</span>
-                    </label>
-                    <span class="parameter-type">${typeLabel}</span>
-                    <span class="parameter-value">${displayValue}</span>
-                </div>
-                <div class="parameter-row-control">
-                    ${this.renderParameterControl(param, inputId, editorValue, { disabled: !enabled })}
-                </div>
-            </div>
-        `;
-    }
-
-    render() {
-        const params = this.app.renderParameterSchema;
-        const hasPendingChanges = this.app.hasPendingRenderParameterChanges();
-        return html`
-            <section id="parameter-controls" aria-label=${t('viewer.frameParams.ariaLabel')}>
-                <div class="parameter-header">
-                    <div class="parameter-controls-title">${t('viewer.frameParams.title')}</div>
-                    <div class="parameter-refresh-controls">
-                        ${hasPendingChanges
-                            ? html`<span class="parameter-changes-indicator">${t('viewer.frameParams.changesDetected')}</span>`
-                            : ''}
-                        <button
-                            id="refresh-btn"
-                            type="button"
-                            title=${t('viewer.frameParams.refresh.title')}
-                            @click=${() => this.app.requestRefreshWithPendingParameters()}>${t('viewer.frameParams.refresh')}</button>
-                    </div>
-                </div>
-                ${params.length === 0
-                    ? html`<div class="parameter-empty">${t('viewer.frameParams.empty')}</div>`
-                    : html`
-                        <div class="parameter-list">
-                            ${params.map((param, index) => html`
-                                <div class="parameter-container">
-                                    ${this.renderParameterInput(param, index)}
-                                    ${param.description
-                                        ? html`<div class="parameter-description">${param.description}</div>`
-                                        : ''}
-                                </div>
-                            `)}
-                        </div>
-                    `}
-            </section>
-        `;
-    }
-}
-
 class KigumiViewerApp extends LitElement {
     constructor() {
         super();
@@ -1422,10 +1188,6 @@ class KigumiViewerApp extends LitElement {
         this.csgTreesByKey = new Map();  // memberKey -> { memberKey, tree }
         this.csgTreeRequests = new Set();// memberKeys already asked for
         this.lastPickDetail = null;      // featureType / jointName / facesToward
-        this.renderParameterSchema = [];
-        this.appliedRenderParameters = {};
-        this.pendingRenderParameters = {};
-        this.renderParameterDraftValues = {};
         this.viewerOptions = normalizeViewerOptions(INITIAL_PAYLOAD.viewerOptions);
         this.cadqueryOcpInstalled = null;
         this.installingCadqueryOcp = false;
@@ -1437,7 +1199,6 @@ class KigumiViewerApp extends LitElement {
         this.exportIndividualsEnabled = false;
         this.exportAccessoriesEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
-        this.parameterPanel = new ViewerParameterPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
         this.selectionPanel = new SelectionPanel(this, {
             t,
@@ -1474,7 +1235,7 @@ class KigumiViewerApp extends LitElement {
 
     render() {
         const cameraMode = this.cameraController.getCameraMode();
-        const hasPendingChanges = this.hasPendingRenderParameterChanges() || this.viewState.sourceHasPendingChanges;
+        const hasPendingChanges = this.viewState.sourceHasPendingChanges;
         const navigationHint = this.leftClickDragRotatesCamera
             ? t('viewer.chrome.navHint.leftClick')
             : t('viewer.chrome.navHint.rightClick');
@@ -1485,10 +1246,10 @@ class KigumiViewerApp extends LitElement {
                     ? html`<button
                         id="top-center-refresh-btn"
                         type="button"
-                        title=${t('viewer.frameParams.refresh.title')}
-                        @click=${() => this.requestRefreshWithPendingParameters()}>
-                            <span class="top-center-refresh-primary">${t('viewer.frameParams.refresh')}</span>
-                            <span class="top-center-refresh-secondary">${t('viewer.frameParams.changesDetected')}</span>
+                        title=${t('viewer.refresh.title')}
+                        @click=${() => this.requestRefresh()}>
+                            <span class="top-center-refresh-primary">${t('viewer.refresh')}</span>
+                            <span class="top-center-refresh-secondary">${t('viewer.refresh.changesDetected')}</span>
                         </button>`
                     : ''}
                 <canvas id="c"></canvas>
@@ -1535,7 +1296,6 @@ class KigumiViewerApp extends LitElement {
             </div>
             <div id="top-controls">
                 ${this.settingsPanel.render()}
-                ${this.parameterPanel.render()}
             </div>
             <div id="panels">
                 ${this.memberListPanel.render()}
@@ -2462,132 +2222,11 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
-    setRenderParametersFromFrame(frameData) {
-        const contract = frameData && frameData.renderParameters && typeof frameData.renderParameters === 'object'
-            ? frameData.renderParameters
-            : null;
-        if (!contract) {
-            return;
-        }
-
-        const schema = Array.isArray(contract.schema) ? contract.schema : [];
-        this.renderParameterSchema = schema
-            .filter((entry) => entry && typeof entry === 'object' && typeof entry.name === 'string' && entry.name.length > 0)
-            .map((entry) => ({
-                name: entry.name,
-                kind: typeof entry.kind === 'string' ? entry.kind : 'string',
-                description: typeof entry.description === 'string' ? entry.description : '',
-                default: Object.prototype.hasOwnProperty.call(entry, 'default') ? entry.default : '',
-                options: Array.isArray(entry.options) ? entry.options.map((option) => String(option)) : [],
-                optional: Boolean(entry.optional),
-            }));
-
-        const applied = contract.applied && typeof contract.applied === 'object' ? contract.applied : {};
-        this.appliedRenderParameters = { ...applied };
-        this.pendingRenderParameters = { ...applied };
-        this.renderParameterDraftValues = Object.fromEntries(
-            this.renderParameterSchema.map((parameter) => {
-                const value = Object.prototype.hasOwnProperty.call(applied, parameter.name)
-                    ? applied[parameter.name]
-                    : parameter.default;
-                return [parameter.name, normalizeRenderParameterEditorValue(parameter, value)];
-            }),
-        );
-        this.requestUpdate();
-    }
-
-    getPendingRenderParameterValue(parameter) {
-        if (Object.prototype.hasOwnProperty.call(this.pendingRenderParameters, parameter.name)) {
-            return this.pendingRenderParameters[parameter.name];
-        }
-        return parameter.default;
-    }
-
-    getRenderParameterEditorValue(parameter) {
-        if (Object.prototype.hasOwnProperty.call(this.renderParameterDraftValues, parameter.name)) {
-            return this.renderParameterDraftValues[parameter.name];
-        }
-        return normalizeRenderParameterEditorValue(parameter, this.getPendingRenderParameterValue(parameter));
-    }
-
-    isOptionalRenderParameterEnabled(parameter) {
-        if (!parameter.optional) {
-            return true;
-        }
-        const value = this.getPendingRenderParameterValue(parameter);
-        return value != null;
-    }
-
-    findRenderParameter(name) {
-        return this.renderParameterSchema.find((parameter) => parameter.name === name) || null;
-    }
-
-    setOptionalRenderParameterEnabled(parameter, enabled) {
-        const nextDrafts = { ...this.renderParameterDraftValues };
-        const currentValue = this.getPendingRenderParameterValue(parameter);
-        if (currentValue != null) {
-            nextDrafts[parameter.name] = normalizeRenderParameterEditorValue(parameter, currentValue);
-        }
-        this.renderParameterDraftValues = nextDrafts;
-
-        this.pendingRenderParameters = {
-            ...this.pendingRenderParameters,
-            [parameter.name]: enabled
-                ? cloneRenderParameterValue(parameter, this.getRenderParameterEditorValue(parameter))
-                : null,
-        };
-        this.requestUpdate();
-    }
-
-    setPendingRenderParameterValue(name, value) {
-        const parameter = this.findRenderParameter(name);
-        if (!parameter) {
-            return;
-        }
-        const normalizedValue = normalizeRenderParameterEditorValue(parameter, value);
-        this.renderParameterDraftValues = {
-            ...this.renderParameterDraftValues,
-            [name]: normalizedValue,
-        };
-        this.pendingRenderParameters = {
-            ...this.pendingRenderParameters,
-            [name]: cloneRenderParameterValue(parameter, normalizedValue),
-        };
-        this.requestUpdate();
-    }
-
-    setPendingRenderParameterComponentValue(parameter, component, value) {
-        const current = normalizeV3RenderParameterValue(this.getRenderParameterEditorValue(parameter));
-        const nextValue = {
-            ...current,
-            [component]: value,
-        };
-        this.setPendingRenderParameterValue(parameter.name, nextValue);
-    }
-
-    hasPendingRenderParameterChanges() {
-        const schema = Array.isArray(this.renderParameterSchema) ? this.renderParameterSchema : [];
-        for (const parameter of schema) {
-            const pendingValue = this.getPendingRenderParameterValue(parameter);
-            const appliedValue = Object.prototype.hasOwnProperty.call(this.appliedRenderParameters, parameter.name)
-                ? this.appliedRenderParameters[parameter.name]
-                : parameter.default;
-            if (JSON.stringify(normalizeComparableRenderParameterValue(parameter, pendingValue))
-                !== JSON.stringify(normalizeComparableRenderParameterValue(parameter, appliedValue))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    requestRefreshWithPendingParameters() {
+    requestRefresh() {
         if (!vscode) {
             return;
         }
-        vscode.postMessage({
-            type: 'requestRefresh',
-            renderParameters: { ...this.pendingRenderParameters },
-        });
+        vscode.postMessage({ type: 'requestRefresh' });
     }
 
     onWindowMessage(event) {
@@ -2627,11 +2266,6 @@ class KigumiViewerApp extends LitElement {
 
         if (message.type === 'capturePanelSnapshotRequest') {
             this.handleCapturePanelSnapshotRequest(message);
-            return;
-        }
-
-        if (message.type === 'collectPendingRenderParametersRequest') {
-            this.handleCollectPendingRenderParametersRequest(message);
             return;
         }
 
@@ -2889,15 +2523,6 @@ class KigumiViewerApp extends LitElement {
                 error: error && error.message ? error.message : fallbackError,
             });
         }
-    }
-
-    handleCollectPendingRenderParametersRequest(message) {
-        this.respondToRequest(
-            message,
-            'collectPendingRenderParametersResult',
-            () => ({ renderParameters: { ...this.pendingRenderParameters } }),
-            'Failed to read pending render parameters',
-        );
     }
 
     handleGetCameraStateRequest(message) {
@@ -5446,8 +5071,6 @@ class KigumiViewerApp extends LitElement {
         const profiling = payload.profiling || null;
         const uiState = this.normalizeUiState(payload.uiState || null);
         const hadExistingScene = this.sceneManager.size > 0;
-
-        this.setRenderParametersFromFrame(frameData);
 
         if (uiState.keepLoading) {
             this.setViewPhase(uiState.phase, uiState.loadingText, { refreshToken, error: uiState.error });

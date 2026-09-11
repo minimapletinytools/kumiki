@@ -232,7 +232,6 @@ function activate(context) {
     register(context, 'kigumi.openCurrentFileInViewer', async () => {
         try {
             await renderActiveEditor(context, {
-                usePanelParameters: true,
                 reason: 'open current file in viewer',
             });
         } catch (error) {
@@ -925,11 +924,7 @@ async function renderActiveEditor(context, options = {}) {
     const filePath = document.fileName;
     const session = await getOrCreateSession(filePath, context);
     session.reveal();
-    if (options.usePanelParameters) {
-        await session.refreshWithPanelParameters(options.reason || 'open current file in viewer');
-    } else {
-        await session.refresh();
-    }
+    await session.refresh(options.reason || 'open current file in viewer');
 }
 
 async function openFileInViewer(filePath, context) {

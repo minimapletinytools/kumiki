@@ -8,9 +8,8 @@ All members (seat, legs, stretchers) are round timbers.
 from kumiki import *
 from kumiki.ticket import TimberTicket
 
-def build_frame(
-    n: int = Param(4, description="Number of legs (at least 3)", kind="number", minimum=3),
-) -> Frame:
+def build_frame(n: int = 4) -> Frame:
+    """Number of legs, at least 3. Not adjustable from kigumi until this takes a kiwari."""
     n_int = int(scalar(n))
     assert n_int >= 3, "Number of legs must be at least 3"
 

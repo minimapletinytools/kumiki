@@ -70,7 +70,6 @@ class FrameViewSession {
         this.pendingRefreshReason = null;
         this.refreshSequence = 0;
         this.refreshOptions = {};
-        this.renderParameters = {};
         this.profiler = new RefreshProfiler({ log: (msg) => this.log(msg) });
         this.slotName = options.slotName || 'main';
         this.sessionType = options.sessionType || 'main';
@@ -272,9 +271,6 @@ class FrameViewSession {
             }
             if (message.type === 'requestRefresh') {
                 this.log('[webview] Manual refresh requested from viewer');
-                if (message.renderParameters && typeof message.renderParameters === 'object') {
-                    this.renderParameters = { ...message.renderParameters };
-                }
                 this.refresh('manual refresh button').catch((error) => {
                     this.log(`[refresh] Manual refresh failed: ${error.message || error}`);
                 });
@@ -519,29 +515,6 @@ class FrameViewSession {
         return this.fileWatcher.isEnabled;
     }
 
-    async syncRenderParametersFromPanel() {
-        if (this.isDisposed || !this.panel) {
-            return;
-        }
-
-        try {
-            const payload = await this._requestWebviewAction(
-                'collectPendingRenderParameters',
-                'collect-pending-render-parameters',
-            );
-            if (payload.renderParameters && typeof payload.renderParameters === 'object') {
-                this.renderParameters = { ...payload.renderParameters };
-            }
-        } catch (error) {
-            this.log(`[refresh] Could not sync panel parameters: ${error.message || error}`);
-        }
-    }
-
-    async refreshWithPanelParameters(reason = 'manual render') {
-        await this.syncRenderParametersFromPanel();
-        await this.refresh(reason);
-    }
-
     getCameraState() {
         return this._requestWebviewAction('getCameraState', 'get-camera-state');
     }
@@ -637,12 +610,7 @@ class FrameViewSession {
         this.slotName = slotName;
         this.patternName = patternName;
         // The new slot was just raised fresh server-side (raise_specific_pattern,
-        // called by the caller before this), with its own pattern's defaults --
-        // not the previous pattern's. Without this reset, refresh() would see a
-        // non-fresh slot and send the old pattern's leftover renderParameters
-        // into reload_example, leaking stale (and, for same-named parameters,
-        // silently wrong) values into the new pattern's parameters panel.
-        this.renderParameters = {};
+        // called by the caller before this), so there is nothing to reload.
         this._slotIsFresh = true;
         if (filePath !== this.filePath) {
             this.filePath = filePath;
@@ -718,7 +686,7 @@ class FrameViewSession {
             this.profiler.markTiming(timing, 'ensureRunner.end');
 
             let reloadResult = null;
-            if (this._slotIsFresh && (!this.renderParameters || Object.keys(this.renderParameters).length === 0)) {
+            if (this._slotIsFresh) {
                 this.log(`[refresh] Skipping reload_example for ${path.basename(this.filePath)} (slot freshly loaded during runner launch)`);
                 this._slotIsFresh = false;
                 reloadResult = { profiling: { reload_s: 0 } };
@@ -727,7 +695,6 @@ class FrameViewSession {
                 this.profiler.markTiming(timing, 'runner.reload_example.start');
                 reloadResult = await this.runnerSession.slotRequest('reload_example', this.slotName, {
                     filePath: this.filePath,
-                    renderParameters: this.renderParameters,
                 });
                 this.profiler.markTiming(timing, 'runner.reload_example.end');
             }
@@ -735,12 +702,6 @@ class FrameViewSession {
             this.profiler.markTiming(timing, 'runner.get_frame.start');
             const frameData = await this.runnerSession.slotRequest('get_frame', this.slotName);
             this.profiler.markTiming(timing, 'runner.get_frame.end');
-            const frameRenderParams = frameData && frameData.renderParameters && typeof frameData.renderParameters === 'object'
-                ? frameData.renderParameters
-                : null;
-            if (frameRenderParams && frameRenderParams.applied && typeof frameRenderParams.applied === 'object') {
-                this.renderParameters = { ...frameRenderParams.applied };
-            }
 
             this.profiler.markTiming(timing, 'runner.get_geometry.start');
             const geometryData = await this.runnerSession.slotRequest('get_geometry', this.slotName, this.refreshOptions);

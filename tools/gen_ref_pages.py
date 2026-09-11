@@ -1,13 +1,12 @@
 """Generate virtual API reference pages for kumiki's public modules.
 
-Derives the module list directly from the `from .X import *` (and the single
-explicit `from .librarian import Param`) statements in kumiki/__init__.py --
-i.e. exactly what makes up kumiki's flattened public namespace reachable via
-`from kumiki import *`. Emits one mkdocstrings stub page per module under
-reference/, plus a literate-nav SUMMARY.md.
+Derives the module list directly from the `from .X import *` statements in
+kumiki/__init__.py -- i.e. exactly what makes up kumiki's flattened public
+namespace reachable via `from kumiki import *`. Emits one mkdocstrings stub
+page per module under reference/, plus a literate-nav SUMMARY.md.
 
 Deliberately does NOT walk the whole kumiki/ source tree: kumiki has many
-internal-only modules (assembly.py, ticket.py, most of librarian.py,
+internal-only modules (assembly.py, ticket.py, librarian.py,
 timber_shavings.py, example_shavings.py, kigumi_at_home.py, librarian_cli.py,
 joints/workshop/shavings/router_table.py, ...) that are not re-exported by
 kumiki/__init__.py and must not get a public reference page. Because the
@@ -68,7 +67,7 @@ JOINTS_ORDER = [
 # Lower-level or rarely-looked-up-directly modules -- listed after Core, under "Supporting
 # Reference". Anything from kumiki/__init__.py not mentioned here or above still gets a page
 # (appended here automatically), just with a guessed display name.
-SUPPORTING_ORDER = ["cutcsg", "patternbook", "librarian", "triangles", "blueprint"]
+SUPPORTING_ORDER = ["cutcsg", "patternbook", "triangles", "blueprint"]
 
 DISPLAY_NAMES = {
     "cutcsg": "CutCSG",

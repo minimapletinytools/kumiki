@@ -24,13 +24,7 @@ import traceback
 import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional, List, Tuple
-
-from kumiki.librarian import (
-    RenderParameterDescriptor,
-    resolve_callable_render_parameters,
-    serialize_render_parameter_value,
-)
+from typing import TYPE_CHECKING, Any, Dict, NamedTuple, Optional, List, Tuple
 
 if TYPE_CHECKING:
     # Annotations only. kumiki must NOT be imported at module scope for
@@ -118,8 +112,6 @@ class SlotState:
     mesh_cache: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     patternbook: Optional[Any] = None
     single_pattern_name: Optional[str] = None
-    render_parameter_schema: List[RenderParameterDescriptor] = field(default_factory=list)
-    applied_render_parameters: Dict[str, Any] = field(default_factory=dict)
     # Drawings made in this session and not yet saved. They live here rather
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
@@ -3034,27 +3026,9 @@ def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
     return build_pattern_grid_frame(pattern_list), pattern_list
 
 
-def _serialize_render_parameters_for_slot(slot_state: SlotState) -> Dict[str, Any]:
-    return {
-        "schema": [descriptor.to_protocol_dict() for descriptor in slot_state.render_parameter_schema],
-        "applied": {
-            name: serialize_render_parameter_value(value)
-            for name, value in slot_state.applied_render_parameters.items()
-        },
-    }
-
-
-def _resolve_callable_entry_with_render_parameters(
-    callable_entry: Any,
-    render_parameters: Optional[Mapping[str, Any]],
-) -> Tuple[Any, List[RenderParameterDescriptor], Dict[str, Any]]:
-    descriptors, resolved_kwargs = resolve_callable_render_parameters(
-        callable_entry,
-        render_parameters,
-    )
+def _call_frame_entry(callable_entry: Any) -> Any:
     with contextlib.redirect_stdout(sys.stderr):
-        value = callable_entry(**resolved_kwargs)
-    return value, descriptors, resolved_kwargs
+        return callable_entry()
 
 
 def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
@@ -3097,41 +3071,28 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
     )
 
 
-def resolve_frame_from_module(
-    module: Any,
-    render_parameters: Optional[Mapping[str, Any]] = None,
-) -> "tuple[Any, Optional[Any], List[RenderParameterDescriptor], Dict[str, Any]]":
+def resolve_frame_from_module(module: Any) -> "tuple[Any, Optional[Any]]":
     """Resolve a frame from a loaded module.
 
-    Returns (frame, patternbook_or_None, schema, applied).
+    Returns (frame, patternbook_or_None).
     """
     if hasattr(module, "patterns"):
         pattern_list = getattr(module, "patterns")
         if _looks_like_pattern_list(pattern_list):
-            frame, patternbook = _frame_from_pattern_list(pattern_list)
-            return frame, patternbook, [], {}
+            return _frame_from_pattern_list(pattern_list)
 
     if hasattr(module, "build_frame") and callable(module.build_frame):
-        frame, descriptors, applied = _resolve_callable_entry_with_render_parameters(
-            module.build_frame,
-            render_parameters,
-        )
-        return _coerce_viewable_frame(frame, "build_frame"), None, descriptors, applied
+        frame = _call_frame_entry(module.build_frame)
+        return _coerce_viewable_frame(frame, "build_frame"), None
 
     if hasattr(module, "example"):
         example = getattr(module, "example")
         if callable(example):
-            example, descriptors, applied = _resolve_callable_entry_with_render_parameters(
-                example,
-                render_parameters,
-            )
-        else:
-            descriptors = []
-            applied = {}
+            example = _call_frame_entry(example)
         if _looks_like_frame(example):
-            return example, None, descriptors, applied
+            return example, None
         try:
-            return _coerce_viewable_frame(example, "example"), None, descriptors, applied
+            return _coerce_viewable_frame(example, "example"), None
         except TypeError:
             pass
 
@@ -3143,25 +3104,19 @@ def resolve_frame_from_module(
 def load_slot_state(
     file_path: str,
     previous_mesh_cache: Optional[Dict[str, Dict[str, Any]]] = None,
-    render_parameters: Optional[Mapping[str, Any]] = None,
 ) -> SlotState:
     resolved_path = Path(file_path).resolve()
     if not resolved_path.exists():
         raise FileNotFoundError(f"File not found: {resolved_path}")
 
     module = load_module_from_path(resolved_path, verbose=True)
-    frame, patternbook, render_parameter_schema, applied_render_parameters = resolve_frame_from_module(
-        module,
-        render_parameters=render_parameters,
-    )
+    frame, patternbook = resolve_frame_from_module(module)
     return SlotState(
         file_path=resolved_path,
         module=module,
         frame=frame,
         mesh_cache=previous_mesh_cache if previous_mesh_cache is not None else {},
         patternbook=patternbook,
-        render_parameter_schema=render_parameter_schema,
-        applied_render_parameters=applied_render_parameters,
     )
 
 
@@ -3187,7 +3142,6 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "timber_count": frame_summary["timber_count"],
             "accessories_count": frame_summary["accessories_count"],
         },
-        "renderParameters": _serialize_render_parameters_for_slot(ss),
     }
 
 
@@ -4687,7 +4641,6 @@ def _find_pattern_in_list(pattern_list: List[Any], pattern_name: str) -> Optiona
 def _raise_specific_pattern(
     source_file: str,
     pattern_name: str,
-    render_parameters: Optional[Mapping[str, Any]] = None,
 ) -> "tuple[SlotState, Dict[str, Any]]":
     """Load a specific pattern from a source file and return (SlotState, result_dict)."""
     resolved = Path(source_file).resolve()
@@ -4706,16 +4659,11 @@ def _raise_specific_pattern(
             raise ValueError(f"Pattern '{pattern_name}' not found. Available: {available}")
 
         pattern_lambda = pattern.lambda_
-        render_parameter_schema, applied_render_parameters = resolve_callable_render_parameters(
-            pattern_lambda,
-            render_parameters,
-            skip_first_parameter=True,
-        )
 
         from kumiki.rule import create_v3, scalar
         origin = create_v3(scalar(0), scalar(0), scalar(0))
         with contextlib.redirect_stdout(sys.stderr):
-            pattern_result = pattern_lambda(origin, **applied_render_parameters)
+            pattern_result = pattern_lambda(origin)
         frame = _coerce_viewable_frame(pattern_result, f"Pattern '{pattern.name}'")
 
         reload_s = time.monotonic() - t0
@@ -4726,8 +4674,6 @@ def _raise_specific_pattern(
             mesh_cache={},
             patternbook=pattern_list,
             single_pattern_name=pattern.path,
-            render_parameter_schema=render_parameter_schema,
-            applied_render_parameters=applied_render_parameters,
         )
         result = {
             "examplePath": str(resolved),
@@ -4737,7 +4683,6 @@ def _raise_specific_pattern(
                 "timber_count": len(frame.cut_timbers),
                 "accessories_count": len(frame.accessories) if hasattr(frame, "accessories") else 0,
             },
-            "renderParameters": _serialize_render_parameters_for_slot(slot),
             "profiling": {"reload_s": reload_s},
         }
         return slot, result
@@ -4754,12 +4699,6 @@ def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
     if not isinstance(value, str) or not value:
         raise ValueError(message)
     return value
-
-
-def _opt_dict(payload: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
-    """Return payload[key] if it is a dict, else None."""
-    value = payload.get(key)
-    return value if isinstance(value, dict) else None
 
 
 _active_assembly_cancels: Dict[str, threading.Event] = {}
@@ -4786,7 +4725,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         _cancel_active_assembly(slot_name)
         old_slot = state.slots.get(slot_name)
         next_path = payload.get("filePath", str(state.get_slot(slot_name).file_path))
-        render_parameters = _opt_dict(payload, "renderParameters")
         old_cache = old_slot.mesh_cache if old_slot else {}
         t0 = time.monotonic()
 
@@ -4795,15 +4733,10 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             next_slot, _ = _raise_specific_pattern(
                 next_path,
                 old_slot.single_pattern_name,
-                render_parameters=render_parameters,
             )
             next_slot.mesh_cache = old_cache
         else:
-            next_slot = load_slot_state(
-                next_path,
-                old_cache,
-                render_parameters=render_parameters,
-            )
+            next_slot = load_slot_state(next_path, old_cache)
 
         reload_s = time.monotonic() - t0
         state.slots[slot_name] = next_slot
@@ -4816,7 +4749,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "timber_count": len(next_slot.frame.cut_timbers),
                 "accessories_count": len(next_slot.frame.accessories),
             },
-            "renderParameters": _serialize_render_parameters_for_slot(next_slot),
             "profiling": {"reload_s": reload_s},
         }
         return state, make_success_response(request_id, command, result), False
@@ -4824,7 +4756,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
     if command == "get_frame":
         ss = _resolve_slot(state, payload)
         frame_payload = serialize_frame(ss.frame)
-        frame_payload["renderParameters"] = _serialize_render_parameters_for_slot(ss)
         return state, make_success_response(request_id, command, frame_payload), False
 
     if command == "get_drawings":
@@ -4980,9 +4911,8 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         slot_name = _require_str(payload, "slot", "load_slot requires payload.slot")
         _cancel_active_assembly(slot_name)
         file_path = _require_str(payload, "filePath", "load_slot requires payload.filePath")
-        render_parameters = _opt_dict(payload, "renderParameters")
         t0 = time.monotonic()
-        new_slot = load_slot_state(file_path, render_parameters=render_parameters)
+        new_slot = load_slot_state(file_path)
         reload_s = time.monotonic() - t0
         state.slots[slot_name] = new_slot
         log_stderr(f"[slot] Loaded slot '{slot_name}' from {file_path}")
@@ -4994,7 +4924,6 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "timber_count": len(new_slot.frame.cut_timbers),
                 "accessories_count": len(new_slot.frame.accessories) if hasattr(new_slot.frame, "accessories") else 0,
             },
-            "renderParameters": _serialize_render_parameters_for_slot(new_slot),
             "profiling": {"reload_s": reload_s},
         }
         return state, make_success_response(request_id, command, result), False
@@ -5034,12 +4963,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         slot_name = _require_str(payload, "slot", "raise_specific_pattern requires payload.slot")
         source_file = _require_str(payload, "sourceFile", "raise_specific_pattern requires payload.sourceFile")
         pattern_name = _require_str(payload, "patternName", "raise_specific_pattern requires payload.patternName")
-        render_parameters = _opt_dict(payload, "renderParameters")
-        new_slot, result = _raise_specific_pattern(
-            source_file,
-            pattern_name,
-            render_parameters=render_parameters,
-        )
+        new_slot, result = _raise_specific_pattern(source_file, pattern_name)
         state.slots[slot_name] = new_slot
         result["slot"] = slot_name
         log_stderr(f"[slot] Raised pattern '{pattern_name}' in slot '{slot_name}'")
