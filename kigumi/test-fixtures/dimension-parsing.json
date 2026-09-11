@@ -1,0 +1,71 @@
+{
+  "_comment": "Shared by tests/test_rule_dimensions.py and kigumi/__tests__/dimension-text.test.js. Python (kumiki.rule) is authoritative; the JS mirror in kigumi/webview/dimension-text.js exists only for instant feedback while typing. Expected values are written by hand, not generated, so neither implementation grades itself.",
+  "length": {
+    "valid": [
+      { "input": "450mm",   "defaultUnit": "mm", "meters": 0.45 },
+      { "input": "2.5cm",   "defaultUnit": "mm", "meters": 0.025 },
+      { "input": "1.5m",    "defaultUnit": "mm", "meters": 1.5 },
+      { "input": "18in",    "defaultUnit": "mm", "meters": 0.4572 },
+      { "input": "18\"",    "defaultUnit": "mm", "meters": 0.4572 },
+      { "input": "3/4\"",   "defaultUnit": "mm", "meters": 0.01905 },
+      { "input": "1 1/4\"", "defaultUnit": "mm", "meters": 0.03175 },
+      { "input": "1-1/4in", "defaultUnit": "mm", "meters": 0.03175 },
+      { "input": "2'",      "defaultUnit": "mm", "meters": 0.6096 },
+      { "input": "2'6\"",   "defaultUnit": "mm", "meters": 0.762 },
+      { "input": "5' 6\"",  "defaultUnit": "mm", "meters": 1.6764 },
+      { "input": "1yd",     "defaultUnit": "mm", "meters": 0.9144 },
+      { "input": "-2in",    "defaultUnit": "mm", "meters": -0.0508 },
+      { "input": "  450mm  ", "defaultUnit": "mm", "meters": 0.45 },
+      { "input": "450",     "defaultUnit": "mm", "meters": 0.45 },
+      { "input": "1 1/4",   "defaultUnit": "in", "meters": 0.03175 },
+      { "input": "18IN",    "defaultUnit": "mm", "meters": 0.4572 },
+      { "input": "1shaku",  "defaultUnit": "mm", "meters": 0.30303030303030304 },
+      { "input": "1尺", "defaultUnit": "mm", "meters": 0.30303030303030304 },
+      { "input": "5寸", "defaultUnit": "mm", "meters": 0.15151515151515152 },
+      { "input": "3分", "defaultUnit": "mm", "meters": 0.00909090909090909 }
+    ],
+    "invalid": [
+      { "input": "",           "why": "empty" },
+      { "input": "   ",        "why": "empty" },
+      { "input": "abc",        "why": "no number in it" },
+      { "input": "\"",         "why": "a unit with no number" },
+      { "input": "10furlongs", "why": "unit is not one we know" },
+      { "input": "2'6",        "why": "compound with a unit missing would be a guess" },
+      { "input": "10 20",      "why": "two numbers, no units" },
+      { "input": "1/0in",      "why": "zero denominator" },
+      { "input": "10 + 5mm",   "why": "arithmetic is not supported" },
+      { "input": "width*2",    "why": "formulas are not supported" }
+    ]
+  },
+  "angle": {
+    "valid": [
+      { "input": "30deg",     "defaultUnit": "deg", "radians": 0.5235987755982988 },
+      { "input": "30°",  "defaultUnit": "deg", "radians": 0.5235987755982988 },
+      { "input": "90degrees", "defaultUnit": "deg", "radians": 1.5707963267948966 },
+      { "input": "1.5rad",    "defaultUnit": "deg", "radians": 1.5 },
+      { "input": "45",        "defaultUnit": "deg", "radians": 0.7853981633974483 },
+      { "input": "-30deg",    "defaultUnit": "deg", "radians": -0.5235987755982988 },
+      { "input": "22.5deg",   "defaultUnit": "deg", "radians": 0.39269908169872414 }
+    ],
+    "invalid": [
+      { "input": "",        "why": "empty" },
+      { "input": "30grads", "why": "unit is not one we know" },
+      { "input": "deg",     "why": "no number in it" }
+    ]
+  },
+  "formatLength": [
+    { "meters": 0.45,    "unit": "mm", "text": "450mm" },
+    { "meters": 1.5,     "unit": "m",  "text": "1.5m" },
+    { "meters": 0.0254,  "unit": "\"", "text": "1\"" },
+    { "meters": 0.03175, "unit": "\"", "text": "1 1/4\"" },
+    { "meters": 0.01905, "unit": "\"", "text": "3/4\"" },
+    { "meters": 0.4572,  "unit": "in", "text": "18in" },
+    { "meters": -0.0508, "unit": "\"", "text": "-2\"" },
+    { "meters": 0,       "unit": "mm", "text": "0mm" }
+  ],
+  "formatAngle": [
+    { "radians": 0.5235987755982988, "unit": "deg", "text": "30deg" },
+    { "radians": 1.5,                "unit": "rad", "text": "1.5rad" },
+    { "radians": 0,                  "unit": "deg", "text": "0deg" }
+  ]
+}

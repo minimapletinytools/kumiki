@@ -29,6 +29,7 @@ floats -- there is no lazy/symbolic expression tree, and no separate
 '''
 
 import math
+import re
 import numpy as np
 from typing import Optional, Union, List, Tuple
 from dataclasses import dataclass, field
@@ -881,6 +882,196 @@ def bu(numerator, denominator=1):
         bu(1, 2)             # 1/2 bu
     """
     return scalar(numerator, denominator) * SHAKU_TO_METER / 100
+
+
+# ============================================================================
+# Writing a measurement down, and reading one back
+#
+# Everything above returns metres, and a metre carries no unit with it. These
+# turn what a person types -- "10in", "1 1/4\"", "2\'6\"", "20mm", "5寸" -- into
+# one, and a number back into something a person would have written.
+#
+# The grammar is closed on purpose: a number, optionally a fraction, and a
+# unit, repeated. A fraction is a literal, not arithmetic, so nothing typed
+# here is ever evaluated as an expression. Formulas are a separate feature and
+# this is deliberately not the start of one.
+# ============================================================================
+
+# Longest first: 'mm' must win over 'm', 'inches' over 'inch' over 'in'.
+_LENGTH_UNITS = {
+    "inches": INCH_TO_METER, "inch": INCH_TO_METER, "in": INCH_TO_METER,
+    '"': INCH_TO_METER, "\u201d": INCH_TO_METER,
+    "feet": FOOT_TO_METER, "foot": FOOT_TO_METER, "ft": FOOT_TO_METER,
+    "'": FOOT_TO_METER, "\u2019": FOOT_TO_METER,
+    "mm": scalar(1, 1000), "cm": scalar(1, 100), "m": scalar(1),
+    "yd": scalar(9144, 10000),
+    "shaku": SHAKU_TO_METER, "\u5c3a": SHAKU_TO_METER,
+    "sun": SHAKU_TO_METER / 10, "\u5bf8": SHAKU_TO_METER / 10,
+    "bu": SHAKU_TO_METER / 100, "\u5206": SHAKU_TO_METER / 100,
+}
+
+_ANGLE_UNITS = {
+    "degrees": pi / 180, "degree": pi / 180, "deg": pi / 180, "\u00b0": pi / 180,
+    "radians": scalar(1), "radian": scalar(1), "rad": scalar(1),
+}
+
+# A whole number, a fraction, or a whole number and a fraction -- "1 1/4" and
+# "1-1/4" being the two ways the second gets written on a board.
+_NUMBER = r"(?:\d+[\s-]\d+/\d+|\d+/\d+|\d*\.\d+|\d+\.?)"
+
+
+def _units_pattern(units) -> str:
+    return "|".join(re.escape(u) for u in sorted(units, key=len, reverse=True))
+
+
+def _parse_number(text: str) -> float:
+    """"1 1/4" -> 1.25. A fraction here is a literal, never an expression."""
+    match = re.fullmatch(r"(\d+)[\s-](\d+)/(\d+)", text)
+    if match:
+        whole, num, den = match.groups()
+        if float(den) == 0:
+            raise ValueError("fraction has a zero denominator")
+        return float(whole) + float(num) / float(den)
+    if "/" in text:
+        num, den = text.split("/", 1)
+        if float(den) == 0:
+            raise ValueError("fraction has a zero denominator")
+        return float(num) / float(den)
+    return float(text)
+
+
+def _parse_measurement(text, units, default_unit, what: str) -> float:
+    """Sum the terms of *text*, each a number and a unit from *units*.
+
+    A term may go without a unit only when it is the whole of what was written
+    -- that is someone typing a bare number into a box that already says what
+    it measures in. In a compound like 2'6" leaving a unit off either half
+    would be a guess, so there every term must carry one.
+    """
+    if isinstance(text, (int, float)) and not isinstance(text, bool):
+        return float(text) * units[default_unit]
+    if not isinstance(text, str):
+        raise ValueError(f"{what} must be written as text or a number, got {type(text).__name__}")
+
+    cleaned = text.strip().replace("\u2212", "-")
+    if not cleaned:
+        raise ValueError(f"{what} is empty")
+
+    written = text.strip()
+    sign = 1.0
+    if cleaned[0] in "+-":
+        sign = -1.0 if cleaned[0] == "-" else 1.0
+        cleaned = cleaned[1:].strip()
+
+    term = re.compile(rf"\s*({_NUMBER})\s*({_units_pattern(units)})?\s*", re.IGNORECASE)
+    terms = []
+    position = 0
+    while position < len(cleaned):
+        match = term.match(cleaned, position)
+        if not match or match.end() == position:
+            leftover = cleaned[position:].strip()
+            if terms and leftover:
+                raise ValueError(
+                    f"{what} {written!r} ends in {leftover!r}, which is not a unit I know "
+                    f"(try mm, cm, m, in, ft, shaku, sun or bu)"
+                )
+            raise ValueError(
+                f"{what} {written!r} is not a measurement I can read "
+                f"""(try something like '450mm', '18in' or '1 1/4\"')"""
+            )
+        terms.append((match.group(1), match.group(2)))
+        position = match.end()
+
+    if not terms:
+        raise ValueError(f"{what} {written!r} has no number in it")
+    if len(terms) > 1 and any(unit is None for _, unit in terms):
+        raise ValueError(
+            f"{what} {written!r} writes more than one measurement but leaves the unit "
+            f"""off one of them (did you mean 2'6\" rather than 2'6?)"""
+        )
+
+    total = 0.0
+    for number_text, unit_text in terms:
+        unit = default_unit if unit_text is None else unit_text.lower()
+        total += _parse_number(number_text) * units[unit]
+    return sign * total
+
+
+def parse_length(text, default_unit: str = "mm") -> float:
+    """A length, in metres, from what someone wrote.
+
+    Examples:
+        parse_length("450mm")     # 0.45
+        parse_length("18in")      # 0.4572
+        parse_length('1 1/4"')    # 0.03175
+        parse_length("2\'6\"")     # 0.762
+        parse_length("450")       # 0.45, taking default_unit
+    """
+    if default_unit not in _LENGTH_UNITS:
+        raise ValueError(f"{default_unit!r} is not a length unit")
+    return _parse_measurement(text, _LENGTH_UNITS, default_unit, "a length")
+
+
+def parse_angle(text, default_unit: str = "deg") -> float:
+    """An angle, in radians, from what someone wrote.
+
+    Examples:
+        parse_angle("30deg")      # pi/6
+        parse_angle("30\u00b0")        # pi/6
+        parse_angle("1.5rad")     # 1.5
+        parse_angle("30")         # pi/6, taking default_unit
+    """
+    if default_unit not in _ANGLE_UNITS:
+        raise ValueError(f"{default_unit!r} is not an angle unit")
+    return _parse_measurement(text, _ANGLE_UNITS, default_unit, "an angle")
+
+
+def _trim_zeros(text: str) -> str:
+    """4.0 -> 4, 3.50 -> 3.5. A whole number is the common case."""
+    return text.rstrip("0").rstrip(".") if "." in text else text
+
+
+# Enough places to hold a hundredth of a millimetre in whatever unit is being
+# written -- 2 for mm, 5 for m. A fixed count would round a metre to the
+# nearest millimetre, which loses a real measurement on the way back in.
+def _decimals_for(unit: str) -> int:
+    return max(0, round(math.log10(_LENGTH_UNITS[unit] / 1e-5)))
+
+
+def format_length(meters: float, unit: str = "mm", *, denominator: int = 32) -> str:
+    """A length in metres, written the way it would be on a cut list.
+
+    Imperial lengths come out as mixed fractions to the nearest 1/denominator,
+    reduced, because that is what a tape measure reads.
+    """
+    if unit not in _LENGTH_UNITS:
+        raise ValueError(f"{unit!r} is not a length unit")
+    value = meters / _LENGTH_UNITS[unit]
+    if unit in ('"', "in", "inch", "inches", "'", "ft", "foot", "feet"):
+        return _format_fraction(value, denominator) + unit
+    return _trim_zeros(f"{value:.{_decimals_for(unit)}f}") + unit
+
+
+def _format_fraction(value: float, denominator: int) -> str:
+    sign = "-" if value < 0 else ""
+    value = abs(value)
+    whole = int(value)
+    ticks = round((value - whole) * denominator)
+    if ticks == denominator:
+        whole += 1
+        ticks = 0
+    if ticks == 0:
+        return f"{sign}{whole}"
+    common = math.gcd(ticks, denominator)
+    numerator, den = ticks // common, denominator // common
+    return f"{sign}{whole} {numerator}/{den}" if whole else f"{sign}{numerator}/{den}"
+
+
+def format_angle(radians: float, unit: str = "deg") -> str:
+    """An angle in radians, written for people."""
+    if unit not in _ANGLE_UNITS:
+        raise ValueError(f"{unit!r} is not an angle unit")
+    return _trim_zeros(f"{radians / _ANGLE_UNITS[unit]:.4f}") + unit
 
 
 # ============================================================================
