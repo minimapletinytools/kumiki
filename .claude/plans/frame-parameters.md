@@ -329,10 +329,16 @@ reflection drops all of them silently unless each is migrated.
 single `use_round_timbers` bool, and a variant is already expressible as a second
 `Pattern` over a lambda passing `True` — which makes the library's UI more
 honest, since a round-timber variant becomes a visible sidebar entry rather than
-a hidden toggle. The genuinely useful ones (`notch_from: NotchFrom`) get a
-`choice`. The alternative — 47 mechanical diffs keeping a feature nobody asked
-for on library examples — answers the question once for all of them instead of
-per pattern.
+a hidden toggle.
+
+**What actually happened: none of them earned one.** `notch_from: NotchFrom` was
+the named candidate, and both of its variants turn out to be registered already
+as their own `Pattern` (`mortise_and_tenon_joints_patterns.py:995-996`) — the
+better form, since they sit side by side in the sidebar and the docstring asks
+you to compare them. The plan called for a `choice` there from a grep, without
+seeing that. The other 46 keep their kwargs as ordinary Python defaults. No
+library pattern declares a kiwari; `Pattern(kiwari=...)` is built and tested for
+when one wants to.
 
 ---
 
