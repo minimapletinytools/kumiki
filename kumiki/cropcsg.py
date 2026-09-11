@@ -132,6 +132,23 @@ class SolidBounds:
     def of(faces: BoundingHalfSpaces) -> 'SolidBounds':
         return SolidBounds(kind=BoundsKind.HALF_SPACES, faces=faces)
 
+    def require_faces(self) -> BoundingHalfSpaces:
+        """The half spaces, for a caller that has ruled out the other two answers.
+
+        `faces` is None unless the answer is HALF_SPACES, which is what makes a
+        caller look at `kind` -- and then leaves it holding an Optional it has
+        already established is not one. This says that out loud: every caller
+        reaches it having returned early on EMPTY and UNKNOWN, and one that has
+        not is asking a question with no answer and is told so here rather than
+        iterating None somewhere further in.
+        """
+        if self.faces is None:
+            raise TypeError(
+                f"bounds of kind {self.kind.name} have no half spaces -- check kind, "
+                f"or is_empty / is_unknown, before asking for them"
+            )
+        return self.faces
+
     @property
     def is_empty(self) -> bool:
         return self.kind is BoundsKind.EMPTY
@@ -449,7 +466,7 @@ def approximately_crop_plane_to_area_on_csg(
             # Nothing is inside it, so nothing survives being clipped by it.
             return ConvexPlanarRegion(plane=plane, boundary=())
 
-        for normal, point in bounds.faces:
+        for normal, point in bounds.require_faces():
             # The half space, written in the plane's own two axes.
             a = float((normal.T * frame.u)[0, 0])
             b = float((normal.T * frame.v)[0, 0])
@@ -720,7 +737,7 @@ def _exact_spans(
         return None
     if bounds.is_empty:
         return []
-    return _spans_within_primitive(bounds.faces, line, seed, tolerance, removing)
+    return _spans_within_primitive(bounds.require_faces(), line, seed, tolerance, removing)
 
 
 def _spans_on_csg(
@@ -810,7 +827,7 @@ def _spans_on_csg(
         # failure -- and not the same as no bounding planes, which would mean
         # the line is everywhere on it.
         return []
-    return _spans_within_primitive(bounds.faces, line, seed, tolerance, removing)
+    return _spans_within_primitive(bounds.require_faces(), line, seed, tolerance, removing)
 
 
 def crop_line_to_segments_on_csg(

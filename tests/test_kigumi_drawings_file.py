@@ -16,10 +16,12 @@ import pytest
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.drawing import Drawing, Measure
-from kumiki.identity import (DerivedFeaturePath, FeaturePath, FeatureRef, JointPath,
+from kumiki.identity import (DerivedFeaturePath, DrawingId, FeaturePath, FeatureRef,
+                             JointPath, MeasurementId,
                              ResolvedJointPath, ResolvedTimberPath, SingleFeaturePath,
                              TimberPath)
 from kumiki.timber import Frame
+from tests.testing_shavings import load_module, present
 
 
 def _load_runner():
@@ -62,7 +64,7 @@ def _write_file(example, drawings):
 
 
 def _ref(feature, timber="posts/fl", csg_path=("cut",), kind="FACE"):
-    """A feature reference as it travels on the wire."""
+    """A feature reference as it travels on the wire, where a timber is a string."""
     return {"timber": timber, "csgPath": list(csg_path), "feature": feature, "type": kind}
 
 
@@ -71,7 +73,7 @@ def _feature_names(measures):
     return [(m["a"]["feature"], m["b"]["feature"]) for m in measures]
 
 
-def _path(feature, timber="posts/fl", csg_path=("cut",), kind="FACE"):
+def _path(feature, timber=ResolvedTimberPath("posts/fl"), csg_path=("cut",), kind="FACE"):
     """The kumiki form of the same thing."""
     return SingleFeaturePath(timber=timber, ref=FeatureRef(csg_path=csg_path, feature=feature),
                              feature_type=kind)
@@ -108,7 +110,7 @@ class TestCollectDrawings:
     def test_the_code_says_what_to_draw_and_the_runner_works_out_how(self, example):
         # A frame names a drawing and its timbers; the page, viewports and
         # cameras are none of its business.
-        frame = _frame([Drawing(name="front left post", timber_paths=["posts/fl"])])
+        frame = _frame([Drawing(name="front left post", timber_paths=[TimberPath("posts/fl")])])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
@@ -120,7 +122,7 @@ class TestCollectDrawings:
 
     def test_the_file_overrides_a_drawing_the_code_asked_for(self, example):
         # By naming it, not by sharing its id.
-        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
+        frame = _frame([Drawing(name="post", timber_paths=[TimberPath("posts/fl")])])
         _write_file(example, [_override("my post sheet", "post")])
 
         drawings = runner.collect_drawings(frame, example)
@@ -150,8 +152,8 @@ class TestCollectDrawings:
 
     def test_code_drawings_come_first_and_keep_their_order(self, example):
         frame = _frame([
-            Drawing(name="a", timber_paths=["posts/fl"]),
-            Drawing(name="b", timber_paths=["posts/fr"]),
+            Drawing(name="a", timber_paths=[TimberPath("posts/fl")]),
+            Drawing(name="b", timber_paths=[TimberPath("posts/fr")]),
         ])
         _write_file(example, [_sheet("z")])
 
@@ -168,7 +170,7 @@ class TestCollectDrawings:
 
     def test_a_drawing_of_a_timber_that_is_gone_is_still_a_drawing(self, example):
         # Raising the frame must not fail because a path stopped matching.
-        frame = _frame([Drawing(name="ghost", timber_paths=["posts/never"])])
+        frame = _frame([Drawing(name="ghost", timber_paths=[TimberPath("posts/never")])])
 
         drawing = runner.collect_drawings(frame, example)[0]
 
@@ -176,7 +178,7 @@ class TestCollectDrawings:
 
     def test_an_id_keeps_an_override_attached_across_a_rename(self, example):
         # drawing_id is what the override names, so the name can change.
-        frame = _frame([Drawing(name="new name", drawing_id="stable", timber_paths=["posts/fl"])])
+        frame = _frame([Drawing(name="new name", drawing_id=DrawingId("stable"), timber_paths=[TimberPath("posts/fl")])])
         _write_file(example, [_override("sheet", "stable")])
 
         drawing = runner.collect_drawings(frame, example)[0]
@@ -189,7 +191,7 @@ class TestCollectDrawings:
         path = runner._drawings_file_path(example)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text("{ not json", encoding="utf-8")
-        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
+        frame = _frame([Drawing(name="post", timber_paths=[TimberPath("posts/fl")])])
 
         drawings = runner.collect_drawings(frame, example)
 
@@ -342,7 +344,7 @@ class TestMeasurementsThroughADrawing:
 
     def test_a_measurement_rides_on_the_viewport_it_is_drawn_in(self, example):
         frame = _frame([Drawing(
-            name="post", timber_paths=["posts/fl"],
+            name="post", timber_paths=[TimberPath("posts/fl")],
             measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
 
@@ -357,7 +359,7 @@ class TestMeasurementsThroughADrawing:
     def test_the_same_pair_in_two_viewports_are_two_measurements(self, example):
         # Neither overrides the other; they have different numbers.
         frame = _frame([Drawing(
-            name="post", timber_paths=["posts/fl"],
+            name="post", timber_paths=[TimberPath("posts/fl")],
             measurements={
                 FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
                 RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
@@ -372,7 +374,7 @@ class TestMeasurementsThroughADrawing:
 
     def test_an_override_only_reaches_its_own_viewport(self, example):
         frame = _frame([Drawing(
-            name="post", timber_paths=["posts/fl"],
+            name="post", timber_paths=[TimberPath("posts/fl")],
             measurements={
                 FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
                 RIGHT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))],
@@ -392,7 +394,7 @@ class TestMeasurementsThroughADrawing:
         # The reason measurements merge where everything else replaces: an
         # override of the whole drawing would take its layout with it.
         frame = _frame([Drawing(
-            name="post", timber_paths=["posts/fl"],
+            name="post", timber_paths=[TimberPath("posts/fl")],
             measurements={FRONT: [Measure(anchor_a=_path("x"), anchor_b=_path("y"))]},
         )])
         _write_file(example, [_override("sheet", "post", [
@@ -408,7 +410,7 @@ class TestMeasurementsThroughADrawing:
 
     def test_a_measurement_for_a_viewport_that_is_gone_is_not_shown(self, example):
         # An override naming a viewport the code's layout does not produce.
-        frame = _frame([Drawing(name="post", timber_paths=["posts/fl"])])
+        frame = _frame([Drawing(name="post", timber_paths=[TimberPath("posts/fl")])])
         _write_file(example, [_override("sheet", "post", [
             {"id": "nowhere", "measurements": [{"a": _ref("x"), "b": _ref("y")}]},
         ])])
@@ -559,7 +561,7 @@ class TestSingleFeaturePath:
 
     def test_an_id_still_separates_two_of_the_same_pair(self):
         assert (Measure(anchor_a=_path("x"), anchor_b=_path("y")).identity()
-                != Measure(anchor_a=_path("x"), anchor_b=_path("y"), measure_id="2").identity())
+                != Measure(anchor_a=_path("x"), anchor_b=_path("y"), measure_id=MeasurementId("2")).identity())
 
 
 class TestResolvingATimberPath:
@@ -649,7 +651,7 @@ class TestIdentifiers:
         assert Drawing(name="post 1").drawing_id == DrawingId("post 1")
 
     def test_a_drawing_takes_the_timber_names_as_names(self):
-        assert Drawing(name="d", timber_paths=["posts/fl"]).timber_paths == (
+        assert Drawing(name="d", timber_paths=[TimberPath("posts/fl")]).timber_paths == (
             TimberPath("posts/fl"),
         )
 
@@ -659,13 +661,8 @@ class TestResolvingAnchors:
 
     @pytest.fixture
     def measured(self):
-        import importlib.util as _ilu
-
         path = Path(__file__).resolve().parent.parent / "kigumi" / "test-fixtures" / "measured_frame.py"
-        spec = _ilu.spec_from_file_location("measured_fixture", path)
-        module = _ilu.module_from_spec(spec)
-        spec.loader.exec_module(module)
-        return module.build_frame()
+        return load_module("measured_fixture", path).build_frame()
 
     def _anchor(self, timber, csg_path, feature):
         return {"timber": timber, "csgPath": list(csg_path), "feature": feature, "type": "FACE"}
@@ -875,9 +872,9 @@ class TestDerivedFeaturePath:
     def _ref(self, path, feature):
         return FeatureRef(csg_path=path, feature=feature)
 
-    def _edge(self, timber="posts/fl"):
+    def _edge(self, timber=ResolvedTimberPath("posts/fl")):
         return DerivedFeaturePath(
-            timber=ResolvedTimberPath(timber),
+            timber=timber,
             a=self._ref(("mortise_and_tenon#0", "mortise_hole"), "mortise_right"),
             b=self._ref(("timber (rough, extended)",), "rough.left"),
         )
@@ -1019,15 +1016,9 @@ class TestAMeasurementMadeInTheViewer:
 
     def _fixture_frame(self):
         import importlib.util
-        import sys
-
         path = (Path(__file__).resolve().parent.parent
                 / "kigumi" / "test-fixtures" / "measured_frame.py")
-        spec = importlib.util.spec_from_file_location("kigumi_measured_fixture", path)
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_measured_fixture"] = module
-        spec.loader.exec_module(module)
-        return module.build_frame()
+        return load_module("kigumi_measured_fixture", path).build_frame()
 
     def _anchor(self, cut, feature):
         return {"timber": "butt_timber#0", "csgPath": list(cut),

@@ -33,7 +33,7 @@ class TestTicket:
         # Joints will get their own tagging system; a tag here would land
         # somewhere nothing reads, so it is discarded rather than kept.
         with pytest.warns(UserWarning, match="do not carry tags"):
-            ticket = JointTicket(joint_type="plain_butt", tags=("bent1",))  # type: ignore[call-arg]
+            ticket = JointTicket(joint_type="plain_butt", tags=("bent1",))
 
         assert ticket.tags == ()
 

@@ -25,8 +25,31 @@ from kumiki.drawing import (
     does_override,
     kinds_for,
 )
-from kumiki.identity import (DerivedFeaturePath, FeatureRef, ResolvedTimberPath,
+from kumiki.identity import (DerivedFeaturePath, FeatureRef, MeasurementId,
+                             ResolvedTimberPath,
                              SingleFeaturePath)
+from tests.testing_shavings import load_module, present
+
+def _feature_of(anchor) -> str:
+    """The feature an anchor names.
+
+    Measure holds FeaturePath, which is abstract on purpose -- a derived edge
+    has two parents and no single feature. These tests build the other kind, so
+    this says so rather than reaching for an attribute the declared type has
+    not got.
+    """
+    assert isinstance(anchor, SingleFeaturePath), f"expected a single feature, got {anchor!r}"
+    return anchor.feature or ""
+
+
+def _offset_of(measure) -> float:
+    """Where a measurement's dimension line sits.
+
+    Both the placement and its offset are optional -- "wherever the viewport
+    puts it" -- and these tests are about the ones that say.
+    """
+    return present(present(measure.placement, "a placement").offset, "an offset")
+
 
 DISTANCE = MeasurementOperation.DISTANCE
 ANGLE = MeasurementOperation.ANGLE
@@ -140,7 +163,7 @@ class TestTheViewerAgrees:
             % json.dumps(str(Path(__file__).resolve().parent.parent
                              / "kigumi" / "webview" / "measurements.js"))
         )
-        out = subprocess.run([node, "-e", script], capture_output=True, text=True, timeout=60)
+        out = subprocess.run([present(node, "node on PATH"), "-e", script], capture_output=True, text=True, timeout=60)
         assert out.returncode == 0, out.stderr
         return json.loads(out.stdout)
 
@@ -168,7 +191,7 @@ class TestAnchorsAreWrittenInOneOrder:
         forwards = Measure(first, second)
         backwards = Measure(second, first)
 
-        assert forwards.anchor_a.feature == backwards.anchor_a.feature
+        assert _feature_of(forwards.anchor_a) == _feature_of(backwards.anchor_a)
         assert forwards == backwards
 
     def test_it_is_one_measurement_however_it_was_written(self):
@@ -187,15 +210,15 @@ class TestAnchorsAreWrittenInOneOrder:
 
         swapped = Measure(second, first, placement=MeasurementPlacement(offset=-24.0))
 
-        assert swapped.placement.offset == 24.0
+        assert _offset_of(swapped) == 24.0
 
     def test_an_order_that_is_already_canonical_is_left_alone(self):
         first, second = self._anchor("aaa"), self._anchor("zzz")
 
         kept = Measure(first, second, placement=MeasurementPlacement(offset=-24.0))
 
-        assert kept.anchor_a.feature == "aaa"
-        assert kept.placement.offset == -24.0
+        assert _feature_of(kept.anchor_a) == "aaa"
+        assert _offset_of(kept) == -24.0
 
     def test_no_placement_is_fine(self):
         first, second = self._anchor("aaa"), self._anchor("zzz")
@@ -218,25 +241,26 @@ class TestKindTellsTwoMeasurementsApart:
         # an id to say they are different.
         first, second = self._pair()
 
-        across = Measure(first, second, kind="horizontal")
-        up = Measure(first, second, kind="vertical")
+        across = Measure(first, second, kind=MeasurementKind.parse("horizontal"))
+        up = Measure(first, second, kind=MeasurementKind.parse("vertical"))
 
         assert across.identity() != up.identity()
 
     def test_the_same_kind_written_twice_is_one_measurement(self):
         first, second = self._pair()
 
-        assert (Measure(first, second, kind="horizontal").identity()
-                == Measure(second, first, kind="horizontal").identity())
+        assert (Measure(first, second, kind=MeasurementKind.parse("horizontal")).identity()
+                == Measure(second, first, kind=MeasurementKind.parse("horizontal")).identity())
 
     def test_an_older_name_matches_the_kind_it_became(self):
         # A file written before kinds had structure has to keep overriding the
         # code measurement it always overrode.
         first, second = self._pair()
-        older = Measure(first, second, kind="angle")
+        older = Measure(first, second, kind=MeasurementKind.parse("angle"))
         newer = Measure(first, second,
-                        kind={"operation": "angle", "space": "projected",
-                              "direction": "perpendicular"})
+                        kind=MeasurementKind.from_wire(
+                            {"operation": "angle", "space": "projected",
+                             "direction": "perpendicular"}))
 
         assert older.identity() == newer.identity()
 
@@ -246,26 +270,20 @@ class TestKindTellsTwoMeasurementsApart:
         first, second = self._pair()
 
         assert Measure(first, second).identity() != Measure(
-            first, second, kind="horizontal").identity()
+            first, second, kind=MeasurementKind.parse("horizontal")).identity()
 
     def test_the_viewer_and_the_library_build_the_same_identity(self):
         # A file measurement overrides a code one by matching this tuple, so
         # the two sides have to agree on what it is.
-        import importlib.util
-        import sys
-
         runner_path = Path(__file__).resolve().parent.parent / "kigumi" / "runner.py"
-        spec = importlib.util.spec_from_file_location("kigumi_runner_kinds", runner_path)
-        runner = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_kinds"] = runner
-        spec.loader.exec_module(runner)
+        runner = load_module("kigumi_runner_kinds", runner_path)
 
         first, second = self._pair()
-        measure = Measure(first, second, kind="horizontal")
+        measure = Measure(first, second, kind=MeasurementKind.parse("horizontal"))
         on_the_wire = {
             "a": runner.serialize_feature_path(measure.anchor_a),
             "b": runner.serialize_feature_path(measure.anchor_b),
-            "kind": measure.kind.as_wire(),
+            "kind": present(measure.kind, "a kind").as_wire(),
             "measureId": None,
         }
 
@@ -284,7 +302,11 @@ class TestWhatReplacesWhat:
             ResolvedTimberPath("post"), FeatureRef((name,), name), "FACE")
 
     def _measure(self, kind=None):
-        return Measure(self._anchor("aaa"), self._anchor("zzz"), kind=kind)
+        """A measurement of the named kind. The name is parsed, not passed --
+        Measure takes a MeasurementKind, and turning a name into one is
+        MeasurementKind.parse's job rather than the constructor's."""
+        return Measure(self._anchor("aaa"), self._anchor("zzz"),
+                       kind=None if kind is None else MeasurementKind.parse(kind))
 
     def test_a_file_override_must_match_the_kind_too(self):
         # It was written against a particular dimension. The vertical between
@@ -305,7 +327,7 @@ class TestWhatReplacesWhat:
 
     def test_a_different_pair_is_never_the_same_measurement(self):
         one = self._measure("horizontal")
-        other = Measure(self._anchor("aaa"), self._anchor("mmm"), kind="horizontal")
+        other = Measure(self._anchor("aaa"), self._anchor("mmm"), kind=MeasurementKind.parse("horizontal"))
 
         assert not does_override(other, one, self.FILE, self.CODED)
         assert not does_override(other, one, self.CODED, self.GENERATED)

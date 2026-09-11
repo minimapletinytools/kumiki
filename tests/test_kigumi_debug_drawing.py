@@ -15,6 +15,7 @@ from pathlib import Path
 from kumiki.construction import create_timber
 from kumiki.rule import create_v2, create_v3, mm
 from kumiki.timber import Frame
+from tests.testing_shavings import load_module, present
 
 
 def _load_runner():
@@ -388,14 +389,10 @@ class TestDrawingFromSelection:
         # A timber with an end joint is not cut to length first, so centring a
         # view on its stock leaves the piece off centre by whatever the joint
         # took off. The assembly fixture's post is 1000mm of stock cut at 900.
-        import importlib.util as _ilu
-
-        spec = _ilu.spec_from_file_location(
+        module = load_module(
             "assembly_fixture",
             Path(__file__).resolve().parent.parent / "kigumi" / "test-fixtures" / "assembly_frame.py",
         )
-        module = _ilu.module_from_spec(spec)
-        spec.loader.exec_module(module)
         frame = module.build_frame()
 
         drawing = runner.create_drawing_from_selection(frame, ["A#0"])
@@ -573,14 +570,10 @@ class TestOrientationStrategies:
 
     def test_a_single_piece_is_framed_on_its_cut_box(self):
         # Not the stock, and not the world box it occupies.
-        import importlib.util as _ilu
-
-        spec = _ilu.spec_from_file_location(
+        module = load_module(
             "assembly_fixture2",
             Path(__file__).resolve().parent.parent / "kigumi" / "test-fixtures" / "assembly_frame.py",
         )
-        module = _ilu.module_from_spec(spec)
-        spec.loader.exec_module(module)
         drawing = runner.create_drawing_from_selection(module.build_frame(), ["A#0"])
 
         preview = next(v for v in drawing["viewports"] if v["projection"] == "perspective")

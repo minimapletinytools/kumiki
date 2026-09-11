@@ -19,6 +19,7 @@ from kumiki.cropcsg import (
     crop_line_to_segments_on_csg,
 )
 from kumiki.rule import Matrix, Transform, create_v2, create_v3, mm, scalar
+from tests.testing_shavings import present
 
 
 def _v(x, y, z):
@@ -34,8 +35,34 @@ def _box(size=(0.1, 0.2), start=0.0, end=1.0, position=(0.0, 0.0, 0.0)):
     )
 
 
+def _p(x, y):
+    """A profile point. A Profile is a list of V2, not of pairs that index alike."""
+    return create_v2(scalar(x), scalar(y))
+
+
 def _dot(a, b):
     return float((a.T * b)[0, 0])
+
+
+# The three below decline on purpose -- a solid they cannot describe, a plane
+# that misses, a direction with nothing along it -- and there are tests for each
+# refusal further down, calling them by their real names. These are for the far
+# more common case of a test that knows the answer is there: `present` says so,
+# and fails with that sentence rather than a TypeError on None a line later.
+def _area(plane, bounding, **options):
+    """The area a plane covers within some solids, which is expected to exist."""
+    return present(
+        approximately_crop_plane_to_area_on_csg(plane, bounding, **options), "an area")
+
+
+def _segments(line, csg, **options):
+    """The pieces of a line that lie on a solid, which are expected to exist."""
+    return present(crop_line_to_segments_on_csg(line, csg, **options), "segments")
+
+
+def _reach(area, direction):
+    """How far an area reaches along a direction, as (min, max)."""
+    return present(area.extent_along(direction), "an extent")
 
 
 class TestPlaneFrame:
@@ -65,7 +92,7 @@ class TestPlaneFrame:
 
 class TestBoundingHalfSpaces:
     def test_a_half_space_bounds_with_one_plane(self):
-        faces = solid_bounds(HalfSpace(normal=_v(0, 0, 1), offset=scalar(2))).faces
+        faces = solid_bounds(HalfSpace(normal=_v(0, 0, 1), offset=scalar(2))).require_faces()
 
         assert len(faces) == 1
         normal, point = faces[0]
@@ -74,13 +101,13 @@ class TestBoundingHalfSpaces:
         assert float(point[2, 0]) == pytest.approx(2, abs=1e-9)
 
     def test_a_closed_prism_bounds_with_six(self):
-        assert len(solid_bounds(_box()).faces) == 6
+        assert len(solid_bounds(_box()).require_faces()) == 6
 
     def test_an_end_that_runs_to_infinity_bounds_nothing(self):
         # The case that started all of this: a cutter extended so the cut comes
         # out clean has no face out there to bound anything.
-        assert len(solid_bounds(_box(start=None)).faces) == 5
-        assert len(solid_bounds(_box(start=None, end=None)).faces) == 4
+        assert len(solid_bounds(_box(start=None)).require_faces()) == 5
+        assert len(solid_bounds(_box(start=None, end=None)).require_faces()) == 4
 
     def test_a_shape_it_cannot_describe_says_so(self):
         # None rather than an empty list: "does not bound" and "cannot say"
@@ -107,7 +134,7 @@ class TestBoundingHalfSpaces:
 
         for csg in (EmptyCSG(), _undescribable()):
             with pytest.raises(TypeError):
-                list(solid_bounds(csg).faces)
+                list(solid_bounds(csg).require_faces())
 
 
 class TestRegionInPlane:
@@ -115,11 +142,11 @@ class TestRegionInPlane:
         box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5))
 
-        region = approximately_crop_plane_to_area_on_csg(plane, [box], seed_reach=10, near=_v(0, 0, 0))
+        region = _area(plane, [box], seed_reach=10, near=_v(0, 0, 0))
 
         assert len(region.boundary) == 4
-        width = region.extent_along(_v(1, 0, 0))
-        height = region.extent_along(_v(0, 1, 0))
+        width = _reach(region, _v(1, 0, 0))
+        height = _reach(region, _v(0, 1, 0))
         assert width[1] - width[0] == pytest.approx(0.1, abs=1e-9)
         assert height[1] - height[0] == pytest.approx(0.2, abs=1e-9)
 
@@ -129,18 +156,18 @@ class TestRegionInPlane:
         timber = _box(size=(0.1, 0.2), start=0.0, end=1.0)
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5))
 
-        region = approximately_crop_plane_to_area_on_csg(plane, [HalfSpace(normal=_v(0, 0, 1), offset=scalar(0)), timber],
+        region = _area(plane, [HalfSpace(normal=_v(0, 0, 1), offset=scalar(0)), timber],
                                  seed_reach=10, near=_v(0, 0, 0))
 
         assert len(region.boundary) == 4
-        assert region.extent_along(_v(1, 0, 0))[1] == pytest.approx(0.05, abs=1e-9)
+        assert _reach(region, _v(1, 0, 0))[1] == pytest.approx(0.05, abs=1e-9)
 
     def test_a_plane_that_misses_everything_leaves_nothing(self):
         # Which is how a feature says it is not on the finished piece at all.
         box = _box(start=0.0, end=1.0)
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 5))
 
-        region = approximately_crop_plane_to_area_on_csg(plane, [box], seed_reach=20, near=_v(0, 0, 5))
+        region = _area(plane, [box], seed_reach=20, near=_v(0, 0, 5))
 
         assert region.is_empty
 
@@ -161,7 +188,7 @@ class TestRegionInPlane:
 
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0))
 
-        region = approximately_crop_plane_to_area_on_csg(
+        region = _area(
             plane, [_box(), EmptyCSG()], seed_reach=10, near=_v(0, 0, 0))
 
         assert region is not None and region.is_empty
@@ -170,7 +197,7 @@ class TestRegionInPlane:
         box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
         plane = Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.25))
 
-        centre = approximately_crop_plane_to_area_on_csg(plane, [box], seed_reach=10, near=_v(0, 0, 0)).centroid()
+        centre = _area(plane, [box], seed_reach=10, near=_v(0, 0, 0)).centroid()
 
         assert float(centre[2, 0]) == pytest.approx(0.25, abs=1e-9)
 
@@ -178,11 +205,11 @@ class TestRegionInPlane:
         # What makes orienting the region to a viewport unnecessary: ask along
         # the viewport's own axes and the answer is the bounds in that view.
         box = _box(size=(0.1, 0.2), start=0.0, end=1.0)
-        region = approximately_crop_plane_to_area_on_csg(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
+        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
                                  [box], seed_reach=10, near=_v(0, 0, 0))
 
         diagonal = _v(0.7071, 0.7071, 0)
-        along = region.extent_along(diagonal)
+        along = _reach(region, diagonal)
         assert along[1] > along[0]
 
     def test_an_empty_region_has_no_centroid_to_offer(self):
@@ -219,7 +246,7 @@ class TestLoftedSolids:
         )
 
     def test_a_taper_is_bounded_by_four_sides_and_two_ends(self):
-        assert len(solid_bounds(self._loft(self._square(0.1), self._square(0.05))).faces) == 6
+        assert len(solid_bounds(self._loft(self._square(0.1), self._square(0.05))).require_faces()) == 6
 
     def test_a_twisted_loft_is_bounded_loosely_rather_than_refused(self):
         # Its sides are ruled surfaces with no plane of their own, so each
@@ -227,7 +254,7 @@ class TestLoftedSolids:
         # hull, which contains the loft -- loose, but the right direction.
         twisted = self._loft(self._square(0.1), self._turned(0.1, 30))
 
-        faces = solid_bounds(twisted).faces
+        faces = solid_bounds(twisted).require_faces()
 
         assert faces is not None and len(faces) == 6
         # Every corner of both profiles inside every face.
@@ -241,23 +268,32 @@ class TestLoftedSolids:
         taper = self._loft(self._square(0.1), self._square(0.05))
 
         for height, width in ((0.0, 0.2), (0.5, 0.15), (1.0, 0.1)):
-            region = approximately_crop_plane_to_area_on_csg(
+            region = _area(
                 Plane(normal=_v(0, 0, 1), point=_v(0, 0, height)),
                 [taper], seed_reach=10, near=_v(0, 0, 0))
-            low, high = region.extent_along(_v(1, 0, 0))
+            low, high = _reach(region, _v(1, 0, 0))
             assert high - low == pytest.approx(width, abs=1e-9), height
 
 
 def _undescribable():
-    """A solid solid_bounds cannot describe: a loft running to infinity."""
+    """A solid solid_bounds cannot describe: a loft running to infinity.
+
+    Deliberately out of contract, and the type checker is told so rather than
+    worked around. ConvexPolygonSimpleLoft REQUIRES both distances -- its
+    contains_point, is_point_on_boundary and _height_fraction all do arithmetic
+    with them and would raise on None -- but cropcsg._loft_half_spaces defends
+    against one anyway, answering UNKNOWN. This is the only thing that reaches
+    that defence, and a compound solid will not do instead: unions and
+    differences are walked, not described, so they are describable after all.
+    """
     from kumiki.cutcsg import ConvexPolygonSimpleLoft
 
-    square = [(-0.05, -0.05), (0.05, -0.05), (0.05, 0.05), (-0.05, 0.05)]
+    square = [_p(-0.05, -0.05), _p(0.05, -0.05), _p(0.05, 0.05), _p(-0.05, 0.05)]
     return ConvexPolygonSimpleLoft(
         bottom_points=square, top_points=square,
         transform=Transform(position=_v(0, 0, 0),
                             orientation=Transform.identity().orientation),
-        start_distance=None, end_distance=None,
+        start_distance=None, end_distance=None,  # ty: ignore[invalid-argument-type]
     )
 
 
@@ -366,7 +402,7 @@ class TestCropLineToSegmentsOnCsg:
     def test_a_line_through_a_box_is_the_box_thickness(self):
         line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
-        segments = crop_line_to_segments_on_csg(
+        segments = _segments(
             line, _box(size=(0.1, 0.2), start=0.0, end=1.0), seed_reach=10, near=_v(0, 0, 0))
 
         low, high = _span(segments)
@@ -376,7 +412,7 @@ class TestCropLineToSegmentsOnCsg:
     def test_the_midpoint_is_the_middle_of_what_survives(self):
         line = Line(direction=_v(0, 0, 1), point=_v(0, 0, 0))
 
-        cropped = crop_line_to_segments_on_csg(
+        cropped = _segments(
             line, _box(size=(0.1, 0.2), start=0.0, end=1.0), seed_reach=10, near=_v(0, 0, 0))
 
         assert float(max(cropped, key=lambda s: s.length()).midpoint()[2, 0]) == pytest.approx(0.5, abs=1e-9)
@@ -387,7 +423,7 @@ class TestCropLineToSegmentsOnCsg:
         # clipping leaves nothing, so the search starts near the timber.
         far = Line(direction=_v(0, 0, 1), point=_v(0.05, 0.1, 900))
 
-        cropped = crop_line_to_segments_on_csg(
+        cropped = _segments(
             far, _box(size=(0.1, 0.2), start=0.0, end=1.0),
             seed_reach=10, near=_v(0, 0, 0.5))
 
@@ -475,7 +511,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         cylinder = self._cylinder(radius=1.0)
 
         bounded = _spans_within_primitive(
-            solid_bounds(cylinder).faces, line, (-50.0, 50.0), 0.0, False)
+            solid_bounds(cylinder).require_faces(), line, (-50.0, 50.0), 0.0, False)
         solved = _span(crop_line_to_segments_on_csg(
             line, cylinder, seed_reach=50, near=_v(0, 0, 5)), along)
 
@@ -527,7 +563,7 @@ class TestSolvingACylinderRatherThanBoundingIt:
         # Across the body, straight through the middle of the bore.
         through = Line(direction=_v(1, 0, 0), point=_v(0, 0, 5))
 
-        segments = crop_line_to_segments_on_csg(
+        segments = _segments(
             through, Difference(base=body, subtract=[self._cylinder(radius=1.0)]),
             seed_reach=50, near=_v(0, 0, 5))
 
@@ -568,7 +604,7 @@ class TestALineOnABoundaryIsKept:
     """
 
     def _kept(self, line, csg, tolerance=0.0):
-        segments = crop_line_to_segments_on_csg(
+        segments = _segments(
             line, csg, seed_reach=50, near=_v(0, 0, 5), tolerance=tolerance)
         return sum(segment.length() for segment in (segments or []))
 
@@ -652,7 +688,7 @@ class TestWhatIsSolvedAndWhatIsBounded:
     def test_the_shapes_that_are_their_own_half_spaces(self):
         from kumiki.cutcsg import ConvexPolygonExtrusion, HalfSpace
 
-        square = [(-1.0, -1.0), (1.0, -1.0), (1.0, 1.0), (-1.0, 1.0)]
+        square = [_p(-1, -1), _p(1, -1), _p(1, 1), _p(-1, 1)]
         assert self._solved(HalfSpace(normal=_v(0, 0, 1), offset=scalar(0)))
         assert self._solved(_box())
         assert self._solved(ConvexPolygonExtrusion(
@@ -729,7 +765,7 @@ class TestCroppingThroughTheTree:
         tree = Difference(base=_box(start=0.0, end=1.0),
                           subtract=[_box(start=0.4, end=0.6)])
 
-        segments = crop_line_to_segments_on_csg(
+        segments = _segments(
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 2
@@ -742,7 +778,7 @@ class TestCroppingThroughTheTree:
         tree = Difference(base=_box(start=0.0, end=1.0),
                           subtract=[_box(start=0.2, end=0.3), _box(start=0.6, end=0.7)])
 
-        segments = crop_line_to_segments_on_csg(
+        segments = _segments(
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 3
@@ -772,7 +808,7 @@ class TestCroppingThroughTheTree:
         # for a solid being removed than for one being added, and at exactly
         # zero there is no slack to hide behind.
         for tolerance in (0.0, 1e-3):
-            segments = crop_line_to_segments_on_csg(
+            segments = _segments(
                 arris, tree, seed_reach=10, near=_v(0, 0, 0.5), tolerance=tolerance)
 
             # Whole and in one piece. Not exactly (0, 1) once there is a
@@ -822,7 +858,7 @@ class TestCroppingThroughTheTree:
         notch = _box(size=(0.06, 0.1), start=0.4, end=0.6, position=(0.03, 0.08, 0.0))
         tree = Difference(base=_box(size=(0.1, 0.2), start=0.0, end=1.0), subtract=[notch])
 
-        segments = crop_line_to_segments_on_csg(
+        segments = _segments(
             arris, tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 2
@@ -845,7 +881,7 @@ class TestCroppingThroughTheTree:
 
         tree = SolidUnion(children=[_box(start=0.0, end=0.3), _box(start=0.7, end=1.0)])
 
-        assert len(crop_line_to_segments_on_csg(
+        assert len(_segments(
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))) == 2
 
     def test_an_intersection_keeps_only_the_overlap(self):
@@ -906,7 +942,7 @@ class TestCroppingThroughTheTree:
         hollow = Difference(base=_box(start=0.2, end=0.8), subtract=[_box(start=0.4, end=0.6)])
         tree = Difference(base=_box(start=0.0, end=1.0), subtract=[hollow])
 
-        segments = crop_line_to_segments_on_csg(
+        segments = _segments(
             self._line(), tree, seed_reach=10, near=_v(0, 0, 0.5))
 
         assert len(segments) == 3
@@ -940,17 +976,17 @@ class TestCurvedAndPointyPrimitives:
         )
 
     def test_a_cylinder_becomes_a_hexagonal_prism(self):
-        assert len(solid_bounds(self._cylinder()).faces) == 8  # six sides, two ends
+        assert len(solid_bounds(self._cylinder()).require_faces()) == 8  # six sides, two ends
 
     def test_a_cylinder_running_to_infinity_has_no_ends(self):
-        assert len(solid_bounds(self._cylinder(start=None, end=None)).faces) == 6
+        assert len(solid_bounds(self._cylinder(start=None, end=None)).require_faces()) == 6
 
     def test_the_hexagon_contains_the_cylinder(self):
         # Outwards, per the rule at the top of cropcsg: one direction,
         # consistently, so that what a region excludes really is excluded.
-        region = approximately_crop_plane_to_area_on_csg(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
+        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
                                  [self._cylinder(radius=0.05)], seed_reach=10, near=_v(0, 0, 0))
-        across = region.extent_along(_v(1, 0, 0))
+        across = _reach(region, _v(1, 0, 0))
 
         # Tangent faces, so it holds the diameter exactly across the flats,
         # and reaches past it at the corners -- never short of it.
@@ -958,7 +994,7 @@ class TestCurvedAndPointyPrimitives:
         assert across[1] - across[0] < 0.125  # 2r/cos(30) at the widest
 
     def test_a_cylinder_sections_as_a_hexagon(self):
-        region = approximately_crop_plane_to_area_on_csg(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
+        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 0.5)),
                                  [self._cylinder()], seed_reach=10, near=_v(0, 0, 0))
 
         assert len(region.boundary) == 6
@@ -967,7 +1003,7 @@ class TestCurvedAndPointyPrimitives:
         from kumiki.cutcsg import ConvexPolygonExtrusion
 
         return ConvexPolygonExtrusion(
-            points=[(scalar(x), scalar(y)) for x, y in points],
+            points=[_p(x, y) for x, y in points],
             transform=Transform.identity(),
             start_distance=None if start is None else scalar(start),
             end_distance=None if end is None else scalar(end),
@@ -976,19 +1012,19 @@ class TestCurvedAndPointyPrimitives:
     def test_an_extrusion_bounds_with_a_plane_per_edge_and_its_ends(self):
         square = self._extrusion([(0, 0), (1, 0), (1, 1), (0, 1)])
 
-        assert len(solid_bounds(square).faces) == 6
+        assert len(solid_bounds(square).require_faces()) == 6
 
     def test_its_planes_come_from_the_hull_not_the_points_as_given(self):
         # A point inside the outline contributes no face of its own.
         with_inner = self._extrusion([(0, 0), (1, 0), (1, 1), (0, 1), (0.5, 0.5)])
 
-        assert len(solid_bounds(with_inner).faces) == 6
+        assert len(solid_bounds(with_inner).require_faces()) == 6
 
     def test_an_extrusion_sections_to_its_cross_section(self):
         square = self._extrusion([(-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5)])
-        region = approximately_crop_plane_to_area_on_csg(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 1)),
+        region = _area(Plane(normal=_v(0, 0, 1), point=_v(0, 0, 1)),
                                  [square], seed_reach=10, near=_v(0, 0, 0))
-        across = region.extent_along(_v(1, 0, 0))
+        across = _reach(region, _v(1, 0, 0))
 
         assert across[1] - across[0] == pytest.approx(1.0, abs=1e-9)
 
