@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     # what the type checker was reporting on each of them.
     from .identity import (JointPath, ResolvedJointPath, ResolvedTimberPath,
                            TimberPath)
+    from .kiwari import Kiwari
 
 # TODO DELETE ME
 # Aliases for backwards compatibility
@@ -2473,6 +2474,10 @@ class Frame:
     # Drawings the frame asks for. The drawings file may override these and add
     # its own; see docs/drawing-mode-plan.md.
     drawings: List[Drawing] = field(default_factory=list)
+    # The numbers this frame was built from, if it was built from any. Declared
+    # inside the builder and handed back here, which is how kigumi learns what
+    # it may adjust without a module-level declaration to go looking for.
+    kiwari: Optional['Kiwari'] = field(default=None, compare=False)
 
     def resolve_timber_path(self, path: 'TimberPath') -> List['ResolvedTimberPath']:
         """Which timbers a name refers to, in this frame.
@@ -2512,7 +2517,8 @@ class Frame:
     @classmethod
     def from_joints(cls, joints: List[Joint],
                     additional_unjointed_timbers: Optional[List[PerfectTimberWithin]] = None,
-                    name: Optional[str] = None) -> 'Frame':
+                    name: Optional[str] = None,
+                    kiwari: Optional['Kiwari'] = None) -> 'Frame':
         """
         Create a Frame from a list of joints and optional additional unjointed timbers.
         
@@ -2524,6 +2530,7 @@ class Frame:
             additional_unjointed_timbers: Optional list of PerfectTimberWithin objects that don't
                                          participate in any joints (default: empty list)
             name: Optional name for the frame
+            kiwari: The numbers the frame was built from, if it takes any
             
         Returns:
             Frame: A new Frame object with merged cut timbers and collected accessories
@@ -2630,6 +2637,7 @@ class Frame:
             accessories=all_accessories,
             name=name,
             source_joints=list(joints),
+            kiwari=kiwari,
         )
     
     def get_bounding_box(self) -> tuple[V3, V3]:

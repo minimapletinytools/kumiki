@@ -162,6 +162,8 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const tagsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'tags.js'))).toString();
     const tagIndexJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'tag-index.js'))).toString();
     const unitsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'units.js'))).toString();
+    const dimensionTextJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'dimension-text.js'))).toString();
+    const kiwariValuesJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'kiwari-values.js'))).toString();
     const displayOptionsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'display-options-store.js'))).toString();
     const sceneStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'scene-store.js'))).toString();
     const stylesCssUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'viewer.css'))).toString();
@@ -218,6 +220,8 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__TAGS_JS_URI__', tagsJsUri)
         .replace('__TAG_INDEX_JS_URI__', tagIndexJsUri)
         .replace('__UNITS_JS_URI__', unitsJsUri)
+        .replace('__DIMENSION_TEXT_JS_URI__', dimensionTextJsUri)
+        .replace('__KIWARI_VALUES_JS_URI__', kiwariValuesJsUri)
         .replace('__DISPLAY_OPTIONS_JS_URI__', displayOptionsJsUri)
         .replace('__SCENE_STORE_JS_URI__', sceneStoreJsUri)
         .replace('__APP_JS_URI__', appJsUri)

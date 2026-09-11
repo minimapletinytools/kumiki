@@ -5,44 +5,21 @@ This module provides a convenient way to organize multiple patterns (frames or C
 and raise them at different positions for visualization and testing.
 """
 
-import inspect
 from typing import Any, Dict, List, Tuple, Optional, Callable, Union, Literal, Sequence
 from dataclasses import dataclass, field, replace
+from .kiwari import Kiwari
 from .rule import V3, create_v3, Transform, scalar
 from .timber import Frame, CutTimber, Timber, Peg, Wedge, CSGAccessory, Joint, Accessory
 from .cutcsg import CutCSG, translate_csg
 
 
-# Type alias for pattern functions.
-# The first positional argument is the pattern center (V3), followed by
-# optional keyword parameters for parameterized rendering.
+# Type alias for pattern functions: ``(center: V3, kiwari: Kiwari | None)``.
+#
+# Center is passed explicitly rather than being a parameter like the rest,
+# because a pattern can be repositioned and that is not something the author
+# chooses. The kiwari is passed if and only if the Pattern declares one, so a
+# pattern that takes no parameters is called exactly as it always was.
 PatternLambda = Callable[..., Union[Frame, CutCSG]]
-
-
-def _build_pattern_lambda_signature(source_func: Callable[..., Any]) -> inspect.Signature:
-    """Build a callable signature for pattern lambdas.
-
-    Pattern lambdas always take center as the first positional argument. Any
-    additional parameters are copied from source_func after dropping its first
-    parameter (the source position argument).
-    """
-    source_sig = inspect.signature(source_func)
-    source_params = list(source_sig.parameters.values())
-
-    center_param = inspect.Parameter(
-        "center",
-        kind=inspect.Parameter.POSITIONAL_OR_KEYWORD,
-        annotation=V3,
-    )
-
-    if not source_params:
-        return inspect.Signature(parameters=[center_param], return_annotation=source_sig.return_annotation)
-
-    trailing_params = source_params[1:]
-    return inspect.Signature(
-        parameters=[center_param, *trailing_params],
-        return_annotation=source_sig.return_annotation,
-    )
 
 
 def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
@@ -51,8 +28,8 @@ def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
     to a pattern lambda that accepts center and returns a Frame with all timbers and
     accessories translated by center.
     """
-    def pattern_lambda(center: V3, **pattern_kwargs: Any) -> Frame:
-        joint = joint_func(**pattern_kwargs)
+    def pattern_lambda(center: V3, kiwari: Optional[Kiwari] = None) -> Frame:
+        joint = joint_func() if kiwari is None else joint_func(kiwari)
         translated_timbers: List[CutTimber] = []
         # Build translated cuttings dict in parallel so that the Cutting objects
         # stored in the joint and in the CutTimbers are identical (same identity),
@@ -117,9 +94,9 @@ def make_pattern_from_joint(joint_func: Callable[..., Joint]) -> PatternLambda:
             cut_timbers=translated_timbers,
             accessories=translated_accessories,
             source_joints=[translated_joint],
+            kiwari=kiwari,
         )
 
-    setattr(pattern_lambda, "__signature__", _build_pattern_lambda_signature(joint_func))
     return pattern_lambda
 
 
@@ -128,8 +105,8 @@ def make_pattern_from_frame(frame_func: Callable[..., Frame]) -> PatternLambda:
     Convert a Frame-returning function (no args) to a pattern lambda that accepts center
     and returns a Frame with all timbers and accessories translated by center.
     """
-    def pattern_lambda(center: V3, **pattern_kwargs: Any) -> Frame:
-        frame = frame_func(**pattern_kwargs)
+    def pattern_lambda(center: V3, kiwari: Optional[Kiwari] = None) -> Frame:
+        frame = frame_func() if kiwari is None else frame_func(kiwari)
         translated_timbers = []
         for cut_timber in frame.cut_timbers:
             new_position = cut_timber.timber.get_bottom_position_global() + center
@@ -183,9 +160,12 @@ def make_pattern_from_frame(frame_func: Callable[..., Frame]) -> PatternLambda:
                 else:
                     translated_accessories.append(accessory)
 
-        return Frame(cut_timbers=translated_timbers, accessories=translated_accessories)
+        return Frame(
+            cut_timbers=translated_timbers,
+            accessories=translated_accessories,
+            kiwari=kiwari if kiwari is not None else frame.kiwari,
+        )
 
-    setattr(pattern_lambda, "__signature__", _build_pattern_lambda_signature(frame_func))
     return pattern_lambda
 
 
@@ -195,10 +175,9 @@ def make_pattern_from_csg(csg_func: Callable[..., CutCSG]) -> PatternLambda:
     and returns the CSG translated by center. Consistent with frame/joint patterns:
     the returned CSG is positioned at the given center.
     """
-    def pattern_lambda(center: V3, **pattern_kwargs: Any) -> CutCSG:
-        return translate_csg(csg_func(**pattern_kwargs), center)
+    def pattern_lambda(center: V3, kiwari: Optional[Kiwari] = None) -> CutCSG:
+        return translate_csg(csg_func() if kiwari is None else csg_func(kiwari), center)
 
-    setattr(pattern_lambda, "__signature__", _build_pattern_lambda_signature(csg_func))
     return pattern_lambda
 
 
@@ -208,15 +187,21 @@ class Pattern:
 
     path: hierarchical path like "corner_joints/cut_plain_miter_joint".
           Each path segment is an implicit tag for filtering.
-    lambda_: callable(center: V3, **kwargs) -> Frame | CutCSG
+    lambda_: callable(center: V3, kiwari: Kiwari | None) -> Frame | CutCSG
     tags: explicit tags. Special values: 'main' (default display when file opened),
           'poop' (hide from sidebar).
     pattern_type: 'frame' or 'csg'
+    kiwari: the numbers this pattern may be adjusted by, if any. Declared here
+          rather than inside the lambda because one file holds many patterns
+          with different parameters, and because a csg pattern returns a
+          CutCSG, which has nowhere to carry one back on. A pattern that
+          declares one is called with a bound kiwari as its second argument.
     """
     path: str
     lambda_: PatternLambda
     tags: List[str] = field(default_factory=list)
     pattern_type: Literal['frame', 'csg'] = 'frame'
+    kiwari: Optional[Kiwari] = None
 
     @property
     def name(self) -> str:
@@ -230,11 +215,19 @@ class Pattern:
         """Return all tags including implicit path segment tags."""
         return list(self.path_segments) + list(self.tags)
 
-    def raise_at(self, center: Optional[Any] = None, **kwargs: Any) -> Any:
-        """Raise this pattern at the given center (defaults to origin)."""
+    def raise_at(self, center: Optional[V3] = None,
+                 kiwari: Optional[Kiwari] = None) -> Union[Frame, CutCSG]:
+        """Raise this pattern at *center* (defaults to origin).
+
+        The one place that knows a pattern is handed a kiwari only when it
+        declares one, so nothing else has to remember that. *kiwari* here is
+        the values to lay over the declaration, not a declaration of its own.
+        """
         if center is None:
             center = create_v3(scalar(0), scalar(0), scalar(0))
-        return self.lambda_(center, **kwargs)
+        if self.kiwari is None:
+            return self.lambda_(center)
+        return self.lambda_(center, self.kiwari.resolve(kiwari))
 
 
 @dataclass(frozen=True)
@@ -281,7 +274,6 @@ class PatternBook:
         self,
         pattern_name: str,
         center: Optional[V3] = None,
-        **pattern_kwargs: Any,
     ) -> Union[Frame, CutCSG]:
         """
         Raise a single pattern by name at the specified center location.
@@ -302,7 +294,7 @@ class PatternBook:
         # Find the pattern by name
         for metadata, pattern_lambda in self.patterns:
             if metadata.pattern_name == pattern_name:
-                return pattern_lambda(center, **pattern_kwargs)
+                return pattern_lambda(center)
         
         # Pattern not found
         available_names = [m.pattern_name for m, _ in self.patterns]

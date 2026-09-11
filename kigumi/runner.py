@@ -13,6 +13,7 @@ from __future__ import annotations
 import contextlib
 import importlib
 import importlib.util
+import inspect
 import json
 import math
 import os
@@ -25,12 +26,6 @@ import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Dict, Mapping, NamedTuple, Optional, List, Tuple
-
-from kumiki.librarian import (
-    RenderParameterDescriptor,
-    resolve_callable_render_parameters,
-    serialize_render_parameter_value,
-)
 
 if TYPE_CHECKING:
     # Annotations only. kumiki must NOT be imported at module scope for
@@ -118,8 +113,11 @@ class SlotState:
     mesh_cache: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     patternbook: Optional[Any] = None
     single_pattern_name: Optional[str] = None
-    render_parameter_schema: List[RenderParameterDescriptor] = field(default_factory=list)
-    applied_render_parameters: Dict[str, Any] = field(default_factory=dict)
+    # What this slot was last built from, bound. Read off the frame the builder
+    # returned, or off the Pattern for a pattern. Kept on the slot rather than
+    # only on the frame so a build that fails leaves the panel something to
+    # dial back from.
+    kiwari: Optional[Any] = None
     # Drawings made in this session and not yet saved. They live here rather
     # than in the viewer so python stays the one place a drawing comes from,
     # and they are lost on reload, which is what "unsaved" should mean.
@@ -3027,34 +3025,143 @@ def _frame_from_pattern_list(pattern_list: List[Any]) -> "tuple[Any, Any]":
         origin = create_v3(scalar(0), scalar(0), scalar(0))
         target = pattern_list[0]
         with contextlib.redirect_stdout(sys.stderr):
-            result = target.lambda_(origin)
+            result = target.raise_at(origin)
         return _coerce_viewable_frame(result, target.name), pattern_list
 
     from kumiki.librarian import build_pattern_grid_frame
     return build_pattern_grid_frame(pattern_list), pattern_list
 
 
-def _serialize_render_parameters_for_slot(slot_state: SlotState) -> Dict[str, Any]:
-    return {
-        "schema": [descriptor.to_protocol_dict() for descriptor in slot_state.render_parameter_schema],
-        "applied": {
-            name: serialize_render_parameter_value(value)
-            for name, value in slot_state.applied_render_parameters.items()
-        },
-    }
+def _accepts_an_argument(entry: Any) -> bool:
+    """Whether *entry* takes a kiwari.
 
-
-def _resolve_callable_entry_with_render_parameters(
-    callable_entry: Any,
-    render_parameters: Optional[Mapping[str, Any]],
-) -> Tuple[Any, List[RenderParameterDescriptor], Dict[str, Any]]:
-    descriptors, resolved_kwargs = resolve_callable_render_parameters(
-        callable_entry,
-        render_parameters,
+    One narrow question about arity, not a schema derived from a signature --
+    what a parameter is and what it may be comes from the kiwari the builder
+    declares, and nothing here reads annotations or defaults to find that out.
+    """
+    try:
+        signature = inspect.signature(entry)
+    except (TypeError, ValueError):
+        return False
+    return any(
+        parameter.kind in (parameter.POSITIONAL_ONLY, parameter.POSITIONAL_OR_KEYWORD, parameter.VAR_POSITIONAL)
+        for parameter in signature.parameters.values()
     )
+
+
+def _call_frame_entry(callable_entry: Any, kiwari: Optional[Any] = None) -> Any:
+    """Build a frame, handing it *kiwari* if it is willing to take one."""
     with contextlib.redirect_stdout(sys.stderr):
-        value = callable_entry(**resolved_kwargs)
-    return value, descriptors, resolved_kwargs
+        if _accepts_an_argument(callable_entry):
+            return callable_entry(kiwari)
+        if kiwari is not None:
+            raise TypeError(
+                f"{getattr(callable_entry, '__name__', 'this frame')} was given parameters to "
+                "build with but takes no argument to receive them. Declare them with a kiwari: "
+                "def build_frame(k: Kiwari | None = None) -> Frame"
+            )
+        return callable_entry()
+
+
+# --- parameters saved beside the source -------------------------------------
+#
+# myframe.py -> myframe.parameters.json. Beside the source rather than under
+# .kigumi/ (where drawings go) because a parameter choice is something you
+# want to commit. The file watcher only watches the example file's own
+# basename, so writing a sibling does not set off a reload.
+
+
+def _parameters_file_path(example_path: Path) -> Path:
+    return example_path.parent / f"{example_path.stem}.parameters.json"
+
+
+def _can_save_parameters(slot_state: SlotState) -> bool:
+    """Whether this slot may write its parameters beside its source.
+
+    Not for a pattern: those live in library folders we have no business
+    writing to, and a pattern's values belong to whoever raised it. Not for a
+    file outside the workspace either, which is the same library case reached
+    by a different road.
+    """
+    if slot_state.single_pattern_name is not None:
+        return False
+    workspace = _workspace_root()
+    if workspace is None:
+        return False
+    try:
+        slot_state.file_path.relative_to(workspace)
+    except ValueError:
+        return False
+    return True
+
+
+def _workspace_root() -> Optional[Path]:
+    root = os.environ.get("KIGUMI_WORKSPACE_ROOT") or _project_root
+    return Path(root).resolve() if root else None
+
+
+def _read_parameters_file(example_path: Path) -> "tuple[Dict[str, Any], Optional[Path]]":
+    """The saved values for *example_path*, and where they came from."""
+    path = _parameters_file_path(example_path)
+    if not path.exists():
+        return {}, None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        log_stderr(f"[parameters] Ignoring {path.name}: {exc}")
+        return {}, None
+    values = data.get("values") if isinstance(data, dict) else None
+    return (values if isinstance(values, dict) else {}), path
+
+
+def _write_parameters_file(slot_state: SlotState) -> str:
+    """Save only what differs from what the code says.
+
+    Writing every value out would mean changing a default in the source did
+    nothing for anyone holding one of these files.
+    """
+    if slot_state.kiwari is None:
+        raise ValueError("This frame takes no parameters, so there is nothing to save")
+    if not _can_save_parameters(slot_state):
+        raise ValueError(
+            "Parameters can only be saved beside a frame in your own workspace, "
+            "not for a library pattern"
+        )
+    changed = slot_state.kiwari.changed_from_defaults()
+    path = _parameters_file_path(slot_state.file_path)
+    if not changed:
+        # Nothing differs any more, so the file has nothing left to say.
+        if path.exists():
+            path.unlink()
+        return str(path)
+    payload = {
+        "schema_version": 1,
+        "values": {key: slot_state.kiwari.value_payload(key) for key in changed},
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    return str(path)
+
+
+def _bind_kiwari_values(kiwari: Optional[Any], values: Optional[Mapping[str, Any]]) -> Optional[Any]:
+    """*kiwari* with *values* laid over it, or None if there is no kiwari yet."""
+    if kiwari is None:
+        return None
+    if not values:
+        return kiwari
+    return kiwari.resolve(dict(values))
+
+
+def _serialize_kiwari_for_slot(slot_state: SlotState, *, stale: bool = False) -> Optional[Dict[str, Any]]:
+    """What the panel is built from, or None when the frame takes no parameters."""
+    if slot_state is None or slot_state.kiwari is None:
+        return None
+    payload = slot_state.kiwari.to_payload()
+    payload["canSave"] = _can_save_parameters(slot_state)
+    if stale:
+        # Kept from the last build that worked, so the panel can say the values
+        # on screen are not the ones the frame in front of you was built from.
+        payload["stale"] = True
+    return payload
 
 
 def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
@@ -3097,41 +3204,28 @@ def _coerce_viewable_frame(value: Any, name: Optional[str] = None) -> Any:
     )
 
 
-def resolve_frame_from_module(
-    module: Any,
-    render_parameters: Optional[Mapping[str, Any]] = None,
-) -> "tuple[Any, Optional[Any], List[RenderParameterDescriptor], Dict[str, Any]]":
-    """Resolve a frame from a loaded module.
+def resolve_frame_from_module(module: Any, kiwari: Optional[Any] = None) -> "tuple[Any, Optional[Any]]":
+    """Resolve a frame from a loaded module, built with *kiwari* if it takes one.
 
-    Returns (frame, patternbook_or_None, schema, applied).
+    Returns (frame, patternbook_or_None).
     """
     if hasattr(module, "patterns"):
         pattern_list = getattr(module, "patterns")
         if _looks_like_pattern_list(pattern_list):
-            frame, patternbook = _frame_from_pattern_list(pattern_list)
-            return frame, patternbook, [], {}
+            return _frame_from_pattern_list(pattern_list)
 
     if hasattr(module, "build_frame") and callable(module.build_frame):
-        frame, descriptors, applied = _resolve_callable_entry_with_render_parameters(
-            module.build_frame,
-            render_parameters,
-        )
-        return _coerce_viewable_frame(frame, "build_frame"), None, descriptors, applied
+        frame = _call_frame_entry(module.build_frame, kiwari)
+        return _coerce_viewable_frame(frame, "build_frame"), None
 
     if hasattr(module, "example"):
         example = getattr(module, "example")
         if callable(example):
-            example, descriptors, applied = _resolve_callable_entry_with_render_parameters(
-                example,
-                render_parameters,
-            )
-        else:
-            descriptors = []
-            applied = {}
+            example = _call_frame_entry(example, kiwari)
         if _looks_like_frame(example):
-            return example, None, descriptors, applied
+            return example, None
         try:
-            return _coerce_viewable_frame(example, "example"), None, descriptors, applied
+            return _coerce_viewable_frame(example, "example"), None
         except TypeError:
             pass
 
@@ -3143,25 +3237,35 @@ def resolve_frame_from_module(
 def load_slot_state(
     file_path: str,
     previous_mesh_cache: Optional[Dict[str, Dict[str, Any]]] = None,
-    render_parameters: Optional[Mapping[str, Any]] = None,
+    kiwari_values: Optional[Mapping[str, Any]] = None,
+    previous_kiwari: Optional[Any] = None,
 ) -> SlotState:
     resolved_path = Path(file_path).resolve()
     if not resolved_path.exists():
         raise FileNotFoundError(f"File not found: {resolved_path}")
 
     module = load_module_from_path(resolved_path, verbose=True)
-    frame, patternbook, render_parameter_schema, applied_render_parameters = resolve_frame_from_module(
-        module,
-        render_parameters=render_parameters,
-    )
+
+    # The values are laid over whatever the last good build declared, so the
+    # builder receives a bound kiwari and re-validates it against the
+    # declaration it makes on this run. On a first load there is nothing to lay
+    # them over yet, and the builder's own declaration is all there is.
+    incoming = _bind_kiwari_values(previous_kiwari, kiwari_values)
+    frame, patternbook = resolve_frame_from_module(module, incoming)
+    saved, saved_path = _read_parameters_file(resolved_path)
+    if saved and getattr(frame, "kiwari", None) is not None and not kiwari_values:
+        # A companion file is the author's saved starting point, so it only
+        # applies when the viewer has not already said what it wants.
+        frame, patternbook = resolve_frame_from_module(
+            module, _bind_kiwari_values(frame.kiwari, saved)
+        )
     return SlotState(
         file_path=resolved_path,
         module=module,
         frame=frame,
         mesh_cache=previous_mesh_cache if previous_mesh_cache is not None else {},
         patternbook=patternbook,
-        render_parameter_schema=render_parameter_schema,
-        applied_render_parameters=applied_render_parameters,
+        kiwari=getattr(frame, "kiwari", None),
     )
 
 
@@ -3178,6 +3282,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
             "get_drawings", "save_drawings", "add_measurement",
+            "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
             "shutdown",
@@ -3187,7 +3292,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "timber_count": frame_summary["timber_count"],
             "accessories_count": frame_summary["accessories_count"],
         },
-        "renderParameters": _serialize_render_parameters_for_slot(ss),
+        "kiwari": _serialize_kiwari_for_slot(ss),
     }
 
 
@@ -4687,7 +4792,7 @@ def _find_pattern_in_list(pattern_list: List[Any], pattern_name: str) -> Optiona
 def _raise_specific_pattern(
     source_file: str,
     pattern_name: str,
-    render_parameters: Optional[Mapping[str, Any]] = None,
+    kiwari_values: Optional[Mapping[str, Any]] = None,
 ) -> "tuple[SlotState, Dict[str, Any]]":
     """Load a specific pattern from a source file and return (SlotState, result_dict)."""
     resolved = Path(source_file).resolve()
@@ -4705,17 +4810,14 @@ def _raise_specific_pattern(
             available = [getattr(p, "path", "") for p in pattern_list]
             raise ValueError(f"Pattern '{pattern_name}' not found. Available: {available}")
 
-        pattern_lambda = pattern.lambda_
-        render_parameter_schema, applied_render_parameters = resolve_callable_render_parameters(
-            pattern_lambda,
-            render_parameters,
-            skip_first_parameter=True,
-        )
-
         from kumiki.rule import create_v3, scalar
         origin = create_v3(scalar(0), scalar(0), scalar(0))
+        # A pattern declares its kiwari on the Pattern, so the schema is
+        # readable without building -- raise_at binds the values onto it and
+        # hands the result in only if this pattern takes one.
+        bound = _bind_kiwari_values(pattern.kiwari, kiwari_values)
         with contextlib.redirect_stdout(sys.stderr):
-            pattern_result = pattern_lambda(origin, **applied_render_parameters)
+            pattern_result = pattern.raise_at(origin, bound)
         frame = _coerce_viewable_frame(pattern_result, f"Pattern '{pattern.name}'")
 
         reload_s = time.monotonic() - t0
@@ -4726,8 +4828,7 @@ def _raise_specific_pattern(
             mesh_cache={},
             patternbook=pattern_list,
             single_pattern_name=pattern.path,
-            render_parameter_schema=render_parameter_schema,
-            applied_render_parameters=applied_render_parameters,
+            kiwari=bound,
         )
         result = {
             "examplePath": str(resolved),
@@ -4737,7 +4838,7 @@ def _raise_specific_pattern(
                 "timber_count": len(frame.cut_timbers),
                 "accessories_count": len(frame.accessories) if hasattr(frame, "accessories") else 0,
             },
-            "renderParameters": _serialize_render_parameters_for_slot(slot),
+            "kiwari": _serialize_kiwari_for_slot(slot),
             "profiling": {"reload_s": reload_s},
         }
         return slot, result
@@ -4748,18 +4849,18 @@ def _raise_specific_pattern(
     )
 
 
+def _opt_mapping(payload: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
+    """Return payload[key] if it is a dict, else None."""
+    value = payload.get(key)
+    return value if isinstance(value, dict) else None
+
+
 def _require_str(payload: Dict[str, Any], key: str, message: str) -> str:
     """Return payload[key] if it is a non-empty string, else raise ValueError(message)."""
     value = payload.get(key)
     if not isinstance(value, str) or not value:
         raise ValueError(message)
     return value
-
-
-def _opt_dict(payload: Dict[str, Any], key: str) -> Optional[Dict[str, Any]]:
-    """Return payload[key] if it is a dict, else None."""
-    value = payload.get(key)
-    return value if isinstance(value, dict) else None
 
 
 _active_assembly_cancels: Dict[str, threading.Event] = {}
@@ -4786,7 +4887,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         _cancel_active_assembly(slot_name)
         old_slot = state.slots.get(slot_name)
         next_path = payload.get("filePath", str(state.get_slot(slot_name).file_path))
-        render_parameters = _opt_dict(payload, "renderParameters")
+        kiwari_values = _opt_mapping(payload, "kiwari")
         old_cache = old_slot.mesh_cache if old_slot else {}
         t0 = time.monotonic()
 
@@ -4795,14 +4896,15 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
             next_slot, _ = _raise_specific_pattern(
                 next_path,
                 old_slot.single_pattern_name,
-                render_parameters=render_parameters,
+                kiwari_values=kiwari_values,
             )
             next_slot.mesh_cache = old_cache
         else:
             next_slot = load_slot_state(
                 next_path,
                 old_cache,
-                render_parameters=render_parameters,
+                kiwari_values=kiwari_values,
+                previous_kiwari=old_slot.kiwari if old_slot else None,
             )
 
         reload_s = time.monotonic() - t0
@@ -4816,7 +4918,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "timber_count": len(next_slot.frame.cut_timbers),
                 "accessories_count": len(next_slot.frame.accessories),
             },
-            "renderParameters": _serialize_render_parameters_for_slot(next_slot),
+            "kiwari": _serialize_kiwari_for_slot(next_slot),
             "profiling": {"reload_s": reload_s},
         }
         return state, make_success_response(request_id, command, result), False
@@ -4824,7 +4926,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
     if command == "get_frame":
         ss = _resolve_slot(state, payload)
         frame_payload = serialize_frame(ss.frame)
-        frame_payload["renderParameters"] = _serialize_render_parameters_for_slot(ss)
+        frame_payload["kiwari"] = _serialize_kiwari_for_slot(ss)
         return state, make_success_response(request_id, command, frame_payload), False
 
     if command == "get_drawings":
@@ -4980,9 +5082,8 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         slot_name = _require_str(payload, "slot", "load_slot requires payload.slot")
         _cancel_active_assembly(slot_name)
         file_path = _require_str(payload, "filePath", "load_slot requires payload.filePath")
-        render_parameters = _opt_dict(payload, "renderParameters")
         t0 = time.monotonic()
-        new_slot = load_slot_state(file_path, render_parameters=render_parameters)
+        new_slot = load_slot_state(file_path, kiwari_values=_opt_mapping(payload, "kiwari"))
         reload_s = time.monotonic() - t0
         state.slots[slot_name] = new_slot
         log_stderr(f"[slot] Loaded slot '{slot_name}' from {file_path}")
@@ -4994,7 +5095,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "timber_count": len(new_slot.frame.cut_timbers),
                 "accessories_count": len(new_slot.frame.accessories) if hasattr(new_slot.frame, "accessories") else 0,
             },
-            "renderParameters": _serialize_render_parameters_for_slot(new_slot),
+            "kiwari": _serialize_kiwari_for_slot(new_slot),
             "profiling": {"reload_s": reload_s},
         }
         return state, make_success_response(request_id, command, result), False
@@ -5034,16 +5135,22 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
         slot_name = _require_str(payload, "slot", "raise_specific_pattern requires payload.slot")
         source_file = _require_str(payload, "sourceFile", "raise_specific_pattern requires payload.sourceFile")
         pattern_name = _require_str(payload, "patternName", "raise_specific_pattern requires payload.patternName")
-        render_parameters = _opt_dict(payload, "renderParameters")
         new_slot, result = _raise_specific_pattern(
-            source_file,
-            pattern_name,
-            render_parameters=render_parameters,
+            source_file, pattern_name, kiwari_values=_opt_mapping(payload, "kiwari")
         )
         state.slots[slot_name] = new_slot
         result["slot"] = slot_name
         log_stderr(f"[slot] Raised pattern '{pattern_name}' in slot '{slot_name}'")
         return state, make_success_response(request_id, command, result), False
+
+    if command == "save_parameters":
+        ss = _resolve_slot(state, payload)
+        written = _write_parameters_file(ss)
+        log_stderr(f"[parameters] Saved to {written}")
+        return state, make_success_response(request_id, command, {
+            "path": written,
+            "saved": list(ss.kiwari.changed_from_defaults()) if ss.kiwari else [],
+        }), False
 
     if command == "export_member":
         ss = _resolve_slot(state, payload)
@@ -5208,7 +5315,15 @@ def main() -> None:
             if should_exit:
                 return
         except Exception as exc:
-            emit_message(make_error_response(request_id, command, exc))
+            # A build that failed leaves the slot it failed on untouched, so
+            # the kiwari it last built from still stands. Sending it back means
+            # a value someone just typed wrong is still there to be dialled
+            # back, rather than the panel emptying along with the frame.
+            response = make_error_response(request_id, command, exc)
+            failed_slot = state.slots.get(_resolve_slot_name(state, request.get("payload") or {}))
+            if failed_slot is not None and failed_slot.kiwari is not None:
+                response["kiwari"] = _serialize_kiwari_for_slot(failed_slot, stale=True)
+            emit_message(response)
 
 
 if __name__ == "__main__":

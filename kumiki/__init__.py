@@ -60,7 +60,7 @@ from .joints.workshop.mixed import *
 from .joints.workshop.basic_joints import *
 from .measuring import *
 from .patternbook import *
-from .librarian import Param
+from .kiwari import *
 
 # Optional heavy mesh/export modules.
 # FreeCAD's bundled Python may not have trimesh installed; keep base imports usable.
