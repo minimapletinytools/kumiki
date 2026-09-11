@@ -266,3 +266,64 @@ def test_a_pattern_that_declares_nothing_is_called_exactly_as_before(workspace):
     slot, result = runner._raise_specific_pattern(str(path), "probe/plain")
     assert result["kiwari"] is None
     assert len(slot.frame.cut_timbers) == 1
+
+
+# --- the fixture the viewer is driven with -----------------------------------
+
+FIXTURE = Path(__file__).resolve().parent.parent / "kigumi" / "test-fixtures" / "kiwari_frame.py"
+
+
+def _frame_signature(frame):
+    """Enough of a frame to tell whether a parameter did anything."""
+    return tuple(
+        tuple(round(float(v), 9) for v in (
+            cut.timber.get_bottom_position_global()[0],
+            cut.timber.get_bottom_position_global()[1],
+            cut.timber.get_bottom_position_global()[2],
+            cut.timber.get_length_direction_global()[0],
+            cut.timber.get_length_direction_global()[2],
+            cut.timber.length, cut.timber.size[0], cut.timber.size[1],
+        ))
+        for cut in frame.cut_timbers
+    )
+
+
+@pytest.mark.parametrize("key,value,also", [
+    ("posts", 4, {}),
+    ("post_height", "2m", {}),
+    ("spacing", "500mm", {}),
+    ("size", {"x": "50mm", "y": "150mm"}, {}),
+    ("lean", "40deg", {}),
+    ("alternating", True, {"lean": "40deg"}),
+    ("cap", "40mm", {}),
+    ("cap_end", "BOTTOM", {"cap": "40mm"}),
+])
+def test_every_parameter_the_viewer_fixture_offers_changes_the_frame(key, value, also):
+    """A control that does nothing is worse than no control.
+
+    The fixture exists to demonstrate the panel, so a parameter it declares and
+    then ignores would make the panel look broken to anyone trying it out.
+    """
+    module = runner.load_module_from_path(FIXTURE)
+    baseline = module.build_frame()
+
+    moved = module.build_frame(baseline.kiwari.resolve({key: value, **also}))
+    if also:
+        # Compare against the other value being set too, so the change measured
+        # is this parameter's own and not its companion's.
+        baseline = module.build_frame(baseline.kiwari.resolve(also))
+
+    assert _frame_signature(moved) != _frame_signature(baseline), (
+        f"{key!r} is declared by the fixture but changes nothing when set to {value!r}"
+    )
+
+
+def test_the_fixtures_optional_parameter_is_nothing_until_it_is_asked_for():
+    module = runner.load_module_from_path(FIXTURE)
+    without = module.build_frame()
+    assert without.kiwari.length("cap") is None
+    with_cap = module.build_frame(without.kiwari.resolve({"cap": "40mm"}))
+    assert with_cap.kiwari.length("cap") == pytest.approx(0.04)
+    assert len(with_cap.cut_timbers) == len(without.cut_timbers) + 1
+    assert without.kiwari.changed_from_defaults() == ()
+    assert with_cap.kiwari.changed_from_defaults() == ("cap",)

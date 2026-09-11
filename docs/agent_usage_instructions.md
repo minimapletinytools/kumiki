@@ -195,6 +195,27 @@ Lengths are metres and angles are radians, as everywhere else in kumiki. The
 user types `450mm`, `18in`, `1 1/4"` or `2'6"` and the panel reads it; a bare
 number takes whichever unit the viewer is set to. Formulas are not supported.
 
+### Optional parameters
+
+A parameter that may be nothing at all takes `optional=True` and gets a switch
+in the panel. With no default it starts switched off; give it one and it starts
+on and can be turned off.
+
+```python
+k = kiwari(
+    cap=kiwari.length(optional=True, about="Thickness of a cap board; off for none"),
+    chamfer=kiwari.length(mm(6), optional=True),
+).resolve(k)
+
+cap = k.length("cap")
+if cap is not None:
+    ...  # build the cap
+```
+
+The accessor returns `None` when it is switched off, so the builder decides
+what nothing means — usually leaving a member out. Bounds are not applied to
+nothing, and switching one on or off counts as a change from the code.
+
 Since the update flow is agentic, a constant in the file is often still better
 than a parameter -- reach for a kiwari when the user genuinely wants to try
 values themselves, not for everything that happens to be a number.

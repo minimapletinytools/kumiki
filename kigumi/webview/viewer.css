@@ -700,6 +700,24 @@ canvas { display: block; width: 100%; height: 100%; }
 .kiwari-box-bad {
     border-color: var(--hv-error);
 }
+/* An optional parameter switched off: still readable, plainly not in play. */
+.kiwari-switch {
+    margin: 0 2px 0 0;
+    cursor: pointer;
+}
+.kiwari-row-off .kiwari-key,
+.kiwari-row-off .kiwari-kind {
+    opacity: 0.6;
+}
+.kiwari-nothing {
+    color: var(--hv-hint);
+    font: italic 11px 'Segoe UI', sans-serif;
+}
+.kiwari-box:disabled,
+.kiwari-step:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
 .kiwari-count {
     display: flex;
     align-items: center;

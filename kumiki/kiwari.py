@@ -63,6 +63,21 @@ from .rule import (
 __all__ = ["Kiwari", "Declaration", "kiwari"]
 
 
+class _Nothing:
+    """Stands for "no default was given", which is not the same as None.
+
+    ``kiwari.length(None, optional=True)`` and ``kiwari.length(optional=True)``
+    mean the same thing; ``kiwari.length()`` on its own is a mistake, and this
+    is what lets the two be told apart.
+    """
+
+    def __repr__(self) -> str:
+        return "<no default>"
+
+
+NOTHING = _Nothing()
+
+
 # What a parameter is. The kind decides how it is written down, how text is
 # read back into it, and which accessor is allowed to ask for it.
 LENGTH = "length"
@@ -114,53 +129,69 @@ class Declaration:
 # ---------------------------------------------------------------------------
 
 
-def length(default, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+def _default_or_nothing(default: Any, optional: bool) -> Any:
+    """An omitted default means nothing at all, which only optional allows."""
+    if default is not NOTHING:
+        return default
+    if optional:
+        return None
+    raise ValueError(
+        "a parameter needs a default to build with. Pass one, or optional=True "
+        "if it is genuinely allowed to be nothing."
+    )
+
+
+def length(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
     """A distance, in metres. Written and read as "450mm", "18in", "1 1/4"."""
-    return Declaration(LENGTH, default, about, optional, minimum, maximum)
+    return Declaration(LENGTH, _default_or_nothing(default, optional), about, optional, minimum, maximum)
 
 
-def angle(default, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+def angle(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
     """An angle, in radians. Written and read as "30deg", "1.5rad"."""
-    return Declaration(ANGLE, default, about, optional, minimum, maximum)
+    return Declaration(ANGLE, _default_or_nothing(default, optional), about, optional, minimum, maximum)
 
 
-def count(default, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+def count(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
     """A whole number of things -- legs, bays, pegs."""
-    return Declaration(COUNT, default, about, optional, minimum, maximum)
+    return Declaration(COUNT, _default_or_nothing(default, optional), about, optional, minimum, maximum)
 
 
-def number(default, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
+def number(default=NOTHING, *, about: str = "", minimum=None, maximum=None, optional: bool = False) -> Declaration:
     """A plain number with no dimension -- a ratio, a factor."""
-    return Declaration(NUMBER, default, about, optional, minimum, maximum)
+    return Declaration(NUMBER, _default_or_nothing(default, optional), about, optional, minimum, maximum)
 
 
-def flag(default: bool, *, about: str = "", optional: bool = False) -> Declaration:
+def flag(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
     """On or off."""
-    return Declaration(FLAG, default, about, optional)
+    return Declaration(FLAG, _default_or_nothing(default, optional), about, optional)
 
 
-def text(default: str, *, about: str = "", optional: bool = False) -> Declaration:
+def text(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
     """Free text -- a name, a label."""
-    return Declaration(TEXT, default, about, optional)
+    return Declaration(TEXT, _default_or_nothing(default, optional), about, optional)
 
 
-def choice(choices: type, default=None, *, about: str = "", optional: bool = False) -> Declaration:
-    """One of an Enum's members. Defaults to the first one declared."""
+def choice(choices: type, default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
+    """One of an Enum's members.
+
+    With no default: the first member declared, or nothing at all when the
+    parameter is optional.
+    """
     if not (isinstance(choices, type) and issubclass(choices, Enum)):
         raise ValueError("a choice must name the Enum class its options come from")
-    if default is None and not optional:
-        default = next(iter(choices))
+    if default is NOTHING:
+        default = None if optional else next(iter(choices))
     return Declaration(CHOICE, default, about, optional, choices=choices)
 
 
-def point2(default, *, about: str = "", optional: bool = False) -> Declaration:
+def point2(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
     """Two lengths -- a cross section, a point on a face."""
-    return Declaration(POINT2, default, about, optional)
+    return Declaration(POINT2, _default_or_nothing(default, optional), about, optional)
 
 
-def point3(default, *, about: str = "", optional: bool = False) -> Declaration:
+def point3(default=NOTHING, *, about: str = "", optional: bool = False) -> Declaration:
     """Three lengths -- a position, an offset."""
-    return Declaration(POINT3, default, about, optional)
+    return Declaration(POINT3, _default_or_nothing(default, optional), about, optional)
 
 
 # ---------------------------------------------------------------------------

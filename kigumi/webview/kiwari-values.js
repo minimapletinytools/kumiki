@@ -22,9 +22,24 @@
         return unitSystem === 'imperial' ? 'in' : 'mm';
     }
 
-    /** A parameter's value as text, ready to put in an input. */
+    /** Whether an optional parameter is switched on. Others always are. */
+    function isEnabled(state, parameter) {
+        return !parameter.optional || state.enabled.has(parameter.key);
+    }
+
+    /**
+     * A parameter's value as text, ready to put in an input.
+     *
+     * An optional parameter that is switched off still gets a draft — whatever
+     * the code would have given it — so that switching it back on puts
+     * something in the box rather than leaving it empty.
+     */
     function toDraft(parameter, entry) {
         if (!entry || entry.value === null || entry.value === undefined) {
+            if (parameter.optional && parameter.default
+                && parameter.default.value !== null && parameter.default.value !== undefined) {
+                return toDraft(parameter, parameter.default);
+            }
             return parameter.kind === 'flag' ? false : '';
         }
         if (parameter.kind === 'flag') {
@@ -70,7 +85,11 @@
     function whyNotOneNumber(parameter, kind, draft, unitSystem) {
         const written = typeof draft === 'string' ? draft.trim() : draft;
         if (written === '' || written === null || written === undefined) {
-            return parameter.optional ? null : 'needs a value';
+            // Optional makes no difference here: problems() never asks about a
+            // parameter that is switched off, and the switch is the only way to
+            // say nothing. An empty box on one that is switched on is someone
+            // part-way through typing, not an answer.
+            return 'needs a value';
         }
         let value;
         if (MEASURED[kind]) {
@@ -137,6 +156,14 @@
         return { value: parameter.kind === 'count' ? Math.round(Number(written)) : Number(written) };
     }
 
+    /** One parameter's wire value, nothing at all when it is switched off. */
+    function valueFor(state, parameter, unitSystem) {
+        if (!isEnabled(state, parameter)) {
+            return { value: null };
+        }
+        return toWireValue(parameter, state.drafts[parameter.key], unitSystem);
+    }
+
     /** True when two wire values mean the same measurement. */
     function sameValue(parameter, one, other) {
         const a = one && one.value;
@@ -167,13 +194,21 @@
             .filter((entry) => entry && typeof entry.key === 'string' && entry.key.length);
         const applied = (payload && payload.applied) || {};
         const drafts = {};
+        const enabled = new Set();
         for (const parameter of schema) {
             drafts[parameter.key] = toDraft(parameter, applied[parameter.key]);
+            const value = applied[parameter.key] && applied[parameter.key].value;
+            if (!parameter.optional || (value !== null && value !== undefined)) {
+                enabled.add(parameter.key);
+            }
         }
         return {
             schema,
             applied,
             drafts,
+            // Which optional parameters are switched on. A parameter that is
+            // off is nothing, whatever its box still says.
+            enabled,
             changed: new Set((payload && payload.changed) || []),
             canSave: Boolean(payload && payload.canSave),
             stale: Boolean(payload && payload.stale),
@@ -191,10 +226,26 @@
         return withDraft(state, key, { ...current, [axis]: draft });
     }
 
+    /** That state with an optional parameter switched on or off. */
+    function withEnabled(state, key, on) {
+        const enabled = new Set(state.enabled);
+        if (on) {
+            enabled.add(key);
+        } else {
+            enabled.delete(key);
+        }
+        return { ...state, enabled };
+    }
+
     /** Every box's complaint, keyed by parameter. Empty when all of them read. */
     function problems(state, unitSystem) {
         const found = {};
         for (const parameter of state.schema) {
+            // A parameter that is switched off is nothing, and nothing is
+            // always a value it is allowed to be.
+            if (!isEnabled(state, parameter)) {
+                continue;
+            }
             const why = whyNotValid(parameter, state.drafts[parameter.key], unitSystem);
             if (why) {
                 found[parameter.key] = why;
@@ -208,7 +259,7 @@
         try {
             return !sameValue(
                 parameter,
-                toWireValue(parameter, state.drafts[parameter.key], unitSystem),
+                valueFor(state, parameter, unitSystem),
                 state.applied[parameter.key],
             );
         } catch (error) {
@@ -227,11 +278,7 @@
             return true;
         }
         try {
-            return !sameValue(
-                parameter,
-                toWireValue(parameter, state.drafts[parameter.key], unitSystem),
-                parameter.default,
-            );
+            return !sameValue(parameter, valueFor(state, parameter, unitSystem), parameter.default);
         } catch (error) {
             return true;
         }
@@ -242,7 +289,7 @@
         const values = {};
         for (const parameter of state.schema) {
             try {
-                values[parameter.key] = toWireValue(parameter, state.drafts[parameter.key], unitSystem);
+                values[parameter.key] = valueFor(state, parameter, unitSystem);
             } catch (error) {
                 return null;
             }
@@ -253,16 +300,24 @@
     /** Every box back to what the code says. */
     function resetToDefaults(state) {
         const drafts = {};
+        const enabled = new Set();
         for (const parameter of state.schema) {
             drafts[parameter.key] = toDraft(parameter, parameter.default);
+            const value = parameter.default && parameter.default.value;
+            if (!parameter.optional || (value !== null && value !== undefined)) {
+                enabled.add(parameter.key);
+            }
         }
-        return { ...state, drafts };
+        return { ...state, drafts, enabled };
     }
 
     const KigumiKiwariValues = {
         fromPayload,
         withDraft,
         withAxisDraft,
+        withEnabled,
+        isEnabled,
+        valueFor,
         problems,
         isEdited,
         isChangedFromDefault,

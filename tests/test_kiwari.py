@@ -265,3 +265,70 @@ def test_a_kiwari_is_immutable_and_resolving_makes_a_new_one() -> None:
     assert k.count("legs") == 4 and after.count("legs") == 6
     with pytest.raises(Exception):
         k.values["legs"] = 9  # type: ignore[index]
+
+
+# --- optional: nothing is a real answer --------------------------------------
+
+
+def test_an_optional_parameter_needs_no_default_and_starts_as_nothing() -> None:
+    k = kiwari(trim=kiwari.length(optional=True))
+    assert k.length("trim") is None
+    assert k.declarations["trim"].optional is True
+
+
+def test_an_optional_parameter_may_still_have_a_default_to_be_turned_off() -> None:
+    k = kiwari(chamfer=kiwari.length(mm(6), optional=True))
+    assert k.length("chamfer") == pytest.approx(0.006)
+    assert k.resolve({"chamfer": None}).length("chamfer") is None
+
+
+def test_an_omitted_default_is_refused_unless_the_parameter_is_optional() -> None:
+    for declare in (kiwari.length, kiwari.angle, kiwari.count, kiwari.number,
+                    kiwari.flag, kiwari.text, kiwari.point2, kiwari.point3):
+        with pytest.raises(ValueError, match="needs a default"):
+            declare()
+        assert declare(optional=True).default is None
+
+
+def test_an_optional_choice_starts_as_nothing_rather_than_the_first_member() -> None:
+    assert kiwari(finish=kiwari.choice(Finish)).choice("finish") is Finish.ROUGH_SAWN
+    assert kiwari(finish=kiwari.choice(Finish, optional=True)).choice("finish") is None
+
+
+def test_switching_an_optional_parameter_on_and_off_round_trips() -> None:
+    k = kiwari(trim=kiwari.length(optional=True))
+    on = k.resolve({"trim": "3mm"})
+    assert on.length("trim") == pytest.approx(0.003)
+    assert on.resolve({"trim": None}).length("trim") is None
+
+
+def test_turning_an_optional_parameter_on_or_off_counts_as_a_change() -> None:
+    off_by_default = kiwari(trim=kiwari.length(optional=True))
+    assert off_by_default.changed_from_defaults() == ()
+    assert off_by_default.resolve({"trim": "3mm"}).changed_from_defaults() == ("trim",)
+
+    on_by_default = kiwari(chamfer=kiwari.length(mm(6), optional=True))
+    assert on_by_default.changed_from_defaults() == ()
+    assert on_by_default.resolve({"chamfer": None}).changed_from_defaults() == ("chamfer",)
+
+
+def test_bounds_do_not_apply_to_nothing() -> None:
+    k = kiwari(trim=kiwari.length(optional=True, minimum=mm(1)))
+    assert k.length("trim") is None
+    with pytest.raises(ValueError, match="at least"):
+        k.resolve({"trim": "0.1mm"})
+
+
+def test_the_payload_says_a_parameter_is_optional_and_what_it_defaults_to() -> None:
+    payload = kiwari(
+        trim=kiwari.length(optional=True),
+        chamfer=kiwari.length(mm(6), optional=True),
+        posts=kiwari.count(2),
+    ).to_payload()
+    by_key = {entry["key"]: entry for entry in payload["schema"]}
+    assert by_key["trim"]["optional"] is True
+    assert by_key["trim"]["default"] == {"value": None}
+    # A default the viewer can put back in the box when it is switched on again.
+    assert by_key["chamfer"]["default"] == {"value": 0.006, "text": "6mm"}
+    assert "optional" not in by_key["posts"]
+    assert payload["applied"]["trim"] == {"value": None}

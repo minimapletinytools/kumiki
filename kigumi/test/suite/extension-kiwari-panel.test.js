@@ -55,7 +55,7 @@ describe('Kigumi parameters panel', () => {
         assert.strictEqual(panel.hasKiwariControls, true, 'Expected the parameters panel to be rendered');
         assert.deepStrictEqual(
             panel.kiwariKeys,
-            ['posts', 'post_height', 'lean', 'size', 'capped', 'end'],
+            ['posts', 'post_height', 'spacing', 'size', 'lean', 'alternating', 'cap', 'cap_end'],
             'Expected one row per declared parameter, in declaration order',
         );
         assert.deepStrictEqual(panel.kiwariChangedKeys, [],
@@ -65,6 +65,15 @@ describe('Kigumi parameters panel', () => {
         assert.strictEqual(panel.kiwariBuildDisabled, true,
             'Nothing has been edited, so there is nothing to build');
         assert.strictEqual(snapshot.frame.name, 'Kiwari Test Frame (2 posts)');
+
+        // `cap` is optional and defaults to nothing, so it is the one row with
+        // a switch, and that switch starts off.
+        assert.deepStrictEqual(panel.kiwariOptionalKeys, ['cap'],
+            'Expected only the optional parameter to carry a switch');
+        assert.deepStrictEqual(panel.kiwariSwitchedOffKeys, ['cap'],
+            'Expected the optional parameter to start switched off');
+        assert.deepStrictEqual(panel.kiwariChangedKeys, [],
+            'An optional parameter that is off by design is not a change');
     });
 
     it('shows no parameters panel for a frame that declares none', async function () {

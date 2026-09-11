@@ -1099,7 +1099,7 @@ class ViewerKiwariPanel {
     }
 
     renderTextControl(parameter, inputId, draft, problem, options = {}) {
-        const { onInput, placeholder } = options;
+        const { onInput, placeholder, disabled = false } = options;
         return html`
             <input
                 id=${inputId}
@@ -1108,12 +1108,13 @@ class ViewerKiwariPanel {
                 inputmode=${parameter.kind === 'count' ? 'numeric' : 'text'}
                 .value=${String(draft ?? '')}
                 placeholder=${placeholder ?? this.placeholderFor(parameter)}
+                ?disabled=${disabled}
                 aria-invalid=${problem ? 'true' : 'false'}
                 @input=${(event) => onInput(event.target.value)}>
         `;
     }
 
-    renderCount(parameter, inputId, draft, problem) {
+    renderCount(parameter, inputId, draft, problem, disabled) {
         // Steppers, because a count is nearly always nudged rather than typed.
         const step = (by) => {
             const next = Math.round(Number(draft) || 0) + by;
@@ -1121,18 +1122,21 @@ class ViewerKiwariPanel {
         };
         return html`
             <div class="kiwari-count">
-                <button type="button" class="kiwari-step" title=${t('viewer.kiwari.decrement')}
+                <button type="button" class="kiwari-step" ?disabled=${disabled}
+                    title=${t('viewer.kiwari.decrement')}
                     @click=${() => step(-1)}>−</button>
                 ${this.renderTextControl(parameter, inputId, draft, problem, {
                     onInput: (value) => this.app.setKiwariDraft(parameter.key, value),
+                    disabled,
                 })}
-                <button type="button" class="kiwari-step" title=${t('viewer.kiwari.increment')}
+                <button type="button" class="kiwari-step" ?disabled=${disabled}
+                    title=${t('viewer.kiwari.increment')}
                     @click=${() => step(1)}>+</button>
             </div>
         `;
     }
 
-    renderChoice(parameter, inputId, draft) {
+    renderChoice(parameter, inputId, draft, disabled) {
         // A datalist gives type-to-search for free, and still accepts a click.
         const choices = Array.isArray(parameter.choices) ? parameter.choices : [];
         return html`
@@ -1140,6 +1144,7 @@ class ViewerKiwariPanel {
                 id=${inputId}
                 class="kiwari-box kiwari-select"
                 .value=${String(draft ?? '')}
+                ?disabled=${disabled}
                 @change=${(event) => this.app.setKiwariDraft(parameter.key, event.target.value)}>
                 ${choices.map((option) => html`
                     <option value=${option.value} ?selected=${String(draft) === String(option.value)}>
@@ -1149,7 +1154,7 @@ class ViewerKiwariPanel {
         `;
     }
 
-    renderPoint(parameter, inputId, draft, problem) {
+    renderPoint(parameter, inputId, draft, problem, disabled) {
         const axes = KigumiKiwariValues.VECTOR_AXES[parameter.kind];
         return html`
             <div class="kiwari-point">
@@ -1162,13 +1167,14 @@ class ViewerKiwariPanel {
                             type="text"
                             .value=${String((draft || {})[axis] ?? '')}
                             placeholder=${this.placeholderFor({ kind: 'length' })}
+                            ?disabled=${disabled}
                             @input=${(event) => this.app.setKiwariAxisDraft(parameter.key, axis, event.target.value)}>
                     </label>`)}
             </div>
         `;
     }
 
-    renderControl(parameter, inputId, draft, problem) {
+    renderControl(parameter, inputId, draft, problem, disabled) {
         if (parameter.kind === 'flag') {
             return html`
                 <label class="kiwari-flag">
@@ -1176,22 +1182,24 @@ class ViewerKiwariPanel {
                         id=${inputId}
                         type="checkbox"
                         ?checked=${Boolean(draft)}
+                        ?disabled=${disabled}
                         @change=${(event) => this.app.setKiwariDraft(parameter.key, event.target.checked)}>
                     <span>${t('common.enabled')}</span>
                 </label>
             `;
         }
         if (parameter.kind === 'choice') {
-            return this.renderChoice(parameter, inputId, draft);
+            return this.renderChoice(parameter, inputId, draft, disabled);
         }
         if (parameter.kind === 'count') {
-            return this.renderCount(parameter, inputId, draft, problem);
+            return this.renderCount(parameter, inputId, draft, problem, disabled);
         }
         if (KigumiKiwariValues.VECTOR_AXES[parameter.kind]) {
-            return this.renderPoint(parameter, inputId, draft, problem);
+            return this.renderPoint(parameter, inputId, draft, problem, disabled);
         }
         return this.renderTextControl(parameter, inputId, draft, problem, {
             onInput: (value) => this.app.setKiwariDraft(parameter.key, value),
+            disabled,
         });
     }
 
@@ -1201,16 +1209,34 @@ class ViewerKiwariPanel {
         const draft = state.drafts[parameter.key];
         const problem = problems[parameter.key];
         const changed = KigumiKiwariValues.isChangedFromDefault(state, parameter, this.unitSystem());
+        // An optional parameter can be nothing at all, which is a real answer
+        // and not a missing one, so it gets a switch rather than an empty box.
+        const on = KigumiKiwariValues.isEnabled(state, parameter);
+        const rowClass = ['kiwari-row', changed ? 'kiwari-row-changed' : '', on ? '' : 'kiwari-row-off']
+            .filter(Boolean).join(' ');
         return html`
-            <div class=${changed ? 'kiwari-row kiwari-row-changed' : 'kiwari-row'}>
+            <div class=${rowClass}>
                 <div class="kiwari-row-header">
-                    <label class="kiwari-key" for=${inputId}>${parameter.key}</label>
+                    ${parameter.optional
+                        ? html`<input
+                            class="kiwari-switch"
+                            type="checkbox"
+                            id=${`${inputId}-on`}
+                            .checked=${on}
+                            title=${on ? t('viewer.kiwari.optional.on') : t('viewer.kiwari.optional.off')}
+                            @change=${(event) => this.app.setKiwariEnabled(parameter.key, event.target.checked)}>`
+                        : ''}
+                    <label class="kiwari-key" for=${parameter.optional ? `${inputId}-on` : inputId}>${parameter.key}</label>
                     <span class="kiwari-kind">${t(`viewer.kiwari.kind.${parameter.kind}`)}</span>
                     ${changed
                         ? html`<span class="kiwari-changed-dot" title=${t('viewer.kiwari.changedFromDefault')}>●</span>`
                         : ''}
                 </div>
-                <div class="kiwari-row-control">${this.renderControl(parameter, inputId, draft, problem)}</div>
+                <div class="kiwari-row-control">
+                    ${on
+                        ? this.renderControl(parameter, inputId, draft, problem, false)
+                        : html`<span class="kiwari-nothing">${t('viewer.kiwari.optional.none')}</span>`}
+                </div>
                 ${problem
                     ? html`<div class="kiwari-problem" role="alert">${problem}</div>`
                     : parameter.about
@@ -2429,6 +2455,14 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
+    setKiwariEnabled(key, on) {
+        if (!this.kiwari) {
+            return;
+        }
+        this.kiwari = KigumiKiwariValues.withEnabled(this.kiwari, key, on);
+        this.requestUpdate();
+    }
+
     setKiwariAxisDraft(key, axis, draft) {
         if (!this.kiwari) {
             return;
@@ -2717,6 +2751,12 @@ class KigumiViewerApp extends LitElement {
                         .map((element) => (element.textContent || '').trim()),
                     kiwariChangedKeys: Array.from(
                         this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-row-changed .kiwari-key'),
+                    ).map((element) => (element.textContent || '').trim()),
+                    kiwariOptionalKeys: Array.from(this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-row'))
+                        .filter((row) => row.querySelector('.kiwari-switch'))
+                        .map((row) => (row.querySelector('.kiwari-key').textContent || '').trim()),
+                    kiwariSwitchedOffKeys: Array.from(
+                        this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-row-off .kiwari-key'),
                     ).map((element) => (element.textContent || '').trim()),
                     kiwariBadKeys: Array.from(this.renderRoot.querySelectorAll('#kiwari-controls .kiwari-row'))
                         .filter((row) => row.querySelector('.kiwari-box-bad'))

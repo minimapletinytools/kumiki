@@ -173,3 +173,111 @@ describe('which unit a bare number means', () => {
         expect(values.defaultUnitFor('angle', 'imperial')).toBe('deg');
     });
 });
+
+describe('an optional parameter', () => {
+    const OPTIONAL = {
+        schema: [
+            { key: 'trim', kind: 'length', optional: true, default: { value: null } },
+            {
+                key: 'chamfer', kind: 'length', optional: true,
+                default: { value: 0.006, text: '6mm' },
+            },
+            { key: 'posts', kind: 'count', default: { value: 2 }, minimum: 1 },
+        ],
+        applied: {
+            trim: { value: null },
+            chamfer: { value: 0.006, text: '6mm' },
+            posts: { value: 2 },
+        },
+        changed: [],
+        canSave: true,
+    };
+    const state = () => values.fromPayload(OPTIONAL);
+    const param = (s, key) => s.schema.find((p) => p.key === key);
+
+    test('starts switched off when it arrived as nothing', () => {
+        expect(values.isEnabled(state(), param(state(), 'trim'))).toBe(false);
+        expect(values.isEnabled(state(), param(state(), 'chamfer'))).toBe(true);
+    });
+
+    test('a parameter that is not optional is always on', () => {
+        expect(values.isEnabled(state(), param(state(), 'posts'))).toBe(true);
+    });
+
+    test('switched off it sends nothing, whatever the box says', () => {
+        const off = values.withEnabled(values.withDraft(state(), 'chamfer', '10mm'), 'chamfer', false);
+        expect(values.toWire(off, 'metric').chamfer).toEqual({ value: null });
+    });
+
+    test('switched on it sends what the box says', () => {
+        const on = values.withDraft(values.withEnabled(state(), 'trim', true), 'trim', '3mm');
+        expect(values.toWire(on, 'metric').trim).toEqual({ value: 0.003, text: '3mm' });
+    });
+
+    test('keeps its value while off, so switching back on restores it', () => {
+        let s = values.withDraft(state(), 'chamfer', '10mm');
+        s = values.withEnabled(s, 'chamfer', false);
+        expect(s.drafts.chamfer).toBe('10mm');
+        s = values.withEnabled(s, 'chamfer', true);
+        expect(values.toWire(s, 'metric').chamfer).toEqual({ value: 0.01, text: '10mm' });
+    });
+
+    test('one that is off but has a code default starts with it in the box', () => {
+        // trim defaults to nothing, so its box is empty; a parameter that
+        // defaults to a real value keeps it ready even while switched off.
+        const withDefault = values.fromPayload({
+            schema: [{ key: 'chamfer', kind: 'length', optional: true, default: { value: 0.006, text: '6mm' } }],
+            applied: { chamfer: { value: null } },
+        });
+        expect(withDefault.drafts.chamfer).toBe('6mm');
+        expect(values.isEnabled(withDefault, withDefault.schema[0])).toBe(false);
+    });
+
+    test('a box that does not read is not a problem while it is switched off', () => {
+        let s = values.withDraft(state(), 'chamfer', 'yea thick');
+        expect(values.problems(s, 'metric').chamfer).toMatch(/not a measurement/);
+        s = values.withEnabled(s, 'chamfer', false);
+        expect(values.problems(s, 'metric')).toEqual({});
+        expect(values.toWire(s, 'metric')).not.toBeNull();
+    });
+
+    test('switching one on and saying what it is counts as a change', () => {
+        const on = values.withDraft(values.withEnabled(state(), 'trim', true), 'trim', '3mm');
+        expect(values.isChangedFromDefault(on, param(on, 'trim'), 'metric')).toBe(true);
+
+        const off = values.withEnabled(state(), 'chamfer', false);
+        expect(values.isChangedFromDefault(off, param(off, 'chamfer'), 'metric')).toBe(true);
+    });
+
+    test('and counts as an edit, so build becomes available', () => {
+        const off = values.withEnabled(state(), 'chamfer', false);
+        expect(values.isEdited(off, param(off, 'chamfer'), 'metric')).toBe(true);
+    });
+
+    test('reset puts the switches back the way the code has them', () => {
+        let s = values.withEnabled(state(), 'trim', true);
+        s = values.withEnabled(s, 'chamfer', false);
+        const back = values.resetToDefaults(s);
+        expect(values.isEnabled(back, param(back, 'trim'))).toBe(false);
+        expect(values.isEnabled(back, param(back, 'chamfer'))).toBe(true);
+    });
+});
+
+describe('an optional parameter switched on with nothing in it', () => {
+    const state = () => values.fromPayload({
+        schema: [{ key: 'trim', kind: 'length', optional: true, default: { value: null } }],
+        applied: { trim: { value: null } },
+    });
+
+    test('is asked to say what it is, rather than quietly meaning nothing', () => {
+        // The switch is the only way to say nothing, so an empty box on a
+        // parameter that is switched on is someone part-way through typing.
+        const on = values.withEnabled(state(), 'trim', true);
+        expect(values.problems(on, 'metric').trim).toMatch(/needs a value/);
+        expect(values.toWire(on, 'metric')).not.toBeNull();
+    });
+
+    test('and is no longer asked once it is switched back off', () => {
+        expect(values.problems(state(), 'metric')).toEqual({});
+    });
+});
