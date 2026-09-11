@@ -77,9 +77,28 @@ Visually speaking, Kumiki supports different types of imperfect timbers all whic
 
 Such timbers contain methods to obtain its "perfect" size as well as its "maximal" size which is a bounding box that contais the entirety of the actual timber. 
 
-### reference faces
+### reference features
 
-TODO
+A timber's *reference features* are where it is measured from. `TimberTicket.reference_features` holds them in priority order, most important first. These are used to determine where dimensions are taken from in drawings.
+
+```python
+TimberTicket("posts/frontleft", reference_features=(
+    TimberFeature.FRONT_FACE,
+    TimberFeature.RIGHT_FRONT_EDGE,
+))
+```
+
+For square rule, you pass in a single long edge as the reference feature.
+
+For mill rule, you should also just pass in a single long edge, but you can pass in additional faces or edges if you like and measurements may be taken from those features if the algorithm deems them more appropriate.
+
+For now, only long faces, long edges, and long centerplanes are allowed as reference features, but more may be allowed in the future.
+
+If the corresponding face to a feature is such that its rough and perfect dimensions do not match, you will get a warning!
+
+`primary_reference_edge()` returns the highest-priority entry that is a *line* -- an arris, the timber's axis, or a long face's centerline -- and `None` if the list holds only faces and planes. This feature may get highlighted in kigumi.
+
+
 
 ### boards
 

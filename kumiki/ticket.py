@@ -15,6 +15,12 @@ from typing import Dict, Iterable, NewType, Optional, Union
 
 from typing_extensions import Self, deprecated
 
+# The one kumiki import here, and the reason timber_features is its own module:
+# reference_features names timber features, and timber.py imports this file.
+from .timber_features import (LONG_TIMBER_FEATURES, LongEdgeOrCenterline,
+                              SomeTimberFeature, TimberFeature, TimberLongEdge,
+                              TimberLongFaceCenterline)
+
 # The path a Ticket has when nobody gave it one. Code that displays a name
 # needs to recognise it, since it is a placeholder rather than a name; it was
 # a bare literal in eight places before this.
@@ -219,6 +225,43 @@ def normalize_timber_tags(tags: Iterable[Union[TimberTag, str]]) -> tuple[Timber
     return tuple(normalized)
 
 
+#: The TimberFeature members primary_reference_edge answers with, by kind.
+_LONG_EDGE_FEATURES = frozenset(edge.to for edge in TimberLongEdge)
+_LONG_FACE_CENTERLINE_FEATURES = frozenset(
+    centerline.to for centerline in TimberLongFaceCenterline)
+
+
+def normalize_reference_features(
+    features: Iterable[SomeTimberFeature],
+) -> tuple[TimberFeature, ...]:
+    """Widen each to a TimberFeature, reject the short ones, dedupe, keep order.
+
+    Order is the whole of the priority, so it is preserved exactly and a repeat
+    is dropped at its later position rather than its earlier one.
+
+    A reference has to be something the timber will still have after it is cut
+    to length, which is what rules out the ends, the eight short edges and the
+    corners: each of those moves with an end cut, so measuring from one means
+    measuring from something that shifts when the length changes. What is left
+    is LONG_TIMBER_FEATURES -- the long faces, the arrises, the two center
+    planes and the five centerlines.
+    """
+    normalized: list[TimberFeature] = []
+    for feature in features:
+        # TimberLongFace, TimberCenterplane and the rest are subsets of
+        # TimberFeature sharing its values; `.to` is how each widens.
+        widened = feature.to
+        assert widened in LONG_TIMBER_FEATURES, (
+            f"reference feature {widened.name} is not a long feature. A reference "
+            f"must survive an end cut, so it has to be a long face, an arris, a "
+            f"center plane or a centerline -- not an end, a short edge or a corner."
+        )
+        if widened in normalized:
+            continue
+        normalized.append(widened)
+    return tuple(normalized)
+
+
 @dataclass(frozen=True)
 class Ticket(ABC):
     """Base ticket shared by all ticket categories.
@@ -247,9 +290,19 @@ class TimberTicket(Ticket):
 
     material: Optional[str] = None
 
-    # TODO consider replacing with a list of reference long features taken in order of priority, with the first one being the main one that gets rendered as a red line?
-    reference_faces: Optional[tuple[str, ...]] = None
-
+    #: Where this timber is measured from, most important first. The first is
+    #: the primary reference -- the one a drawing marks in red -- and the rest
+    #: are fallbacks for when it cannot answer.
+    #:
+    #: Every entry must be a LONG feature: a long face, an arris, a center
+    #: plane, or a centerline. See normalize_reference_features.
+    #:
+    #: Write these as TimberFeature members. That is the one enum with a name
+    #: for all of them, so a mixed list reads as one vocabulary rather than
+    #: four. A narrow member is widened if one arrives -- code holding a
+    #: TimberLongFace should not have to say `.to` -- but the field always
+    #: holds TimberFeature, which is why it says so.
+    reference_features: tuple[TimberFeature, ...] = ()
 
     # Strings are coerced to GenericTag, the same way Timber's factories take
     # either a TimberTicket or a bare name.
@@ -257,6 +310,30 @@ class TimberTicket(Ticket):
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "tags", normalize_timber_tags(self.tags))
+        object.__setattr__(
+            self, "reference_features",
+            normalize_reference_features(self.reference_features))
+
+    def primary_reference_edge(self) -> Optional[LongEdgeOrCenterline]:
+        """The highest-priority reference feature that is a line, or None.
+
+        An arris, the timber's axis, or a long face's centerline -- whichever
+        of those comes first in reference_features. Faces and center planes are
+        skipped rather than turned into one: a drawing's reference edge is a
+        line, and this reports the line the author asked for rather than
+        inventing one from two faces they might not have meant as a pair.
+
+        Returned as the narrow type, so it goes straight into measuring's
+        locate_edge or locate_long_face_centerline.
+        """
+        for feature in self.reference_features:
+            if feature in _LONG_EDGE_FEATURES:
+                return feature.long_edge()
+            if feature is TimberFeature.CENTERLINE:
+                return feature.centerline()
+            if feature in _LONG_FACE_CENTERLINE_FEATURES:
+                return feature.long_face_centerline()
+        return None
 
     def with_tags(self, *tags: Union[TimberTag, str]) -> Self:
         """Return a copy of this ticket carrying these tags as well as its own."""

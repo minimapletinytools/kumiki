@@ -399,6 +399,37 @@ def locate_centerline(timber: PerfectTimberWithin) -> Line:
     """Measure the centerline of a timber. Thin wrapper around locate_edge."""
     return locate_edge(timber, TimberCenterline.CENTERLINE)
 
+def locate_long_face_centerline(timber: PerfectTimberWithin, centerline: TimberLongFaceCenterline) -> Line:
+    """Measure the centerline of one long face, returning a Line along it.
+
+    The line runs the timber's length down the middle of that face, which is
+    the face's center point carried along the length direction.
+
+    Kept out of locate_edge and out of EdgeOrCenterline on purpose. The marking
+    functions that take an EdgeOrCenterline -- see
+    mark_distance_from_corner_along_edge_by_intersecting_plane -- measure from
+    a CORNER along the line, and a face's centerline passes through no corner,
+    so widening that union would offer an answer that cannot be given.
+    """
+    length_direction = timber.get_length_direction_global()
+    face_center = get_center_point_on_face_global(centerline.long_face, timber)
+    return Line(length_direction, face_center)
+
+
+def locate_center_plane(timber: PerfectTimberWithin, plane: TimberCenterplane) -> UnsignedPlane:
+    """Measure a center plane on a timber, returning the plane it lies in.
+
+    Unsigned, because a bisector has no outward side: the two long faces it
+    sits between are equally far away in either direction, so a signed normal
+    would be picking one arbitrarily and inviting a caller to read meaning into
+    the choice.
+    """
+    normal = (timber.get_width_direction_global()
+              if plane is TimberCenterplane.RIGHT_LEFT
+              else timber.get_height_direction_global())
+    return UnsignedPlane(normal, locate_centerline(timber).point)
+
+
 def locate_edge_on_face(timber: PerfectTimberWithin, edge: TimberLongEdge, face: TimberFace) -> LineOnPlane:
     # TODO: Implement this function
     raise NotImplementedError("locate_edge_on_face is not yet implemented")

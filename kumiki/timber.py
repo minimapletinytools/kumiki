@@ -47,376 +47,10 @@ OFFSET_TEST_POINT = scalar(1, 1000)  # Small offset (0.001) for testing inward d
 # Timber Feature Enums
 # ============================================================================
 
-
-class TimberFeature(Enum):
-    TOP_FACE = 1
-    BOTTOM_FACE = 2
-    RIGHT_FACE = 3
-    FRONT_FACE = 4
-    LEFT_FACE = 5
-    BACK_FACE = 6
-    CENTERLINE = 7
-    # Long edges (edges running along the length of the timber)
-    RIGHT_FRONT_EDGE = 8
-    FRONT_LEFT_EDGE = 9
-    LEFT_BACK_EDGE = 10
-    BACK_RIGHT_EDGE = 11
-    # Short edges (edges on the ends of the timber)
-    BOTTOM_RIGHT_EDGE = 12
-    BOTTOM_FRONT_EDGE = 13
-    BOTTOM_LEFT_EDGE = 14
-    BOTTOM_BACK_EDGE = 15
-    TOP_RIGHT_EDGE = 16
-    TOP_FRONT_EDGE = 17
-    TOP_LEFT_EDGE = 18
-    TOP_BACK_EDGE = 19
-    # corners
-    BOT_RIGHT_FRONT = 20
-    BOT_FRONT_LEFT = 21
-    BOT_LEFT_BACK = 22
-    BOT_BACK_RIGHT = 23
-    TOP_RIGHT_FRONT = 24
-    TOP_FRONT_LEFT = 25
-    TOP_LEFT_BACK = 26
-    TOP_BACK_RIGHT = 27
-
-    @property
-    def to(self) -> 'TimberFeature':
-        """Convert to TimberFeature for further conversions. This is a no-op."""
-        return self
-
-    def feature(self) -> 'TimberFeature':
-        """Convert to TimberFeature. This is a no-op."""
-        return self
-    
-    def face(self) -> 'TimberFace':
-        """Convert to TimberFace. Values 1-6 map to faces."""
-        if self.value not in range(1, 7):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberFace. Only values 1-6 are valid faces.")
-        return TimberFace(self.value)
-    
-    def end(self) -> 'TimberEnd':
-        """Convert to TimberEnd. Values 1-2 map to ends."""
-        if self.value not in range(1, 3):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberEnd. Only values 1-2 are valid ends.")
-        return TimberEnd(self.value)
-    
-    def long_face(self) -> 'TimberLongFace':
-        """Convert to TimberLongFace. Values 3-6 map to long faces."""
-        if self.value not in range(3, 7):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberLongFace. Only values 3-6 are valid long faces.")
-        return TimberLongFace(self.value)
-
-    def edge(self) -> 'TimberEdge':
-        """Convert to TimberEdge. Values 8-19 map to edges."""
-        if self.value not in range(8, 20):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberEdge. Only values 8-19 are valid edges.")
-        return TimberEdge(self.value)
-
-    def centerline(self) -> 'TimberCenterline':
-        """Convert to TimberCenterline. Value 7 maps to CENTERLINE."""
-        if self.value != 7:
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberCenterline. Only value 7 is valid.")
-        return TimberCenterline(self.value)
-    
-    def long_edge(self) -> 'TimberLongEdge':
-        """Convert to TimberLongEdge. Values 8-11 map to long edges."""
-        if self.value not in range(8, 12):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberLongEdge. Only values 8-11 are valid long edges.")
-        return TimberLongEdge(self.value)
-
-    def short_edge(self) -> 'TimberShortEdge':
-        """Convert to TimberShortEdge. Values 12-19 map to short edges."""
-        if self.value not in range(12, 20):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberShortEdge. Only values 12-19 are valid short edges.")
-        return TimberShortEdge(self.value)
-
-    def corner(self) -> 'TimberCorner':
-        """Convert to TimberCorner. Values 20-27 map to corners."""
-        if self.value not in range(20, 28):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberCorner. Only values 20-27 are valid corners.")
-        return TimberCorner(self.value)
-    
-class TimberFace(Enum):
-    TOP = 1 # the face vector with normal vector in the +Z axis direction
-    BOTTOM = 2 # the face vector with normal vector in the -Z axis direction
-    RIGHT = 3 # the face vector with normal vector in the +X axis direction
-    FRONT = 4 # the face vector with normal vector in the +Y axis direction
-    LEFT = 5 # the face vector with normal vector in the -X axis direction
-    BACK = 6 # the face vector with normal vector in the -Y axis direction
-    
-    @property
-    def to(self) -> TimberFeature:
-        """Convert to TimberFeature for further conversions."""
-        return TimberFeature(self.value)
-    
-    def get_direction(self) -> Direction3D:
-        """Get the direction vector for this face in world coordinates."""
-        if self == TimberFace.TOP:
-            return create_v3(scalar(0), scalar(0), scalar(1))
-        elif self == TimberFace.BOTTOM:
-            return create_v3(scalar(0), scalar(0), scalar(-1))
-        elif self == TimberFace.RIGHT:
-            return create_v3(scalar(1), scalar(0), scalar(0))
-        elif self == TimberFace.LEFT:
-            return create_v3(scalar(-1), scalar(0), scalar(0))
-        elif self == TimberFace.FRONT:
-            return create_v3(scalar(0), scalar(1), scalar(0))
-        else:  # BACK
-            return create_v3(scalar(0), scalar(-1), scalar(0))
-
-    # TODO rename to is_orthogonal?
-    def is_perpendicular(self, other: 'TimberFace') -> bool:
-        """
-        Check if two faces are perpendicular to each other.
-        
-        Perpendicular face pairs (orthogonal axes):
-        - X-axis faces (RIGHT, LEFT) <-> Y-axis faces (FRONT, BACK)
-        - X-axis faces (RIGHT, LEFT) <-> Z-axis faces (TOP, BOTTOM)
-        - Y-axis faces (FRONT, BACK) <-> Z-axis faces (TOP, BOTTOM)
-        """
-        # Define axis groups
-        x_faces = {TimberFace.RIGHT, TimberFace.LEFT}
-        y_faces = {TimberFace.FRONT, TimberFace.BACK}
-        z_faces = {TimberFace.TOP, TimberFace.BOTTOM}
-        
-        # Two faces are perpendicular if they are on different axes
-        self_in_x = self in x_faces
-        self_in_y = self in y_faces
-        self_in_z = self in z_faces
-        
-        other_in_x = other in x_faces
-        other_in_y = other in y_faces
-        other_in_z = other in z_faces
-        
-        # Perpendicular if on different axes
-        return (self_in_x and (other_in_y or other_in_z)) or \
-               (self_in_y and (other_in_x or other_in_z)) or \
-               (self_in_z and (other_in_x or other_in_y))
-    
-    def get_opposite_face(self) -> 'TimberFace':
-        """
-        Get the opposite face (the face on the opposite side of the timber).
-        
-        Opposite pairs:
-        - TOP <-> BOTTOM
-        - RIGHT <-> LEFT
-        - FRONT <-> BACK
-        """
-        if self == TimberFace.TOP:
-            return TimberFace.BOTTOM
-        elif self == TimberFace.BOTTOM:
-            return TimberFace.TOP
-        elif self == TimberFace.RIGHT:
-            return TimberFace.LEFT
-        elif self == TimberFace.LEFT:
-            return TimberFace.RIGHT
-        elif self == TimberFace.FRONT:
-            return TimberFace.BACK
-        else:  # BACK
-            return TimberFace.FRONT
-
-    def rotate_about(self, face: 'TimberFace') -> 'TimberFace':
-        """
-        Rotate this face by 90 degrees about `face`'s outward-normal axis
-        (a quarter turn using the right-hand rule around that normal).
-
-        If this face IS the rotation axis (self == face or self ==
-        face.get_opposite_face()), it lies on the axis and is unaffected by
-        the rotation, so it is returned unchanged.
-        """
-        if self == face or self == face.get_opposite_face():
-            return self
-
-        # Each cycle lists the 4 faces perpendicular to the rotation axis, in
-        # the order a right-hand rotation about that axis's outward normal
-        # maps them (self -> next element, wrapping around).
-        cycles = {
-            TimberFace.TOP: [TimberFace.RIGHT, TimberFace.FRONT, TimberFace.LEFT, TimberFace.BACK],
-            TimberFace.BOTTOM: [TimberFace.RIGHT, TimberFace.BACK, TimberFace.LEFT, TimberFace.FRONT],
-            TimberFace.RIGHT: [TimberFace.FRONT, TimberFace.TOP, TimberFace.BACK, TimberFace.BOTTOM],
-            TimberFace.LEFT: [TimberFace.FRONT, TimberFace.BOTTOM, TimberFace.BACK, TimberFace.TOP],
-            TimberFace.FRONT: [TimberFace.RIGHT, TimberFace.BOTTOM, TimberFace.LEFT, TimberFace.TOP],
-            TimberFace.BACK: [TimberFace.RIGHT, TimberFace.TOP, TimberFace.LEFT, TimberFace.BOTTOM],
-        }
-        cycle = cycles[face]
-        index = cycle.index(self)
-        return cycle[(index + 1) % len(cycle)]
-
-class TimberEnd(Enum):
-    TOP = 1
-    BOTTOM = 2
-    
-    @property
-    def to(self) -> TimberFeature:
-        """Convert to TimberFeature for further conversions."""
-        return TimberFeature(self.value)
-
-class TimberLongFace(Enum):
-    RIGHT = 3
-    FRONT = 4
-    LEFT = 5
-    BACK = 6
-    
-    @property
-    def to(self) -> TimberFeature:
-        """Convert to TimberFeature for further conversions."""
-        return TimberFeature(self.value)
-    
-    def is_perpendicular(self, other: 'TimberLongFace') -> bool:
-        """
-        Check if two long faces are perpendicular to each other.
-        
-        Perpendicular face pairs:
-        - RIGHT <-> FRONT, RIGHT <-> BACK
-        - LEFT <-> FRONT, LEFT <-> BACK
-        """
-        return self.to.face().is_perpendicular(other.to.face())
-
-    def rotate_right(self) -> 'TimberLongFace':
-        """Rotate the long face right (90 degrees clockwise)."""
-        # Map from 3-6 to 0-3, rotate, then map back to 3-6
-        return TimberLongFace((self.value - 3 + 1) % 4 + 3)
-    
-    def rotate_left(self) -> 'TimberLongFace':
-        """Rotate the long face left (90 degrees counter-clockwise)."""
-        # Map from 3-6 to 0-3, rotate, then map back to 3-6
-        return TimberLongFace((self.value - 3 - 1) % 4 + 3)
-
-class TimberCorner(Enum):
-    BOT_RIGHT_FRONT = 20
-    BOT_FRONT_LEFT = 21
-    BOT_LEFT_BACK = 22
-    BOT_BACK_RIGHT = 23
-    TOP_RIGHT_FRONT = 24
-    TOP_FRONT_LEFT = 25
-    TOP_LEFT_BACK = 26
-    TOP_BACK_RIGHT = 27
-class TimberCenterline(Enum):
-    CENTERLINE = 7
-
-    @property
-    def to(self) -> TimberFeature:
-        """Convert to TimberFeature for further conversions."""
-        return TimberFeature(self.value)
-
-class TimberEdge(Enum):
-    # Long edges (edges running along the length of the timber)
-    RIGHT_FRONT = 8
-    FRONT_LEFT = 9
-    LEFT_BACK = 10
-    BACK_RIGHT = 11
-    # Short edges (edges on the ends of the timber)
-    BOTTOM_RIGHT = 12
-    BOTTOM_FRONT = 13
-    BOTTOM_LEFT = 14
-    BOTTOM_BACK = 15
-    TOP_RIGHT = 16
-    TOP_FRONT = 17
-    TOP_LEFT = 18
-    TOP_BACK = 19
-    
-    @property
-    def to(self) -> TimberFeature:
-        """Convert to TimberFeature for further conversions."""
-        return TimberFeature(self.value)
-
-    def canonical_line_from_corner(self) -> Tuple['TimberCorner', 'TimberFace']:
-        """Returns canonical way to express a line from an edge.
-        The line is defined by starting from the TimberCorner and pointing
-        in the direction of the returned TimberFace's outward normal.
-
-        For long edges the line starts at the bottom corner and points toward TOP.
-        For short edges the direction follows cross(long_face_normal, end_outward).
-        """
-        _map = {
-            TimberEdge.RIGHT_FRONT: (TimberCorner.BOT_RIGHT_FRONT, TimberFace.TOP),
-            TimberEdge.FRONT_LEFT:  (TimberCorner.BOT_FRONT_LEFT,  TimberFace.TOP),
-            TimberEdge.LEFT_BACK:   (TimberCorner.BOT_LEFT_BACK,   TimberFace.TOP),
-            TimberEdge.BACK_RIGHT:  (TimberCorner.BOT_BACK_RIGHT,  TimberFace.TOP),
-
-            TimberEdge.BOTTOM_RIGHT: (TimberCorner.BOT_BACK_RIGHT,  TimberFace.FRONT),
-            TimberEdge.BOTTOM_FRONT: (TimberCorner.BOT_RIGHT_FRONT, TimberFace.LEFT),
-            TimberEdge.BOTTOM_LEFT:  (TimberCorner.BOT_FRONT_LEFT,  TimberFace.BACK),
-            TimberEdge.BOTTOM_BACK:  (TimberCorner.BOT_LEFT_BACK,   TimberFace.RIGHT),
-
-            TimberEdge.TOP_RIGHT: (TimberCorner.TOP_RIGHT_FRONT, TimberFace.BACK),
-            TimberEdge.TOP_FRONT: (TimberCorner.TOP_FRONT_LEFT,  TimberFace.RIGHT),
-            TimberEdge.TOP_LEFT:  (TimberCorner.TOP_LEFT_BACK,   TimberFace.FRONT),
-            TimberEdge.TOP_BACK:  (TimberCorner.TOP_BACK_RIGHT,  TimberFace.LEFT),
-        }
-        return _map[self]
-
-    def long_edge(self) -> 'TimberLongEdge':
-        """Convert to TimberLongEdge. Values 8-11 map to long edges."""
-        if self.value not in range(8, 12):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberLongEdge. Only values 8-11 are valid long edges.")
-        return TimberLongEdge(self.value)
-
-    def short_edge(self) -> 'TimberShortEdge':
-        """Convert to TimberShortEdge. Values 12-19 map to short edges."""
-        if self.value not in range(12, 20):
-            raise ValueError(f"Cannot convert {self} (value={self.value}) to TimberShortEdge. Only values 12-19 are valid short edges.")
-        return TimberShortEdge(self.value)
-
-
-class TimberLongEdge(Enum):
-    RIGHT_FRONT = 8
-    FRONT_LEFT = 9
-    LEFT_BACK = 10
-    BACK_RIGHT = 11
-    
-    @property
-    def to(self) -> TimberFeature:
-        """Convert to TimberFeature for further conversions."""
-        return TimberFeature(self.value)
-
-
-class TimberShortEdge(Enum):
-    BOTTOM_RIGHT = 12
-    BOTTOM_FRONT = 13
-    BOTTOM_LEFT = 14
-    BOTTOM_BACK = 15
-    TOP_RIGHT = 16
-    TOP_FRONT = 17
-    TOP_LEFT = 18
-    TOP_BACK = 19
-    
-    @property
-    def to(self) -> TimberFeature:
-        """Convert to TimberFeature for further conversions."""
-        return TimberFeature(self.value)
-
-    @property
-    def end(self) -> TimberEnd:
-        """Get the TimberEnd associated with this short edge."""
-        if self.value in (12, 13, 14, 15):
-            return TimberEnd.BOTTOM
-        else:
-            return TimberEnd.TOP
-
-    @property
-    def long_face(self) -> TimberLongFace:
-        """Get the TimberLongFace associated with this short edge."""
-        _map = {
-            12: TimberLongFace.RIGHT,
-            16: TimberLongFace.RIGHT,
-            13: TimberLongFace.FRONT,
-            17: TimberLongFace.FRONT,
-            14: TimberLongFace.LEFT,
-            18: TimberLongFace.LEFT,
-            15: TimberLongFace.BACK,
-            19: TimberLongFace.BACK,
-        }
-        return _map[self.value]
-
-
-# ============================================================================
-# Type Aliases
-# ============================================================================
-
-# Union type for face-like enums (TimberFace, TimberEnd, or TimberLongFace)
-SomeTimberFace = Union[TimberFace, TimberEnd, TimberLongFace]
+# The vocabulary for naming part of a timber lives one module down, so that
+# ticket.py can use it without importing this one. Re-exported here because
+# `from kumiki.timber import TimberLongFace` is how every caller reaches it.
+from .timber_features import *
 
 
 # ============================================================================
@@ -544,36 +178,53 @@ class PerfectTimberWithin(ABC):
     ticket: TimberTicket = field(default_factory=TimberTicket)
 
     def __post_init__(self):
-        if self.ticket.reference_faces is not None:
-            self._validate_reference_faces()
+        self._warn_about_imperfect_reference_features()
 
-    def _validate_reference_faces(self):
-        """Assert that each reference face is a valid long face and that
-        the rough half-size matches the PTW half-size on that face
-        (i.e. the rough face plane and PTW face plane are coincident)."""
-        ref_faces = self.ticket.reference_faces
-        assert ref_faces is not None
-        valid_names = {f.name for f in TimberLongFace}
-        ptw_w_half = self.size[0] / scalar(2)
-        ptw_h_half = self.size[1] / scalar(2)
-        width_halves, height_halves = self.get_rough_half_sizes()
+    def _warn_about_imperfect_reference_features(self):
+        """Warn where a reference rests on a face the rough timber does not match.
 
-        # TODO consider allowing top/bot ends?
-        _face_to_rough_and_ptw = {
-            "RIGHT": (width_halves[0], ptw_w_half),
-            "LEFT":  (width_halves[1], ptw_w_half),
-            "FRONT": (height_halves[0], ptw_h_half),
-            "BACK":  (height_halves[1], ptw_h_half),
-        }
-        for face_name in ref_faces:
-            assert face_name in valid_names, (
-                f"reference_face '{face_name}' is not a valid TimberLongFace "
-                f"(expected one of {sorted(valid_names)})"
-            )
-            rough_half, ptw_half = _face_to_rough_and_ptw[face_name]
-            assert safe_equality_test(rough_half, ptw_half), (
-                f"Reference face {face_name} on timber '{self.ticket.path}' is not coincident: "
-                f"rough half-size ({rough_half}) != PTW half-size ({ptw_half})"
+        The expectation, by kind of reference:
+
+        - a reference FACE expects the rough timber's dimension in that face to
+          match the perfect timber within's, so the two faces are one plane;
+        - a reference ARRIS expects that of BOTH the long faces meeting at it,
+          since the line is only where it should be if both are;
+        - a centerline or a center plane expects nothing. Both are intrinsic to
+          the perfect timber within and have no rough counterpart to disagree
+          with, which is exactly what makes them somewhere to measure from when
+          no face is.
+
+        A warning rather than an error, and that is the point. Measurements are
+        taken off the perfect timber within, so a reference face is only
+        somewhere you can physically put a rule when the two coincide. When
+        they do not, the reference still means something -- it says which face
+        the layout is worked from -- and a drawing answers by rendering the
+        internal PTW face to carry the measurements. A timber with no perfect
+        face at all still has to be measured from somewhere.
+
+        Whether the feature is a LONG one at all is settled by the ticket, in
+        normalize_reference_features; it needs no timber, so it does not wait
+        for one.
+        """
+        for feature in self.ticket.reference_features:
+            faces = feature.long_faces_it_rests_on()
+            imperfect = [face for face in faces
+                         if not self.is_face_perfect(face.to.face())]
+            if not imperfect:
+                continue
+            # Naming the whole expectation and then what fell short of it: for
+            # an arris, which face is at fault is the useful half, and that
+            # both were required is the half that says why.
+            shortfall = ("It does not." if len(imperfect) == len(faces)
+                         else f"It does not on {', '.join(f.name for f in imperfect)}.")
+            warnings.warn(
+                f"Reference feature {feature.name} on timber "
+                f"'{self.ticket.path}' rests on "
+                f"{' and '.join(face.name for face in faces)}, so the rough "
+                f"timber is expected to match the perfect timber within there. "
+                f"{shortfall} The rough face and the PTW face are not the same "
+                f"plane, so a measurement from this reference has to be drawn "
+                f"on the PTW."
             )
 
     @property

@@ -8,6 +8,23 @@ each entry is split into `kumiki` / `kigumi` subsections where relevant.
 
 ## [Unreleased]
 
+### kumiki
+
+#### Added
+
+- `TimberCenterplane` names the two planes that bisect a timber along its length, `RIGHT_LEFT` and `FRONT_BACK`, and `measuring.locate_center_plane` returns one as an `UnsignedPlane` -- unsigned because a bisector has no outward side. There is deliberately no TOP/BOTTOM one: it is not a long plane, and it moves with every end cut.
+- `TimberLongFaceCenterline` names the line down the middle of each long face, and `measuring.locate_long_face_centerline` locates it. Geometrically it is where a center plane meets that face, and the pairing crosses over -- the RIGHT face's centerline lies in the FRONT_BACK plane.
+- The vocabulary enums moved to `kumiki/timber_features.py`, which imports nothing of kumiki's but `rule`, so `ticket` can use them. `timber` re-exports the lot, so `from kumiki.timber import TimberLongFace` is unchanged.
+- `TimberLongEdge.long_faces`, `TimberLongFaceCenterline.long_face` / `.center_plane`, `TimberCenterplane.long_faces`, and `TimberFeature.long_faces_it_rests_on()`, which answers which face agreements a feature depends on -- a face rests on itself, an arris on both of its faces, a centerline or center plane on neither.
+- `SomeTimberFeature` (anything `.to` widens into a `TimberFeature`), `SomeTimberCenterline`, `LongEdgeOrCenterline`, and `LONG_TIMBER_FEATURES` -- the fifteen features that survive an end cut.
+
+#### Changed
+
+- **Breaking:** `TimberTicket.reference_faces` is `reference_features`, an ordered `tuple[TimberFeature, ...]` rather than face names, defaulting to `()`. Order is the priority: the first is the primary reference, the one a drawing marks in red. Entries may be a long face, an arris, a center plane or a centerline -- anything that survives an end cut -- so a timber with no perfect face can still say where it is measured from. `primary_reference_edge()` returns the highest-priority entry that is a line, and is deliberately literal: it will not derive the arris between two reference faces.
+  **Migrate:** `reference_faces=("RIGHT",)` becomes `reference_features=(TimberFeature.RIGHT_FACE,)`.
+- **Breaking:** a reference face the rough timber does not match now WARNS rather than raising, and the check reuses `is_face_perfect` instead of reimplementing the half-size comparison. A timber with no perfect face still has to be measured from somewhere, and the answer there is to render the internal PTW face to carry the measurements.
+- **Breaking:** `TimberFeature.CENTERLINE` is 30, not 7, so the five centerlines form one run alongside the two center planes at 28-29. Value 7 is retired and left empty rather than reused -- a value is how the narrow enums address a member, so handing it to something else would turn anything still holding the old one into a different feature. Nothing persists a `TimberFeature` by value, so this is invisible outside the library.
+
 ## [0.6.0] - 2026-09-07
 
 ### kumiki

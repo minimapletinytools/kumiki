@@ -4,7 +4,9 @@ Tests for the measuring module (geometric primitives).
 
 import pytest
 from kumiki.measuring import *
-from kumiki.timber import create_timber, TimberFace, TimberLongEdge, TimberEdge, TimberCenterline, TimberCorner
+from kumiki.timber import (create_timber, TimberFace, TimberLongEdge, TimberEdge,
+                          TimberCenterline, TimberCenterplane, TimberCorner,
+                          TimberLongFaceCenterline)
 from kumiki.rule import create_v3, create_v2, Transform, Orientation, scalar
 
 
@@ -635,6 +637,135 @@ class TestMeasureCenterLine:
         # Point should be at mid-length along the diagonal
         expected_point = direction * scalar(30)  # 60/2 = 30
         assert line.point.equals(expected_point)
+
+
+class TestMeasureLongFaceCenterline:
+    """Tests for locate_long_face_centerline function"""
+
+    def _timber(self):
+        return create_timber(
+            length=scalar(100),
+            size=create_v2(4, 6),  # 4 wide (X), 6 high (Y)
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="test_timber"
+        )
+
+    def test_locate_long_face_centerline_right(self):
+        """Half the width out along +X, centred in Y, at mid-length"""
+        line = locate_long_face_centerline(self._timber(), TimberLongFaceCenterline.RIGHT)
+
+        assert isinstance(line, Line)
+        assert line.direction.equals(create_v3(0, 0, 1))
+        assert line.point.equals(create_v3(2, 0, 50))
+
+    def test_locate_long_face_centerline_front(self):
+        """Half the height out along +Y, centred in X"""
+        line = locate_long_face_centerline(self._timber(), TimberLongFaceCenterline.FRONT)
+
+        assert line.point.equals(create_v3(0, 3, 50))
+
+    def test_each_one_runs_along_the_timber_on_its_own_face(self):
+        timber = self._timber()
+
+        for centerline in TimberLongFaceCenterline:
+            line = locate_long_face_centerline(timber, centerline)
+            face = locate_face(timber, centerline.long_face)
+
+            assert line.direction.equals(timber.get_length_direction_global())
+            # On the face it is named for: no offset along that face's normal.
+            assert safe_zero_test(
+                float(((line.point - face.point).T * face.normal)[0, 0]))
+
+    def test_it_lies_in_its_own_center_plane(self):
+        """A face's centerline is where a center plane meets that face"""
+        timber = self._timber()
+
+        for centerline in TimberLongFaceCenterline:
+            line = locate_long_face_centerline(timber, centerline)
+            plane = locate_center_plane(timber, centerline.center_plane)
+
+            assert safe_zero_test(
+                float(((line.point - plane.point).T * plane.normal)[0, 0]))
+
+    def test_locate_long_face_centerline_horizontal(self):
+        """A timber lying down still measures from its own axes"""
+        timber = create_timber(
+            length=scalar(48),
+            size=create_v2(4, 6),
+            bottom_position=create_v3(10, 20, 5),
+            length_direction=create_v3(1, 0, 0),  # Length along +X
+            width_direction=create_v3(0, 1, 0),   # Width along +Y
+            ticket="test_timber"
+        )
+
+        line = locate_long_face_centerline(timber, TimberLongFaceCenterline.RIGHT)
+
+        assert line.direction.equals(create_v3(1, 0, 0))
+        # Mid-length along X, half the width out along the local width axis
+        assert line.point.equals(create_v3(34, 22, 5))
+
+
+class TestMeasureCenterPlane:
+    """Tests for locate_center_plane function"""
+
+    def _timber(self):
+        return create_timber(
+            length=scalar(100),
+            size=create_v2(4, 6),
+            bottom_position=create_v3(0, 0, 0),
+            length_direction=create_v3(0, 0, 1),
+            width_direction=create_v3(1, 0, 0),
+            ticket="test_timber"
+        )
+
+    def test_locate_center_plane_right_left(self):
+        """Normal along the width axis, through the centerline"""
+        plane = locate_center_plane(self._timber(), TimberCenterplane.RIGHT_LEFT)
+
+        assert plane.normal.equals(create_v3(1, 0, 0))
+        assert plane.point.equals(create_v3(0, 0, 50))
+
+    def test_locate_center_plane_front_back(self):
+        """Normal along the height axis"""
+        plane = locate_center_plane(self._timber(), TimberCenterplane.FRONT_BACK)
+
+        assert plane.normal.equals(create_v3(0, 1, 0))
+        assert plane.point.equals(create_v3(0, 0, 50))
+
+    def test_a_center_plane_is_unsigned(self):
+        """A bisector has no outward side.
+
+        The two faces it sits between are the same distance away either way, so
+        a signed normal would be picking one arbitrarily.
+        """
+        plane = locate_center_plane(self._timber(), TimberCenterplane.RIGHT_LEFT)
+
+        assert isinstance(plane, UnsignedPlane)
+
+    def test_both_run_through_the_centerline(self):
+        timber = self._timber()
+        axis = locate_centerline(timber).point
+
+        for centerplane in TimberCenterplane:
+            plane = locate_center_plane(timber, centerplane)
+            assert safe_zero_test(float(((axis - plane.point).T * plane.normal)[0, 0]))
+
+    def test_locate_center_plane_horizontal(self):
+        timber = create_timber(
+            length=scalar(48),
+            size=create_v2(4, 6),
+            bottom_position=create_v3(10, 20, 5),
+            length_direction=create_v3(1, 0, 0),
+            width_direction=create_v3(0, 1, 0),  # Width along +Y
+            ticket="test_timber"
+        )
+
+        plane = locate_center_plane(timber, TimberCenterplane.RIGHT_LEFT)
+
+        assert plane.normal.equals(create_v3(0, 1, 0))
+        assert plane.point.equals(create_v3(34, 20, 5))
 
 
 class TestDistanceFromPointIntoFaceMark:
