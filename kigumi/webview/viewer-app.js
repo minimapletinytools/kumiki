@@ -1080,6 +1080,194 @@ class ViewerSettingsPanel {
     }
 }
 
+class ViewerKiwariPanel {
+    constructor(app) {
+        this.app = app;
+    }
+
+    unitSystem() {
+        return this.app.units || KigumiUnits.DEFAULT_UNIT_SYSTEM;
+    }
+
+    // A dimensioned box says what a bare number in it would mean, so nobody
+    // has to guess whether "18" is inches or millimetres.
+    placeholderFor(parameter) {
+        if (parameter.kind === 'length' || parameter.kind === 'angle') {
+            return KigumiKiwariValues.defaultUnitFor(parameter.kind, this.unitSystem());
+        }
+        return '';
+    }
+
+    renderTextControl(parameter, inputId, draft, problem, options = {}) {
+        const { onInput, placeholder } = options;
+        return html`
+            <input
+                id=${inputId}
+                class=${problem ? 'kiwari-box kiwari-box-bad' : 'kiwari-box'}
+                type="text"
+                inputmode=${parameter.kind === 'count' ? 'numeric' : 'text'}
+                .value=${String(draft ?? '')}
+                placeholder=${placeholder ?? this.placeholderFor(parameter)}
+                aria-invalid=${problem ? 'true' : 'false'}
+                @input=${(event) => onInput(event.target.value)}>
+        `;
+    }
+
+    renderCount(parameter, inputId, draft, problem) {
+        // Steppers, because a count is nearly always nudged rather than typed.
+        const step = (by) => {
+            const next = Math.round(Number(draft) || 0) + by;
+            this.app.setKiwariDraft(parameter.key, String(next));
+        };
+        return html`
+            <div class="kiwari-count">
+                <button type="button" class="kiwari-step" title=${t('viewer.kiwari.decrement')}
+                    @click=${() => step(-1)}>−</button>
+                ${this.renderTextControl(parameter, inputId, draft, problem, {
+                    onInput: (value) => this.app.setKiwariDraft(parameter.key, value),
+                })}
+                <button type="button" class="kiwari-step" title=${t('viewer.kiwari.increment')}
+                    @click=${() => step(1)}>+</button>
+            </div>
+        `;
+    }
+
+    renderChoice(parameter, inputId, draft) {
+        // A datalist gives type-to-search for free, and still accepts a click.
+        const choices = Array.isArray(parameter.choices) ? parameter.choices : [];
+        return html`
+            <select
+                id=${inputId}
+                class="kiwari-box kiwari-select"
+                .value=${String(draft ?? '')}
+                @change=${(event) => this.app.setKiwariDraft(parameter.key, event.target.value)}>
+                ${choices.map((option) => html`
+                    <option value=${option.value} ?selected=${String(draft) === String(option.value)}>
+                        ${option.label || option.value}
+                    </option>`)}
+            </select>
+        `;
+    }
+
+    renderPoint(parameter, inputId, draft, problem) {
+        const axes = KigumiKiwariValues.VECTOR_AXES[parameter.kind];
+        return html`
+            <div class="kiwari-point">
+                ${axes.map((axis) => html`
+                    <label class="kiwari-axis">
+                        <span class="kiwari-axis-name">${axis}</span>
+                        <input
+                            id=${`${inputId}-${axis}`}
+                            class=${problem && problem.startsWith(`${axis}:`) ? 'kiwari-box kiwari-box-bad' : 'kiwari-box'}
+                            type="text"
+                            .value=${String((draft || {})[axis] ?? '')}
+                            placeholder=${this.placeholderFor({ kind: 'length' })}
+                            @input=${(event) => this.app.setKiwariAxisDraft(parameter.key, axis, event.target.value)}>
+                    </label>`)}
+            </div>
+        `;
+    }
+
+    renderControl(parameter, inputId, draft, problem) {
+        if (parameter.kind === 'flag') {
+            return html`
+                <label class="kiwari-flag">
+                    <input
+                        id=${inputId}
+                        type="checkbox"
+                        ?checked=${Boolean(draft)}
+                        @change=${(event) => this.app.setKiwariDraft(parameter.key, event.target.checked)}>
+                    <span>${t('common.enabled')}</span>
+                </label>
+            `;
+        }
+        if (parameter.kind === 'choice') {
+            return this.renderChoice(parameter, inputId, draft);
+        }
+        if (parameter.kind === 'count') {
+            return this.renderCount(parameter, inputId, draft, problem);
+        }
+        if (KigumiKiwariValues.VECTOR_AXES[parameter.kind]) {
+            return this.renderPoint(parameter, inputId, draft, problem);
+        }
+        return this.renderTextControl(parameter, inputId, draft, problem, {
+            onInput: (value) => this.app.setKiwariDraft(parameter.key, value),
+        });
+    }
+
+    renderParameter(parameter, problems) {
+        const state = this.app.kiwari;
+        const inputId = `kiwari-${parameter.key}`;
+        const draft = state.drafts[parameter.key];
+        const problem = problems[parameter.key];
+        const changed = KigumiKiwariValues.isChangedFromDefault(state, parameter, this.unitSystem());
+        return html`
+            <div class=${changed ? 'kiwari-row kiwari-row-changed' : 'kiwari-row'}>
+                <div class="kiwari-row-header">
+                    <label class="kiwari-key" for=${inputId}>${parameter.key}</label>
+                    <span class="kiwari-kind">${t(`viewer.kiwari.kind.${parameter.kind}`)}</span>
+                    ${changed
+                        ? html`<span class="kiwari-changed-dot" title=${t('viewer.kiwari.changedFromDefault')}>●</span>`
+                        : ''}
+                </div>
+                <div class="kiwari-row-control">${this.renderControl(parameter, inputId, draft, problem)}</div>
+                ${problem
+                    ? html`<div class="kiwari-problem" role="alert">${problem}</div>`
+                    : parameter.about
+                        ? html`<div class="kiwari-about">${parameter.about}</div>`
+                        : ''}
+            </div>
+        `;
+    }
+
+    render() {
+        const state = this.app.kiwari;
+        if (!state || !state.schema.length) {
+            return '';
+        }
+        const problems = KigumiKiwariValues.problems(state, this.unitSystem());
+        const problemCount = Object.keys(problems).length;
+        const edited = state.schema.some(
+            (parameter) => KigumiKiwariValues.isEdited(state, parameter, this.unitSystem()),
+        );
+        return html`
+            <section id="kiwari-controls" aria-label=${t('viewer.kiwari.ariaLabel')}>
+                <div class="kiwari-header">
+                    <div class="kiwari-title">${t('viewer.kiwari.title')}</div>
+                    <div class="kiwari-actions">
+                        ${state.stale
+                            ? html`<span class="kiwari-stale" title=${t('viewer.kiwari.stale.title')}>${t('viewer.kiwari.stale')}</span>`
+                            : ''}
+                        <button
+                            type="button"
+                            class="kiwari-action"
+                            title=${t('viewer.kiwari.reset.title')}
+                            @click=${() => this.app.resetKiwariToDefaults()}>${t('viewer.kiwari.reset')}</button>
+                        ${state.canSave
+                            ? html`<button
+                                type="button"
+                                class="kiwari-action"
+                                ?disabled=${problemCount > 0}
+                                title=${t('viewer.kiwari.save.title')}
+                                @click=${() => this.app.saveKiwariToFile()}>${t('viewer.kiwari.save')}</button>`
+                            : ''}
+                        <button
+                            id="kiwari-build-btn"
+                            type="button"
+                            class="kiwari-action kiwari-build"
+                            ?disabled=${problemCount > 0 || !edited}
+                            title=${problemCount > 0 ? t('viewer.kiwari.cannotBuild') : t('viewer.kiwari.build.title')}
+                            @click=${() => this.app.requestRefresh()}>${t('viewer.kiwari.build')}</button>
+                    </div>
+                </div>
+                <div class="kiwari-list">
+                    ${state.schema.map((parameter) => this.renderParameter(parameter, problems))}
+                </div>
+            </section>
+        `;
+    }
+}
+
 class KigumiViewerApp extends LitElement {
     constructor() {
         super();
@@ -1199,6 +1387,10 @@ class KigumiViewerApp extends LitElement {
         this.exportIndividualsEnabled = false;
         this.exportAccessoriesEnabled = true;
         this.settingsPanel = new ViewerSettingsPanel(this);
+        // What the frame on screen may be adjusted by, or null when it takes
+        // nothing. The shape is kiwari-values.js's, not this file's.
+        this.kiwari = null;
+        this.kiwariPanel = new ViewerKiwariPanel(this);
         this.memberListPanel = new MemberListPanel(this, { t });
         this.selectionPanel = new SelectionPanel(this, {
             t,
@@ -1296,6 +1488,7 @@ class KigumiViewerApp extends LitElement {
             </div>
             <div id="top-controls">
                 ${this.settingsPanel.render()}
+                ${this.kiwariPanel.render()}
             </div>
             <div id="panels">
                 ${this.memberListPanel.render()}
@@ -2222,11 +2415,63 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
+    setKiwariFromFrame(frameData) {
+        const payload = frameData && frameData.kiwari;
+        this.kiwari = payload ? KigumiKiwariValues.fromPayload(payload) : null;
+        this.requestUpdate();
+    }
+
+    setKiwariDraft(key, draft) {
+        if (!this.kiwari) {
+            return;
+        }
+        this.kiwari = KigumiKiwariValues.withDraft(this.kiwari, key, draft);
+        this.requestUpdate();
+    }
+
+    setKiwariAxisDraft(key, axis, draft) {
+        if (!this.kiwari) {
+            return;
+        }
+        this.kiwari = KigumiKiwariValues.withAxisDraft(this.kiwari, key, axis, draft);
+        this.requestUpdate();
+    }
+
+    resetKiwariToDefaults() {
+        if (!this.kiwari) {
+            return;
+        }
+        this.kiwari = KigumiKiwariValues.resetToDefaults(this.kiwari);
+        this.requestUpdate();
+    }
+
+    /** What the boxes currently say, or null if any of them does not read. */
+    pendingKiwariValues() {
+        if (!this.kiwari) {
+            return null;
+        }
+        return KigumiKiwariValues.toWire(this.kiwari, this.units || KigumiUnits.DEFAULT_UNIT_SYSTEM);
+    }
+
+    saveKiwariToFile() {
+        if (!vscode || !this.kiwari || !this.kiwari.canSave) {
+            return;
+        }
+        vscode.postMessage({ type: 'saveParameters', kiwari: this.pendingKiwariValues() });
+    }
+
     requestRefresh() {
         if (!vscode) {
             return;
         }
-        vscode.postMessage({ type: 'requestRefresh' });
+        // A box that does not read sends nothing rather than a guess; the
+        // build button is disabled in that state, so this is the belt to its
+        // braces.
+        const values = this.pendingKiwariValues();
+        if (this.kiwari && values === null) {
+            return;
+        }
+        vscode.postMessage({ type: 'requestRefresh', kiwari: values });
     }
 
     onWindowMessage(event) {
@@ -5071,6 +5316,8 @@ class KigumiViewerApp extends LitElement {
         const profiling = payload.profiling || null;
         const uiState = this.normalizeUiState(payload.uiState || null);
         const hadExistingScene = this.sceneManager.size > 0;
+
+        this.setKiwariFromFrame(frameData);
 
         if (uiState.keepLoading) {
             this.setViewPhase(uiState.phase, uiState.loadingText, { refreshToken, error: uiState.error });

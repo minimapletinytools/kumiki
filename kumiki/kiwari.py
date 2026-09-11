@@ -8,9 +8,9 @@ A builder declares its kiwari in its own body and hands it back on the frame::
 
     def build_frame(k: Kiwari | None = None) -> Frame:
         k = kiwari(
-            legs=count(4, minimum=3, about="Number of legs"),
-            seat_height=length(mm(450)),
-            butt_end=choice(TimberEnd, TimberEnd.TOP),
+            legs=kiwari.count(4, minimum=3, about="Number of legs"),
+            seat_height=kiwari.length(mm(450)),
+            butt_end=kiwari.choice(TimberEnd, TimberEnd.TOP),
         ).resolve(k)
 
         for i in range(k.count("legs")):
@@ -55,20 +55,12 @@ from .rule import (
     scalar,
 )
 
-__all__ = [
-    "Kiwari",
-    "Declaration",
-    "kiwari",
-    "length",
-    "angle",
-    "count",
-    "number",
-    "flag",
-    "text",
-    "choice",
-    "point2",
-    "point3",
-]
+# Deliberately only three names. The declaration helpers hang off ``kiwari``
+# rather than standing on their own, because ``length`` is a local variable in
+# five hundred places in this codebase and a module-level ``length`` would be
+# shadowed by every one of them -- in the same function that then tries to
+# call it, which is an UnboundLocalError pointing at a line that looks fine.
+__all__ = ["Kiwari", "Declaration", "kiwari"]
 
 
 # What a parameter is. The kind decides how it is written down, how text is
@@ -465,14 +457,14 @@ class Kiwari:
         return payload
 
 
-def kiwari(**declarations: Declaration) -> Kiwari:
+def _kiwari(**declarations: Declaration) -> Kiwari:
     """Declare what a frame is proportioned from.
 
     Each keyword is a parameter's key and each value is a declaration::
 
         kiwari(
-            legs=count(4, minimum=3),
-            seat_height=length(mm(450)),
+            legs=kiwari.count(4, minimum=3),
+            seat_height=kiwari.length(mm(450)),
         )
     """
     for key, declaration in declarations.items():
@@ -493,6 +485,33 @@ def kiwari(**declarations: Declaration) -> Kiwari:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+class _KiwariFactory:
+    """``kiwari(...)`` to declare, ``kiwari.length(...)`` and friends to say what
+    each one is.
+
+    The helpers live here rather than as bare names so that a builder's own
+    local variables -- ``length``, ``angle``, ``count`` -- cannot shadow them.
+    """
+
+    __call__ = staticmethod(_kiwari)
+
+    length = staticmethod(length)
+    angle = staticmethod(angle)
+    count = staticmethod(count)
+    number = staticmethod(number)
+    flag = staticmethod(flag)
+    text = staticmethod(text)
+    choice = staticmethod(choice)
+    point2 = staticmethod(point2)
+    point3 = staticmethod(point3)
+
+    def __repr__(self) -> str:
+        return "<kiwari: declare with kiwari(key=kiwari.length(...), ...)>"
+
+
+kiwari = _KiwariFactory()
 
 
 def _split_values_and_texts(incoming: Mapping[str, Any]):

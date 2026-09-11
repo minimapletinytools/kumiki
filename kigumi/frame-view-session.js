@@ -70,6 +70,11 @@ class FrameViewSession {
         this.pendingRefreshReason = null;
         this.refreshSequence = 0;
         this.refreshOptions = {};
+        // What the viewer last said the frame should be built from. Held
+        // here so a reload triggered by anything else -- a file save, a
+        // watcher -- rebuilds with the values on screen rather than reverting
+        // to the defaults behind the user's back.
+        this.kiwariValues = null;
         this.profiler = new RefreshProfiler({ log: (msg) => this.log(msg) });
         this.slotName = options.slotName || 'main';
         this.sessionType = options.sessionType || 'main';
@@ -271,8 +276,23 @@ class FrameViewSession {
             }
             if (message.type === 'requestRefresh') {
                 this.log('[webview] Manual refresh requested from viewer');
+                if (message.kiwari && typeof message.kiwari === 'object') {
+                    this.kiwariValues = { ...message.kiwari };
+                }
                 this.refresh('manual refresh button').catch((error) => {
                     this.log(`[refresh] Manual refresh failed: ${error.message || error}`);
+                });
+                return;
+            }
+            if (message.type === 'saveParameters') {
+                if (message.kiwari && typeof message.kiwari === 'object') {
+                    this.kiwariValues = { ...message.kiwari };
+                }
+                this.saveParameters().catch((error) => {
+                    this.log(`[parameters] Save failed: ${error.message || error}`);
+                    vscode.window.showErrorMessage(
+                        t('message.saveParametersFailed', { error: error.message || error }),
+                    );
                 });
                 return;
             }
@@ -515,6 +535,16 @@ class FrameViewSession {
         return this.fileWatcher.isEnabled;
     }
 
+    /** Ask the runner to write this frame's parameters beside its source. */
+    async saveParameters() {
+        await this.ensureRunnerSession();
+        const result = await this.runnerSession.slotRequest('save_parameters', this.slotName, {});
+        const written = (result && result.path) ? path.basename(result.path) : 'parameters';
+        this.log(`[parameters] Saved ${written}`);
+        vscode.window.showInformationMessage(t('message.parametersSaved', { file: written }));
+        return result;
+    }
+
     getCameraState() {
         return this._requestWebviewAction('getCameraState', 'get-camera-state');
     }
@@ -611,6 +641,9 @@ class FrameViewSession {
         this.patternName = patternName;
         // The new slot was just raised fresh server-side (raise_specific_pattern,
         // called by the caller before this), so there is nothing to reload.
+        // Its values are its own: carrying the previous pattern's over would
+        // be wrong, and silently wrong wherever the two share a key.
+        this.kiwariValues = null;
         this._slotIsFresh = true;
         if (filePath !== this.filePath) {
             this.filePath = filePath;
@@ -695,6 +728,7 @@ class FrameViewSession {
                 this.profiler.markTiming(timing, 'runner.reload_example.start');
                 reloadResult = await this.runnerSession.slotRequest('reload_example', this.slotName, {
                     filePath: this.filePath,
+                    kiwari: this.kiwariValues,
                 });
                 this.profiler.markTiming(timing, 'runner.reload_example.end');
             }

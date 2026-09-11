@@ -6,9 +6,7 @@ from enum import Enum
 
 import pytest
 
-from kumiki.kiwari import (
-    Kiwari, angle, choice, count, flag, kiwari, length, number, point2, point3, text,
-)
+from kumiki.kiwari import Kiwari, kiwari
 from kumiki.rule import create_v2, create_v3, degrees, inches, mm
 from kumiki.timber import Frame, TimberEnd
 
@@ -20,15 +18,15 @@ class Finish(Enum):
 
 def a_kiwari() -> Kiwari:
     return kiwari(
-        legs=count(4, minimum=3, maximum=12, about="Number of legs"),
-        seat_height=length(mm(450)),
-        splay=angle(degrees(10)),
-        waste=number(0.1),
-        pegged=flag(True),
-        label=text("stool"),
-        butt_end=choice(TimberEnd, TimberEnd.TOP),
-        size=point2(create_v2(inches(2), inches(4))),
-        origin=point3(create_v3(0.0, 0.0, 0.0)),
+        legs=kiwari.count(4, minimum=3, maximum=12, about="Number of legs"),
+        seat_height=kiwari.length(mm(450)),
+        splay=kiwari.angle(degrees(10)),
+        waste=kiwari.number(0.1),
+        pegged=kiwari.flag(True),
+        label=kiwari.text("stool"),
+        butt_end=kiwari.choice(TimberEnd, TimberEnd.TOP),
+        size=kiwari.point2(create_v2(inches(2), inches(4))),
+        origin=kiwari.point3(create_v3(0.0, 0.0, 0.0)),
     )
 
 
@@ -112,8 +110,8 @@ def test_resolving_against_another_kiwari_takes_its_values() -> None:
 
 def test_a_declaration_made_fresh_this_run_wins_over_a_stale_value() -> None:
     """Editing the file while the viewer is open: the new declaration governs."""
-    was = kiwari(legs=count(4), rails=count(2)).resolve({"legs": 6, "rails": 3})
-    now = kiwari(legs=count(4))  # the author deleted 'rails'
+    was = kiwari(legs=kiwari.count(4), rails=kiwari.count(2)).resolve({"legs": 6, "rails": 3})
+    now = kiwari(legs=kiwari.count(4))  # the author deleted 'rails'
     with pytest.warns(UserWarning, match="rails"):
         resolved = now.resolve(was)
     assert resolved.count("legs") == 6
@@ -178,21 +176,21 @@ def test_a_point_takes_the_shapes_the_viewer_and_python_both_send() -> None:
 def test_nothing_is_allowed_only_where_the_declaration_says_so() -> None:
     with pytest.raises(ValueError, match="not allowed to be nothing"):
         a_kiwari().resolve({"seat_height": None})
-    optional = kiwari(trim=length(mm(10), optional=True))
+    optional = kiwari(trim=kiwari.length(mm(10), optional=True))
     assert optional.resolve({"trim": None}).length("trim") is None
 
 
 def test_a_parameter_with_no_default_has_nothing_to_build_with() -> None:
     with pytest.raises(ValueError, match="nothing to build with"):
-        length(None)
-    assert length(None, optional=True).default is None
+        kiwari.length(None)
+    assert kiwari.length(None, optional=True).default is None
 
 
 def test_a_default_that_is_not_what_it_claims_fails_where_it_was_written() -> None:
     with pytest.raises(ValueError):
-        kiwari(legs=count("four"))
+        kiwari(legs=kiwari.count("four"))
     with pytest.raises(ValueError, match="at least 3"):
-        kiwari(legs=count(1, minimum=3))
+        kiwari(legs=kiwari.count(1, minimum=3))
 
 
 def test_a_declaration_has_to_be_one() -> None:
@@ -202,11 +200,11 @@ def test_a_declaration_has_to_be_one() -> None:
 
 def test_a_choice_must_name_an_enum() -> None:
     with pytest.raises(ValueError, match="Enum"):
-        choice(str)
+        kiwari.choice(str)
 
 
 def test_a_choice_with_no_default_takes_the_first_member_declared() -> None:
-    assert kiwari(finish=choice(Finish)).choice("finish") is Finish.ROUGH_SAWN
+    assert kiwari(finish=kiwari.choice(Finish)).choice("finish") is Finish.ROUGH_SAWN
 
 
 # --- describing --------------------------------------------------------------

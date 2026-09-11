@@ -5,17 +5,24 @@ with a basic mortise and tenon joint. This creates a reciprocal frame cycle such
 all n timbers need to be disassembled simultaneously.
 """
 
+from typing import Optional
+
 from kumiki import *
 from kumiki.ticket import TimberTicket
 
-def build_frame(n: int = 4) -> Frame:
-    """Number of timbers, at least 3. Not adjustable from kigumi until this takes a kiwari."""
-    n_int = int(scalar(n))
-    assert n_int >= 3, "Number of timbers must be at least 3"
+def build_frame(k: Optional[Kiwari] = None) -> Frame:
+    k = kiwari(
+        timbers=kiwari.count(4, minimum=3, maximum=16,
+                      about="How many timbers go round the cycle"),
+        timber_size=kiwari.point2(create_v2(inches(2), inches(2))),
+        radius=kiwari.length(inches(13), about="How far out the timbers sit"),
+    ).resolve(k)
 
-    timber_size = create_v2(inches(2), inches(2))
+    n_int = k.count("timbers")
 
-    radius = inches(13)
+    timber_size = k.v2("timber_size")
+
+    radius = k.length("radius")
 
     # Angle of each sector
     theta_rad = pi * scalar(2) / n_int
@@ -92,6 +99,6 @@ def build_frame(n: int = 4) -> Frame:
         )
         joints.append(joint)
 
-    return Frame.from_joints(joints, name=f"Simple Assembly Test ({n_int}-gon)")
+    return Frame.from_joints(joints, name=f"Simple Assembly Test ({n_int}-gon)", kiwari=k)
 
 example = build_frame

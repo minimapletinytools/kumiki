@@ -18,10 +18,10 @@ from kumiki.ticket import TimberTicket
 
 def build_frame(k=None):
     k = kiwari(
-        posts=count(2, minimum=1, maximum=8, about="How many posts"),
-        post_height=length(mm(2400)),
-        capped=flag(False),
-        end=choice(TimberEnd, TimberEnd.TOP),
+        posts=kiwari.count(2, minimum=1, maximum=8, about="How many posts"),
+        post_height=kiwari.length(mm(2400)),
+        capped=kiwari.flag(False),
+        end=kiwari.choice(TimberEnd, TimberEnd.TOP),
     ).resolve(k)
     timbers = [
         create_timber(
@@ -121,10 +121,10 @@ def test_a_value_the_frame_refuses_is_reported_not_swallowed(frame_file):
 def test_a_builder_that_takes_no_argument_is_told_what_to_add(workspace):
     path = workspace / "plain.py"
     path.write_text(PLAIN_SOURCE)
-    from kumiki.kiwari import count, kiwari
+    from kumiki.kiwari import kiwari
     with pytest.raises(TypeError, match="takes no argument to receive them"):
         runner.load_slot_state(str(path), kiwari_values={"posts": 3},
-                               previous_kiwari=kiwari(posts=count(2)))
+                               previous_kiwari=kiwari(posts=kiwari.count(2)))
 
 
 # --- the file beside the source ---------------------------------------------
@@ -235,12 +235,12 @@ def a_post(k):
 
 
 def a_plain_post():
-    return a_post(kiwari(height=length(mm(1000))))
+    return a_post(kiwari(height=kiwari.length(mm(1000))))
 
 
 patterns = [
     Pattern(path="probe/tall", lambda_=make_pattern_from_frame(a_post),
-            kiwari=kiwari(height=length(mm(1000), minimum=mm(100)))),
+            kiwari=kiwari(height=kiwari.length(mm(1000), minimum=mm(100)))),
     Pattern(path="probe/plain", lambda_=make_pattern_from_frame(a_plain_post)),
 ]
 '''

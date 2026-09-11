@@ -574,9 +574,169 @@ canvas { display: block; width: 100%; height: 100%; }
     margin: 14px 0 0;
     padding: 0 14px;
     display: grid;
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
     gap: 12px;
     align-items: start;
+}
+/* Frame parameters (kiwari). Sits beside the settings panel in #top-controls,
+   and is not rendered at all when a frame takes no parameters. */
+#kiwari-controls {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    padding: 10px 14px;
+    background: var(--hv-panel-bg);
+    color: var(--hv-text);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 10px;
+    font: 12px/1.5 'Segoe UI', sans-serif;
+    backdrop-filter: blur(4px);
+}
+.kiwari-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.kiwari-title {
+    color: var(--hv-title);
+    font: 600 12px 'Segoe UI', sans-serif;
+    letter-spacing: 0.02em;
+    text-transform: lowercase;
+}
+.kiwari-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.kiwari-action {
+    padding: 3px 10px;
+    border-radius: 6px;
+    border: 1px solid var(--hv-control-border-strong);
+    background: var(--hv-control-bg-solid);
+    color: var(--hv-text);
+    font: 600 11px 'Segoe UI', sans-serif;
+    cursor: pointer;
+}
+.kiwari-action:hover:not(:disabled) {
+    background: var(--hv-control-bg-solid-hover);
+}
+.kiwari-action:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+}
+.kiwari-build {
+    border-color: var(--hv-accent);
+    color: var(--hv-strong);
+}
+.kiwari-stale {
+    color: var(--hv-error);
+    font: 600 11px 'Segoe UI', sans-serif;
+    text-transform: lowercase;
+}
+.kiwari-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.kiwari-row {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--hv-control-bg);
+}
+/* A value away from what the code says is marked, so it is obvious which of
+   these the frame in front of you does not get from its source alone. */
+.kiwari-row-changed {
+    border-color: var(--hv-control-border-strong);
+    background: var(--hv-control-bg-strong);
+}
+.kiwari-row-header {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+}
+.kiwari-key {
+    color: var(--hv-strong);
+    font: 600 11px 'Segoe UI', sans-serif;
+}
+.kiwari-kind {
+    color: var(--hv-dim);
+    font: 10px 'Segoe UI', sans-serif;
+    text-transform: lowercase;
+}
+.kiwari-changed-dot {
+    margin-left: auto;
+    color: var(--hv-accent);
+    font-size: 9px;
+}
+.kiwari-about,
+.kiwari-problem {
+    font: 10px/1.4 'Segoe UI', sans-serif;
+}
+.kiwari-about {
+    color: var(--hv-dim);
+}
+.kiwari-problem {
+    color: var(--hv-error);
+}
+.kiwari-box {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 3px 7px;
+    border-radius: 6px;
+    border: 1px solid var(--hv-control-border-strong);
+    background: var(--hv-control-bg-solid);
+    color: var(--hv-text);
+    font: 12px 'Segoe UI', sans-serif;
+}
+.kiwari-box::placeholder {
+    color: var(--hv-hint);
+}
+.kiwari-box-bad {
+    border-color: var(--hv-error);
+}
+.kiwari-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.kiwari-step {
+    flex: 0 0 auto;
+    width: 22px;
+    padding: 2px 0;
+    border-radius: 6px;
+    border: 1px solid var(--hv-control-border-strong);
+    background: var(--hv-control-bg-solid);
+    color: var(--hv-text);
+    cursor: pointer;
+}
+.kiwari-step:hover {
+    background: var(--hv-control-bg-solid-hover);
+}
+.kiwari-flag {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+.kiwari-point {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+    gap: 4px;
+}
+.kiwari-axis {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+.kiwari-axis-name {
+    color: var(--hv-dim);
+    font: 10px 'Segoe UI', sans-serif;
 }
 #render-controls {
     width: auto;

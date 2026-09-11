@@ -5,22 +5,34 @@ symmetry splaying out by 10 degrees, and a ring of stretchers.
 All members (seat, legs, stretchers) are round timbers.
 """
 
+from typing import Optional
+
 from kumiki import *
 from kumiki.ticket import TimberTicket
 
-def build_frame(n: int = 4) -> Frame:
-    """Number of legs, at least 3. Not adjustable from kigumi until this takes a kiwari."""
-    n_int = int(scalar(n))
-    assert n_int >= 3, "Number of legs must be at least 3"
+def build_frame(k: Optional[Kiwari] = None) -> Frame:
+    k = kiwari(
+        legs=kiwari.count(4, minimum=3, maximum=12, about="How many legs the stool stands on"),
+        stool_height=kiwari.length(mm(450), about="Floor to the top of the seat"),
+        seat_diameter=kiwari.length(mm(300)),
+        seat_thickness=kiwari.length(mm(40)),
+        leg_diameter=kiwari.length(mm(35)),
+        stretcher_diameter=kiwari.length(mm(25)),
+        stretcher_height=kiwari.length(mm(150), about="Floor to the stretcher ring"),
+        splay_angle=kiwari.angle(degrees(30), minimum=0, maximum=degrees(45),
+                          about="How far the legs lean out"),
+    ).resolve(k)
 
-    stool_height: Numeric = mm(450)
-    seat_diameter: Numeric = mm(300)
-    seat_thickness: Numeric = mm(40)
-    leg_diameter: Numeric = mm(35)
-    stretcher_diameter: Numeric = mm(25)
-    stretcher_height: Numeric = mm(150)
-    leg_top_radius: Numeric = mm(100)
-    splay_angle_rad = degrees(30)
+    n_int = k.count("legs")
+
+    stool_height: Numeric = k.length("stool_height")
+    seat_diameter: Numeric = k.length("seat_diameter")
+    seat_thickness: Numeric = k.length("seat_thickness")
+    leg_diameter: Numeric = k.length("leg_diameter")
+    stretcher_diameter: Numeric = k.length("stretcher_diameter")
+    stretcher_height: Numeric = k.length("stretcher_height")
+    leg_top_radius: Numeric = seat_diameter / scalar(3)
+    splay_angle_rad = k.angle("splay_angle")
 
     # 1. Stool Seat
     # Seat is a horizontal regular rectangular timber running along the X axis.
@@ -183,6 +195,6 @@ def build_frame(n: int = 4) -> Frame:
         )
         joints.append(joint_end)
 
-    return Frame.from_joints(joints, name=f"{n_int}-Legged Stool")
+    return Frame.from_joints(joints, name=f"{n_int}-Legged Stool", kiwari=k)
 
 example = build_frame
