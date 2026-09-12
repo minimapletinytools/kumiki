@@ -276,3 +276,84 @@ describe('angleLayout', () => {
                            { x: 0, y: 50 }, { x: 1, y: 0 }, {})).toBeNull();
     });
 });
+
+const { measurementStatus, planeMatchesView } = require('../webview/measurements.js');
+
+describe('a measurement is judged on its own plane', () => {
+    // The plane is the measurement's, not the viewport's. That is what keeps a
+    // number steady while the 3D view's camera orbits: the plane does not move
+    // when the camera does.
+    const AXES = { look: [0, -1, 0], right: [1, 0, 0], up: [0, 0, 1] };
+    const point = (at) => ({ at, geometry: { kind: 'point', at } });
+    const ORTHO = { orthographic: true };
+    const PERSPECTIVE = { orthographic: false };
+
+    const pair = (plane) => ({
+        a: point([0, 0, 0]), b: point([1, 0, 1]), plane,
+    });
+
+    test('with no plane it falls back to the viewport, as it always did', () => {
+        expect(measurementStatus(pair(undefined), AXES, ORTHO).drawable).toBe(true);
+    });
+
+    test('a plane matching the view is drawn', () => {
+        const status = measurementStatus(
+            pair({ at: [0, 0, 0], normal: [0, -1, 0] }), AXES, ORTHO);
+
+        expect(status.drawable).toBe(true);
+    });
+
+    test('the normal may point the other way -- a plane has no front', () => {
+        const status = measurementStatus(
+            pair({ at: [0, 0, 0], normal: [0, 1, 0] }), AXES, ORTHO);
+
+        expect(status.drawable).toBe(true);
+    });
+
+    test('a plane square to the view is refused rather than re-planed', () => {
+        // Re-planing would change a number someone has already read off the
+        // sheet, which is worse than saying it cannot be drawn.
+        const status = measurementStatus(
+            pair({ at: [0, 0, 0], normal: [1, 0, 0] }), AXES, ORTHO);
+
+        expect(status.drawable).toBe(false);
+        expect(status.reason).toBe('plane-mismatch');
+    });
+
+    test('a perspective camera projects onto no plane, so it does not ask', () => {
+        // The 3D view and a drawing's preview. The measurement keeps its own
+        // plane and is drawn through whatever the camera is doing.
+        const status = measurementStatus(
+            pair({ at: [0, 0, 0], normal: [1, 0, 0] }), AXES, PERSPECTIVE);
+
+        expect(status.reason).not.toBe('plane-mismatch');
+    });
+
+    test('the value comes from the plane, not from the viewport', () => {
+        // Two points a unit apart in x and in z. Seen down y the separation is
+        // the diagonal; seen down x it is the z component alone. The plane
+        // decides which, whatever the viewport says.
+        const downY = measurementStatus(
+            pair({ at: [0, 0, 0], normal: [0, 1, 0] }), AXES, PERSPECTIVE);
+        const downX = measurementStatus(
+            pair({ at: [0, 0, 0], normal: [1, 0, 0] }), AXES, PERSPECTIVE);
+
+        expect(downY.value.value).toBeCloseTo(Math.SQRT2, 9);
+        expect(downX.value.value).toBeCloseTo(1, 9);
+    });
+});
+
+describe('planeMatchesView', () => {
+    test('no plane matches anything, which is what absent means', () => {
+        expect(planeMatchesView(null, [0, 1, 0])).toBe(true);
+    });
+
+    test('parallel matches, square does not', () => {
+        expect(planeMatchesView({ normal: [0, 2, 0] }, [0, 1, 0])).toBe(true);
+        expect(planeMatchesView({ normal: [1, 0, 0] }, [0, 1, 0])).toBe(false);
+    });
+
+    test('a hair off parallel is still off', () => {
+        expect(planeMatchesView({ normal: [0.01, 1, 0] }, [0, 1, 0])).toBe(false);
+    });
+});

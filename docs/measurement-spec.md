@@ -337,8 +337,13 @@ camera plane arrives in the payload.
 - Multi-select for anything but deletion.
 - A plane that tracks a feature rather than holding fixed coordinates.
 
-## Open
+## The perspective preview
 
-- A measurement whose viewport is a drawing's perspective preview: drawn through
-  that camera, unchecked. Worth confirming this is wanted at all, or whether
-  measurements simply should not be created in a preview viewport.
+A drawing's preview viewport behaves as the 3D view does, because it is the same
+thing: a perspective camera you can orbit. Measurements are created there the
+same way, derive their plane from the live camera the same way, and are checked
+against no invariant.
+
+The one difference is the one the drawing view imposes anyway — no timber
+selection. Features are picked as if every member of the drawing were selected,
+in the preview as in the elevations.
