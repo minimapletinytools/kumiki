@@ -7,43 +7,6 @@ the same code should still work as the VSCode extension as it is right now, so b
 We do need to recreate the kigumi sidebar in the app though, so that part needs to refactored out so as much code is shared as possible, the in app sidebar is not used in the vs code extension
 
 
-:: 9/10/2026
-
-Frames parameter refactor. 
-
-Frames expose parameters that can be adjusted in the kigumi UI. 
-There are a few major components
-
-
-Parameters input UI overhaul
-- determine the set of supported parameter types and create easy UI for each of them
-  - support "10in" "20mm" "1 1/4"" string parsing syntax for dimensioned numbers
-  - enums should come from a dropdown that you can type to search as well
-  - special UI for V2 V3 types
--integer/float dimensionless number types
--formulas explicityl not supported yet
--sensible UI for rejecting invalid inputs when typed in
-
-
-Overhaul the way parameters are exposed:
--first step is to get rid of the current frame function argument reflection system (don't mind that this is a breaking change)
--create some new FrameParameter object (or come up with a cuter in-theme name for this, IDK what it could be)
-  -the FrameParameter has function to pull out typed values from keys
-  -if a the key/type/dimeniosn that's pulled out of it that does not match FrameParameterConfiguration raise an error or warning or something
--Frame function may optionally take this object
--Frames now include a FrameParameterConfiguration object which defines a list of parameter,s their type,s if they have dimensions, their default values, etc
--kigumi picks up this object, loads up the configuration panel based on its contents, and then writes it back to the FrameParameter when updating the frame if there were any changes
--update all the configureable patterns to use this new pattern to set parameters. The center argument is still provided explicitly, this is a unique feature of patterns sa they can be repositioned and we do not leverage the FrameParameter object for this.
-
-
-Additional UI changes
-- parameters that aren't default should be highlighted so it's clear which ones have been modified
-- add a "save to companion file"
-  - if you change parameters on myframe.py it saves parameters to myframe.parameters.json or osmething like that
-  - auto loads
-  - this option is not available when viewing patterns since we shouldn't write to library folders
-
-
 :: 9/8/2026 project notes
 
 Subject: Kumiki Project Ideas — Disassembly Solver + 3D-to-Code “Pullbacks”
@@ -300,23 +263,19 @@ IGNORE-consider refactoring runner.py
 DONE-consider doing the big 1 joint per file reorg
   -decide how to reorg examples too...
   -maybe get ird of folder + example support, examples are always leaf nodes?
-
 DONE-DO THE PARAMETRIC PARAMETER REFACTOR
 DONE-add support for optionla parameters in kiwari (gets a check box to enabel or disable them) which can take the None value which will often (or always if that mkes it esaier) be the default.
+IGNORE-consider renaming kiwari methods
+DONE-update patterns to be sensible with parameters.. do thec leanup!!
 
--consider renaming kiwari methods
 
--update patterns to be sensible with parameters.. do thec leanup!!
 -do joint rename to match what's in your new book
-
-
+-add srcibe notching ot more joints...
 
 -DRAWING NONSENSE
   DONE-fix lighting in ortho drawing
   DONE-following up on viewports, lets create a proper viewport class in DRawing.py that matches the viewport topology we had worked on earlier. The viewport class holds its label, sizing informatio and eventually other viewport specific info. It is unaware of its own position in the hierarchy but is aware of its chlidren. in order to get its ID, it must be queried from the DRawing objec tthat owns the viewport. can you propose a plan to refactor drawing.py so thta viweport info is contained as such
   DONE-reflects should not render in drawing moed
-
-  
 
   -do the drawing border and meta info stuff
     -add background border for drawing...
@@ -1728,6 +1687,45 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 
 :: ARCHIVE
+
+
+
+:: 9/10/2026
+
+Frames parameter refactor. 
+
+Frames expose parameters that can be adjusted in the kigumi UI. 
+There are a few major components
+
+
+Parameters input UI overhaul
+- determine the set of supported parameter types and create easy UI for each of them
+  - support "10in" "20mm" "1 1/4"" string parsing syntax for dimensioned numbers
+  - enums should come from a dropdown that you can type to search as well
+  - special UI for V2 V3 types
+-integer/float dimensionless number types
+-formulas explicityl not supported yet
+-sensible UI for rejecting invalid inputs when typed in
+
+
+Overhaul the way parameters are exposed:
+-first step is to get rid of the current frame function argument reflection system (don't mind that this is a breaking change)
+-create some new FrameParameter object (or come up with a cuter in-theme name for this, IDK what it could be)
+  -the FrameParameter has function to pull out typed values from keys
+  -if a the key/type/dimeniosn that's pulled out of it that does not match FrameParameterConfiguration raise an error or warning or something
+-Frame function may optionally take this object
+-Frames now include a FrameParameterConfiguration object which defines a list of parameter,s their type,s if they have dimensions, their default values, etc
+-kigumi picks up this object, loads up the configuration panel based on its contents, and then writes it back to the FrameParameter when updating the frame if there were any changes
+-update all the configureable patterns to use this new pattern to set parameters. The center argument is still provided explicitly, this is a unique feature of patterns sa they can be repositioned and we do not leverage the FrameParameter object for this.
+
+
+Additional UI changes
+- parameters that aren't default should be highlighted so it's clear which ones have been modified
+- add a "save to companion file"
+  - if you change parameters on myframe.py it saves parameters to myframe.parameters.json or osmething like that
+  - auto loads
+  - this option is not available when viewing patterns since we shouldn't write to library folders
+
 
 
 :: 9/6/2026 house model notes
