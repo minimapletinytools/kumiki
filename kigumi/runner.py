@@ -2069,6 +2069,36 @@ def add_measurement(
     other, is not something anyone means to ask for -- and the second click of a
     measurement is often a correction of the first.
     """
+    holder, measures = _measurement_slot(
+        frame, example_path, pending, drawing_id, viewport_id)
+    pair = _measure_pair_identity(measure)
+    measures[:] = [m for m in measures if _measure_pair_identity(m) != pair] + [measure]
+    return holder
+
+
+def _viewer_measure_identity(measure: Dict[str, Any]) -> Tuple[Any, str]:
+    """Which measurement an edit from the viewer means.
+
+    The two features, plus the id that lets one pair be measured twice. NOT the
+    kind: changing what a dimension measures between the same two features is
+    editing that dimension, not putting another one there.
+    """
+    return (_measure_pair_identity(measure), str(measure.get("measureId") or ""))
+
+
+def _measurement_slot(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """The file entry that holds a viewport's measurements, and that list.
+
+    The list is returned to be edited in place, and the holder is on `pending`
+    by the time this returns, so every caller writes the same way and none of
+    them has to remember the second half.
+    """
     existing = collect_drawings(frame, example_path, pending)
     target = next((d for d in existing if d["id"] == drawing_id), None)
     if target is None:
@@ -2080,15 +2110,80 @@ def add_measurement(
     if viewport is None:
         viewport = {"id": viewport_id, "measurements": []}
         holder["viewports"].append(viewport)
-
-    measures = viewport.setdefault("measurements", [])
-    pair = _measure_pair_identity(measure)
-    kept = [m for m in measures if _measure_pair_identity(m) != pair]
-    kept.append(measure)
-    viewport["measurements"] = kept
-
     if holder not in pending:
         pending.append(holder)
+    return holder, viewport.setdefault("measurements", [])
+
+
+def update_measurement(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+    measure: Dict[str, Any],
+    changes: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Change a measurement without replacing it: its kind, its plane, where it sits.
+
+    Not add_measurement with different fields. An add replaces whatever measured
+    that pair, so a viewer that changed a kind by adding could not tell the undo
+    stack whether a dimension had been edited or made -- and dragging one would
+    push a create.
+
+    A measurement the code declares has no entry here to change, so one is made
+    carrying the anchors and the change. That is what an override is for: the
+    code keeps asking for the measurement, and the file says what to do with it.
+    """
+    holder, measures = _measurement_slot(
+        frame, example_path, pending, drawing_id, viewport_id)
+    identity = _viewer_measure_identity(measure)
+    for entry in measures:
+        if _viewer_measure_identity(entry) == identity:
+            entry.update(changes)
+            return holder
+    measures.append({**measure, **changes})
+    return holder
+
+
+def delete_measurement(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+    measure: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Take a measurement off a viewport.
+
+    One of the file's own goes away. One the code asks for cannot -- the code
+    will ask again next time it runs -- so what is written instead is an entry
+    saying it is not wanted, which is what suppression is for.
+
+    Which of the two it is, is not asked directly: the entry is dropped, the
+    drawings are collected again, and if the measurement is still there then the
+    code is what is producing it. That beats reading the code declarations a
+    second way, which is how two answers to the same question start to differ.
+    """
+    holder, measures = _measurement_slot(
+        frame, example_path, pending, drawing_id, viewport_id)
+    identity = _viewer_measure_identity(measure)
+    measures[:] = [m for m in measures if _viewer_measure_identity(m) != identity]
+
+    still_there = any(
+        _viewer_measure_identity(m) == identity
+        for drawing in collect_drawings(frame, example_path, pending)
+        if drawing["id"] == drawing_id
+        for viewport in drawing.get("viewports") or []
+        if viewport.get("id") == viewport_id
+        for m in viewport.get("measurements") or []
+    )
+    if still_there:
+        measures.append({
+            "a": measure.get("a"), "b": measure.get("b"),
+            "measureId": measure.get("measureId"),
+            MEASURE_SUPPRESSED: True,
+        })
     return holder
 
 
@@ -3401,6 +3496,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
             "get_drawings", "save_drawings", "add_measurement",
+            "update_measurement", "delete_measurement",
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
@@ -5079,6 +5175,33 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "kind": payload.get("kind"),
                 "measureId": payload.get("measureId"),
             },
+        )
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "update_measurement":
+        ss = _resolve_slot(state, payload)
+        update_measurement(
+            ss.frame, ss.file_path, ss.pending_drawings,
+            str(payload.get("drawingId") or ""),
+            str(payload.get("viewportId") or ""),
+            {"a": payload.get("a"), "b": payload.get("b"),
+             "measureId": payload.get("measureId")},
+            payload.get("changes") or {},
+        )
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "delete_measurement":
+        ss = _resolve_slot(state, payload)
+        delete_measurement(
+            ss.frame, ss.file_path, ss.pending_drawings,
+            str(payload.get("drawingId") or ""),
+            str(payload.get("viewportId") or ""),
+            {"a": payload.get("a"), "b": payload.get("b"),
+             "measureId": payload.get("measureId")},
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
