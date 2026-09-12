@@ -7,6 +7,7 @@ from dataclasses import replace
 
 from kumiki import *
 from kumiki.example_shavings import (
+    ROUND_STOCK,
     RoundTimberConfig,
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
@@ -40,10 +41,18 @@ def _maybe_round_timber(timber, use_round_timbers: bool):
 
 
 def _make_frame_pattern(pattern_func, name: str):
-    return lambda center, use_round_timbers=False: Frame(
-        cut_timbers=pattern_func(center, use_round_timbers=use_round_timbers),
-        name=name,
-    )
+    """A pattern lambda that hands its kiwari's round-stock flag to *pattern_func*.
+
+    The second argument is the kiwari, not a bool -- that is the contract a
+    Pattern declaring one is called under.
+    """
+    def pattern_lambda(center, kiwari=None):
+        on_round = ROUND_STOCK.resolve(kiwari).flag("round_timbers")
+        return Frame(
+            cut_timbers=pattern_func(center, use_round_timbers=on_round),
+            name=name,
+        )
+    return pattern_lambda
 
 
 def make_butt_joint_example(position: V3, use_round_timbers=False) -> list[CutTimber]:
@@ -121,6 +130,6 @@ def make_butt_joint_3d_angles_example(position: V3, use_round_timbers=False) -> 
 
 
 patterns = [
-    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint", lambda_=_make_frame_pattern(make_butt_joint_example, "Plain Butt Joint"), pattern_type='frame'),
-    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint_3d", lambda_=_make_frame_pattern(make_butt_joint_3d_angles_example, "Plain Butt Joint (3D)"), pattern_type='frame'),
+    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint", lambda_=_make_frame_pattern(make_butt_joint_example, "Plain Butt Joint"), kiwari=ROUND_STOCK, pattern_type='frame'),
+    Pattern(path="butt_joints/plain_butt_joint/plain_butt_joint_3d", lambda_=_make_frame_pattern(make_butt_joint_3d_angles_example, "Plain Butt Joint (3D)"), kiwari=ROUND_STOCK, pattern_type='frame'),
 ]

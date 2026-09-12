@@ -9,6 +9,7 @@ from kumiki.joints.workshop.shavings.build_a_butt import (
     DovetailTenonWedgeAccessoryParameters,
 )
 from kumiki.example_shavings import (
+    ROUND_STOCK,
     RoundTimberConfig,
     create_canonical_example_butt_joint_timbers,
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
@@ -24,13 +25,14 @@ def _maybe_round_timber_config(use_round_timbers: bool):
     )
 
 
-def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timbers=False):
+def example_wedged_half_dovetail_mortise_and_tenon(k=None, *, position=None):
     """
     Wedged half-dovetail mortise and tenon joint on the canonical 4"x5"x4'
     butt joint timbers. The dovetail's flat (top) side sits on the FRONT face
     of the butt timber, which aligns with the receiving timber's length axis.
     A wedge accessory is included to lock the tenon.
     """
+    use_round_timbers = ROUND_STOCK.resolve(k).flag("round_timbers")
     if position is None:
         position = create_v3(0, 0, 0)
 
@@ -57,5 +59,5 @@ def example_wedged_half_dovetail_mortise_and_tenon(position=None, use_round_timb
 
 
 patterns = [
-    Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), pattern_type='frame'),
+    Pattern(path="butt_joints/wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_wedged_half_dovetail_mortise_and_tenon), kiwari=ROUND_STOCK, pattern_type='frame'),
 ]

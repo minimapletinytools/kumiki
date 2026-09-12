@@ -13,7 +13,7 @@ from patterns.basic_joints_patterns import example_basic_butt_joint
 def build_frame():
     add_milestone("fixture:start")
 
-    butt_joint = example_basic_butt_joint(create_v3(mm(0), mm(0), mm(0)))
+    butt_joint = example_basic_butt_joint(position=create_v3(mm(0), mm(0), mm(0)))
     add_milestone("fixture:joint-created")
 
     extra_timber = create_timber(

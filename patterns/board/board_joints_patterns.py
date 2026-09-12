@@ -1,6 +1,8 @@
 """Tongue-and-groove board joint example using PatternBook."""
 
 from dataclasses import replace
+from enum import Enum
+from typing import Optional
 
 from kumiki import *
 from kumiki.construction import CornerJointTimberArrangement, ExtendedTimberArrangement, PanelBoardArrangement
@@ -53,13 +55,27 @@ def example_tongue_and_groove(position=None):
     )
 
 
-def example_board_in_grooved_frame(
-    frame_width=inches(24),
-    frame_height=inches(40),
-    board_orientation="vertical",
-    n_boards=4,
-) -> Frame:
+class BoardOrientation(Enum):
+    """Which way the boards run inside the frame."""
+    VERTICAL = "vertical"
+    HORIZONTAL = "horizontal"
+
+
+GROOVED_FRAME = kiwari(
+    frame_width=kiwari.length(inches(24), minimum=inches(6), about="Outside width of the frame"),
+    frame_height=kiwari.length(inches(40), minimum=inches(6), about="Outside height of the frame"),
+    board_orientation=kiwari.choice(BoardOrientation, BoardOrientation.VERTICAL),
+    n_boards=kiwari.count(4, minimum=1, maximum=20, about="How many boards fill the opening"),
+)
+
+
+def example_board_in_grooved_frame(k: Optional[Kiwari] = None) -> Frame:
     """Boards fitted into a grooved rectangular frame."""
+    k = GROOVED_FRAME.resolve(k)
+    frame_width = k.length("frame_width")
+    frame_height = k.length("frame_height")
+    board_orientation = k.choice("board_orientation", BoardOrientation)
+    n_boards = k.count("n_boards")
     member_size = inches(2)
     board_thickness = inches(3, 4)
     groove_depth = inches(3, 8)
@@ -109,7 +125,7 @@ def example_board_in_grooved_frame(
         ticket=TimberTicket(path="top_rail"),
     )
 
-    if board_orientation == "vertical":
+    if board_orientation is BoardOrientation.VERTICAL:
         board_length = (inner_z_max - inner_z_min) + 2 * groove_depth
         board_width = (inner_x_max - inner_x_min + 2 * groove_depth) / n_boards
         x_start = inner_x_min - groove_depth
@@ -238,6 +254,6 @@ def example_sliding_dovetail_boards() -> Frame:
 
 patterns = [
     Pattern(path="board_joints/tongue_and_groove", lambda_=make_pattern_from_joint(example_tongue_and_groove), pattern_type='frame', tags=['main']),
-    Pattern(path="board_joints/board_in_grooved_frame", lambda_=make_pattern_from_frame(example_board_in_grooved_frame), pattern_type='frame', tags=['main']),
+    Pattern(path="board_joints/board_in_grooved_frame", lambda_=make_pattern_from_frame(example_board_in_grooved_frame), kiwari=GROOVED_FRAME, pattern_type='frame', tags=['main']),
     Pattern(path="board_joints/sliding_dovetail", lambda_=make_pattern_from_frame(example_sliding_dovetail_boards), pattern_type='frame', tags=['main']),
 ]

@@ -9,6 +9,8 @@ live in construction.py.
 from typing import Optional, Tuple
 from dataclasses import dataclass
 
+from kumiki.kiwari import Kiwari, kiwari
+
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace,
     Board, create_timber, compute_timber_orientation, safe_normalize_vector,
@@ -687,3 +689,14 @@ def create_canonical_example_board_butt_joint_boards_end_to_face(
         butt_timber_face=TimberFace.TOP,
         front_face_on_butt_timber=TimberFace.RIGHT,
     )
+
+
+# ---------------------------------------------------------------------------
+# Parameters the patterns share
+# ---------------------------------------------------------------------------
+
+# "Show this joint cut on round stock" is the same question asked of a dozen
+# different joints, so it is declared once rather than a dozen times.
+ROUND_STOCK = kiwari(
+    round_timbers=kiwari.flag(False, about="Cut the joint on round stock instead of square"),
+)
