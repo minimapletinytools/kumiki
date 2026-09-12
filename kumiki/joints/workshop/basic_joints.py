@@ -493,11 +493,10 @@ def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbe
     tenon_timber: TimberLike,
     mortise_timber: TimberLike,
     tenon_end: TimberEnd,
-    use_wedge: bool = True,
 ) -> Joint:
     """
     Creates a half-dovetail mortise-and-tenon joint between two face-aligned orthogonal
-    timbers, with automatic sizing and an optional wedge.
+    timbers, with automatic sizing and a wedge.
 
     Tenon dimensions are derived automatically: full size of the tenon timber along the axis
     parallel to the mortise timber's length (this is also the dovetail's slope axis -- the
@@ -505,20 +504,19 @@ def cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbe
     resistance to sit along the joint's load axis), and 1/3 of the mortise timber's size
     along the perpendicular axis. The tenon is a through-tenon (tenon_depth = the mortise
     timber's full size along the entry axis), and dovetail_depth is 1/4 of the tenon's size
-    in the dovetail (length) axis. When use_wedge is True, the wedge's taper angle matches
-    the dovetail's own slope and its narrow end (wedge_small_height) is 1/8 of the tenon's
-    size in the dovetail axis. For full control over sizing, use
+    in the dovetail (length) axis. The wedge's taper angle matches the dovetail's own
+    slope and its narrow end (wedge_small_height) is 1/8 of the tenon's size in the
+    dovetail axis. For a joint without one, or for full control over sizing, use
     `cut_wedged_half_dovetail_mortise_and_tenon_joint_on_face_aligned_timbers` directly.
 
     Args:
         tenon_timber: The timber that will receive the dovetail tenon cut.
         mortise_timber: The timber that will receive the dovetail mortise.
         tenon_end: Which end of the tenon timber gets the tenon (TOP or BOTTOM).
-        use_wedge: If True, adds a wedge accessory (and matching slot) on the dovetail's
-            flat side, tapered to match the dovetail's own slope angle.
 
     Returns:
-        Joint object containing the two CutTimbers and, if use_wedge=True, a "wedge" accessory.
+        Joint object containing the two CutTimbers and a "wedge" accessory on the
+        dovetail's flat side, tapered to match the dovetail's own slope angle.
     """
 
     assert isinstance(tenon_end, TimberEnd), f"expected TimberEnd, got {type(tenon_end).__name__}"

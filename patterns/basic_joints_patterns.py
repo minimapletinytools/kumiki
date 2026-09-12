@@ -52,10 +52,6 @@ MORTISE_AND_TENON_OPTIONS = kiwari(
     pegged=kiwari.flag(False, about="Drive a peg through the tenon"),
 )
 
-# No `wedged` switch: cut_basic_wedged_half_dovetail_mortise_and_tenon_joint_
-# on_face_aligned_timbers takes a use_wedge argument and never reads it, so the
-# joint always has its wedge. The old UI toggle did nothing either. A control
-# that changes nothing is worse than no control, so this waits on the library.
 WEDGED_DOVETAIL_OPTIONS = kiwari(
     round_timbers=kiwari.flag(False, about="Cut the joint on round stock instead of square"),
 )
