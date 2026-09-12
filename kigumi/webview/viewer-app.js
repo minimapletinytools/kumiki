@@ -5566,6 +5566,18 @@ class KigumiViewerApp extends LitElement {
      * one, and now colouring a hover -- and a dimension that is drawn against
      * different axes than it was judged against would be drawn wrong.
      */
+    /**
+     * Whether this viewport projects onto a plane at all.
+     *
+     * A perspective camera does not, so a measurement's plane cannot be checked
+     * against it -- the 3D view and a drawing's preview both behave that way.
+     * Passed alongside the axes rather than read from them, because the axes
+     * are a direction and this is a fact about the camera.
+     */
+    viewportProjection(viewport) {
+        return { orthographic: Boolean(viewport && viewport.isOrthographic) };
+    }
+
     viewportAxes(viewport) {
         const camera = (viewport && viewport.spec && viewport.spec.camera) || {};
         return {
@@ -5579,7 +5591,8 @@ class KigumiViewerApp extends LitElement {
         const axes = this.viewportAxes(viewport);
         // The same answer the list shows, so a dimension that is not drawn and
         // a row that says why can never disagree.
-        const status = KigumiMeasurements.measurementStatus(measure, axes);
+        const status = KigumiMeasurements.measurementStatus(
+            measure, axes, this.viewportProjection(viewport));
         if (!status.drawable) {
             return;
         }
@@ -5918,10 +5931,12 @@ class KigumiViewerApp extends LitElement {
     /** One viewport's measurements, judged and described for the list. */
     _measurementRows(viewport) {
         const axes = this.viewportAxes(viewport);
+        const projection = this.viewportProjection(viewport);
         return {
             id: viewport.id,
             measurements: (viewport.spec.measurements || []).map((measure) => {
-                const status = KigumiMeasurements.measurementStatus(measure, axes);
+                const status = KigumiMeasurements.measurementStatus(
+                    measure, axes, projection);
                 const named = (anchor) => (anchor && anchor.feature)
                     || (anchor && anchor.timber) || '?';
                 return {

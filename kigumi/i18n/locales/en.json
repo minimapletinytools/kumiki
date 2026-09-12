@@ -173,6 +173,7 @@
   "viewer.drawing.refused.not-measurable": "nothing to measure in this view",
   "viewer.drawing.refused.kind-unavailable": "not available in this view",
   "viewer.drawing.refused.degenerate": "no separation in this view",
+  "viewer.drawing.refused.plane-mismatch": "plane does not match this view",
   "viewer.layers.tag.select.title": "Select these {count} timbers (shift-click to add)",
   "viewer.layers.tag.partial.title": "Some of these timbers are selected",
   "viewer.layers.lock.title": "Lock",

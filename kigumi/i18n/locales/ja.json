@@ -173,6 +173,7 @@
   "viewer.drawing.refused.not-measurable": "このビューでは計測できません",
   "viewer.drawing.refused.kind-unavailable": "このビューでは使用できません",
   "viewer.drawing.refused.degenerate": "このビューでは間隔がありません",
+  "viewer.drawing.refused.plane-mismatch": "この視点と平面が一致しません",
   "viewer.layers.tag.select.title": "この {count} 本を選択（Shift+クリックで追加）",
   "viewer.layers.tag.partial.title": "一部の木材が選択されています",
   "viewer.layers.lock.title": "ロック",
