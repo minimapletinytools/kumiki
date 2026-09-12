@@ -89,14 +89,23 @@ order:
 
 Position, when no point pins it: through the midpoint of the two anchors.
 
-If 1–3 cannot be satisfied together — two skew edges, say — the plane is the
-current camera's plane, and rules 1–3 are abandoned rather than partially
-applied. A half-satisfied plane is harder to reason about than an honest
-fallback.
+**Rules 1–3 cannot actually conflict**, which is worth writing down because it
+is not obvious and the fallback below otherwise looks like it does real work.
+Each of them says the same thing — the plane's normal must be square to some
+direction — and two anchors produce at most two such directions: a face's
+normal, an edge's run, or the line between two measured points. Two directions
+are always satisfiable, by their cross product; parallel ones collapse to the
+single-direction case, which leaves a whole family to choose from. Two *skew*
+edges are satisfiable too: the plane has to run the same way as both, not
+contain either.
 
-In a drawing's orthographic viewport the fallback and rule 4 are the same thing,
-so a measurement made there lands on the viewport's plane, which is the
-invariant below.
+So the camera's plane is a genuine fallback rather than a common branch — it is
+what rule 4 returns when nothing constrains the normal, and what the code
+returns if the geometry arrives malformed.
+
+In a drawing's orthographic viewport rule 4 and the viewport's own plane are the
+same thing, so a measurement made there lands on the viewport's plane, which is
+the invariant below.
 
 ### The invariant, and where it does not apply
 
