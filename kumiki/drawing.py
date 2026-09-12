@@ -266,6 +266,64 @@ def kinds_for(
 
 
 @dataclass(frozen=True)
+class MeasurementPlane:
+    """The flat surface a measurement is taken and drawn on.
+
+    The measurement's own property, not the viewport's. A drawing viewport is
+    locked, so a measurement in one could be evaluated against the viewport and
+    get a stable answer; the 3D view's camera is not, and the same two faces
+    would read a different number from one moment to the next as it orbits.
+    Carrying the plane makes the number the measurement's, and leaves the
+    viewport deciding only how it is drawn.
+
+    Floats rather than exact scalars, like Rect and for the same reason: this is
+    where a dimension is drawn, not where a joint is cut.
+
+    Its own dataclass rather than a bare pair because it will grow. A plane that
+    tracks a feature -- so that moving the timber moves the dimension with it --
+    is the obvious next form, and a pair of vectors leaves nowhere to say which
+    kind of plane this is.
+
+    None on a Measure means "derive it from the viewport", which is what every
+    measurement written before this means, and all an orthographic viewport's
+    measurements are entitled to mean.
+    """
+
+    #: A point on the plane, in world space.
+    at: Tuple[float, float, float]
+    #: The plane's normal, in world space. Not required to be unit length on the
+    #: way in; compared up to sign, since a plane has no front.
+    normal: Tuple[float, float, float]
+
+    def __post_init__(self):
+        for name in ("at", "normal"):
+            value = tuple(float(part) for part in getattr(self, name))
+            if len(value) != 3:
+                raise ValueError(f"A plane's {name} is [x, y, z], got {getattr(self, name)!r}")
+            object.__setattr__(self, name, value)
+        if not any(self.normal):
+            raise ValueError("A plane's normal cannot be zero length")
+
+    @classmethod
+    def from_wire(cls, value) -> Optional['MeasurementPlane']:
+        """A plane as read from a file, or one already built.
+
+        The same shape as MeasurementKind.from_wire and MeasurementPlacement's,
+        and for the same reason: the field holds a MeasurementPlane, and saying
+        so is only true if the conversion from the file's form happens somewhere
+        that takes the file's form as its argument type.
+        """
+        if value is None or isinstance(value, cls):
+            return value
+        if isinstance(value, Mapping):
+            return cls(at=value.get("at"), normal=value.get("normal"))
+        raise TypeError(f"Expected a plane or a mapping, got {type(value).__name__}")
+
+    def as_wire(self) -> Dict[str, list]:
+        return {"at": list(self.at), "normal": list(self.normal)}
+
+
+@dataclass(frozen=True)
 class MeasurementPlacement:
     """Where a dimension sits, as distinct from what it measures.
 
@@ -325,6 +383,11 @@ class Measure:
     #: Where the dimension sits. Deliberately not part of identity: moving a
     #: dimension line is not measuring something else.
     placement: Optional[MeasurementPlacement] = None
+    #: The plane this is taken and drawn on, or None to take the viewport's.
+    #: Not part of identity either: the same two features measured on a
+    #: different plane is the same measurement seen from elsewhere, and giving
+    #: it a second identity would let a file hold both and draw them twice.
+    plane: Optional[MeasurementPlane] = None
 
     def __post_init__(self):
         self._canonicalise_anchors()

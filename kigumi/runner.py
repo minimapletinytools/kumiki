@@ -1099,6 +1099,10 @@ def _viewport_aspect(rect: List[float], page: Dict[str, float]) -> float:
     return (rect[2] * page["width"]) / height if height > 0 else 1.0
 
 
+def _dot(a: List[float], b: List[float]) -> float:
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
 def _cross(a: List[float], b: List[float]) -> List[float]:
     return [
         a[1] * b[2] - a[2] * b[1],
@@ -1751,8 +1755,119 @@ def deserialize_feature_path(source: Any) -> Optional[Any]:
     )
 
 
+# --- the plane a measurement is taken on -------------------------------------
+#
+# A measurement's own, not the viewport's. See docs/measurement-spec.md: a
+# drawing viewport is locked so either would do, but the 3D view's camera
+# orbits, and a measurement evaluated against it would read a different number
+# from one moment to the next.
+
+def _plane_constraints(one: Dict[str, Any], other: Dict[str, Any]) -> List[List[float]]:
+    """Directions the plane's normal has to be square to, for these two features.
+
+    Each rule in the spec's priority order turns into the same kind of thing:
+
+      perpendicular to a measured FACE  ->  normal square to that face's normal
+      parallel to a measured EDGE       ->  normal square to that edge's run
+      contains both measured POINTS     ->  normal square to the line between
+
+    the last only when both anchors are points, since one point constrains where
+    the plane sits rather than which way it faces.
+    """
+    constraints = []
+    for geometry in (one, other):
+        kind = (geometry or {}).get("kind")
+        if kind == "plane":
+            constraints.append([float(part) for part in geometry.get("normal") or []])
+        elif kind == "line":
+            constraints.append([float(part) for part in geometry.get("direction") or []])
+    if (one or {}).get("kind") == "point" and (other or {}).get("kind") == "point":
+        here, there = one.get("at") or [], other.get("at") or []
+        if len(here) == 3 and len(there) == 3:
+            constraints.append([float(there[i]) - float(here[i]) for i in range(3)])
+    return [c for c in constraints if len(c) == 3 and any(c)]
+
+
+def _plane_normal(constraints: List[List[float]], look: List[float]) -> Optional[List[float]]:
+    """A normal square to every constraint, and otherwise as close to `look` as it can be.
+
+    Two anchors give at most two constraints, and two constraints can always be
+    met: square to both is their cross product, and when they are parallel it is
+    the one-constraint case again. So this does not fail for want of a solution
+    -- it returns None only when there is no direction left to choose, which is
+    the caller's cue to fall back to the camera's own plane.
+
+    Closest to `look` means the dimension is drawn as nearly face-on as its
+    constraints allow, which is the difference between reading it and seeing it
+    edge-on as a line.
+    """
+    gaze = _normalize(look)
+    distinct = []
+    for constraint in constraints:
+        unit = _normalize(constraint)
+        if not any(abs(abs(_dot(unit, seen)) - 1.0) < 1e-9 for seen in distinct):
+            distinct.append(unit)
+
+    if not distinct:
+        # Nothing to be square to: face the camera.
+        return gaze
+    if len(distinct) >= 2:
+        normal = _cross(distinct[0], distinct[1])
+        if not any(abs(part) > 1e-12 for part in normal):
+            return None
+        normal = _normalize(normal)
+        # A plane has no front, so take whichever way round faces the camera.
+        return normal if _dot(normal, gaze) >= 0 else [-part for part in normal]
+
+    # One constraint: a whole family of planes contains it. Take the camera's
+    # direction with the part along the constraint removed, which is the member
+    # of that family nearest to facing the camera.
+    only = distinct[0]
+    along = _dot(gaze, only)
+    flattened = [gaze[i] - only[i] * along for i in range(3)]
+    if not any(abs(part) > 1e-9 for part in flattened):
+        # Looking straight down the one thing the plane must contain, so every
+        # member of the family is equally edge-on. Any of them will do.
+        fallback = [1.0, 0.0, 0.0] if abs(only[0]) < 0.9 else [0.0, 1.0, 0.0]
+        return _normalize(_cross(only, fallback))
+    return _normalize(flattened)
+
+
+def _measurement_plane(
+    one: Dict[str, Any],
+    other: Dict[str, Any],
+    at_one: List[float],
+    at_other: List[float],
+    look: List[float],
+) -> Dict[str, Any]:
+    """Where a measurement between these two features is taken and drawn.
+
+    `look` is the camera's view direction at the moment it was made, which
+    settles whatever the features leave free -- and settles all of it when they
+    constrain nothing.
+
+    Position: through a measured point if there is one, since the plane has to
+    contain it; otherwise midway between the two anchors, which puts the
+    dimension among what it measures rather than off beside it.
+    """
+    normal = _plane_normal(_plane_constraints(one, other), look)
+    if normal is None:
+        normal = _normalize(look)
+
+    at = None
+    for geometry in (one, other):
+        if (geometry or {}).get("kind") == "point" and geometry.get("at"):
+            at = [float(part) for part in geometry["at"]]
+            break
+    if at is None and len(at_one or []) == 3 and len(at_other or []) == 3:
+        at = [(float(at_one[i]) + float(at_other[i])) / 2 for i in range(3)]
+
+    return {"at": at or [0.0, 0.0, 0.0], "normal": normal}
+
+
 def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
     placement = getattr(measure, "placement", None)
+    plane = getattr(measure, "plane", None)
     return {
         "a": serialize_feature_path(measure.anchor_a),
         "b": serialize_feature_path(measure.anchor_b),
@@ -1766,6 +1881,10 @@ def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
         # projected one, so a bare name cannot carry both.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
         "placement": {"offset": placement.offset} if placement is not None else None,
+        # Likewise not identity. Absent means "take the viewport's plane",
+        # which is what an orthographic viewport's measurements may always
+        # mean and what everything written before planes existed does mean.
+        "plane": plane.as_wire() if plane is not None else None,
         "origin": ORIGIN_CODE,
     }
 
