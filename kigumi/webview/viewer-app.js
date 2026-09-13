@@ -3179,6 +3179,7 @@ class KigumiViewerApp extends LitElement {
             hits: along.hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: false,
+            inDrawing: this.selectionManager.inDrawing,
         });
         const target = window.KigumiHover.hoverTarget(decision);
         if (decision.action !== 'csg' || !target) {
@@ -3693,6 +3694,11 @@ class KigumiViewerApp extends LitElement {
             hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: !!event.shiftKey,
+            // A drawing has no timber selection to drill in from, so a click
+            // goes straight to the feature. Hover asks the same question above
+            // and must get the same answer, or it lights what a click will not
+            // take -- which in a drawing was nothing at all.
+            inDrawing: this.selectionManager.inDrawing,
         });
 
         if (decision.action === 'clear') {
@@ -3783,13 +3789,6 @@ class KigumiViewerApp extends LitElement {
     }
 
     handleCSGSelectionResult(message) {
-        // While a measurement is being made, a pick is its second end rather
-        // than a new selection. Offered to the draft first, which refuses what
-        // it cannot use and leaves the selection alone either way.
-        if (this.measureDraft.isActive) {
-            this._measurePicked(message);
-            return;
-        }
         const path = Array.isArray(message.path) ? message.path : [];
         const featureLabel = message.featureLabel || null;
         // Kept so that "measure from this" has something to start from without
@@ -3831,6 +3830,15 @@ class KigumiViewerApp extends LitElement {
                     : { section: 'timbers' },
             });
             this._revealCsgFocusInList(target, path);
+        }
+
+        // A pick made while a measurement is being taken is also its second
+        // end. Offered to the draft AFTER the ordinary handling rather than
+        // instead of it: it is still a selection, and highlighting it is how
+        // you can see what you picked. The first end is not deselected by
+        // that -- it was never the selection, it is held, and drawn as held.
+        if (this.measureDraft.isActive) {
+            this._measurePicked(message);
         }
 
         const baseUnselectedOpacity = 1 - (this.unselectedTransparencyPercent / 100);
