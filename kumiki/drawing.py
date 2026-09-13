@@ -13,6 +13,7 @@ are two dimensions with two numbers, and either may be meaningless while the
 other is fine.
 """
 
+import math
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
@@ -211,6 +212,103 @@ _LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
     "vertical": _projected(MeasurementOperation.DISTANCE, MeasurementDirection.VERTICAL),
     "angle": _projected(MeasurementOperation.ANGLE),
 }
+
+
+#: How square something has to be to the view before it counts as square. An
+#: edge a hair off end-on still projects to a line, just a very short one, and
+#: calling it a point would refuse a dimension that is drawable.
+ALIGNMENT_EPSILON = 1e-3
+
+#: Two projected directions within this of parallel are treated as parallel: the
+#: angle between them would be a number nobody wrote down deliberately, and
+#: their separation is what was meant.
+PARALLEL_EPSILON = 1e-2
+
+
+def _unit(vector: Sequence[float]) -> Tuple[float, float, float]:
+    size = math.sqrt(sum(float(part) * float(part) for part in vector))
+    if size == 0:
+        return (0.0, 0.0, 0.0)
+    return tuple(float(part) / size for part in vector)
+
+
+def _dot(a: Sequence[float], b: Sequence[float]) -> float:
+    return sum(float(x) * float(y) for x, y in zip(a, b))
+
+
+def projected_form(
+    geometry: Optional[Mapping], look: Sequence[float],
+) -> Tuple[MeasurementFeature, Optional[Tuple[float, float, float]]]:
+    """What a feature behaves as once projected, and which way it runs.
+
+    A point stays a point. An edge seen end-on becomes one, and otherwise stays
+    a line. A face is a LINE seen edge-on and an AREA at any other angle -- and
+    an area covers the view, which is the whole of what PROJECTS_TO means by a
+    face having two answers.
+
+    The direction comes back with it because a pair of lines admits different
+    kinds depending on whether they are parallel, and the caller would otherwise
+    have to work the projection out a second time to find out.
+
+    None for `geometry` is a feature lying on no plane or line -- a cylinder's
+    barrel, a lofted side -- which is good to select and cannot be measured to.
+
+    THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
+    against each other. Two copies of a rule is how a rule drifts; the reason
+    for the second one is that the viewer projects on every pointer move and
+    cannot ask python each time.
+    """
+    kind = (geometry or {}).get("kind")
+    gaze = _unit(look)
+    if kind == "point":
+        return (MeasurementFeature.POINT, None)
+    if kind == "line":
+        direction = _unit(geometry.get("direction") or (0, 0, 0))
+        if abs(_dot(direction, gaze)) > 1 - ALIGNMENT_EPSILON:
+            return (MeasurementFeature.POINT, None)
+        return (MeasurementFeature.LINE, _flatten(direction, gaze))
+    if kind == "plane":
+        normal = _unit(geometry.get("normal") or (0, 0, 0))
+        if abs(_dot(normal, gaze)) > ALIGNMENT_EPSILON:
+            # Not edge-on: it covers the view, and an area has no distance.
+            return (MeasurementFeature.AREA, None)
+        # Edge-on, so it draws as a line along the plane, square to its normal
+        # and to the line of sight.
+        return (MeasurementFeature.LINE, _cross(normal, gaze))
+    return (None, None)
+
+
+def _flatten(direction: Sequence[float], gaze: Sequence[float]) -> Tuple[float, float, float]:
+    """The part of a direction that survives projection."""
+    along = _dot(direction, gaze)
+    return _unit([direction[i] - gaze[i] * along for i in range(3)])
+
+
+def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]:
+    return _unit([
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ])
+
+
+def projected_kinds(
+    one: Optional[Mapping], other: Optional[Mapping], look: Sequence[float],
+) -> Tuple[MeasurementKind, ...]:
+    """Which kinds this pair admits, seen from `look`. Empty when none.
+
+    The two halves put together: project both, then ask the table. This is the
+    question "could these two be measured against each other from here", which
+    is what decides whether a feature is worth preferring under the pointer.
+    """
+    form_one, run_one = projected_form(one, look)
+    form_other, run_other = projected_form(other, look)
+    if form_one is None or form_other is None:
+        return ()
+    parallel = None
+    if run_one is not None and run_other is not None:
+        parallel = abs(_dot(run_one, run_other)) > 1 - PARALLEL_EPSILON
+    return kinds_for(form_one, form_other, MeasurementSpace.PROJECTED, parallel=parallel)
 
 
 def kinds_for(

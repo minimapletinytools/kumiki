@@ -167,6 +167,74 @@ class TestTheViewerAgrees:
         assert out.returncode == 0, out.stderr
         return json.loads(out.stdout)
 
+    #: Geometry to project, spanning every answer projected_form can give.
+    CASES = [
+        {"kind": "point", "at": [0, 0, 0]},
+        {"kind": "line", "direction": [1, 0, 0]},
+        {"kind": "line", "direction": [0, 1, 0]},          # end-on: a point
+        {"kind": "line", "direction": [0, 0.9995, 0.03]},  # a hair off end-on
+        # Straddling ALIGNMENT_EPSILON, so the two sides disagree the moment
+        # either moves its threshold. Without a case in the gap this comparison
+        # passes whatever the epsilons are, which is a test of nothing.
+        {"kind": "line", "direction": [0.0999, 0.995, 0]},
+        {"kind": "plane", "normal": [1, 0.005, 0]},
+        {"kind": "line", "direction": [1, 1, 0]},          # oblique
+        {"kind": "plane", "normal": [0, 0, 1]},            # edge-on: a line
+        {"kind": "plane", "normal": [0, 1, 0]},            # facing: an area
+        {"kind": "plane", "normal": [0, 1, 0.0005]},       # barely off facing
+        {"kind": "plane", "normal": [1, 1, 0]},            # oblique
+        None,                                              # nothing to measure
+    ]
+    LOOKS = [[0, 1, 0], [0, -1, 0], [1, 0, 0], [0.577, 0.577, 0.577]]
+
+    def _viewer_forms(self):
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not available")
+        script = (
+            "const m = require(%s);"
+            "const cases = %s, looks = %s;"
+            "const out = [];"
+            "for (const look of looks) { for (const g of cases) {"
+            "  const f = m.projectedForm(g, look);"
+            "  out.push([f.form, f.direction || null]); } }"
+            "process.stdout.write(JSON.stringify(out));"
+            % (json.dumps(str(Path(__file__).resolve().parent.parent
+                              / "kigumi" / "webview" / "measurements.js")),
+               json.dumps(self.CASES), json.dumps(self.LOOKS))
+        )
+        out = subprocess.run([present(node, "node on PATH"), "-e", script],
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return json.loads(out.stdout)
+
+    def test_the_two_projections_say_the_same_thing(self):
+        """The rule the runner prefers features by, and the one the viewer draws by.
+
+        The viewer keeps a copy because it projects on every pointer move and
+        cannot ask python each time. Two copies of a rule is how a rule drifts,
+        so they are run against each other here.
+        """
+        from kumiki.drawing import projected_form
+
+        mine = []
+        for look in self.LOOKS:
+            for geometry in self.CASES:
+                form, direction = projected_form(geometry, look)
+                mine.append([
+                    form.value if form is not None else "none",
+                    list(direction) if direction is not None else None,
+                ])
+
+        theirs = self._viewer_forms()
+        assert len(theirs) == len(mine)
+        for (form, direction), (their_form, their_direction) in zip(mine, theirs):
+            assert form == their_form
+            if direction is None or their_direction is None:
+                assert direction is None and their_direction is None
+            else:
+                assert direction == pytest.approx(their_direction, abs=1e-9)
+
     def test_the_two_tables_say_the_same_thing(self):
         expected = {
             "point-point": [k.name for k in kinds_for(POINT, POINT, PROJECTED)],

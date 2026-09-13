@@ -1865,6 +1865,115 @@ def _measurement_plane(
     return {"at": at or [0.0, 0.0, 0.0], "normal": normal}
 
 
+def _picked_located(
+    feature_hits: List[Any], feature_label: Optional[str], edge: Any, owner: Any,
+):
+    """The picked feature, its owner, and what it lies on, or None.
+
+    One lookup for the anchor and the geometry both, so the two cannot end up
+    describing different features.
+    """
+    if feature_label is None:
+        return None
+    if edge is not None:
+        return (edge, owner, edge.locate(owner))
+    hit = next((h for h in feature_hits if h.feature.name == feature_label), None)
+    if hit is None:
+        return None
+    return (hit.feature, hit.owner, hit.feature.locate(hit.owner))
+
+
+def _pick_from_candidate(local_csg: Any, hit: Any):
+    """Everything a pick needs, for one chosen feature at the point.
+
+    Returns (path, node, label, type, edge, declared_edge), or None when the
+    feature's owner cannot be placed in the tree, which leaves the caller with
+    what it had.
+    """
+    from kumiki.cutcsg import CSGFeatureType
+
+    feature = hit.feature
+    positions = _node_positions(local_csg)
+    if feature.feature_type() == CSGFeatureType.EDGE:
+        # A derived edge is placed by the deeper of the two faces that form it;
+        # a declared one belongs to whoever declared it, and has no such pair
+        # for _edge_owner to read. Trying derived first tells them apart.
+        owned = _edge_owner(local_csg, feature)
+        if owned is not None:
+            return (owned[1], owned[0], feature.name, "EDGE", feature, None)
+        placed = positions.get(id(hit.owner))
+        if placed is None:
+            return None
+        return (placed[2], hit.owner, feature.name, "EDGE", None, feature)
+
+    placed = positions.get(id(hit.owner))
+    if placed is None:
+        return None
+    return (placed[2], hit.owner, feature.name, feature.feature_type().name, None, None)
+
+
+def _best_matching_candidate(
+    feature_hits: List[Any],
+    timber: Any,
+    held_geometry: Optional[Dict[str, Any]],
+    look: Optional[List[float]],
+) -> Optional[int]:
+    """Which feature under the pointer best finishes the measurement in hand.
+
+    The most specific feature is the right answer to "what is this thing here" --
+    an edge beats the two faces that form it -- and the wrong one while a
+    measurement is being made. Holding a face and being handed the arris beside
+    it means most hovers refuse, and the face you want is never the best answer
+    anywhere: it shows as a line, and on that line the edge wins.
+
+    So while something is held, a candidate that ADMITS A MEASUREMENT with it
+    beats one that does not, and among those, one of the same type as the held
+    feature breaks the tie. Type matching is the tie-break rather than the rule:
+    a candidate matching by type that admits nothing is worse than one that does
+    not match and admits a distance.
+
+    None when nothing is held, when there is no camera to project by, or when no
+    candidate admits anything -- all of which leave the ordinary answer standing.
+    """
+    from kumiki.drawing import projected_kinds
+
+    if not held_geometry or not look or not feature_hits:
+        return None
+
+    held_kind = held_geometry.get("kind")
+    best = None
+    for index, hit in enumerate(feature_hits):
+        located = hit.feature.locate(hit.owner)
+        geometry = _located_geometry_payload(located, timber)
+        if not geometry or not projected_kinds(held_geometry, geometry, look):
+            continue
+        # Earlier is more specific, so among equals the first wins.
+        rank = (0 if geometry.get("kind") == held_kind else 1, index)
+        if best is None or rank < best[0]:
+            best = (rank, index)
+    return None if best is None else best[1]
+
+
+def _plane_for_pick(
+    located_pick: Any, timber: Any, payload: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """The plane a measurement to this pick would be taken on, or None.
+
+    None unless something is held and the viewer said which way it is looking:
+    a plane needs both ends and a camera, and a first pick has neither.
+    """
+    held_geometry = payload.get("heldGeometry")
+    look = payload.get("look")
+    if located_pick is None or not held_geometry or not look:
+        return None
+    geometry = _located_geometry_payload(located_pick[2], timber)
+    if geometry is None:
+        return None
+    anchor = _feature_anchor(located_pick[0], located_pick[1], timber, located_pick[2])
+    return _measurement_plane(
+        held_geometry, geometry, payload.get("heldAt"), anchor, look)
+
+
 def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
     placement = getattr(measure, "placement", None)
     plane = getattr(measure, "plane", None)
@@ -2293,7 +2402,7 @@ def collect_drawings(
                 "which the frame no longer declares."
             )
         scene["origin"] = ORIGIN_FILE
-        _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"])
+        _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"], frame)
         drawings.append(scene)
 
     # Not in the file yet: either the drawing itself is unsaved, or the override
@@ -2335,7 +2444,7 @@ def _attach_measurements(
     scene: Dict[str, Any],
     by_viewport: Dict[str, List[Dict[str, Any]]],
     drawing_name: str,
-    frame: Any = None,
+    frame: Any,
 ) -> None:
     """Put each viewport's measurements on the viewport they belong to.
 
@@ -2346,10 +2455,15 @@ def _attach_measurements(
     so they are not shown and the mismatch is warned about. They are kept all the
     same: a viewport can come back when the code changes, and dropping them here
     would mean the next save deleted them from the file for good.
+
+    The frame is not optional. Without it the anchors go out unresolved -- no
+    position, no geometry -- which the viewer can only read as a broken
+    reference, so every measurement on the drawing is refused and silently never
+    drawn. That is what a drawing made from a selection did: it is a file
+    drawing, and the file loop was the caller that left it out.
     """
     remaining = {
         viewport: [_resolve_measurement(frame, measure) for measure in measures]
-        if frame is not None else measures
         for viewport, measures in by_viewport.items()
     }
     for viewport in scene.get("viewports") or []:
@@ -4723,27 +4837,49 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     declared_edge = None
     feature_hits = _features_at_point(local_csg, local_pt, eps, tolerances)
     edge = _resolve_derived_edge(feature_hits) if feature_label is not None else None
-    if edge is not None:
-        owned = _edge_owner(local_csg, edge)
-        if owned is not None:
-            target_csg, new_path = owned[0], owned[1]
-            feature_label = edge.name
-            feature_type = "EDGE"
-    elif feature_label is not None and feature_hits:
-        # A declared edge -- a timber's own arris -- beats the face a click
-        # lands on, the same way a derived one does and for the same reason: it
-        # is the more specific answer at that point. Unlike a derived one it
-        # belongs to the node that declared it, so it is placed the way any
-        # declared feature is.
-        from kumiki.cutcsg import CSGFeatureType
 
-        best = feature_hits[0]
-        if best.feature.feature_type() == CSGFeatureType.EDGE:
-            placed = _node_positions(local_csg).get(id(best.owner))
-            if placed is not None:
-                new_path, target_csg = placed[2], best.owner
-                feature_label, feature_type = best.feature.name, "EDGE"
-                declared_edge = best.feature
+    # Which of the features at this point is wanted, when more than one is.
+    #
+    # The caller may name one outright -- Tab steps through them -- or leave it
+    # to the preference, which while a measurement is being made picks whichever
+    # can actually finish it. Either way the choice is FINAL: the rules below
+    # exist to guess what was meant, and they have nothing left to decide once
+    # it has been said. Letting them run anyway puts the most specific feature
+    # back, which is how cycling to a face landed on the arris again every time.
+    held_geometry = payload.get("heldGeometry")
+    look = payload.get("look")
+    candidate_index = payload.get("candidateIndex")
+    if candidate_index is None:
+        candidate_index = _best_matching_candidate(feature_hits, timber, held_geometry, look)
+    picked = None
+    if candidate_index and feature_hits:
+        chosen = feature_hits[int(candidate_index) % len(feature_hits)]
+        picked = _pick_from_candidate(local_csg, chosen)
+        if picked is not None:
+            new_path, target_csg, feature_label, feature_type, edge, declared_edge = picked
+
+    if picked is None:
+        if edge is not None:
+            owned = _edge_owner(local_csg, edge)
+            if owned is not None:
+                target_csg, new_path = owned[0], owned[1]
+                feature_label = edge.name
+                feature_type = "EDGE"
+        elif feature_label is not None and feature_hits:
+            # A declared edge -- a timber's own arris -- beats the face a click
+            # lands on, the same way a derived one does and for the same
+            # reason: it is the more specific answer at that point. Unlike a
+            # derived one it belongs to the node that declared it, so it is
+            # placed the way any declared feature is.
+            from kumiki.cutcsg import CSGFeatureType
+
+            best = feature_hits[0]
+            if best.feature.feature_type() == CSGFeatureType.EDGE:
+                placed = _node_positions(local_csg).get(id(best.owner))
+                if placed is not None:
+                    new_path, target_csg = placed[2], best.owner
+                    feature_label, feature_type = best.feature.name, "EDGE"
+                    declared_edge = best.feature
 
     parent_csg = None
     if new_path:
@@ -4755,6 +4891,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     highlight_edge = None
     edge_absent = False
     edge_feature = edge if edge is not None else declared_edge
+    located_pick = _picked_located(feature_hits, feature_label, edge_feature, target_csg)
     if edge_feature is not None:
         highlight_edge, edge_absent = _edge_highlight_segments(
             edge_feature, target_csg, timber, local_csg,
@@ -4808,6 +4945,26 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         "reference": _pick_reference(
             local_csg, member_key, new_path, feature_label, feature_type, edge,
         ),
+        # How many features are at this point, so the viewer knows how many
+        # there are to step through.
+        "candidateCount": len(feature_hits),
+        # Where the feature is, unbounded, in world space. What decides whether
+        # a pair can be dimensioned is what each PROJECTS to, and the viewer
+        # projects on every pointer move -- so it gets the plane or the line and
+        # works that out itself between asking.
+        "geometry": (_located_geometry_payload(located_pick[2], timber)
+                     if located_pick is not None else None),
+        # And where a dimension would attach, cropped to the solid the cuts have
+        # left, which is the same anchor the saved measurement resolves to. An
+        # edge in particular anchors at the middle of its longest surviving
+        # piece, not at the extent it was declared with.
+        "at": (_feature_anchor(located_pick[0], located_pick[1], timber,
+                               located_pick[2], local_csg)
+               if located_pick is not None else None),
+        # The plane this pair would be measured on, when something is held.
+        # Derived here rather than in the viewer so there is one copy of the
+        # rule, and it costs no round trip: this request was already being made.
+        "plane": _plane_for_pick(located_pick, timber, payload),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a
