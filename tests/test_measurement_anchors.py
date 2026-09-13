@@ -299,3 +299,57 @@ class TestOnARealFrame:
         for measure in crossing:
             assert measure["a"]["at"] is not None
             assert measure["b"]["at"] is not None
+
+
+class TestAFeatureSeenEndOn:
+    """A line whose length is all depth draws as a point, and must be given as one.
+
+    MeasureSpan is what a feature is ONCE PROJECTED, and building it in three
+    dimensions ignored that: two arrises running along different axes were handed
+    over as two lines, so a point-and-line pair went through the parallel-lines
+    rule and both ends were slid to a station that meant nothing.
+    """
+
+    def test_a_line_along_the_view_is_a_point_to_the_rules(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_endon", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_endon"] = runner
+        spec.loader.exec_module(runner)
+
+        assert runner._projects_to_a_point((0, 1, 0), (0, 1, 0)) is True
+        assert runner._projects_to_a_point((0, -1, 0), (0, 1, 0)) is True
+        assert runner._projects_to_a_point((1, 0, 0), (0, 1, 0)) is False
+
+    def test_a_hair_off_end_on_is_still_a_line(self):
+        # It draws as a very short line, and calling it a point would refuse a
+        # dimension that is drawable.
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_endon2", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_endon2"] = runner
+        spec.loader.exec_module(runner)
+
+        assert runner._projects_to_a_point((0.05, 1, 0), (0, 1, 0)) is False
+
+    def test_a_point_and_a_line_do_not_go_through_the_parallel_rule(self):
+        # The point stays where it is and the line takes the foot. The parallel
+        # rule would slide BOTH to a shared station.
+        anchors = distance_anchors(
+            point((0, -0.6, 0.05)),
+            line((-0.064, -0.61, 0.05), (0, 1, 0), (0, 0.546)),
+            PERPENDICULAR,
+        )
+
+        assert anchors[0] == (0, -0.6, 0.05)
+        assert anchors[1][1] == pytest.approx(-0.6)

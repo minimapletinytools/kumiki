@@ -2467,6 +2467,19 @@ def collect_drawings(
     return drawings
 
 
+def _projects_to_a_point(direction: Sequence[float], plane_normal: Sequence[float]) -> bool:
+    """Whether a line seen from this plane draws as a point rather than a line.
+
+    The same threshold the viewer projects by -- a line a hair off end-on still
+    draws as a very short line, and calling it a point would refuse a dimension
+    that is drawable.
+    """
+    from kumiki.drawing import ALIGNMENT_EPSILON
+
+    return abs(_dot(_normalize(list(direction)), _normalize(list(plane_normal)))) \
+        > 1 - ALIGNMENT_EPSILON
+
+
 def _measure_span(
     feature: Any, node: Any, timber: Any, located: Any, root_csg: Any,
     plane_normal: Optional[Sequence[float]],
@@ -2509,6 +2522,12 @@ def _measure_span(
             longest = max(pieces, key=lambda piece: piece.length())
             start, end = to_world(longest.start), to_world(longest.end)
             direction = _normalize([end[i] - start[i] for i in range(3)])
+            if plane_normal is not None and _projects_to_a_point(direction, plane_normal):
+                # Seen end-on it IS a point, and a point is what the rules have
+                # to be given: a line whose length is all depth has no direction
+                # on the sheet to be square to, and treating it as one put a
+                # point-and-line pair through the parallel-lines rule.
+                return MeasureSpan(at=tuple(to_world(longest.midpoint())))
             return MeasureSpan(
                 at=start, direction=tuple(direction),
                 interval=(0.0, math.dist(start, end)))
