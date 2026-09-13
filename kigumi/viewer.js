@@ -152,6 +152,8 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const sceneManagerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'scene-manager.js'))).toString();
     const inputControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'input-controller.js'))).toString();
     const measurementsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measurements.js'))).toString();
+    const measureDraftJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measure-draft.js'))).toString();
+    const undoStacksJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'undo-stacks.js'))).toString();
     const hoverStateJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'hover-state.js'))).toString();
     const pickTolerancesJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'pick-tolerances.js'))).toString();
     const renderModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'render-mode.js'))).toString();
@@ -209,6 +211,8 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__SCENE_MANAGER_JS_URI__', sceneManagerJsUri)
         .replace('__INPUT_CONTROLLER_JS_URI__', inputControllerJsUri)
         .replace('__MEASUREMENTS_JS_URI__', measurementsJsUri)
+        .replace('__MEASURE_DRAFT_JS_URI__', measureDraftJsUri)
+        .replace('__UNDO_STACKS_JS_URI__', undoStacksJsUri)
         .replace('__HOVER_STATE_JS_URI__', hoverStateJsUri)
         .replace('__PICK_TOLERANCES_JS_URI__', pickTolerancesJsUri)
         .replace('__RENDER_MODE_JS_URI__', renderModeJsUri)
