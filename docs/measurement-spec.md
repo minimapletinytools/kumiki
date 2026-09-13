@@ -351,6 +351,34 @@ editing: it makes a drag indistinguishable from a create on the undo stack.
 Plane derivation is python's, since it needs the features' geometry, and the
 camera plane arrives in the payload.
 
+## Extents: done for edges, still approximate for faces
+
+An edge now says where it ends. A prism's arris is two of its own corners, a
+derived edge reaches as far as both faces that form it, and measurement asks the
+feature and then clips to the timber. Nothing is discovered by testing whether a
+point on a surface is inside the solid it lies on, which is the question that
+cannot be answered and which made a mortise hole's arris as long as the post.
+
+A FACE has not had the same treatment, and should:
+
+- **Its bounds should be its four corners**, not a box. `get_extent` carries
+  `aabb`, which is axis-aligned in WORLD space, so a face of a rotated prism --
+  most timbers in a frame -- has a box substantially larger than the face, never
+  smaller. The corners are computed already (`SimpleRectangularPrismFeature.
+  corners`); `CSGFeatureExtent` needs somewhere to put them, the way `ends`
+  holds an edge's. Nothing reads `aabb` today except one test, so this costs
+  nothing to change and buys the face side what the edge side now has.
+- **Other primitives still return the owner's box** -- the polygon extrusion and
+  the loft. A half space genuinely has no bounded extent and should keep saying
+  so.
+- **Subtraction is the hard half, and separate.** A declared region cannot know
+  that a housing removed part of it, and
+  `approximately_crop_plane_to_area_on_csg` cannot subtract in the plane -- its
+  own docstring calls that "worth doing, not yet done". So a face partly cut
+  away still reports whole however exact its declared bounds are. That wants
+  polygon booleans and should wait until something needs a face's extent to be
+  right where material has gone.
+
 ## Deferred
 
 - Occlusion for 3D dimensions. Not built; the SVG path cannot do it, and moving

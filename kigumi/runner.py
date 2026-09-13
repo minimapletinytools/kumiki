@@ -3081,14 +3081,20 @@ def _feature_anchor(
             )
             middle = cropped.centroid() if cropped is not None and not cropped.is_empty else None
         elif root_csg is not None:
-            cropped = crop_line_to_segments_on_csg(
-                located, root_csg, seed_reach=reach, near=solid.transform.position,
-            )
-            if cropped:
+            # The same bounds a measurement uses -- what the feature says about
+            # itself, and where the timber leaves it. Cropping to the timber
+            # alone gave a mortise hole's arris the length of the whole post,
+            # and its midpoint the middle of the post, which is where a
+            # half-made measurement was being drawn.
+            pieces = _intersected_line_pieces(
+                located, [root_csg], reach, solid.transform.position,
+                declared=_declared_line_span(feature, node, located))
+            if pieces:
                 # The longest piece. A cut can leave an edge in several, and a
                 # dimension has to attach to one of them -- the biggest is the
                 # one a reader would point at.
-                middle = max(cropped, key=lambda segment: segment.length()).midpoint()
+                low, high = max(pieces, key=lambda piece: piece[1] - piece[0])
+                middle = located.point + located.direction * scalar_of((low + high) / 2)
         if middle is not None:
             return _vector3_to_floats(timber.transform.local_to_global(middle))
 
