@@ -410,7 +410,11 @@
             if (!drawing) {
                 return [];
             }
-            return (drawing.viewports || []).flatMap((pane) => pane.measurements || []);
+            // Carrying which viewport it is on, since selecting one needs both
+            // that and its key -- the same pair every other measurement row
+            // hands back.
+            return (drawing.viewports || []).flatMap((pane) => (pane.measurements || [])
+                .map((measure) => ({ ...measure, viewportId: pane.id })));
         }
 
         _buildThreeDMeasurementRows() {
@@ -440,6 +444,12 @@
             name.textContent = between;
             name.title = between;
             row.appendChild(name);
+            row.addEventListener('click', (event) => this._emit(
+                'kigumi-focus-measurement', {
+                    viewportId: measure.viewportId || null,
+                    measureKey: globalScope.KigumiMeasurements.measurementKey(measure),
+                    add: Boolean(event.shiftKey),
+                }));
             return row;
         }
 

@@ -234,3 +234,34 @@ describe('what to ask about', () => {
         expect(hoverTarget({ memberKey: 'post#0', hit: {} })).toBeNull();
     });
 });
+
+describe('asking about the same place again', () => {
+    // Stepping to the next feature under the pointer asks the same point a
+    // different question, and `moved` refuses a point that has not travelled.
+    const answer = (name) => ({ featureLabel: name, path: [], memberKey: 'm' });
+
+    test('the same place can be asked about again', () => {
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        const first = hover.due();
+        hover.answered(first.request, answer('a'));
+
+        expect(hover.askAgain()).toBe(true);
+        const again = hover.due();
+
+        expect([again.x, again.y]).toEqual([100, 100]);
+        expect(again.request).not.toBe(first.request);
+    });
+
+    test('there is nothing to ask again about before the pointer has moved', () => {
+        expect(new HoverState().askAgain()).toBe(false);
+    });
+
+    test('and nothing after the pointer has left', () => {
+        const hover = new HoverState();
+        hover.moved(100, 100);
+        hover.clear();
+
+        expect(hover.askAgain()).toBe(false);
+    });
+});

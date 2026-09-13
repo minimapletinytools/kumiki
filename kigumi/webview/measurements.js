@@ -532,8 +532,25 @@
         };
     }
 
+    /**
+     * A measurement's identity, as a string, scoped to its viewport.
+     *
+     * The two features plus the id that lets one pair be measured twice --
+     * sorted, because measuring A to B and measuring B to A are one
+     * measurement, and the anchors are already canonically ordered.
+     */
+    function measurementKey(measure) {
+        const name = (anchor) => (anchor
+            ? [anchor.timber, (anchor.csgPath || []).join('/'), anchor.feature, anchor.type]
+                .join('|')
+            : '');
+        return [name(measure.a), name(measure.b)].sort().join('::')
+            + '::' + (measure.measureId || '');
+    }
+
     const KigumiMeasurements = {
         PROJECTED_RULES,
+        measurementKey,
         perpendicularEnds,
         anchorReference,
         normalizeKind,

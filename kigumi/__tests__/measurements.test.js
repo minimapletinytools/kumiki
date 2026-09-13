@@ -584,3 +584,37 @@ describe('where the two ends of a perpendicular distance are drawn', () => {
         expect(ends.to).toEqual({ x: 0, y: 4 });
     });
 });
+
+const { measurementKey } = require('../webview/measurements.js');
+
+describe('measurementKey', () => {
+    // One definition, shared by the sheet, the drawing panel and the tree --
+    // three places that must agree about which measurement was clicked.
+    const anchor = (feature) => ({
+        timber: 'post#0', csgPath: ['cut'], feature, type: 'FACE',
+    });
+
+    test('the same pair is the same key', () => {
+        expect(measurementKey({ a: anchor('x'), b: anchor('y') }))
+            .toBe(measurementKey({ a: anchor('x'), b: anchor('y') }));
+    });
+
+    test('written either way round it is one measurement', () => {
+        expect(measurementKey({ a: anchor('x'), b: anchor('y') }))
+            .toBe(measurementKey({ a: anchor('y'), b: anchor('x') }));
+    });
+
+    test('different pairs are different', () => {
+        expect(measurementKey({ a: anchor('x'), b: anchor('y') }))
+            .not.toBe(measurementKey({ a: anchor('x'), b: anchor('z') }));
+    });
+
+    test('an id tells two of the same pair apart', () => {
+        expect(measurementKey({ a: anchor('x'), b: anchor('y'), measureId: 'second' }))
+            .not.toBe(measurementKey({ a: anchor('x'), b: anchor('y') }));
+    });
+
+    test('a missing anchor does not throw', () => {
+        expect(typeof measurementKey({ a: anchor('x'), b: null })).toBe('string');
+    });
+});

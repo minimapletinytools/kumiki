@@ -2700,7 +2700,6 @@ def _resolve_measurement(
 
     placeable = (
         spans.get("a") is not None and spans.get("b") is not None and plane is not None)
-    _log_anchor_placement(measure, resolved, spans, plane, placeable)
     if placeable:
         # What this pair admits from here, so the anchors are placed for the
         # measurement that will actually be drawn. Defaulting to perpendicular
@@ -2717,61 +2716,7 @@ def _resolve_measurement(
             at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, axes)
             resolved["a"] = {**resolved["a"], "at": list(at_a)}
             resolved["b"] = {**resolved["b"], "at": list(at_b)}
-            log_stderr(f"[anchor]   placing for {kind.name}")
-            _log_anchor_result(resolved)
-        else:
-            log_stderr(f"[anchor]   NOT PLACED: {kind.name if kind else 'nothing admitted'}"
-                       " is not a distance -- each end keeps its own")
     return resolved
-
-
-def _describe_span(span: Any) -> str:
-    """One span, short enough to sit on a log line."""
-    if span is None:
-        return "none"
-    if span.is_point:
-        return "point at " + _round3(span.at)
-    low, high = span.interval
-    return (f"line {high - low:.4f} long along {_round3(span.direction)} "
-            f"from {_round3(span.at)}")
-
-
-def _round3(values: Sequence[float]) -> str:
-    return "[" + ", ".join(f"{float(part):.4f}" for part in values) + "]"
-
-
-def _log_anchor_placement(measure, resolved, spans, plane, placeable) -> None:
-    """Say where a measurement's ends were put, and what decided it.
-
-    Every step the rules take, because when a dimension lands somewhere absurd
-    the question is always WHICH step -- the crop, the projection, the pair the
-    kinds table saw, or the placement -- and guessing at it from a screenshot
-    has been wrong more often than right.
-    """
-    from kumiki.drawing import projected_kinds
-
-    names = f"{(measure.get('a') or {}).get('feature')} / {(measure.get('b') or {}).get('feature')}"
-    log_stderr(f"[anchor] {names}")
-    log_stderr(f"[anchor]   plane {_round3(plane) if plane else 'none'}"
-               f"  written kind {measure.get('kind')}")
-    for key in ("a", "b"):
-        log_stderr(f"[anchor]   {key}: {_describe_span(spans.get(key))}")
-        geometry = (resolved.get(key) or {}).get("geometry") or {}
-        log_stderr(f"[anchor]      lies on {geometry.get('kind')}"
-                   f"  before placing {_round3((resolved.get(key) or {}).get('at') or [])}")
-    if not placeable:
-        log_stderr("[anchor]   NOT PLACED: no span or no plane -- each end keeps its own")
-        return
-    admitted = projected_kinds(
-        (resolved.get("a") or {}).get("geometry"),
-        (resolved.get("b") or {}).get("geometry"), plane)
-    log_stderr(f"[anchor]   admits {[kind.name for kind in admitted]}")
-
-
-def _log_anchor_result(resolved) -> None:
-    for key in ("a", "b"):
-        log_stderr(f"[anchor]   {key} placed at "
-                   f"{_round3((resolved.get(key) or {}).get('at') or [])}")
 
 
 def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Dict[str, Any]]:

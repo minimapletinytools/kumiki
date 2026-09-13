@@ -43,6 +43,8 @@ const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
 const KigumiMeasurements = window.KigumiMeasurements;
+// One definition of a measurement's identity, shared with the panels.
+const { measurementKey } = KigumiMeasurements;
 const { DrawingPanel } = window.KigumiDrawingPanel;
 
 /**
@@ -52,14 +54,6 @@ const { DrawingPanel } = window.KigumiDrawingPanel;
  * measurements are the same one -- so a row and the thing it stands for cannot
  * come apart.
  */
-function measurementKey(measure) {
-    const name = (anchor) => (anchor
-        ? [anchor.timber, (anchor.csgPath || []).join('/'), anchor.feature, anchor.type].join('|')
-        : '');
-    return [name(measure.a), name(measure.b)].sort().join('::')
-        + '::' + (measure.measureId || '');
-}
-
 /** A feature reference, for a person to read. */
 function describeAnchor(anchor) {
     if (!anchor) {
@@ -1646,6 +1640,9 @@ class KigumiViewerApp extends LitElement {
             this._layersView.addEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
             this._layersView.addEventListener('kigumi-enter-drawing', this.onEnterDrawingRequested);
             this._layersView.addEventListener('kigumi-save-drawings', this.onSaveDrawingsRequested);
+            this._layersView.addEventListener('kigumi-focus-measurement', (event) => {
+                this._focusMeasurementFrom(event.detail);
+            });
             this._layersView.addEventListener('kigumi-toggle-measurements', (event) => {
                 this.setMeasurementsHidden(event.detail && event.detail.hidden);
                 this._layersDrawingsChanged();
@@ -3004,6 +3001,27 @@ class KigumiViewerApp extends LitElement {
         if (event.defaultPrevented) {
             return;
         }
+        // Tab is checked before the defaultPrevented guard: it is the focus key,
+        // so something else may well have claimed it, and this only acts while
+        // the pointer is over a feature -- which is not a moment anyone is
+        // tabbing between controls.
+        if (event.key === 'Tab' && this._hover && this._hover.feature) {
+            // A face seen edge-on is never the best answer where it lies -- the
+            // edge formed with it wins, being the more specific one -- so
+            // without this it cannot be reached at all. In an elevation it is
+            // the face you most often want to measure to.
+            event.preventDefault();
+            const count = Math.max(1, this._hover.feature.candidateCount || 1);
+            this._candidateIndex = ((this._candidateIndex || 0) + 1) % count;
+            this.emitViewerLog('measure-cycle', {
+                index: this._candidateIndex, of: count,
+                from: this._hover.feature.featureLabel,
+            });
+            // The place did not change, the question did: ask the same point
+            // again so the hover shows what the next click would now take.
+            this._hover.askAgain();
+            return;
+        }
         // Undo and redo act on the drawing in front of you, which is what they
         // are keyed by. Refused while a measurement is half-made: there is
         // nothing on the stack for it, so undo would reach past the thing you
@@ -3176,6 +3194,13 @@ class KigumiViewerApp extends LitElement {
             this._hover = new window.KigumiHover.HoverState();
         }
         this._hoverClient = { x: event.clientX, y: event.clientY };
+        if (this._hover.at === null
+            || Math.abs(event.clientX - this._hover.at.x)
+               + Math.abs(event.clientY - this._hover.at.y) > 0) {
+            // Cycling is about one place. Move somewhere else and it starts
+            // again at the best answer there.
+            this._candidateIndex = 0;
+        }
         // Which viewport a pick lands in is decided from here, since the answer
         // arrives long after the click that asked.
         this._lastClientX = event.clientX;
@@ -3231,6 +3256,7 @@ class KigumiViewerApp extends LitElement {
             currentPath,
             ctrlClick: false,
             request: due.request,
+            candidateIndex: this._candidateIndex || 0,
             // The same tolerances a click would use, or hover lights something
             // a click then refuses to select -- and through the camera the ray
             // actually went through, which on a sheet need not be the active
@@ -3649,6 +3675,30 @@ class KigumiViewerApp extends LitElement {
         };
     }
 
+    /**
+     * Look at a measurement, from wherever it was clicked.
+     *
+     * One path for the dimension itself, the drawing panel and the tree, so
+     * what they highlight and what the info pane shows cannot drift. `add` puts
+     * it beside the others rather than replacing them, which only deletion does
+     * anything with.
+     */
+    _focusMeasurementFrom(detail) {
+        if (!detail || !detail.measureKey) {
+            return;
+        }
+        const where = { viewportId: detail.viewportId, measureKey: detail.measureKey };
+        if (detail.add) {
+            this.selectionManager.toggleMeasurementMark(where);
+        } else {
+            this.selectionManager.setMeasurementFocus(where);
+        }
+        this._syncDrawingPanel();
+        this._layersDrawingsChanged();
+        this.selectionPanel.updateInfo(this.currentFrameData);
+        this.renderMeasurements();
+    }
+
     /** Show or hide every 3D measurement at once. */
     setMeasurementsHidden(hidden) {
         const next = Boolean(hidden);
@@ -3888,6 +3938,8 @@ class KigumiViewerApp extends LitElement {
                     currentPath,
                     ctrlClick: !!event.ctrlKey || !!event.metaKey,
                     tolerances: this._pickTolerances(point, pickCamera),
+                    // Whatever the hover is showing is what the click takes.
+                    candidateIndex: this._candidateIndex || 0,
                     // The same question the hover asked, so the click resolves
                     // to the feature the hover lit rather than to a different
                     // one -- and so the pick comes back with the plane.
@@ -6320,6 +6372,34 @@ class KigumiViewerApp extends LitElement {
         };
     }
 
+    /**
+     * A group for one dimension, which is the thing a click lands on.
+     *
+     * Hit-testing the geometry by hand would mean a second copy of where every
+     * line was put. The lines themselves already know, so they are asked --
+     * which also means the hit area is exactly what is drawn, arrowheads and
+     * text included.
+     */
+    _measurementGroup(overlay, viewport, measure, options) {
+        const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        overlay.appendChild(group);
+        if (options.pending) {
+            // Not there yet, so not selectable: the way to change it is to pick
+            // another feature or press escape.
+            return group;
+        }
+        const key = measurementKey(measure);
+        group.setAttribute('class', 'dim-group'
+            + (this.selectionManager.isMeasurementFocused(viewport.id, key)
+                ? ' dim-focused' : ''));
+        group.addEventListener('pointerdown', (event) => {
+            event.stopPropagation();
+            this._focusMeasurementFrom({
+                viewportId: viewport.id, measureKey: key, add: event.shiftKey });
+        });
+        return group;
+    }
+
     _drawMeasurement(overlay, viewport, pageRect, measure, options = {}) {
         const axes = this.viewportAxes(viewport);
         // The same answer the list shows, so a dimension that is not drawn and
@@ -6329,6 +6409,7 @@ class KigumiViewerApp extends LitElement {
         if (!status.drawable) {
             return;
         }
+        const into = this._measurementGroup(overlay, viewport, measure, options);
         const from = measure.a.at;
         const to = measure.b.at;
         const value = status.value;
@@ -6339,7 +6420,7 @@ class KigumiViewerApp extends LitElement {
         // linear dimension: the right number, with the wrong picture and the
         // wrong units beside it.
         if (value.unit === 'angle') {
-            this._drawAngle(overlay, viewport, pageRect, from, to,
+            this._drawAngle(into, viewport, pageRect, from, to,
                             status.formA, status.formB, value, options);
             return;
         }
@@ -6388,7 +6469,7 @@ class KigumiViewerApp extends LitElement {
             line.setAttribute('x2', to_.x);
             line.setAttribute('y2', to_.y);
             line.setAttribute('class', className + extra);
-            overlay.appendChild(line);
+            into.appendChild(line);
         };
 
         for (const witness of layout.witness) {
@@ -6402,7 +6483,7 @@ class KigumiViewerApp extends LitElement {
         text.setAttribute('class', `dim-label${extra}`);
         text.setAttribute('transform', `rotate(${layout.label.angle} ${layout.label.x} ${layout.label.y})`);
         text.textContent = this.fmt(value.value);
-        overlay.appendChild(text);
+        into.appendChild(text);
     }
 
     /**
@@ -6411,7 +6492,7 @@ class KigumiViewerApp extends LitElement {
      * At the corner rather than between them, because that is where an angle
      * is: the same two faces read as nothing at all anywhere else on the sheet.
      */
-    _drawAngle(overlay, viewport, pageRect, from, to, formA, formB, value, options = {}) {
+    _drawAngle(into, viewport, pageRect, from, to, formA, formB, value, options = {}) {
         // The screen direction of each projected line, taken by stepping a
         // little along it and seeing where that lands.
         const screenDirection = (point, direction) => {
@@ -6448,14 +6529,14 @@ class KigumiViewerApp extends LitElement {
             layout.end.x, layout.end.y,
         ].join(' '));
         arc.setAttribute('class', `dim-line${options.className ? ` ${options.className}` : ''}`);
-        overlay.appendChild(arc);
+        into.appendChild(arc);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', layout.label.x);
         text.setAttribute('y', layout.label.y);
         text.setAttribute('class', `dim-label${options.className ? ` ${options.className}` : ''}`);
         text.textContent = `${value.value.toFixed(1)}\u00b0`;
-        overlay.appendChild(text);
+        into.appendChild(text);
     }
 
     /** The members this scene is about, or null when it is about all of them. */
@@ -6684,8 +6765,7 @@ class KigumiViewerApp extends LitElement {
             host.addEventListener('kigumi-close-drawing', () => this.leaveDrawing());
             host.addEventListener('kigumi-save-drawings', () => this.saveDrawings());
             host.addEventListener('kigumi-focus-measurement', (event) => {
-                this.selectionManager.setMeasurementFocus(event.detail);
-                this._syncDrawingPanel();
+                this._focusMeasurementFrom(event.detail);
             });
             host.addEventListener('kigumi-select-drawing-member', (event) => {
                 this.selectionManager.selectTimber(

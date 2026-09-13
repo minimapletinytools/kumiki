@@ -100,6 +100,22 @@
         }
 
         /**
+         * Ask about the same place again, without the pointer having moved.
+         *
+         * For when the QUESTION changed rather than the place: stepping to the
+         * next feature under the pointer asks the same point a different thing,
+         * and `moved` would refuse it for not having travelled far enough.
+         */
+        askAgain() {
+            if (this.at === null) {
+                return false;
+            }
+            this._pending = { x: this.at.x, y: this.at.y };
+            this._stillFrames = 0;
+            return true;
+        }
+
+        /**
          * A frame passed. Returns the point to ask about, or nothing.
          *
          * Called from the render loop rather than a timer, so a hover cannot
