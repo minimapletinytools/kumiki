@@ -204,3 +204,98 @@ class TestAlongTheSheetsOwnDirections:
         anchors = distance_anchors(point((0, 5, 0)), point((4, -5, 9)), HORIZONTAL, AXES)
 
         assert abs(dot(run(anchors), AXES["right"])) == pytest.approx(4)
+
+
+class TestOnARealFrame:
+    """The rules reaching a measurement through collect_drawings."""
+
+    @pytest.fixture
+    def drawings(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_anchors", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_anchors"] = runner
+        spec.loader.exec_module(runner)
+        frame = load_module(
+            "anchors_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
+        ).build_frame()
+        return runner, runner.collect_drawings(frame, None, [])
+
+    def _measurements(self, runner, drawings):
+        from kumiki.drawing import projected_kinds
+
+        for drawing in drawings:
+            for viewport in drawing.get("viewports") or []:
+                axes = runner._viewport_axes(drawing, viewport["id"])
+                for measure in viewport.get("measurements") or []:
+                    if measure.get("unresolved") or not axes:
+                        continue
+                    admitted = projected_kinds(
+                        measure["a"].get("geometry"), measure["b"].get("geometry"),
+                        axes["look"])
+                    yield measure, axes, admitted
+
+    def _square_to(self, measure, end, look):
+        """How far from square the dimension is to one edge-on face."""
+        geometry = measure[end].get("geometry") or {}
+        if geometry.get("kind") != "plane":
+            return None
+        normal, run = geometry["normal"], [
+            measure["b"]["at"][i] - measure["a"]["at"][i] for i in range(3)]
+        across = (normal[1] * look[2] - normal[2] * look[1],
+                  normal[2] * look[0] - normal[0] * look[2],
+                  normal[0] * look[1] - normal[1] * look[0])
+        size = sum(part * part for part in across) ** 0.5
+        if size < 1e-9:
+            # Facing the reader rather than edge-on: no line to be square to.
+            return None
+        return dot(run, tuple(part / size for part in across)) / max(
+            1e-12, sum(part * part for part in run) ** 0.5)
+
+    def test_the_fixture_offers_both_a_distance_and_an_angle(self, drawings):
+        # Otherwise the two assertions below are not being exercised.
+        runner, collected = drawings
+        names = {
+            kind.name
+            for _measure, _axes, admitted in self._measurements(runner, collected)
+            for kind in admitted
+        }
+
+        assert "projected_perpendicular_distance" in names
+        assert "projected_angle" in names
+
+    def test_every_distance_is_drawn_square_to_what_it_measures(self, drawings):
+        runner, collected = drawings
+        checked = 0
+        for measure, axes, admitted in self._measurements(runner, collected):
+            if not admitted or admitted[0].name != "projected_perpendicular_distance":
+                continue
+            for end in ("a", "b"):
+                askew = self._square_to(measure, end, axes["look"])
+                if askew is None:
+                    continue
+                checked += 1
+                assert askew == pytest.approx(0, abs=1e-9)
+
+        assert checked > 0
+
+    def test_an_angle_keeps_the_anchors_its_features_gave_it(self, drawings):
+        # The distance rules would place a crossing pair square to one of them
+        # and not the other. An angle uses no anchor positions, and where it
+        # should sit is its own question.
+        runner, collected = drawings
+        crossing = [
+            measure for measure, _axes, admitted in self._measurements(runner, collected)
+            if admitted and admitted[0].name == "projected_angle"
+        ]
+
+        assert crossing, "the fixture should offer an angle"
+        for measure in crossing:
+            assert measure["a"]["at"] is not None
+            assert measure["b"]["at"] is not None

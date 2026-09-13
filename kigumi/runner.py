@@ -2467,27 +2467,161 @@ def collect_drawings(
     return drawings
 
 
-def _resolve_measurement(frame: Any, measure: Dict[str, Any]) -> Dict[str, Any]:
+def _measure_span(
+    feature: Any, node: Any, timber: Any, located: Any, root_csg: Any,
+    plane_normal: Optional[Sequence[float]],
+) -> Optional[Any]:
+    """What a feature is, once projected into the plane a measurement is on.
+
+    A point, or a line with an extent -- see MeasureSpan. The extent comes from
+    what the feature occupies once cropped to the timber, not from what declared
+    it: a cutter extended past the timber puts its declared extent out there
+    with it.
+
+    A FACE becomes a line, because a face is only measurable when it is seen
+    edge-on and a face seen edge-on draws as a line along itself. Which line
+    depends on the plane, which is why this needs it. Without a plane, or for a
+    face that is not edge-on, it falls back to the point it used to be: enough
+    to attach a dimension to, and no worse than before.
+    """
+    from kumiki.geometry import Line, Plane, Point
+    from kumiki.cropcsg import (
+        approximately_crop_plane_to_area_on_csg,
+        crop_line_to_segments_on_csg,
+    )
+    from kumiki.drawing import MeasureSpan
+
+    to_world = lambda v: tuple(_vector3_to_floats(timber.transform.local_to_global(v)))
+
+    if isinstance(located, Point):
+        return MeasureSpan(at=to_world(located.position))
+
+    solid = timber.get_perfect_timber_within_csg_local()
+    reach = float(timber.length) * 4
+
+    if isinstance(located, Line) and root_csg is not None:
+        pieces = crop_line_to_segments_on_csg(
+            located, root_csg, seed_reach=reach, near=solid.transform.position)
+        if pieces:
+            # The longest. A cut can leave an edge in several, and a dimension
+            # has to attach to one of them -- the biggest is the one a reader
+            # would point at.
+            longest = max(pieces, key=lambda piece: piece.length())
+            start, end = to_world(longest.start), to_world(longest.end)
+            direction = _normalize([end[i] - start[i] for i in range(3)])
+            return MeasureSpan(
+                at=start, direction=tuple(direction),
+                interval=(0.0, math.dist(start, end)))
+
+    if isinstance(located, Plane):
+        cropped = approximately_crop_plane_to_area_on_csg(
+            located, [node, solid], seed_reach=reach, near=solid.transform.position)
+        middle = cropped.centroid() if cropped is not None and not cropped.is_empty else None
+        if middle is None:
+            return None
+        at = to_world(middle)
+        if plane_normal is None:
+            return MeasureSpan(at=at)
+        # Edge-on, so it draws as a line running along the face, square to its
+        # own normal and to the way we are looking.
+        normal = _normalize(_located_geometry_payload(located, timber)["normal"])
+        along = _cross(normal, _normalize(list(plane_normal)))
+        if not any(abs(part) > 1e-9 for part in along):
+            # Facing the reader rather than edge-on: it covers the view and
+            # admits no measurement, so there is no line to give.
+            return MeasureSpan(at=at)
+        along = _normalize(along)
+        # The region is timber-local and the direction is world, so the boundary
+        # is brought over rather than the direction sent back. Mixing the two
+        # spaces is the kind of wrong that still looks plausible on screen.
+        if not cropped.boundary:
+            return MeasureSpan(at=at)
+        reach = [_dot(list(to_world(corner)), along) for corner in cropped.boundary]
+        here = _dot(list(at), along)
+        return MeasureSpan(
+            at=at, direction=tuple(along),
+            interval=(min(reach) - here, max(reach) - here))
+
+    return None
+
+
+def _resolve_measurement(
+    frame: Any, measure: Dict[str, Any], axes: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
     """A measurement with its anchors found, or marked as not findable.
 
     Resolved here rather than in the viewer because finding a feature means
     walking the CSG, which is python's. What the viewer gets is geometry in
     world space, which it can project into whichever viewport the measurement
     belongs to.
+
+    The two ends are resolved TOGETHER. Where a dimension attaches is a property
+    of the pair and of the plane it is drawn on, not of either feature alone: an
+    anchor chosen per feature cannot know where the two face each other, and two
+    parallel edges each taking their own midpoint gave a dimension that leaned.
+    Only when the pair cannot be placed together does each fall back to a point
+    of its own, which is what a feature that resolves to nothing else can offer.
     """
+    from kumiki.drawing import (MeasurementDirection, MeasurementKind,
+                               MeasurementOperation, MeasurementSpace,
+                               distance_anchors, projected_kinds)
+
     resolved = dict(measure)
     broken = []
+    found = {}
+    spans = {}
+    plane = (measure.get("plane") or {}).get("normal")
+    if plane is None and axes is not None:
+        # No plane written means the viewport's, which is the invariant an
+        # orthographic viewport's measurements are entitled to rely on.
+        plane = axes.get("look")
+
     for key in ("a", "b"):
-        found = resolve_anchor(frame, measure.get(key))
-        if found is None:
+        placed = _resolve_anchor_placed(frame, measure.get(key), plane)
+        if placed is None:
             broken.append(key)
-        else:
-            resolved[key] = {**(measure.get(key) or {}), **found}
+            continue
+        found[key], spans[key] = placed
+        resolved[key] = {**(measure.get(key) or {}), **found[key]}
+
     if broken:
         # Shown greyed rather than dropped: a reference that stops resolving is
         # worth seeing, since the fix is usually a rename away.
         resolved["unresolved"] = broken
+        return resolved
+
+    placeable = (
+        spans.get("a") is not None and spans.get("b") is not None and plane is not None)
+    if placeable:
+        # What this pair admits from here, so the anchors are placed for the
+        # measurement that will actually be drawn. Defaulting to perpendicular
+        # instead put two crossing faces -- which admit an ANGLE and nothing
+        # else -- through the parallel-line rule, and came out square to one of
+        # them and not the other.
+        admitted = projected_kinds(
+            resolved["a"].get("geometry"), resolved["b"].get("geometry"), plane)
+        kind = MeasurementKind.from_wire(measure.get("kind")) or (
+            admitted[0] if admitted else None)
+        # An angle uses no anchor positions at all, and where it should sit is
+        # its own question. A pair that admits nothing has nothing to place.
+        if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
+            at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, axes)
+            resolved["a"] = {**resolved["a"], "at": list(at_a)}
+            resolved["b"] = {**resolved["b"], "at": list(at_b)}
     return resolved
+
+
+def _viewport_axes(scene: Dict[str, Any], viewport_id: str) -> Optional[Dict[str, Any]]:
+    """A viewport's camera frame, as the measurement code wants it."""
+    for viewport in scene.get("viewports") or []:
+        if viewport.get("id") != viewport_id:
+            continue
+        camera = viewport.get("camera")
+        if not camera:
+            return None
+        return {"look": camera.get("look"), "right": camera.get("right"),
+                "up": camera.get("up")}
+    return None
 
 
 def _attach_measurements(
@@ -2512,8 +2646,14 @@ def _attach_measurements(
     drawn. That is what a drawing made from a selection did: it is a file
     drawing, and the file loop was the caller that left it out.
     """
+    # Each viewport's own camera frame goes with its measurements: the sheet's
+    # across and up are what a horizontal or vertical distance is measured
+    # along, and its look is the plane of any measurement that did not write one.
     remaining = {
-        viewport: [_resolve_measurement(frame, measure) for measure in measures]
+        viewport: [
+            _resolve_measurement(frame, measure, _viewport_axes(scene, viewport))
+            for measure in measures
+        ]
         for viewport, measures in by_viewport.items()
     }
     for viewport in scene.get("viewports") or []:
@@ -2867,6 +3007,14 @@ def _find_declared_feature(cut_timber: Any, ref: Any) -> Optional[Tuple[Any, Any
 
 
 def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Where one feature is, on its own. See _resolve_anchor_placed for the pair."""
+    placed = _resolve_anchor_placed(frame, anchor, None)
+    return None if placed is None else placed[0]
+
+
+def _resolve_anchor_placed(
+    frame: Any, anchor: Dict[str, Any], plane: Optional[Sequence[float]],
+):
     """Where the feature an anchor names actually is, in world space.
 
     None when it cannot be found -- a renamed feature, a timber that has gone, a
@@ -2913,20 +3061,28 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
             return None
         owner = first[1]
         located = edge.locate(owner)
-        return {
-            "at": _feature_anchor(edge, owner, timber, located, root_csg),
-            "geometry": _located_geometry_payload(located, timber),
-        }
+        return _anchor_payload(edge, owner, timber, located, root_csg, plane)
 
     found = _find_declared_feature(entry["cutTimber"], path.ref)
     if found is None:
         return None
     feature, node = found
     located = feature.locate(node)
-    return {
+    return _anchor_payload(feature, node, timber, located, root_csg, plane)
+
+
+def _anchor_payload(feature, node, timber, located, root_csg, plane):
+    """What one end of a measurement is: where it is, what it lies on, its extent.
+
+    The span is what the pairwise rules need and the anchor is what they fall
+    back to. Both come from one lookup so they cannot end up describing
+    different features.
+    """
+    span = _measure_span(feature, node, timber, located, root_csg, plane)
+    return ({
         "at": _feature_anchor(feature, node, timber, located, root_csg),
         "geometry": _located_geometry_payload(located, timber),
-    }
+    }, span)
 
 
 def serialize_layers(frame: Any) -> Dict[str, Any]:
