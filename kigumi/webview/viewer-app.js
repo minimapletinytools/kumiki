@@ -35,6 +35,10 @@ const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
 // to it without a second implementation; reserved so nothing in python declares
 // one. See docs/measurement-spec.md.
 const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
+// Only a measurement the file owns can be deleted here. 'code' and 'overridden'
+// both mean the frame's python is still asking for it, and an override is
+// somebody's placement or kind on top of one the code owns.
+const MEASUREMENT_FILE_ORIGIN = 'file';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
@@ -1378,6 +1382,9 @@ class KigumiViewerApp extends LitElement {
         this.undoStacks = new window.KigumiUndoStacks.UndoStacks();
         /** Lines drawn for the feature a measurement is being taken from. */
         this._heldFeatureLines = [];
+        // The eyeball on the 3D measurements node. About looking rather than
+        // about the drawing, so deliberately not on the undo stack.
+        this.measurementsHidden = false;
 
         this.showCenterGizmo = true;
         this.footprintObjects = [];
@@ -2966,6 +2973,33 @@ class KigumiViewerApp extends LitElement {
         if (event.defaultPrevented) {
             return;
         }
+        // Undo and redo act on the drawing in front of you, which is what they
+        // are keyed by. Refused while a measurement is half-made: there is
+        // nothing on the stack for it, so undo would reach past the thing you
+        // are looking at to something you are not.
+        const accel = event.metaKey || event.ctrlKey;
+        if (accel && (event.key === 'z' || event.key === 'Z')) {
+            event.preventDefault();
+            if (event.shiftKey) {
+                this.redoMeasurementChange();
+            } else {
+                this.undoMeasurementChange();
+            }
+            return;
+        }
+        if (accel && (event.key === 'y' || event.key === 'Y')) {
+            event.preventDefault();
+            this.redoMeasurementChange();
+            return;
+        }
+        if (event.key === 'Delete' || event.key === 'Backspace') {
+            // Nothing to delete is not an error: a measurement the code asks
+            // for is passed over, and the key simply does nothing.
+            if (this.deleteMarkedMeasurements()) {
+                event.preventDefault();
+            }
+            return;
+        }
         if (event.key === 'Escape') {
             event.preventDefault();
             if (this.contextMenuState) {
@@ -3344,6 +3378,124 @@ class KigumiViewerApp extends LitElement {
         if (typeof vscode !== 'undefined') {
             vscode.postMessage(payload);
         }
+    }
+
+    /**
+     * The measurement being looked at, with what this view makes of it.
+     *
+     * Defaults to the focused one; the arguments ask about a particular one.
+     */
+    focusedMeasurement(viewportId, measureKey) {
+        let wanted = { viewportId, measureKey };
+        if (viewportId === undefined) {
+            const focus = this.selectionManager.measurementFocus;
+            if (!focus) {
+                return null;
+            }
+            wanted = focus;
+        }
+        const viewport = this.viewports.find((one) => one.id === wanted.viewportId);
+        if (!viewport) {
+            return null;
+        }
+        const measure = (viewport.spec.measurements || []).find(
+            (one) => measurementKey(one) === wanted.measureKey);
+        if (!measure) {
+            return null;
+        }
+        return { viewportId: wanted.viewportId, measureKey: wanted.measureKey, measure };
+    }
+
+    /**
+     * Delete every measurement picked out, where it is the file's own.
+     *
+     * A measurement the frame's code asks for is not the viewer's to remove --
+     * the code asks again the next time it runs -- so it is passed over rather
+     * than refused with a message. The key does nothing for one, which is the
+     * whole of what "there is no delete for it" means.
+     */
+    deleteMarkedMeasurements() {
+        if (this.measureDraft.isActive) {
+            return false;
+        }
+        const drawingId = this.sceneStore.activeSceneId;
+        const removable = this.selectionManager.getMarkedMeasurements()
+            .map((mark) => this.focusedMeasurement(mark.viewportId, mark.measureKey))
+            .filter((found) => found && found.measure.origin === MEASUREMENT_FILE_ORIGIN);
+        if (removable.length === 0) {
+            return false;
+        }
+        for (const found of removable) {
+            const measure = found.measure;
+            const a = KigumiMeasurements.anchorReference(measure.a);
+            const b = KigumiMeasurements.anchorReference(measure.b);
+            const payload = {
+                type: 'deleteMeasurement',
+                drawingId,
+                viewportId: found.viewportId,
+                a,
+                b,
+                measureId: measure.measureId || null,
+            };
+            this.undoStacks.push(this.frameKey, drawingId, {
+                label: 'delete measurement',
+                redo: payload,
+                undo: {
+                    type: 'addMeasurement',
+                    drawingId,
+                    viewportId: found.viewportId,
+                    a,
+                    b,
+                    measureId: measure.measureId || null,
+                    kind: measure.kind || null,
+                    plane: measure.plane || null,
+                    placement: measure.placement || null,
+                },
+            });
+            this._sendMeasurementCommand(payload);
+        }
+        this.selectionManager.clearMeasurementMarks();
+        return true;
+    }
+
+    /**
+     * Take back the last change to this drawing, or put it back.
+     *
+     * The entries hold a pair of calls rather than a snapshot, because the model
+     * of record is python and the viewer keeps no copy to restore. So undoing is
+     * sending the other one.
+     */
+    undoMeasurementChange() {
+        const drawingId = this.sceneStore.activeSceneId;
+        const entry = this.undoStacks.undo(this.frameKey, drawingId);
+        if (!entry) {
+            return false;
+        }
+        this.emitViewerLog('measure-undo', { label: entry.label });
+        this._sendMeasurementCommand(entry.undo);
+        return true;
+    }
+
+    redoMeasurementChange() {
+        const drawingId = this.sceneStore.activeSceneId;
+        const entry = this.undoStacks.redo(this.frameKey, drawingId);
+        if (!entry) {
+            return false;
+        }
+        this.emitViewerLog('measure-redo', { label: entry.label });
+        this._sendMeasurementCommand(entry.redo);
+        return true;
+    }
+
+    /** Show or hide every 3D measurement at once. */
+    setMeasurementsHidden(hidden) {
+        const next = Boolean(hidden);
+        if (this.measurementsHidden === next) {
+            return;
+        }
+        this.measurementsHidden = next;
+        this.renderMeasurements();
+        this.requestUpdate();
     }
 
     /** Which drawing a measurement made now belongs to. */
@@ -5876,14 +6028,46 @@ class KigumiViewerApp extends LitElement {
         }
         overlay.setAttribute('viewBox', `0 0 ${element.offsetWidth} ${element.offsetHeight}`);
         overlay.innerHTML = '';
-        if (!this.activePage) {
-            // The 3D scene is not a sheet, and has nothing to draw dimensions on.
-            return;
-        }
 
-        const pageRect = this.pageScreenRect(element.offsetWidth, element.offsetHeight);
+        // A drawing is laid out on a sheet, so its viewports sit on the page
+        // rect. The 3D scene is not a sheet: its one viewport IS the canvas, so
+        // the page rect is the canvas and the rest of the path is the same. It
+        // used to return here, which is why a measurement made in the 3D view
+        // had nowhere to appear.
+        const pageRect = this.activePage
+            ? this.pageScreenRect(element.offsetWidth, element.offsetHeight)
+            : { x: 0, y: 0, width: element.offsetWidth, height: element.offsetHeight };
+
         for (const viewport of this.viewports) {
             for (const measure of (viewport.spec.measurements || [])) {
+                this._drawMeasurement(overlay, viewport, pageRect, measure);
+            }
+        }
+        if (!this.activePage) {
+            this._drawThreeDMeasurements(overlay, pageRect);
+        }
+    }
+
+    /**
+     * The 3D view's own measurements, which belong to no drawing on screen.
+     *
+     * They live in a reserved drawing rather than on the scene the viewer is
+     * showing, so they are not on any viewport's spec and have to be fetched.
+     * Drawn through the live camera: each carries its own plane, so the number
+     * does not move when the camera does, only the picture of it.
+     */
+    _drawThreeDMeasurements(overlay, pageRect) {
+        if (this.measurementsHidden) {
+            return;
+        }
+        const viewport = this.viewports[0];
+        const drawing = this.sceneStore.drawings()
+            .find((one) => one.id === THREE_D_MEASUREMENTS_ID);
+        if (!viewport || !drawing) {
+            return;
+        }
+        for (const pane of drawing.viewports || []) {
+            for (const measure of pane.measurements || []) {
                 this._drawMeasurement(overlay, viewport, pageRect, measure);
             }
         }

@@ -357,3 +357,60 @@ describe('planeMatchesView', () => {
         expect(planeMatchesView({ normal: [0.01, 1, 0] }, [0, 1, 0])).toBe(false);
     });
 });
+
+
+const { anchorReference } = require('../webview/measurements.js');
+
+describe('anchorReference', () => {
+    // A measurement comes back with its anchors resolved, and is rewritten by
+    // sending it back. What resolving added must not come with it: the file
+    // holds which feature, and where that feature is belongs to whichever
+    // frame is loaded at the time.
+    const resolved = {
+        timber: 'post#0',
+        csgPath: ['cut', 'mortise'],
+        feature: 'cheek',
+        type: 'FACE',
+        at: [1, 2, 3],
+        geometry: { kind: 'plane', normal: [0, 0, 1], at: [1, 2, 3] },
+    };
+
+    test('keeps what names the feature and drops where it resolved to', () => {
+        expect(anchorReference(resolved)).toEqual({
+            timber: 'post#0',
+            csgPath: ['cut', 'mortise'],
+            feature: 'cheek',
+            type: 'FACE',
+        });
+    });
+
+    test('an edge keeps both the parents that form it', () => {
+        const edge = {
+            kind: 'edge',
+            timber: 'post#0',
+            a: { csgPath: ['cut'], feature: 'shoulder' },
+            b: { csgPath: [], feature: 'top' },
+            type: 'EDGE',
+            at: [0, 0, 0],
+            geometry: { kind: 'line', direction: [1, 0, 0], at: [0, 0, 0] },
+        };
+
+        expect(anchorReference(edge)).toEqual({
+            kind: 'edge',
+            timber: 'post#0',
+            a: { csgPath: ['cut'], feature: 'shoulder' },
+            b: { csgPath: [], feature: 'top' },
+            type: 'EDGE',
+        });
+    });
+
+    test('a missing anchor stays missing rather than becoming an empty one', () => {
+        expect(anchorReference(null)).toBeNull();
+    });
+
+    test('a reference that was never resolved survives the round trip', () => {
+        const reference = { timber: 'post#0', csgPath: [], feature: 'top', type: 'FACE' };
+
+        expect(anchorReference(reference)).toEqual(reference);
+    });
+});
