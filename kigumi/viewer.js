@@ -153,7 +153,6 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const inputControllerJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'input-controller.js'))).toString();
     const measurementsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measurements.js'))).toString();
     const hoverStateJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'hover-state.js'))).toString();
-    const measureModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'measure-mode.js'))).toString();
     const pickTolerancesJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'pick-tolerances.js'))).toString();
     const renderModeJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'render-mode.js'))).toString();
     const drawingPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'drawing-panel.js'))).toString();
@@ -211,7 +210,6 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__INPUT_CONTROLLER_JS_URI__', inputControllerJsUri)
         .replace('__MEASUREMENTS_JS_URI__', measurementsJsUri)
         .replace('__HOVER_STATE_JS_URI__', hoverStateJsUri)
-        .replace('__MEASURE_MODE_JS_URI__', measureModeJsUri)
         .replace('__PICK_TOLERANCES_JS_URI__', pickTolerancesJsUri)
         .replace('__RENDER_MODE_JS_URI__', renderModeJsUri)
         .replace('__DRAWING_PANEL_JS_URI__', drawingPanelJsUri)
