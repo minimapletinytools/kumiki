@@ -3301,6 +3301,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this._pendingKinds = message.kinds || null;
+        this.renderMeasurements();
         this.requestUpdate();
     }
 
@@ -3379,6 +3380,7 @@ class KigumiViewerApp extends LitElement {
             this.undoStacks.suspend(false);
         }
         this._pendingKinds = null;
+        this.renderMeasurements();
         this.emitViewerLog('measure-escape', { action: released.action });
         this.requestUpdate();
         return true;
@@ -3421,7 +3423,57 @@ class KigumiViewerApp extends LitElement {
         if (!measure) {
             return null;
         }
-        return { viewportId: wanted.viewportId, measureKey: wanted.measureKey, measure };
+        const status = KigumiMeasurements.measurementStatus(
+            measure, this.viewportAxes(viewport), this.viewportProjection(viewport));
+        return {
+            viewportId: wanted.viewportId,
+            measureKey: wanted.measureKey,
+            measure,
+            status,
+            // Every kind this pair admits here, refusals included: a measurement
+            // whose kind this view cannot draw, or one that comes to zero, is
+            // the one most worth offering another kind for. measurementStatus
+            // carries them on some answers only, but carries the forms they are
+            // worked out from on every answer that got far enough to have any.
+            available: status.available
+                || (status.formA && status.formB
+                    ? KigumiMeasurements.availableKinds(status.formA, status.formB)
+                    : []),
+        };
+    }
+
+    /**
+     * Change what a measurement measures between its two features.
+     *
+     * Sent as an update rather than an add: an add replaces whatever measured
+     * that pair, which would make this indistinguishable from a create on the
+     * undo stack.
+     */
+    setMeasurementKind(viewportId, measureKey, kind) {
+        const found = this.focusedMeasurement(viewportId, measureKey);
+        if (!found) {
+            return;
+        }
+        const drawingId = this.sceneStore.activeSceneId === DEFAULT_SCENE_ID
+            ? THREE_D_MEASUREMENTS_ID
+            : this.sceneStore.activeSceneId;
+        const was = found.measure.kind || null;
+        const where = {
+            drawingId,
+            viewportId,
+            a: KigumiMeasurements.anchorReference(found.measure.a),
+            b: KigumiMeasurements.anchorReference(found.measure.b),
+            measureId: found.measure.measureId || null,
+        };
+        this._focusMeasurementOnArrival = { viewportId, measureKey };
+        this.undoStacks.push(this.frameKey, drawingId, {
+            label: 'measurement kind',
+            redo: { type: 'updateMeasurement', ...where, changes: { kind } },
+            undo: { type: 'updateMeasurement', ...where, changes: { kind: was } },
+        });
+        this._sendMeasurementCommand(
+            { type: 'updateMeasurement', ...where, changes: { kind } });
+        this.emitViewerLog('measure-kind', { viewport: viewportId, kind });
     }
 
     /**
@@ -3538,6 +3590,43 @@ class KigumiViewerApp extends LitElement {
         this.selectionManager.setMeasurementFocus(wanted);
         this._syncDrawingPanel();
         this.selectionPanel.updateInfo(this.currentFrameData);
+    }
+
+    /**
+     * How far a dimension sits from what it measures, in page pixels.
+     *
+     * The reader's, when they have moved it; otherwise the viewport's default.
+     * A measurement's one degree of freedom once its two ends are fixed.
+     */
+    _measurementOffset(measure) {
+        const placement = measure && measure.placement;
+        const offset = placement && placement.offset;
+        return typeof offset === 'number' ? offset : MEASUREMENT_OFFSET_PX;
+    }
+
+    /**
+     * The measurement being made, shaped like a written one so it can be drawn.
+     *
+     * Drawn before it exists, because confirming something you cannot see is
+     * confirming blind -- and because the correction for a mis-picked second
+     * end is to pick another, which you can only judge by looking at it.
+     *
+     * The ends carry their resolved geometry already: the pick brought it back.
+     */
+    _pendingMeasurementForDisplay() {
+        const draft = this.measureDraft;
+        if (draft.state !== window.KigumiMeasureDraft.STATES.PENDING) {
+            return null;
+        }
+        const end = (anchor) => ({
+            ...anchor.reference, at: anchor.at, geometry: anchor.geometry,
+        });
+        return {
+            a: end(draft.held),
+            b: end(draft.other),
+            plane: draft.plane || null,
+            kind: (this._pendingKinds && this._pendingKinds[0]) || null,
+        };
     }
 
     /** Show or hide every 3D measurement at once. */
@@ -6110,6 +6199,18 @@ class KigumiViewerApp extends LitElement {
         if (!this.activePage) {
             this._drawThreeDMeasurements(overlay, pageRect);
         }
+
+        // Last, and over the rest: what is being made now is what you are
+        // looking at.
+        const pending = this._pendingMeasurementForDisplay();
+        if (pending) {
+            const viewport = this.viewports.find((one) => one.id === this.measureDraft.viewportId)
+                || this.viewports[0];
+            if (viewport) {
+                this._drawMeasurement(
+                    overlay, viewport, pageRect, pending, { className: 'dim-pending' });
+            }
+        }
     }
 
     /**
@@ -6176,7 +6277,7 @@ class KigumiViewerApp extends LitElement {
         };
     }
 
-    _drawMeasurement(overlay, viewport, pageRect, measure) {
+    _drawMeasurement(overlay, viewport, pageRect, measure, options = {}) {
         const axes = this.viewportAxes(viewport);
         // The same answer the list shows, so a dimension that is not drawn and
         // a row that says why can never disagree.
@@ -6197,7 +6298,11 @@ class KigumiViewerApp extends LitElement {
         const layout = KigumiMeasurements.dimensionLayout(
             this._projectToPage(from, viewport, pageRect),
             this._projectToPage(to, viewport, pageRect),
-            { offset: MEASUREMENT_OFFSET_PX },
+            // Where the reader put it, or the viewport's own default. This is
+            // the one degree of freedom a dimension has once its two ends are
+            // fixed, and it was being ignored: a saved offset drew where the
+            // default said, and dragging would have had nothing to change.
+            { offset: this._measurementOffset(measure) },
         );
         if (!layout) {
             // Far enough apart in the world, but on top of each other once
@@ -6205,13 +6310,14 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
+        const extra = options.className ? ` ${options.className}` : '';
         const draw = (from_, to_, className) => {
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', from_.x);
             line.setAttribute('y1', from_.y);
             line.setAttribute('x2', to_.x);
             line.setAttribute('y2', to_.y);
-            line.setAttribute('class', className);
+            line.setAttribute('class', className + extra);
             overlay.appendChild(line);
         };
 
@@ -6223,7 +6329,7 @@ class KigumiViewerApp extends LitElement {
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', layout.label.x);
         text.setAttribute('y', layout.label.y);
-        text.setAttribute('class', 'dim-label');
+        text.setAttribute('class', `dim-label${extra}`);
         text.setAttribute('transform', `rotate(${layout.label.angle} ${layout.label.x} ${layout.label.y})`);
         text.textContent = this.fmt(value.value);
         overlay.appendChild(text);

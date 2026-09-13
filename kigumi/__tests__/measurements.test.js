@@ -414,3 +414,43 @@ describe('anchorReference', () => {
         expect(anchorReference(reference)).toEqual(reference);
     });
 });
+
+describe('which kinds a focused measurement offers to change to', () => {
+    // What the info pane's dropdown is built from: the kinds this pair admits
+    // in this view, and the one currently being drawn.
+    const AXES = { look: [0, -1, 0], right: [1, 0, 0], up: [0, 0, 1] };
+    const point = (at) => ({ at, geometry: { kind: 'point', at } });
+
+    test('two points admit three, so there is a choice to offer', () => {
+        const status = measurementStatus({ a: point([0, 0, 0]), b: point([1, 0, 1]) }, AXES);
+
+        expect(status.available.length).toBe(3);
+    });
+
+    test('the default is the first, which is what a new one is written with', () => {
+        const status = measurementStatus({ a: point([0, 0, 0]), b: point([1, 0, 1]) }, AXES);
+
+        expect(status.kind).toBe(status.available[0]);
+    });
+
+    test('a written kind is what is drawn, not the default', () => {
+        const status = measurementStatus({
+            a: point([0, 0, 0]), b: point([1, 0, 1]),
+            kind: 'projected_vertical_distance',
+        }, AXES);
+
+        expect(status.kind).toBe('projected_vertical_distance');
+    });
+
+    test('two in line still admit the kinds that would not read zero', () => {
+        // Refused as degenerate under the default kind, and horizontal or
+        // vertical between the same two points is a real number -- so the
+        // dropdown has somewhere to go, which is the point of offering it on a
+        // refusal at all.
+        const status = measurementStatus({ a: point([0, 0, 0]), b: point([0, 5, 0]) }, AXES);
+
+        expect(status.drawable).toBe(false);
+        expect(status.reason).toBe('degenerate');
+        expect(availableKinds(status.formA, status.formB).length).toBe(3);
+    });
+});

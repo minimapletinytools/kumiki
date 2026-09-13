@@ -306,6 +306,14 @@ canvas { display: block; width: 100%; height: 100%; }
     opacity: 0.7;
 }
 
+/* A measurement being made, before it is confirmed. Dashed, because it is not
+   there yet -- and drawn at all, because confirming what you cannot see is
+   confirming blind. */
+.dim-pending {
+    stroke-dasharray: 5 3;
+    opacity: 0.85;
+}
+
 .dim-label {
     fill: var(--hv-title);
     font-size: 11px;
@@ -426,6 +434,21 @@ canvas { display: block; width: 100%; height: 100%; }
 .ip-detail-label {
     color: var(--hv-dim);
     min-width: 78px;
+}
+
+/* How a focused measurement is measured, when the pair admits more than one
+   way. Sized to its row rather than to the panel: the label beside it is the
+   fixed part. */
+.ip-kind {
+    font: inherit;
+    font-size: 0.95em;
+    color: var(--hv-text);
+    background: var(--hv-panel-bg);
+    border: 1px solid var(--hv-panel-border);
+    border-radius: 3px;
+    padding: 0 2px;
+    max-width: 100%;
+    cursor: pointer;
 }
 
 .ip-detail-value {
