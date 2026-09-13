@@ -309,19 +309,59 @@
      * Whether a measurement can be drawn in this viewport, and what it comes to.
      *
      * One answer for both the sheet and the list, so that a dimension which is
-     * not drawn and a row which says why cannot disagree. Four ways to fail, and
-     * they are worth telling apart: a reference that no longer resolves is
-     * broken everywhere, while the other three are about this view alone -- the
-     * same measurement can read fine under one viewport and be refused by the
-     * next.
+     * not drawn and a row which says why cannot disagree. Five ways to fail, and
+     * they are worth telling apart: a reference that no longer resolves, and a
+     * plane that disagrees with the view it is drawn in, are broken wherever you
+     * look at them, while the other three are about this view alone -- the same
+     * measurement can read fine under one viewport and be refused by the next.
+     *
+     * The measurement's own plane decides the projection when it has one; the
+     * viewport's look is the fallback, which is what every measurement written
+     * before planes existed relies on. That is what keeps a number steady while
+     * a camera orbits -- the plane does not move when the camera does.
+     *
+     * `options.orthographic` says whether the viewport projects onto a plane at
+     * all. A perspective camera does not, so the match below means nothing there
+     * and is not asked -- see the 3D view and a drawing's preview.
      */
-    function measurementStatus(measure, axes) {
+    /**
+     * How closely a measurement's plane has to match an orthographic viewport's.
+     *
+     * Both are computed -- one derived when the measurement was made, one from
+     * the viewport's declared camera -- so they agree to within arithmetic
+     * rather than exactly.
+     */
+    const PLANE_MATCH_EPSILON = 1e-6;
+
+    /**
+     * Whether a measurement's plane is the one this viewport projects onto.
+     *
+     * Up to sign, since a plane has no front, and only in direction: where the
+     * plane sits along the view cannot change an orthographic projection.
+     */
+    function planeMatchesView(plane, look) {
+        if (!plane || !plane.normal) {
+            return true;
+        }
+        return Math.abs(Math.abs(dot(normalized(plane.normal), normalized(look))) - 1)
+            <= PLANE_MATCH_EPSILON;
+    }
+
+    function measurementStatus(measure, axes, options) {
         if (!measure || measure.unresolved || !measure.a || !measure.b
             || !measure.a.at || !measure.b.at) {
             return { drawable: false, reason: 'unresolved' };
         }
-        const formA = projectedForm(measure.a.geometry, axes.look);
-        const formB = projectedForm(measure.b.geometry, axes.look);
+        const orthographic = !options || options.orthographic !== false;
+        const plane = measure.plane || null;
+        if (orthographic && !planeMatchesView(plane, axes.look)) {
+            // Not re-planed to match: that would quietly change the number
+            // someone has already read off the sheet.
+            return { drawable: false, reason: 'plane-mismatch', plane };
+        }
+        const look = plane && plane.normal ? plane.normal : axes.look;
+        const formA = projectedForm(measure.a.geometry, look);
+        const formB = projectedForm(measure.b.geometry, look);
         const available = availableKinds(formA, formB);
         if (available.length === 0) {
             return { drawable: false, reason: 'not-measurable', formA, formB };
@@ -333,7 +373,10 @@
             };
         }
         const kind = measure.kind || available[0];
-        const value = measureValue(kind, measure.a.at, measure.b.at, formA, formB, axes);
+        // The plane's look, not the viewport's, for the same reason the forms
+        // were taken with it: the two have to describe one projection.
+        const value = measureValue(
+            kind, measure.a.at, measure.b.at, formA, formB, { ...axes, look });
         if (value.unit === 'length' && value.value < DEGENERATE_WORLD) {
             return { drawable: false, reason: 'degenerate', kind, formA, formB };
         }
@@ -407,11 +450,45 @@
         return angle;
     }
 
+    /**
+     * Just the reference part of an anchor, as the file holds it.
+     *
+     * A measurement read back carries where its anchors resolved to as well --
+     * a world point and the plane or line it lies on -- and writing that back
+     * would put in the drawings file what the next resolve recomputes anyway,
+     * and what goes stale the moment the timber moves.
+     */
+    function anchorReference(anchor) {
+        if (!anchor) {
+            return null;
+        }
+        if (anchor.kind === 'edge') {
+            // Its two parents carry no resolved fields of their own: only the
+            // anchor they hang off is merged into.
+            return {
+                kind: 'edge',
+                timber: anchor.timber,
+                a: anchor.a,
+                b: anchor.b,
+                type: anchor.type,
+            };
+        }
+        return {
+            timber: anchor.timber,
+            csgPath: anchor.csgPath || [],
+            feature: anchor.feature,
+            type: anchor.type,
+        };
+    }
+
     const KigumiMeasurements = {
         PROJECTED_RULES,
+        anchorReference,
         normalizeKind,
         projectedForm,
         measurementStatus,
+        planeMatchesView,
+        PLANE_MATCH_EPSILON,
         availableKinds,
         kindApplies,
         projectedSeparation,

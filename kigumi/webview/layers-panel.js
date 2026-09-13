@@ -1,4 +1,8 @@
 (function (globalScope) {
+    // The reserved drawing that holds the 3D view's measurements. Not a drawing
+    // you open -- see docs/measurement-spec.md.
+    const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
+
     // LayersPanel renders a collapsible overlay tree on the left edge of the viewport.
     // It syncs bidirectionally with SelectionStore: canvas clicks highlight the
     // corresponding row, and clicking a row updates the canvas selection.
@@ -49,6 +53,9 @@
             // Drawings, and which of them is open. Set by the viewer; the panel
             // keeps no list of its own to fall out of step.
             this.drawings = [];
+            /** Whether a drawing is open: the 3D measurements section hides then. */
+            this.inDrawing = false;
+            this.measurementsHidden = false;
             this.activeSceneId = null;
             this.drawingsEnabled = false;
             this.viewport = null;
@@ -195,15 +202,28 @@
             if (!this._treeEl) return;
             this._treeEl.innerHTML = '';
             if (this.drawingsEnabled) {
+                // No save button here. Saving is offered in the drawing panel,
+                // beside the drawing being saved; two of them is two places to
+                // look and one to forget to update.
                 this._renderSection(
                     this._treeEl, 'drawings', t('viewer.layers.section.drawings'),
                     () => this._buildDrawingRows(),
-                    () => this._makeSaveDrawingsButton(),
                 );
             }
             this._renderSection(this._treeEl, 'tags', t('viewer.layers.section.tags'), () => this._buildTagRows());
             this._renderSection(this._treeEl, 'timbers', t('viewer.layers.section.timbers'), () => this._buildTimberRows());
             this._renderSection(this._treeEl, 'joints', t('viewer.layers.section.joints'), () => this._buildJointRows());
+            // Last, and only in the 3D view. These measurements are about the
+            // model rather than about any drawing of it, so inside a drawing
+            // they are neither shown nor drawable -- which is why this is the
+            // one section that comes and goes with the scene.
+            if (this.drawingsEnabled && !this.inDrawing) {
+                this._renderSection(
+                    this._treeEl, 'measurements', t('viewer.layers.section.measurements'),
+                    () => this._buildThreeDMeasurementRows(),
+                    () => this._makeMeasurementsEyeButton(),
+                );
+            }
             this._syncHighlight();
         }
 
@@ -373,8 +393,70 @@
 
         _buildDrawingRows() {
             return (this.drawings || [])
+                // The 3D measurements are held in a drawing so that the file
+                // merge, saving and identity all apply to them unchanged -- but
+                // it is not a drawing you open, and listing it among the ones
+                // you do would offer to enter a sheet that does not exist. It
+                // gets a section of its own below.
+                .filter((drawing) => drawing.id !== THREE_D_MEASUREMENTS_ID)
                 .filter((drawing) => this._matchesFilter(drawing.name || drawing.id))
                 .map((drawing) => this._makeDrawingRow(drawing));
+        }
+
+        /** The measurements held against the model rather than against a drawing. */
+        _threeDMeasurements() {
+            const drawing = (this.drawings || [])
+                .find((one) => one.id === THREE_D_MEASUREMENTS_ID);
+            if (!drawing) {
+                return [];
+            }
+            return (drawing.viewports || []).flatMap((pane) => pane.measurements || []);
+        }
+
+        _buildThreeDMeasurementRows() {
+            return this._threeDMeasurements()
+                .map((measure, index) => this._makeThreeDMeasurementRow(measure, index))
+                .filter(Boolean);
+        }
+
+        /** One 3D measurement: what it is between. */
+        _makeThreeDMeasurementRow(measure, index) {
+            const between = [measure.a, measure.b]
+                .map((anchor) => (anchor && anchor.feature) || (anchor && anchor.timber) || '?')
+                .join(' / ');
+            if (!this._matchesFilter(between)) {
+                return null;
+            }
+            const row = document.createElement('div');
+            row.className = 'lp-row lp-row-measurement lp-depth-0 lp-selectable';
+            row.dataset.nodeId = 'measurement:' + index;
+
+            const chev = document.createElement('span');
+            chev.className = 'lp-chev lp-leaf';
+            row.appendChild(chev);
+
+            const name = document.createElement('span');
+            name.className = 'lp-name';
+            name.textContent = between;
+            name.title = between;
+            row.appendChild(name);
+            return row;
+        }
+
+        /** The eyeball on the 3D measurements section: all of them, or none. */
+        _makeMeasurementsEyeButton() {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'lp-section-action';
+            button.textContent = this.measurementsHidden ? '\u25cb' : '\u25c9';
+            button.title = this.measurementsHidden
+                ? t('viewer.layers.measurements.show.title')
+                : t('viewer.layers.measurements.hide.title');
+            button.addEventListener('click', (event) => {
+                event.stopPropagation();
+                this._emit('kigumi-toggle-measurements', { hidden: !this.measurementsHidden });
+            });
+            return button;
         }
 
         /** One drawing: where it came from, what it is called, and whether it is saved. */
@@ -415,22 +497,6 @@
             });
 
             return row;
-        }
-
-        /** Save, on the section rather than the rows: it saves all of them. */
-        _makeSaveDrawingsButton() {
-            const anyUnsaved = (this.drawings || []).some((drawing) => drawing.dirty);
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'lp-section-action';
-            button.textContent = t('viewer.layers.drawing.save');
-            button.title = t('viewer.layers.drawing.save.title');
-            button.disabled = !anyUnsaved;
-            button.addEventListener('click', (event) => {
-                event.stopPropagation();
-                this._emit('kigumi-save-drawings', {});
-            });
-            return button;
         }
 
         /** One tag: its kind as a colour, its name, and how many wear it. */
@@ -635,9 +701,11 @@
         }
 
         /** The drawings to list, and which one is open. */
-        setDrawings(drawings, activeSceneId) {
+        setDrawings(drawings, activeSceneId, options = {}) {
             this.drawings = Array.isArray(drawings) ? drawings : [];
             this.activeSceneId = activeSceneId || null;
+            this.inDrawing = Boolean(options.inDrawing);
+            this.measurementsHidden = Boolean(options.measurementsHidden);
             this._render();
         }
 
@@ -947,11 +1015,11 @@
         }
 
         /** The drawings to list, and which one is open. */
-        setDrawings(drawings, activeSceneId) {
-            this._drawings = { drawings, activeSceneId };
+        setDrawings(drawings, activeSceneId, options = {}) {
+            this._drawings = { drawings, activeSceneId, options };
             this._ensureMounted();
             if (this._panel) {
-                this._panel.setDrawings(drawings, activeSceneId);
+                this._panel.setDrawings(drawings, activeSceneId, options);
             }
         }
 
@@ -989,7 +1057,9 @@
             this._panel.setHierarchy(this._hierarchy);
             // Whatever arrived before there was a panel to give it to.
             if (this._drawings) {
-                this._panel.setDrawings(this._drawings.drawings, this._drawings.activeSceneId);
+                this._panel.setDrawings(
+                    this._drawings.drawings, this._drawings.activeSceneId,
+                    this._drawings.options || {});
             }
             this._emitLayerStateSync();
         }

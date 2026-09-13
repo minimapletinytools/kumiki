@@ -13,6 +13,7 @@ are two dimensions with two numbers, and either may be meaningless while the
 other is fine.
 """
 
+import math
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import Dict, Iterator, Mapping, Optional, Sequence, Tuple, Union
@@ -213,6 +214,103 @@ _LEGACY_KIND_NAMES: Mapping[str, MeasurementKind] = {
 }
 
 
+#: How square something has to be to the view before it counts as square. An
+#: edge a hair off end-on still projects to a line, just a very short one, and
+#: calling it a point would refuse a dimension that is drawable.
+ALIGNMENT_EPSILON = 1e-3
+
+#: Two projected directions within this of parallel are treated as parallel: the
+#: angle between them would be a number nobody wrote down deliberately, and
+#: their separation is what was meant.
+PARALLEL_EPSILON = 1e-2
+
+
+def _unit(vector: Sequence[float]) -> Tuple[float, float, float]:
+    size = math.sqrt(sum(float(part) * float(part) for part in vector))
+    if size == 0:
+        return (0.0, 0.0, 0.0)
+    return tuple(float(part) / size for part in vector)
+
+
+def _dot(a: Sequence[float], b: Sequence[float]) -> float:
+    return sum(float(x) * float(y) for x, y in zip(a, b))
+
+
+def projected_form(
+    geometry: Optional[Mapping], look: Sequence[float],
+) -> Tuple[MeasurementFeature, Optional[Tuple[float, float, float]]]:
+    """What a feature behaves as once projected, and which way it runs.
+
+    A point stays a point. An edge seen end-on becomes one, and otherwise stays
+    a line. A face is a LINE seen edge-on and an AREA at any other angle -- and
+    an area covers the view, which is the whole of what PROJECTS_TO means by a
+    face having two answers.
+
+    The direction comes back with it because a pair of lines admits different
+    kinds depending on whether they are parallel, and the caller would otherwise
+    have to work the projection out a second time to find out.
+
+    None for `geometry` is a feature lying on no plane or line -- a cylinder's
+    barrel, a lofted side -- which is good to select and cannot be measured to.
+
+    THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
+    against each other. Two copies of a rule is how a rule drifts; the reason
+    for the second one is that the viewer projects on every pointer move and
+    cannot ask python each time.
+    """
+    kind = (geometry or {}).get("kind")
+    gaze = _unit(look)
+    if kind == "point":
+        return (MeasurementFeature.POINT, None)
+    if kind == "line":
+        direction = _unit(geometry.get("direction") or (0, 0, 0))
+        if abs(_dot(direction, gaze)) > 1 - ALIGNMENT_EPSILON:
+            return (MeasurementFeature.POINT, None)
+        return (MeasurementFeature.LINE, _flatten(direction, gaze))
+    if kind == "plane":
+        normal = _unit(geometry.get("normal") or (0, 0, 0))
+        if abs(_dot(normal, gaze)) > ALIGNMENT_EPSILON:
+            # Not edge-on: it covers the view, and an area has no distance.
+            return (MeasurementFeature.AREA, None)
+        # Edge-on, so it draws as a line along the plane, square to its normal
+        # and to the line of sight.
+        return (MeasurementFeature.LINE, _cross(normal, gaze))
+    return (None, None)
+
+
+def _flatten(direction: Sequence[float], gaze: Sequence[float]) -> Tuple[float, float, float]:
+    """The part of a direction that survives projection."""
+    along = _dot(direction, gaze)
+    return _unit([direction[i] - gaze[i] * along for i in range(3)])
+
+
+def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]:
+    return _unit([
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ])
+
+
+def projected_kinds(
+    one: Optional[Mapping], other: Optional[Mapping], look: Sequence[float],
+) -> Tuple[MeasurementKind, ...]:
+    """Which kinds this pair admits, seen from `look`. Empty when none.
+
+    The two halves put together: project both, then ask the table. This is the
+    question "could these two be measured against each other from here", which
+    is what decides whether a feature is worth preferring under the pointer.
+    """
+    form_one, run_one = projected_form(one, look)
+    form_other, run_other = projected_form(other, look)
+    if form_one is None or form_other is None:
+        return ()
+    parallel = None
+    if run_one is not None and run_other is not None:
+        parallel = abs(_dot(run_one, run_other)) > 1 - PARALLEL_EPSILON
+    return kinds_for(form_one, form_other, MeasurementSpace.PROJECTED, parallel=parallel)
+
+
 def kinds_for(
     feature_a: MeasurementFeature,
     feature_b: MeasurementFeature,
@@ -263,6 +361,64 @@ def kinds_for(
     # is technically available here too and is not offered: it is not what
     # anyone means by the distance to a line.
     return (perpendicular,)
+
+
+@dataclass(frozen=True)
+class MeasurementPlane:
+    """The flat surface a measurement is taken and drawn on.
+
+    The measurement's own property, not the viewport's. A drawing viewport is
+    locked, so a measurement in one could be evaluated against the viewport and
+    get a stable answer; the 3D view's camera is not, and the same two faces
+    would read a different number from one moment to the next as it orbits.
+    Carrying the plane makes the number the measurement's, and leaves the
+    viewport deciding only how it is drawn.
+
+    Floats rather than exact scalars, like Rect and for the same reason: this is
+    where a dimension is drawn, not where a joint is cut.
+
+    Its own dataclass rather than a bare pair because it will grow. A plane that
+    tracks a feature -- so that moving the timber moves the dimension with it --
+    is the obvious next form, and a pair of vectors leaves nowhere to say which
+    kind of plane this is.
+
+    None on a Measure means "derive it from the viewport", which is what every
+    measurement written before this means, and all an orthographic viewport's
+    measurements are entitled to mean.
+    """
+
+    #: A point on the plane, in world space.
+    at: Tuple[float, float, float]
+    #: The plane's normal, in world space. Not required to be unit length on the
+    #: way in; compared up to sign, since a plane has no front.
+    normal: Tuple[float, float, float]
+
+    def __post_init__(self):
+        for name in ("at", "normal"):
+            value = tuple(float(part) for part in getattr(self, name))
+            if len(value) != 3:
+                raise ValueError(f"A plane's {name} is [x, y, z], got {getattr(self, name)!r}")
+            object.__setattr__(self, name, value)
+        if not any(self.normal):
+            raise ValueError("A plane's normal cannot be zero length")
+
+    @classmethod
+    def from_wire(cls, value) -> Optional['MeasurementPlane']:
+        """A plane as read from a file, or one already built.
+
+        The same shape as MeasurementKind.from_wire and MeasurementPlacement's,
+        and for the same reason: the field holds a MeasurementPlane, and saying
+        so is only true if the conversion from the file's form happens somewhere
+        that takes the file's form as its argument type.
+        """
+        if value is None or isinstance(value, cls):
+            return value
+        if isinstance(value, Mapping):
+            return cls(at=value.get("at"), normal=value.get("normal"))
+        raise TypeError(f"Expected a plane or a mapping, got {type(value).__name__}")
+
+    def as_wire(self) -> Dict[str, list]:
+        return {"at": list(self.at), "normal": list(self.normal)}
 
 
 @dataclass(frozen=True)
@@ -325,6 +481,11 @@ class Measure:
     #: Where the dimension sits. Deliberately not part of identity: moving a
     #: dimension line is not measuring something else.
     placement: Optional[MeasurementPlacement] = None
+    #: The plane this is taken and drawn on, or None to take the viewport's.
+    #: Not part of identity either: the same two features measured on a
+    #: different plane is the same measurement seen from elsewhere, and giving
+    #: it a second identity would let a file hold both and draw them twice.
+    plane: Optional[MeasurementPlane] = None
 
     def __post_init__(self):
         self._canonicalise_anchors()

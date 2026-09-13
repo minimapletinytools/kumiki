@@ -1099,6 +1099,10 @@ def _viewport_aspect(rect: List[float], page: Dict[str, float]) -> float:
     return (rect[2] * page["width"]) / height if height > 0 else 1.0
 
 
+def _dot(a: List[float], b: List[float]) -> float:
+    return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
+
+
 def _cross(a: List[float], b: List[float]) -> List[float]:
     return [
         a[1] * b[2] - a[2] * b[1],
@@ -1174,6 +1178,16 @@ def build_default_drawing_for_debugging(frame: Any) -> Dict[str, Any]:
 _SELECTION_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
 
 SELECTION_DRAWING_ID = "selection-drawing"
+
+#: The one reserved drawing that holds the 3D view's measurements.
+#:
+#: A drawing like any other, so the file merge, overrides, identity, saving and
+#: the panel all apply to it without a second implementation. Reserved so that
+#: nothing in python declares one. Its single viewport carries no camera: the 3D
+#: view's belongs to the viewer and changes constantly, so there is nothing to
+#: declare, and every measurement on it carries its own plane instead.
+THREE_D_MEASUREMENTS_ID = "three-d-measurements"
+THREE_D_MEASUREMENTS_VIEWPORT = "main"
 
 # One timber gets its four long faces rolled out down the left of the sheet,
 # with a live preview beside them -- the shop drawing for a single piece. Which
@@ -1751,8 +1765,251 @@ def deserialize_feature_path(source: Any) -> Optional[Any]:
     )
 
 
+# --- the plane a measurement is taken on -------------------------------------
+#
+# A measurement's own, not the viewport's. See docs/measurement-spec.md: a
+# drawing viewport is locked so either would do, but the 3D view's camera
+# orbits, and a measurement evaluated against it would read a different number
+# from one moment to the next.
+
+def _plane_constraints(one: Dict[str, Any], other: Dict[str, Any]) -> List[List[float]]:
+    """Directions the plane's normal has to be square to, for these two features.
+
+    Each rule in the spec's priority order turns into the same kind of thing:
+
+      perpendicular to a measured FACE  ->  normal square to that face's normal
+      parallel to a measured EDGE       ->  normal square to that edge's run
+      contains both measured POINTS     ->  normal square to the line between
+
+    the last only when both anchors are points, since one point constrains where
+    the plane sits rather than which way it faces.
+    """
+    constraints = []
+    for geometry in (one, other):
+        kind = (geometry or {}).get("kind")
+        if kind == "plane":
+            constraints.append([float(part) for part in geometry.get("normal") or []])
+        elif kind == "line":
+            constraints.append([float(part) for part in geometry.get("direction") or []])
+    if (one or {}).get("kind") == "point" and (other or {}).get("kind") == "point":
+        here, there = one.get("at") or [], other.get("at") or []
+        if len(here) == 3 and len(there) == 3:
+            constraints.append([float(there[i]) - float(here[i]) for i in range(3)])
+    return [c for c in constraints if len(c) == 3 and any(c)]
+
+
+def _plane_normal(constraints: List[List[float]], look: List[float]) -> Optional[List[float]]:
+    """A normal square to every constraint, and otherwise as close to `look` as it can be.
+
+    Two anchors give at most two constraints, and two constraints can always be
+    met: square to both is their cross product, and when they are parallel it is
+    the one-constraint case again. So this does not fail for want of a solution
+    -- it returns None only when there is no direction left to choose, which is
+    the caller's cue to fall back to the camera's own plane.
+
+    Closest to `look` means the dimension is drawn as nearly face-on as its
+    constraints allow, which is the difference between reading it and seeing it
+    edge-on as a line.
+    """
+    gaze = _normalize(look)
+    distinct = []
+    for constraint in constraints:
+        unit = _normalize(constraint)
+        if not any(abs(abs(_dot(unit, seen)) - 1.0) < 1e-9 for seen in distinct):
+            distinct.append(unit)
+
+    if not distinct:
+        # Nothing to be square to: face the camera.
+        return gaze
+    if len(distinct) >= 2:
+        normal = _cross(distinct[0], distinct[1])
+        if not any(abs(part) > 1e-12 for part in normal):
+            return None
+        normal = _normalize(normal)
+        # A plane has no front, so take whichever way round faces the camera.
+        return normal if _dot(normal, gaze) >= 0 else [-part for part in normal]
+
+    # One constraint: a whole family of planes contains it. Take the camera's
+    # direction with the part along the constraint removed, which is the member
+    # of that family nearest to facing the camera.
+    only = distinct[0]
+    along = _dot(gaze, only)
+    flattened = [gaze[i] - only[i] * along for i in range(3)]
+    if not any(abs(part) > 1e-9 for part in flattened):
+        # Looking straight down the one thing the plane must contain, so every
+        # member of the family is equally edge-on. Any of them will do.
+        fallback = [1.0, 0.0, 0.0] if abs(only[0]) < 0.9 else [0.0, 1.0, 0.0]
+        return _normalize(_cross(only, fallback))
+    return _normalize(flattened)
+
+
+def _measurement_plane(
+    one: Dict[str, Any],
+    other: Dict[str, Any],
+    at_one: List[float],
+    at_other: List[float],
+    look: List[float],
+) -> Dict[str, Any]:
+    """Where a measurement between these two features is taken and drawn.
+
+    `look` is the camera's view direction at the moment it was made, which
+    settles whatever the features leave free -- and settles all of it when they
+    constrain nothing.
+
+    Position: through a measured point if there is one, since the plane has to
+    contain it; otherwise midway between the two anchors, which puts the
+    dimension among what it measures rather than off beside it.
+    """
+    normal = _plane_normal(_plane_constraints(one, other), look)
+    if normal is None:
+        normal = _normalize(look)
+
+    at = None
+    for geometry in (one, other):
+        if (geometry or {}).get("kind") == "point" and geometry.get("at"):
+            at = [float(part) for part in geometry["at"]]
+            break
+    if at is None and len(at_one or []) == 3 and len(at_other or []) == 3:
+        at = [(float(at_one[i]) + float(at_other[i])) / 2 for i in range(3)]
+
+    return {"at": at or [0.0, 0.0, 0.0], "normal": normal}
+
+
+def _picked_located(
+    feature_hits: List[Any], feature_label: Optional[str], edge: Any, owner: Any,
+):
+    """The picked feature, its owner, and what it lies on, or None.
+
+    One lookup for the anchor and the geometry both, so the two cannot end up
+    describing different features.
+    """
+    if feature_label is None:
+        return None
+    if edge is not None:
+        return (edge, owner, edge.locate(owner))
+    hit = next((h for h in feature_hits if h.feature.name == feature_label), None)
+    if hit is None:
+        return None
+    return (hit.feature, hit.owner, hit.feature.locate(hit.owner))
+
+
+def _pick_from_candidate(local_csg: Any, hit: Any):
+    """Everything a pick needs, for one chosen feature at the point.
+
+    Returns (path, node, label, type, edge, declared_edge), or None when the
+    feature's owner cannot be placed in the tree, which leaves the caller with
+    what it had.
+    """
+    from kumiki.cutcsg import CSGFeatureType
+
+    feature = hit.feature
+    positions = _node_positions(local_csg)
+    if feature.feature_type() == CSGFeatureType.EDGE:
+        # A derived edge is placed by the deeper of the two faces that form it;
+        # a declared one belongs to whoever declared it, and has no such pair
+        # for _edge_owner to read. Trying derived first tells them apart.
+        owned = _edge_owner(local_csg, feature)
+        if owned is not None:
+            return (owned[1], owned[0], feature.name, "EDGE", feature, None)
+        placed = positions.get(id(hit.owner))
+        if placed is None:
+            return None
+        return (placed[2], hit.owner, feature.name, "EDGE", None, feature)
+
+    placed = positions.get(id(hit.owner))
+    if placed is None:
+        return None
+    return (placed[2], hit.owner, feature.name, feature.feature_type().name, None, None)
+
+
+def _best_matching_candidate(
+    feature_hits: List[Any],
+    timber: Any,
+    held_geometry: Optional[Dict[str, Any]],
+    look: Optional[List[float]],
+) -> Optional[int]:
+    """Which feature under the pointer best finishes the measurement in hand.
+
+    The most specific feature is the right answer to "what is this thing here" --
+    an edge beats the two faces that form it -- and the wrong one while a
+    measurement is being made. Holding a face and being handed the arris beside
+    it means most hovers refuse, and the face you want is never the best answer
+    anywhere: it shows as a line, and on that line the edge wins.
+
+    So while something is held, a candidate that ADMITS A MEASUREMENT with it
+    beats one that does not, and among those, one of the same type as the held
+    feature breaks the tie. Type matching is the tie-break rather than the rule:
+    a candidate matching by type that admits nothing is worse than one that does
+    not match and admits a distance.
+
+    None when nothing is held, when there is no camera to project by, or when no
+    candidate admits anything -- all of which leave the ordinary answer standing.
+    """
+    from kumiki.drawing import projected_kinds
+
+    if not held_geometry or not look or not feature_hits:
+        return None
+
+    held_kind = held_geometry.get("kind")
+    best = None
+    for index, hit in enumerate(feature_hits):
+        located = hit.feature.locate(hit.owner)
+        geometry = _located_geometry_payload(located, timber)
+        if not geometry or not projected_kinds(held_geometry, geometry, look):
+            continue
+        # Earlier is more specific, so among equals the first wins.
+        rank = (0 if geometry.get("kind") == held_kind else 1, index)
+        if best is None or rank < best[0]:
+            best = (rank, index)
+    return None if best is None else best[1]
+
+
+def _kinds_for_pick(
+    located_pick: Any, timber: Any, payload: Dict[str, Any],
+) -> Optional[List[str]]:
+    """Which kinds a measurement to this pick would admit, or None if none held.
+
+    None and empty mean different things and the viewer reads both: None is "no
+    measurement is being made", empty is "this one cannot be finished from
+    here".
+    """
+    from kumiki.drawing import projected_kinds
+
+    held_geometry = payload.get("heldGeometry")
+    look = payload.get("look")
+    if not held_geometry or not look:
+        return None
+    if located_pick is None:
+        return []
+    geometry = _located_geometry_payload(located_pick[2], timber)
+    if geometry is None:
+        return []
+    return [kind.name for kind in projected_kinds(held_geometry, geometry, look)]
+
+
+def _plane_for_pick(
+    located_pick: Any, timber: Any, payload: Dict[str, Any],
+) -> Optional[Dict[str, Any]]:
+    """The plane a measurement to this pick would be taken on, or None.
+
+    None unless something is held and the viewer said which way it is looking:
+    a plane needs both ends and a camera, and a first pick has neither.
+    """
+    held_geometry = payload.get("heldGeometry")
+    look = payload.get("look")
+    if located_pick is None or not held_geometry or not look:
+        return None
+    geometry = _located_geometry_payload(located_pick[2], timber)
+    if geometry is None:
+        return None
+    anchor = _feature_anchor(located_pick[0], located_pick[1], timber, located_pick[2])
+    return _measurement_plane(
+        held_geometry, geometry, payload.get("heldAt"), anchor, look)
+
+
 def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
     placement = getattr(measure, "placement", None)
+    plane = getattr(measure, "plane", None)
     return {
         "a": serialize_feature_path(measure.anchor_a),
         "b": serialize_feature_path(measure.anchor_b),
@@ -1766,6 +2023,10 @@ def _serialize_code_measure(measure: Any) -> Dict[str, Any]:
         # projected one, so a bare name cannot carry both.
         "kind": measure.kind.as_wire() if getattr(measure, "kind", None) else None,
         "placement": {"offset": placement.offset} if placement is not None else None,
+        # Likewise not identity. Absent means "take the viewport's plane",
+        # which is what an orthographic viewport's measurements may always
+        # mean and what everything written before planes existed does mean.
+        "plane": plane.as_wire() if plane is not None else None,
         "origin": ORIGIN_CODE,
     }
 
@@ -1950,8 +2211,55 @@ def add_measurement(
     other, is not something anyone means to ask for -- and the second click of a
     measurement is often a correction of the first.
     """
+    holder, measures = _measurement_slot(
+        frame, example_path, pending, drawing_id, viewport_id)
+    pair = _measure_pair_identity(measure)
+    measures[:] = [m for m in measures if _measure_pair_identity(m) != pair] + [measure]
+    return holder
+
+
+def _viewer_measure_identity(measure: Dict[str, Any]) -> Tuple[Any, str]:
+    """Which measurement an edit from the viewer means.
+
+    The two features, plus the id that lets one pair be measured twice. NOT the
+    kind: changing what a dimension measures between the same two features is
+    editing that dimension, not putting another one there.
+    """
+    return (_measure_pair_identity(measure), str(measure.get("measureId") or ""))
+
+
+def _measurement_slot(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
+    """The file entry that holds a viewport's measurements, and that list.
+
+    The list is returned to be edited in place, and the holder is on `pending`
+    by the time this returns, so every caller writes the same way and none of
+    them has to remember the second half.
+    """
     existing = collect_drawings(frame, example_path, pending)
     target = next((d for d in existing if d["id"] == drawing_id), None)
+    if target is None and drawing_id == THREE_D_MEASUREMENTS_ID:
+        # The reserved drawing is made when the first measurement needs it
+        # rather than always being there: an empty one in every listing is a
+        # drawing nobody asked for. It is not laid out on a sheet and is never
+        # entered -- what it holds are measurements that belong to the model
+        # rather than to any drawing of it, so its viewport declares no camera
+        # and each measurement carries its own plane.
+        target = {
+            "id": THREE_D_MEASUREMENTS_ID,
+            "name": THREE_D_MEASUREMENTS_ID,
+            "origin": ORIGIN_FILE,
+            "page": None,
+            "cameraControls": [],
+            "viewports": [{"id": THREE_D_MEASUREMENTS_VIEWPORT, "measurements": []}],
+        }
+        pending.append(target)
+        existing = existing + [target]
     if target is None:
         raise ValueError(f"No drawing {drawing_id!r} to measure on")
 
@@ -1961,15 +2269,89 @@ def add_measurement(
     if viewport is None:
         viewport = {"id": viewport_id, "measurements": []}
         holder["viewports"].append(viewport)
-
-    measures = viewport.setdefault("measurements", [])
-    pair = _measure_pair_identity(measure)
-    kept = [m for m in measures if _measure_pair_identity(m) != pair]
-    kept.append(measure)
-    viewport["measurements"] = kept
-
     if holder not in pending:
         pending.append(holder)
+    return holder, viewport.setdefault("measurements", [])
+
+
+def update_measurement(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+    measure: Dict[str, Any],
+    changes: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Change a measurement without replacing it: its kind, its plane, where it sits.
+
+    Not add_measurement with different fields. An add replaces whatever measured
+    that pair, so a viewer that changed a kind by adding could not tell the undo
+    stack whether a dimension had been edited or made -- and dragging one would
+    push a create.
+
+    A measurement the code declares has no entry here to change, so one is made
+    carrying the anchors and the change. That is what an override is for: the
+    code keeps asking for the measurement, and the file says what to do with it.
+    """
+    holder, measures = _measurement_slot(
+        frame, example_path, pending, drawing_id, viewport_id)
+    identity = _viewer_measure_identity(measure)
+    for entry in measures:
+        if _viewer_measure_identity(entry) == identity:
+            entry.update(changes)
+            return holder
+    measures.append({**measure, **changes})
+    return holder
+
+
+def delete_measurement(
+    frame: Any,
+    example_path: Optional[Path],
+    pending: List[Dict[str, Any]],
+    drawing_id: str,
+    viewport_id: str,
+    measure: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Take a measurement off a viewport. Only one the file owns.
+
+    A measurement the code asks for cannot be deleted: the code will ask again
+    the next time it runs, so the most this tier could do is write down that it
+    is not wanted, and a drawing whose python says one thing and whose file
+    quietly says another is worse than a delete that does not happen. It is
+    removed by editing the python that asks for it.
+
+    So the viewer offers no delete for one, and this refuses if asked anyway.
+    The file format still understands suppression for a hand-written entry; this
+    does not produce one.
+
+    Whether the code asks for it is not read off the declarations a second way:
+    the entry is dropped, the drawings are collected again, and if it is still
+    there then the code is what produces it.
+    """
+    holder, measures = _measurement_slot(
+        frame, example_path, pending, drawing_id, viewport_id)
+    identity = _viewer_measure_identity(measure)
+    dropped = [m for m in measures if _viewer_measure_identity(m) == identity]
+    measures[:] = [m for m in measures if _viewer_measure_identity(m) != identity]
+
+    still_there = any(
+        _viewer_measure_identity(m) == identity
+        for drawing in collect_drawings(frame, example_path, pending)
+        if drawing["id"] == drawing_id
+        for viewport in drawing.get("viewports") or []
+        if viewport.get("id") == viewport_id
+        for m in viewport.get("measurements") or []
+    )
+    if still_there:
+        # Put back whatever was removed: an override of a code measurement is
+        # somebody's placement or kind, and losing it to a refused delete would
+        # be a quiet edit of its own.
+        measures.extend(dropped)
+        raise ValueError(
+            "That measurement is declared in the frame's code, so it cannot be "
+            "deleted here. Remove it from the python that asks for it."
+        )
     return holder
 
 
@@ -2070,7 +2452,7 @@ def collect_drawings(
                 "which the frame no longer declares."
             )
         scene["origin"] = ORIGIN_FILE
-        _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"])
+        _attach_measurements(scene, _measurements_by_viewport(None, entry), scene["name"], frame)
         drawings.append(scene)
 
     # Not in the file yet: either the drawing itself is unsaved, or the override
@@ -2112,7 +2494,7 @@ def _attach_measurements(
     scene: Dict[str, Any],
     by_viewport: Dict[str, List[Dict[str, Any]]],
     drawing_name: str,
-    frame: Any = None,
+    frame: Any,
 ) -> None:
     """Put each viewport's measurements on the viewport they belong to.
 
@@ -2123,10 +2505,15 @@ def _attach_measurements(
     so they are not shown and the mismatch is warned about. They are kept all the
     same: a viewport can come back when the code changes, and dropping them here
     would mean the next save deleted them from the file for good.
+
+    The frame is not optional. Without it the anchors go out unresolved -- no
+    position, no geometry -- which the viewer can only read as a broken
+    reference, so every measurement on the drawing is refused and silently never
+    drawn. That is what a drawing made from a selection did: it is a file
+    drawing, and the file loop was the caller that left it out.
     """
     remaining = {
         viewport: [_resolve_measurement(frame, measure) for measure in measures]
-        if frame is not None else measures
         for viewport, measures in by_viewport.items()
     }
     for viewport in scene.get("viewports") or []:
@@ -3282,6 +3669,7 @@ def make_ready_event(state: RunnerState) -> Dict[str, Any]:
             "get_default_drawing_for_debugging",
             "create_drawing_from_selection",
             "get_drawings", "save_drawings", "add_measurement",
+            "update_measurement", "delete_measurement",
             "save_parameters",
             "load_slot", "unload_slot", "list_slots",
             "list_available_patterns", "raise_specific_pattern",
@@ -4499,27 +4887,49 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     declared_edge = None
     feature_hits = _features_at_point(local_csg, local_pt, eps, tolerances)
     edge = _resolve_derived_edge(feature_hits) if feature_label is not None else None
-    if edge is not None:
-        owned = _edge_owner(local_csg, edge)
-        if owned is not None:
-            target_csg, new_path = owned[0], owned[1]
-            feature_label = edge.name
-            feature_type = "EDGE"
-    elif feature_label is not None and feature_hits:
-        # A declared edge -- a timber's own arris -- beats the face a click
-        # lands on, the same way a derived one does and for the same reason: it
-        # is the more specific answer at that point. Unlike a derived one it
-        # belongs to the node that declared it, so it is placed the way any
-        # declared feature is.
-        from kumiki.cutcsg import CSGFeatureType
 
-        best = feature_hits[0]
-        if best.feature.feature_type() == CSGFeatureType.EDGE:
-            placed = _node_positions(local_csg).get(id(best.owner))
-            if placed is not None:
-                new_path, target_csg = placed[2], best.owner
-                feature_label, feature_type = best.feature.name, "EDGE"
-                declared_edge = best.feature
+    # Which of the features at this point is wanted, when more than one is.
+    #
+    # The caller may name one outright -- Tab steps through them -- or leave it
+    # to the preference, which while a measurement is being made picks whichever
+    # can actually finish it. Either way the choice is FINAL: the rules below
+    # exist to guess what was meant, and they have nothing left to decide once
+    # it has been said. Letting them run anyway puts the most specific feature
+    # back, which is how cycling to a face landed on the arris again every time.
+    held_geometry = payload.get("heldGeometry")
+    look = payload.get("look")
+    candidate_index = payload.get("candidateIndex")
+    if candidate_index is None:
+        candidate_index = _best_matching_candidate(feature_hits, timber, held_geometry, look)
+    picked = None
+    if candidate_index and feature_hits:
+        chosen = feature_hits[int(candidate_index) % len(feature_hits)]
+        picked = _pick_from_candidate(local_csg, chosen)
+        if picked is not None:
+            new_path, target_csg, feature_label, feature_type, edge, declared_edge = picked
+
+    if picked is None:
+        if edge is not None:
+            owned = _edge_owner(local_csg, edge)
+            if owned is not None:
+                target_csg, new_path = owned[0], owned[1]
+                feature_label = edge.name
+                feature_type = "EDGE"
+        elif feature_label is not None and feature_hits:
+            # A declared edge -- a timber's own arris -- beats the face a click
+            # lands on, the same way a derived one does and for the same
+            # reason: it is the more specific answer at that point. Unlike a
+            # derived one it belongs to the node that declared it, so it is
+            # placed the way any declared feature is.
+            from kumiki.cutcsg import CSGFeatureType
+
+            best = feature_hits[0]
+            if best.feature.feature_type() == CSGFeatureType.EDGE:
+                placed = _node_positions(local_csg).get(id(best.owner))
+                if placed is not None:
+                    new_path, target_csg = placed[2], best.owner
+                    feature_label, feature_type = best.feature.name, "EDGE"
+                    declared_edge = best.feature
 
     parent_csg = None
     if new_path:
@@ -4531,6 +4941,7 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     highlight_edge = None
     edge_absent = False
     edge_feature = edge if edge is not None else declared_edge
+    located_pick = _picked_located(feature_hits, feature_label, edge_feature, target_csg)
     if edge_feature is not None:
         highlight_edge, edge_absent = _edge_highlight_segments(
             edge_feature, target_csg, timber, local_csg,
@@ -4584,6 +4995,32 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         "reference": _pick_reference(
             local_csg, member_key, new_path, feature_label, feature_type, edge,
         ),
+        # How many features are at this point, so the viewer knows how many
+        # there are to step through.
+        "candidateCount": len(feature_hits),
+        # Where the feature is, unbounded, in world space. What decides whether
+        # a pair can be dimensioned is what each PROJECTS to, and the viewer
+        # projects on every pointer move -- so it gets the plane or the line and
+        # works that out itself between asking.
+        "geometry": (_located_geometry_payload(located_pick[2], timber)
+                     if located_pick is not None else None),
+        # And where a dimension would attach, cropped to the solid the cuts have
+        # left, which is the same anchor the saved measurement resolves to. An
+        # edge in particular anchors at the middle of its longest surviving
+        # piece, not at the extent it was declared with.
+        "at": (_feature_anchor(located_pick[0], located_pick[1], timber,
+                               located_pick[2], local_csg)
+               if located_pick is not None else None),
+        # The plane this pair would be measured on, when something is held.
+        # Derived here rather than in the viewer so there is one copy of the
+        # rule, and it costs no round trip: this request was already being made.
+        "plane": _plane_for_pick(located_pick, timber, payload),
+        # And which kinds the pair admits from here, best first. Empty means the
+        # click will refuse, which is what the hover paints red -- one answer for
+        # the colour and the refusal, so a feature drawn red cannot be one the
+        # click then accepts. Null when nothing is held: a first pick is always
+        # allowed, having nothing yet to be wrong about.
+        "kinds": _kinds_for_pick(located_pick, timber, payload),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a
@@ -4959,7 +5396,35 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "b": payload.get("b"),
                 "kind": payload.get("kind"),
                 "measureId": payload.get("measureId"),
+                "plane": payload.get("plane"),
             },
+        )
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "update_measurement":
+        ss = _resolve_slot(state, payload)
+        update_measurement(
+            ss.frame, ss.file_path, ss.pending_drawings,
+            str(payload.get("drawingId") or ""),
+            str(payload.get("viewportId") or ""),
+            {"a": payload.get("a"), "b": payload.get("b"),
+             "measureId": payload.get("measureId")},
+            payload.get("changes") or {},
+        )
+        return state, make_success_response(request_id, command, {
+            "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),
+        }), False
+
+    if command == "delete_measurement":
+        ss = _resolve_slot(state, payload)
+        delete_measurement(
+            ss.frame, ss.file_path, ss.pending_drawings,
+            str(payload.get("drawingId") or ""),
+            str(payload.get("viewportId") or ""),
+            {"a": payload.get("a"), "b": payload.get("b"),
+             "measureId": payload.get("measureId")},
         )
         return state, make_success_response(request_id, command, {
             "scenes": collect_drawings(ss.frame, ss.file_path, ss.pending_drawings),

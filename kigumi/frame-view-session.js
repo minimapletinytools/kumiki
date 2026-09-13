@@ -348,6 +348,35 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'addMeasurement' || message.type === 'updateMeasurement'
+                || message.type === 'deleteMeasurement') {
+                // Through the same path every other drawings command takes, so
+                // the whole set comes back as one 'scenes' message and the
+                // panels redraw from one answer. Posting a shape of its own is
+                // how a measurement gets made and never appears.
+                //
+                // Rebuilt field by field rather than forwarded: anything added
+                // to the message has to be added here too, which is how a field
+                // arrives empty and something silently stops working.
+                const command = {
+                    addMeasurement: 'add_measurement',
+                    updateMeasurement: 'update_measurement',
+                    deleteMeasurement: 'delete_measurement',
+                }[message.type];
+                this._handleDrawingsCommand(command, {
+                    drawingId: message.drawingId,
+                    viewportId: message.viewportId,
+                    a: message.a,
+                    b: message.b,
+                    measureId: message.measureId || null,
+                    kind: message.kind || null,
+                    plane: message.plane || null,
+                    changes: message.changes || null,
+                }, { enter: false }).catch((err) => {
+                    this.log(`[measure] ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestDrawingFromSelection') {
                 this._handleRequestDrawingFromSelection(message).catch((err) => {
                     this.log(`[drawing] requestDrawingFromSelection error: ${err.message || err}`);
@@ -971,6 +1000,15 @@ class FrameViewSession {
             // has to be added here too -- which is how this arrived empty and
             // edges stopped being selectable while still highlighting.
             tolerances: message.tolerances || null,
+            // Which feature at the point is wanted, and what would be measured
+            // to it. With these the runner offers one that can finish the
+            // measurement rather than the most specific one, says whether it
+            // can, and works out the plane -- all in the request that was being
+            // made anyway.
+            candidateIndex: message.candidateIndex || 0,
+            heldGeometry: message.heldGeometry || null,
+            heldAt: message.heldAt || null,
+            look: message.look || null,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
@@ -986,6 +1024,15 @@ class FrameViewSession {
             // The same tolerances the click will use. Hover that answers by a
             // different rule lights things a click then refuses.
             tolerances: message.tolerances || null,
+            // Which feature at the point is wanted, and what would be measured
+            // to it. With these the runner offers one that can finish the
+            // measurement rather than the most specific one, says whether it
+            // can, and works out the plane -- all in the request that was being
+            // made anyway.
+            candidateIndex: message.candidateIndex || 0,
+            heldGeometry: message.heldGeometry || null,
+            heldAt: message.heldAt || null,
+            look: message.look || null,
         });
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about

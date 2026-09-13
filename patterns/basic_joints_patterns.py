@@ -3,6 +3,7 @@ Example usage of basic joint construction functions
 Uses canonical timber configurations from construction.py
 """
 
+from kumiki.kiwari import kiwari
 from kumiki.rule import inches, Transform, scalar, create_v2, degrees, Matrix, sqrt
 from kumiki.timber import (
     Timber, TimberEnd, TimberFace, TimberLongFace, Peg, Wedge,
@@ -30,6 +31,7 @@ from kumiki.joints.workshop.basic_joints import (
     cut_basic_practice_tusked_mortise_and_tenon_joint_on_plane_aligned_timbers,
 )
 from kumiki.example_shavings import (
+    ROUND_STOCK,
     RoundTimberConfig,
     create_canonical_example_corner_joint_timbers,
     create_canonical_example_right_angle_corner_joint_timbers,
@@ -41,6 +43,18 @@ from kumiki.example_shavings import (
     _CANONICAL_EXAMPLE_TIMBER_SIZE,
 )
 from kumiki.patternbook import Pattern, make_pattern_from_joint
+
+
+# These two ask the round-stock question plus one of their own, so they
+# declare it rather than sharing ROUND_STOCK -- same key name either way.
+MORTISE_AND_TENON_OPTIONS = kiwari(
+    round_timbers=kiwari.flag(False, about="Cut the joint on round stock instead of square"),
+    pegged=kiwari.flag(False, about="Drive a peg through the tenon"),
+)
+
+WEDGED_DOVETAIL_OPTIONS = kiwari(
+    round_timbers=kiwari.flag(False, about="Cut the joint on round stock instead of square"),
+)
 
 
 def _maybe_round_timber_config(use_round_timbers: bool):
@@ -93,10 +107,11 @@ def example_basic_tongue_and_fork_joint(position=None):
     return joint
 
 
-def example_basic_butt_joint(position=None, use_round_timbers=False):
+def example_basic_butt_joint(k=None, *, position=None):
     """
     Create a basic butt joint using canonical butt joint timbers.
     """
+    use_round_timbers = ROUND_STOCK.resolve(k).flag("round_timbers")
     if position is None:
         position = create_v3(0, 0, 0)
 
@@ -185,10 +200,13 @@ def example_basic_splice_lap_joint(position=None):
     return joint
 
 
-def example_basic_mortise_and_tenon_joint(position=None, use_round_timber=False, use_peg=False):
+def example_basic_mortise_and_tenon_joint(k=None, *, position=None):
     """
     Create a basic mortise and tenon joint using canonical butt joint timbers.
     """
+    k = MORTISE_AND_TENON_OPTIONS.resolve(k)
+    use_round_timber = k.flag("round_timbers")
+    use_peg = k.flag("pegged")
     if position is None:
         position = create_v3(0, 0, 0)
 
@@ -205,10 +223,12 @@ def example_basic_mortise_and_tenon_joint(position=None, use_round_timber=False,
     return joint
 
 
-def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(position=None, use_round_timbers=False, use_wedge=False):
+def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(k=None, *, position=None):
     """
     Create a basic wedged half-dovetail mortise and tenon joint using canonical butt joint timbers.
     """
+    k = WEDGED_DOVETAIL_OPTIONS.resolve(k)
+    use_round_timbers = k.flag("round_timbers")
     if position is None:
         position = create_v3(0, 0, 0)
 
@@ -219,7 +239,6 @@ def example_basic_wedged_half_dovetail_mortise_and_tenon_joint(position=None, us
         tenon_timber=arrangement.butt_timber,
         mortise_timber=arrangement.receiving_timber,
         tenon_end=arrangement.butt_timber_end,
-        use_wedge=use_wedge,
     )
 
     return joint
@@ -348,18 +367,18 @@ patterns = [
     Pattern(path="basic_joints/basic_miter_joint", lambda_=make_pattern_from_joint(example_basic_miter_joint), pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_miter_joint_face_aligned", lambda_=make_pattern_from_joint(example_basic_miter_joint_face_aligned), pattern_type='frame'),
     Pattern(path="basic_joints/basic_tongue_and_fork_corner_joint", lambda_=make_pattern_from_joint(example_basic_tongue_and_fork_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_butt_joint", lambda_=make_pattern_from_joint(example_basic_butt_joint), pattern_type='frame'),
+    Pattern(path="basic_joints/basic_butt_joint", lambda_=make_pattern_from_joint(example_basic_butt_joint), kiwari=ROUND_STOCK, pattern_type='frame'),
     Pattern(path="basic_joints/basic_butt_splice_joint", lambda_=make_pattern_from_joint(example_basic_butt_splice_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_cross_lap_joint", lambda_=make_pattern_from_joint(example_basic_cross_lap_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_house_joint", lambda_=make_pattern_from_joint(example_basic_house_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_splined_opposing_double_butt_joint", lambda_=make_pattern_from_joint(example_basic_splined_opposing_double_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_splice_lap_joint", lambda_=make_pattern_from_joint(example_basic_splice_lap_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint", lambda_=make_pattern_from_joint(example_basic_half_blind_tenoned_dadoed_rabbeted_scarf_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint), pattern_type='frame', tags=['main']),
+    Pattern(path="basic_joints/basic_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_mortise_and_tenon_joint), kiwari=MORTISE_AND_TENON_OPTIONS, pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_lapped_gooseneck_joint", lambda_=make_pattern_from_joint(example_basic_lapped_gooseneck_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_dropin_dovetail_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_dovetail_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_dropin_housed_butt_joint", lambda_=make_pattern_from_joint(example_basic_dropin_housed_butt_joint), pattern_type='frame'),
     Pattern(path="basic_joints/basic_mitered_and_keyed_lap_joint", lambda_=make_pattern_from_joint(example_basic_mitered_and_keyed_lap_joint), pattern_type='frame'),
-    Pattern(path="basic_joints/basic_wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_wedged_half_dovetail_mortise_and_tenon_joint), pattern_type='frame', tags=['main']),
+    Pattern(path="basic_joints/basic_wedged_half_dovetail_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_wedged_half_dovetail_mortise_and_tenon_joint), kiwari=WEDGED_DOVETAIL_OPTIONS, pattern_type='frame', tags=['main']),
     Pattern(path="basic_joints/basic_tusked_mortise_and_tenon", lambda_=make_pattern_from_joint(example_basic_tusked_mortise_and_tenon_joint), pattern_type='frame'),
 ]

@@ -922,6 +922,173 @@ class TestDerivedFeaturePath:
         assert read.identity() == ("posts/fl#0", ("cut",), "x", "FACE")
 
 
+VIEWPORT = "0.0.0"  # the first pane a default layout produces; ids are tree paths
+
+
+class TestChangingAndRemovingAMeasurement:
+    """Editing one that is already there, from the viewer.
+
+    Deliberately not add_measurement with different fields. An add replaces
+    whatever measured that pair, so a viewer that changed a kind by adding could
+    not tell its undo stack whether a dimension had been edited or made -- and
+    dragging one would push a create.
+    """
+
+    def _frame(self):
+        return Frame(cut_timbers=[], name="f",
+                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+
+    def _measure(self, feature_b="right"):
+        return {
+            "a": {"timber": "post#0", "csgPath": ["cut"], "feature": "left", "type": "FACE"},
+            "b": {"timber": "post#0", "csgPath": ["cut"], "feature": feature_b, "type": "FACE"},
+            "kind": None,
+            "measureId": None,
+        }
+
+    def _measurements(self, frame, pending):
+        drawings = runner.collect_drawings(frame, None, pending)
+        plan = next(d for d in drawings if d["id"] == "plan")
+        return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]
+
+    def test_a_change_lands_on_the_measurement_already_there(self):
+        runner = _load_runner()
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"kind": "projected_vertical_distance"})
+
+        held = self._measurements(frame, pending)
+        assert len(held) == 1
+        assert held[0]["kind"] == "projected_vertical_distance"
+
+    def test_a_change_does_not_disturb_what_it_measures(self):
+        runner = _load_runner()
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"placement": {"offset": 12.0}})
+
+        held = self._measurements(frame, pending)[0]
+        assert held["a"]["feature"] == "left"
+        assert held["b"]["feature"] == "right"
+        assert held["placement"] == {"offset": 12.0}
+
+    def test_a_plane_can_be_written_by_a_change(self):
+        runner = _load_runner()
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"plane": {"at": [0, 0, 0], "normal": [0, 1, 0]}})
+
+        assert self._measurements(frame, pending)[0]["plane"]["normal"] == [0, 1, 0]
+
+    def test_changing_one_of_two_leaves_the_other_alone(self):
+        runner = _load_runner()
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure("top"))
+
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"kind": "projected_angle"})
+
+        by_feature = {m["b"]["feature"]: m for m in self._measurements(frame, pending)}
+        assert by_feature["right"]["kind"] == "projected_angle"
+        assert by_feature["top"]["kind"] is None
+
+    def test_deleting_one_the_file_owns_takes_it_away(self):
+        runner = _load_runner()
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+
+        assert self._measurements(frame, pending) == []
+
+    def test_deleting_leaves_its_neighbours(self):
+        runner = _load_runner()
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure("top"))
+
+        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+
+        held = self._measurements(frame, pending)
+        assert [m["b"]["feature"] for m in held] == ["top"]
+
+
+class TestDeletingAMeasurementTheCodeAsksFor:
+    """It cannot be done. The code asks again the next time it runs."""
+
+    def _frame(self):
+        anchor = lambda feature: SingleFeaturePath(
+            timber=ResolvedTimberPath("post"),
+            ref=FeatureRef(csg_path=("cut",), feature=feature),
+            feature_type="FACE",
+        )
+        return Frame(cut_timbers=[], name="f", drawings=[Drawing(
+            name="plan",
+            timber_paths=(TimberPath("post"),),
+            measurements={ViewportId(VIEWPORT): [
+                Measure(anchor_a=anchor("left"), anchor_b=anchor("right"))]},
+        )])
+
+    def _wire(self):
+        return {
+            "a": {"timber": "post#0", "csgPath": ["cut"], "feature": "left", "type": "FACE"},
+            "b": {"timber": "post#0", "csgPath": ["cut"], "feature": "right", "type": "FACE"},
+            "measureId": None,
+        }
+
+    def _measurements(self, frame, pending):
+        drawings = runner.collect_drawings(frame, None, pending)
+        plan = next(d for d in drawings if d["id"] == "plan")
+        return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]
+
+    def test_the_code_measurement_is_there_to_begin_with(self):
+        assert len(self._measurements(self._frame(), [])) == 1
+
+    def test_deleting_it_is_refused(self):
+        frame, pending = self._frame(), []
+
+        with pytest.raises(ValueError, match="declared in the frame's code"):
+            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+    def test_and_it_is_still_there_afterwards(self):
+        frame, pending = self._frame(), []
+
+        with pytest.raises(ValueError):
+            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert len(self._measurements(frame, pending)) == 1
+
+    def test_a_refused_delete_does_not_quietly_drop_an_override(self):
+        # The file may hold this measurement's placement or kind. Losing that to
+        # a delete that did not happen would be an edit nobody asked for.
+        frame, pending = self._frame(), []
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(),
+            {"placement": {"offset": 9.0}})
+
+        with pytest.raises(ValueError):
+            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert self._measurements(frame, pending)[0]["placement"] == {"offset": 9.0}
+
+    def test_the_file_still_says_which_it_is(self):
+        # What the viewer reads to decide whether to offer a delete at all.
+        frame = self._frame()
+
+        assert self._measurements(frame, [])[0]["origin"] == runner.ORIGIN_CODE
+
+
 class TestAddingAMeasurement:
     """Putting a measurement on a viewport, from the viewer."""
 
@@ -1071,3 +1238,83 @@ class TestAMeasurementMadeInTheViewer:
 
         assert made["a"].get("at") is not None
         assert made["b"].get("at") is not None
+
+
+class TestTheReservedDrawingForTheThreeDView:
+    """Measurements that belong to the model rather than to any drawing of it."""
+
+    def _frame(self):
+        return Frame(cut_timbers=[], name="f",
+                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+
+    def _measure(self):
+        return {
+            "a": {"timber": "post#0", "csgPath": ["cut"], "feature": "left", "type": "FACE"},
+            "b": {"timber": "post#0", "csgPath": ["cut"], "feature": "right", "type": "FACE"},
+            "kind": None, "measureId": None,
+            "plane": {"at": [0, 0, 0], "normal": [0, 1, 0]},
+        }
+
+    def test_it_is_not_there_until_something_needs_it(self):
+        # An empty drawing in every listing is a drawing nobody asked for.
+        ids = [d["id"] for d in runner.collect_drawings(self._frame(), None, [])]
+
+        assert runner.THREE_D_MEASUREMENTS_ID not in ids
+
+    def test_measuring_in_the_3d_view_makes_it(self):
+        frame, pending = self._frame(), []
+
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        ids = [d["id"] for d in runner.collect_drawings(frame, None, pending)]
+        assert runner.THREE_D_MEASUREMENTS_ID in ids
+
+    def test_and_the_measurement_is_on_it(self):
+        frame, pending = self._frame(), []
+
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        held = next(d for d in runner.collect_drawings(frame, None, pending)
+                    if d["id"] == runner.THREE_D_MEASUREMENTS_ID)
+        measures = held["viewports"][0]["measurements"]
+        assert len(measures) == 1
+        assert measures[0]["plane"]["normal"] == [0, 1, 0]
+
+    def test_its_viewport_declares_no_camera(self):
+        # The 3D view's camera belongs to the viewer and changes constantly, so
+        # there is nothing to declare -- each measurement carries its own plane.
+        frame, pending = self._frame(), []
+
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        held = next(d for d in runner.collect_drawings(frame, None, pending)
+                    if d["id"] == runner.THREE_D_MEASUREMENTS_ID)
+        assert held["viewports"][0].get("camera") is None
+
+    def test_a_second_measurement_joins_the_first(self):
+        frame, pending = self._frame(), []
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        other = dict(self._measure())
+        other["b"] = {"timber": "post#0", "csgPath": ["cut"], "feature": "top", "type": "FACE"}
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, other)
+
+        held = next(d for d in runner.collect_drawings(frame, None, pending)
+                    if d["id"] == runner.THREE_D_MEASUREMENTS_ID)
+        assert len(held["viewports"][0]["measurements"]) == 2
+
+    def test_any_other_unknown_drawing_is_still_refused(self):
+        # Only this one id is reserved. A typo should not quietly make a drawing.
+        with pytest.raises(ValueError, match="No drawing"):
+            runner.add_measurement(
+                self._frame(), None, [], "not-a-drawing", "front", self._measure())
