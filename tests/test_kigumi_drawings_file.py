@@ -1238,3 +1238,83 @@ class TestAMeasurementMadeInTheViewer:
 
         assert made["a"].get("at") is not None
         assert made["b"].get("at") is not None
+
+
+class TestTheReservedDrawingForTheThreeDView:
+    """Measurements that belong to the model rather than to any drawing of it."""
+
+    def _frame(self):
+        return Frame(cut_timbers=[], name="f",
+                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+
+    def _measure(self):
+        return {
+            "a": {"timber": "post#0", "csgPath": ["cut"], "feature": "left", "type": "FACE"},
+            "b": {"timber": "post#0", "csgPath": ["cut"], "feature": "right", "type": "FACE"},
+            "kind": None, "measureId": None,
+            "plane": {"at": [0, 0, 0], "normal": [0, 1, 0]},
+        }
+
+    def test_it_is_not_there_until_something_needs_it(self):
+        # An empty drawing in every listing is a drawing nobody asked for.
+        ids = [d["id"] for d in runner.collect_drawings(self._frame(), None, [])]
+
+        assert runner.THREE_D_MEASUREMENTS_ID not in ids
+
+    def test_measuring_in_the_3d_view_makes_it(self):
+        frame, pending = self._frame(), []
+
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        ids = [d["id"] for d in runner.collect_drawings(frame, None, pending)]
+        assert runner.THREE_D_MEASUREMENTS_ID in ids
+
+    def test_and_the_measurement_is_on_it(self):
+        frame, pending = self._frame(), []
+
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        held = next(d for d in runner.collect_drawings(frame, None, pending)
+                    if d["id"] == runner.THREE_D_MEASUREMENTS_ID)
+        measures = held["viewports"][0]["measurements"]
+        assert len(measures) == 1
+        assert measures[0]["plane"]["normal"] == [0, 1, 0]
+
+    def test_its_viewport_declares_no_camera(self):
+        # The 3D view's camera belongs to the viewer and changes constantly, so
+        # there is nothing to declare -- each measurement carries its own plane.
+        frame, pending = self._frame(), []
+
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        held = next(d for d in runner.collect_drawings(frame, None, pending)
+                    if d["id"] == runner.THREE_D_MEASUREMENTS_ID)
+        assert held["viewports"][0].get("camera") is None
+
+    def test_a_second_measurement_joins_the_first(self):
+        frame, pending = self._frame(), []
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, self._measure())
+
+        other = dict(self._measure())
+        other["b"] = {"timber": "post#0", "csgPath": ["cut"], "feature": "top", "type": "FACE"}
+        runner.add_measurement(
+            frame, None, pending, runner.THREE_D_MEASUREMENTS_ID,
+            runner.THREE_D_MEASUREMENTS_VIEWPORT, other)
+
+        held = next(d for d in runner.collect_drawings(frame, None, pending)
+                    if d["id"] == runner.THREE_D_MEASUREMENTS_ID)
+        assert len(held["viewports"][0]["measurements"]) == 2
+
+    def test_any_other_unknown_drawing_is_still_refused(self):
+        # Only this one id is reserved. A typo should not quietly make a drawing.
+        with pytest.raises(ValueError, match="No drawing"):
+            runner.add_measurement(
+                self._frame(), None, [], "not-a-drawing", "front", self._measure())
