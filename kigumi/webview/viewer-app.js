@@ -6348,12 +6348,23 @@ class KigumiViewerApp extends LitElement {
         // anchors. The value has the along-the-line part taken out, so drawing
         // it in would put a slanted line, longer than its own label, beside a
         // number that is neither its length nor its direction.
-        const ends = KigumiMeasurements.perpendicularEnds(
-            this._projectToPage(from, viewport, pageRect),
-            this._projectToPage(to, viewport, pageRect),
-            this._pageDirection(from, status.formA, viewport, pageRect),
-            this._pageDirection(to, status.formB, viewport, pageRect),
-        );
+        //
+        // Only for the perpendicular kind. A horizontal or vertical distance is
+        // the separation along an axis OF THE SHEET, and squaring its ends to
+        // the features would contradict its label in the same way, the other
+        // way round.
+        const perpendicular = KigumiMeasurements.normalizeKind(status.kind)
+            === 'projected_perpendicular_distance';
+        const ends = perpendicular
+            ? KigumiMeasurements.perpendicularEnds(
+                this._projectToPage(from, viewport, pageRect),
+                this._projectToPage(to, viewport, pageRect),
+                this._pageDirection(from, status.formA, viewport, pageRect),
+                this._pageDirection(to, status.formB, viewport, pageRect))
+            : {
+                from: this._projectToPage(from, viewport, pageRect),
+                to: this._projectToPage(to, viewport, pageRect),
+            };
         const layout = KigumiMeasurements.dimensionLayout(
             ends.from,
             ends.to,
