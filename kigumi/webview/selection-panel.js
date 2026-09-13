@@ -31,14 +31,17 @@ export class SelectionPanel {
         action.type = 'button';
         action.className = 'ip-action';
         const inDrawing = this.app.isInDrawing;
+        // Drawing nothing means drawing the whole frame, which is a reasonable
+        // thing to ask for -- so rather than disabling the button with nothing
+        // selected, it says which of the two it is about to do.
+        const drawKey = window.drawButtonKey(
+            this.app.selectionManager.getSelectedTimbers().length);
         action.textContent = inDrawing
             ? this.t('viewer.selection.leaveDrawing')
-            : this.t('viewer.selection.drawSelection');
+            : this.t(drawKey);
         action.title = inDrawing
             ? this.t('viewer.selection.leaveDrawing.title')
-            : this.t('viewer.selection.drawSelection.title');
-        // Drawing nothing means drawing the whole frame, which is a reasonable
-        // thing to ask for, so this stays enabled with an empty selection.
+            : this.t(`${drawKey}.title`);
         action.addEventListener('click', (event) => {
             event.stopPropagation();
             if (inDrawing) {

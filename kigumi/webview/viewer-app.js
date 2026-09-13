@@ -1479,9 +1479,12 @@ class KigumiViewerApp extends LitElement {
                     <button id="output-btn" type="button" title=${t('viewer.chrome.viewOutput.title')} style="display: ${this.viewState.showOutputLink ? 'block' : 'none'}">${t('viewer.chrome.viewOutput')}</button>
                 </div>
                 <div id="left-rail">
+                    <!-- What is selected, then the drawing it is in, then
+                         everything there is. Narrowest first: the panel you
+                         came to read is the one about what you just clicked. -->
+                    ${this.selectionPanel.render()}
                     <!-- Content only; where it lives is this one line. -->
                     <div id="drawing-panel-host"></div>
-                    ${this.selectionPanel.render()}
                     <kigumi-layers-view id="layers-view"></kigumi-layers-view>
                     <div id="rail-resize" title=${t('viewer.layers.resize.title')}
                          @pointerdown=${this.onRailResizeStart}></div>
@@ -5917,14 +5920,23 @@ class KigumiViewerApp extends LitElement {
                 );
             });
         }
+        // A drawing about everything names no members, which used to leave the
+        // section empty -- the one case where you most want to know what is on
+        // the sheet. Fall back to every timber there is, and say which of the
+        // two lists this is.
+        const drawnMembers = this.activeSceneMembers;
+        const keys = drawnMembers
+            ? Array.from(drawnMembers)
+            : Array.from(this.memberMetadataByKey.keys());
         this._drawingPanel.setDrawing({
             drawing: scene,
             viewports: this.viewports.map((viewport) => this._measurementRows(viewport)),
-            members: (this.activeSceneMembers ? Array.from(this.activeSceneMembers) : [])
-                .map((key) => ({
-                    key,
-                    name: (this.memberMetadataByKey.get(key) || {}).name || key,
-                })),
+            members: keys.map((key) => ({
+                key,
+                name: (this.memberMetadataByKey.get(key) || {}).name || key,
+            })),
+            // Python names the slice; the drawing's own name is what it sends.
+            slice: drawnMembers ? (scene.sliceName || scene.name || null) : null,
         });
     }
 

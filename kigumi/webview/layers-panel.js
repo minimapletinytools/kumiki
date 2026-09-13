@@ -195,10 +195,12 @@
             if (!this._treeEl) return;
             this._treeEl.innerHTML = '';
             if (this.drawingsEnabled) {
+                // No save button here. Saving is offered in the drawing panel,
+                // beside the drawing being saved; two of them is two places to
+                // look and one to forget to update.
                 this._renderSection(
                     this._treeEl, 'drawings', t('viewer.layers.section.drawings'),
                     () => this._buildDrawingRows(),
-                    () => this._makeSaveDrawingsButton(),
                 );
             }
             this._renderSection(this._treeEl, 'tags', t('viewer.layers.section.tags'), () => this._buildTagRows());
@@ -415,22 +417,6 @@
             });
 
             return row;
-        }
-
-        /** Save, on the section rather than the rows: it saves all of them. */
-        _makeSaveDrawingsButton() {
-            const anyUnsaved = (this.drawings || []).some((drawing) => drawing.dirty);
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.className = 'lp-section-action';
-            button.textContent = t('viewer.layers.drawing.save');
-            button.title = t('viewer.layers.drawing.save.title');
-            button.disabled = !anyUnsaved;
-            button.addEventListener('click', (event) => {
-                event.stopPropagation();
-                this._emit('kigumi-save-drawings', {});
-            });
-            return button;
         }
 
         /** One tag: its kind as a colour, its name, and how many wear it. */

@@ -644,3 +644,22 @@ describe('measurements picked out to delete together', () => {
         expect(store.getMarkedMeasurements()).toEqual([]);
     });
 });
+
+const { drawButtonKey } = require('../webview/selection-store');
+
+describe('what the draw button says', () => {
+    // Never disabled: drawing nothing means drawing the whole frame, which is a
+    // reasonable thing to ask for. So it says which of the two it will do.
+    test('nothing selected draws the frame', () => {
+        expect(drawButtonKey(0)).toBe('viewer.selection.drawFrame');
+    });
+
+    test('one timber is singular, several are not', () => {
+        expect(drawButtonKey(1)).toBe('viewer.selection.drawTimber');
+        expect(drawButtonKey(4)).toBe('viewer.selection.drawTimbers');
+    });
+
+    test('a missing count reads as nothing selected', () => {
+        expect(drawButtonKey(undefined)).toBe('viewer.selection.drawFrame');
+    });
+});
