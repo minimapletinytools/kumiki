@@ -454,3 +454,48 @@ describe('which kinds a focused measurement offers to change to', () => {
         expect(availableKinds(status.formA, status.formB).length).toBe(3);
     });
 });
+
+describe('an angle says it is an angle', () => {
+    // The viewer decides whether to draw an arc or a dimension line from the
+    // status. It used to ask `status.kind === 'angle'` -- the bare legacy name
+    // -- and the kinds became composed, so every angle fell through and was
+    // drawn as a linear dimension: the right number, the wrong picture, and
+    // degrees labelled as a length.
+    //
+    // The value's unit is what the viewer asks now, so these pin that the two
+    // agree and that nothing answers to the old bare name.
+    const AXES = { look: [0, -1, 0], right: [1, 0, 0], up: [0, 0, 1] };
+    const crossing = {
+        a: { at: [0, 0, 0], geometry: { kind: 'line', direction: [1, 0, 0], at: [0, 0, 0] } },
+        b: { at: [1, 0, 1], geometry: { kind: 'line', direction: [0, 0, 1], at: [1, 0, 1] } },
+    };
+
+    test('two crossing lines admit an angle and nothing else', () => {
+        expect(measurementStatus(crossing, AXES).kind).toBe('projected_angle');
+    });
+
+    test('and the value calls itself an angle', () => {
+        expect(measurementStatus(crossing, AXES).value.unit).toBe('angle');
+    });
+
+    test('no kind answers to the bare name the viewer used to look for', () => {
+        // If a kind is ever named plain 'angle' again, the two ways of asking
+        // stop agreeing and this is where it shows.
+        const kinds = availableKinds(
+            { form: 'line', direction: [1, 0, 0] },
+            { form: 'line', direction: [0, 0, 1] },
+        );
+
+        expect(kinds).not.toContain('angle');
+        expect(kinds).toContain('projected_angle');
+    });
+
+    test('a distance calls itself a length, so the two branches cannot blur', () => {
+        const apart = {
+            a: { at: [0, 0, 0], geometry: { kind: 'point', at: [0, 0, 0] } },
+            b: { at: [1, 0, 1], geometry: { kind: 'point', at: [1, 0, 1] } },
+        };
+
+        expect(measurementStatus(apart, AXES).value.unit).toBe('length');
+    });
+});

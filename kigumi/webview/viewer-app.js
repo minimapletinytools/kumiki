@@ -115,6 +115,27 @@ class ViewerViewport {
      * locked viewport zooms, and toggles projection, on the same path as a free
      * one, and pan/zoom deltas ride on top of the angle rather than replacing it.
      */
+    /**
+     * The angle this viewport was declared at, kept so a tilt can spring back.
+     *
+     * Read off the spec and nothing else. Deliberately separate from pointing
+     * the camera, which is camera state and must NOT be redone when a rebuild
+     * reuses a controller -- this is a fact about the viewport and must be.
+     * Kept together, a rebuild of the same scene left declaredOffsetDir unset
+     * and releaseTilt returned early, so a tilted elevation stopped springing
+     * back the moment anything redrew the scene.
+     */
+    rememberDeclaredCamera() {
+        const camera = this.spec.camera;
+        if (!camera) {
+            return;
+        }
+        this.declaredOffsetDir = new THREE.Vector3(
+            -camera.look[0], -camera.look[1], -camera.look[2]).normalize();
+        this.declaredUpVector = new THREE.Vector3(
+            camera.up[0], camera.up[1], camera.up[2]).normalize();
+    }
+
     applySpecCamera() {
         const camera = this.spec.camera;
         if (!camera) {
@@ -124,11 +145,7 @@ class ViewerViewport {
         controller.setCenter(camera.target[0], camera.target[1], camera.target[2]);
         controller.cameraOffsetDir.set(-camera.look[0], -camera.look[1], -camera.look[2]).normalize();
         controller.cameraUpVector.set(camera.up[0], camera.up[1], camera.up[2]).normalize();
-        // Kept so a tilt has a rest position to be measured against and to
-        // return to. Without it the declared angle is only wherever the camera
-        // happened to start.
-        this.declaredOffsetDir = controller.cameraOffsetDir.clone();
-        this.declaredUpVector = controller.cameraUpVector.clone();
+        this.rememberDeclaredCamera();
         // Free mode, always. The standard mode orbits about world Z and resets
         // the camera's up to it, which is fine for a view of a frame and wrong
         // for a declared one: a plan view's up is +Y, and forcing it to +Z puts
@@ -2066,8 +2083,11 @@ class KigumiViewerApp extends LitElement {
         this.viewports = this.sceneStore.activeViewports().map((spec) => {
             const reused = previous.get(spec.id);
             const viewport = new ViewerViewport(spec, reused || new CameraController({ THREE }));
-            // A fresh controller takes the spec's angle, and remembers it as the
-            // one to spring back to. A reused one already has both.
+            // The declared angle is the spec's, so every viewport records it,
+            // reused controller or not. Only POINTING the camera at it is
+            // skipped on reuse -- that would throw away where the reader had
+            // got to.
+            viewport.rememberDeclaredCamera();
             if (!reused) {
                 viewport.applySpecCamera();
             }
@@ -6290,8 +6310,14 @@ class KigumiViewerApp extends LitElement {
         const to = measure.b.at;
         const value = status.value;
 
-        if (status.kind === 'angle') {
-            this._drawAngle(overlay, viewport, pageRect, from, to, status.formA, status.formB, value);
+        // What the value IS, not what the kind is called. The kinds became
+        // composed names -- `projected_angle` -- and this still asked for the
+        // old bare `angle`, so every angle fell through and was drawn as a
+        // linear dimension: the right number, with the wrong picture and the
+        // wrong units beside it.
+        if (value.unit === 'angle') {
+            this._drawAngle(overlay, viewport, pageRect, from, to,
+                            status.formA, status.formB, value, options);
             return;
         }
 
@@ -6341,7 +6367,7 @@ class KigumiViewerApp extends LitElement {
      * At the corner rather than between them, because that is where an angle
      * is: the same two faces read as nothing at all anywhere else on the sheet.
      */
-    _drawAngle(overlay, viewport, pageRect, from, to, formA, formB, value) {
+    _drawAngle(overlay, viewport, pageRect, from, to, formA, formB, value, options = {}) {
         // The screen direction of each projected line, taken by stepping a
         // little along it and seeing where that lands.
         const screenDirection = (point, direction) => {
@@ -6377,13 +6403,13 @@ class KigumiViewerApp extends LitElement {
             'A', layout.radius, layout.radius, 0, layout.largeArc, layout.sweepFlag,
             layout.end.x, layout.end.y,
         ].join(' '));
-        arc.setAttribute('class', 'dim-line');
+        arc.setAttribute('class', `dim-line${options.className ? ` ${options.className}` : ''}`);
         overlay.appendChild(arc);
 
         const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
         text.setAttribute('x', layout.label.x);
         text.setAttribute('y', layout.label.y);
-        text.setAttribute('class', 'dim-label');
+        text.setAttribute('class', `dim-label${options.className ? ` ${options.className}` : ''}`);
         text.textContent = `${value.value.toFixed(1)}\u00b0`;
         overlay.appendChild(text);
     }
