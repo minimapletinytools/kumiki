@@ -1,3 +1,27 @@
+:: 9/12/2026 do kumiki vid 
+
+There's a hidden assembly solver in kumiki that allows you to dissamble your designs and make your own ikea assembly explosion animations
+
+Why is this feature disabled by default?
+
+well kumiki is a term for interlocking wooden puzzles in japan
+
+The current dissamebly easily handles simple puzzles with single step solutions
+
+But puzzles requiring multiple steps are much harder for it to handle
+
+And these can get quite complicated
+
+So until the kumki's assembly feature can really live up to its own name
+
+- 6 sliding piece puzzle
+- 3 pcs burr puzzle https://www.youtube.com/watch?v=8ffj5BrKnfs
+- 6 pcs chinese cross puzzle https://www.youtube.com/watch?v=Vxw2LPQ8c4c
+- gordian knot puzzle lol https://sketchfab.com/3d-models/gordian-knot-assembly-cf579718b14649839d5f04beef1c6e2b
+ 
+
+
+
 :: 9/12/2026 NEW LHS AND DRAWING SPEC
 
 We introduce drawing mode and drawings view
@@ -264,7 +288,35 @@ DONE-add support for optionla parameters in kiwari (gets a check box to enabel o
 IGNORE-consider renaming kiwari methods
 DONE-update patterns to be sensible with parameters.. do thec leanup!!
 
+
 -DO LHS MENU AND DRAWING INTERFACE DESIGN SPEC 
+  DONE-after amesaurement is taken in drawing view, the camera snapping back breaks
+  DONE-face to face non parallel measurements seem be mesauring distance not angle
+  DONE-similarl, face to edge and edge to edge non parallel measurements seem to be measuring distance as well
+  -edges don't know their outward facing normal when measuring angles between them. I think you have a few choices here
+    -attempt to remap edges to adjacent face features when possible. so measurement is between faces and not edges
+    -or just do the remap when rendering the measurement so measurement remains between actually selected features
+  -def need to improve rules for measurementp lacement
+  -angles should have anchors too? it's weird cuz their anchors want to move as you zoom. maybe pick the intersection point as the anchor and determine the maximal extents that the measurement is willing to tolerate before it goes way off the fetaures?
+
+  -BUG first click in drawing view dosen't do anythnig, only second click allows acutal selection, highlight always works
+  -timber goes into x-ray view when a feature is selected in drawing mode 
+
+  -xray view should just be a toggelable feature in general in drawing mode. However it should be clear what's xrayed (and not selectable) and what's not. 
+    -or maybe allow selectino of xrayed features?
+
+  -measurement seleciton interface is a little screwy??
+
+
+  -measurements between 2 parallel lines/faces should hav ethe |---| perpendicular
+     ok, before we go onto that, lets fix the placement of the 2 end points of the measurement. right now it's way off.
+    the way to do it is to place the first endpoint based on the first feature selected, and the second endpoint should
+    be based on the first by perpendicularly projecting it from the first fetaure to the second feature. At least in the
+  cases where the 2 features being measured are perpendicular
+  -add hotkey for "measure from this"
+  -get rid of "confirm measurement" maybe, or add hotkey for it
+
+
 
 
 -do joint rename to match what's in your new book
@@ -1686,9 +1738,98 @@ IGNORE- you need a better system for determining timber orientation after each t
 
 :: ARCHIVE
 
+:: 9/13/2026 gordian knot notes 
+
+https://sketchfab.com/3d-models/gordian-knot-assembly-cf579718b14649839d5f04beef1c6e2b
+
+lets add the the holes next, but first lets name and orient the pieces. the 2 Z length axis pieces are called YELLOW
+and RED (yellow is -x, red is +x). the 2 X lengtha xis pieces are PURPLE (-y) and GREEN (+y)  the 2 Y facing pieces
+are ORANGE (+z) and BLUE (-z). each piece should be oriented in nice RHS coordinates. so that if I look at the X
+pieces looking down from the +Z axis, with up direction in the +x, then +Y should be to the left
+
+each piece has square cutouts in it, in the pieces own coordiante,s we will go from left ot right top to bottom to draw the cutouts:
+
+RED
+
+XXXXX
+X X X
+X X
+X XXX
+  X
+X X X
+XXXXX
+
+YELLOW
+
+XXXXX
+X X X
+X
+X X X
+X X X
+X X X
+XXXXX
+
+PURPLE
+
+XXXXX
+X X X
+X   X
+X   X
+    X
+X X X
+XXXXX
+
+GREEN
+
+XXXXX
+X X X
+X X X
+X X X
+X X X
+X X X
+XXXXX
+
+ORANGE
+
+XXXXX
+X X X
+X   X
+X   X
+X   
+X X X
+XXXXX
+
+BLUE
+
+XXXXX
+X X X
+X   
+X   X
+X  XX   
+X X X
+XXXXX
 
 
+:: 9/13/2026 kumiki promo shortened
 
+Hi friends, I'm finally ready to share the programmatic timber frame design (CAD) program I've been working on. A culmination of my years of software design experience and my woodworking obsession :). I hope ya'll will find it useful. It's open source and completely free.[https://kumiki.build/\](https://kumiki.build)
+
+---
+
+kumiki is a **parametric CAD** program so designs are programmed with code. A year ago I would have said this program is just for myself or the handful of others willing to trudge through code, but now with AI code driven interfaces are accessible -- for better or worse. The shed in the screenshot took about an hour to design this way, and every joint is still fully modeled, parametric geometry — not a rendering, an actual buildable frame. You can of course implement your designs by hand too.
+
+There's a youtube playlist of kumiki in action on the website. 
+
+If anything in the program looks wrong or could use improvement, I'd love to know.
+
+kumiki is under active development. It is not just a hobby project. It is intended for professional use. Here's what's coming:
+
+* standalone app with simplified installation process (the hardest part of kumiki right now is just getting it installed correctly)
+* full automated drawing generation with both code and UI manual overrides
+* improved frame disassembly solver
+* the complete set of joints from Dorian Bracht's Japanese Joinery book (just an arbitrary goal, and joints not from this book are also being added!)
+* more furniture joints and more support for furniture making in general.
+* improved examples, patterns, and agent instructions
 
 :: 8/2026 reddit kumiki promo draft
 
@@ -1705,7 +1846,7 @@ kumiki answers both of those questions. It's a python library with an intuitive 
 * connect timbers together with joints (with dozens of supported fully modeled parametric joints)
 * assembly everything into a frame
 
-A year ago I would have said this program is just for myself a handful of others willing to trudge through code, but now AI has made code driven interfaces accessible -- for better or worse. The shed in the screenshot took about an hour to design this way, and every joint is still fully modeled, parametric geometry — not a rendering, an actual buildable frame. You can of course implement your designs by hand too.
+A year ago I would have said this program is just for myself a handful of others willing to trudge through code, but now with AI code driven interfaces are accessible -- for better or worse. The shed in the screenshot took about an hour to design this way, and every joint is still fully modeled, parametric geometry — not a rendering, an actual buildable frame. You can of course implement your designs by hand too.
 
 I've also put together a few videos of kumiki in action [here].(https://www.youtube.com/playlist?list=PLWKU1B561fyM) 
 
