@@ -292,6 +292,134 @@ def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]
     ])
 
 
+@dataclass(frozen=True)
+class MeasureSpan:
+    """What a feature is, once projected into the plane a measurement is taken on.
+
+    Two shapes, not three. A point is a point; an edge is a line with an extent;
+    and a FACE seen edge-on is also a line with an extent, while a face seen at
+    any other angle covers the view and admits no measurement at all. So there
+    is nothing else for a measurable feature to be, and the anchor rules below
+    have two cases rather than six.
+
+    `interval` is how far it reaches along `direction`, as stations from `at`,
+    taken from what the feature occupies once cropped to the timber. Both are
+    None for a point.
+    """
+
+    at: Tuple[float, float, float]
+    direction: Optional[Tuple[float, float, float]] = None
+    interval: Optional[Tuple[float, float]] = None
+
+    @property
+    def is_point(self) -> bool:
+        return self.direction is None
+
+    def ends(self) -> Tuple[Tuple[float, float, float], ...]:
+        """The two extremities, or the point itself."""
+        if self.is_point:
+            return (self.at,)
+        unit = _unit(self.direction)
+        return tuple(
+            tuple(self.at[i] + unit[i] * station for i in range(3))
+            for station in (self.interval or (0.0, 0.0))
+        )
+
+
+def _stations(span: MeasureSpan, along: Sequence[float]) -> Tuple[float, float]:
+    """How far a span reaches along a direction, as absolute stations.
+
+    Absolute -- measured from the world origin rather than from the span's own
+    point -- because two features have two different points, and overlap is a
+    question about one shared ruler.
+    """
+    reach = [_dot(end, along) for end in span.ends()]
+    return (min(reach), max(reach))
+
+
+def _at_station(span: MeasureSpan, along: Sequence[float], station: float):
+    """The point on a span that sits at a given station along `along`."""
+    if span.is_point:
+        return span.at
+    unit = _unit(span.direction)
+    rate = _dot(unit, along)
+    if abs(rate) < 1e-12:
+        return span.at
+    step = (station - _dot(span.at, along)) / rate
+    return tuple(span.at[i] + unit[i] * step for i in range(3))
+
+
+def _foot_on(span: MeasureSpan, point: Sequence[float]):
+    """Where a perpendicular from `point` meets a span, kept on the span."""
+    unit = _unit(span.direction)
+    station = _dot([point[i] - span.at[i] for i in range(3)], unit)
+    low, high = span.interval or (station, station)
+    # Clamped: a dimension whose end floats off the end of a short edge points
+    # at nothing, and the nearest place on the feature is the honest answer.
+    station = max(low, min(high, station))
+    return tuple(span.at[i] + unit[i] * station for i in range(3))
+
+
+def distance_anchors(
+    first: MeasureSpan,
+    second: MeasureSpan,
+    kind: MeasurementKind,
+    axes: Optional[Mapping] = None,
+):
+    """Where a distance between these two features attaches, at both ends.
+
+    A property of the PAIR and the plane, not of either feature alone. An anchor
+    chosen per feature cannot know where the sensible attachment point is for a
+    given pair -- two parallel edges each anchoring at their own midpoint gave a
+    dimension that leaned if the midpoints were offset along their length.
+
+    PERPENDICULAR, between two parallel lines: both ends sit at one station
+    along the shared direction, which is what makes the line between them square
+    to both. The station is the middle of the overlap of their extents, so the
+    dimension lands where the two features actually face each other. Where they
+    do not overlap there is no such place, so it goes to the end of the FIRST
+    nearest the second, and the other end is projected across from there.
+
+    PERPENDICULAR, a point and a line: the point does not move -- it is the
+    whole of what is being measured from -- and the other end is the foot of the
+    perpendicular dropped onto the line.
+
+    PERPENDICULAR, two points: themselves. With no line to be square to, the
+    distance between them is the distance.
+
+    HORIZONTAL or VERTICAL: the first end stays put and the second is projected
+    onto the axis through it, so the dimension runs along the sheet's own
+    direction and reads the separation in it. Offered only between two points
+    today -- kinds_for lists no other pair for them -- so the two closest points
+    on the two features are the two points.
+    """
+    named = kind.name if hasattr(kind, "name") else str(kind)
+
+    if named in ("projected_horizontal_distance", "projected_vertical_distance"):
+        axis = _unit((axes or {}).get(
+            "right" if named.endswith("horizontal_distance") else "up") or (1, 0, 0))
+        offset = _dot([second.at[i] - first.at[i] for i in range(3)], axis)
+        return (first.at, tuple(first.at[i] + axis[i] * offset for i in range(3)))
+
+    if first.is_point and second.is_point:
+        return (first.at, second.at)
+    if first.is_point:
+        return (first.at, _foot_on(second, first.at))
+    if second.is_point:
+        return (_foot_on(first, second.at), second.at)
+
+    along = _unit(first.direction)
+    first_low, first_high = _stations(first, along)
+    second_low, second_high = _stations(second, along)
+    low, high = max(first_low, second_low), min(first_high, second_high)
+    if low <= high:
+        station = (low + high) / 2
+    else:
+        # Nothing faces anything: go to the end of the first that is nearest.
+        station = first_high if first_high < second_low else first_low
+    return (_at_station(first, along, station), _at_station(second, along, station))
+
+
 def projected_kinds(
     one: Optional[Mapping], other: Optional[Mapping], look: Sequence[float],
 ) -> Tuple[MeasurementKind, ...]:
