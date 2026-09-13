@@ -203,7 +203,29 @@ Rules that fall out of it:
 - **Escape** releases the second end, then the held end, then leaves drawing
   mode in the 3D view. In the drawing view there is no mode to leave, so a third
   press does nothing.
-- **Delete and Backspace** delete the focused measurement, or every marked one.
+- **Delete and Backspace** delete the focused measurement, or every marked one —
+  when it is one the file owns. See below.
+
+### A measurement the code asks for cannot be deleted
+
+The code will ask for it again the next time it runs, so the most the file tier
+could do is record that it is not wanted. A drawing whose python says one thing
+and whose file quietly says another is worse than a delete that does not happen.
+It is removed by editing the python that asks for it.
+
+So there is **no delete in the selection panel** for one, and Delete and
+Backspace do nothing. Not a disabled button and not an error — the affordance is
+absent, because the measurement is not the viewer's to remove.
+
+Which is which comes off the `origin` each measurement already carries: only
+`file` is deletable. `code` and `overridden` both mean the code is still asking,
+and an override is somebody's placement or kind on top of a measurement the
+python owns.
+
+The runner refuses as a backstop, and puts back any override it removed on the
+way — losing a placement to a delete that did not happen would be an edit nobody
+asked for. The file format still understands a hand-written suppression entry;
+nothing the viewer does produces one.
 
 ## Creating a measurement
 
@@ -319,7 +341,7 @@ there. In drawing mode the tree selects nothing.
 | command | for |
 |---|---|
 | `add_measurement` | exists; gains `plane` |
-| `delete_measurement` | new — anchors plus `measureId`, scoped to a viewport |
+| `delete_measurement` | new — anchors plus `measureId`, scoped to a viewport. Only a measurement the file owns |
 | `update_measurement` | new — kind and placement, so a drag is not an add |
 
 `add_measurement` currently doubles as "change the kind", because it replaces a
