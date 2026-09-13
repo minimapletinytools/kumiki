@@ -6258,6 +6258,29 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    /**
+     * Which way a feature runs, on the page, or null when it is a point.
+     *
+     * Taken by projecting a step along it rather than by transforming the
+     * direction: the page is the camera's projection and the viewport's rect
+     * together, and stepping through the same path is the only way to be sure
+     * the answer is in the same space as the anchors.
+     */
+    _pageDirection(at, form, viewport, pageRect) {
+        if (!form || form.form !== 'line' || !form.direction) {
+            return null;
+        }
+        const here = this._projectToPage(at, viewport, pageRect);
+        const there = this._projectToPage(
+            [at[0] + form.direction[0], at[1] + form.direction[1], at[2] + form.direction[2]],
+            viewport, pageRect);
+        const run = { x: there.x - here.x, y: there.y - here.y };
+        const size = Math.hypot(run.x, run.y);
+        // Seen exactly end-on it projects to nothing, and there is no direction
+        // to be square to. Treated as a point, which is what it looks like.
+        return size > 1e-9 ? { x: run.x / size, y: run.y / size } : null;
+    }
+
     /** Where a world point lands on the page, in the viewport's own pixels. */
     _projectToPage(point, viewport, pageRect) {
         const [x, y, width, height] = viewport.spec.rect;
@@ -6321,9 +6344,19 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        const layout = KigumiMeasurements.dimensionLayout(
+        // Square across what is being measured, not straight between the two
+        // anchors. The value has the along-the-line part taken out, so drawing
+        // it in would put a slanted line, longer than its own label, beside a
+        // number that is neither its length nor its direction.
+        const ends = KigumiMeasurements.perpendicularEnds(
             this._projectToPage(from, viewport, pageRect),
             this._projectToPage(to, viewport, pageRect),
+            this._pageDirection(from, status.formA, viewport, pageRect),
+            this._pageDirection(to, status.formB, viewport, pageRect),
+        );
+        const layout = KigumiMeasurements.dimensionLayout(
+            ends.from,
+            ends.to,
             // Where the reader put it, or the viewport's own default. This is
             // the one degree of freedom a dimension has once its two ends are
             // fixed, and it was being ignored: a saved offset drew where the

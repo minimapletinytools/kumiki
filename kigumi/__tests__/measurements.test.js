@@ -499,3 +499,88 @@ describe('an angle says it is an angle', () => {
         expect(measurementStatus(apart, AXES).value.unit).toBe('length');
     });
 });
+
+const { perpendicularEnds } = require('../webview/measurements.js');
+
+describe('where the two ends of a perpendicular distance are drawn', () => {
+    // The value has the along-the-line part taken out; the picture did not, so
+    // two parallel edges offset along their length were drawn as a slanted
+    // line, longer than the number beside it.
+    const along = (x, y) => ({ x, y });
+    const spanOf = (ends) => Math.hypot(ends.to.x - ends.from.x, ends.to.y - ends.from.y);
+    const isSquareTo = (ends, direction) => {
+        const run = { x: ends.to.x - ends.from.x, y: ends.to.y - ends.from.y };
+        return Math.abs(run.x * direction.x + run.y * direction.y);
+    };
+
+    test('two points are drawn between themselves', () => {
+        // No line to be square to, so the distance IS the distance.
+        const ends = perpendicularEnds({ x: 0, y: 0 }, { x: 3, y: 4 }, null, null);
+
+        expect(ends).toEqual({ from: { x: 0, y: 0 }, to: { x: 3, y: 4 } });
+    });
+
+    test('two parallel lines are joined square across', () => {
+        // Offset 10 along x and 4 apart across it: the drawn span should be 4,
+        // not the 10.77 between the raw anchors.
+        const ends = perpendicularEnds(
+            { x: 0, y: 0 }, { x: 10, y: 4 }, along(1, 0), along(1, 0));
+
+        expect(isSquareTo(ends, along(1, 0))).toBeCloseTo(0, 9);
+        expect(spanOf(ends)).toBeCloseTo(4, 9);
+    });
+
+    test('and each end stays on its own feature', () => {
+        // Sliding a point along the line it lies on does not change which
+        // feature it marks. Moving it off would.
+        const ends = perpendicularEnds(
+            { x: 0, y: 0 }, { x: 10, y: 4 }, along(1, 0), along(1, 0));
+
+        expect(ends.from.y).toBeCloseTo(0, 9);
+        expect(ends.to.y).toBeCloseTo(4, 9);
+    });
+
+    test('the dimension sits between the two, not at one end', () => {
+        const ends = perpendicularEnds(
+            { x: 0, y: 0 }, { x: 10, y: 4 }, along(1, 0), along(1, 0));
+
+        expect(ends.from.x).toBeCloseTo(5, 9);
+        expect(ends.to.x).toBeCloseTo(5, 9);
+    });
+
+    test('lines pointing opposite ways are still one pair', () => {
+        // A feature's direction has no preferred sense, so the two may come
+        // back antiparallel. Sliding one the wrong way would pull them apart.
+        const ends = perpendicularEnds(
+            { x: 0, y: 0 }, { x: 10, y: 4 }, along(1, 0), along(-1, 0));
+
+        expect(isSquareTo(ends, along(1, 0))).toBeCloseTo(0, 9);
+        expect(spanOf(ends)).toBeCloseTo(4, 9);
+    });
+
+    test('a point and a line meet at the foot of the perpendicular', () => {
+        const ends = perpendicularEnds(
+            { x: 0, y: 0 }, { x: 10, y: 4 }, null, along(1, 0));
+
+        expect(ends.from).toEqual({ x: 0, y: 0 });
+        expect(ends.to.x).toBeCloseTo(0, 9);
+        expect(spanOf(ends)).toBeCloseTo(4, 9);
+    });
+
+    test('whichever way round the point and the line arrive', () => {
+        const ends = perpendicularEnds(
+            { x: 10, y: 4 }, { x: 0, y: 0 }, along(1, 0), null);
+
+        expect(ends.to).toEqual({ x: 0, y: 0 });
+        expect(ends.from.x).toBeCloseTo(0, 9);
+        expect(spanOf(ends)).toBeCloseTo(4, 9);
+    });
+
+    test('already square stays where it is', () => {
+        const ends = perpendicularEnds(
+            { x: 0, y: 0 }, { x: 0, y: 4 }, along(1, 0), along(1, 0));
+
+        expect(ends.from).toEqual({ x: 0, y: 0 });
+        expect(ends.to).toEqual({ x: 0, y: 4 });
+    });
+});

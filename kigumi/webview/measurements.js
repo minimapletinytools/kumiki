@@ -481,8 +481,60 @@
         };
     }
 
+    /**
+     * Where to draw the two ends of a perpendicular distance, on the page.
+     *
+     * The VALUE of a perpendicular distance has the along-the-line part taken
+     * out -- that is what makes it perpendicular. The picture did not: it was
+     * drawn between the two anchors as they fell, which for two parallel edges
+     * offset along their length is a slanted line, longer than the number
+     * beside it, with neither end square to what it measures.
+     *
+     * So the ends are moved along their own features until the segment between
+     * them is square to them. Moving a point along the line it lies on does not
+     * change which feature it marks -- an anchor is a convenient station on a
+     * feature, not a part of what is being measured -- and the length that
+     * comes out is then the length that was written.
+     *
+     * Both are slid to the halfway station rather than one to the other's, so
+     * the dimension sits between the two features instead of at one end of the
+     * overlap.
+     *
+     * `dirA` and `dirB` are the features' directions in page space, or null for
+     * a point, which has no line to be square to and does not move.
+     */
+    function perpendicularEnds(from, to, dirA, dirB) {
+        const run = { x: to.x - from.x, y: to.y - from.y };
+        const slide = (point, direction, by) => (direction === null ? point : {
+            x: point.x + direction.x * by,
+            y: point.y + direction.y * by,
+        });
+
+        if (dirA === null && dirB === null) {
+            // Two points: the distance between them is the distance, and the
+            // segment joining them is already the one to draw.
+            return { from, to };
+        }
+        if (dirA === null || dirB === null) {
+            // A point and a line: the foot of the perpendicular from the point.
+            const line = dirA === null ? dirB : dirA;
+            const along = run.x * line.x + run.y * line.y;
+            return dirA === null
+                ? { from, to: slide(to, line, -along) }
+                : { from: slide(from, line, along), to };
+        }
+        // Two parallel lines. Halfway along, square across.
+        const along = run.x * dirA.x + run.y * dirA.y;
+        return {
+            from: slide(from, dirA, along / 2),
+            to: slide(to, dirB, -(along / 2) * Math.sign(
+                dirA.x * dirB.x + dirA.y * dirB.y || 1)),
+        };
+    }
+
     const KigumiMeasurements = {
         PROJECTED_RULES,
+        perpendicularEnds,
         anchorReference,
         normalizeKind,
         projectedForm,
