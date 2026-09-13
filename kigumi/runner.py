@@ -2480,19 +2480,14 @@ def _line_intervals(located: Any, csg: Any, reach: float, near: Any):
     None when the solid cannot say -- which is different from an empty list,
     since "I do not know" must not read as "nowhere".
 
-    Cropped with slack, because an arris lies exactly ON the surface of whatever
-    declared it, and a point on a surface is the case an inside test is worst
-    at. Without it the crop said a mortise hole's own arris was nowhere on the
-    mortise hole, the bound was thrown away, and the feature fell back to the
-    length of the whole timber. The slack is the gap between analytic geometry
-    and the mesh, which is what FEATURE_FACE_TOLERANCE is for.
+    No slack: this is only ever asked of the TIMBER now, which a feature's line
+    passes through rather than lies on, so there is no boundary for an inside
+    test to be uncertain about. What the feature itself reaches is asked of the
+    feature -- see _declared_line_span.
     """
     from kumiki.cropcsg import crop_line_to_segments_on_csg
-    from kumiki.cutcsg import FEATURE_FACE_TOLERANCE
 
-    pieces = crop_line_to_segments_on_csg(
-        located, csg, seed_reach=reach, near=near,
-        tolerance=float(FEATURE_FACE_TOLERANCE))
+    pieces = crop_line_to_segments_on_csg(located, csg, seed_reach=reach, near=near)
     if pieces is None:
         return None
     station = lambda point: float(
@@ -2501,25 +2496,40 @@ def _line_intervals(located: Any, csg: Any, reach: float, near: Any):
             for piece in pieces]
 
 
-def _intersected_line_pieces(located: Any, solids: List[Any], reach: float, near: Any):
-    """Where a line lies on ALL of these solids, as intervals along it.
+def _declared_line_span(feature: Any, node: Any, located: Any):
+    """Where a feature says its own line ends, as an interval along it, or None.
+
+    Exact, and asked of the feature rather than found by clipping, so there is
+    no inside test at a boundary to go wrong.
+    """
+    extent = feature.get_extent(node)
+    ends = getattr(extent, "ends", None) if extent is not None else None
+    if not ends:
+        return None
+    station = lambda point: float(
+        ((point - located.point).T * located.direction)[0, 0])
+    reach = sorted(station(end) for end in ends)
+    return (reach[0], reach[-1])
+
+
+def _intersected_line_pieces(
+    located: Any, solids: List[Any], reach: float, near: Any, declared=None,
+):
+    """Where a line lies on all of these solids, as intervals along it.
 
     Intervals rather than segments because that is what makes this exact: a line
     clipped by a convex solid is an interval, and intervals intersect cleanly.
     A solid that cannot answer is skipped rather than treated as empty.
+
+    `declared` is what the feature says about itself, which bounds the result
+    without anything having to be clipped.
     """
-    intervals = None
+    intervals = [declared] if declared is not None else None
     for solid in solids:
         if solid is None:
             continue
         found = _line_intervals(located, solid, reach, near)
-        if not found:
-            # None is "cannot say"; empty is "nowhere", and nowhere is not
-            # credible for a feature somebody just picked. An arris lies exactly
-            # ON the surface of whatever declared it, which is the case an
-            # inside test is worst at -- so an empty answer here means the crop
-            # could not place it, not that the feature is absent. Taking it at
-            # its word intersected the feature away.
+        if found is None:
             continue
         if intervals is None:
             intervals = found
@@ -2578,14 +2588,20 @@ def _measure_span(
     reach = float(timber.length) * 4
 
     if isinstance(located, Line) and root_csg is not None:
-        # Bounded by the timber AND by whatever declared it, the way a face
-        # already was. The timber alone is not enough: an arris of a mortise
-        # hole lies along a line that runs the whole length of the post, so
-        # cropping it to the post gave back the post -- a 25mm feature with a
-        # 1295mm extent, and a dimension placed in the middle of the timber
-        # because that is where two such extents overlap.
+        # Where the feature itself says it ends, and where the timber leaves it.
+        #
+        # The feature first, because it knows: a prism's arris is a pair of its
+        # own corners, and a derived edge reaches as far as both the faces that
+        # form it. Asking a solid instead means clipping a line that lies
+        # exactly ON that solid's surface, which is the one place an inside test
+        # cannot be trusted -- it answered "nowhere" for a mortise hole's own
+        # arris, and the fallback was the whole length of the post.
+        #
+        # Then the timber, which is what a feature declared on a cutter that
+        # runs past the piece needs and the feature cannot know.
         pieces = _intersected_line_pieces(
-            located, [root_csg, node], reach, solid.transform.position)
+            located, [root_csg], reach, solid.transform.position,
+            declared=_declared_line_span(feature, node, located))
         if pieces:
             # The longest. A cut can leave an edge in several, and a dimension
             # has to attach to one of them -- the biggest is the one a reader

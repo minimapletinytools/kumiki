@@ -439,90 +439,146 @@ class TestAFeatureIsBoundedByWhatDeclaredIt:
             > length / 2
 
 
-class TestALineLyingOnTheSurfaceOfWhatDeclaredIt:
-    """An arris is ON its owner's surface, and a crop must still place it.
+class TestAFeatureKnowsItsOwnEnds:
+    """Extents come from the shape, not from clipping it against something.
 
-    This is where the placement rules were being fed nonsense. Cropping a line
-    to a solid asks whether points are inside it, and an arris sits exactly on
-    the boundary -- the one place that test is worst at. The crop answered
-    "nowhere", the bound from the owner was thrown away, and the feature fell
-    back to the length of the whole timber: a 52mm arris of a mortise hole
-    reported as 1295mm, so two of them overlapped over the entire post and the
-    dimension landed in the middle of it.
+    An arris lies exactly ON the surface of whatever declared it, and asking a
+    solid "is this boundary point inside you" is the one question an inside test
+    cannot answer. It said no, the bound was lost, and a 51mm arris of a mortise
+    hole was reported with the 1295mm extent of the whole post -- so two of them
+    overlapped over the entire timber and the dimension landed in the middle of
+    it.
+
+    A prism knows where its own corners are. Nothing has to be clipped to find
+    out where its faces and arrises stop.
     """
 
-    @pytest.fixture
-    def runner(self):
+    def _box(self):
+        from kumiki.cutcsg import RectangularPrism
+        from kumiki.rule import create_v2, scalar
+
+        return RectangularPrism(
+            size=create_v2(scalar("0.1"), scalar("0.2")),
+            start_distance=scalar("0"), end_distance=scalar("0.4"))
+
+    def _face(self, which):
+        from kumiki.cutcsg import SimpleRectangularPrismFeature
+
+        return SimpleRectangularPrismFeature(name=str(which), face=which)
+
+    def test_a_face_knows_its_four_corners(self):
+        from kumiki.cutcsg import PrismFace
+
+        corners = self._face(PrismFace.RIGHT).corners(self._box())
+
+        assert len(corners) == 4
+        # Half the width across, half the height up, the length along.
+        for corner in corners:
+            assert float(corner[0, 0]) == pytest.approx(0.05)
+            assert abs(float(corner[1, 0])) == pytest.approx(0.1)
+            assert float(corner[2, 0]) in (pytest.approx(0.0), pytest.approx(0.4))
+
+    def test_an_unbounded_face_says_so_rather_than_guessing(self):
+        from kumiki.cutcsg import PrismFace, RectangularPrism
+        from kumiki.rule import create_v2, scalar
+
+        endless = RectangularPrism(
+            size=create_v2(scalar("0.1"), scalar("0.2")),
+            start_distance=scalar("0"), end_distance=None)
+
+        assert self._face(PrismFace.RIGHT).corners(endless) is None
+
+    def test_an_arris_is_two_corners_of_the_faces_that_form_it(self):
+        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+
+        arris = SimpleRectangularPrismEdgeFeature(
+            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT))
+
+        extent = arris.get_extent(self._box())
+
+        assert extent.ends is not None
+        first, second = extent.ends
+        assert abs(float(second[2, 0]) - float(first[2, 0])) == pytest.approx(0.4)
+
+    def test_and_its_anchor_is_between_them(self):
+        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+
+        extent = SimpleRectangularPrismEdgeFeature(
+            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT)).get_extent(self._box())
+
+        assert float(extent.anchor[2, 0]) == pytest.approx(0.2)
+
+    def test_opposite_faces_form_no_arris_and_are_not_invented(self):
+        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+
+        assert SimpleRectangularPrismEdgeFeature(
+            name="a", faces=(PrismFace.LEFT, PrismFace.RIGHT)).get_extent(self._box()) is None
+
+    def test_a_derived_edge_reaches_as_far_as_both_its_parents(self):
+        from kumiki.cutcsg import (DerivedEdgeFeature, FeatureGroup, FeatureProperties,
+                                   OwnedFeatureHit, PrismFace,
+                                   SimpleRectangularPrismFeature)
+
+        box = self._box()
+        # Groups that are allowed to meet: A pairs with B2, which is what makes
+        # an edge between these two derivable at all.
+        face = lambda which, group: SimpleRectangularPrismFeature(
+            name=str(which), face=which, properties=FeatureProperties(group=group))
+        edge = DerivedEdgeFeature.derive(
+            OwnedFeatureHit(feature=face(PrismFace.RIGHT, FeatureGroup.A), owner=box),
+            OwnedFeatureHit(feature=face(PrismFace.FRONT, FeatureGroup.B2), owner=box))
+        assert edge is not None, "adjacent faces in meeting groups form an edge"
+
+        extent = edge.get_extent(box)
+
+        assert extent.ends is not None
+        first, second = extent.ends
+        assert abs(float(second[2, 0]) - float(first[2, 0])) == pytest.approx(0.4)
+
+    def test_the_runner_reads_those_ends_as_an_interval(self):
         import importlib.util
         import sys
         from pathlib import Path
 
+        from kumiki.cutcsg import PrismFace, SimpleRectangularPrismEdgeFeature
+
         root = Path(__file__).resolve().parent.parent
         spec = importlib.util.spec_from_file_location(
-            "kigumi_runner_onsurface", root / "kigumi" / "runner.py")
-        module = importlib.util.module_from_spec(spec)
-        sys.modules["kigumi_runner_onsurface"] = module
-        spec.loader.exec_module(module)
-        return module
+            "kigumi_runner_declared", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_declared"] = runner
+        spec.loader.exec_module(runner)
 
-    def _box_and_arris(self):
-        from kumiki.cutcsg import RectangularPrism
-        from kumiki.geometry import Line
-        from kumiki.rule import create_v2, create_v3, scalar
+        box = self._box()
+        arris = SimpleRectangularPrismEdgeFeature(
+            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT))
 
-        box = RectangularPrism(
-            size=create_v2(scalar("0.1"), scalar("0.1")),
-            start_distance=scalar("0"), end_distance=scalar("0.4"))
-        # One of its long arrises: on the surface in two directions at once.
-        arris = Line(
-            point=create_v3(scalar("0.05"), scalar("0.05"), scalar("0")),
-            direction=create_v3(scalar("0"), scalar("0"), scalar("1")))
-        return box, arris
+        span = runner._declared_line_span(arris, box, arris.locate(box))
 
-    def test_the_arris_is_placed_rather_than_reported_as_nowhere(self, runner):
-        box, arris = self._box_and_arris()
+        assert span is not None
+        assert span[1] - span[0] == pytest.approx(0.4)
 
-        found = runner._line_intervals(arris, box, 10.0, box.transform.position)
+    def test_a_feature_that_cannot_say_returns_nothing(self):
+        # So the caller falls back to clipping rather than to a wrong number.
+        import importlib.util
+        import sys
+        from pathlib import Path
 
-        assert found, "an arris of a box lies on that box"
+        from kumiki.cutcsg import PrismFace, RectangularPrism
+        from kumiki.cutcsg import SimpleRectangularPrismEdgeFeature
+        from kumiki.rule import create_v2, scalar
 
-    def test_and_placed_over_the_length_of_the_box(self, runner):
-        box, arris = self._box_and_arris()
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_declared2", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_declared2"] = runner
+        spec.loader.exec_module(runner)
 
-        found = runner._line_intervals(arris, box, 10.0, box.transform.position)
-        low, high = max(found, key=lambda piece: piece[1] - piece[0])
+        endless = RectangularPrism(
+            size=create_v2(scalar("0.1"), scalar("0.2")),
+            start_distance=scalar("0"), end_distance=None)
+        arris = SimpleRectangularPrismEdgeFeature(
+            name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT))
 
-        assert high - low == pytest.approx(0.4, abs=1e-2)
-
-    def test_a_bound_that_says_nowhere_is_skipped_rather_than_believed(self, runner):
-        # Empty is "nowhere", and nowhere is not credible for a feature somebody
-        # just picked -- an arris on a surface is exactly what the inside test
-        # gets wrong. Taking it at its word intersected the feature away and
-        # left the measurement with no extent at all.
-        from kumiki.cutcsg import RectangularPrism
-        from kumiki.rule import (Orientation, Transform, create_v2, create_v3,
-                                 scalar)
-
-        box, arris = self._box_and_arris()
-        elsewhere = RectangularPrism(
-            size=create_v2(scalar("0.1"), scalar("0.1")),
-            start_distance=scalar("0"), end_distance=scalar("0.4"),
-            transform=Transform(
-                position=create_v3(scalar("50"), scalar("50"), scalar("50")),
-                orientation=Orientation.identity()))
-
-        assert runner._line_intervals(
-            arris, elsewhere, 10.0, box.transform.position) == []
-
-        both = runner._intersected_line_pieces(
-            arris, [box, elsewhere], 10.0, box.transform.position)
-
-        assert both, "a bound that says nowhere must not erase the others"
-
-    def test_a_bound_that_cannot_answer_is_skipped_too(self, runner):
-        box, arris = self._box_and_arris()
-
-        both = runner._intersected_line_pieces(
-            arris, [box, None], 10.0, box.transform.position)
-
-        assert both
+        assert runner._declared_line_span(arris, endless, arris.locate(endless)) is None
