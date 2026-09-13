@@ -108,3 +108,48 @@ describe('every global the webview reaches for is loaded before it is used', () 
         expect(late).toEqual([]);
     });
 });
+
+describe('every argument a shared decision takes is actually passed', () => {
+    // choosePickAction gained `inDrawing`, was unit tested, and neither caller
+    // was updated -- so in a drawing the store refused the timber selection,
+    // the pick never became a 'csg', and nothing selected or hovered at all.
+    // A pure function is easy to test and easy to leave unwired.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    /** Each `choosePickAction({ ... })` call in the app, with its argument text. */
+    function callsTo(name) {
+        const calls = [];
+        let at = app.indexOf(`${name}({`);
+        while (at !== -1) {
+            const open = app.indexOf('{', at);
+            let depth = 0;
+            let end = open;
+            for (; end < app.length; end += 1) {
+                if (app[end] === '{') depth += 1;
+                if (app[end] === '}') {
+                    depth -= 1;
+                    if (depth === 0) break;
+                }
+            }
+            calls.push(app.slice(open, end + 1));
+            at = app.indexOf(`${name}({`, end);
+        }
+        return calls;
+    }
+
+    const picks = callsTo('choosePickAction');
+
+    test('the app calls choosePickAction in more than one place', () => {
+        expect(picks.length).toBeGreaterThan(1);
+    });
+
+    test.each(['hits', 'selectedTimbers', 'inDrawing'])(
+        'every call passes %s', (argument) => {
+            // Either spelling: `hits: along.hits` or the shorthand `hits,`.
+            const passed = new RegExp(`\\b${argument}\\s*[,:}]`);
+            const missing = picks.filter((call) => !passed.test(call));
+
+            expect(missing).toEqual([]);
+        },
+    );
+});
