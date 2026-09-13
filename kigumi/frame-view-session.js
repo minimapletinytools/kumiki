@@ -1000,6 +1000,15 @@ class FrameViewSession {
             // has to be added here too -- which is how this arrived empty and
             // edges stopped being selectable while still highlighting.
             tolerances: message.tolerances || null,
+            // Which feature at the point is wanted, and what would be measured
+            // to it. With these the runner offers one that can finish the
+            // measurement rather than the most specific one, says whether it
+            // can, and works out the plane -- all in the request that was being
+            // made anyway.
+            candidateIndex: message.candidateIndex || 0,
+            heldGeometry: message.heldGeometry || null,
+            heldAt: message.heldAt || null,
+            look: message.look || null,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
@@ -1015,6 +1024,15 @@ class FrameViewSession {
             // The same tolerances the click will use. Hover that answers by a
             // different rule lights things a click then refuses.
             tolerances: message.tolerances || null,
+            // Which feature at the point is wanted, and what would be measured
+            // to it. With these the runner offers one that can finish the
+            // measurement rather than the most specific one, says whether it
+            // can, and works out the plane -- all in the request that was being
+            // made anyway.
+            candidateIndex: message.candidateIndex || 0,
+            heldGeometry: message.heldGeometry || null,
+            heldAt: message.heldAt || null,
+            look: message.look || null,
         });
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about

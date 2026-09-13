@@ -1629,6 +1629,10 @@ class KigumiViewerApp extends LitElement {
             this._layersView.addEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
             this._layersView.addEventListener('kigumi-enter-drawing', this.onEnterDrawingRequested);
             this._layersView.addEventListener('kigumi-save-drawings', this.onSaveDrawingsRequested);
+            this._layersView.addEventListener('kigumi-toggle-measurements', (event) => {
+                this.setMeasurementsHidden(event.detail && event.detail.hidden);
+                this._layersDrawingsChanged();
+            });
             this._layersView.setDrawingsEnabled(this.drawingBetaEnabled);
             if (this.drawingBetaEnabled) {
                 // The list is python's; ask for it once there is somewhere to
@@ -2669,8 +2673,15 @@ class KigumiViewerApp extends LitElement {
                 : (payload.enter || this.debugDrawingEnabled ? ids[0] : null);
             if (entering) {
                 this.setActiveScene(entering);
+            } else {
+                // Same scene, new contents. setActiveScene refuses the id it is
+                // already on, so without this a measurement was written, came
+                // back in this very message, and never appeared -- which is the
+                // whole reason these commands answer with the full set.
+                this.refreshActiveScene();
             }
             this._layersDrawingsChanged();
+            this._applyPendingMeasurementFocus();
             return;
         }
 
@@ -3327,6 +3338,12 @@ class KigumiViewerApp extends LitElement {
         this.clearHeldFeature();
 
         const drawingId = this.measurementDrawingId;
+        // Focused once it arrives, so the kind can be changed without hunting
+        // for the row it landed on.
+        this._focusMeasurementOnArrival = {
+            viewportId: measurement.viewportId,
+            measureKey: measurementKey(measurement),
+        };
         const payload = {
             type: 'addMeasurement',
             drawingId,
@@ -3486,6 +3503,41 @@ class KigumiViewerApp extends LitElement {
         this.emitViewerLog('measure-redo', { label: entry.label });
         this._sendMeasurementCommand(entry.redo);
         return true;
+    }
+
+    /**
+     * Redraw the scene already on screen, after its contents changed.
+     *
+     * Deliberately not setActiveScene: nothing about the mode has changed, so
+     * the held end of a half-made measurement, the hover and the focus all stay
+     * where they are, and the cameras are kept the way a rebuild of the same
+     * scene always keeps them.
+     */
+    refreshActiveScene() {
+        this.rebuildViewports();
+        this._syncDrawingPanel();
+        this.renderMeasurements();
+        this.requestUpdate();
+    }
+
+    /**
+     * Look at the measurement just made, once it comes back.
+     *
+     * It cannot be focused before then: until the runner answers it is not on a
+     * viewport to be focused on.
+     */
+    _applyPendingMeasurementFocus() {
+        const wanted = this._focusMeasurementOnArrival;
+        if (!wanted) {
+            return;
+        }
+        this._focusMeasurementOnArrival = null;
+        if (!this.focusedMeasurement(wanted.viewportId, wanted.measureKey)) {
+            return;
+        }
+        this.selectionManager.setMeasurementFocus(wanted);
+        this._syncDrawingPanel();
+        this.selectionPanel.updateInfo(this.currentFrameData);
     }
 
     /** Show or hide every 3D measurement at once. */
@@ -3727,6 +3779,10 @@ class KigumiViewerApp extends LitElement {
                     currentPath,
                     ctrlClick: !!event.ctrlKey || !!event.metaKey,
                     tolerances: this._pickTolerances(point, pickCamera),
+                    // The same question the hover asked, so the click resolves
+                    // to the feature the hover lit rather than to a different
+                    // one -- and so the pick comes back with the plane.
+                    ...this._heldForRequest(),
                 });
             }
         } else {
@@ -6512,7 +6568,9 @@ class KigumiViewerApp extends LitElement {
     /** Hand the drawings to the layers panel, which lists them. */
     _layersDrawingsChanged() {
         if (this._layersView && typeof this._layersView.setDrawings === 'function') {
-            this._layersView.setDrawings(this.sceneStore.drawings(), this.sceneStore.activeSceneId);
+            this._layersView.setDrawings(
+                this.sceneStore.drawings(), this.sceneStore.activeSceneId,
+                { inDrawing: this.isInDrawing, measurementsHidden: this.measurementsHidden });
         }
     }
 
