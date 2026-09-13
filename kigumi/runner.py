@@ -2467,6 +2467,71 @@ def collect_drawings(
     return drawings
 
 
+def scalar_of(value: float):
+    """A float as the exact scalar the geometry code multiplies by."""
+    from kumiki.rule import scalar
+
+    return scalar(repr(float(value)))
+
+
+def _line_intervals(located: Any, csg: Any, reach: float, near: Any):
+    """Where a line lies on one solid, as intervals along its own direction.
+
+    None when the solid cannot say -- which is different from an empty list,
+    since "I do not know" must not read as "nowhere".
+
+    Cropped with slack, because an arris lies exactly ON the surface of whatever
+    declared it, and a point on a surface is the case an inside test is worst
+    at. Without it the crop said a mortise hole's own arris was nowhere on the
+    mortise hole, the bound was thrown away, and the feature fell back to the
+    length of the whole timber. The slack is the gap between analytic geometry
+    and the mesh, which is what FEATURE_FACE_TOLERANCE is for.
+    """
+    from kumiki.cropcsg import crop_line_to_segments_on_csg
+    from kumiki.cutcsg import FEATURE_FACE_TOLERANCE
+
+    pieces = crop_line_to_segments_on_csg(
+        located, csg, seed_reach=reach, near=near,
+        tolerance=float(FEATURE_FACE_TOLERANCE))
+    if pieces is None:
+        return None
+    station = lambda point: float(
+        ((point - located.point).T * located.direction)[0, 0])
+    return [tuple(sorted((station(piece.start), station(piece.end))))
+            for piece in pieces]
+
+
+def _intersected_line_pieces(located: Any, solids: List[Any], reach: float, near: Any):
+    """Where a line lies on ALL of these solids, as intervals along it.
+
+    Intervals rather than segments because that is what makes this exact: a line
+    clipped by a convex solid is an interval, and intervals intersect cleanly.
+    A solid that cannot answer is skipped rather than treated as empty.
+    """
+    intervals = None
+    for solid in solids:
+        if solid is None:
+            continue
+        found = _line_intervals(located, solid, reach, near)
+        if not found:
+            # None is "cannot say"; empty is "nowhere", and nowhere is not
+            # credible for a feature somebody just picked. An arris lies exactly
+            # ON the surface of whatever declared it, which is the case an
+            # inside test is worst at -- so an empty answer here means the crop
+            # could not place it, not that the feature is absent. Taking it at
+            # its word intersected the feature away.
+            continue
+        if intervals is None:
+            intervals = found
+            continue
+        intervals = [
+            (max(one[0], other[0]), min(one[1], other[1]))
+            for one in intervals for other in found
+            if max(one[0], other[0]) < min(one[1], other[1])
+        ]
+    return intervals or []
+
+
 def _projects_to_a_point(direction: Sequence[float], plane_normal: Sequence[float]) -> bool:
     """Whether a line seen from this plane draws as a point rather than a line.
 
@@ -2513,21 +2578,29 @@ def _measure_span(
     reach = float(timber.length) * 4
 
     if isinstance(located, Line) and root_csg is not None:
-        pieces = crop_line_to_segments_on_csg(
-            located, root_csg, seed_reach=reach, near=solid.transform.position)
+        # Bounded by the timber AND by whatever declared it, the way a face
+        # already was. The timber alone is not enough: an arris of a mortise
+        # hole lies along a line that runs the whole length of the post, so
+        # cropping it to the post gave back the post -- a 25mm feature with a
+        # 1295mm extent, and a dimension placed in the middle of the timber
+        # because that is where two such extents overlap.
+        pieces = _intersected_line_pieces(
+            located, [root_csg, node], reach, solid.transform.position)
         if pieces:
             # The longest. A cut can leave an edge in several, and a dimension
             # has to attach to one of them -- the biggest is the one a reader
             # would point at.
-            longest = max(pieces, key=lambda piece: piece.length())
-            start, end = to_world(longest.start), to_world(longest.end)
+            low, high = max(pieces, key=lambda piece: piece[1] - piece[0])
+            start = to_world(located.point + located.direction * scalar_of(low))
+            end = to_world(located.point + located.direction * scalar_of(high))
             direction = _normalize([end[i] - start[i] for i in range(3)])
             if plane_normal is not None and _projects_to_a_point(direction, plane_normal):
                 # Seen end-on it IS a point, and a point is what the rules have
                 # to be given: a line whose length is all depth has no direction
                 # on the sheet to be square to, and treating it as one put a
                 # point-and-line pair through the parallel-lines rule.
-                return MeasureSpan(at=tuple(to_world(longest.midpoint())))
+                middle = tuple((start[i] + end[i]) / 2 for i in range(3))
+                return MeasureSpan(at=middle)
             return MeasureSpan(
                 at=start, direction=tuple(direction),
                 interval=(0.0, math.dist(start, end)))

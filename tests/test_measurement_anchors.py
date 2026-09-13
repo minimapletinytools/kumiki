@@ -353,3 +353,176 @@ class TestAFeatureSeenEndOn:
 
         assert anchors[0] == (0, -0.6, 0.05)
         assert anchors[1][1] == pytest.approx(-0.6)
+
+
+class TestAFeatureIsBoundedByWhatDeclaredIt:
+    """An arris of a mortise hole is as long as the hole, not as the timber.
+
+    A face was already cropped to the node that declared it as well as to the
+    timber. A line was cropped to the timber alone -- and the line an arris lies
+    on runs the whole length of the post, so a 25mm feature came back with a
+    1295mm extent. Two such extents overlap over the whole timber, so the
+    dimension landed in the middle of it, nowhere near what it measured.
+    """
+
+    @pytest.fixture
+    def receiving(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        from kumiki.example_shavings import create_canonical_example_butt_joint_timbers
+        from kumiki.joints.workshop.mixed import (
+            cut_mortise_and_tenon_joint_on_face_aligned_timbers)
+        from kumiki.rule import create_v3, inches
+        from kumiki.timber import Frame
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_bounds", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_bounds"] = runner
+        spec.loader.exec_module(runner)
+
+        joint = cut_mortise_and_tenon_joint_on_face_aligned_timbers(
+            arrangement=create_canonical_example_butt_joint_timbers(create_v3(0, 0, 0)),
+            tenon_width_relative_to_joint=inches(3),
+            tenon_height_relative_to_joint=inches(1),
+            tenon_length=inches(3), mortise_depth=inches(7, 2))
+        frame = Frame.from_joints([joint])
+        entries, _ = runner._assign_member_keys(frame)
+        entry = next(e for e in entries if e["memberKey"] == "receiving_timber#0")
+        return runner, entry
+
+    def _spans(self, runner, entry, look):
+        from kumiki.cutcsg import CSGFeatureType, FeatureTestTolerances
+        from kumiki.triangles import triangulate_cutcsg
+
+        timber = entry["timber"]
+        root = entry["cutTimber"].render_timber_with_cuts_csg_local()
+        points = [
+            [float(vertex[i]) for i in range(3)]
+            for triangle in triangulate_cutcsg(root).mesh.triangles for vertex in triangle
+        ]
+        found = {}
+        for point in points:
+            for hit in runner._features_at_point(
+                    root, runner._to_v3(point), 5e-4, FeatureTestTolerances(face=5e-4)):
+                if hit.feature.feature_type() != CSGFeatureType.EDGE:
+                    continue
+                found.setdefault(hit.feature.name, runner._measure_span(
+                    hit.feature, hit.owner, timber, hit.feature.locate(hit.owner),
+                    root, look))
+        return found, float(timber.length)
+
+    def test_an_arris_of_the_hole_is_as_long_as_the_hole(self, receiving):
+        runner, entry = receiving
+        spans, length = self._spans(runner, entry, [1, 0, 0])
+
+        holes = [span for name, span in spans.items()
+                 if name.startswith("arris.") and span is not None and not span.is_point]
+        assert holes, "the mortise hole should declare some arrises"
+        for span in holes:
+            low, high = span.interval
+            assert high - low < length / 4
+
+    def test_a_timber_arris_is_still_as_long_as_the_timber_allows(self, receiving):
+        # The bound has to come from what declared it, not from being small: a
+        # rough arris IS declared by the whole timber and must keep its length.
+        runner, entry = receiving
+        spans, length = self._spans(runner, entry, [0, 0, 1])
+
+        rough = [span for name, span in spans.items()
+                 if name.startswith("rough.") and span is not None and not span.is_point]
+        assert rough, "the timber should declare some arrises"
+        assert max(high - low for low, high in (span.interval for span in rough)) \
+            > length / 2
+
+
+class TestALineLyingOnTheSurfaceOfWhatDeclaredIt:
+    """An arris is ON its owner's surface, and a crop must still place it.
+
+    This is where the placement rules were being fed nonsense. Cropping a line
+    to a solid asks whether points are inside it, and an arris sits exactly on
+    the boundary -- the one place that test is worst at. The crop answered
+    "nowhere", the bound from the owner was thrown away, and the feature fell
+    back to the length of the whole timber: a 52mm arris of a mortise hole
+    reported as 1295mm, so two of them overlapped over the entire post and the
+    dimension landed in the middle of it.
+    """
+
+    @pytest.fixture
+    def runner(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_onsurface", root / "kigumi" / "runner.py")
+        module = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_onsurface"] = module
+        spec.loader.exec_module(module)
+        return module
+
+    def _box_and_arris(self):
+        from kumiki.cutcsg import RectangularPrism
+        from kumiki.geometry import Line
+        from kumiki.rule import create_v2, create_v3, scalar
+
+        box = RectangularPrism(
+            size=create_v2(scalar("0.1"), scalar("0.1")),
+            start_distance=scalar("0"), end_distance=scalar("0.4"))
+        # One of its long arrises: on the surface in two directions at once.
+        arris = Line(
+            point=create_v3(scalar("0.05"), scalar("0.05"), scalar("0")),
+            direction=create_v3(scalar("0"), scalar("0"), scalar("1")))
+        return box, arris
+
+    def test_the_arris_is_placed_rather_than_reported_as_nowhere(self, runner):
+        box, arris = self._box_and_arris()
+
+        found = runner._line_intervals(arris, box, 10.0, box.transform.position)
+
+        assert found, "an arris of a box lies on that box"
+
+    def test_and_placed_over_the_length_of_the_box(self, runner):
+        box, arris = self._box_and_arris()
+
+        found = runner._line_intervals(arris, box, 10.0, box.transform.position)
+        low, high = max(found, key=lambda piece: piece[1] - piece[0])
+
+        assert high - low == pytest.approx(0.4, abs=1e-2)
+
+    def test_a_bound_that_says_nowhere_is_skipped_rather_than_believed(self, runner):
+        # Empty is "nowhere", and nowhere is not credible for a feature somebody
+        # just picked -- an arris on a surface is exactly what the inside test
+        # gets wrong. Taking it at its word intersected the feature away and
+        # left the measurement with no extent at all.
+        from kumiki.cutcsg import RectangularPrism
+        from kumiki.rule import (Orientation, Transform, create_v2, create_v3,
+                                 scalar)
+
+        box, arris = self._box_and_arris()
+        elsewhere = RectangularPrism(
+            size=create_v2(scalar("0.1"), scalar("0.1")),
+            start_distance=scalar("0"), end_distance=scalar("0.4"),
+            transform=Transform(
+                position=create_v3(scalar("50"), scalar("50"), scalar("50")),
+                orientation=Orientation.identity()))
+
+        assert runner._line_intervals(
+            arris, elsewhere, 10.0, box.transform.position) == []
+
+        both = runner._intersected_line_pieces(
+            arris, [box, elsewhere], 10.0, box.transform.position)
+
+        assert both, "a bound that says nowhere must not erase the others"
+
+    def test_a_bound_that_cannot_answer_is_skipped_too(self, runner):
+        box, arris = self._box_and_arris()
+
+        both = runner._intersected_line_pieces(
+            arris, [box, None], 10.0, box.transform.position)
+
+        assert both
