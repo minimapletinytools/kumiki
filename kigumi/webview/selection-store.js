@@ -401,11 +401,28 @@
         return { action: 'select', memberKey: nearest.memberKey, hit: nearest.hit };
     }
 
+    /**
+     * Which label the draw button wears, given how many timbers are selected.
+     *
+     * Drawing nothing means drawing the whole frame, which is a reasonable
+     * thing to ask for -- so the button is never disabled, and says which of
+     * the two it is about to do instead.
+     */
+    function drawButtonKey(selectedCount) {
+        if (!selectedCount) {
+            return 'viewer.selection.drawFrame';
+        }
+        return selectedCount === 1
+            ? 'viewer.selection.drawTimber'
+            : 'viewer.selection.drawTimbers';
+    }
+
     const SELECTION_MODES = Object.freeze({ MODEL, DRAWING });
 
     if (typeof module !== 'undefined' && module.exports) {
-        module.exports = { SelectionStore, choosePickAction, SELECTION_MODES };
+        module.exports = { SelectionStore, choosePickAction, SELECTION_MODES, drawButtonKey };
     }
     globalScope.SelectionStore = SelectionStore;
     globalScope.choosePickAction = choosePickAction;
+    globalScope.drawButtonKey = drawButtonKey;
 })(typeof window !== 'undefined' ? window : globalThis);

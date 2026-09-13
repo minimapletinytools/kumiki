@@ -91,3 +91,23 @@ describe('layers payload conversion', () => {
         expect(convert({})).toEqual({ timbers: [], joints: [] });
     });
 });
+
+const { membersTitle } = require('../webview/drawing-panel.js');
+
+describe('what the members section is a list of', () => {
+    // The list alone cannot say: a drawing of every timber and a drawing that
+    // happens to name every timber look identical in it.
+    const t = (key) => (key === 'viewer.drawing.members' ? 'members' : 'everything');
+
+    test('a drawing about everything says so', () => {
+        expect(membersTitle(null, t)).toBe('members (everything)');
+    });
+
+    test('a drawing of a slice is named after it', () => {
+        expect(membersTitle('East Top Plate', t)).toBe('members (East Top Plate)');
+    });
+
+    test('an empty name is no name, not a blank one', () => {
+        expect(membersTitle('', t)).toBe('members (everything)');
+    });
+});
