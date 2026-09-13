@@ -1405,7 +1405,9 @@ class KigumiViewerApp extends LitElement {
         this.footprintObjects = [];
         this.debugEnabled = false;
         this.leftClickDragRotatesCamera = true;
-        this.contextMenuState = null; // { memberKey, x, y } | null
+        // What a right-click is offering. One menu for every kind of menu --
+        // dismissing, choosing and where it sits are solved once.
+        this.contextMenu = new window.KigumiContextMenu.ContextMenu();
         this.showAssemblyTimeline = true;
         this.disassemblyMultiplier = 1.5;
         this.assemblyData = null;
@@ -2976,9 +2978,16 @@ class KigumiViewerApp extends LitElement {
             && mouseDownTarget === canvas
             && !mouseActionMoved
         ) {
-            const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
-            if (found) {
-                this.showMemberContextMenu(found.memberKey, event.clientX, event.clientY);
+            // While a feature is under the pointer, the useful question is
+            // which feature you meant -- the same choice Tab steps through,
+            // said out loud, since a face seen edge-on is never the best answer
+            // where it lies and there is no reason to expect it is on offer.
+            // Exporting the member is the answer when there is no such choice.
+            if (!this.showFeatureContextMenu(event.clientX, event.clientY)) {
+                const found = this._findMemberAtClientPoint(event.clientX, event.clientY);
+                if (found) {
+                    this.showMemberContextMenu(found.memberKey, event.clientX, event.clientY);
+                }
             }
         }
     }
@@ -3055,7 +3064,7 @@ class KigumiViewerApp extends LitElement {
         }
         if (event.key === 'Escape') {
             event.preventDefault();
-            if (this.contextMenuState) {
+            if (this.contextMenu.isOpen) {
                 this.closeMemberContextMenu();
             } else if (this.escapeMeasurement()) {
                 // One end at a time, so leaving a half-made measurement takes
@@ -4064,20 +4073,64 @@ class KigumiViewerApp extends LitElement {
         if (!memberKey) {
             return;
         }
-        this.contextMenuState = { memberKey, x: clientX, y: clientY };
+        const meta = this.memberMetadataByKey.get(memberKey);
+        this.contextMenu.open({
+            x: clientX,
+            y: clientY,
+            title: (meta && meta.name) || memberKey,
+            items: [
+                { id: 'stl', label: t('viewer.contextMenu.exportStl') },
+                { id: 'step', label: t('viewer.contextMenu.exportStep') },
+            ],
+            onChoose: (id) => this.exportMember(memberKey, id),
+        });
         this.requestUpdate();
+    }
+
+    /**
+     * Offer the features under the pointer, by name.
+     *
+     * The same choice Tab steps through, said out loud. Tab is quicker once you
+     * know what is there; this is how you find out -- a face seen edge-on is
+     * never the best answer where it lies, so without being told it is on offer
+     * there is no reason to expect it.
+     */
+    showFeatureContextMenu(clientX, clientY) {
+        const hovered = this._hover && this._hover.feature;
+        const candidates = (hovered && hovered.candidates) || [];
+        if (candidates.length < 2) {
+            // One feature under the pointer is not a choice.
+            return false;
+        }
+        const current = (this._candidateIndex || 0) % candidates.length;
+        return this.contextMenu.open({
+            x: clientX,
+            y: clientY,
+            title: t('viewer.contextMenu.features'),
+            items: candidates.map((candidate, index) => ({
+                id: String(index),
+                label: candidate.label,
+                note: (candidate.type || '').toLowerCase(),
+                checked: index === current,
+            })),
+            onChoose: (id) => {
+                this._candidateIndex = Number(id);
+                this._hover.askAgain();
+                this.emitViewerLog('measure-cycle', {
+                    index: this._candidateIndex, of: candidates.length, from: 'menu',
+                });
+            },
+        }) && (this.requestUpdate(), true);
     }
 
     closeMemberContextMenu() {
-        if (!this.contextMenuState) {
-            return;
+        if (this.contextMenu.close()) {
+            this.requestUpdate();
         }
-        this.contextMenuState = null;
-        this.requestUpdate();
     }
 
     onWindowContextMenuDismiss(event) {
-        if (!this.contextMenuState) {
+        if (!this.contextMenu.isOpen) {
             return;
         }
         const menuEl = this.renderRoot.querySelector('#member-context-menu');
@@ -4939,13 +4992,18 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
+    /**
+     * Whatever menu is open, from the one description of a menu.
+     *
+     * One template rather than one per menu: exporting a member and choosing a
+     * feature differ only in what they list, and a second template is a second
+     * place for dismissing and positioning to go quietly wrong.
+     */
     renderMemberContextMenu() {
-        const state = this.contextMenuState;
+        const state = this.contextMenu.state;
         if (!state) {
             return '';
         }
-        const meta = this.memberMetadataByKey.get(state.memberKey);
-        const displayName = (meta && meta.name) || state.memberKey;
         return html`
             <div
                 id="member-context-menu"
@@ -4955,17 +5013,22 @@ class KigumiViewerApp extends LitElement {
                 @mousedown=${(event) => event.stopPropagation()}
                 @contextmenu=${(event) => event.preventDefault()}
             >
-                <div class="context-menu-title">${displayName}</div>
-                <button
-                    type="button"
-                    class="context-menu-item"
-                    @click=${() => this.exportMember(state.memberKey, 'stl')}
-                >${t('viewer.contextMenu.exportStl')}</button>
-                <button
-                    type="button"
-                    class="context-menu-item"
-                    @click=${() => this.exportMember(state.memberKey, 'step')}
-                >${t('viewer.contextMenu.exportStep')}</button>
+                ${state.title
+                    ? html`<div class="context-menu-title">${state.title}</div>`
+                    : ''}
+                ${state.items.map((item) => html`
+                    <button
+                        type="button"
+                        class="context-menu-item${item.checked ? ' context-menu-checked' : ''}"
+                        ?disabled=${Boolean(item.disabled)}
+                        @click=${() => {
+                            this.contextMenu.choose(item.id);
+                            this.requestUpdate();
+                        }}
+                    >${item.label}${item.note
+                        ? html`<span class="context-menu-note">${item.note}</span>`
+                        : ''}</button>
+                `)}
             </div>
         `;
     }

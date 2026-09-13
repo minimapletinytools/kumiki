@@ -5273,8 +5273,13 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
             local_csg, member_key, new_path, feature_label, feature_type, edge,
         ),
         # How many features are at this point, so the viewer knows how many
-        # there are to step through.
+        # there are to step through, and what they are called, so it can offer
+        # them by name rather than as "the next one".
         "candidateCount": len(feature_hits),
+        "candidates": [
+            {"label": hit.feature.name, "type": hit.feature.feature_type().name}
+            for hit in feature_hits
+        ],
         # Where the feature is, unbounded, in world space. What decides whether
         # a pair can be dimensioned is what each PROJECTS to, and the viewer
         # projects on every pointer move -- so it gets the plane or the line and

@@ -595,6 +595,16 @@ canvas { display: block; width: 100%; height: 100%; }
     overflow: hidden;
     text-overflow: ellipsis;
 }
+.context-menu-checked::before {
+    content: '\2713\00a0';
+}
+
+.context-menu-note {
+    margin-left: 8px;
+    opacity: 0.6;
+    font-size: 0.85em;
+}
+
 .context-menu-item {
     display: block;
     width: 100%;
