@@ -2154,20 +2154,26 @@ def delete_measurement(
     viewport_id: str,
     measure: Dict[str, Any],
 ) -> Dict[str, Any]:
-    """Take a measurement off a viewport.
+    """Take a measurement off a viewport. Only one the file owns.
 
-    One of the file's own goes away. One the code asks for cannot -- the code
-    will ask again next time it runs -- so what is written instead is an entry
-    saying it is not wanted, which is what suppression is for.
+    A measurement the code asks for cannot be deleted: the code will ask again
+    the next time it runs, so the most this tier could do is write down that it
+    is not wanted, and a drawing whose python says one thing and whose file
+    quietly says another is worse than a delete that does not happen. It is
+    removed by editing the python that asks for it.
 
-    Which of the two it is, is not asked directly: the entry is dropped, the
-    drawings are collected again, and if the measurement is still there then the
-    code is what is producing it. That beats reading the code declarations a
-    second way, which is how two answers to the same question start to differ.
+    So the viewer offers no delete for one, and this refuses if asked anyway.
+    The file format still understands suppression for a hand-written entry; this
+    does not produce one.
+
+    Whether the code asks for it is not read off the declarations a second way:
+    the entry is dropped, the drawings are collected again, and if it is still
+    there then the code is what produces it.
     """
     holder, measures = _measurement_slot(
         frame, example_path, pending, drawing_id, viewport_id)
     identity = _viewer_measure_identity(measure)
+    dropped = [m for m in measures if _viewer_measure_identity(m) == identity]
     measures[:] = [m for m in measures if _viewer_measure_identity(m) != identity]
 
     still_there = any(
@@ -2179,11 +2185,14 @@ def delete_measurement(
         for m in viewport.get("measurements") or []
     )
     if still_there:
-        measures.append({
-            "a": measure.get("a"), "b": measure.get("b"),
-            "measureId": measure.get("measureId"),
-            MEASURE_SUPPRESSED: True,
-        })
+        # Put back whatever was removed: an override of a code measurement is
+        # somebody's placement or kind, and losing it to a refused delete would
+        # be a quiet edit of its own.
+        measures.extend(dropped)
+        raise ValueError(
+            "That measurement is declared in the frame's code, so it cannot be "
+            "deleted here. Remove it from the python that asks for it."
+        )
     return holder
 
 

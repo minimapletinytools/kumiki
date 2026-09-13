@@ -1025,7 +1025,7 @@ class TestChangingAndRemovingAMeasurement:
 
 
 class TestDeletingAMeasurementTheCodeAsksFor:
-    """It cannot be taken away -- the code will ask again -- so it is suppressed."""
+    """It cannot be done. The code asks again the next time it runs."""
 
     def _frame(self):
         anchor = lambda feature: SingleFeaturePath(
@@ -1053,30 +1053,40 @@ class TestDeletingAMeasurementTheCodeAsksFor:
         return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"]
 
     def test_the_code_measurement_is_there_to_begin_with(self):
-        runner = _load_runner()
+        assert len(self._measurements(self._frame(), [])) == 1
+
+    def test_deleting_it_is_refused(self):
+        frame, pending = self._frame(), []
+
+        with pytest.raises(ValueError, match="declared in the frame's code"):
+            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+    def test_and_it_is_still_there_afterwards(self):
+        frame, pending = self._frame(), []
+
+        with pytest.raises(ValueError):
+            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert len(self._measurements(frame, pending)) == 1
+
+    def test_a_refused_delete_does_not_quietly_drop_an_override(self):
+        # The file may hold this measurement's placement or kind. Losing that to
+        # a delete that did not happen would be an edit nobody asked for.
+        frame, pending = self._frame(), []
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._wire(),
+            {"placement": {"offset": 9.0}})
+
+        with pytest.raises(ValueError):
+            runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
+
+        assert self._measurements(frame, pending)[0]["placement"] == {"offset": 9.0}
+
+    def test_the_file_still_says_which_it_is(self):
+        # What the viewer reads to decide whether to offer a delete at all.
         frame = self._frame()
 
-        assert len(self._measurements(frame, [])) == 1
-
-    def test_deleting_it_makes_it_go_away(self):
-        runner = _load_runner()
-        frame, pending = self._frame(), []
-
-        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
-
-        assert self._measurements(frame, pending) == []
-
-    def test_and_what_is_written_says_it_is_not_wanted(self):
-        # Rather than the measurement being absent from the file, which would
-        # only mean the code had not been asked yet.
-        runner = _load_runner()
-        frame, pending = self._frame(), []
-
-        runner.delete_measurement(frame, None, pending, "plan", VIEWPORT, self._wire())
-
-        written = pending[0]["viewports"][0]["measurements"]
-        assert len(written) == 1
-        assert written[0][runner.MEASURE_SUPPRESSED] is True
+        assert self._measurements(frame, [])[0]["origin"] == runner.ORIGIN_CODE
 
 
 class TestAddingAMeasurement:
