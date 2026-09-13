@@ -548,9 +548,31 @@
             + '::' + (measure.measureId || '');
     }
 
+    /**
+     * How far from the run a dimension sits, given where the pointer is.
+     *
+     * The one degree of freedom a dimension has once its two ends are fixed:
+     * it slides along the perpendicular and nowhere else. Signed, because
+     * which SIDE it sits on is the other half of that freedom -- dragging
+     * through the run puts it on the far side rather than stopping at zero.
+     *
+     * The same perpendicular dimensionLayout offsets along, so what is dragged
+     * is what is drawn.
+     */
+    function offsetForPointer(from, to, pointer) {
+        const run = { x: to.x - from.x, y: to.y - from.y };
+        const span = Math.hypot(run.x, run.y);
+        if (span < DEGENERATE_PIXELS) {
+            return null;
+        }
+        const away = { x: -run.y / span, y: run.x / span };
+        return (pointer.x - from.x) * away.x + (pointer.y - from.y) * away.y;
+    }
+
     const KigumiMeasurements = {
         PROJECTED_RULES,
         measurementKey,
+        offsetForPointer,
         perpendicularEnds,
         anchorReference,
         normalizeKind,

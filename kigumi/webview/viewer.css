@@ -311,7 +311,9 @@ canvas { display: block; width: 100%; height: 100%; }
    exactly what was drawn, because it IS what was drawn. */
 .dim-group {
     pointer-events: auto;
-    cursor: pointer;
+    /* Move, because that is what dragging it does -- and selecting it is what
+       happens when the drag turns out to be a click. */
+    cursor: move;
 }
 
 .dim-focused .dim-line,

@@ -153,6 +153,10 @@ class ViewerViewport {
 // How far a dimension line sits from what it measures, in page pixels. Enough
 // to leave the drawing itself unobscured.
 const MEASUREMENT_OFFSET_PX = 26;
+// How far the pointer travels before holding a dimension counts as moving it.
+// A click and the start of a drag are the same event until then, and a click
+// has to keep meaning "select this one".
+const MEASUREMENT_DRAG_SLOP_PX = 3;
 
 // What a sheet is. Off-white rather than pure white, which glares.
 const PAPER_COLOR = 0xfbfbf8;
@@ -3644,7 +3648,12 @@ class KigumiViewerApp extends LitElement {
      * The reader's, when they have moved it; otherwise the viewport's default.
      * A measurement's one degree of freedom once its two ends are fixed.
      */
-    _measurementOffset(measure) {
+    _measurementOffset(measure, viewportId, measureKey) {
+        const dragging = this._draggingMeasurement;
+        if (dragging && dragging.viewportId === viewportId
+            && dragging.measureKey === measureKey) {
+            return dragging.offset;
+        }
         const placement = measure && measure.placement;
         const offset = placement && placement.offset;
         return typeof offset === 'number' ? offset : MEASUREMENT_OFFSET_PX;
@@ -3673,6 +3682,89 @@ class KigumiViewerApp extends LitElement {
             plane: draft.plane || null,
             kind: (this._pendingKinds && this._pendingKinds[0]) || null,
         };
+    }
+
+    /**
+     * Start moving a dimension, if the pointer turns out to be dragging.
+     *
+     * Armed rather than begun: a click and the start of a drag look identical
+     * until the pointer moves, and a click has to keep meaning "select this".
+     * So nothing happens until it has travelled far enough to be a gesture.
+     */
+    _beginMeasurementDrag(event, group, viewportId, measureKey, measure) {
+        const run = group._dimensionRun;
+        if (!run) {
+            return;
+        }
+        const was = this._measurementOffset(measure);
+        const start = { x: event.clientX, y: event.clientY };
+        let moved = false;
+
+        const pageOf = (moveEvent) => {
+            const canvas = this.renderRoot.querySelector('#viewport');
+            const rect = canvas.getBoundingClientRect();
+            return { x: moveEvent.clientX - rect.left, y: moveEvent.clientY - rect.top };
+        };
+
+        const onMove = (moveEvent) => {
+            if (!moved
+                && Math.abs(moveEvent.clientX - start.x)
+                   + Math.abs(moveEvent.clientY - start.y) < MEASUREMENT_DRAG_SLOP_PX) {
+                return;
+            }
+            moved = true;
+            const offset = KigumiMeasurements.offsetForPointer(
+                run.from, run.to, pageOf(moveEvent));
+            if (offset === null) {
+                return;
+            }
+            // Held here while the pointer is down, so the dimension follows
+            // without a round trip for every pixel.
+            this._draggingMeasurement = { viewportId, measureKey, offset };
+            this.renderMeasurements();
+        };
+
+        const onUp = () => {
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', onUp);
+            const dragged = this._draggingMeasurement;
+            this._draggingMeasurement = null;
+            if (!moved || !dragged) {
+                return;
+            }
+            this.renderMeasurements();
+            this._writeMeasurementPlacement(
+                viewportId, measureKey, { offset: dragged.offset }, { offset: was });
+        };
+
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', onUp);
+    }
+
+    /** Write where a dimension now sits, and what would put it back. */
+    _writeMeasurementPlacement(viewportId, measureKey, placement, was) {
+        const found = this.focusedMeasurement(viewportId, measureKey);
+        if (!found) {
+            return;
+        }
+        const drawingId = this.sceneStore.activeSceneId === DEFAULT_SCENE_ID
+            ? THREE_D_MEASUREMENTS_ID
+            : this.sceneStore.activeSceneId;
+        const where = {
+            drawingId,
+            viewportId,
+            a: KigumiMeasurements.anchorReference(found.measure.a),
+            b: KigumiMeasurements.anchorReference(found.measure.b),
+            measureId: found.measure.measureId || null,
+        };
+        this._focusMeasurementOnArrival = { viewportId, measureKey };
+        this.undoStacks.push(this.frameKey, drawingId, {
+            label: 'move measurement',
+            redo: { type: 'updateMeasurement', ...where, changes: { placement } },
+            undo: { type: 'updateMeasurement', ...where, changes: { placement: was } },
+        });
+        this._sendMeasurementCommand(
+            { type: 'updateMeasurement', ...where, changes: { placement } });
     }
 
     /**
@@ -6396,6 +6488,11 @@ class KigumiViewerApp extends LitElement {
             event.stopPropagation();
             this._focusMeasurementFrom({
                 viewportId: viewport.id, measureKey: key, add: event.shiftKey });
+            if (event.shiftKey) {
+                // Marking several to delete, not moving one.
+                return;
+            }
+            this._beginMeasurementDrag(event, group, viewport.id, key, measure);
         });
         return group;
     }
@@ -6453,7 +6550,8 @@ class KigumiViewerApp extends LitElement {
             // the one degree of freedom a dimension has once its two ends are
             // fixed, and it was being ignored: a saved offset drew where the
             // default said, and dragging would have had nothing to change.
-            { offset: this._measurementOffset(measure) },
+            { offset: this._measurementOffset(
+                measure, viewport.id, measurementKey(measure)) },
         );
         if (!layout) {
             // Far enough apart in the world, but on top of each other once
@@ -6462,6 +6560,9 @@ class KigumiViewerApp extends LitElement {
         }
 
         const extra = options.className ? ` ${options.className}` : '';
+        // What a drag measures against. Kept from the drawing rather than
+        // projected again, so what is dragged is exactly what is on screen.
+        into._dimensionRun = { from: ends.from, to: ends.to };
         const draw = (from_, to_, className) => {
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', from_.x);

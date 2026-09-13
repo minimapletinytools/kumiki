@@ -618,3 +618,45 @@ describe('measurementKey', () => {
         expect(typeof measurementKey({ a: anchor('x'), b: null })).toBe('string');
     });
 });
+
+const { offsetForPointer } = require('../webview/measurements.js');
+
+describe('offsetForPointer', () => {
+    // A dimension's one degree of freedom once its ends are fixed: it slides
+    // along the perpendicular and nowhere else.
+    const from = { x: 0, y: 0 };
+    const to = { x: 100, y: 0 };
+
+    test('a pointer on the run sits at no offset', () => {
+        expect(offsetForPointer(from, to, { x: 50, y: 0 })).toBeCloseTo(0, 9);
+    });
+
+    test('it measures across the run, not along it', () => {
+        // Moving along the run changes nothing: that is not the freedom.
+        expect(offsetForPointer(from, to, { x: 10, y: 30 }))
+            .toBeCloseTo(offsetForPointer(from, to, { x: 90, y: 30 }), 9);
+    });
+
+    test('and gives the distance across', () => {
+        expect(Math.abs(offsetForPointer(from, to, { x: 50, y: 30 }))).toBeCloseTo(30, 9);
+    });
+
+    test('the sign says which side, so it can be dragged through', () => {
+        const above = offsetForPointer(from, to, { x: 50, y: 30 });
+        const below = offsetForPointer(from, to, { x: 50, y: -30 });
+
+        expect(Math.sign(above)).toBe(-Math.sign(below));
+    });
+
+    test('it follows the run round, not the screen', () => {
+        // The same pointer relative to a vertical run gives the same offset as
+        // it does to a horizontal one, turned.
+        const across = offsetForPointer({ x: 0, y: 0 }, { x: 0, y: 100 }, { x: 30, y: 50 });
+
+        expect(Math.abs(across)).toBeCloseTo(30, 9);
+    });
+
+    test('two ends on top of each other have no perpendicular to slide along', () => {
+        expect(offsetForPointer(from, { x: 0, y: 0 }, { x: 5, y: 5 })).toBeNull();
+    });
+});

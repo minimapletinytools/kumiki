@@ -1318,3 +1318,64 @@ class TestTheReservedDrawingForTheThreeDView:
         with pytest.raises(ValueError, match="No drawing"):
             runner.add_measurement(
                 self._frame(), None, [], "not-a-drawing", "front", self._measure())
+
+
+class TestMovingAMeasurement:
+    """Dragging a dimension writes where it now sits, and nothing else."""
+
+    def _frame(self):
+        return Frame(cut_timbers=[], name="f",
+                     drawings=[Drawing(name="plan", timber_paths=(TimberPath("post"),))])
+
+    def _measure(self):
+        return {
+            "a": {"timber": "post#0", "csgPath": ["cut"], "feature": "left", "type": "FACE"},
+            "b": {"timber": "post#0", "csgPath": ["cut"], "feature": "right", "type": "FACE"},
+            "kind": None, "measureId": None,
+        }
+
+    def _held(self, frame, pending):
+        drawings = runner.collect_drawings(frame, None, pending)
+        plan = next(d for d in drawings if d["id"] == "plan")
+        return next(v for v in plan["viewports"] if v["id"] == VIEWPORT)["measurements"][0]
+
+    def test_the_placement_is_written(self):
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"placement": {"offset": -42.0}})
+
+        assert self._held(frame, pending)["placement"] == {"offset": -42.0}
+
+    def test_moving_it_does_not_change_what_it_measures(self):
+        # Where a dimension sits and what it measures are separate, which is why
+        # placement is not part of a measurement's identity.
+        frame, pending = self._frame(), []
+        runner.add_measurement(
+            frame, None, pending, "plan", VIEWPORT,
+            dict(self._measure(), kind="projected_vertical_distance"))
+
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"placement": {"offset": 12.0}})
+
+        held = self._held(frame, pending)
+        assert held["kind"] == "projected_vertical_distance"
+        assert held["a"]["feature"] == "left"
+        assert held["b"]["feature"] == "right"
+
+    def test_moving_it_back_restores_the_offset(self):
+        # What undo sends: the placement it had before.
+        frame, pending = self._frame(), []
+        runner.add_measurement(frame, None, pending, "plan", VIEWPORT, self._measure())
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"placement": {"offset": 30.0}})
+
+        runner.update_measurement(
+            frame, None, pending, "plan", VIEWPORT, self._measure(),
+            {"placement": None})
+
+        assert self._held(frame, pending)["placement"] is None
