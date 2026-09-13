@@ -425,4 +425,5 @@
     globalScope.SelectionStore = SelectionStore;
     globalScope.choosePickAction = choosePickAction;
     globalScope.drawButtonKey = drawButtonKey;
+    globalScope.SELECTION_MODES = SELECTION_MODES;
 })(typeof window !== 'undefined' ? window : globalThis);

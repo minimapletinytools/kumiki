@@ -348,6 +348,35 @@ class FrameViewSession {
                 });
                 return;
             }
+            if (message.type === 'addMeasurement' || message.type === 'updateMeasurement'
+                || message.type === 'deleteMeasurement') {
+                // Through the same path every other drawings command takes, so
+                // the whole set comes back as one 'scenes' message and the
+                // panels redraw from one answer. Posting a shape of its own is
+                // how a measurement gets made and never appears.
+                //
+                // Rebuilt field by field rather than forwarded: anything added
+                // to the message has to be added here too, which is how a field
+                // arrives empty and something silently stops working.
+                const command = {
+                    addMeasurement: 'add_measurement',
+                    updateMeasurement: 'update_measurement',
+                    deleteMeasurement: 'delete_measurement',
+                }[message.type];
+                this._handleDrawingsCommand(command, {
+                    drawingId: message.drawingId,
+                    viewportId: message.viewportId,
+                    a: message.a,
+                    b: message.b,
+                    measureId: message.measureId || null,
+                    kind: message.kind || null,
+                    plane: message.plane || null,
+                    changes: message.changes || null,
+                }, { enter: false }).catch((err) => {
+                    this.log(`[measure] ${err.message || err}`);
+                });
+                return;
+            }
             if (message.type === 'requestDrawingFromSelection') {
                 this._handleRequestDrawingFromSelection(message).catch((err) => {
                     this.log(`[drawing] requestDrawingFromSelection error: ${err.message || err}`);

@@ -53,6 +53,39 @@ export class SelectionPanel {
         return action;
     }
 
+    /**
+     * Start a measurement from the feature being looked at.
+     *
+     * In the body rather than the header: it is about what is selected, which
+     * is what the body is, and unlike the way out of a drawing there is no harm
+     * in it being collapsed away when nothing is focused.
+     */
+    _measureButton() {
+        const action = document.createElement('button');
+        action.type = 'button';
+        action.className = 'ip-action ip-measure';
+        const making = this.app.measureDraft.isActive;
+        action.textContent = making
+            ? this.t('viewer.selection.measureConfirm')
+            : this.t('viewer.selection.measureFrom');
+        action.title = making
+            ? this.t('viewer.selection.measureConfirm.title')
+            : this.t('viewer.selection.measureFrom.title');
+        // Confirm is only meaningful once both ends are known; until then the
+        // button is there to say what the flow is waiting for.
+        action.disabled = making
+            && this.app.measureDraft.state !== window.KigumiMeasureDraft.STATES.PENDING;
+        action.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (making) {
+                this.app.confirmMeasurement();
+            } else {
+                this.app.startMeasurementFromFocus();
+            }
+        });
+        return action;
+    }
+
     updateInfo(frameData) {
         this.app.currentFrameData = frameData || {};
         const timberCount = frameData && frameData.timber_count ? frameData.timber_count : 0;
@@ -208,6 +241,15 @@ export class SelectionPanel {
             size.textContent = summary.size;
             size.title = summary.size;
             body.appendChild(size);
+        }
+
+        // Measuring from what is focused. Present while a measurement is being
+        // made too, since that is when it becomes the way to finish one.
+        if (this.app.canStartMeasurement || this.app.measureDraft.isActive) {
+            const line = document.createElement('div');
+            line.className = 'ip-detail';
+            line.appendChild(this._measureButton());
+            body.appendChild(line);
         }
 
         if (summary.breadcrumb) {

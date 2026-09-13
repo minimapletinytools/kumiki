@@ -1179,6 +1179,16 @@ _SELECTION_DRAWING_PAGE = {"width": 0.420, "height": 0.297}
 
 SELECTION_DRAWING_ID = "selection-drawing"
 
+#: The one reserved drawing that holds the 3D view's measurements.
+#:
+#: A drawing like any other, so the file merge, overrides, identity, saving and
+#: the panel all apply to it without a second implementation. Reserved so that
+#: nothing in python declares one. Its single viewport carries no camera: the 3D
+#: view's belongs to the viewer and changes constantly, so there is nothing to
+#: declare, and every measurement on it carries its own plane instead.
+THREE_D_MEASUREMENTS_ID = "three-d-measurements"
+THREE_D_MEASUREMENTS_VIEWPORT = "main"
+
 # One timber gets its four long faces rolled out down the left of the sheet,
 # with a live preview beside them -- the shop drawing for a single piece. Which
 # face each view looks at, in the timber's own frame, going around it.
@@ -1954,6 +1964,29 @@ def _best_matching_candidate(
     return None if best is None else best[1]
 
 
+def _kinds_for_pick(
+    located_pick: Any, timber: Any, payload: Dict[str, Any],
+) -> Optional[List[str]]:
+    """Which kinds a measurement to this pick would admit, or None if none held.
+
+    None and empty mean different things and the viewer reads both: None is "no
+    measurement is being made", empty is "this one cannot be finished from
+    here".
+    """
+    from kumiki.drawing import projected_kinds
+
+    held_geometry = payload.get("heldGeometry")
+    look = payload.get("look")
+    if not held_geometry or not look:
+        return None
+    if located_pick is None:
+        return []
+    geometry = _located_geometry_payload(located_pick[2], timber)
+    if geometry is None:
+        return []
+    return [kind.name for kind in projected_kinds(held_geometry, geometry, look)]
+
+
 def _plane_for_pick(
     located_pick: Any, timber: Any, payload: Dict[str, Any],
 ) -> Optional[Dict[str, Any]]:
@@ -2210,6 +2243,23 @@ def _measurement_slot(
     """
     existing = collect_drawings(frame, example_path, pending)
     target = next((d for d in existing if d["id"] == drawing_id), None)
+    if target is None and drawing_id == THREE_D_MEASUREMENTS_ID:
+        # The reserved drawing is made when the first measurement needs it
+        # rather than always being there: an empty one in every listing is a
+        # drawing nobody asked for. It is not laid out on a sheet and is never
+        # entered -- what it holds are measurements that belong to the model
+        # rather than to any drawing of it, so its viewport declares no camera
+        # and each measurement carries its own plane.
+        target = {
+            "id": THREE_D_MEASUREMENTS_ID,
+            "name": THREE_D_MEASUREMENTS_ID,
+            "origin": ORIGIN_FILE,
+            "page": None,
+            "cameraControls": [],
+            "viewports": [{"id": THREE_D_MEASUREMENTS_VIEWPORT, "measurements": []}],
+        }
+        pending.append(target)
+        existing = existing + [target]
     if target is None:
         raise ValueError(f"No drawing {drawing_id!r} to measure on")
 
@@ -4965,6 +5015,12 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         # Derived here rather than in the viewer so there is one copy of the
         # rule, and it costs no round trip: this request was already being made.
         "plane": _plane_for_pick(located_pick, timber, payload),
+        # And which kinds the pair admits from here, best first. Empty means the
+        # click will refuse, which is what the hover paints red -- one answer for
+        # the colour and the refusal, so a feature drawn red cannot be one the
+        # click then accepts. Null when nothing is held: a first pick is always
+        # allowed, having nothing yet to be wrong about.
+        "kinds": _kinds_for_pick(located_pick, timber, payload),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a
@@ -5340,6 +5396,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "b": payload.get("b"),
                 "kind": payload.get("kind"),
                 "measureId": payload.get("measureId"),
+                "plane": payload.get("plane"),
             },
         )
         return state, make_success_response(request_id, command, {

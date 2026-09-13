@@ -30,6 +30,11 @@ const { DisplayOptionsStore, FOOTPRINT_COLORS: FOOTPRINT_COLOR_IDS } = window.Ki
 const { SceneStore, DEFAULT_SCENE_ID, orbitDistanceForExtent, firstLoadCameraPlan, pageScreenRect, panPage, zoomPageAt, MAX_TILT_RADIANS, sceneMembers, pixelRect: viewportPixelRect, viewportAspect: rectAspect } = window.KigumiScenes;
 // Matches the id build_default_drawing_for_debugging ships in runner.py.
 const DEBUG_DRAWING_SCENE_ID = 'debug-default-drawing';
+// The one reserved drawing that holds the 3D view's measurements. A drawing
+// like any other, so the file merge, saving, identity and the panel all apply
+// to it without a second implementation; reserved so nothing in python declares
+// one. See docs/measurement-spec.md.
+const THREE_D_MEASUREMENTS_ID = 'three-d-measurements';
 const { CameraCubeGizmo, OrbitCenterGizmo } = window.KigumiCameraControls;
 const { SceneManager } = window.KigumiSceneManager;
 const { PointerDrag, actionForButton, resolvePointers } = window.KigumiInput;
@@ -211,6 +216,18 @@ const CSG_HIGHLIGHT_COLORS = Object.freeze({
 // well as a different shape -- an outline rather than a fill -- so the two
 // never read as the same state.
 const HOVER_COLOR = 0xffa726;
+// Shown while measuring, for a feature that cannot finish the measurement from
+// where you are looking. Said in colour rather than only by refusing the click,
+// since the answer depends on the view and the useful thing is to see that.
+const HOVER_REFUSED_COLOR = 0xef5350;
+// The feature a measurement is being taken FROM, while the other end is chosen.
+// Its own colour: it is neither hovered nor selected, it is held.
+const HELD_COLOR = 0x66bb6a;
+const HELD_OPACITY = 0.8;
+// Above the hover, which is itself above the selection, for the same reason the
+// hover was put there: while one end is held it is the thing on screen most
+// worth seeing, and the pointer passes over it constantly.
+const HELD_RENDER_ORDER = 1101;
 // Opaque enough to hold its own over a selected face rather than
 // tinting it. Under a fill this washed out to nothing.
 const HOVER_OPACITY = 0.8;
@@ -592,6 +609,26 @@ const EXPORT_FORMAT_PROP = {
     obj: 'exportFormatObjEnabled',
     step: 'exportFormatStepEnabled',
 };
+
+/**
+ * Every triangle edge of a mesh, as line-segment positions.
+ *
+ * So a face still shows when it projects to a line: seen exactly edge-on it has
+ * no area to shade and the mesh renders as nothing, while its boundary is still
+ * there to draw.
+ */
+function _meshEdgePositions(vertices, indices) {
+    const out = [];
+    const at = (index) => [vertices[index * 3], vertices[index * 3 + 1], vertices[index * 3 + 2]];
+    const list = indices || [];
+    for (let triangle = 0; triangle + 2 < list.length; triangle += 3) {
+        const corners = [list[triangle], list[triangle + 1], list[triangle + 2]];
+        for (let side = 0; side < 3; side += 1) {
+            out.push(...at(corners[side]), ...at(corners[(side + 1) % 3]));
+        }
+    }
+    return out;
+}
 
 /**
  * A cropped edge as one flat position array, for LineSegmentsGeometry.
@@ -1334,6 +1371,13 @@ class KigumiViewerApp extends LitElement {
 
 
         this.pointerDrag = new PointerDrag();
+
+        // Making a measurement, and what could be taken back. Both are per
+        // viewer; the stacks key themselves by frame and drawing.
+        this.measureDraft = new window.KigumiMeasureDraft.MeasureDraft();
+        this.undoStacks = new window.KigumiUndoStacks.UndoStacks();
+        /** Lines drawn for the feature a measurement is being taken from. */
+        this._heldFeatureLines = [];
 
         this.showCenterGizmo = true;
         this.footprintObjects = [];
@@ -2531,6 +2575,7 @@ class KigumiViewerApp extends LitElement {
                 return;
             }
 
+            this._frameLoaded();
             void this.beginPayloadApplication({
                 frame: message.frame || {},
                 geometry: message.geometry || { meshes: [] },
@@ -2925,6 +2970,9 @@ class KigumiViewerApp extends LitElement {
             event.preventDefault();
             if (this.contextMenuState) {
                 this.closeMemberContextMenu();
+            } else if (this.escapeMeasurement()) {
+                // One end at a time, so leaving a half-made measurement takes
+                // two presses: the second feature, then the first.
             } else if (this.selectionManager.csgFocus) {
                 this._dropCsgFocus();
             } else {
@@ -3063,6 +3111,10 @@ class KigumiViewerApp extends LitElement {
             this._hover = new window.KigumiHover.HoverState();
         }
         this._hoverClient = { x: event.clientX, y: event.clientY };
+        // Which viewport a pick lands in is decided from here, since the answer
+        // arrives long after the click that asked.
+        this._lastClientX = event.clientX;
+        this._lastClientY = event.clientY;
         this._hover.moved(event.clientX, event.clientY);
     }
 
@@ -3118,6 +3170,10 @@ class KigumiViewerApp extends LitElement {
             // actually went through, which on a sheet need not be the active
             // viewport's.
             tolerances: this._pickTolerances(target.point, along.camera),
+            // The end already held, and which way we are looking. With these
+            // the runner offers the feature that can finish the measurement
+            // rather than the most specific one, and says whether it can.
+            ...this._heldForRequest(),
         });
     }
 
@@ -3134,7 +3190,278 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this._hoverDrawn = message;
+        // `kinds` is null when nothing is held -- an ordinary hover -- empty
+        // when this pair cannot be measured from here, and a list when it can.
+        // The runner answers it, so what is drawn red is what the click
+        // refuses; two judgements would eventually disagree.
+        if (message.kinds && message.kinds.length === 0) {
+            this.drawHoverHighlight(message, HOVER_REFUSED_COLOR);
+            return;
+        }
         this.drawHoverHighlight(message);
+    }
+
+    // -------------------------------------------------------------------------
+    // Making a measurement
+    // -------------------------------------------------------------------------
+
+    /** Whether a measurement could be started from what is focused now. */
+    get canStartMeasurement() {
+        return Boolean(this.drawingBetaEnabled
+            && this.selectionManager.csgFocus
+            && this._lastPickAnchor
+            && this._lastPickAnchor.reference
+            && this._lastPickAnchor.geometry);
+    }
+
+    /**
+     * Begin a measurement from the feature being looked at.
+     *
+     * Deliberately an explicit action rather than a click meaning something
+     * different in a drawing. That is what leaves a drawing with a plain
+     * selection, and what makes the first end something you chose rather than
+     * something the last click happened to leave behind.
+     */
+    startMeasurementFromFocus() {
+        if (!this.canStartMeasurement) {
+            return;
+        }
+        const result = this.measureDraft.hold(this._lastPickAnchor);
+        if (result.action !== 'holding') {
+            this.reportMeasureRefusal(result.reason);
+            return;
+        }
+        // Nothing half-made is on the stack to undo, so undo would reach past
+        // it to something you are no longer looking at.
+        this.undoStacks.suspend(true);
+        this.drawHeldFeature(this._lastPickAnchor.highlight);
+        this.emitViewerLog('measure-hold', {
+            feature: this._lastPickAnchor.reference.feature || null,
+        });
+        this.requestUpdate();
+    }
+
+    /** A pick came back while a measurement is being made. Offers it to the draft. */
+    _measurePicked(message) {
+        const anchor = this._anchorFromPick(message);
+        const viewport = this._resolvePointer(this._lastClientX, this._lastClientY);
+        const result = this.measureDraft.pick(
+            anchor, viewport ? viewport.viewport.id : this.activeViewportId);
+        this.emitViewerLog('measure-pick', {
+            feature: message.featureLabel, action: result.action, reason: result.reason,
+        });
+        if (result.action === 'refused') {
+            this.reportMeasureRefusal(result.reason);
+            return;
+        }
+        this._pendingKinds = message.kinds || null;
+        this.requestUpdate();
+    }
+
+    /** What a pick offers as one end of a measurement. */
+    _anchorFromPick(message) {
+        return {
+            reference: message.reference || null,
+            geometry: message.geometry || null,
+            at: message.at || null,
+            plane: message.plane || null,
+            highlight: {
+                highlightMesh: message.highlightMesh,
+                highlightEdgeSegments: message.highlightEdgeSegments,
+            },
+        };
+    }
+
+    /**
+     * Take the measurement being made, and write it.
+     *
+     * The kind is the first the pair admits from here, which the runner worked
+     * out while judging the pick. Written rather than left blank: no kind reads
+     * as "whatever this view admits", which draws the right dimension today and
+     * quietly becomes a different one when the viewport moves.
+     */
+    confirmMeasurement() {
+        const result = this.measureDraft.confirm();
+        if (result.action !== 'confirmed') {
+            return;
+        }
+        const measurement = result.measurement;
+        const kind = (this._pendingKinds && this._pendingKinds[0]) || null;
+        this._pendingKinds = null;
+        this.undoStacks.suspend(false);
+        this.clearHeldFeature();
+
+        const drawingId = this.measurementDrawingId;
+        const payload = {
+            type: 'addMeasurement',
+            drawingId,
+            viewportId: measurement.viewportId,
+            a: measurement.a,
+            b: measurement.b,
+            plane: measurement.plane,
+            kind,
+        };
+        this.undoStacks.push(this.frameKey, drawingId, {
+            label: 'measure',
+            redo: payload,
+            undo: {
+                type: 'deleteMeasurement',
+                drawingId,
+                viewportId: measurement.viewportId,
+                a: measurement.a,
+                b: measurement.b,
+            },
+        });
+        this._sendMeasurementCommand(payload);
+        this.requestUpdate();
+    }
+
+    /** Release the most recent end, or leave the flow. */
+    escapeMeasurement() {
+        const released = this.measureDraft.escape();
+        if (released.action === 'none') {
+            return false;
+        }
+        if (released.action === 'left') {
+            this.clearHeldFeature();
+            this.undoStacks.suspend(false);
+        }
+        this._pendingKinds = null;
+        this.emitViewerLog('measure-escape', { action: released.action });
+        this.requestUpdate();
+        return true;
+    }
+
+    /** Changing scene or mode: hold nothing, show nothing held. */
+    clearMeasureDraft() {
+        this.measureDraft.leave();
+        this._pendingKinds = null;
+        this.undoStacks.suspend(false);
+        this.clearHeldFeature();
+    }
+
+    _sendMeasurementCommand(payload) {
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage(payload);
+        }
+    }
+
+    /** Which drawing a measurement made now belongs to. */
+    get measurementDrawingId() {
+        return this.isInDrawing ? this.sceneStore.activeSceneId : THREE_D_MEASUREMENTS_ID;
+    }
+
+    /**
+     * Which loaded frame the undo stacks are keyed by.
+     *
+     * A counter bumped on every load rather than the file's path, which the
+     * viewer is never told. It answers the only question the key has to: a
+     * reload is a different frame, so its stacks are different stacks. What a
+     * stack holds names features and viewports the reloaded frame may not have,
+     * and an undo that cannot be trusted to apply is worse than none.
+     */
+    get frameKey() {
+        return String(this._frameGeneration || 0);
+    }
+
+    /** A frame arrived. Whatever could be undone was about the last one. */
+    _frameLoaded() {
+        this.undoStacks.purgeAll();
+        this._frameGeneration = (this._frameGeneration || 0) + 1;
+        this._lastPickAnchor = null;
+        this.clearMeasureDraft();
+    }
+
+    /**
+     * Say why a pick cannot be measured, rather than doing nothing.
+     *
+     * A click that silently achieves nothing is the worst of the options: it
+     * looks like the viewer missed the click.
+     */
+    reportMeasureRefusal(reason) {
+        const said = {
+            'nothing-held': 'nothing is being measured from yet',
+            'same-feature': 'that is the feature already held; pick a different one',
+            'no-reference': 'that one cannot be measured to -- it is a face nobody named, '
+                + 'so a dimension to it could not be saved',
+            'not-measurable': 'that one has no plane or line of its own, so there is '
+                + 'nothing to measure to',
+            'nothing-pending': 'pick a second feature first',
+        }[reason] || reason;
+        this.emitViewerLog('measure-refused', { reason, said });
+        if (typeof vscode !== 'undefined') {
+            vscode.postMessage({ type: 'log', text: `[measure] ${said}` });
+        }
+    }
+
+    /**
+     * Show the feature a measurement is being taken from.
+     *
+     * The mesh, and its edges as well. A face seen exactly edge-on -- the usual
+     * case in an elevation, and the case where measuring to it makes most sense
+     * -- projects to a line with no area, so the mesh alone renders as nothing.
+     */
+    drawHeldFeature(highlight) {
+        this.clearHeldFeature();
+        const mesh = highlight && highlight.highlightMesh;
+        const positions = edgeSegmentPositions(highlight && highlight.highlightEdgeSegments);
+
+        if (positions.length > 0) {
+            this._addHeldLine(positions);
+        }
+        if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
+            this._buildHighlightMesh(
+                mesh.vertices, mesh.indices, HELD_COLOR, HELD_OPACITY, '_heldFeatureMesh',
+            );
+            if (this._heldFeatureMesh) {
+                this._heldFeatureMesh.renderOrder = HELD_RENDER_ORDER;
+            }
+            this._addHeldLine(_meshEdgePositions(mesh.vertices, mesh.indices));
+        }
+    }
+
+    _addHeldLine(positions) {
+        const geometry = new THREE.LineSegmentsGeometry();
+        geometry.setPositions(positions);
+        const material = new THREE.LineMaterial({
+            color: HELD_COLOR,
+            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
+            resolution: this._getRendererResolution(),
+            depthTest: false,
+            transparent: true,
+        });
+        const line = new THREE.LineSegments2(geometry, material);
+        line.computeLineDistances();
+        line.renderOrder = HELD_RENDER_ORDER + 1;
+        this.scene.add(line);
+        // A list: an edge pick draws its segments and a face pick draws its
+        // outline, and holding only the last would leak the ones before it.
+        this._heldFeatureLines.push(line);
+    }
+
+    clearHeldFeature() {
+        this._disposeHighlightMesh('_heldFeatureMesh');
+        for (const line of this._heldFeatureLines) {
+            this.scene.remove(line);
+            line.geometry.dispose();
+            line.material.dispose();
+        }
+        this._heldFeatureLines = [];
+    }
+
+    /** What the hover has to say about the measurement in hand, if any. */
+    _heldForRequest() {
+        const draft = this.measureDraft;
+        if (draft.state !== window.KigumiMeasureDraft.STATES.HOLDING) {
+            return {};
+        }
+        const viewport = this.viewports.find((one) => one.id === this.activeViewportId)
+            || this.viewports[0];
+        return {
+            heldGeometry: draft.held.geometry,
+            heldAt: draft.held.at,
+            look: viewport ? this.viewportAxes(viewport).look : null,
+        };
     }
 
     /**
@@ -3146,17 +3473,18 @@ class KigumiViewerApp extends LitElement {
      * an outline taken from the CSG was convex, so a timber face with mortises
      * through it lit as a whole rectangle over the openings.
      */
-    drawHoverHighlight(message) {
+    drawHoverHighlight(message, color) {
         this.clearHoverOutline();
         const mesh = message.highlightMesh;
         const positions = edgeSegmentPositions(message.highlightEdgeSegments);
+        const shade = color === undefined ? HOVER_COLOR : color;
 
         if (positions.length > 0) {
-            this._buildHoverEdgeLine(positions);
+            this._buildHoverEdgeLine(positions, shade);
         }
         if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
             this._buildHighlightMesh(
-                mesh.vertices, mesh.indices, HOVER_COLOR, HOVER_OPACITY, '_hoverHighlightMesh',
+                mesh.vertices, mesh.indices, shade, HOVER_OPACITY, '_hoverHighlightMesh',
             );
             // OVER the selection's own highlight, which sits at 999. It used
             // to go under, on the grounds that what is selected outranks what
@@ -3171,11 +3499,11 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    _buildHoverEdgeLine(positions) {
+    _buildHoverEdgeLine(positions, color) {
         const geometry = new THREE.LineSegmentsGeometry();
         geometry.setPositions(positions);
         const material = new THREE.LineMaterial({
-            color: HOVER_COLOR,
+            color: color === undefined ? HOVER_COLOR : color,
             linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
             resolution: this._getRendererResolution(),
             depthTest: false,
@@ -3303,8 +3631,18 @@ class KigumiViewerApp extends LitElement {
     }
 
     handleCSGSelectionResult(message) {
+        // While a measurement is being made, a pick is its second end rather
+        // than a new selection. Offered to the draft first, which refuses what
+        // it cannot use and leaves the selection alone either way.
+        if (this.measureDraft.isActive) {
+            this._measurePicked(message);
+            return;
+        }
         const path = Array.isArray(message.path) ? message.path : [];
         const featureLabel = message.featureLabel || null;
+        // Kept so that "measure from this" has something to start from without
+        // asking again: the reference, where it is, and what it lies on.
+        this._lastPickAnchor = this._anchorFromPick(message);
         this.lastPickDetail = {
             featureType: message.featureType || null,
             jointName: message.jointName || null,
@@ -5811,6 +6149,17 @@ class KigumiViewerApp extends LitElement {
         if (!this.sceneStore.setActiveScene(sceneId)) {
             return;
         }
+        // Nothing carries across. A feature selected in the model means nothing
+        // in a drawing, a half-made measurement means nothing outside the one it
+        // was being made in, and either left behind is something the new mode
+        // cannot act on. The store drops the selection; this drops the draft.
+        this.clearMeasureDraft();
+        this.clearHover();
+        this.selectionManager.setMode(
+            this.isInDrawing
+                ? window.SELECTION_MODES.DRAWING
+                : window.SELECTION_MODES.MODEL);
+        this._lastPickAnchor = null;
         this.rebuildViewports();
         this.syncCameraControls();
         this.applyFootprintVisibility();
