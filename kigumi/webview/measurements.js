@@ -450,8 +450,40 @@
         return angle;
     }
 
+    /**
+     * Just the reference part of an anchor, as the file holds it.
+     *
+     * A measurement read back carries where its anchors resolved to as well --
+     * a world point and the plane or line it lies on -- and writing that back
+     * would put in the drawings file what the next resolve recomputes anyway,
+     * and what goes stale the moment the timber moves.
+     */
+    function anchorReference(anchor) {
+        if (!anchor) {
+            return null;
+        }
+        if (anchor.kind === 'edge') {
+            // Its two parents carry no resolved fields of their own: only the
+            // anchor they hang off is merged into.
+            return {
+                kind: 'edge',
+                timber: anchor.timber,
+                a: anchor.a,
+                b: anchor.b,
+                type: anchor.type,
+            };
+        }
+        return {
+            timber: anchor.timber,
+            csgPath: anchor.csgPath || [],
+            feature: anchor.feature,
+            type: anchor.type,
+        };
+    }
+
     const KigumiMeasurements = {
         PROJECTED_RULES,
+        anchorReference,
         normalizeKind,
         projectedForm,
         measurementStatus,
