@@ -1516,7 +1516,6 @@ class KigumiViewerApp extends LitElement {
         this.onLightDialPointerMove = this.onLightDialPointerMove.bind(this);
         this.onLightDialPointerUp = this.onLightDialPointerUp.bind(this);
         this.onWindowKeyDown = this.onWindowKeyDown.bind(this);
-        this.onWindowKeyProbe = this.onWindowKeyProbe.bind(this);
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
         this.onLayerStateSync = this.onLayerStateSync.bind(this);
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
@@ -1692,7 +1691,6 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('mousedown', this.onWindowContextMenuDismiss);
         window.removeEventListener('resize', this.onWindowResize);
         window.removeEventListener('keydown', this.onWindowKeyDown);
-        document.removeEventListener('keydown', this.onWindowKeyProbe, true);
         window.removeEventListener('pointermove', this.onGizmoPointerMove);
         window.removeEventListener('pointerup', this.onGizmoPointerUp);
         window.removeEventListener('pointermove', this.onLightDialPointerMove);
@@ -1909,7 +1907,6 @@ class KigumiViewerApp extends LitElement {
         window.addEventListener('pointerup', this.onLightDialPointerUp);
         window.addEventListener('resize', this.onWindowResize);
         window.addEventListener('keydown', this.onWindowKeyDown);
-        document.addEventListener('keydown', this.onWindowKeyProbe, true);
     }
 
     setupThreeScene() {
@@ -3027,47 +3024,7 @@ class KigumiViewerApp extends LitElement {
         this.updateCamera();
     }
 
-    /**
-     * Temporary: says which keys reach the page at all.
-     *
-     * Capture phase on the document, so it runs before anything in the page
-     * can stop propagation. A key logged here but not by onWindowKeyDown was
-     * eaten in between; a key logged by neither never reached the webview.
-     */
-    onWindowKeyProbe(event) {
-        this._keyProbeCount = (this._keyProbeCount || 0) + 1;
-        if (this._keyProbeCount > 40) {
-            return;
-        }
-        this.emitViewerLog('key-probe', {
-            key: event.key,
-            meta: event.metaKey,
-            ctrl: event.ctrlKey,
-            prevented: event.defaultPrevented,
-            target: event.target && event.target.tagName,
-            focused: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
-        });
-    }
-
     onWindowKeyDown(event) {
-        // Temporary, for chasing an undo that does nothing. Deliberately ABOVE
-        // every guard: below them, silence means either the key never arrived
-        // or it arrived and a guard passed it over, and those want different
-        // fixes.
-        if ((event.metaKey || event.ctrlKey)
-            && ['z', 'Z', 'y', 'Y'].indexOf(event.key) !== -1) {
-            this.emitViewerLog('undo-key', {
-                key: event.key,
-                shift: event.shiftKey,
-                prevented: event.defaultPrevented,
-                target: event.target && event.target.tagName,
-                typing: _isTypingTarget(event.target),
-                frame: this.frameKey,
-                drawing: this.measurementDrawingId,
-                suspended: this.undoStacks.suspended,
-                depth: this.undoStacks.depth(this.frameKey, this.measurementDrawingId),
-            });
-        }
         // Tab is checked BEFORE the defaultPrevented guard: it is the focus key,
         // so something else may well have claimed it, and this only acts while
         // the pointer is over a feature -- which is not a moment anyone is
@@ -3091,19 +3048,24 @@ class KigumiViewerApp extends LitElement {
             this._hover.askAgain();
             return;
         }
-        if (event.defaultPrevented) {
-            return;
-        }
         // Nothing below belongs to whatever has the caret. Delete in a search
         // box deletes text, and ctrl-Z there undoes typing -- taking those
         // would be the viewer reaching into a control it does not own.
         if (_isTypingTarget(event.target)) {
             return;
         }
-        // Undo and redo act on the drawing in front of you, which is what they
-        // are keyed by. Refused while a measurement is half-made: there is
-        // nothing on the stack for it, so undo would reach past the thing you
-        // are looking at to something you are not.
+        // Undo and redo are settled BEFORE the defaultPrevented guard, for the
+        // same reason Tab is: the host claims them. VS Code forwards key events
+        // from a webview to its own keybindings and marks ctrl-Z handled on the
+        // way through, so by the time this listener runs the event is already
+        // prevented -- and the guard below turned undo away every time, which
+        // is exactly what "ctrl-Z does nothing" was. While the viewer has focus
+        // and the caret is not in a control, these are the viewer's keys.
+        //
+        // They act on the drawing in front of you, which is what they are keyed
+        // by. Refused while a measurement is half-made: there is nothing on the
+        // stack for it, so undo would reach past the thing you are looking at
+        // to something you are not.
         const accel = event.metaKey || event.ctrlKey;
         if (accel && (event.key === 'z' || event.key === 'Z')) {
             event.preventDefault();
@@ -3117,6 +3079,9 @@ class KigumiViewerApp extends LitElement {
         if (accel && (event.key === 'y' || event.key === 'Y')) {
             event.preventDefault();
             this.redoMeasurementChange();
+            return;
+        }
+        if (event.defaultPrevented) {
             return;
         }
         if (event.key === 'Delete' || event.key === 'Backspace') {
