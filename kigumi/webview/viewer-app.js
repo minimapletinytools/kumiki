@@ -6567,29 +6567,6 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    /**
-     * Which way a feature runs, on the page, or null when it is a point.
-     *
-     * Taken by projecting a step along it rather than by transforming the
-     * direction: the page is the camera's projection and the viewport's rect
-     * together, and stepping through the same path is the only way to be sure
-     * the answer is in the same space as the anchors.
-     */
-    _pageDirection(at, form, viewport, pageRect) {
-        if (!form || form.form !== 'line' || !form.direction) {
-            return null;
-        }
-        const here = this._projectToPage(at, viewport, pageRect);
-        const there = this._projectToPage(
-            [at[0] + form.direction[0], at[1] + form.direction[1], at[2] + form.direction[2]],
-            viewport, pageRect);
-        const run = { x: there.x - here.x, y: there.y - here.y };
-        const size = Math.hypot(run.x, run.y);
-        // Seen exactly end-on it projects to nothing, and there is no direction
-        // to be square to. Treated as a point, which is what it looks like.
-        return size > 1e-9 ? { x: run.x / size, y: run.y / size } : null;
-    }
-
     /** Where a world point lands on the page, in the viewport's own pixels. */
     _projectToPage(point, viewport, pageRect) {
         const [x, y, width, height] = viewport.spec.rect;
@@ -6696,28 +6673,19 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        // A backstop, not the mechanism. Both a written measurement and a
-        // half-made one now get their ends from the runner, placed square by
-        // the same rules, so this slides them by zero -- it earns its place
-        // only when a pair arrives unplaced, which is a pair the runner could
-        // not resolve.
+        // Projected, and nothing more. Where the two ends sit was decided once,
+        // against the measurement's own plane, when it was placed; drawing it
+        // only says where those points land in this view.
         //
-        // Only for the perpendicular kind. A horizontal or vertical distance is
-        // the separation along an axis OF THE SHEET, and squaring its ends to
-        // the features would contradict its label in the same way, the other
-        // way round.
-        const perpendicular = KigumiMeasurements.normalizeKind(status.kind)
-            === 'projected_perpendicular_distance';
-        const ends = perpendicular
-            ? KigumiMeasurements.perpendicularEnds(
-                this._projectToPage(from, viewport, pageRect),
-                this._projectToPage(to, viewport, pageRect),
-                this._pageDirection(from, status.formA, viewport, pageRect),
-                this._pageDirection(to, status.formB, viewport, pageRect))
-            : {
-                from: this._projectToPage(from, viewport, pageRect),
-                to: this._projectToPage(to, viewport, pageRect),
-            };
+        // This used to re-square the ends against the LIVE camera, which is a
+        // no-op only while the camera is the measurement's plane. In the 3D
+        // view it is not, so the ends were slid by an amount that changed as
+        // the camera turned -- anchors wandering off their features while you
+        // orbited, which is the opposite of what a placed anchor means.
+        const ends = {
+            from: this._projectToPage(from, viewport, pageRect),
+            to: this._projectToPage(to, viewport, pageRect),
+        };
         // How many screen pixels a world unit is worth HERE -- taken from the
         // run itself, which is a known world length and a known drawn length.
         // An offset is stored in world units so that it stays where it was put

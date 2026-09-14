@@ -629,3 +629,84 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         assert runner._anchors_for_pick(None, None, None, {}, None) is None
         assert runner._anchors_for_pick(
             None, None, None, {"heldReference": {"timber": "t"}}, None) is None
+
+
+class TestAPlacedAnchorStaysPlaced:
+    """A measurement carrying its own plane does not move when the camera does.
+
+    Its ends were decided once, against that plane. Drawing it says where those
+    points land in this view and nothing more -- the viewer used to re-square
+    them against the LIVE camera, which is a no-op only while the camera IS the
+    plane. In the 3D view it is not, so the anchors wandered off their features
+    as you orbited.
+    """
+
+    @pytest.fixture
+    def resolved(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_stable", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_stable"] = runner
+        spec.loader.exec_module(runner)
+        frame = load_module(
+            "stable_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
+        ).build_frame()
+        return runner, frame
+
+    LOOKS = [[0, 1, 0], [1, 0, 0], [0.577, 0.577, 0.577], [0, -1, 0]]
+
+    def _anchors_under_each_camera(self, runner, frame, measure):
+        pinned = dict(measure)
+        pinned["plane"] = {"at": [0, 0, 0], "normal": [0, 1, 0]}
+        seen = []
+        for look in self.LOOKS:
+            out = runner._resolve_measurement(
+                frame, pinned,
+                {"look": look, "right": [1, 0, 0], "up": [0, 0, 1]})
+            if out.get("unresolved"):
+                continue
+            seen.append((tuple(out["a"]["at"]), tuple(out["b"]["at"])))
+        return seen
+
+    def _measurements(self, runner, frame):
+        for drawing in runner.collect_drawings(frame, None, []):
+            for viewport in drawing.get("viewports") or []:
+                for measure in viewport.get("measurements") or []:
+                    if not measure.get("unresolved"):
+                        yield measure
+
+    def test_the_fixture_has_measurements_to_check(self, resolved):
+        runner, frame = resolved
+
+        assert list(self._measurements(runner, frame))
+
+    def test_the_anchors_are_the_same_from_every_direction(self, resolved):
+        runner, frame = resolved
+
+        for measure in self._measurements(runner, frame):
+            seen = self._anchors_under_each_camera(runner, frame, measure)
+
+            assert len(set(seen)) == 1, (
+                f"{measure['a'].get('feature')}/{measure['b'].get('feature')} moved")
+
+    def test_and_a_measurement_with_no_plane_does_follow_the_viewport(self, resolved):
+        # The other half of the rule: with nothing written, the viewport's own
+        # plane is what it is entitled to mean, so it SHOULD differ by view.
+        runner, frame = resolved
+        measure = next(iter(self._measurements(runner, frame)))
+        without = dict(measure)
+        without.pop("plane", None)
+
+        seen = []
+        for look in self.LOOKS:
+            out = runner._resolve_measurement(
+                frame, without, {"look": look, "right": [1, 0, 0], "up": [0, 0, 1]})
+            seen.append(out.get("unresolved") or tuple(out["a"]["at"]))
+
+        assert len(set(map(str, seen))) > 1
