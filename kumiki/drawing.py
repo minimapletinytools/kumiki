@@ -439,6 +439,75 @@ def projected_kinds(
     return kinds_for(form_one, form_other, MeasurementSpace.PROJECTED, parallel=parallel)
 
 
+def solid_form(
+    geometry: Optional[Mapping],
+) -> Tuple[Optional[MeasurementFeature], Optional[Tuple[float, float, float]]]:
+    """What a feature IS, with nothing projected away.
+
+    The 3D view's camera belongs to the reader and turns as they look around, so
+    a feature there cannot be classified by how it happens to appear from where
+    they are standing: a face is a plane whatever angle it is seen from. Asking
+    `projected_form` there said a face was an AREA -- covering the view, nothing
+    to measure -- for every face not seen exactly edge-on, which is nearly all
+    of them.
+
+    The direction that comes back is the line's own, or the plane's normal, for
+    deciding whether a pair runs together.
+
+    THE VIEWER HAS A COPY OF THIS, in measurements.js, and a test runs the two
+    against each other.
+    """
+    kind = (geometry or {}).get("kind")
+    if kind == "point":
+        return (MeasurementFeature.POINT, None)
+    if kind == "line":
+        return (MeasurementFeature.LINE, _unit(geometry.get("direction") or (0, 0, 0)))
+    if kind == "plane":
+        return (MeasurementFeature.PLANE, _unit(geometry.get("normal") or (0, 0, 0)))
+    return (None, None)
+
+
+def _solid_parallel(
+    form_one: MeasurementFeature,
+    run_one: Optional[Sequence[float]],
+    form_other: MeasurementFeature,
+    run_other: Optional[Sequence[float]],
+) -> Optional[bool]:
+    """Whether two solid features run together.
+
+    Two planes are parallel when their NORMALS align and two lines when their
+    DIRECTIONS do -- but a line is parallel to a plane when it runs square to
+    the normal, which is the opposite test. One of these carries a normal and
+    the other a direction, so comparing them as though both were directions
+    would have called a line lying in a plane a crossing.
+    """
+    if run_one is None or run_other is None:
+        return None
+    alignment = abs(_dot(run_one, run_other))
+    if form_one is form_other:
+        return alignment > 1 - PARALLEL_EPSILON
+    return alignment < PARALLEL_EPSILON
+
+
+def solid_kinds(
+    one: Optional[Mapping], other: Optional[Mapping],
+) -> Tuple[MeasurementKind, ...]:
+    """Which kinds this pair admits in the 3D view. Empty when none.
+
+    The counterpart of `projected_kinds` for a view that projects nothing. No
+    camera comes into it: what a pair admits in the solid does not depend on
+    where anyone is standing.
+    """
+    form_one, run_one = solid_form(one)
+    form_other, run_other = solid_form(other)
+    if form_one is None or form_other is None:
+        return ()
+    return kinds_for(
+        form_one, form_other, MeasurementSpace.THREE_D,
+        parallel=_solid_parallel(form_one, run_one, form_other, run_other),
+    )
+
+
 def kinds_for(
     feature_a: MeasurementFeature,
     feature_b: MeasurementFeature,

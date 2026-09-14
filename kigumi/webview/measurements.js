@@ -103,6 +103,9 @@
      * `aligned` and `perpendicular` both become one kind: between two points
      * the shortest distance IS the distance, which is why the two collapsed.
      */
+    /** The kinds the solid admits, by their composed names. */
+    const SOLID_KIND_NAMES = Object.freeze(['angle', 'perpendicular_distance']);
+
     const LEGACY_KINDS = Object.freeze({
         aligned: 'projected_perpendicular_distance',
         perpendicular: 'projected_perpendicular_distance',
@@ -116,6 +119,76 @@
         return LEGACY_KINDS[kind] || kind;
     }
 
+    /**
+     * A kind's composed name, however it arrived.
+     *
+     * A file and the runner write kinds STRUCTURED -- {operation, space,
+     * direction} -- because one name is ambiguous: `angle` composes for a solid
+     * angle and is also what every measurement written before spaces existed
+     * calls a projected one. Everything below compares names, and comparing a
+     * structured kind against them matched nothing, so every measurement a
+     * python file declared with a kind read as `kind-unavailable`.
+     */
+    function kindName(kind) {
+        if (!kind) {
+            return null;
+        }
+        if (typeof kind === 'string') {
+            return normalizeKind(kind);
+        }
+        const operation = kind.operation || 'distance';
+        const parts = [];
+        if ((kind.space || 'projected') === 'projected') {
+            parts.push('projected');
+        }
+        if (operation === 'distance') {
+            parts.push(kind.direction || 'perpendicular');
+        }
+        parts.push(operation);
+        return parts.join('_');
+    }
+
+    /**
+     * A kind in the form python reads back, which says the space outright.
+     *
+     * `space` settles the one name that cannot say it for itself: a bare
+     * `angle` composes for a solid angle, and python reads it as the projected
+     * one because every file holding that word was written meaning that. So a
+     * solid angle has to be written structured or it comes back as a different
+     * measurement. Every other name carries its own space.
+     */
+    function kindWire(kind, space) {
+        if (!kind) {
+            return null;
+        }
+        if (typeof kind !== 'string') {
+            return {
+                operation: kind.operation || 'distance',
+                space: kind.space || 'projected',
+                direction: kind.direction || 'perpendicular',
+            };
+        }
+        // A solid name is composed as it stands. Putting it through the legacy
+        // map first turned the solid `angle` into the projected one, which is
+        // the very ambiguity this exists to settle -- and only a name that IS a
+        // solid kind may skip it, or a pre-spaces name like `aligned` would be
+        // read as an operation called "aligned".
+        const name = (space === '3d' && SOLID_KIND_NAMES.indexOf(kind) !== -1)
+            ? kind : kindName(kind);
+        const parts = name.split('_');
+        const projected = parts[0] === 'projected';
+        if (projected) {
+            parts.shift();
+        }
+        const operation = parts[parts.length - 1];
+        return {
+            operation,
+            space: projected ? 'projected' : (space || '3d'),
+            direction: operation === 'distance' && parts.length > 1
+                ? parts[0] : 'perpendicular',
+        };
+    }
+
     const PROJECTED_RULES = Object.freeze({
         'point-point': Object.freeze([
             'projected_perpendicular_distance',
@@ -126,6 +199,71 @@
         'line-line-parallel': Object.freeze(['projected_perpendicular_distance']),
         'line-line-crossing': Object.freeze(['projected_angle']),
     });
+
+    /**
+     * What a feature IS, with nothing projected away.
+     *
+     * The 3D view's camera belongs to the reader and turns as they look around,
+     * so a feature there cannot be classified by how it happens to appear: a
+     * face is a plane whatever angle it is seen from. Asking projectedForm
+     * there called every face not seen exactly edge-on an 'area' -- nothing to
+     * measure -- which is nearly all of them.
+     *
+     * PYTHON HAS A COPY OF THIS, as solid_form in drawing.py, and a test runs
+     * the two against each other.
+     */
+    function solidForm(geometry) {
+        if (!geometry || !geometry.kind) {
+            return { form: 'none' };
+        }
+        if (geometry.kind === 'point') {
+            return { form: 'point' };
+        }
+        if (geometry.kind === 'line') {
+            return { form: 'line', direction: normalized(geometry.direction || [0, 0, 0]) };
+        }
+        if (geometry.kind === 'plane') {
+            return { form: 'plane', direction: normalized(geometry.normal || [0, 0, 0]) };
+        }
+        return { form: 'none' };
+    }
+
+    /**
+     * Whether two solid features run together.
+     *
+     * Two planes are parallel when their NORMALS align and two lines when their
+     * DIRECTIONS do -- but a line is parallel to a plane when it runs square to
+     * the normal, the opposite test. One carries a normal and the other a
+     * direction, so comparing them as though both were directions would call a
+     * line lying in a plane a crossing.
+     */
+    function solidParallel(formA, formB) {
+        if (!formA.direction || !formB.direction) {
+            return null;
+        }
+        const alignment = Math.abs(dot(formA.direction, formB.direction));
+        return formA.form === formB.form
+            ? alignment > 1 - PARALLEL_EPSILON
+            : alignment < PARALLEL_EPSILON;
+    }
+
+    /**
+     * Which kinds this pair admits in the 3D view, best first.
+     *
+     * No camera comes into it: what a pair admits in the solid does not depend
+     * on where anyone is standing. Two flat features that cross admit an angle;
+     * anything else admits the distance between them.
+     */
+    function solidKinds(formA, formB) {
+        if (formA.form === 'none' || formB.form === 'none') {
+            return [];
+        }
+        const flat = (form) => form === 'line' || form === 'plane';
+        if (flat(formA.form) && flat(formB.form) && solidParallel(formA, formB) === false) {
+            return ['angle'];
+        }
+        return ['perpendicular_distance'];
+    }
 
     /**
      * Which kinds this pair admits in this viewport, best first.
@@ -208,8 +346,47 @@
             delta[2] - gaze[2] * along,
         ];
 
-        const named = normalizeKind(kind);
+        const named = kindName(kind);
 
+        if (named === 'angle') {
+            // In the solid. A plane is given by its NORMAL and a line by its
+            // DIRECTION, so a line against a plane is the complement: the line
+            // lies in the plane exactly when it runs square to the normal.
+            const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
+            const between = Math.acos(facing) * 180 / Math.PI;
+            return {
+                unit: 'angle',
+                value: formA.form === formB.form ? between : 90 - between,
+            };
+        }
+        if (named === 'perpendicular_distance') {
+            // In the solid, so the whole separation rather than the part of it
+            // that survives a projection.
+            const plane = formA.form === 'plane' ? formA
+                : (formB.form === 'plane' ? formB : null);
+            if (plane) {
+                // To a plane, the distance is taken along its normal.
+                return {
+                    unit: 'length',
+                    value: Math.abs(dot(delta, normalized(plane.direction))),
+                };
+            }
+            const solidLine = formA.form === 'line' ? formA
+                : (formB.form === 'line' ? formB : null);
+            if (solidLine === null) {
+                return { unit: 'length', value: length(delta) };
+            }
+            const along = normalized(solidLine.direction);
+            const slide = dot(delta, along);
+            return {
+                unit: 'length',
+                value: length([
+                    delta[0] - along[0] * slide,
+                    delta[1] - along[1] * slide,
+                    delta[2] - along[2] * slide,
+                ]),
+            };
+        }
         if (named === 'projected_angle') {
             const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
             return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
@@ -347,6 +524,21 @@
             <= PLANE_MATCH_EPSILON;
     }
 
+    /**
+     * Which space a measurement is taken in.
+     *
+     * Its own kind knows, when it has one written structured. A kind that
+     * arrived as a bare name cannot say -- `angle` reads as the projected one
+     * -- so the view answers instead, and only the 3D view has no sheet.
+     */
+    function measureSpace(measure, options) {
+        const kind = measure && measure.kind;
+        if (kind && typeof kind !== 'string' && kind.space) {
+            return kind.space;
+        }
+        return (options && options.space) || 'projected';
+    }
+
     function measurementStatus(measure, axes, options) {
         if (!measure || measure.unresolved || !measure.a || !measure.b
             || !measure.a.at || !measure.b.at) {
@@ -360,19 +552,32 @@
             return { drawable: false, reason: 'plane-mismatch', plane };
         }
         const look = plane && plane.normal ? plane.normal : axes.look;
-        const formA = projectedForm(measure.a.geometry, look);
-        const formB = projectedForm(measure.b.geometry, look);
-        const available = availableKinds(formA, formB);
+        // Which space this is judged in comes from the MEASUREMENT, not from
+        // the camera: a drawing shown in perspective still projects onto its
+        // sheet, so "not orthographic" does not mean "solid". A kind says its
+        // own space; without one, the view says, and only the 3D view has no
+        // sheet to project onto.
+        const solid = measureSpace(measure, options) === '3d';
+        const formA = solid
+            ? solidForm(measure.a.geometry)
+            : projectedForm(measure.a.geometry, look);
+        const formB = solid
+            ? solidForm(measure.b.geometry)
+            : projectedForm(measure.b.geometry, look);
+        const available = solid
+            ? solidKinds(formA, formB)
+            : availableKinds(formA, formB);
         if (available.length === 0) {
             return { drawable: false, reason: 'not-measurable', formA, formB };
         }
-        if (measure.kind && available.indexOf(measure.kind) === -1) {
+        const wanted = kindName(measure.kind);
+        if (wanted && available.indexOf(wanted) === -1) {
             return {
                 drawable: false, reason: 'kind-unavailable',
-                kind: measure.kind, available, formA, formB,
+                kind: wanted, available, formA, formB,
             };
         }
-        const kind = measure.kind || available[0];
+        const kind = wanted || available[0];
         // The plane's look, not the viewport's, for the same reason the forms
         // were taken with it: the two have to describe one projection.
         const value = measureValue(
@@ -562,6 +767,12 @@
         anchorReference,
         normalizeKind,
         projectedForm,
+        measureSpace,
+        kindName,
+        kindWire,
+        solidForm,
+        solidKinds,
+        solidParallel,
         measurementStatus,
         planeMatchesView,
         PLANE_MATCH_EPSILON,

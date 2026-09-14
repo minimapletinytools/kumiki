@@ -3430,7 +3430,10 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const measurement = result.measurement;
-        const kind = (this._pendingKinds && this._pendingKinds[0]) || null;
+        // Structured, not named, so a solid angle cannot be read back as the
+        // projected one it shares a name with.
+        const kind = KigumiMeasurements.kindWire(
+            (this._pendingKinds && this._pendingKinds[0]) || null, this.measurementSpace);
         this._pendingKinds = null;
         this.undoStacks.suspend(false);
         this.clearHeldFeature();
@@ -3580,7 +3583,9 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const drawingId = this.measurementDrawingId;
-        const was = found.measure.kind || null;
+        const space = this.measurementSpace;
+        const asked = KigumiMeasurements.kindWire(kind, space);
+        const was = KigumiMeasurements.kindWire(found.measure.kind || null, space);
         const where = {
             drawingId,
             viewportId,
@@ -3591,12 +3596,12 @@ class KigumiViewerApp extends LitElement {
         this._focusMeasurementOnArrival = { viewportId, measureKey };
         this.undoStacks.push(this.frameKey, drawingId, {
             label: 'measurement kind',
-            redo: { type: 'updateMeasurement', ...where, changes: { kind } },
+            redo: { type: 'updateMeasurement', ...where, changes: { kind: asked } },
             undo: { type: 'updateMeasurement', ...where, changes: { kind: was } },
         });
         this._sendMeasurementCommand(
-            { type: 'updateMeasurement', ...where, changes: { kind } });
-        this.emitViewerLog('measure-kind', { viewport: viewportId, kind });
+            { type: 'updateMeasurement', ...where, changes: { kind: asked } });
+        this.emitViewerLog('measure-kind', { viewport: viewportId, kind: asked });
     }
 
     /**
@@ -3932,6 +3937,18 @@ class KigumiViewerApp extends LitElement {
      * did not, and in the 3D view undo silently did nothing, delete was refused
      * by the runner, and entries landed on a stack nobody read.
      */
+    /**
+     * Which space measurements here are taken in.
+     *
+     * A drawing projects onto its sheet; the 3D view projects nothing. It
+     * settles the one kind name that cannot say it for itself -- a bare `angle`
+     * composes for a solid angle and is what every measurement written before
+     * spaces called a projected one.
+     */
+    get measurementSpace() {
+        return this.isInDrawing ? 'projected' : '3d';
+    }
+
     get measurementDrawingId() {
         return this.isInDrawing ? this.sceneStore.activeSceneId : THREE_D_MEASUREMENTS_ID;
     }
@@ -4066,6 +4083,10 @@ class KigumiViewerApp extends LitElement {
             look: axes ? axes.look : null,
             right: axes ? axes.right : null,
             up: axes ? axes.up : null,
+            // Which space to judge the pair in. A drawing projects onto its
+            // sheet; the 3D view projects nothing, so a face there is a plane
+            // rather than whatever it looks like from where the reader stands.
+            space: this.isInDrawing ? 'projected' : '3d',
         };
     }
 
@@ -6645,16 +6666,46 @@ class KigumiViewerApp extends LitElement {
         const declared = Boolean(viewport && viewport.spec && viewport.spec.camera);
         return {
             orthographic: declared && Boolean(viewport.isOrthographic),
+            // A declared camera means a sheet to project onto, whatever its
+            // projection toggle says. Only the 3D view has none, and only
+            // there is a face a plane rather than whatever shape it presents.
+            space: declared ? 'projected' : '3d',
         };
     }
 
     viewportAxes(viewport) {
-        const camera = (viewport && viewport.spec && viewport.spec.camera) || {};
+        const camera = (viewport && viewport.spec && viewport.spec.camera) || null;
+        if (!camera) {
+            // The 3D view declares no camera, because its camera is the
+            // reader's. A fixed basis here told the runner the view looked down
+            // -Z with Y up -- neither where it points nor which way is up, this
+            // world being Z-up -- so the plane a measurement was taken on, and
+            // which feature under the pointer was preferred, were both worked
+            // out against a view nobody was looking from.
+            return this._liveAxes(viewport);
+        }
         return {
             look: camera.look || [0, 0, -1],
             right: camera.right || [1, 0, 0],
             up: camera.up || [0, 1, 0],
         };
+    }
+
+    /** Where a camera actually points, for a viewport that declares none. */
+    _liveAxes(viewport) {
+        const live = viewport && viewport.camera;
+        if (!live) {
+            return { look: [0, 0, -1], right: [1, 0, 0], up: [0, 0, 1] };
+        }
+        // From the camera's own basis rather than from its `up` hint: `up` is
+        // what lookAt aims for, not where the camera ended up.
+        live.updateMatrixWorld();
+        const basis = new THREE.Matrix4().extractRotation(live.matrixWorld);
+        const axis = (x, y, z) => {
+            const out = new THREE.Vector3(x, y, z).applyMatrix4(basis).normalize();
+            return [out.x, out.y, out.z];
+        };
+        return { look: axis(0, 0, -1), right: axis(1, 0, 0), up: axis(0, 1, 0) };
     }
 
     /**

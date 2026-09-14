@@ -685,3 +685,124 @@ describe('a derived edge is identified by the faces that form it', () => {
             .not.toBe(measurementKey({ a: face, b: face }));
     });
 });
+
+const Measurements = require('../webview/measurements.js');
+
+describe('what the 3D view measures', () => {
+    // The 3D view's camera belongs to the reader and turns as they look around,
+    // so a feature there is classified as it IS. Projecting instead called
+    // every face not seen exactly edge-on an 'area' -- nothing to measure --
+    // which is nearly all of them, in every direction the camera can point.
+    const { solidForm, solidKinds, measurementStatus } = Measurements;
+    const face = (normal) => ({ kind: 'plane', normal });
+    const edge = (direction) => ({ kind: 'line', direction });
+    const solid = { orthographic: false };
+    const axes = { look: [-0.577, -0.577, -0.577], right: [1, 0, 0], up: [0, 0, 1] };
+
+    test('a face is a plane from wherever it is seen', () => {
+        expect(solidForm(face([0, 0, 1])).form).toBe('plane');
+    });
+
+    test('an edge is a line even when it points at you', () => {
+        expect(solidForm(edge([0, 0, 1])).form).toBe('line');
+    });
+
+    test('two faces meeting at a corner admit an angle', () => {
+        expect(solidKinds(solidForm(face([1, 0, 0])), solidForm(face([0, 0, 1]))))
+            .toEqual(['angle']);
+    });
+
+    test('two parallel faces admit the distance between them', () => {
+        expect(solidKinds(solidForm(face([1, 0, 0])), solidForm(face([-1, 0, 0]))))
+            .toEqual(['perpendicular_distance']);
+    });
+
+    test('an edge lying in a face is parallel to it, not crossing it', () => {
+        // A normal is not a direction: the line runs square to the normal
+        // exactly when it lies in the plane.
+        expect(solidKinds(solidForm(edge([0, 0, 1])), solidForm(face([1, 0, 0]))))
+            .toEqual(['perpendicular_distance']);
+    });
+
+    test('and one square to a face does cross it', () => {
+        expect(solidKinds(solidForm(edge([1, 0, 0])), solidForm(face([1, 0, 0]))))
+            .toEqual(['angle']);
+    });
+
+    test('a corner reads 90 degrees, not a length', () => {
+        const status = measurementStatus({
+            a: { at: [0, 0, 0], geometry: face([1, 0, 0]) },
+            b: { at: [0, 0, 0], geometry: face([0, 0, 1]) },
+            kind: { operation: 'angle', space: '3d' },
+        }, axes, solid);
+
+        expect(status.drawable).toBe(true);
+        expect(status.value).toEqual({ unit: 'angle', value: 90 });
+    });
+
+    test('a slab reads its whole thickness, not the projected part of it', () => {
+        const status = measurementStatus({
+            a: { at: [0, 0, 0], geometry: face([1, 0, 0]) },
+            b: { at: [150, 0, 0], geometry: face([-1, 0, 0]) },
+            kind: { operation: 'distance', space: '3d', direction: 'perpendicular' },
+        }, axes, solid);
+
+        expect(status.value).toEqual({ unit: 'length', value: 150 });
+    });
+
+    test('the same pair, judged as a sheet would, is not measurable at all', () => {
+        // Which is what the 3D view was doing, and why a face went red.
+        const status = measurementStatus({
+            a: { at: [0, 0, 0], geometry: face([1, 0, 0]) },
+            b: { at: [0, 0, 0], geometry: face([0, 0, 1]) },
+        }, axes, { orthographic: true });
+
+        expect(status.drawable).toBe(false);
+        expect(status.reason).toBe('not-measurable');
+    });
+});
+
+describe('naming a kind, and writing one back', () => {
+    const { kindName, kindWire, measurementStatus } = Measurements;
+
+    test('a structured kind composes to its name', () => {
+        expect(kindName({ operation: 'distance', space: 'projected', direction: 'horizontal' }))
+            .toBe('projected_horizontal_distance');
+        expect(kindName({ operation: 'angle', space: '3d' })).toBe('angle');
+    });
+
+    test('a measurement a python file declared is drawable', () => {
+        // Its kind arrives structured, and comparing that against a list of
+        // names matched nothing: every one read as kind-unavailable.
+        const status = measurementStatus({
+            a: { at: [0, 0, 0], geometry: { kind: 'plane', normal: [1, 0, 0] } },
+            b: { at: [100, 0, 0], geometry: { kind: 'plane', normal: [-1, 0, 0] } },
+            kind: { operation: 'distance', space: 'projected', direction: 'perpendicular' },
+        }, { look: [0, 0, -1], right: [1, 0, 0], up: [0, 1, 0] }, { orthographic: true });
+
+        expect(status.drawable).toBe(true);
+    });
+
+    test('a solid angle is written structured, so it cannot be read back projected', () => {
+        // `angle` is also what every measurement written before spaces existed
+        // calls a projected one, and python reads the bare word that way.
+        expect(kindWire('angle', '3d').space).toBe('3d');
+        expect(kindWire('angle', 'projected').space).toBe('projected');
+    });
+
+    test('a name that carries its own space keeps it', () => {
+        expect(kindWire('projected_angle', '3d').space).toBe('projected');
+    });
+
+    test('a name from before spaces existed is still projected', () => {
+        // 'aligned' must not be composed as though it were a solid kind.
+        expect(kindWire('aligned', '3d')).toEqual({
+            operation: 'distance', space: 'projected', direction: 'perpendicular',
+        });
+    });
+
+    test('a structured kind passes through unchanged', () => {
+        const wire = { operation: 'angle', space: '3d', direction: 'perpendicular' };
+        expect(kindWire(wire, 'projected')).toEqual(wire);
+    });
+});

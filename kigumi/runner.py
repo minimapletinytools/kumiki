@@ -1964,6 +1964,39 @@ def _best_matching_candidate(
     return None if best is None else best[1]
 
 
+def _pick_space(payload: Dict[str, Any]) -> Any:
+    """Which space a pick is judged in: the sheet's, or the solid's.
+
+    The viewer says, because it is the one that knows which view the pointer is
+    in. A drawing's viewport has a declared camera and projects onto its sheet;
+    the 3D view projects nothing, its camera being the reader's.
+    """
+    from kumiki.drawing import MeasurementSpace
+
+    named = (payload or {}).get("space")
+    return (MeasurementSpace.THREE_D
+            if named == MeasurementSpace.THREE_D.value
+            else MeasurementSpace.PROJECTED)
+
+
+def _kinds_for_pair(
+    one: Optional[Dict[str, Any]], other: Optional[Dict[str, Any]],
+    look: Sequence[float], payload: Dict[str, Any],
+) -> Tuple[Any, ...]:
+    """What a pair admits, judged in whichever space the view is.
+
+    In the 3D view a face is a plane, not whatever shape it happens to present
+    from here -- so two faces meeting at a corner admit an angle, and two
+    parallel ones a distance. Projecting there instead called almost every face
+    an AREA and refused it.
+    """
+    from kumiki.drawing import MeasurementSpace, projected_kinds, solid_kinds
+
+    if _pick_space(payload) is MeasurementSpace.THREE_D:
+        return solid_kinds(one, other)
+    return projected_kinds(one, other, look)
+
+
 def _anchors_for_pick(
     state: Any, located_pick: Any, timber: Any, payload: Dict[str, Any], slot_state: Any,
 ) -> Optional[Dict[str, List[float]]]:
@@ -1976,7 +2009,7 @@ def _anchors_for_pick(
     was drawn at each feature's own middle while the finished one went to the
     middle of their overlap.
     """
-    from kumiki.drawing import MeasurementKind, distance_anchors, projected_kinds
+    from kumiki.drawing import MeasurementKind, distance_anchors
 
     held = payload.get("heldReference")
     look = payload.get("look")
@@ -2001,7 +2034,7 @@ def _anchors_for_pick(
         return None
 
     geometry = _located_geometry_payload(located_pick[2], timber)
-    admitted = projected_kinds(placed[0].get("geometry"), geometry, normal)
+    admitted = _kinds_for_pair(placed[0].get("geometry"), geometry, normal, payload)
     if not admitted:
         return None
     kind = admitted[0]
@@ -2026,8 +2059,6 @@ def _kinds_for_pick(
     measurement is being made", empty is "this one cannot be finished from
     here".
     """
-    from kumiki.drawing import projected_kinds
-
     held_geometry = payload.get("heldGeometry")
     look = payload.get("look")
     if not held_geometry or not look:
@@ -2037,7 +2068,7 @@ def _kinds_for_pick(
     geometry = _located_geometry_payload(located_pick[2], timber)
     if geometry is None:
         return []
-    return [kind.name for kind in projected_kinds(held_geometry, geometry, look)]
+    return [kind.name for kind in _kinds_for_pair(held_geometry, geometry, look, payload)]
 
 
 def _plane_for_pick(
@@ -2725,7 +2756,7 @@ def _resolve_measurement(
     """
     from kumiki.drawing import (MeasurementDirection, MeasurementKind,
                                MeasurementOperation, MeasurementSpace,
-                               distance_anchors, projected_kinds)
+                               distance_anchors, projected_kinds, solid_kinds)
 
     resolved = dict(measure)
     broken = []
@@ -2759,10 +2790,17 @@ def _resolve_measurement(
         # instead put two crossing faces -- which admit an ANGLE and nothing
         # else -- through the parallel-line rule, and came out square to one of
         # them and not the other.
-        admitted = projected_kinds(
-            resolved["a"].get("geometry"), resolved["b"].get("geometry"), plane)
-        kind = MeasurementKind.from_wire(measure.get("kind")) or (
-            admitted[0] if admitted else None)
+        # Judged in the space the measurement is taken in. A 3D measurement
+        # says so in its own kind; one still being inferred is projected,
+        # since that is what a sheet has. Projecting a solid measurement here
+        # called its faces AREAs and left it with no kind at all.
+        declared = MeasurementKind.from_wire(measure.get("kind"))
+        solid = declared is not None and declared.space is MeasurementSpace.THREE_D
+        admitted = (
+            solid_kinds(resolved["a"].get("geometry"), resolved["b"].get("geometry"))
+            if solid else projected_kinds(
+                resolved["a"].get("geometry"), resolved["b"].get("geometry"), plane))
+        kind = declared or (admitted[0] if admitted else None)
         # An angle uses no anchor positions at all, and where it should sit is
         # its own question. A pair that admits nothing has nothing to place.
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
