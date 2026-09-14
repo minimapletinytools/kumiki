@@ -650,18 +650,6 @@ function _isTypingTarget(target) {
         || target.isContentEditable === true;
 }
 
-function _meshEdgePositions(vertices, indices) {
-    const out = [];
-    const at = (index) => [vertices[index * 3], vertices[index * 3 + 1], vertices[index * 3 + 2]];
-    const list = indices || [];
-    for (let triangle = 0; triangle + 2 < list.length; triangle += 3) {
-        const corners = [list[triangle], list[triangle + 1], list[triangle + 2]];
-        for (let side = 0; side < 3; side += 1) {
-            out.push(...at(corners[side]), ...at(corners[(side + 1) % 3]));
-        }
-    }
-    return out;
-}
 
 /**
  * A cropped edge as one flat position array, for LineSegmentsGeometry.
@@ -4015,7 +4003,11 @@ class KigumiViewerApp extends LitElement {
             if (this._heldFeatureMesh) {
                 this._heldFeatureMesh.renderOrder = HELD_RENDER_ORDER;
             }
-            this._addHeldLine(_meshEdgePositions(mesh.vertices, mesh.indices));
+            // No outline from the mesh itself. Its triangles are a
+            // tessellation, not a boundary, so drawing their edges wrote the
+            // triangulation across the middle of the face. The boundary is
+            // what highlightEdgeSegments carries, drawn above -- which is
+            // exactly what the selection highlight does with the same answer.
         }
     }
 
