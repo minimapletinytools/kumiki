@@ -3325,7 +3325,10 @@ class KigumiViewerApp extends LitElement {
         if (!kept.kept) {
             return;
         }
-        if (window.KigumiHover.HoverState.sameFeature(this._hoverDrawn, message)) {
+        // The verdict counts as part of what is drawn, not just the feature:
+        // taking a first end is a button press, so the colour can change while
+        // the pointer rests exactly where it was.
+        if (window.KigumiHover.HoverState.sameHighlight(this._hoverDrawn, message)) {
             return;
         }
         this._hoverDrawn = message;
@@ -3333,7 +3336,7 @@ class KigumiViewerApp extends LitElement {
         // when this pair cannot be measured from here, and a list when it can.
         // The runner answers it, so what is drawn red is what the click
         // refuses; two judgements would eventually disagree.
-        if (message.kinds && message.kinds.length === 0) {
+        if (window.KigumiHover.HoverState.isRefused(message)) {
             this.drawHoverHighlight(message, HOVER_REFUSED_COLOR);
             return;
         }
@@ -3377,6 +3380,7 @@ class KigumiViewerApp extends LitElement {
         this.emitViewerLog('measure-hold', {
             feature: this._lastPickAnchor.reference.feature || null,
         });
+        this._reaskHover();
         this.requestUpdate();
     }
 
@@ -3387,7 +3391,7 @@ class KigumiViewerApp extends LitElement {
         // view admits. The hover has already drawn it red and promised the
         // click would refuse it, so refuse it -- taking it instead replaced a
         // good second end with one that has no kind, and drew nothing at all.
-        if (Array.isArray(message.kinds) && message.kinds.length === 0) {
+        if (window.KigumiHover.HoverState.isRefused(message)) {
             this.reportMeasureRefusal('no-kind');
             return;
         }
@@ -3442,6 +3446,7 @@ class KigumiViewerApp extends LitElement {
         this._pendingKinds = null;
         this.undoStacks.suspend(false);
         this.clearHeldFeature();
+        this._reaskHover();
 
         const drawingId = this.measurementDrawingId;
         // Focused once it arrives, so the kind can be changed without hunting
@@ -3476,6 +3481,23 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
+    /**
+     * Ask the hover its question again, the held end having changed.
+     *
+     * The place did not change, the question did -- the same reason Tab does
+     * this. What sits under the pointer is drawn in the colour that says
+     * whether a click will be taken, and that answer turns on what is held.
+     * Taking or releasing an end is a button or a key, so the pointer does not
+     * move, and the hover only asks when it moves: without this the verdict on
+     * screen is the one from before the end was taken, and stays that way until
+     * the pointer happens to move.
+     */
+    _reaskHover() {
+        if (this._hover) {
+            this._hover.askAgain();
+        }
+    }
+
     /** Release the most recent end, or leave the flow. */
     escapeMeasurement() {
         const released = this.measureDraft.escape();
@@ -3489,6 +3511,7 @@ class KigumiViewerApp extends LitElement {
         this._pendingKinds = null;
         this.renderMeasurements();
         this.emitViewerLog('measure-escape', { action: released.action });
+        this._reaskHover();
         this.requestUpdate();
         return true;
     }
@@ -3499,6 +3522,7 @@ class KigumiViewerApp extends LitElement {
         this._pendingKinds = null;
         this.undoStacks.suspend(false);
         this.clearHeldFeature();
+        this._reaskHover();
     }
 
     _sendMeasurementCommand(payload) {

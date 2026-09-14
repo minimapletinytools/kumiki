@@ -177,3 +177,61 @@ describe('the app asks the draft what is held, rather than deciding again', () =
         expect(body).not.toContain('STATES.HOLDING');
     });
 });
+
+describe('the hover redraws when the verdict changes, not just the feature', () => {
+    // handleHoverResult skips redrawing an answer about the same feature. The
+    // colour it draws says whether the click will be taken, and that turns on
+    // what is held -- so the skip has to account for it. Comparing features
+    // alone left the highlight green over a pair that could not be measured.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    test('it compares whole highlights', () => {
+        expect(app).toContain('HoverState.sameHighlight');
+    });
+
+    test('and never the feature alone, which is the weaker question', () => {
+        expect(app).not.toContain('HoverState.sameFeature');
+    });
+
+    test('with one place judging what counts as refused', () => {
+        // The hover colour and the click refusal must agree, so both ask the
+        // same function rather than each testing kinds.length.
+        expect(app).not.toContain('kinds.length === 0');
+    });
+});
+
+describe('the hover is asked again whenever the held end changes', () => {
+    // The hover only asks a question when the pointer moves. Taking, releasing
+    // or confirming an end is a button or a key, so the pointer does not move
+    // -- and the colour under it, which says whether a click will be taken,
+    // depends on exactly that. Without a re-ask the verdict on screen is the
+    // one from before, however right the comparison that draws it.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    /** The body of a no-argument method, by brace matching. */
+    function body(name) {
+        const at = app.indexOf(`\n    ${name}() {`);
+        if (at === -1) {
+            throw new Error(`${name} is not a method of viewer-app.js`);
+        }
+        const open = app.indexOf('{', at + name.length + 5);
+        let depth = 0;
+        for (let end = open; end < app.length; end += 1) {
+            if (app[end] === '{') depth += 1;
+            if (app[end] === '}') {
+                depth -= 1;
+                if (depth === 0) return app.slice(open, end + 1);
+            }
+        }
+        throw new Error(`${name} is never closed`);
+    }
+
+    test.each([
+        'startMeasurementFromFocus',
+        'escapeMeasurement',
+        'confirmMeasurement',
+        'clearMeasureDraft',
+    ])('%s asks the hover again', (method) => {
+        expect(body(method)).toContain('_reaskHover');
+    });
+});

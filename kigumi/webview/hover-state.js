@@ -184,7 +184,34 @@
         }
 
         /**
-         * Whether two answers are about the same feature, so redrawing is pointless.
+         * Whether the runner judged this pair unmeasurable from where we stand.
+         *
+         * Empty, not absent: null kinds mean no measurement is being made at
+         * all, which is an ordinary hover and not a refusal.
+         */
+        static isRefused(answer) {
+            return Boolean(answer
+                && Array.isArray(answer.kinds)
+                && answer.kinds.length === 0);
+        }
+
+        /**
+         * Whether drawing this answer would put the same thing on screen.
+         *
+         * The feature AND the verdict. What is drawn is geometry plus a colour,
+         * and the colour turns on what is held -- which changes without the
+         * pointer moving, because taking a first end is a button press. Comparing
+         * the feature alone left a highlight green after a first end was taken
+         * under a resting pointer, and green is the colour that promises the
+         * click will be taken.
+         */
+        static sameHighlight(one, other) {
+            return HoverState.sameFeature(one, other)
+                && HoverState.isRefused(one) === HoverState.isRefused(other);
+        }
+
+        /**
+         * Whether two answers are about the same feature.
          *
          * The feature's name as well as the path: two faces of one prism share
          * a path and differ only by which face, so comparing paths alone would

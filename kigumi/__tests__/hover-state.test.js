@@ -265,3 +265,54 @@ describe('asking about the same place again', () => {
         expect(hover.askAgain()).toBe(false);
     });
 });
+
+describe('whether redrawing the hover would change anything', () => {
+    // What is drawn is geometry plus a colour, and the colour says whether the
+    // click will be taken. The colour turns on what is HELD, which changes
+    // without the pointer moving -- taking a first end is a button press. So a
+    // hover cached by feature alone stayed green after a first end was taken
+    // under a resting pointer, promising a click that was then refused.
+    const refused = (label) => ({ ...answer(label), kinds: [] });
+    const allowed = (label) => ({ ...answer(label), kinds: ['projected_distance'] });
+    const idle = (label) => ({ ...answer(label), kinds: null });
+
+    test('an ordinary hover is not a refusal', () => {
+        // Null kinds mean no measurement is being made, not that this one
+        // cannot be finished.
+        expect(HoverState.isRefused(idle('front'))).toBe(false);
+        expect(HoverState.isRefused(answer('front'))).toBe(false);
+    });
+
+    test('no kind this view admits is', () => {
+        expect(HoverState.isRefused(refused('front'))).toBe(true);
+    });
+
+    test('a kind it does admit is not', () => {
+        expect(HoverState.isRefused(allowed('front'))).toBe(false);
+    });
+
+    test('the same feature with the same verdict need not be redrawn', () => {
+        expect(HoverState.sameHighlight(allowed('front'), allowed('front'))).toBe(true);
+        expect(HoverState.sameHighlight(refused('front'), refused('front'))).toBe(true);
+    });
+
+    test('the SAME feature whose verdict changed must be', () => {
+        // The pointer has not moved; the first end was taken. This is the one
+        // that was wrong: the highlight stayed green over a pair that could
+        // not be measured.
+        expect(HoverState.sameHighlight(idle('front'), refused('front'))).toBe(false);
+    });
+
+    test('and one that stopped being refused, equally', () => {
+        expect(HoverState.sameHighlight(refused('front'), allowed('front'))).toBe(false);
+    });
+
+    test('a different feature is still a different drawing', () => {
+        expect(HoverState.sameHighlight(allowed('front'), allowed('back'))).toBe(false);
+    });
+
+    test('nothing drawn yet, and an answer, differ', () => {
+        expect(HoverState.sameHighlight(null, allowed('front'))).toBe(false);
+        expect(HoverState.sameHighlight(null, null)).toBe(true);
+    });
+});
