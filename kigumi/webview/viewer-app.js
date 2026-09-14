@@ -346,6 +346,10 @@ const DEFAULT_THEME_UI = Object.freeze({
     hint: 'rgba(72, 77, 94, 0.58)',
     overlayBg: 'rgba(255, 255, 255, 0.46)',
     overlayErrorBg: 'rgba(255, 236, 236, 0.78)',
+    // A measurement that is broken wherever you look at it. Its own
+    // entry rather than a hard-coded red, so it stays legible on the
+    // dark theme's ground as well as this one.
+    broken: '#c0392b',
     error: '#8a2b2b',
     errorHover: '#a63535',
     errorActive: '#6d1f1f',
@@ -522,6 +526,7 @@ const THEMES = Object.freeze({
             hint: 'rgba(204, 218, 242, 0.74)',
             overlayBg: 'rgba(17, 22, 33, 0.56)',
             overlayErrorBg: 'rgba(67, 28, 38, 0.74)',
+            broken: '#ff8a80',
             error: '#ff8ea3',
             errorHover: '#ff9db0',
             errorActive: '#ef708b',
@@ -4706,6 +4711,7 @@ class KigumiViewerApp extends LitElement {
             '--hv-hint': ui.hint,
             '--hv-overlay-bg': ui.overlayBg,
             '--hv-overlay-error-bg': ui.overlayErrorBg,
+            '--hv-broken': ui.broken,
             '--hv-error': ui.error,
             '--hv-error-hover': ui.errorHover,
             '--hv-error-active': ui.errorActive,
@@ -5037,12 +5043,13 @@ class KigumiViewerApp extends LitElement {
         // timeline marks above are positioned this way instead.
         const menu = this.querySelector('#member-context-menu');
         if (menu) {
-            const x = Number(menu.dataset.x);
-            const y = Number(menu.dataset.y);
-            const maxLeft = Math.max(0, window.innerWidth - menu.offsetWidth - 4);
-            const maxTop = Math.max(0, window.innerHeight - menu.offsetHeight - 4);
-            menu.style.left = `${Math.min(Math.max(0, x), maxLeft)}px`;
-            menu.style.top = `${Math.min(Math.max(0, y), maxTop)}px`;
+            const at = window.KigumiContextMenu.menuPosition(
+                { x: Number(menu.dataset.x), y: Number(menu.dataset.y) },
+                { width: menu.offsetWidth, height: menu.offsetHeight },
+                { width: window.innerWidth, height: window.innerHeight },
+            );
+            menu.style.left = `${at.x}px`;
+            menu.style.top = `${at.y}px`;
         }
     }
 
