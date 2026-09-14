@@ -3062,6 +3062,19 @@ class KigumiViewerApp extends LitElement {
         // nothing on the stack for it, so undo would reach past the thing you
         // are looking at to something you are not.
         const accel = event.metaKey || event.ctrlKey;
+        if (accel && (event.key === 'z' || event.key === 'Z' || event.key === 'y')) {
+            // Temporary, for chasing an undo that does nothing: says whether
+            // the key arrived, and if so what the stack it would read holds.
+            const at = this.measurementDrawingId;
+            this.emitViewerLog('undo-key', {
+                key: event.key,
+                shift: event.shiftKey,
+                frame: this.frameKey,
+                drawing: at,
+                suspended: this.undoStacks.suspended,
+                depth: this.undoStacks.depth(this.frameKey, at),
+            });
+        }
         if (accel && (event.key === 'z' || event.key === 'Z')) {
             event.preventDefault();
             if (event.shiftKey) {
@@ -3443,6 +3456,8 @@ class KigumiViewerApp extends LitElement {
             plane: measurement.plane,
             kind,
         };
+        this.emitViewerLog('undo-push', {
+            label: 'measure', frame: this.frameKey, drawing: drawingId });
         this.undoStacks.push(this.frameKey, drawingId, {
             label: 'measure',
             redo: payload,
