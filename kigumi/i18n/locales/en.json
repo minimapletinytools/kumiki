@@ -160,6 +160,7 @@
   "viewer.layers.section.timbers": "Timbers",
   "viewer.layers.section.joints": "Joints",
   "viewer.layers.section.measurements": "3D measurements",
+  "viewer.layers.measurement.unresolved": "This measurement names a feature that is no longer there",
   "viewer.layers.measurements.hide.title": "Hide every 3D measurement",
   "viewer.layers.measurements.show.title": "Show every 3D measurement",
   "viewer.layers.section.tags": "Tags",

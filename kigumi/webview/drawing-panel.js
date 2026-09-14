@@ -205,8 +205,10 @@
             const row = document.createElement('div');
             const focused = this.selectionManager
                 && this.selectionManager.isMeasurementFocused(viewport.id, entry.key);
+            const broken = globalScope.KigumiMeasurements.isBroken(entry.status);
             row.className = 'dp-row dp-measurement'
                 + (entry.status.drawable ? '' : ' dp-unavailable')
+                + (broken ? ' dp-broken' : '')
                 + (focused ? ' dp-focused' : '');
 
             const origin = document.createElement('span');

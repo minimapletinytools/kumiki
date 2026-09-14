@@ -431,8 +431,14 @@
             if (!this._matchesFilter(between)) {
                 return null;
             }
+            // Broken here means the reference no longer finds a feature -- a
+            // renamed face, a timber that has gone. The runner says so when it
+            // resolves, so no camera is needed to tell. The view-dependent
+            // refusals cannot arise: these belong to no viewport.
+            const broken = Boolean(measure.unresolved);
             const row = document.createElement('div');
-            row.className = 'lp-row lp-row-measurement lp-depth-0 lp-selectable';
+            row.className = 'lp-row lp-row-measurement lp-depth-0 lp-selectable'
+                + (broken ? ' lp-broken' : '');
             row.dataset.nodeId = 'measurement:' + index;
 
             const chev = document.createElement('span');
@@ -442,8 +448,18 @@
             const name = document.createElement('span');
             name.className = 'lp-name';
             name.textContent = between;
-            name.title = between;
+            name.title = broken
+                ? t('viewer.layers.measurement.unresolved')
+                : between;
             row.appendChild(name);
+            if (broken) {
+                // Said as well as coloured. Colour alone is not a reason, and
+                // is not available to everyone reading it.
+                const why = document.createElement('span');
+                why.className = 'lp-broken-note';
+                why.textContent = t('viewer.drawing.refused.unresolved');
+                row.appendChild(why);
+            }
             row.addEventListener('click', (event) => this._emit(
                 'kigumi-focus-measurement', {
                     viewportId: measure.viewportId || null,

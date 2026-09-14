@@ -693,3 +693,49 @@ describe('an offset is stored in world units, not screen pixels', () => {
         expect(Number.isFinite(perWorld(0, 100))).toBe(false);
     });
 });
+
+const { isBroken, BROKEN_REASONS } = require('../webview/measurements.js');
+
+describe('which refusals are damage and which are just this view', () => {
+    // Only one kind is something to go and mend, and only one kind should be
+    // shouting. Two panels read this, so it is decided once.
+    test('a reference that no longer resolves is broken', () => {
+        expect(isBroken({ drawable: false, reason: 'unresolved' })).toBe(true);
+    });
+
+    test('a plane that disagrees with its viewport is broken', () => {
+        expect(isBroken({ drawable: false, reason: 'plane-mismatch' })).toBe(true);
+    });
+
+    test('the view-dependent refusals are not', () => {
+        // The same measurement reads fine under one viewport and is refused by
+        // the next. That is information, not damage.
+        for (const reason of ['not-measurable', 'kind-unavailable', 'degenerate']) {
+            expect(isBroken({ drawable: false, reason })).toBe(false);
+        }
+    });
+
+    test('something that draws is not broken whatever else it says', () => {
+        expect(isBroken({ drawable: true, reason: 'unresolved' })).toBe(false);
+    });
+
+    test('no status is not a claim that anything is broken', () => {
+        expect(isBroken(null)).toBe(false);
+        expect(isBroken(undefined)).toBe(false);
+    });
+
+    test('the two reasons are the ones the statuses actually use', () => {
+        // A reason renamed on one side and not the other would silently stop
+        // anything being called broken.
+        const AXES = { look: [0, -1, 0], right: [1, 0, 0], up: [0, 0, 1] };
+        const unresolved = measurementStatus({ a: null, b: null }, AXES);
+        const mismatched = measurementStatus({
+            a: { at: [0, 0, 0], geometry: { kind: 'point', at: [0, 0, 0] } },
+            b: { at: [1, 0, 1], geometry: { kind: 'point', at: [1, 0, 1] } },
+            plane: { at: [0, 0, 0], normal: [1, 0, 0] },
+        }, AXES, { orthographic: true });
+
+        expect(BROKEN_REASONS).toContain(unresolved.reason);
+        expect(BROKEN_REASONS).toContain(mismatched.reason);
+    });
+});

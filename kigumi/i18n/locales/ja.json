@@ -160,6 +160,7 @@
   "viewer.layers.section.timbers": "木材",
   "viewer.layers.section.joints": "仕口",
   "viewer.layers.section.measurements": "3D寸法",
+  "viewer.layers.measurement.unresolved": "この寸法が指す特徴は見つかりません",
   "viewer.layers.measurements.hide.title": "すべての3D寸法を隠す",
   "viewer.layers.measurements.show.title": "すべての3D寸法を表示",
   "viewer.layers.section.tags": "タグ",

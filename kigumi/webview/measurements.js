@@ -569,8 +569,30 @@
         return (pointer.x - from.x) * away.x + (pointer.y - from.y) * away.y;
     }
 
+    /**
+     * Why a measurement cannot be drawn, when the reason is not about the view.
+     *
+     * An anchor that no longer resolves, and a plane that disagrees with the
+     * viewport it is drawn in, are wrong wherever you look at them -- a rename
+     * away from being fixed, or a drawing whose python has moved. The other
+     * three refusals are about THIS view: the same measurement reads fine under
+     * one viewport and is refused by the next, which is information rather than
+     * damage.
+     *
+     * Worth telling apart because only the first kind is something to go and
+     * mend, and only the first kind should be shouting.
+     */
+    const BROKEN_REASONS = Object.freeze(['unresolved', 'plane-mismatch']);
+
+    function isBroken(status) {
+        return Boolean(status) && !status.drawable
+            && BROKEN_REASONS.indexOf(status.reason) !== -1;
+    }
+
     const KigumiMeasurements = {
         PROJECTED_RULES,
+        BROKEN_REASONS,
+        isBroken,
         measurementKey,
         offsetForPointer,
         perpendicularEnds,
