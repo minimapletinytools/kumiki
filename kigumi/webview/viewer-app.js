@@ -1516,6 +1516,7 @@ class KigumiViewerApp extends LitElement {
         this.onLightDialPointerMove = this.onLightDialPointerMove.bind(this);
         this.onLightDialPointerUp = this.onLightDialPointerUp.bind(this);
         this.onWindowKeyDown = this.onWindowKeyDown.bind(this);
+        this.onWindowKeyProbe = this.onWindowKeyProbe.bind(this);
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
         this.onLayerStateSync = this.onLayerStateSync.bind(this);
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
@@ -1691,6 +1692,7 @@ class KigumiViewerApp extends LitElement {
         window.removeEventListener('mousedown', this.onWindowContextMenuDismiss);
         window.removeEventListener('resize', this.onWindowResize);
         window.removeEventListener('keydown', this.onWindowKeyDown);
+        document.removeEventListener('keydown', this.onWindowKeyProbe, true);
         window.removeEventListener('pointermove', this.onGizmoPointerMove);
         window.removeEventListener('pointerup', this.onGizmoPointerUp);
         window.removeEventListener('pointermove', this.onLightDialPointerMove);
@@ -1907,6 +1909,7 @@ class KigumiViewerApp extends LitElement {
         window.addEventListener('pointerup', this.onLightDialPointerUp);
         window.addEventListener('resize', this.onWindowResize);
         window.addEventListener('keydown', this.onWindowKeyDown);
+        document.addEventListener('keydown', this.onWindowKeyProbe, true);
     }
 
     setupThreeScene() {
@@ -3024,7 +3027,47 @@ class KigumiViewerApp extends LitElement {
         this.updateCamera();
     }
 
+    /**
+     * Temporary: says which keys reach the page at all.
+     *
+     * Capture phase on the document, so it runs before anything in the page
+     * can stop propagation. A key logged here but not by onWindowKeyDown was
+     * eaten in between; a key logged by neither never reached the webview.
+     */
+    onWindowKeyProbe(event) {
+        this._keyProbeCount = (this._keyProbeCount || 0) + 1;
+        if (this._keyProbeCount > 40) {
+            return;
+        }
+        this.emitViewerLog('key-probe', {
+            key: event.key,
+            meta: event.metaKey,
+            ctrl: event.ctrlKey,
+            prevented: event.defaultPrevented,
+            target: event.target && event.target.tagName,
+            focused: typeof document.hasFocus === 'function' ? document.hasFocus() : null,
+        });
+    }
+
     onWindowKeyDown(event) {
+        // Temporary, for chasing an undo that does nothing. Deliberately ABOVE
+        // every guard: below them, silence means either the key never arrived
+        // or it arrived and a guard passed it over, and those want different
+        // fixes.
+        if ((event.metaKey || event.ctrlKey)
+            && ['z', 'Z', 'y', 'Y'].indexOf(event.key) !== -1) {
+            this.emitViewerLog('undo-key', {
+                key: event.key,
+                shift: event.shiftKey,
+                prevented: event.defaultPrevented,
+                target: event.target && event.target.tagName,
+                typing: _isTypingTarget(event.target),
+                frame: this.frameKey,
+                drawing: this.measurementDrawingId,
+                suspended: this.undoStacks.suspended,
+                depth: this.undoStacks.depth(this.frameKey, this.measurementDrawingId),
+            });
+        }
         // Tab is checked BEFORE the defaultPrevented guard: it is the focus key,
         // so something else may well have claimed it, and this only acts while
         // the pointer is over a feature -- which is not a moment anyone is
@@ -3062,19 +3105,6 @@ class KigumiViewerApp extends LitElement {
         // nothing on the stack for it, so undo would reach past the thing you
         // are looking at to something you are not.
         const accel = event.metaKey || event.ctrlKey;
-        if (accel && (event.key === 'z' || event.key === 'Z' || event.key === 'y')) {
-            // Temporary, for chasing an undo that does nothing: says whether
-            // the key arrived, and if so what the stack it would read holds.
-            const at = this.measurementDrawingId;
-            this.emitViewerLog('undo-key', {
-                key: event.key,
-                shift: event.shiftKey,
-                frame: this.frameKey,
-                drawing: at,
-                suspended: this.undoStacks.suspended,
-                depth: this.undoStacks.depth(this.frameKey, at),
-            });
-        }
         if (accel && (event.key === 'z' || event.key === 'Z')) {
             event.preventDefault();
             if (event.shiftKey) {
