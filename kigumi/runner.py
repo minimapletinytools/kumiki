@@ -1927,6 +1927,7 @@ def _best_matching_candidate(
     timber: Any,
     held_geometry: Optional[Dict[str, Any]],
     look: Optional[List[float]],
+    payload: Optional[Dict[str, Any]] = None,
 ) -> Optional[int]:
     """Which feature under the pointer best finishes the measurement in hand.
 
@@ -1945,8 +1946,6 @@ def _best_matching_candidate(
     None when nothing is held, when there is no camera to project by, or when no
     candidate admits anything -- all of which leave the ordinary answer standing.
     """
-    from kumiki.drawing import projected_kinds
-
     if not held_geometry or not look or not feature_hits:
         return None
 
@@ -1955,7 +1954,7 @@ def _best_matching_candidate(
     for index, hit in enumerate(feature_hits):
         located = hit.feature.locate(hit.owner)
         geometry = _located_geometry_payload(located, timber)
-        if not geometry or not projected_kinds(held_geometry, geometry, look):
+        if not geometry or not _kinds_for_pair(held_geometry, geometry, look, payload or {}):
             continue
         # Earlier is more specific, so among equals the first wins.
         rank = (0 if geometry.get("kind") == held_kind else 1, index)
@@ -2068,7 +2067,11 @@ def _kinds_for_pick(
     geometry = _located_geometry_payload(located_pick[2], timber)
     if geometry is None:
         return []
-    return [kind.name for kind in _kinds_for_pair(held_geometry, geometry, look, payload)]
+    # Structured, not named. `angle` composes for a solid angle and is also
+    # what every measurement written before spaces called a projected one, so
+    # the bare name reached the viewer and was read as the projected kind --
+    # which then matched nothing the pair admitted, and drew nothing at all.
+    return [kind.as_wire() for kind in _kinds_for_pair(held_geometry, geometry, look, payload)]
 
 
 def _plane_for_pick(
@@ -5268,7 +5271,8 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     look = payload.get("look")
     candidate_index = payload.get("candidateIndex")
     if candidate_index is None:
-        candidate_index = _best_matching_candidate(feature_hits, timber, held_geometry, look)
+        candidate_index = _best_matching_candidate(
+            feature_hits, timber, held_geometry, look, payload)
     picked = None
     # `is not None`, because ZERO IS A CHOICE. Stepping round to the first
     # feature, or picking the first row of the menu, is the caller naming one --

@@ -1017,6 +1017,10 @@ class FrameViewSession {
             look: message.look || null,
             right: message.right || null,
             up: message.up || null,
+            // Which space to judge the pair in. Without it the runner projects,
+            // and in the 3D view -- where the camera is oblique and no face is
+            // ever seen exactly edge-on -- that makes every face unmeasurable.
+            space: message.space || null,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
@@ -1044,6 +1048,10 @@ class FrameViewSession {
             look: message.look || null,
             right: message.right || null,
             up: message.up || null,
+            // Which space to judge the pair in. Without it the runner projects,
+            // and in the 3D view -- where the camera is oblique and no face is
+            // ever seen exactly edge-on -- that makes every face unmeasurable.
+            space: message.space || null,
         });
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about
