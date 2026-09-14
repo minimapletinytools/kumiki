@@ -562,8 +562,20 @@ class MeasurementPlacement:
     measurement written before placement existed means.
     """
 
-    #: How far the dimension line sits from the features, in page units.
-    #: None asks the viewport for its own default.
+    #: How far the dimension line sits from the features, in WORLD units,
+    #: measured along the in-plane perpendicular to the run.
+    #:
+    #: World rather than page or screen, so that where somebody put a dimension
+    #: does not depend on how far they were zoomed in at the time, and so that
+    #: it means the same thing in a drawing viewport and in the 3D view. What
+    #: zoom changes is how big the drawing is, not where on it a dimension was
+    #: placed. Only the drawn SIZE of things -- line weights, text -- is in
+    #: pixels, so that it stays legible at any scale.
+    #:
+    #: None asks the viewport for its own default, which IS a pixel distance:
+    #: there is nothing in the world to derive one from, and an untouched
+    #: dimension sitting a readable distance away at any zoom is the better
+    #: default.
     offset: Optional[float] = None
 
     @classmethod

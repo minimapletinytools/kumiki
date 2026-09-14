@@ -3657,15 +3657,50 @@ class KigumiViewerApp extends LitElement {
      * The reader's, when they have moved it; otherwise the viewport's default.
      * A measurement's one degree of freedom once its two ends are fixed.
      */
-    _measurementOffset(measure, viewportId, measureKey) {
-        const dragging = this._draggingMeasurement;
-        if (dragging && dragging.viewportId === viewportId
-            && dragging.measureKey === measureKey) {
-            return dragging.offset;
-        }
+    _measurementOffset(measure) {
         const placement = measure && measure.placement;
         const offset = placement && placement.offset;
-        return typeof offset === 'number' ? offset : MEASUREMENT_OFFSET_PX;
+        return typeof offset === 'number' ? offset : null;
+    }
+
+    /**
+     * How many screen pixels one world unit is worth along this dimension.
+     *
+     * Read off the run rather than off the camera: the run is a length we know
+     * in the world and have just drawn on the page, so their ratio is the scale
+     * at exactly the place the dimension sits -- true under perspective as well,
+     * where a scale taken from the camera would not be.
+     */
+    _pixelsPerWorldUnit(from, to, ends) {
+        const world = Math.hypot(to[0] - from[0], to[1] - from[1], to[2] - from[2]);
+        const drawn = Math.hypot(ends.to.x - ends.from.x, ends.to.y - ends.from.y);
+        return world > 1e-9 ? drawn / world : null;
+    }
+
+    /**
+     * Where to draw a dimension line, in screen pixels.
+     *
+     * The stored offset is in WORLD units, so that a dimension stays where it
+     * was put as the view zooms -- what changes with zoom is how big the
+     * drawing is, not where on it somebody placed a dimension. Only the drawn
+     * SIZE of things is measured in pixels: line weights and text stay legible
+     * whatever the scale.
+     *
+     * No stored offset means the viewport's own default, which is a pixel
+     * distance -- there is nothing in the world it could be derived from, and
+     * an untouched dimension sitting a readable distance away at any zoom is
+     * the better default.
+     */
+    _offsetInPixels(measure, viewportId, measureKey, perWorld) {
+        const dragging = this._draggingMeasurement;
+        const inWorld = (dragging && dragging.viewportId === viewportId
+            && dragging.measureKey === measureKey)
+            ? dragging.offset
+            : this._measurementOffset(measure);
+        if (inWorld === null || !perWorld) {
+            return MEASUREMENT_OFFSET_PX;
+        }
+        return inWorld * perWorld;
     }
 
     /**
@@ -3722,11 +3757,14 @@ class KigumiViewerApp extends LitElement {
                 return;
             }
             moved = true;
-            const offset = KigumiMeasurements.offsetForPointer(
+            const inPixels = KigumiMeasurements.offsetForPointer(
                 run.from, run.to, pageOf(moveEvent));
-            if (offset === null) {
+            if (inPixels === null || !run.perWorld) {
                 return;
             }
+            // Stored in world units: where somebody put a dimension should not
+            // depend on how far they happened to be zoomed in at the time.
+            const offset = inPixels / run.perWorld;
             // Held here while the pointer is down, so the dimension follows
             // without a round trip for every pixel.
             this._draggingMeasurement = { viewportId, measureKey, offset };
@@ -6613,8 +6651,8 @@ class KigumiViewerApp extends LitElement {
             // the one degree of freedom a dimension has once its two ends are
             // fixed, and it was being ignored: a saved offset drew where the
             // default said, and dragging would have had nothing to change.
-            { offset: this._measurementOffset(
-                measure, viewport.id, measurementKey(measure)) },
+            { offset: this._offsetInPixels(
+                measure, viewport.id, measurementKey(measure), perWorld) },
         );
         if (!layout) {
             // Far enough apart in the world, but on top of each other once
@@ -6623,9 +6661,14 @@ class KigumiViewerApp extends LitElement {
         }
 
         const extra = options.className ? ` ${options.className}` : '';
+        // How many screen pixels a world unit is worth HERE -- taken from the
+        // run itself, which is a known world length and a known drawn length.
+        // An offset is stored in world units so that it stays where it was put
+        // as the view zooms; only what is drawn is measured in pixels.
+        const perWorld = this._pixelsPerWorldUnit(from, to, ends);
         // What a drag measures against. Kept from the drawing rather than
         // projected again, so what is dragged is exactly what is on screen.
-        into._dimensionRun = { from: ends.from, to: ends.to };
+        into._dimensionRun = { from: ends.from, to: ends.to, perWorld };
         const draw = (from_, to_, className) => {
             const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
             line.setAttribute('x1', from_.x);

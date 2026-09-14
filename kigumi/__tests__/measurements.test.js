@@ -660,3 +660,36 @@ describe('offsetForPointer', () => {
         expect(offsetForPointer(from, { x: 0, y: 0 }, { x: 5, y: 5 })).toBeNull();
     });
 });
+
+describe('an offset is stored in world units, not screen pixels', () => {
+    // Where somebody put a dimension should not depend on how far they were
+    // zoomed in at the time. What zoom changes is how big the drawing is; only
+    // the drawn SIZE of things -- line weights, text -- stays in pixels.
+    //
+    // The scale comes off the run itself: a length known in the world and just
+    // drawn on the page. These pin the arithmetic both ways round.
+    const perWorld = (worldSpan, drawnSpan) => drawnSpan / worldSpan;
+
+    test('the same drag at twice the zoom stores the same offset', () => {
+        const pointer = { x: 50, y: 30 };
+        const near = offsetForPointer({ x: 0, y: 0 }, { x: 100, y: 0 }, pointer);
+        const far = offsetForPointer({ x: 0, y: 0 }, { x: 200, y: 0 },
+                                     { x: 100, y: 60 });
+
+        // 100px drawn for a 1m run, then 200px for the same run.
+        expect(near / perWorld(1, 100)).toBeCloseTo(far / perWorld(1, 200), 9);
+    });
+
+    test('and is drawn twice as far out at twice the zoom', () => {
+        const stored = 0.3;
+
+        expect(stored * perWorld(1, 100)).toBeCloseTo(30, 9);
+        expect(stored * perWorld(1, 200)).toBeCloseTo(60, 9);
+    });
+
+    test('a run of no world length has no scale to speak of', () => {
+        // Two features on top of each other: nothing to divide by, and the
+        // caller falls back to the viewport's pixel default.
+        expect(Number.isFinite(perWorld(0, 100))).toBe(false);
+    });
+});
