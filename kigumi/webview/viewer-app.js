@@ -3383,6 +3383,14 @@ class KigumiViewerApp extends LitElement {
     /** A pick came back while a measurement is being made. Offers it to the draft. */
     _measurePicked(message) {
         const anchor = this._anchorFromPick(message);
+        // Empty, not null: the runner judged this pair and found no kind this
+        // view admits. The hover has already drawn it red and promised the
+        // click would refuse it, so refuse it -- taking it instead replaced a
+        // good second end with one that has no kind, and drew nothing at all.
+        if (Array.isArray(message.kinds) && message.kinds.length === 0) {
+            this.reportMeasureRefusal('no-kind');
+            return;
+        }
         const viewport = this._resolvePointer(this._lastClientX, this._lastClientY);
         const result = this.measureDraft.pick(
             anchor, viewport ? viewport.viewport.id : this.activeViewportId);
@@ -3952,6 +3960,8 @@ class KigumiViewerApp extends LitElement {
             'not-measurable': 'that one has no plane or line of its own, so there is '
                 + 'nothing to measure to',
             'nothing-pending': 'pick a second feature first',
+            'no-kind': 'those two cannot be measured against each other from '
+                + 'this view -- turn the camera, or pick a different feature',
         }[reason] || reason;
         this.emitViewerLog('measure-refused', { reason, said });
         if (typeof vscode !== 'undefined') {
@@ -4016,21 +4026,27 @@ class KigumiViewerApp extends LitElement {
 
     /** What the hover has to say about the measurement in hand, if any. */
     _heldForRequest() {
-        const draft = this.measureDraft;
-        if (draft.state !== window.KigumiMeasureDraft.STATES.HOLDING) {
+        // Whether an end is still held is the draft's to answer, not this
+        // method's: asking for HOLDING alone left every pick after the first
+        // pair judged as if nothing were held, so the runner returned no kinds,
+        // no pairwise anchors and no plane -- and a third pick drew nothing in
+        // the 3D view and drew the preview from each end's own position, only
+        // coming right on confirm.
+        const held = this.measureDraft.heldEnd;
+        if (!held) {
             return {};
         }
         const viewport = this.viewports.find((one) => one.id === this.activeViewportId)
             || this.viewports[0];
         const axes = viewport ? this.viewportAxes(viewport) : null;
         return {
-            heldGeometry: draft.held.geometry,
-            heldAt: draft.held.at,
+            heldGeometry: held.geometry,
+            heldAt: held.at,
             // The reference too, so the runner can resolve the held end the way
             // it resolves a written one and place both through the same rules.
             // Sending its geometry alone left it working the answer out a
             // second way, and the two drifted.
-            heldReference: draft.held.reference,
+            heldReference: held.reference,
             look: axes ? axes.look : null,
             right: axes ? axes.right : null,
             up: axes ? axes.up : null,

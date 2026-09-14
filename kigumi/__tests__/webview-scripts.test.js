@@ -153,3 +153,27 @@ describe('every argument a shared decision takes is actually passed', () => {
         },
     );
 });
+
+describe('the app asks the draft what is held, rather than deciding again', () => {
+    // _heldForRequest tells the runner which end a pick is being measured
+    // against. It decided that itself, as `state === HOLDING`, and so stopped
+    // answering the moment a second end was picked -- leaving every further
+    // pick judged as if nothing were held. The draft answers it now, and the
+    // answer is unit tested there.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const at = app.indexOf('_heldForRequest() {');
+    const body = app.slice(at, app.indexOf('\n    }', at));
+
+    test('there is a _heldForRequest to check', () => {
+        expect(at).toBeGreaterThan(-1);
+    });
+
+    test('it reads the held end off the draft', () => {
+        expect(body).toContain('heldEnd');
+    });
+
+    test('and does not re-decide which states still hold one', () => {
+        // PENDING holds a first end too. Naming one state here is the bug.
+        expect(body).not.toContain('STATES.HOLDING');
+    });
+});

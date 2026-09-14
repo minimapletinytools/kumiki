@@ -88,6 +88,70 @@ describe('making a measurement', () => {
     });
 });
 
+describe('the end that stays held', () => {
+    // A third pick replaces the second end and is measured against the first,
+    // so the first has to be on offer for as long as the draft is active. The
+    // app asks the runner to judge a pick against `heldEnd`; when that was
+    // decided in the app as "state is HOLDING", every pick after the first pair
+    // was judged as if nothing were held -- no kinds, no pairwise anchors, no
+    // plane -- so a third pick drew nothing in 3D and drew the preview from
+    // each end's own position in a drawing until confirm put it right.
+
+    test('nothing is held to begin with', () => {
+        expect(new MeasureDraft().heldEnd).toBeNull();
+    });
+
+    test('the first feature, once held', () => {
+        const draft = new MeasureDraft();
+        const first = anchor('front');
+        draft.hold(first);
+
+        expect(draft.heldEnd).toBe(first);
+    });
+
+    test('and STILL the first feature once a second is pending', () => {
+        const draft = new MeasureDraft();
+        const first = anchor('front');
+        draft.hold(first);
+        draft.pick(anchor('back'), 'v1');
+
+        expect(draft.state).toBe(STATES.PENDING);
+        expect(draft.heldEnd).toBe(first);
+    });
+
+    test('unchanged by a third pick, which replaces only the second end', () => {
+        const draft = new MeasureDraft();
+        const first = anchor('front');
+        draft.hold(first);
+        draft.pick(anchor('back'), 'v1');
+        const third = anchor('left');
+        const result = draft.pick(third, 'v1');
+
+        expect(result.action).toBe('replaced');
+        expect(draft.heldEnd).toBe(first);
+        expect(draft.other).toBe(third);
+    });
+
+    test('still held after escaping back off the second end', () => {
+        const draft = new MeasureDraft();
+        const first = anchor('front');
+        draft.hold(first);
+        draft.pick(anchor('back'), 'v1');
+        draft.escape();
+
+        expect(draft.heldEnd).toBe(first);
+    });
+
+    test('and nothing once the measurement is taken', () => {
+        const draft = new MeasureDraft();
+        draft.hold(anchor('front'));
+        draft.pick(anchor('back'), 'v1');
+        draft.confirm();
+
+        expect(draft.heldEnd).toBeNull();
+    });
+});
+
 describe('what is refused', () => {
     test('picking before anything is held', () => {
         expect(new MeasureDraft().pick(anchor('a'), 'front').reason).toBe('nothing-held');

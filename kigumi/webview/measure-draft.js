@@ -76,6 +76,20 @@
             return this.state !== IDLE;
         }
 
+        /**
+         * The first end, while there is one, for judging a further pick.
+         *
+         * Held through PENDING as well as HOLDING: a third pick REPLACES the
+         * second end and is measured against this one, so it has to be offered
+         * for as long as the draft is active. Offering it only while HOLDING is
+         * how every pick after the first pair came to be judged as if nothing
+         * were held -- the runner then had no pair to answer about, so it
+         * returned no kinds, no pairwise anchors and no plane.
+         */
+        get heldEnd() {
+            return this.isActive ? this.held : null;
+        }
+
         /** The measurement as it stands, or null while only one end is held. */
         get pending() {
             if (this.state !== PENDING) {
