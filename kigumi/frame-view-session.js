@@ -1008,7 +1008,10 @@ class FrameViewSession {
             candidateIndex: message.candidateIndex || 0,
             heldGeometry: message.heldGeometry || null,
             heldAt: message.heldAt || null,
+            heldReference: message.heldReference || null,
             look: message.look || null,
+            right: message.right || null,
+            up: message.up || null,
         };
         const result = await this.runnerSession.slotRequest('find_csg_at_point', this.slotName, payload);
         this._postToWebview({ type: 'csgSelectionResult', ...result });
@@ -1032,7 +1035,10 @@ class FrameViewSession {
             candidateIndex: message.candidateIndex || 0,
             heldGeometry: message.heldGeometry || null,
             heldAt: message.heldAt || null,
+            heldReference: message.heldReference || null,
             look: message.look || null,
+            right: message.right || null,
+            up: message.up || null,
         });
         // The request number goes out and comes back untouched, so the viewer
         // can tell an answer about where the pointer is now from one about

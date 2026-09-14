@@ -1964,6 +1964,59 @@ def _best_matching_candidate(
     return None if best is None else best[1]
 
 
+def _anchors_for_pick(
+    state: Any, located_pick: Any, timber: Any, payload: Dict[str, Any], slot_state: Any,
+) -> Optional[Dict[str, List[float]]]:
+    """Where a measurement to this pick would attach, at both ends.
+
+    None unless something is held. The held end is resolved from its REFERENCE
+    rather than sent along as geometry, so this goes through exactly the code a
+    written measurement goes through -- the alternative is a second way of
+    working out the same answer, and the two drifted: a half-made measurement
+    was drawn at each feature's own middle while the finished one went to the
+    middle of their overlap.
+    """
+    from kumiki.drawing import MeasurementKind, distance_anchors, projected_kinds
+
+    held = payload.get("heldReference")
+    look = payload.get("look")
+    if not held or not look or located_pick is None:
+        return None
+    ss = slot_state if slot_state is not None else state._active
+    frame = getattr(ss, "frame", None)
+    if frame is None:
+        return None
+
+    plane = _plane_for_pick(located_pick, timber, payload)
+    normal = (plane or {}).get("normal") or look
+    placed = _resolve_anchor_placed(frame, held, normal)
+    if placed is None or placed[1] is None:
+        return None
+    held_span = placed[1]
+
+    picked_span = _measure_span(
+        located_pick[0], located_pick[1], timber, located_pick[2],
+        _root_csg_of(ss, payload.get("memberKey")), normal)
+    if picked_span is None:
+        return None
+
+    geometry = _located_geometry_payload(located_pick[2], timber)
+    admitted = projected_kinds(placed[0].get("geometry"), geometry, normal)
+    if not admitted:
+        return None
+    kind = admitted[0]
+    if kind.operation.value != "distance":
+        return None
+    axes = {"look": look, "right": payload.get("right"), "up": payload.get("up")}
+    at_held, at_picked = distance_anchors(held_span, picked_span, kind, axes)
+    return {"a": list(at_held), "b": list(at_picked)}
+
+
+def _root_csg_of(ss: Any, member_key: Optional[str]):
+    cached = (getattr(ss, "mesh_cache", None) or {}).get(member_key) or {}
+    return cached.get("local_csg")
+
+
 def _kinds_for_pick(
     located_pick: Any, timber: Any, payload: Dict[str, Any],
 ) -> Optional[List[str]]:
@@ -5297,6 +5350,10 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         # Derived here rather than in the viewer so there is one copy of the
         # rule, and it costs no round trip: this request was already being made.
         "plane": _plane_for_pick(located_pick, timber, payload),
+        # Where the two ends would attach if this pick became a measurement.
+        # Through the same rules that place a written one, so what is drawn
+        # while deciding is where it lands once decided.
+        "anchors": _anchors_for_pick(state, located_pick, timber, payload, slot_state),
         # And which kinds the pair admits from here, best first. Empty means the
         # click will refuse, which is what the hover paints red -- one answer for
         # the colour and the refusal, so a feature drawn red cannot be one the

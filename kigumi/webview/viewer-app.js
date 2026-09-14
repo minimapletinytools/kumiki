@@ -3371,6 +3371,10 @@ class KigumiViewerApp extends LitElement {
             geometry: message.geometry || null,
             at: message.at || null,
             plane: message.plane || null,
+            // Where the pair would attach, when something was held. The runner
+            // works it out with the rules that place a written measurement, so
+            // the preview sits where the result will.
+            anchors: message.anchors || null,
             highlight: {
                 highlightMesh: message.highlightMesh,
                 highlightEdgeSegments: message.highlightEdgeSegments,
@@ -3717,12 +3721,16 @@ class KigumiViewerApp extends LitElement {
         if (draft.state !== window.KigumiMeasureDraft.STATES.PENDING) {
             return null;
         }
-        const end = (anchor) => ({
-            ...anchor.reference, at: anchor.at, geometry: anchor.geometry,
+        // The pair's anchors when the runner placed them, and each end's own
+        // otherwise -- which is what a pair admitting no distance leaves, an
+        // angle being placed by nothing yet.
+        const placed = draft.other.anchors;
+        const end = (anchor, at) => ({
+            ...anchor.reference, at: at || anchor.at, geometry: anchor.geometry,
         });
         return {
-            a: end(draft.held),
-            b: end(draft.other),
+            a: end(draft.held, placed && placed.a),
+            b: end(draft.other, placed && placed.b),
             plane: draft.plane || null,
             kind: (this._pendingKinds && this._pendingKinds[0]) || null,
         };
@@ -3960,10 +3968,18 @@ class KigumiViewerApp extends LitElement {
         }
         const viewport = this.viewports.find((one) => one.id === this.activeViewportId)
             || this.viewports[0];
+        const axes = viewport ? this.viewportAxes(viewport) : null;
         return {
             heldGeometry: draft.held.geometry,
             heldAt: draft.held.at,
-            look: viewport ? this.viewportAxes(viewport).look : null,
+            // The reference too, so the runner can resolve the held end the way
+            // it resolves a written one and place both through the same rules.
+            // Sending its geometry alone left it working the answer out a
+            // second way, and the two drifted.
+            heldReference: draft.held.reference,
+            look: axes ? axes.look : null,
+            right: axes ? axes.right : null,
+            up: axes ? axes.up : null,
         };
     }
 
@@ -6623,10 +6639,11 @@ class KigumiViewerApp extends LitElement {
             return;
         }
 
-        // Square across what is being measured, not straight between the two
-        // anchors. The value has the along-the-line part taken out, so drawing
-        // it in would put a slanted line, longer than its own label, beside a
-        // number that is neither its length nor its direction.
+        // A backstop, not the mechanism. Both a written measurement and a
+        // half-made one now get their ends from the runner, placed square by
+        // the same rules, so this slides them by zero -- it earns its place
+        // only when a pair arrives unplaced, which is a pair the runner could
+        // not resolve.
         //
         // Only for the perpendicular kind. A horizontal or vertical distance is
         // the separation along an axis OF THE SHEET, and squaring its ends to

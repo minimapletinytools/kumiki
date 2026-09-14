@@ -582,3 +582,50 @@ class TestAFeatureKnowsItsOwnEnds:
             name="a", faces=(PrismFace.RIGHT, PrismFace.FRONT))
 
         assert runner._declared_line_span(arris, endless, arris.locate(endless)) is None
+
+
+class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
+    """A preview that sits somewhere else is a preview of nothing.
+
+    Both go through distance_anchors now. Before, a pick carried each feature's
+    own anchor and the preview was drawn between those, while the written
+    measurement was placed at the middle of their overlap -- so confirming moved
+    the dimension, sometimes the length of the timber.
+    """
+
+    def test_the_held_end_is_resolved_from_its_reference(self):
+        # Not from geometry sent along with the request: resolving it the way a
+        # written measurement resolves it is what makes the two agree, rather
+        # than being a second way of working out the same answer.
+        import importlib.util
+        import inspect
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_preview", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_preview"] = runner
+        spec.loader.exec_module(runner)
+
+        source = inspect.getsource(runner._anchors_for_pick)
+
+        assert "_resolve_anchor_placed" in source
+        assert "distance_anchors" in source
+
+    def test_a_pick_with_nothing_held_places_nothing(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_preview2", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_preview2"] = runner
+        spec.loader.exec_module(runner)
+
+        assert runner._anchors_for_pick(None, None, None, {}, None) is None
+        assert runner._anchors_for_pick(
+            None, None, None, {"heldReference": {"timber": "t"}}, None) is None
