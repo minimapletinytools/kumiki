@@ -739,3 +739,34 @@ describe('which refusals are damage and which are just this view', () => {
         expect(BROKEN_REASONS).toContain(mismatched.reason);
     });
 });
+
+describe('a derived edge is identified by the faces that form it', () => {
+    // Without them every derived edge on one timber shares a key, so focusing
+    // one focuses both and an edit or a delete lands on whichever was found
+    // first -- silently, on the wrong dimension.
+    const edge = (path) => ({
+        kind: 'edge', timber: 'T', type: 'EDGE',
+        a: { csgPath: [path], feature: 'x' }, b: { csgPath: [], feature: 'y' },
+    });
+    const face = { timber: 'U', csgPath: ['z'], feature: 'top', type: 'FACE' };
+
+    test('two different edges to the same face are two measurements', () => {
+        expect(measurementKey({ a: edge('cutA'), b: face }))
+            .not.toBe(measurementKey({ a: edge('cutB'), b: face }));
+    });
+
+    test('and one edge written either way round is still one measurement', () => {
+        const forwards = { kind: 'edge', timber: 'T', type: 'EDGE',
+            a: { csgPath: ['cut'], feature: 'x' }, b: { csgPath: [], feature: 'y' } };
+        const backwards = { kind: 'edge', timber: 'T', type: 'EDGE',
+            a: { csgPath: [], feature: 'y' }, b: { csgPath: ['cut'], feature: 'x' } };
+
+        expect(measurementKey({ a: forwards, b: face }))
+            .toBe(measurementKey({ a: backwards, b: face }));
+    });
+
+    test('an edge and a face are never the same anchor', () => {
+        expect(measurementKey({ a: edge('cut'), b: face }))
+            .not.toBe(measurementKey({ a: face, b: face }));
+    });
+});

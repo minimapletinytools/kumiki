@@ -641,6 +641,15 @@ const EXPORT_FORMAT_PROP = {
  * no area to shade and the mesh renders as nothing, while its boundary is still
  * there to draw.
  */
+/** Whether a key event belongs to something the reader is typing in. */
+function _isTypingTarget(target) {
+    if (!target || !target.tagName) {
+        return false;
+    }
+    return ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(target.tagName) !== -1
+        || target.isContentEditable === true;
+}
+
 function _meshEdgePositions(vertices, indices) {
     const out = [];
     const at = (index) => [vertices[index * 3], vertices[index * 3 + 1], vertices[index * 3 + 2]];
@@ -3016,13 +3025,11 @@ class KigumiViewerApp extends LitElement {
     }
 
     onWindowKeyDown(event) {
-        if (event.defaultPrevented) {
-            return;
-        }
-        // Tab is checked before the defaultPrevented guard: it is the focus key,
+        // Tab is checked BEFORE the defaultPrevented guard: it is the focus key,
         // so something else may well have claimed it, and this only acts while
         // the pointer is over a feature -- which is not a moment anyone is
-        // tabbing between controls.
+        // tabbing between controls. The comment said this while the code did
+        // the opposite, which disabled cycling wherever anything took Tab.
         if (event.key === 'Tab' && this._hover && this._hover.feature) {
             // A face seen edge-on is never the best answer where it lies -- the
             // edge formed with it wins, being the more specific one -- so
@@ -3030,7 +3037,8 @@ class KigumiViewerApp extends LitElement {
             // the face you most often want to measure to.
             event.preventDefault();
             const count = Math.max(1, this._hover.feature.candidateCount || 1);
-            this._candidateIndex = ((this._candidateIndex || 0) + 1) % count;
+            this._candidateIndex = ((this._candidateIndex === undefined
+                ? -1 : this._candidateIndex) + 1) % count;
             this.emitViewerLog('measure-cycle', {
                 index: this._candidateIndex, of: count,
                 from: this._hover.feature.featureLabel,
@@ -3038,6 +3046,15 @@ class KigumiViewerApp extends LitElement {
             // The place did not change, the question did: ask the same point
             // again so the hover shows what the next click would now take.
             this._hover.askAgain();
+            return;
+        }
+        if (event.defaultPrevented) {
+            return;
+        }
+        // Nothing below belongs to whatever has the caret. Delete in a search
+        // box deletes text, and ctrl-Z there undoes typing -- taking those
+        // would be the viewer reaching into a control it does not own.
+        if (_isTypingTarget(event.target)) {
             return;
         }
         // Undo and redo act on the drawing in front of you, which is what they
@@ -3215,9 +3232,10 @@ class KigumiViewerApp extends LitElement {
         if (this._hover.at === null
             || Math.abs(event.clientX - this._hover.at.x)
                + Math.abs(event.clientY - this._hover.at.y) > 0) {
-            // Cycling is about one place. Move somewhere else and it starts
-            // again at the best answer there.
-            this._candidateIndex = 0;
+            // Cycling is about one place. Move somewhere else and the runner
+            // chooses again -- undefined rather than zero, which would pin it
+            // to the first feature there.
+            this._candidateIndex = undefined;
         }
         // Which viewport a pick lands in is decided from here, since the answer
         // arrives long after the click that asked.
@@ -3274,7 +3292,10 @@ class KigumiViewerApp extends LitElement {
             currentPath,
             ctrlClick: false,
             request: due.request,
-            candidateIndex: this._candidateIndex || 0,
+            // Null, not zero: zero means "the first one", and the runner needs
+            // to tell that from "choose for me".
+            candidateIndex: this._candidateIndex === undefined
+                ? null : this._candidateIndex,
             // The same tolerances a click would use, or hover lights something
             // a click then refuses to select -- and through the camera the ray
             // actually went through, which on a sheet need not be the active
@@ -3482,17 +3503,23 @@ class KigumiViewerApp extends LitElement {
             }
             wanted = focus;
         }
+        // A drawing's measurements hang off its viewports; the 3D view's live
+        // in a reserved drawing of their own and are on no viewport the scene
+        // knows about. Looking only at the scene's viewports found none of
+        // them, which quietly took the kind dropdown, the drag and delete with
+        // it -- all three ask this first.
         const viewport = this.viewports.find((one) => one.id === wanted.viewportId);
-        if (!viewport) {
-            return null;
-        }
-        const measure = (viewport.spec.measurements || []).find(
-            (one) => measurementKey(one) === wanted.measureKey);
+        const measure = (viewport ? (viewport.spec.measurements || []) : [])
+            .concat(this._threeDMeasurements())
+            .find((one) => measurementKey(one) === wanted.measureKey);
         if (!measure) {
             return null;
         }
+        // A 3D measurement is on no viewport, and carries its own plane, so
+        // there is nothing for the plane to be checked against.
+        const axes = viewport ? this.viewportAxes(viewport) : { look: [0, 0, -1] };
         const status = KigumiMeasurements.measurementStatus(
-            measure, this.viewportAxes(viewport), this.viewportProjection(viewport));
+            measure, axes, this.viewportProjection(viewport));
         return {
             viewportId: wanted.viewportId,
             measureKey: wanted.measureKey,
@@ -3522,9 +3549,7 @@ class KigumiViewerApp extends LitElement {
         if (!found) {
             return;
         }
-        const drawingId = this.sceneStore.activeSceneId === DEFAULT_SCENE_ID
-            ? THREE_D_MEASUREMENTS_ID
-            : this.sceneStore.activeSceneId;
+        const drawingId = this.measurementDrawingId;
         const was = found.measure.kind || null;
         const where = {
             drawingId,
@@ -3556,7 +3581,7 @@ class KigumiViewerApp extends LitElement {
         if (this.measureDraft.isActive) {
             return false;
         }
-        const drawingId = this.sceneStore.activeSceneId;
+        const drawingId = this.measurementDrawingId;
         const removable = this.selectionManager.getMarkedMeasurements()
             .map((mark) => this.focusedMeasurement(mark.viewportId, mark.measureKey))
             .filter((found) => found && found.measure.origin === MEASUREMENT_FILE_ORIGIN);
@@ -3604,7 +3629,7 @@ class KigumiViewerApp extends LitElement {
      * sending the other one.
      */
     undoMeasurementChange() {
-        const drawingId = this.sceneStore.activeSceneId;
+        const drawingId = this.measurementDrawingId;
         const entry = this.undoStacks.undo(this.frameKey, drawingId);
         if (!entry) {
             return false;
@@ -3615,7 +3640,7 @@ class KigumiViewerApp extends LitElement {
     }
 
     redoMeasurementChange() {
-        const drawingId = this.sceneStore.activeSceneId;
+        const drawingId = this.measurementDrawingId;
         const entry = this.undoStacks.redo(this.frameKey, drawingId);
         if (!entry) {
             return false;
@@ -3807,9 +3832,7 @@ class KigumiViewerApp extends LitElement {
         if (!found) {
             return;
         }
-        const drawingId = this.sceneStore.activeSceneId === DEFAULT_SCENE_ID
-            ? THREE_D_MEASUREMENTS_ID
-            : this.sceneStore.activeSceneId;
+        const drawingId = this.measurementDrawingId;
         const where = {
             drawingId,
             viewportId,
@@ -3851,6 +3874,14 @@ class KigumiViewerApp extends LitElement {
         this.renderMeasurements();
     }
 
+    /** The measurements held against the model rather than against a drawing. */
+    _threeDMeasurements() {
+        const drawing = this.sceneStore.drawings()
+            .find((one) => one.id === THREE_D_MEASUREMENTS_ID);
+        return (drawing ? drawing.viewports || [] : [])
+            .flatMap((pane) => pane.measurements || []);
+    }
+
     /** Show or hide every 3D measurement at once. */
     setMeasurementsHidden(hidden) {
         const next = Boolean(hidden);
@@ -3862,7 +3893,15 @@ class KigumiViewerApp extends LitElement {
         this.requestUpdate();
     }
 
-    /** Which drawing a measurement made now belongs to. */
+    /**
+     * Which drawing a measurement here belongs to.
+     *
+     * NOT the active scene: the 3D view's measurements live in a reserved
+     * drawing of their own, so asking the scene gives 'default-3d', which holds
+     * none of them. Every reader and writer goes through this -- three of them
+     * did not, and in the 3D view undo silently did nothing, delete was refused
+     * by the runner, and entries landed on a stack nobody read.
+     */
     get measurementDrawingId() {
         return this.isInDrawing ? this.sceneStore.activeSceneId : THREE_D_MEASUREMENTS_ID;
     }
@@ -4099,7 +4138,8 @@ class KigumiViewerApp extends LitElement {
                     ctrlClick: !!event.ctrlKey || !!event.metaKey,
                     tolerances: this._pickTolerances(point, pickCamera),
                     // Whatever the hover is showing is what the click takes.
-                    candidateIndex: this._candidateIndex || 0,
+                    candidateIndex: this._candidateIndex === undefined
+                        ? null : this._candidateIndex,
                     // The same question the hover asked, so the click resolves
                     // to the feature the hover lit rather than to a different
                     // one -- and so the pick comes back with the plane.
@@ -6496,7 +6536,8 @@ class KigumiViewerApp extends LitElement {
                 || this.viewports[0];
             if (viewport) {
                 this._drawMeasurement(
-                    overlay, viewport, pageRect, pending, { className: 'dim-pending' });
+                    overlay, viewport, pageRect, pending,
+                    { className: 'dim-pending', pending: true });
             }
         }
     }
@@ -6576,7 +6617,16 @@ class KigumiViewerApp extends LitElement {
      * are a direction and this is a fact about the camera.
      */
     viewportProjection(viewport) {
-        return { orthographic: Boolean(viewport && viewport.isOrthographic) };
+        // A viewport with no DECLARED camera projects onto no particular plane,
+        // whatever its projection toggle says: the 3D view's angle is wherever
+        // the reader last left it. Checking a measurement's plane against the
+        // fallback look turned every 3D measurement red the moment the view was
+        // switched to orthographic. See docs/measurement-spec.md, which says
+        // the invariant does not apply there.
+        const declared = Boolean(viewport && viewport.spec && viewport.spec.camera);
+        return {
+            orthographic: declared && Boolean(viewport.isOrthographic),
+        };
     }
 
     viewportAxes(viewport) {

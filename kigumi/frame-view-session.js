@@ -371,6 +371,11 @@ class FrameViewSession {
                     measureId: message.measureId || null,
                     kind: message.kind || null,
                     plane: message.plane || null,
+                    // Where it sat. Undoing a delete has to put the dimension
+                    // back where it was, not at the default -- losing a drag to
+                    // an undo is the quiet edit this path avoids everywhere
+                    // else.
+                    placement: message.placement || null,
                     changes: message.changes || null,
                 }, { enter: false }).catch((err) => {
                     this.log(`[measure] ${err.message || err}`);

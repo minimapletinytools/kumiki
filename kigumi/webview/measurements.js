@@ -540,10 +540,25 @@
      * measurement, and the anchors are already canonically ordered.
      */
     function measurementKey(measure) {
-        const name = (anchor) => (anchor
-            ? [anchor.timber, (anchor.csgPath || []).join('/'), anchor.feature, anchor.type]
-                .join('|')
-            : '');
+        const name = (anchor) => {
+            if (!anchor) {
+                return '';
+            }
+            if (anchor.kind === 'edge') {
+                // A derived edge has no csgPath or feature of its own -- it is
+                // named by the two faces that form it, sorted, the same way
+                // DerivedFeaturePath sorts them. Leaving them out gave every
+                // derived edge on a timber the same key, so editing one edited
+                // whichever happened to be found first.
+                const parents = [anchor.a, anchor.b]
+                    .map((part) => `${((part || {}).csgPath || []).join('/')}/${(part || {}).feature || ''}`)
+                    .sort()
+                    .join('&');
+                return [anchor.timber, 'edge', parents, anchor.type].join('|');
+            }
+            return [anchor.timber, (anchor.csgPath || []).join('/'), anchor.feature, anchor.type]
+                .join('|');
+        };
         return [name(measure.a), name(measure.b)].sort().join('::')
             + '::' + (measure.measureId || '');
     }

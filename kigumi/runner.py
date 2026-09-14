@@ -5232,7 +5232,11 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     if candidate_index is None:
         candidate_index = _best_matching_candidate(feature_hits, timber, held_geometry, look)
     picked = None
-    if candidate_index and feature_hits:
+    # `is not None`, because ZERO IS A CHOICE. Stepping round to the first
+    # feature, or picking the first row of the menu, is the caller naming one --
+    # and treating it as "nothing named" dropped it back to the most specific
+    # answer, which is the very thing cycling exists to get away from.
+    if candidate_index is not None and feature_hits:
         chosen = feature_hits[int(candidate_index) % len(feature_hits)]
         picked = _pick_from_candidate(local_csg, chosen)
         if picked is not None:
@@ -5736,6 +5740,7 @@ def handle_request(state: RunnerState, request: Dict[str, Any]) -> tuple[RunnerS
                 "kind": payload.get("kind"),
                 "measureId": payload.get("measureId"),
                 "plane": payload.get("plane"),
+                "placement": payload.get("placement"),
             },
         )
         return state, make_success_response(request_id, command, {
