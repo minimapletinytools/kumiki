@@ -6644,6 +6644,15 @@ class KigumiViewerApp extends LitElement {
                 from: this._projectToPage(from, viewport, pageRect),
                 to: this._projectToPage(to, viewport, pageRect),
             };
+        // How many screen pixels a world unit is worth HERE -- taken from the
+        // run itself, which is a known world length and a known drawn length.
+        // An offset is stored in world units so that it stays where it was put
+        // as the view zooms; only what is drawn is measured in pixels.
+        //
+        // Worked out before it is used, which is the whole of what went wrong:
+        // it was declared further down, beside the drag that also wants it, and
+        // a const is not reachable before its declaration.
+        const perWorld = this._pixelsPerWorldUnit(from, to, ends);
         const layout = KigumiMeasurements.dimensionLayout(
             ends.from,
             ends.to,
@@ -6661,11 +6670,6 @@ class KigumiViewerApp extends LitElement {
         }
 
         const extra = options.className ? ` ${options.className}` : '';
-        // How many screen pixels a world unit is worth HERE -- taken from the
-        // run itself, which is a known world length and a known drawn length.
-        // An offset is stored in world units so that it stays where it was put
-        // as the view zooms; only what is drawn is measured in pixels.
-        const perWorld = this._pixelsPerWorldUnit(from, to, ends);
         // What a drag measures against. Kept from the drawing rather than
         // projected again, so what is dragged is exactly what is on screen.
         into._dimensionRun = { from: ends.from, to: ends.to, perWorld };
