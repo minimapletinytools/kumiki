@@ -6908,8 +6908,78 @@ class KigumiViewerApp extends LitElement {
      * is: the same two faces read as nothing at all anywhere else on the sheet.
      */
     _drawAngle(into, viewport, pageRect, from, to, formA, formB, value, options = {}) {
-        // The screen direction of each projected line, taken by stepping a
-        // little along it and seeing where that lands.
+        const rays = options.rays || null;
+        const drawn = rays
+            ? this._angleArcInItsOwnPlane(viewport, pageRect, rays)
+            : this._angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB);
+        if (!drawn) {
+            return;
+        }
+
+        const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        arc.setAttribute('d', drawn.path);
+        arc.setAttribute('class', `dim-line${options.className ? ` ${options.className}` : ''}`);
+        arc.setAttribute('fill', 'none');
+        into.appendChild(arc);
+
+        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+        text.setAttribute('x', drawn.label.x);
+        text.setAttribute('y', drawn.label.y);
+        text.setAttribute('class', `dim-label${options.className ? ` ${options.className}` : ''}`);
+        text.textContent = `${value.value.toFixed(1)}\u00b0`;
+        into.appendChild(text);
+    }
+
+    /**
+     * The arc swept in the angle's own plane, then projected.
+     *
+     * A drafted angle lies on the work: the arc turns in the plane the two
+     * features make a corner in, so it foreshortens with the timber and reads
+     * as the angle beside it. Drawn flat on the screen instead it showed the
+     * PROJECTED angle, which agrees with its own number only from the one
+     * direction -- from anywhere else a right angle reads as twenty degrees and
+     * the arc floats free of the work.
+     */
+    _angleArcInItsOwnPlane(viewport, pageRect, rays) {
+        const at = this._projectToPage(rays.vertex, viewport, pageRect);
+        // A radius in world units that comes out near the pixels a dimension
+        // wants, so the arc is legible at any zoom without being drawn flat.
+        const unit = this._projectToPage([
+            rays.vertex[0] + rays.from[0],
+            rays.vertex[1] + rays.from[1],
+            rays.vertex[2] + rays.from[2],
+        ], viewport, pageRect);
+        const perWorld = Math.hypot(unit.x - at.x, unit.y - at.y);
+        if (!(perWorld > 1e-9)) {
+            // Looking straight down the ray: it has no length on screen, so
+            // there is no scale to take and nothing worth drawing.
+            return null;
+        }
+        const radius = MEASUREMENT_ANGLE_RADIUS_PX / perWorld;
+        const points = KigumiMeasurements.angleArcPoints(rays, radius)
+            .map((point) => this._projectToPage(point, viewport, pageRect));
+        if (points.length < 2) {
+            return null;
+        }
+        const path = points
+            .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`)
+            .join(' ');
+        return {
+            path,
+            label: this._projectToPage(
+                KigumiMeasurements.angleLabelPoint(rays, radius), viewport, pageRect),
+        };
+    }
+
+    /**
+     * The older arc, for a measurement carrying no corner.
+     *
+     * Two features' own anchors and their own directions, with the vertex where
+     * those two screen lines cross. Kept for anything the runner could not
+     * place -- it is better than drawing nothing, and it is what every angle
+     * used to get.
+     */
+    _angleArcOnTheScreen(viewport, pageRect, from, to, formA, formB) {
         const screenDirection = (point, direction) => {
             const here = this._projectToPage(point, viewport, pageRect);
             const step = 0.01;
@@ -6922,54 +6992,27 @@ class KigumiViewerApp extends LitElement {
             const size = Math.hypot(run.x, run.y);
             return size > 0 ? { x: run.x / size, y: run.y / size } : null;
         };
-
-        // The corner the runner placed, when it placed one: a vertex on the
-        // line the two features share, and the two ways it opens, already on
-        // the side the material is. Drawing from each feature's own anchor and
-        // its own direction instead put the vertex wherever two unrelated
-        // screen lines happened to cross, which was often off both features --
-        // and for two faces those "directions" were their NORMALS.
-        const rays = options.rays || null;
-        const at = rays ? rays.vertex : null;
-        const fromDirection = rays
-            ? screenDirection(at, rays.from) : screenDirection(from, formA.direction);
-        const toDirection = rays
-            ? screenDirection(at, rays.to) : screenDirection(to, formB.direction);
+        const fromDirection = screenDirection(from, formA.direction);
+        const toDirection = screenDirection(to, formB.direction);
         if (!fromDirection || !toDirection) {
-            return;
+            return null;
         }
-        // Both rays leave the SAME point when there is a corner, so the layout
-        // has no two lines to intersect and takes the vertex as given.
-        const fromPoint = this._projectToPage(rays ? at : from, viewport, pageRect);
-        const toPoint = rays
-            ? {
-                x: fromPoint.x + toDirection.x * MEASUREMENT_ANGLE_RADIUS_PX,
-                y: fromPoint.y + toDirection.y * MEASUREMENT_ANGLE_RADIUS_PX,
-            }
-            : this._projectToPage(to, viewport, pageRect);
         const layout = KigumiMeasurements.angleLayout(
-            fromPoint, fromDirection, toPoint, toDirection,
+            this._projectToPage(from, viewport, pageRect), fromDirection,
+            this._projectToPage(to, viewport, pageRect), toDirection,
             { radius: MEASUREMENT_ANGLE_RADIUS_PX },
         );
         if (!layout) {
-            return;
+            return null;
         }
-
-        const arc = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        arc.setAttribute('d', [
-            'M', layout.start.x, layout.start.y,
-            'A', layout.radius, layout.radius, 0, layout.largeArc, layout.sweepFlag,
-            layout.end.x, layout.end.y,
-        ].join(' '));
-        arc.setAttribute('class', `dim-line${options.className ? ` ${options.className}` : ''}`);
-        into.appendChild(arc);
-
-        const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-        text.setAttribute('x', layout.label.x);
-        text.setAttribute('y', layout.label.y);
-        text.setAttribute('class', `dim-label${options.className ? ` ${options.className}` : ''}`);
-        text.textContent = `${value.value.toFixed(1)}\u00b0`;
-        into.appendChild(text);
+        return {
+            path: [
+                'M', layout.start.x, layout.start.y,
+                'A', layout.radius, layout.radius, 0, layout.largeArc, layout.sweepFlag,
+                layout.end.x, layout.end.y,
+            ].join(' '),
+            label: layout.label,
+        };
     }
 
     /** The members this scene is about, or null when it is about all of them. */

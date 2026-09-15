@@ -478,8 +478,9 @@ def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = N
 def angle_rays(first: MeasureSpan, second: MeasureSpan):
     """Where an angle between two features is, and which two ways it opens.
 
-    A vertex and two unit rays from it, in world space, as
-    `{"vertex", "from", "to"}` -- or None when the pair makes no corner.
+    A vertex, two unit rays from it, and the plane they span, in world space,
+    as `{"vertex", "from", "to", "normal"}` -- or None when the pair makes no
+    corner.
 
     Worked out here rather than in the viewer for the same reason the anchors of
     a distance are: an angle drawn from one derivation and labelled from another
@@ -525,7 +526,20 @@ def angle_rays(first: MeasureSpan, second: MeasureSpan):
         return None
     if rays[0] is None or rays[1] is None:
         return None
-    return {"vertex": list(vertex), "from": list(rays[0]), "to": list(rays[1])}
+    # The plane the angle is IN: the one both rays lie in, which for two faces
+    # is the plane they are each perpendicular to -- its normal is the corner
+    # they share. Carried so the arc can be swept in it rather than drawn flat
+    # on the screen, where it shows the projected angle and agrees with the
+    # number it labels only from the one direction.
+    upright = _cross(rays[0], rays[1])
+    if not any(abs(part) > 1e-9 for part in upright):
+        return None
+    return {
+        "vertex": list(vertex),
+        "from": list(rays[0]),
+        "to": list(rays[1]),
+        "normal": list(_unit(upright)),
+    }
 
 
 def _closest_between(first: MeasureSpan, second: MeasureSpan):

@@ -106,6 +106,12 @@
     /** The kinds the solid admits, by their composed names. */
     const SOLID_KIND_NAMES = Object.freeze(['angle', 'perpendicular_distance']);
 
+    /** How many segments an arc is drawn with. Enough to read as a curve. */
+    const ANGLE_ARC_SAMPLES = 24;
+
+    /** How far past the arc the label sits, as a multiple of the radius. */
+    const ANGLE_LABEL_REACH = 1.28;
+
     const LEGACY_KINDS = Object.freeze({
         aligned: 'projected_perpendicular_distance',
         perpendicular: 'projected_perpendicular_distance',
@@ -455,6 +461,54 @@
      * sheet -- which the rules should already have refused, but a dimension
      * drawn from a crossing at infinity would be worse than none.
      */
+    /**
+     * Points along an angle's arc, in world space, swept in the angle's OWN plane.
+     *
+     * A drafted angle lies on the work. Drawn instead as a flat arc between two
+     * projected directions it shows the PROJECTED angle, which agrees with the
+     * number beside it only when the camera happens to look down the plane --
+     * from anywhere else a right angle reads as twenty degrees and the arc
+     * floats free of the timber.
+     *
+     * `radius` is in world units, so the arc foreshortens with everything else.
+     */
+    function angleArcPoints(rays, radius, samples) {
+        const from = normalized(rays.from);
+        const upright = normalized(rays.normal || cross(rays.from, rays.to));
+        // In the plane, square to `from`, turning toward `to`.
+        const across = cross(upright, from);
+        const facing = Math.max(-1, Math.min(1, dot(from, normalized(rays.to))));
+        const sweep = Math.acos(facing);
+        const count = Math.max(2, samples || ANGLE_ARC_SAMPLES);
+        const points = [];
+        for (let step = 0; step <= count; step += 1) {
+            const turn = sweep * (step / count);
+            const along = Math.cos(turn);
+            const over = Math.sin(turn);
+            points.push([
+                rays.vertex[0] + (from[0] * along + across[0] * over) * radius,
+                rays.vertex[1] + (from[1] * along + across[1] * over) * radius,
+                rays.vertex[2] + (from[2] * along + across[2] * over) * radius,
+            ]);
+        }
+        return points;
+    }
+
+    /** Where an angle's label sits: past the middle of its arc, in the plane. */
+    function angleLabelPoint(rays, radius) {
+        const middle = angleArcPoints(rays, radius, 2)[1];
+        const out = subtract(middle, rays.vertex);
+        const size = length(out);
+        if (size < 1e-9) {
+            return middle;
+        }
+        return [
+            rays.vertex[0] + (out[0] / size) * radius * ANGLE_LABEL_REACH,
+            rays.vertex[1] + (out[1] / size) * radius * ANGLE_LABEL_REACH,
+            rays.vertex[2] + (out[2] / size) * radius * ANGLE_LABEL_REACH,
+        ];
+    }
+
     function angleLayout(fromPoint, fromDirection, toPoint, toDirection, options) {
         const settings = options || {};
         const radius = settings.radius === undefined ? 34 : settings.radius;
@@ -809,6 +863,8 @@
         measureValue,
         dimensionLayout,
         angleLayout,
+        angleArcPoints,
+        angleLabelPoint,
         DEGENERATE_PIXELS,
         DEGENERATE_WORLD,
         ALIGNMENT_EPSILON,

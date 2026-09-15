@@ -112,9 +112,13 @@ the second was wrong.
 - **A written measurement carries its own plane**, fixed at creation. In the 3D
   view that plane comes partly from where the camera was; the value must not
   drift when the reader orbits afterwards.
-- **An angle is a corner, placed where the corner is.** The runner works out a
-  vertex on the line the two features share and two rays from it, and the viewer
-  draws that — it decides nothing. The value is read off the same two rays, so
+- **An angle is a corner, placed where the corner is, and drawn in its own
+  plane.** The runner works out a vertex on the line the two features share, two
+  rays from it, and the plane they span — which for two faces is the plane both
+  are perpendicular to, its normal being their shared corner. The viewer sweeps
+  the arc in that plane and projects it, so it lies on the work and foreshortens
+  with it; drawn flat on the screen instead it showed the *projected* angle and
+  agreed with its own label only from one direction. The value is read off the same two rays, so
   the number and the arc cannot disagree; normals alone give the same absolute
   dot for 45° and 135°, which is why the side has to be settled where the corner
   is. Which side: where each feature actually reaches, and for an edge that

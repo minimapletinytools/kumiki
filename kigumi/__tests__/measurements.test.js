@@ -806,3 +806,71 @@ describe('naming a kind, and writing one back', () => {
         expect(kindWire(wire, 'projected')).toEqual(wire);
     });
 });
+
+describe('the arc of an angle lies in the angle\'s own plane', () => {
+    // A drafted angle lies on the work. Drawn as a flat arc between two
+    // projected directions it shows the PROJECTED angle, which agrees with the
+    // number beside it only when the camera looks down the plane -- from
+    // anywhere else a right angle reads as twenty degrees and the arc floats
+    // free of the timber.
+    const { angleArcPoints, angleLabelPoint } = Measurements;
+    const square = { vertex: [0, 0, 0], from: [1, 0, 0], to: [0, 1, 0], normal: [0, 0, 1] };
+    const radius = (point) => Math.hypot(point[0], point[1], point[2]);
+
+    test('it starts on one ray and ends on the other', () => {
+        const points = angleArcPoints(square, 100, 8);
+
+        expect(points[0].map(Math.round)).toEqual([100, 0, 0]);
+        expect(points[points.length - 1].map(Math.round)).toEqual([0, 100, 0]);
+    });
+
+    test('every point is the same distance from the vertex', () => {
+        for (const point of angleArcPoints(square, 100, 8)) {
+            expect(radius(point)).toBeCloseTo(100, 9);
+        }
+    });
+
+    test('and every point lies in the plane', () => {
+        // Square to the normal is what being in the plane means, and it is why
+        // the plane is carried at all.
+        for (const point of angleArcPoints(square, 100, 8)) {
+            expect(point[2]).toBeCloseTo(0, 9);
+        }
+    });
+
+    test('a plane can be worked out when none was sent', () => {
+        // Older measurements carry no normal; the two rays still span one.
+        const points = angleArcPoints(
+            { vertex: [0, 0, 0], from: [1, 0, 0], to: [0, 0, 1] }, 10, 4);
+
+        expect(points[points.length - 1].map(Math.round)).toEqual([0, 0, 10]);
+    });
+
+    test('an obtuse angle sweeps through the corner, not around the back', () => {
+        // 135 degrees. Halfway round is 67.5, so the arc passes through the
+        // quadrant between the two rays rather than the one opposite it -- and
+        // it reaches `to` at the far end rather than stopping square.
+        const obtuse = {
+            vertex: [0, 0, 0], from: [1, 0, 0],
+            to: [-0.7071067811865476, 0.7071067811865476, 0], normal: [0, 0, 1],
+        };
+
+        const points = angleArcPoints(obtuse, 100, 2);
+
+        // cos 67.5, sin 67.5.
+        expect(points[1][0]).toBeCloseTo(38.268343, 5);
+        expect(points[1][1]).toBeCloseTo(92.387953, 5);
+        expect(points[2].map((v) => Math.round(v))).toEqual([-71, 71, 0]);
+    });
+
+    test('the label sits past the arc, along its middle', () => {
+        const label = angleLabelPoint(square, 100);
+
+        expect(radius(label)).toBeGreaterThan(100);
+        expect(label[0]).toBeCloseTo(label[1], 6);
+    });
+
+    test('the arc is drawn with enough segments to read as a curve', () => {
+        expect(angleArcPoints(square, 100).length).toBeGreaterThan(8);
+    });
+});
