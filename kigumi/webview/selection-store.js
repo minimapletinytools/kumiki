@@ -377,7 +377,7 @@
      * only ever select a timber, and hover -- which asks the same question
      * before the click -- never lit anything at all.
      */
-    function choosePickAction({ hits, selectedTimbers, shiftKey, inDrawing }) {
+    function choosePickAction({ hits, selectedTimbers, shiftKey, inDrawing, measuring }) {
         const along = hits || [];
         if (along.length === 0) {
             return { action: 'clear' };
@@ -386,9 +386,15 @@
             ? selectedTimbers
             : new Set(selectedTimbers || []);
         const nearest = along[0];
-        if (inDrawing) {
-            // Straight to the feature, from the front. There is nothing to
-            // narrow by and nothing to toggle.
+        if (inDrawing || measuring) {
+            // Straight to the feature, from the front. In a drawing there is
+            // nothing to narrow by and nothing to toggle.
+            //
+            // And while an end is HELD, the 3D view drills straight in too. Its
+            // usual two clicks -- select the timber, then pick a feature on it
+            // -- would mean a feature on any other timber could not even be
+            // hovered, let alone previewed, until it was selected first; and
+            // measuring between two timbers is the ordinary case.
             return { action: 'csg', memberKey: nearest.memberKey, hit: nearest.hit };
         }
         if (shiftKey) {

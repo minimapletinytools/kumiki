@@ -1963,6 +1963,59 @@ def _best_matching_candidate(
     return None if best is None else best[1]
 
 
+def _pick_verdict(
+    state: Any, located_pick: Any, timber: Any,
+    payload: Dict[str, Any], slot_state: Any,
+) -> Optional[Dict[str, Any]]:
+    """What a measurement to this pick would be, as one object.
+
+    None when no measurement is being made -- an ordinary hover, which is a
+    different thing from a pair that admits nothing, and both are read.
+
+    Otherwise:
+
+      kinds    what the pair admits, best first. Empty means the click refuses,
+               and the hover paints it red.
+      plane    the plane it would be taken on.
+      anchors  where it would attach, at both ends, through the same rules that
+               place a written measurement -- so what is drawn while deciding is
+               where it lands once decided.
+      reason   why there is nothing, when there is nothing.
+
+    Asked once here rather than three times in the viewer. A colour, a preview
+    and a refusal derived separately will eventually disagree, and the
+    disagreement is invisible until someone clicks.
+    """
+    if not payload.get("heldGeometry") or not payload.get("look"):
+        return None
+    if located_pick is None:
+        return {"kinds": [], "plane": None, "anchors": None,
+                "reason": "nothing-under-pointer"}
+    geometry = _located_geometry_payload(located_pick[2], timber)
+    if geometry is None:
+        # A cylinder's barrel, a lofted side: good to select, nothing to
+        # measure to.
+        return {"kinds": [], "plane": None, "anchors": None,
+                "reason": "not-measurable"}
+    # The plane comes first and stands whether or not a kind does: where a pair
+    # would be measured is a property of the two features and the camera, not of
+    # what the pair happens to admit.
+    plane = _plane_for_pick(located_pick, timber, payload)
+    # Structured, not named: `angle` composes for a solid angle and is also what
+    # every measurement written before spaces called a projected one.
+    kinds = [kind.as_wire() for kind
+             in _kinds_for_pair(payload["heldGeometry"], geometry,
+                                payload["look"], payload)]
+    if not kinds:
+        return {"kinds": [], "plane": plane, "anchors": None, "reason": "no-kind"}
+    return {
+        "kinds": kinds,
+        "plane": plane,
+        "anchors": _anchors_for_pick(state, located_pick, timber, payload, slot_state),
+        "reason": None,
+    }
+
+
 def _pick_space(payload: Dict[str, Any]) -> Any:
     """Which space a pick is judged in: the sheet's, or the solid's.
 
@@ -2047,31 +2100,6 @@ def _anchors_for_pick(
 def _root_csg_of(ss: Any, member_key: Optional[str]):
     cached = (getattr(ss, "mesh_cache", None) or {}).get(member_key) or {}
     return cached.get("local_csg")
-
-
-def _kinds_for_pick(
-    located_pick: Any, timber: Any, payload: Dict[str, Any],
-) -> Optional[List[str]]:
-    """Which kinds a measurement to this pick would admit, or None if none held.
-
-    None and empty mean different things and the viewer reads both: None is "no
-    measurement is being made", empty is "this one cannot be finished from
-    here".
-    """
-    held_geometry = payload.get("heldGeometry")
-    look = payload.get("look")
-    if not held_geometry or not look:
-        return None
-    if located_pick is None:
-        return []
-    geometry = _located_geometry_payload(located_pick[2], timber)
-    if geometry is None:
-        return []
-    # Structured, not named. `angle` composes for a solid angle and is also
-    # what every measurement written before spaces called a projected one, so
-    # the bare name reached the viewer and was read as the projected kind --
-    # which then matched nothing the pair admitted, and drew nothing at all.
-    return [kind.as_wire() for kind in _kinds_for_pair(held_geometry, geometry, look, payload)]
 
 
 def _plane_for_pick(
@@ -5392,20 +5420,11 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
         "at": (_feature_anchor(located_pick[0], located_pick[1], timber,
                                located_pick[2], local_csg)
                if located_pick is not None else None),
-        # The plane this pair would be measured on, when something is held.
-        # Derived here rather than in the viewer so there is one copy of the
-        # rule, and it costs no round trip: this request was already being made.
-        "plane": _plane_for_pick(located_pick, timber, payload),
-        # Where the two ends would attach if this pick became a measurement.
-        # Through the same rules that place a written one, so what is drawn
-        # while deciding is where it lands once decided.
-        "anchors": _anchors_for_pick(state, located_pick, timber, payload, slot_state),
-        # And which kinds the pair admits from here, best first. Empty means the
-        # click will refuse, which is what the hover paints red -- one answer for
-        # the colour and the refusal, so a feature drawn red cannot be one the
-        # click then accepts. Null when nothing is held: a first pick is always
-        # allowed, having nothing yet to be wrong about.
-        "kinds": _kinds_for_pick(located_pick, timber, payload),
+        # What a measurement to this pick would BE: one answer, asked once, and
+        # read by the hover colour, the preview and the click alike. See
+        # docs/measuring-states.md -- three readers deriving it separately is
+        # what every measurement bug on this branch came down to.
+        "verdict": _pick_verdict(state, located_pick, timber, payload, slot_state),
         # What was selected, and the feature within it if navigation resolved
         # one. feature_label is None while a click is still drilling down
         # through compounds, and the display has to say so rather than name a

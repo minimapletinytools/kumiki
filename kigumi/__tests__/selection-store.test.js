@@ -663,3 +663,58 @@ describe('what the draw button says', () => {
         expect(drawButtonKey(undefined)).toBe('viewer.selection.drawFrame');
     });
 });
+
+describe('reaching a feature while a measurement is being made', () => {
+    // The 3D view normally takes two clicks: select the timber, then pick a
+    // feature on it. While an end is HELD that would mean a feature on any
+    // other timber could not be hovered, let alone previewed, until it was
+    // selected first -- and measuring between two timbers is the ordinary case.
+    const hits = [
+        { memberKey: 'post#0', hit: { point: { x: 0, y: 0, z: 0 } } },
+        { memberKey: 'girt#0', hit: { point: { x: 1, y: 0, z: 0 } } },
+    ];
+
+    test('normally an unselected timber is selected, not drilled into', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: new Set(), shiftKey: false,
+            inDrawing: false, measuring: false,
+        });
+
+        expect(decision.action).toBe('select');
+    });
+
+    test('but while measuring the click goes straight to the feature', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: new Set(), shiftKey: false,
+            inDrawing: false, measuring: true,
+        });
+
+        expect(decision.action).toBe('csg');
+        expect(decision.memberKey).toBe('post#0');
+    });
+
+    test('the nearest one, not whichever happened to be selected', () => {
+        const decision = choosePickAction({
+            hits, selectedTimbers: new Set(['girt#0']), shiftKey: false,
+            inDrawing: false, measuring: true,
+        });
+
+        expect(decision.memberKey).toBe('post#0');
+    });
+
+    test('a drawing already did this, measuring or not', () => {
+        for (const measuring of [false, true]) {
+            expect(choosePickAction({
+                hits, selectedTimbers: new Set(), shiftKey: false,
+                inDrawing: true, measuring,
+            }).action).toBe('csg');
+        }
+    });
+
+    test('empty space is still empty space', () => {
+        expect(choosePickAction({
+            hits: [], selectedTimbers: new Set(), shiftKey: false,
+            inDrawing: false, measuring: true,
+        }).action).toBe('clear');
+    });
+});

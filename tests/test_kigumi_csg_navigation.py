@@ -2087,11 +2087,13 @@ class TestWhatAPickCarriesBack:
 
         assert pick["at"] == pytest.approx(resolved["at"])
 
-    def test_a_first_pick_has_no_plane_yet(self, mortise_and_tenon_frame):
-        # A plane needs both ends and a camera. A first pick has neither.
+    def test_a_first_pick_is_judged_about_nothing(self, mortise_and_tenon_frame):
+        # No measurement is being made, which is a different answer from "this
+        # pair admits nothing" -- and the viewer reads both. A plane needs both
+        # ends and a camera, and a first pick has neither.
         pick = self._first_pick(mortise_and_tenon_frame, "receiving_timber")
 
-        assert pick["plane"] is None
+        assert pick["verdict"] is None
 
     def test_a_second_pick_brings_the_plane_with_it(self, mortise_and_tenon_frame):
         held = {"kind": "plane", "normal": [0, 0, 1], "at": [0, 0, 0]}
@@ -2099,8 +2101,24 @@ class TestWhatAPickCarriesBack:
             mortise_and_tenon_frame, "receiving_timber",
             {"heldGeometry": held, "heldAt": [0, 0, 0], "look": [0, 1, 0]})
 
-        assert pick["plane"] is not None
-        assert len(pick["plane"]["normal"]) == 3
+        assert pick["verdict"] is not None
+        assert pick["verdict"]["plane"] is not None
+        assert len(pick["verdict"]["plane"]["normal"]) == 3
+
+    def test_the_verdict_says_why_when_it_admits_nothing(
+            self, mortise_and_tenon_frame):
+        # Empty kinds and a reason, rather than a bare absence: the viewer draws
+        # the refusal and says it, and both come from this one answer.
+        held = {"kind": "plane", "normal": [0, 0, 1], "at": [0, 0, 0]}
+        pick = self._first_pick(
+            mortise_and_tenon_frame, "receiving_timber",
+            {"heldGeometry": held, "heldAt": [0, 0, 0], "look": [0, 1, 0]})
+
+        verdict = pick["verdict"]
+        if verdict["kinds"]:
+            assert verdict["reason"] is None
+        else:
+            assert verdict["reason"] == "no-kind" 
 
 
 class TestPreferringAFeatureThatCanFinishTheMeasurement:

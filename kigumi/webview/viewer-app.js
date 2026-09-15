@@ -3268,6 +3268,7 @@ class KigumiViewerApp extends LitElement {
             selectedTimbers: this.selectionManager.selectedTimbers,
             shiftKey: false,
             inDrawing: this.selectionManager.inDrawing,
+            measuring: this.measureDraft.isActive,
         });
         const target = window.KigumiHover.hoverTarget(decision);
         if (decision.action !== 'csg' || !target) {
@@ -3375,12 +3376,10 @@ class KigumiViewerApp extends LitElement {
     /** A pick came back while a measurement is being made. Offers it to the draft. */
     _measurePicked(message) {
         const anchor = this._anchorFromPick(message);
-        // Empty, not null: the runner judged this pair and found no kind this
-        // view admits. The hover has already drawn it red and promised the
-        // click would refuse it, so refuse it -- taking it instead replaced a
-        // good second end with one that has no kind, and drew nothing at all.
+        // The same verdict the hover painted red. Refusing here is not a second
+        // judgement: it is the one the colour already promised.
         if (window.KigumiHover.HoverState.isRefused(message)) {
-            this.reportMeasureRefusal('no-kind');
+            this.reportMeasureRefusal((message.verdict || {}).reason || 'no-kind');
             return;
         }
         const viewport = this._resolvePointer(this._lastClientX, this._lastClientY);
@@ -3393,22 +3392,27 @@ class KigumiViewerApp extends LitElement {
             this.reportMeasureRefusal(result.reason);
             return;
         }
-        this._pendingKinds = message.kinds || null;
+        this._pendingKinds = (message.verdict && message.verdict.kinds) || null;
         this.renderMeasurements();
         this.requestUpdate();
     }
 
     /** What a pick offers as one end of a measurement. */
     _anchorFromPick(message) {
+        // One object, from the runner, read by the colour, the preview and the
+        // click alike. Null when no measurement is being made; kinds empty when
+        // this pair admits nothing from here. See docs/measuring-states.md.
+        const verdict = message.verdict || null;
         return {
             reference: message.reference || null,
             geometry: message.geometry || null,
             at: message.at || null,
-            plane: message.plane || null,
-            // Where the pair would attach, when something was held. The runner
-            // works it out with the rules that place a written measurement, so
-            // the preview sits where the result will.
-            anchors: message.anchors || null,
+            verdict,
+            plane: (verdict && verdict.plane) || null,
+            // Where the pair would attach. The runner works it out with the
+            // rules that place a written measurement, so the preview sits where
+            // the result will.
+            anchors: (verdict && verdict.anchors) || null,
             highlight: {
                 highlightMesh: message.highlightMesh,
                 highlightEdgeSegments: message.highlightEdgeSegments,
@@ -3989,6 +3993,7 @@ class KigumiViewerApp extends LitElement {
             'not-measurable': 'that one has no plane or line of its own, so there is '
                 + 'nothing to measure to',
             'nothing-pending': 'pick a second feature first',
+            'nothing-under-pointer': 'there is nothing there to measure to',
             'no-kind': 'those two cannot be measured against each other from '
                 + 'this view -- turn the camera, or pick a different feature',
         }[reason] || reason;
@@ -4172,6 +4177,9 @@ class KigumiViewerApp extends LitElement {
             // and must get the same answer, or it lights what a click will not
             // take -- which in a drawing was nothing at all.
             inDrawing: this.selectionManager.inDrawing,
+            // While an end is held, a click reaches the feature directly, so
+            // the second end can be on a timber that was never selected.
+            measuring: this.measureDraft.isActive,
         });
 
         if (decision.action === 'clear') {

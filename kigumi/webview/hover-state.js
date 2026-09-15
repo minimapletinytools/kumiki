@@ -186,13 +186,16 @@
         /**
          * Whether the runner judged this pair unmeasurable from where we stand.
          *
-         * Empty, not absent: null kinds mean no measurement is being made at
-         * all, which is an ordinary hover and not a refusal.
+         * A verdict with no kinds, not an absent verdict: no verdict at all
+         * means no measurement is being made, which is an ordinary hover and
+         * not a refusal. Both are read; collapsing them is how a red hover
+         * became a click that was accepted and drew nothing.
          */
         static isRefused(answer) {
-            return Boolean(answer
-                && Array.isArray(answer.kinds)
-                && answer.kinds.length === 0);
+            const verdict = answer && answer.verdict;
+            return Boolean(verdict
+                && Array.isArray(verdict.kinds)
+                && verdict.kinds.length === 0);
         }
 
         /**

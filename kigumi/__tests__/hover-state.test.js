@@ -272,9 +272,13 @@ describe('whether redrawing the hover would change anything', () => {
     // without the pointer moving -- taking a first end is a button press. So a
     // hover cached by feature alone stayed green after a first end was taken
     // under a resting pointer, promising a click that was then refused.
-    const refused = (label) => ({ ...answer(label), kinds: [] });
-    const allowed = (label) => ({ ...answer(label), kinds: ['projected_distance'] });
-    const idle = (label) => ({ ...answer(label), kinds: null });
+    // The runner's one verdict. Absent means no measurement is being made;
+    // present with no kinds means this pair admits nothing from here.
+    const refused = (label) => ({ ...answer(label), verdict: { kinds: [], reason: 'no-kind' } });
+    const allowed = (label) => ({
+        ...answer(label), verdict: { kinds: [{ operation: 'distance', space: 'projected' }] },
+    });
+    const idle = (label) => ({ ...answer(label), verdict: null });
 
     test('an ordinary hover is not a refusal', () => {
         // Null kinds mean no measurement is being made, not that this one

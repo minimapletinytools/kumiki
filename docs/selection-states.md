@@ -154,7 +154,7 @@ clears the selection. There is no pending measurement and no confirm button.
 | `IDLE` | "Measure from" | `HOLDING` | undo suspended; held end drawn |
 | `HOLDING` | hover a measurable candidate | `HOLDING` | **the measurement is drawn, where it will land** |
 | `HOLDING` | hover anything else | `HOLDING` | lit, red if refused; no preview |
-| `HOLDING` | click a measurable candidate | `IDLE` | **written**; selection cleared; undo resumed; one entry pushed |
+| `HOLDING` | click a measurable candidate | `IDLE` | **written**; the new measurement is selected; undo resumed; one entry pushed |
 | `HOLDING` | click anything else | `HOLDING` | refusal reported |
 | `HOLDING` | Escape | `IDLE` | undo resumed; held end cleared |
 
@@ -179,10 +179,10 @@ consolidation and the new interaction at the same time.
   the pair admits and changed afterwards on the written measurement, which is
   already supported. Unchanged from today — the confirm button never offered a
   choice either.
-- **"Clears the selection" makes the kind dropdown one click further away**,
-  since that dropdown hangs off the focused measurement. The measurement panel
-  still lists it. Flagged as a decision, not a blocker; the alternative is to
-  leave the new measurement focused.
+- **The feature selection clears, and the new measurement takes its place.**
+  Decided: writing one selects it. The kind dropdown hangs off the focused
+  measurement, so it stays one click away — change the kind straight after
+  making it, which is the moment you want it.
 - **Escape becomes one level.** The spec's "one end at a time" rule goes with
   `PENDING`; `measurement-spec.md` needs that paragraph rewritten.
 - **The fork in §3 must collapse while holding.** In 3D, hovering a feature on

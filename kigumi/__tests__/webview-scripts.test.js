@@ -143,7 +143,7 @@ describe('every argument a shared decision takes is actually passed', () => {
         expect(picks.length).toBeGreaterThan(1);
     });
 
-    test.each(['hits', 'selectedTimbers', 'inDrawing'])(
+    test.each(['hits', 'selectedTimbers', 'inDrawing', 'measuring'])(
         'every call passes %s', (argument) => {
             // Either spelling: `hits: along.hits` or the shorthand `hits,`.
             const passed = new RegExp(`\\b${argument}\\s*[,:}]`);
