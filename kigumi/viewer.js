@@ -143,6 +143,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const bootDiagnosticsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'boot-diagnostics.js'))).toString();
     const i18nJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'i18n.js'))).toString();
     const selectionStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-store.js'))).toString();
+    const selectionVisualsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-visuals.js'))).toString();
     const layerStateStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layer-state-store.js'))).toString();
     const layersPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layers-panel.js'))).toString();
     const assemblyTimelineJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'assembly-timeline.js'))).toString();
@@ -203,6 +204,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__BOOT_DIAGNOSTICS_JS_URI__', bootDiagnosticsJsUri)
         .replace('__I18N_JS_URI__', i18nJsUri)
         .replace('__SELECTION_STORE_JS_URI__', selectionStoreJsUri)
+        .replace('__SELECTION_VISUALS_JS_URI__', selectionVisualsJsUri)
         .replace('__LAYER_STATE_STORE_JS_URI__', layerStateStoreJsUri)
         .replace('__LAYERS_PANEL_JS_URI__', layersPanelJsUri)
         .replace('__ASSEMBLY_TIMELINE_JS_URI__', assemblyTimelineJsUri)
