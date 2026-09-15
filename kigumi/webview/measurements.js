@@ -647,13 +647,13 @@
             ? solidKinds(formA, formB)
             : availableKinds(formA, formB);
         if (available.length === 0) {
-            return { drawable: false, reason: 'not-measurable', formA, formB };
+            return { drawable: false, reason: 'not-measurable', space, formA, formB };
         }
         const wanted = kindName(measure.kind, space);
         if (wanted && available.indexOf(wanted) === -1) {
             return {
                 drawable: false, reason: 'kind-unavailable',
-                kind: wanted, available, formA, formB,
+                kind: wanted, available, space, formA, formB,
             };
         }
         const kind = wanted || available[0];
@@ -663,9 +663,9 @@
             kind, measure.a.at, measure.b.at, formA, formB,
             { ...axes, look, space, rays: measure.angle || null });
         if (value.unit === 'length' && value.value < DEGENERATE_WORLD) {
-            return { drawable: false, reason: 'degenerate', kind, formA, formB };
+            return { drawable: false, reason: 'degenerate', kind, space, formA, formB };
         }
-        return { drawable: true, kind, value, available, formA, formB };
+        return { drawable: true, kind, value, available, space, formA, formB };
     }
 
     // Below this the two anchors are on top of each other in this view, and

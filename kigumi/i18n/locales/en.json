@@ -208,6 +208,8 @@
   "viewer.measure.kind.projected_horizontal_distance": "horizontal",
   "viewer.measure.kind.projected_vertical_distance": "vertical",
   "viewer.measure.kind.projected_angle": "angle",
+  "viewer.measure.kind.perpendicular_distance": "distance",
+  "viewer.measure.kind.angle": "angle",
   "viewer.selection.measureFrom.title": "Start a measurement from this feature",
   "viewer.selection.measureCancel": "cancel measurement",
   "viewer.selection.measureCancel.title": "Stop measuring and release the held feature",

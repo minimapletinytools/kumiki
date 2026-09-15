@@ -1,6 +1,7 @@
 import { html } from 'lit';
 
 const KigumiUnits = window.KigumiUnits;
+const KigumiMeasurements = window.KigumiMeasurements;
 const TagIndex = window.TagIndex;
 
 /**
@@ -96,9 +97,18 @@ export class SelectionPanel {
      */
     _measureKindRow(found) {
         const available = found.available || [];
-        // The written kind, or the one the view falls back to when none was
-        // written -- which is what is being drawn, so it is what to show.
-        const current = found.measure.kind || (found.status && found.status.kind);
+        // The written kind BY NAME, or the one the view falls back to when none
+        // was written -- which is what is being drawn, so it is what to show.
+        //
+        // By name because that is what `available` holds. A kind arrives from
+        // python structured -- {operation, space, direction} -- and comparing
+        // that object against a list of names matched nothing, so every
+        // measurement looked as though its kind were unavailable: the dropdown
+        // appeared even with a single choice, and the entry it showed was
+        // labelled from a key built out of "[object Object]".
+        const space = found.status && found.status.space;
+        const current = KigumiMeasurements.kindName(found.measure.kind, space)
+            || (found.status && found.status.kind);
         // A kind this view cannot draw is still the kind this measurement is.
         // Showing an alternative as though it were selected would misreport it,
         // so it is listed, unselectable, and choosing anything else is the way

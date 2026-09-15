@@ -58,3 +58,61 @@ describe('createTranslator', () => {
     expect(t('viewer.options.theme.label')).toBe(en['viewer.options.theme.label']);
   });
 });
+
+describe('every measurement kind has a name a person would use', () => {
+  // The kind dropdown labels each entry with `viewer.measure.kind.<name>`, and
+  // a missing key falls through as the key itself -- so a kind nobody
+  // translated shows the reader a code reference. The SOLID kinds arrived
+  // without entries and did exactly that.
+  const Measurements = require('../webview/measurements.js');
+
+  /** Every kind name the rules can hand the dropdown, in both spaces. */
+  function everyKind() {
+    const geometries = [
+      { kind: 'point' },
+      { kind: 'line', direction: [1, 0, 0] },
+      { kind: 'line', direction: [0, 1, 0] },
+      { kind: 'plane', normal: [0, 0, 1] },
+      { kind: 'plane', normal: [1, 0, 0] },
+      { kind: 'plane', normal: [0, 0, -1] },
+    ];
+    const look = [0, 0, -1];
+    const names = new Set();
+    for (const one of geometries) {
+      for (const other of geometries) {
+        for (const name of Measurements.availableKinds(
+          Measurements.projectedForm(one, look), Measurements.projectedForm(other, look))) {
+          names.add(name);
+        }
+        for (const name of Measurements.solidKinds(
+          Measurements.solidForm(one), Measurements.solidForm(other))) {
+          names.add(name);
+        }
+      }
+    }
+    return [...names];
+  }
+
+  const kinds = everyKind();
+
+  test('the rules produce kinds to check, in both spaces', () => {
+    expect(kinds).toEqual(expect.arrayContaining([
+      'projected_perpendicular_distance', 'projected_angle',
+      'perpendicular_distance', 'angle',
+    ]));
+  });
+
+  test.each(kinds)('en names %s', (kind) => {
+    expect(typeof en[`viewer.measure.kind.${kind}`]).toBe('string');
+  });
+
+  test.each(kinds)('ja names %s', (kind) => {
+    expect(typeof ja[`viewer.measure.kind.${kind}`]).toBe('string');
+  });
+
+  test('and none of those names is the code name', () => {
+    for (const kind of kinds) {
+      expect(en[`viewer.measure.kind.${kind}`]).not.toContain('_');
+    }
+  });
+});

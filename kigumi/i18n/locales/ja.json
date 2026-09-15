@@ -208,6 +208,8 @@
   "viewer.measure.kind.projected_horizontal_distance": "水平距離",
   "viewer.measure.kind.projected_vertical_distance": "垂直距離",
   "viewer.measure.kind.projected_angle": "角度",
+  "viewer.measure.kind.perpendicular_distance": "距離",
+  "viewer.measure.kind.angle": "角度",
   "viewer.selection.measureFrom.title": "この特徴から寸法を開始する",
   "viewer.selection.measureCancel": "寸法を取り消す",
   "viewer.selection.measureCancel.title": "寸法をやめて、保持中の特徴を解放する",

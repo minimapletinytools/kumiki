@@ -301,3 +301,27 @@ describe('what a redraw tears down, and what only a real clear does', () => {
         expect(body('handleHoverResult')).toContain('sameHighlight');
     });
 });
+
+describe('the kind dropdown compares names, not the object a kind arrives as', () => {
+    // It offers itself only when there is a choice, and labels each entry from
+    // `viewer.measure.kind.<name>`. A kind arrives from python STRUCTURED --
+    // {operation, space, direction} -- so comparing it against the list of
+    // available names matched nothing: every measurement read as though its
+    // kind were unavailable, which showed the dropdown even with a single
+    // choice and labelled its entry from a key built out of "[object Object]".
+    const panel = fs.readFileSync(path.join(webviewDir, 'selection-panel.js'), 'utf8');
+    const at = panel.indexOf('_measureKindRow(found) {');
+    const body = panel.slice(at, panel.indexOf('\n    }', at));
+
+    test('there is a _measureKindRow to check', () => {
+        expect(at).toBeGreaterThan(-1);
+    });
+
+    test('it names the kind before comparing it', () => {
+        expect(body).toContain('kindName');
+    });
+
+    test('and still offers nothing when there is only one choice', () => {
+        expect(body).toContain('available.length < 2');
+    });
+});
