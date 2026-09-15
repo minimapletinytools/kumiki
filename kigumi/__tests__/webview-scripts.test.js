@@ -208,9 +208,9 @@ describe('the hover is asked again whenever the held end changes', () => {
     // one from before, however right the comparison that draws it.
     const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
 
-    /** The body of a no-argument method, by brace matching. */
+    /** The body of a method, by brace matching, whatever it takes. */
     function body(name) {
-        const at = app.indexOf(`\n    ${name}() {`);
+        const at = app.search(new RegExp(`\\n    ${name}\\([^)]*\\) \\{`));
         if (at === -1) {
             throw new Error(`${name} is not a method of viewer-app.js`);
         }
@@ -229,7 +229,7 @@ describe('the hover is asked again whenever the held end changes', () => {
     test.each([
         'startMeasurementFromFocus',
         'escapeMeasurement',
-        'confirmMeasurement',
+        '_writeMeasurement',
         'clearMeasureDraft',
     ])('%s asks the hover again', (method) => {
         expect(body(method)).toContain('_reaskHover');

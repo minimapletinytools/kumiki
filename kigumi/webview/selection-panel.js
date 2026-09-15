@@ -65,20 +65,20 @@ export class SelectionPanel {
         action.type = 'button';
         action.className = 'ip-action ip-measure';
         const making = this.app.measureDraft.isActive;
+        // There is nothing to confirm: the second feature is confirmed by being
+        // clicked, and what the click takes is already drawn under the pointer.
+        // So while an end is held this is the way OUT, which is otherwise only
+        // on the Escape key.
         action.textContent = making
-            ? this.t('viewer.selection.measureConfirm')
+            ? this.t('viewer.selection.measureCancel')
             : this.t('viewer.selection.measureFrom');
         action.title = making
-            ? this.t('viewer.selection.measureConfirm.title')
+            ? this.t('viewer.selection.measureCancel.title')
             : this.t('viewer.selection.measureFrom.title');
-        // Confirm is only meaningful once both ends are known; until then the
-        // button is there to say what the flow is waiting for.
-        action.disabled = making
-            && this.app.measureDraft.state !== window.KigumiMeasureDraft.STATES.PENDING;
         action.addEventListener('click', (event) => {
             event.stopPropagation();
             if (making) {
-                this.app.confirmMeasurement();
+                this.app.escapeMeasurement();
             } else {
                 this.app.startMeasurementFromFocus();
             }

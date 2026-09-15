@@ -3276,6 +3276,7 @@ class KigumiViewerApp extends LitElement {
             // whole timber rather than anything inside it.
             this._hover.clear();
             this.clearHoverOutline();
+            this._updateMeasurePreview(null);
             return;
         }
 
@@ -3321,6 +3322,8 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this._hoverDrawn = message;
+        // What the pointer is offering, drawn as the measurement it would make.
+        this._updateMeasurePreview(message);
         // `kinds` is null when nothing is held -- an ordinary hover -- empty
         // when this pair cannot be measured from here, and a list when it can.
         // The runner answers it, so what is drawn red is what the click
@@ -3383,7 +3386,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const viewport = this._resolvePointer(this._lastClientX, this._lastClientY);
-        const result = this.measureDraft.pick(
+        const result = this.measureDraft.confirm(
             anchor, viewport ? viewport.viewport.id : this.activeViewportId);
         this.emitViewerLog('measure-pick', {
             feature: message.featureLabel, action: result.action, reason: result.reason,
@@ -3392,9 +3395,8 @@ class KigumiViewerApp extends LitElement {
             this.reportMeasureRefusal(result.reason);
             return;
         }
-        this._pendingKinds = (message.verdict && message.verdict.kinds) || null;
-        this.renderMeasurements();
-        this.requestUpdate();
+        this._writeMeasurement(
+            result.measurement, (message.verdict && message.verdict.kinds) || null);
     }
 
     /** What a pick offers as one end of a measurement. */
@@ -3421,26 +3423,30 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * Take the measurement being made, and write it.
+     * Write the measurement the click just took.
+     *
+     * There is no confirm step: the preview under the pointer was already what
+     * this writes, so clicking it IS the confirmation. See
+     * docs/measuring-states.md.
      *
      * The kind is the first the pair admits from here, which the runner worked
      * out while judging the pick. Written rather than left blank: no kind reads
      * as "whatever this view admits", which draws the right dimension today and
      * quietly becomes a different one when the viewport moves.
      */
-    confirmMeasurement() {
-        const result = this.measureDraft.confirm();
-        if (result.action !== 'confirmed') {
-            return;
-        }
-        const measurement = result.measurement;
+    _writeMeasurement(measurement, kinds) {
         // Structured, not named, so a solid angle cannot be read back as the
         // projected one it shares a name with.
         const kind = KigumiMeasurements.kindWire(
-            (this._pendingKinds && this._pendingKinds[0]) || null, this.measurementSpace);
-        this._pendingKinds = null;
+            (kinds && kinds[0]) || null, this.measurementSpace);
         this.undoStacks.suspend(false);
         this.clearHeldFeature();
+        this._measurePreview = null;
+        // The feature selection has served its purpose; the measurement it made
+        // takes its place, so the kind can be changed in the moment you want to
+        // change it.
+        this._dropCsgFocus();
+        this.selectionManager.clearTimberSelection();
         this._reaskHover();
 
         const drawingId = this.measurementDrawingId;
@@ -3459,7 +3465,7 @@ class KigumiViewerApp extends LitElement {
             plane: measurement.plane,
             kind,
         };
-        this.emitViewerLog('undo-push', {
+        this.emitViewerLog('measure-written', {
             label: 'measure', frame: this.frameKey, drawing: drawingId });
         this.undoStacks.push(this.frameKey, drawingId, {
             label: 'measure',
@@ -3503,7 +3509,7 @@ class KigumiViewerApp extends LitElement {
             this.clearHeldFeature();
             this.undoStacks.suspend(false);
         }
-        this._pendingKinds = null;
+        this._measurePreview = null;
         this.renderMeasurements();
         this.emitViewerLog('measure-escape', { action: released.action });
         this._reaskHover();
@@ -3514,7 +3520,7 @@ class KigumiViewerApp extends LitElement {
     /** Changing scene or mode: hold nothing, show nothing held. */
     clearMeasureDraft() {
         this.measureDraft.leave();
-        this._pendingKinds = null;
+        this._measurePreview = null;
         this.undoStacks.suspend(false);
         this.clearHeldFeature();
         this._reaskHover();
@@ -3777,32 +3783,59 @@ class KigumiViewerApp extends LitElement {
     }
 
     /**
-     * The measurement being made, shaped like a written one so it can be drawn.
+     * The measurement the pointer is currently offering, or null.
      *
-     * Drawn before it exists, because confirming something you cannot see is
-     * confirming blind -- and because the correction for a mis-picked second
-     * end is to pick another, which you can only judge by looking at it.
+     * Drawn from the HOVER, not from any state of its own: while an end is
+     * held, whatever is under the pointer is shown as the measurement it would
+     * make, and clicking writes exactly that. There is nothing pending in
+     * between, and so nothing to keep in step. See docs/measuring-states.md.
      *
-     * The ends carry their resolved geometry already: the pick brought it back.
+     * Both ends carry their resolved geometry already -- the hover brought it
+     * back -- and the anchors are the ones the runner placed for the pair, so
+     * the preview sits where the result will.
      */
-    _pendingMeasurementForDisplay() {
-        const draft = this.measureDraft;
-        if (draft.state !== window.KigumiMeasureDraft.STATES.PENDING) {
+    _previewMeasurementForDisplay() {
+        const preview = this._measurePreview;
+        if (!preview) {
             return null;
         }
-        // The pair's anchors when the runner placed them, and each end's own
-        // otherwise -- which is what a pair admitting no distance leaves, an
-        // angle being placed by nothing yet.
-        const placed = draft.other.anchors;
+        const placed = preview.anchors;
         const end = (anchor, at) => ({
             ...anchor.reference, at: at || anchor.at, geometry: anchor.geometry,
         });
         return {
-            a: end(draft.held, placed && placed.a),
-            b: end(draft.other, placed && placed.b),
-            plane: draft.plane || null,
-            kind: (this._pendingKinds && this._pendingKinds[0]) || null,
+            a: end(preview.held, placed && placed.a),
+            b: end(preview.other, placed && placed.b),
+            plane: preview.plane || null,
+            kind: preview.kind || null,
         };
+    }
+
+    /**
+     * Offer, or stop offering, the measurement under the pointer.
+     *
+     * The verdict decides, and it is the same verdict that colours the
+     * highlight and that the click will read -- so what is drawn is what
+     * clicking takes, by construction rather than by agreement.
+     */
+    _updateMeasurePreview(message) {
+        const held = this.measureDraft.heldEnd;
+        const verdict = message && message.verdict;
+        const anchor = message ? this._anchorFromPick(message) : null;
+        const offered = Boolean(
+            held && verdict && verdict.kinds && verdict.kinds.length > 0
+            && anchor && this.measureDraft.canTake(anchor).ok);
+        const was = this._measurePreview;
+        this._measurePreview = offered ? {
+            held,
+            other: anchor,
+            anchors: verdict.anchors || null,
+            plane: verdict.plane || null,
+            kind: verdict.kinds[0],
+        } : null;
+        if (was || this._measurePreview) {
+            this.renderMeasurements();
+        }
     }
 
     /**
@@ -4150,6 +4183,7 @@ class KigumiViewerApp extends LitElement {
 
     clearHoverOutline() {
         this._hoverDrawn = null;
+        this._updateMeasurePreview(null);
         this._disposeHighlightMesh('_hoverHighlightMesh');
         this._disposeHighlightMesh('_hoverHighlightEdge');
     }
@@ -6601,9 +6635,13 @@ class KigumiViewerApp extends LitElement {
 
         // Last, and over the rest: what is being made now is what you are
         // looking at.
-        const pending = this._pendingMeasurementForDisplay();
+        const pending = this._previewMeasurementForDisplay();
         if (pending) {
-            const viewport = this.viewports.find((one) => one.id === this.measureDraft.viewportId)
+            // Whichever viewport the pointer is over -- the draft no longer
+            // holds one, there being nothing pending to hold it for.
+            const at = this._resolvePointer(this._lastClientX, this._lastClientY);
+            const viewport = (at && at.viewport)
+                || this.viewports.find((one) => one.id === this.activeViewportId)
                 || this.viewports[0];
             if (viewport) {
                 this._drawMeasurement(
