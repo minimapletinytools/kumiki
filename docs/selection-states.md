@@ -219,26 +219,32 @@ panel keeps "Measure from" and loses "Confirm".
 *The behaviour change, once the two things it relies on are in.*
 
 **Phase 4 — settle up.** *Done:* the Escape, pending and mode-table paragraphs
-in `measurement-spec.md` are rewritten. *Outstanding:* retest the
-angle/distance kind stickiness — Phase 1 removed its cause, and it needs
-confirming in the viewer rather than asserting. Then the deferred items: angle
-placement, and faces carrying corners rather than an AABB.
+in `measurement-spec.md` are rewritten; the kind stickiness is confirmed gone in
+the viewer; angle placement is built. *Outstanding:* faces carrying corners
+rather than an AABB — see §9.
 
 Phases 1 and 2 are independent of each other and both independent of 3, so they
 can land in either order; 3 wants both.
 
 ## 9. Known open
 
-- **Kind sticks when the second end changes between an angle pair and a distance
-  pair.** Reported against the 3D view, seen in a drawing too. `_pendingKinds` is
-  replaced on every accepted pick and the SVG overlay is rebuilt each frame, so
-  neither holds the old kind. The likely mechanism is §6 case "2 and 5
-  disagreeing": `measurementStatus` recomputes `available` using the
-  **measurement's plane normal** as the look, while the runner computed `kinds`
-  using the **camera's** look. Where those differ the viewer rejects the
-  runner's kind as `kind-unavailable` and draws nothing — leaving whatever was
-  last drawn to read as "stuck". Phase 1 removes the cause; retest there.
-- **Angle placement** is deferred: an angle uses no anchor positions, and where
-  it should sit is its own question.
-- **Faces carry an AABB, not corners**, so a rotated prism's face extent is
-  larger than the face.
+- **Faces carry an AABB, not corners.** `CSGFeatureExtent` gives a face a box
+  that is axis-aligned in WORLD space, so a rotated prism's face extent is
+  larger than the face and never smaller — every rafter is one. This now matters
+  more than it did: a perpendicular dropped onto a face is **not clamped**,
+  because a span carries the plane's normal and a point on it rather than its
+  outline, so a distance to a face can land off the face. An edge carries its
+  `ends` for exactly this reason; a face wants the same.
+
+Closed since this was written, and recorded because the reasoning is the part
+worth keeping:
+
+- **The kind sticking between an angle pair and a distance pair** was the fifth
+  implementation disagreeing with the runner, as §6 predicted. One verdict
+  removed the cause, and the preview log shows it switching cleanly between
+  `perpendicular_distance` and `angle` as the pointer moves.
+- **Angle placement**, deferred as "an angle uses no anchor positions, and where
+  it should sit is its own question". It has an answer now: a vertex on the line
+  the two features share, two rays from it on the side the material is, and the
+  plane they span — with the value read off the same rays, so the number and the
+  arc cannot disagree.

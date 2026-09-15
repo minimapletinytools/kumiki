@@ -341,6 +341,58 @@ class TestTheViewerAgrees:
             else:
                 assert direction == pytest.approx(their_direction, abs=1e-9)
 
+    def _viewer_status_kinds(self):
+        """What measurementStatus says a WRITTEN measurement admits."""
+        node = shutil.which("node")
+        if node is None:
+            pytest.skip("node is not available")
+        script = (
+            "const m = require(%s);"
+            "const cases = %s, look = %s;"
+            "const out = [];"
+            "for (const a of cases) { for (const b of cases) {"
+            "  for (const space of ['projected', '3d']) {"
+            "    const status = m.measurementStatus("
+            "      { a: { at: [0,0,0], geometry: a }, b: { at: [137,91,53], geometry: b } },"
+            "      { look, right: [1,0,0], up: [0,0,1] },"
+            "      { orthographic: space === 'projected', space });"
+            "    out.push(status.available || []); } } }"
+            "process.stdout.write(JSON.stringify(out));"
+            % (json.dumps(str(Path(__file__).resolve().parent.parent
+                              / "kigumi" / "webview" / "measurements.js")),
+               json.dumps(self.CASES), json.dumps(self.LOOKS[0]))
+        )
+        out = subprocess.run([present(node, "node on PATH"), "-e", script],
+                             capture_output=True, text=True, timeout=60)
+        assert out.returncode == 0, out.stderr
+        return json.loads(out.stdout)
+
+    def test_a_written_measurement_is_judged_the_way_a_pick_is(self):
+        """The fifth place the verdict is decided, against the rules it must match.
+
+        The two anchors are deliberately off every axis: a pair whose ends come
+        to zero is refused as degenerate before its kinds are reported, which
+        says nothing about whether the two sides agree.
+
+        The runner answers what a PICK admits; measurementStatus answers what a
+        measurement already written admits, which no pick is happening for. That
+        second answer is legitimate and it is also where three shipped bugs
+        came from -- it judged in the wrong space, it upgraded a solid kind's
+        name to the projected one, and it compared a structured kind against a
+        list of names. Nothing pinned it to the rules until here.
+        """
+        from kumiki.drawing import projected_kinds, solid_kinds
+
+        mine = []
+        for one in self.CASES:
+            for other in self.CASES:
+                for space in ("projected", "3d"):
+                    admitted = (solid_kinds(one, other) if space == "3d"
+                                else projected_kinds(one, other, self.LOOKS[0]))
+                    mine.append([kind.name for kind in admitted])
+
+        assert self._viewer_status_kinds() == mine
+
     def test_the_two_tables_say_the_same_thing(self):
         expected = {
             "point-point": [k.name for k in kinds_for(POINT, POINT, PROJECTED)],

@@ -5307,6 +5307,37 @@ def _pick_tolerances(payload: Dict[str, Any], eps: float) -> Any:
     )
 
 
+#: How an accessory -- a wedge, a peg -- is keyed in the mesh cache.
+ACCESSORY_KEY_PREFIX = "accessory:"
+
+
+def _nothing_at_point(member_key: str) -> Dict[str, Any]:
+    """A pick that found nothing, in the shape every pick answer takes.
+
+    Every key the viewer reads, so nothing it displays is left holding what the
+    last answer said.
+    """
+    return {
+        "memberKey": member_key,
+        "path": [],
+        "reference": None,
+        "candidateCount": 0,
+        "candidates": [],
+        "geometry": None,
+        "at": None,
+        "verdict": None,
+        "featureLabel": None,
+        "featureType": None,
+        "facesToward": None,
+        "outwardNormal": None,
+        "nodeDisplayName": None,
+        "nodeLabel": None,
+        "jointName": None,
+        "highlightMesh": {"vertices": [], "indices": []},
+        "stats": {"meshWalkMs": 0.0, "trianglesMatched": 0, "totalTriangles": 0},
+    }
+
+
 def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_state: Optional['SlotState'] = None) -> Dict[str, Any]:
     """Process a find_csg_at_point request and return the result dict."""
     ss = slot_state if slot_state is not None else state._active
@@ -5324,12 +5355,27 @@ def _handle_find_csg_at_point(state: RunnerState, payload: Dict[str, Any], slot_
     if not isinstance(point, list) or len(point) != 3:
         raise ValueError("point must be [x, y, z]")
 
+    if member_key.startswith(ACCESSORY_KEY_PREFIX):
+        # A wedge or a peg. It is drawn, so a ray hits it, and it is cached with
+        # a mesh and nothing else -- no CSG, no declared features, nothing
+        # inside one to pick. So: nothing here, rather than an error.
+        #
+        # It has to be an answer and not a raise because the HOVER asks about
+        # whatever the pointer crosses. A raise there is reported once and then
+        # suppressed, which left hover silently dead for the rest of the session
+        # after the pointer passed over a single wedge. Reaching one got easier
+        # when a click began drilling straight in while measuring, since it no
+        # longer has to be selected first.
+        return _nothing_at_point(member_key)
+
     cached = ss.mesh_cache[member_key]
     local_csg = cached.get("local_csg")
     cut_timber = cached.get("cut_timber")
     mesh = cached.get("mesh")
 
     if local_csg is None or cut_timber is None or mesh is None:
+        # A TIMBER with nothing cached is a real fault -- they are cached with
+        # their CSG or not at all -- so this still raises.
         raise ValueError(f"No CSG data cached for {member_key}")
 
     timber = cut_timber.timber

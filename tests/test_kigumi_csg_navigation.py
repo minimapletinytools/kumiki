@@ -2201,3 +2201,67 @@ class TestPreferringAFeatureThatCanFinishTheMeasurement:
             state, dict(base, look=self.LOOK), slot)
 
         assert with_camera["featureLabel"] == plain["featureLabel"]
+
+
+class TestPointingAtAnAccessory:
+    """A wedge is drawn, so a ray hits it. There is nothing inside one to pick.
+
+    An accessory is cached with a mesh and nothing else -- no CSG, no declared
+    features -- and asking about one used to raise. The HOVER asks about
+    whatever the pointer crosses, and a raise there is reported once and then
+    suppressed, so passing the pointer over a single wedge left hover silently
+    dead for the rest of the session.
+    """
+
+    def _slot_with_accessory(self):
+        class Slot:
+            mesh_cache = {
+                "accessory:Wedge#3": {"mesh": {"vertices": [], "indices": []}},
+                "brokenTimber#0": {"mesh": {"vertices": [], "indices": []}},
+            }
+
+        class State:
+            _active = Slot()
+
+        return State(), Slot()
+
+    def test_it_answers_rather_than_raising(self):
+        state, slot = self._slot_with_accessory()
+
+        result = runner._handle_find_csg_at_point(
+            state, {"memberKey": "accessory:Wedge#3", "point": [0, 0, 0]}, slot)
+
+        assert result["memberKey"] == "accessory:Wedge#3"
+        assert result["featureLabel"] is None
+        assert result["geometry"] is None
+
+    def test_and_says_there_is_no_measurement_to_be_made_here(self):
+        # None, not an empty verdict: nothing is being judged, which is a
+        # different answer from "this pair admits nothing".
+        state, slot = self._slot_with_accessory()
+
+        result = runner._handle_find_csg_at_point(
+            state, {"memberKey": "accessory:Wedge#3", "point": [0, 0, 0],
+                    "heldGeometry": {"kind": "plane", "normal": [0, 0, 1]},
+                    "look": [0, 1, 0]}, slot)
+
+        assert result["verdict"] is None
+
+    def test_it_carries_every_key_the_viewer_reads(self):
+        state, slot = self._slot_with_accessory()
+
+        result = runner._handle_find_csg_at_point(
+            state, {"memberKey": "accessory:Wedge#3", "point": [0, 0, 0]}, slot)
+
+        for key in ("path", "reference", "at", "candidates", "candidateCount",
+                    "featureType", "nodeDisplayName", "highlightMesh", "stats"):
+            assert key in result, key
+
+    def test_but_a_timber_with_nothing_cached_is_still_a_fault(self):
+        # Timbers are cached with their CSG or not at all, so this one is a bug
+        # worth hearing about rather than a place with nothing in it.
+        state, slot = self._slot_with_accessory()
+
+        with pytest.raises(ValueError):
+            runner._handle_find_csg_at_point(
+                state, {"memberKey": "brokenTimber#0", "point": [0, 0, 0]}, slot)
