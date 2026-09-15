@@ -3807,6 +3807,7 @@ class KigumiViewerApp extends LitElement {
             b: end(preview.other, placed && placed.b),
             plane: preview.plane || null,
             kind: preview.kind || null,
+            angle: preview.angle || null,
         };
     }
 
@@ -3829,6 +3830,7 @@ class KigumiViewerApp extends LitElement {
             held,
             other: anchor,
             anchors: verdict.anchors || null,
+            angle: verdict.angle || null,
             plane: verdict.plane || null,
             kind: verdict.kinds[0],
         } : null;
@@ -6828,7 +6830,8 @@ class KigumiViewerApp extends LitElement {
         // wrong units beside it.
         if (value.unit === 'angle') {
             this._drawAngle(into, viewport, pageRect, from, to,
-                            status.formA, status.formB, value, options);
+                            status.formA, status.formB, value,
+                            { ...options, rays: measure.angle || null });
             return;
         }
 
@@ -6920,14 +6923,32 @@ class KigumiViewerApp extends LitElement {
             return size > 0 ? { x: run.x / size, y: run.y / size } : null;
         };
 
-        const fromDirection = screenDirection(from, formA.direction);
-        const toDirection = screenDirection(to, formB.direction);
+        // The corner the runner placed, when it placed one: a vertex on the
+        // line the two features share, and the two ways it opens, already on
+        // the side the material is. Drawing from each feature's own anchor and
+        // its own direction instead put the vertex wherever two unrelated
+        // screen lines happened to cross, which was often off both features --
+        // and for two faces those "directions" were their NORMALS.
+        const rays = options.rays || null;
+        const at = rays ? rays.vertex : null;
+        const fromDirection = rays
+            ? screenDirection(at, rays.from) : screenDirection(from, formA.direction);
+        const toDirection = rays
+            ? screenDirection(at, rays.to) : screenDirection(to, formB.direction);
         if (!fromDirection || !toDirection) {
             return;
         }
+        // Both rays leave the SAME point when there is a corner, so the layout
+        // has no two lines to intersect and takes the vertex as given.
+        const fromPoint = this._projectToPage(rays ? at : from, viewport, pageRect);
+        const toPoint = rays
+            ? {
+                x: fromPoint.x + toDirection.x * MEASUREMENT_ANGLE_RADIUS_PX,
+                y: fromPoint.y + toDirection.y * MEASUREMENT_ANGLE_RADIUS_PX,
+            }
+            : this._projectToPage(to, viewport, pageRect);
         const layout = KigumiMeasurements.angleLayout(
-            this._projectToPage(from, viewport, pageRect), fromDirection,
-            this._projectToPage(to, viewport, pageRect), toDirection,
+            fromPoint, fromDirection, toPoint, toDirection,
             { radius: MEASUREMENT_ANGLE_RADIUS_PX },
         );
         if (!layout) {

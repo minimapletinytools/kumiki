@@ -129,11 +129,20 @@
      * structured kind against them matched nothing, so every measurement a
      * python file declared with a kind read as `kind-unavailable`.
      */
-    function kindName(kind) {
+    function kindName(kind, space) {
         if (!kind) {
             return null;
         }
         if (typeof kind === 'string') {
+            // `angle` composes for a SOLID angle and is also what everything
+            // written before spaces called a projected one, so a bare name
+            // cannot say which it is. Where the caller knows the space, it
+            // settles it; otherwise the older reading wins, as it does in
+            // python. Without this the solid name was upgraded to the projected
+            // one and every rule below about solid angles was unreachable.
+            if (space === '3d' && SOLID_KIND_NAMES.indexOf(kind) !== -1) {
+                return kind;
+            }
             return normalizeKind(kind);
         }
         const operation = kind.operation || 'distance';
@@ -168,13 +177,7 @@
                 direction: kind.direction || 'perpendicular',
             };
         }
-        // A solid name is composed as it stands. Putting it through the legacy
-        // map first turned the solid `angle` into the projected one, which is
-        // the very ambiguity this exists to settle -- and only a name that IS a
-        // solid kind may skip it, or a pre-spaces name like `aligned` would be
-        // read as an operation called "aligned".
-        const name = (space === '3d' && SOLID_KIND_NAMES.indexOf(kind) !== -1)
-            ? kind : kindName(kind);
+        const name = kindName(kind, space);
         const parts = name.split('_');
         const projected = parts[0] === 'projected';
         if (projected) {
@@ -223,9 +226,18 @@
             return { form: 'line', direction: normalized(geometry.direction || [0, 0, 0]) };
         }
         if (geometry.kind === 'plane') {
-            return { form: 'plane', direction: normalized(geometry.normal || [0, 0, 0]) };
+            // The NORMAL, under its own name. It was carried as `direction`
+            // once, which is the field meaning "the way this feature runs as
+            // drawn" -- so an angle between two faces built its arc out of two
+            // normals and pointed at nothing.
+            return { form: 'plane', normal: normalized(geometry.normal || [0, 0, 0]) };
         }
         return { form: 'none' };
+    }
+
+    /** What a solid form is oriented by: a line's direction, a plane's normal. */
+    function orientationOf(form) {
+        return (form && (form.normal || form.direction)) || null;
     }
 
     /**
@@ -238,10 +250,12 @@
      * line lying in a plane a crossing.
      */
     function solidParallel(formA, formB) {
-        if (!formA.direction || !formB.direction) {
+        const one = orientationOf(formA);
+        const other = orientationOf(formB);
+        if (!one || !other) {
             return null;
         }
-        const alignment = Math.abs(dot(formA.direction, formB.direction));
+        const alignment = Math.abs(dot(one, other));
         return formA.form === formB.form
             ? alignment > 1 - PARALLEL_EPSILON
             : alignment < PARALLEL_EPSILON;
@@ -346,13 +360,23 @@
             delta[2] - gaze[2] * along,
         ];
 
-        const named = kindName(kind);
+        const named = kindName(kind, axes && axes.space);
 
         if (named === 'angle') {
-            // In the solid. A plane is given by its NORMAL and a line by its
-            // DIRECTION, so a line against a plane is the complement: the line
-            // lies in the plane exactly when it runs square to the normal.
-            const facing = Math.min(1, Math.abs(dot(formA.direction, formB.direction)));
+            // From the RAYS when the measurement has them: they are the two
+            // ways the corner opens, so the number and the arc drawn from them
+            // are one answer. Normals alone cannot tell 45 degrees from 135 --
+            // they give the same absolute dot either way -- which is the whole
+            // reason the side has to be settled where the corner is.
+            if (axes && axes.rays) {
+                const facing = Math.max(-1, Math.min(1,
+                    dot(normalized(axes.rays.from), normalized(axes.rays.to))));
+                return { unit: 'angle', value: Math.acos(facing) * 180 / Math.PI };
+            }
+            // No rays: a pair that makes no corner, or an older measurement.
+            const one = orientationOf(formA);
+            const other = orientationOf(formB);
+            const facing = Math.min(1, Math.abs(dot(one, other)));
             const between = Math.acos(facing) * 180 / Math.PI;
             return {
                 unit: 'angle',
@@ -368,7 +392,7 @@
                 // To a plane, the distance is taken along its normal.
                 return {
                     unit: 'length',
-                    value: Math.abs(dot(delta, normalized(plane.direction))),
+                    value: Math.abs(dot(delta, normalized(plane.normal))),
                 };
             }
             const solidLine = formA.form === 'line' ? formA
@@ -557,7 +581,8 @@
         // sheet, so "not orthographic" does not mean "solid". A kind says its
         // own space; without one, the view says, and only the 3D view has no
         // sheet to project onto.
-        const solid = measureSpace(measure, options) === '3d';
+        const space = measureSpace(measure, options);
+        const solid = space === '3d';
         const formA = solid
             ? solidForm(measure.a.geometry)
             : projectedForm(measure.a.geometry, look);
@@ -570,7 +595,7 @@
         if (available.length === 0) {
             return { drawable: false, reason: 'not-measurable', formA, formB };
         }
-        const wanted = kindName(measure.kind);
+        const wanted = kindName(measure.kind, space);
         if (wanted && available.indexOf(wanted) === -1) {
             return {
                 drawable: false, reason: 'kind-unavailable',
@@ -581,7 +606,8 @@
         // The plane's look, not the viewport's, for the same reason the forms
         // were taken with it: the two have to describe one projection.
         const value = measureValue(
-            kind, measure.a.at, measure.b.at, formA, formB, { ...axes, look });
+            kind, measure.a.at, measure.b.at, formA, formB,
+            { ...axes, look, space, rays: measure.angle || null });
         if (value.unit === 'length' && value.value < DEGENERATE_WORLD) {
             return { drawable: false, reason: 'degenerate', kind, formA, formB };
         }
@@ -771,6 +797,7 @@
         kindName,
         kindWire,
         solidForm,
+        orientationOf,
         solidKinds,
         solidParallel,
         measurementStatus,

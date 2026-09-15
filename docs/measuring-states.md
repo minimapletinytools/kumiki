@@ -112,6 +112,14 @@ the second was wrong.
 - **A written measurement carries its own plane**, fixed at creation. In the 3D
   view that plane comes partly from where the camera was; the value must not
   drift when the reader orbits afterwards.
+- **An angle is a corner, placed where the corner is.** The runner works out a
+  vertex on the line the two features share and two rays from it, and the viewer
+  draws that — it decides nothing. The value is read off the same two rays, so
+  the number and the arc cannot disagree; normals alone give the same absolute
+  dot for 45° and 135°, which is why the side has to be settled where the corner
+  is. Which side: where each feature actually reaches, and for an edge that
+  straddles the vertex, the OTHER feature's outward normal — an edge's own
+  normal is square to it and cannot choose a direction along it.
 - **A distance to a face is square to the face.** In the solid a face is a
   plane, not the line a face draws as when seen edge-on from a sheet, so the
   anchor is chosen on whichever end has less freedom — a point has none, a line

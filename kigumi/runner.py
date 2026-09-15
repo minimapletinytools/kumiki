@@ -2011,7 +2011,10 @@ def _pick_verdict(
     return {
         "kinds": kinds,
         "plane": plane,
-        "anchors": _anchors_for_pick(state, located_pick, timber, payload, slot_state),
+        # Where it would sit: anchors for a distance, a corner for an angle.
+        # By the rules that place it once written, so the preview IS the
+        # measurement rather than a likeness of one.
+        **_pick_placement(state, located_pick, timber, payload, slot_state),
         "reason": None,
     }
 
@@ -2049,55 +2052,58 @@ def _kinds_for_pair(
     return projected_kinds(one, other, look)
 
 
-def _anchors_for_pick(
+def _pick_placement(
     state: Any, located_pick: Any, timber: Any, payload: Dict[str, Any], slot_state: Any,
-) -> Optional[Dict[str, List[float]]]:
-    """Where a measurement to this pick would attach, at both ends.
+) -> Dict[str, Any]:
+    """Where a measurement to this pick would sit: its anchors, or its corner.
 
-    None unless something is held. The held end is resolved from its REFERENCE
-    rather than sent along as geometry, so this goes through exactly the code a
-    written measurement goes through -- the alternative is a second way of
-    working out the same answer, and the two drifted: a half-made measurement
-    was drawn at each feature's own middle while the finished one went to the
-    middle of their overlap.
+    Both from the same pair of spans and the same rules that place a written
+    measurement, so what is drawn while deciding is where it lands once decided.
+    A distance gets anchors and an angle gets a vertex and two rays; neither
+    gets the other, and a pair that admits nothing gets nothing.
+
+    The held end is resolved from its REFERENCE rather than sent along as
+    geometry, so this goes through exactly the code a written measurement goes
+    through -- the alternative is a second way of working out the same answer,
+    and the two drifted: a half-made measurement was drawn at each feature's own
+    middle while the finished one went to the middle of their overlap.
     """
-    from kumiki.drawing import MeasurementKind, distance_anchors
+    from kumiki.drawing import (MeasurementSpace, angle_rays, distance_anchors)
 
+    empty = {"anchors": None, "angle": None}
     held = payload.get("heldReference")
     look = payload.get("look")
     if not held or not look or located_pick is None:
-        return None
+        return empty
     ss = slot_state if slot_state is not None else state._active
     frame = getattr(ss, "frame", None)
     if frame is None:
-        return None
-
-    from kumiki.drawing import MeasurementSpace
+        return empty
 
     solid = _pick_space(payload) is MeasurementSpace.THREE_D
     plane = _plane_for_pick(located_pick, timber, payload)
     normal = (plane or {}).get("normal") or look
     placed = _resolve_anchor_placed(frame, held, normal, solid)
     if placed is None or placed[1] is None:
-        return None
+        return empty
     held_span = placed[1]
 
     picked_span = _measure_span(
         located_pick[0], located_pick[1], timber, located_pick[2],
         _root_csg_of(ss, payload.get("memberKey")), normal, solid)
     if picked_span is None:
-        return None
+        return empty
 
     geometry = _located_geometry_payload(located_pick[2], timber)
     admitted = _kinds_for_pair(placed[0].get("geometry"), geometry, normal, payload)
     if not admitted:
-        return None
+        return empty
     kind = admitted[0]
-    if kind.operation.value != "distance":
-        return None
+    if kind.operation.value == "angle":
+        return {"anchors": None, "angle": angle_rays(held_span, picked_span)}
     axes = {"look": look, "right": payload.get("right"), "up": payload.get("up")}
     at_held, at_picked = distance_anchors(held_span, picked_span, kind, axes)
-    return {"a": list(at_held), "b": list(at_picked)}
+    return {"anchors": {"a": list(at_held), "b": list(at_picked)}, "angle": None}
 
 
 def _root_csg_of(ss: Any, member_key: Optional[str]):
@@ -2673,6 +2679,54 @@ def _projects_to_a_point(direction: Sequence[float], plane_normal: Sequence[floa
         > 1 - ALIGNMENT_EPSILON
 
 
+def _edge_outward_normal(feature: Any, node: Any, timber: Any) -> Optional[Tuple[float, ...]]:
+    """Which way is out of the material across an edge, or None.
+
+    An arris bisects the two faces that form it, so the way out of it is the
+    average of their outward normals. Both kinds of edge can say which two
+    faces those are: a declared arris names them, and a derived edge IS the
+    meeting of two face hits and carries both.
+
+    Only ever used to decide which of two supplementary angles is meant, and
+    only when where the features REACH cannot say -- so None is a fair answer
+    and the caller falls back to that.
+    """
+    from kumiki.cutcsg import (DerivedEdgeFeature, SimpleRectangularPrismEdgeFeature,
+                               SimpleRectangularPrismFeature)
+    from kumiki.geometry import Plane
+
+    located = []
+    if isinstance(feature, DerivedEdgeFeature):
+        for parent in (feature.a, feature.b):
+            if parent is not None:
+                located.append(parent.locate())
+    elif isinstance(feature, SimpleRectangularPrismEdgeFeature):
+        for face in feature.faces:
+            located.append(SimpleRectangularPrismFeature(name=feature.name, face=face).locate(node))
+    else:
+        return None
+
+    normals = []
+    for found in located:
+        if isinstance(found, Plane):
+            normals.append(_normalize(_direction_to_world(found.normal, timber)))
+    if len(normals) != 2:
+        return None
+    total = [normals[0][i] + normals[1][i] for i in range(3)]
+    if not any(abs(part) > 1e-9 for part in total):
+        # Two faces looking opposite ways do not form an edge, and their
+        # average says nothing about a side.
+        return None
+    return tuple(_normalize(total))
+
+
+def _direction_to_world(direction: Any, timber: Any) -> List[float]:
+    """A direction rotated into world space. Rotated but not translated."""
+    origin = timber.transform.local_to_global(direction * 0)
+    moved = timber.transform.local_to_global(direction)
+    return [moved[i, 0] - origin[i, 0] for i in range(3)]
+
+
 def _measure_span(
     feature: Any, node: Any, timber: Any, located: Any, root_csg: Any,
     plane_normal: Optional[Sequence[float]],
@@ -2744,7 +2798,8 @@ def _measure_span(
                 return MeasureSpan(at=middle)
             return MeasureSpan(
                 at=start, direction=tuple(direction),
-                interval=(0.0, math.dist(start, end)))
+                interval=(0.0, math.dist(start, end)),
+                outward=_edge_outward_normal(feature, node, timber))
 
     if isinstance(located, Plane):
         cropped = approximately_crop_plane_to_area_on_csg(
@@ -2802,7 +2857,8 @@ def _resolve_measurement(
     """
     from kumiki.drawing import (MeasurementDirection, MeasurementKind,
                                MeasurementOperation, MeasurementSpace,
-                               distance_anchors, projected_kinds, solid_kinds)
+                               angle_rays, distance_anchors, projected_kinds,
+                               solid_kinds)
 
     resolved = dict(measure)
     broken = []
@@ -2851,12 +2907,17 @@ def _resolve_measurement(
             if solid else projected_kinds(
                 resolved["a"].get("geometry"), resolved["b"].get("geometry"), plane))
         kind = declared or (admitted[0] if admitted else None)
-        # An angle uses no anchor positions at all, and where it should sit is
-        # its own question. A pair that admits nothing has nothing to place.
         if kind is not None and kind.operation is MeasurementOperation.DISTANCE:
             at_a, at_b = distance_anchors(spans["a"], spans["b"], kind, axes)
             resolved["a"] = {**resolved["a"], "at": list(at_a)}
             resolved["b"] = {**resolved["b"], "at": list(at_b)}
+        elif kind is not None and kind.operation is MeasurementOperation.ANGLE:
+            # Where the corner IS and which two ways it opens, worked out from
+            # both features together. The viewer used to build the arc from each
+            # feature's own anchor and its normal, which put the vertex wherever
+            # two unrelated screen lines happened to cross -- often touching
+            # neither of the features being measured.
+            resolved["angle"] = angle_rays(spans["a"], spans["b"])
     return resolved
 
 

@@ -318,6 +318,10 @@ class MeasureSpan:
     direction: Optional[Tuple[float, float, float]] = None
     interval: Optional[Tuple[float, float]] = None
     normal: Optional[Tuple[float, float, float]] = None
+    #: For a LINE, the way out of the material across it -- an arris bisects the
+    #: two faces that form it. Only used to decide which side an angle opens on,
+    #: and absent whenever nothing could work it out.
+    outward: Optional[Tuple[float, float, float]] = None
 
     @property
     def is_point(self) -> bool:
@@ -407,6 +411,183 @@ def _foot_on_plane(span: MeasureSpan, point: Sequence[float]):
     unit = _unit(span.normal)
     gap = _dot([point[i] - span.at[i] for i in range(3)], unit)
     return tuple(point[i] - unit[i] * gap for i in range(3))
+
+
+def _closest_on_line(point, at, direction):
+    """Where a line comes nearest a point."""
+    unit = _unit(direction)
+    step = _dot([point[i] - at[i] for i in range(3)], unit)
+    return tuple(at[i] + unit[i] * step for i in range(3))
+
+
+def _plane_crossing(first: MeasureSpan, second: MeasureSpan):
+    """The line two planes share: a point on it and its direction, or None.
+
+    None when they are parallel, which has no corner to stand in -- and admits a
+    distance rather than an angle anyway.
+    """
+    one, other = _unit(first.normal), _unit(second.normal)
+    along = _cross(one, other)
+    # The UNNORMALISED cross, because the closed form below divides by its
+    # square length. Normalising first and dividing by one puts the point out by
+    # a factor of the sine between the planes, which is right only when they
+    # happen to meet square.
+    scale = _dot(along, along)
+    if scale < PARALLEL_EPSILON:
+        return None
+    reach_one, reach_other = _dot(one, first.at), _dot(other, second.at)
+    part_one, part_other = _cross(other, along), _cross(along, one)
+    point = tuple(
+        (reach_one * part_one[i] + reach_other * part_other[i]) / scale
+        for i in range(3))
+    return point, _unit(along)
+
+
+def _ray_toward(ray, vertex, span: MeasureSpan, other: Optional[MeasureSpan] = None):
+    """A unit ray from `vertex`, turned to point at where the feature is.
+
+    Which of the two supplementary angles is meant is decided here, and where
+    the feature actually lies is usually what says it: a face reaches off to one
+    side of the corner, and an arris runs away from it.
+
+    An edge that STRADDLES the vertex reaches equally both ways and says
+    nothing. The other feature's outward normal says it instead -- the way out
+    of the material across it -- because the angle a reader means is the one
+    with both timbers in it. Note it is the OTHER feature's: an edge's own
+    normal is square to the edge, so it cannot choose a direction along it.
+    """
+    unit = _unit(ray)
+    if not any(abs(part) > 1e-9 for part in unit):
+        return None
+    if span.is_line:
+        stations = [_dot([end[i] - vertex[i] for i in range(3)], unit)
+                    for end in span.ends()]
+        low, high = min(stations), max(stations)
+        straddles = low < -1e-9 < 1e-9 < high
+        outward = other.outward if other is not None else None
+        if straddles and outward is not None:
+            lean = -_dot(unit, _unit(outward))
+        else:
+            # The longer side, which for an edge running off one way is that way.
+            lean = high + low
+    else:
+        lean = _dot(unit, [span.at[i] - vertex[i] for i in range(3)])
+    return tuple(-part for part in unit) if lean < 0 else unit
+
+
+def angle_rays(first: MeasureSpan, second: MeasureSpan):
+    """Where an angle between two features is, and which two ways it opens.
+
+    A vertex and two unit rays from it, in world space, as
+    `{"vertex", "from", "to"}` -- or None when the pair makes no corner.
+
+    Worked out here rather than in the viewer for the same reason the anchors of
+    a distance are: an angle drawn from one derivation and labelled from another
+    will eventually disagree, and the disagreement is a picture that means
+    nothing next to a number that is right.
+
+    THE RAYS DECIDE THE VALUE. The angle a reader wants is the one the two
+    features actually subtend -- the corner they make, not its supplement -- so
+    it is read off the rays rather than from the features' normals, which cannot
+    tell 45 degrees from 135.
+    """
+    if first is None or second is None:
+        return None
+    if first.is_plane and second.is_plane:
+        crossing = _plane_crossing(first, second)
+        if crossing is None:
+            return None
+        point, along = crossing
+        middle = tuple((first.at[i] + second.at[i]) / 2 for i in range(3))
+        vertex = _closest_on_line(middle, point, along)
+        # Square to the shared corner, and lying in its own face.
+        rays = (_ray_toward(_cross(along, _unit(first.normal)), vertex, first),
+                _ray_toward(_cross(along, _unit(second.normal)), vertex, second))
+    elif first.is_line and second.is_line:
+        placed = _closest_between(first, second)
+        if placed is None:
+            return None
+        vertex = placed
+        rays = (_ray_toward(first.direction, vertex, first, second),
+                _ray_toward(second.direction, vertex, second, first))
+    elif first.is_line or second.is_line:
+        line, plane = (first, second) if first.is_line else (second, first)
+        vertex = _line_meets_plane(line, plane)
+        if vertex is None:
+            return None
+        in_plane = _flatten_onto(line.direction, plane.normal)
+        if in_plane is None:
+            return None
+        line_ray = _ray_toward(line.direction, vertex, line, plane)
+        plane_ray = _ray_toward(in_plane, vertex, plane)
+        rays = (line_ray, plane_ray) if first.is_line else (plane_ray, line_ray)
+    else:
+        return None
+    if rays[0] is None or rays[1] is None:
+        return None
+    return {"vertex": list(vertex), "from": list(rays[0]), "to": list(rays[1])}
+
+
+def _closest_between(first: MeasureSpan, second: MeasureSpan):
+    """Where two lines come nearest each other, kept on both.
+
+    Two edges in a frame are skew as often as they cross, so there is usually no
+    single point on both. The midpoint of their nearest approach is the honest
+    place to stand, and each station is clamped to what survives of its edge so
+    the arc lands on the timber rather than out past the end of it.
+    """
+    one, other = _unit(first.direction), _unit(second.direction)
+    facing = _dot(one, other)
+    spread = 1 - facing * facing
+    if spread < PARALLEL_EPSILON:
+        return None
+    gap = [first.at[i] - second.at[i] for i in range(3)]
+    lean_one, lean_other = _dot(one, gap), _dot(other, gap)
+    station_one = (facing * lean_other - lean_one) / spread
+    station_other = (lean_other - facing * lean_one) / spread
+    station_one = _clamp_to(station_one, first.interval)
+    station_other = _clamp_to(station_other, second.interval)
+    on_one = [first.at[i] + one[i] * station_one for i in range(3)]
+    on_other = [second.at[i] + other[i] * station_other for i in range(3)]
+    return tuple((on_one[i] + on_other[i]) / 2 for i in range(3))
+
+
+def _clamp_to(station: float, interval):
+    if interval is None:
+        return station
+    low, high = interval
+    return max(low, min(high, station))
+
+
+def _line_meets_plane(line: MeasureSpan, plane: MeasureSpan):
+    """Where a line crosses a plane, or its nearest point when it runs flat."""
+    unit, normal = _unit(line.direction), _unit(plane.normal)
+    rate = _dot(unit, normal)
+    if abs(rate) < PARALLEL_EPSILON:
+        # Running along the face: it never crosses, so stand where the edge is
+        # and drop that onto the face.
+        return _foot_on_plane(plane, _representative_point(line))
+    step = _dot([plane.at[i] - line.at[i] for i in range(3)], normal) / rate
+    step = _clamp_to(step, line.interval)
+    return tuple(line.at[i] + unit[i] * step for i in range(3))
+
+
+def _flatten_onto(direction, normal):
+    """The part of a direction that lies in a plane."""
+    unit, up = _unit(direction), _unit(normal)
+    along = _dot(unit, up)
+    flat = [unit[i] - up[i] * along for i in range(3)]
+    if not any(abs(part) > 1e-9 for part in flat):
+        return None
+    return _unit(flat)
+
+
+def angle_between(rays) -> Optional[float]:
+    """The angle the rays open, in degrees. The value a reader sees."""
+    if not rays:
+        return None
+    facing = max(-1.0, min(1.0, _dot(_unit(rays["from"]), _unit(rays["to"]))))
+    return math.degrees(math.acos(facing))
 
 
 def distance_anchors(

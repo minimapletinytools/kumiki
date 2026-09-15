@@ -609,10 +609,13 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         sys.modules["kigumi_runner_preview"] = runner
         spec.loader.exec_module(runner)
 
-        source = inspect.getsource(runner._anchors_for_pick)
+        source = inspect.getsource(runner._pick_placement)
 
         assert "_resolve_anchor_placed" in source
         assert "distance_anchors" in source
+        # And an angle is placed by the same rules from the same spans, rather
+        # than by a second derivation in the viewer.
+        assert "angle_rays" in source
 
     def test_a_pick_with_nothing_held_places_nothing(self):
         import importlib.util
@@ -626,9 +629,10 @@ class TestTheHalfMadeMeasurementIsPlacedLikeTheFinishedOne:
         sys.modules["kigumi_runner_preview2"] = runner
         spec.loader.exec_module(runner)
 
-        assert runner._anchors_for_pick(None, None, None, {}, None) is None
-        assert runner._anchors_for_pick(
-            None, None, None, {"heldReference": {"timber": "t"}}, None) is None
+        nothing = {"anchors": None, "angle": None}
+        assert runner._pick_placement(None, None, None, {}, None) == nothing
+        assert runner._pick_placement(
+            None, None, None, {"heldReference": {"timber": "t"}}, None) == nothing
 
 
 class TestAPlacedAnchorStaysPlaced:
@@ -848,3 +852,164 @@ class TestAFaceIsOnlyAPlaneInTheSolid:
 
     def test_in_the_solid_it_is(self):
         assert self._span(True).is_plane is True
+
+
+class TestWhereAnAngleSits:
+    """A corner, and which of its two supplementary angles is meant.
+
+    The arc used to be built in the viewer from each feature's own anchor and
+    its own `direction` -- which for a face in the solid was its NORMAL. The
+    vertex was then wherever two unrelated screen lines happened to cross, often
+    touching neither feature, and the value was acos of an absolute dot, which
+    cannot tell 45 degrees from 135.
+    """
+
+    def _span(self, **fields):
+        from kumiki.drawing import MeasureSpan
+
+        return MeasureSpan(**fields)
+
+    def _rays(self, first, second):
+        from kumiki.drawing import angle_rays
+
+        return angle_rays(first, second)
+
+    def _value(self, rays):
+        from kumiki.drawing import angle_between
+
+        return angle_between(rays)
+
+    def test_the_vertex_sits_on_the_line_the_two_faces_share(self):
+        # Both planes pass through the z axis, so the corner is the z axis.
+        rays = self._rays(
+            self._span(at=(-300, 0, 500), normal=(0, 1, 0)),
+            self._span(at=(0, -300, 500), normal=(1, 0, 0)))
+
+        vertex = rays["vertex"]
+        assert abs(vertex[0]) < 1e-9 and abs(vertex[1]) < 1e-9
+
+    def test_and_near_the_features_rather_than_anywhere_on_it(self):
+        # The corner line runs the whole height of the frame; the arc belongs
+        # beside the two faces, which sit at z = 500.
+        rays = self._rays(
+            self._span(at=(-300, 0, 500), normal=(0, 1, 0)),
+            self._span(at=(0, -300, 500), normal=(1, 0, 0)))
+
+        assert abs(rays["vertex"][2] - 500) < 1e-9
+
+    def test_each_ray_lies_in_its_own_face(self):
+        first = self._span(at=(-300, 0, 500), normal=(0, 1, 0))
+        second = self._span(at=(0, -300, 500), normal=(1, 0, 0))
+
+        rays = self._rays(first, second)
+
+        # Square to the face's normal is what "in the face" means.
+        assert abs(sum(rays["from"][i] * first.normal[i] for i in range(3))) < 1e-9
+        assert abs(sum(rays["to"][i] * second.normal[i] for i in range(3))) < 1e-9
+
+    def test_which_side_the_material_is_on_decides_the_angle(self):
+        """The same two planes read 45 or 135 by where the faces actually are.
+
+        This is the whole reason the rays exist: the normals are identical in
+        both cases, so anything derived from them alone gives one answer to two
+        different questions.
+        """
+        slope = (0.7071067811865476, 0.7071067811865476, 0)
+
+        shallow = self._rays(self._span(at=(-300, 0, 0), normal=(0, 1, 0)),
+                             self._span(at=(-300, 300, 0), normal=slope))
+        wide = self._rays(self._span(at=(300, 0, 0), normal=(0, 1, 0)),
+                          self._span(at=(-300, 300, 0), normal=slope))
+
+        assert round(self._value(shallow), 6) == 45.0
+        assert round(self._value(wide), 6) == 135.0
+
+    def test_two_edges_meeting_at_a_corner_open_away_from_it(self):
+        along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 400.0))
+        up = self._span(at=(0, 0, 0), direction=(0, 1, 0), interval=(0.0, 400.0))
+
+        rays = self._rays(along, up)
+
+        assert [round(v, 6) for v in rays["vertex"]] == [0.0, 0.0, 0.0]
+        # Each ray runs along its own edge, into the part that exists.
+        assert [round(v, 6) for v in rays["from"]] == [1.0, 0.0, 0.0]
+        assert [round(v, 6) for v in rays["to"]] == [0.0, 1.0, 0.0]
+
+    def test_skew_edges_stand_between_them(self):
+        # Two edges that never meet. The nearest approach is the honest place.
+        along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 400.0))
+        over = self._span(at=(0, 0, 400), direction=(0, 1, 0), interval=(0.0, 400.0))
+
+        rays = self._rays(along, over)
+
+        assert [round(v, 6) for v in rays["vertex"]] == [0.0, 0.0, 200.0]
+
+    def test_the_vertex_is_kept_on_the_edges(self):
+        """Clamped to what survives, so the arc lands on the timber.
+
+        Two edges can come nearest each other far past the end of both.
+        """
+        along = self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 100.0))
+        over = self._span(at=(900, 0, 50), direction=(0, 1, 0), interval=(0.0, 100.0))
+
+        rays = self._rays(along, over)
+
+        # x is clamped to the end of the first edge, not carried out to 900.
+        assert rays["vertex"][0] <= 900
+
+    def test_an_edge_running_into_a_face(self):
+        face = self._span(at=(0, 0, 0), normal=(0, 0, 1))
+        into = self._span(at=(100, 100, 300), direction=(0, 0.7071067811865476,
+                                                        -0.7071067811865476),
+                          interval=(0.0, 500.0))
+
+        rays = self._rays(face, into)
+
+        # It crosses the face at z = 0.
+        assert abs(rays["vertex"][2]) < 1e-6
+        assert round(self._value(rays), 4) == 45.0
+
+    def test_parallel_faces_make_no_corner(self):
+        assert self._rays(self._span(at=(0, 0, 0), normal=(0, 0, 1)),
+                          self._span(at=(0, 0, 100), normal=(0, 0, 1))) is None
+
+    def test_parallel_edges_make_no_corner(self):
+        assert self._rays(
+            self._span(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 100.0)),
+            self._span(at=(0, 50, 0), direction=(1, 0, 0), interval=(0.0, 100.0))) is None
+
+    def test_an_edge_straddling_the_vertex_asks_the_other_edge_s_normal(self):
+        """Where the feature REACHES says nothing, so a normal decides instead.
+
+        An edge crossing the corner reaches both ways. It is the OTHER edge's
+        outward normal that settles it, not its own: an edge's normal is square
+        to the edge and so cannot choose a direction ALONG it. What it can
+        choose is which side of ITSELF the arc opens on, which is the other ray
+        -- and the angle wanted is the one with both timbers in it.
+
+        Deliberately LOPSIDED about the vertex. Symmetric, the fallback (the
+        longer side) and the normal happen to agree, and the test would pass
+        with this rule taken out.
+        """
+        # Reaches 100 one way and 300 the other, so "the longer side" says +x.
+        crossing = self._span(at=(-100, 0, 0), direction=(1, 0, 0),
+                              interval=(0.0, 400.0), outward=(0, -1, 0))
+        # Its material lies on -x, so the arc should open that way instead.
+        other = self._span(at=(0, -200, 0), direction=(0, 1, 0),
+                           interval=(0.0, 400.0), outward=(1, 0, 0))
+
+        rays = self._rays(crossing, other)
+
+        assert [round(v, 6) for v in rays["from"]] == [-1.0, 0.0, 0.0]
+
+    def test_and_with_no_normal_to_ask_it_takes_the_longer_side(self):
+        # Nothing said which side the material is on, so the arc goes with the
+        # part of the edge there is more of, rather than refusing to draw.
+        crossing = self._span(at=(-100, 0, 0), direction=(1, 0, 0),
+                              interval=(0.0, 400.0))
+        other = self._span(at=(0, -200, 0), direction=(0, 1, 0),
+                           interval=(0.0, 400.0))
+
+        rays = self._rays(crossing, other)
+
+        assert [round(v, 6) for v in rays["from"]] == [1.0, 0.0, 0.0]
