@@ -321,7 +321,18 @@ describe('the kind dropdown compares names, not the object a kind arrives as', (
         expect(body).toContain('kindName');
     });
 
-    test('and still offers nothing when there is only one choice', () => {
-        expect(body).toContain('available.length < 2');
+    test('it offers a choice only when there is more than one to make', () => {
+        // Counting the written kind when this view cannot draw it: that one is
+        // listed unselectable, and with it there IS something to change away
+        // from. Without it, one kind is a readout.
+        expect(body).toContain('const choices = available.length + (broken ? 1 : 0)');
+        expect(body).toContain('if (choices < 2)');
+    });
+
+    test('and says which kind it is either way', () => {
+        // The row is not withheld when there is nothing to choose -- which kind
+        // it is is worth saying even when it cannot be changed.
+        expect(body).toContain('ip-detail-value');
+        expect(body).toContain('viewer.measure.kind.');
     });
 });

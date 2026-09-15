@@ -88,12 +88,14 @@ export class SelectionPanel {
     }
 
     /**
-     * How the focused measurement is measured, when there is a choice.
+     * How the focused measurement is measured.
      *
-     * Only when there is one: a pair of points admits three kinds and a pair of
-     * crossing lines admits exactly one, and a dropdown with a single entry is
-     * a control that lies about being one. What it comes to is already on the
-     * row in the drawing panel, so this says how rather than how much.
+     * Always said; only OFFERED when there is something to offer. A pair of
+     * points admits three kinds and a pair of crossing lines admits exactly
+     * one, and a dropdown holding a single entry is a control that lies about
+     * being one -- so one kind reads out as a value and several become a
+     * choice. What the measurement comes to is already on the row in the
+     * drawing panel, so this says how rather than how much.
      */
     _measureKindRow(found) {
         const available = found.available || [];
@@ -114,7 +116,9 @@ export class SelectionPanel {
         // so it is listed, unselectable, and choosing anything else is the way
         // out of it.
         const broken = current && available.indexOf(current) === -1;
-        if (available.length < 2 && !broken) {
+        if (!current && available.length === 0) {
+            // Nothing is known about how this is measured, so there is nothing
+            // to say about it.
             return null;
         }
         const line = document.createElement('div');
@@ -123,6 +127,23 @@ export class SelectionPanel {
         label.className = 'ip-detail-label';
         label.textContent = this.t('viewer.selection.measureKind');
         line.appendChild(label);
+
+        // What the dropdown would hold: everything on offer, plus the written
+        // kind when this view cannot draw it -- that one is listed unselectable
+        // so the measurement is not misreported, and it counts, because with it
+        // there IS something to change away from.
+        const choices = available.length + (broken ? 1 : 0);
+        if (choices < 2) {
+            // Nothing to choose between. WHICH kind it is is still worth
+            // saying, so it is said as a value -- a dropdown holding a single
+            // entry is a control that lies about being one, and offering to
+            // change what cannot change is worse than reading it out.
+            const value = document.createElement('span');
+            value.className = 'ip-detail-value';
+            value.textContent = this.t(`viewer.measure.kind.${current || available[0]}`);
+            line.appendChild(value);
+            return line;
+        }
 
         const select = document.createElement('select');
         select.className = 'ip-kind';

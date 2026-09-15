@@ -3572,9 +3572,14 @@ class KigumiViewerApp extends LitElement {
             // the one most worth offering another kind for. measurementStatus
             // carries them on some answers only, but carries the forms they are
             // worked out from on every answer that got far enough to have any.
+            // In the space it was judged in: the forms carried on the status
+            // are solid ones for a 3D measurement, and asking the sheet's rule
+            // about a pair of PLANES gets nothing, since a sheet never has any.
             available: status.available
                 || (status.formA && status.formB
-                    ? KigumiMeasurements.availableKinds(status.formA, status.formB)
+                    ? (status.space === '3d'
+                        ? KigumiMeasurements.solidKinds(status.formA, status.formB)
+                        : KigumiMeasurements.availableKinds(status.formA, status.formB))
                     : []),
         };
     }
