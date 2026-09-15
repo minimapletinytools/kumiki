@@ -236,15 +236,20 @@ describe('the hover is asked again whenever the held end changes', () => {
     });
 });
 
-describe('the preview is not torn down by the highlight it belongs with', () => {
-    // drawHoverHighlight clears the outline it is about to replace, as its
-    // first line. Clearing the measurement preview in that same teardown erased
-    // the preview a moment after it was drawn -- the logs showed it decided,
-    // drawn, and cleared on every single hover, which looked exactly like a
-    // preview that never appeared.
+describe('what a redraw tears down, and what only a real clear does', () => {
+    // drawHoverHighlight removes the outline it is about to replace, as its
+    // first line. Anything ELSE forgotten in that teardown is forgotten in the
+    // middle of drawing, which is not a moment when the hover has gone away.
     //
-    // The preview is cleared where the pointer has actually gone: clearHover,
-    // and the branch of pumpHover where a click would take no feature.
+    // Two things were, and both were bugs. The measurement preview: decided,
+    // drawn, and erased on the very next statement, which on screen is a
+    // preview that never appears. And `_hoverDrawn`, the record of what is on
+    // screen: left null after every draw, so it said "nothing is drawn" while
+    // something was, and the redraw it guards never once short-circuited.
+    //
+    // Both are forgotten in _forgetHover, called where the pointer has actually
+    // gone: leaving the canvas, and the branch of pumpHover where a click would
+    // take no feature.
     const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
 
     function body(name) {
@@ -265,15 +270,34 @@ describe('the preview is not torn down by the highlight it belongs with', () => 
     }
 
     test('drawHoverHighlight still tears the outline down first', () => {
-        // If it stops doing this the test below stops meaning anything.
+        // If it stops doing this, every test below is about nothing.
         expect(body('drawHoverHighlight')).toContain('clearHoverOutline');
     });
 
-    test('taking down the outline does not take down the preview', () => {
-        expect(body('clearHoverOutline')).not.toContain('_updateMeasurePreview');
+    test.each(['_updateMeasurePreview', '_hoverDrawn'])(
+        'the teardown does not touch %s', (forgotten) => {
+            expect(body('clearHoverOutline')).not.toContain(forgotten);
+        },
+    );
+
+    test('the teardown disposes the outline, which is its whole job', () => {
+        expect(body('clearHoverOutline')).toContain('_disposeHighlightMesh');
     });
 
-    test('but leaving the canvas does', () => {
-        expect(body('clearHover')).toContain('_updateMeasurePreview(null)');
+    test.each(['_updateMeasurePreview(null)', '_hoverDrawn = null'])(
+        'forgetting the hover does %s', (forgotten) => {
+            expect(body('_forgetHover')).toContain(forgotten);
+        },
+    );
+
+    test('and leaving the canvas forgets the hover', () => {
+        expect(body('clearHover')).toContain('_forgetHover');
+    });
+
+    test('the redraw guard has something to compare against', () => {
+        // _hoverDrawn is set to the answer just drawn, so the next identical
+        // answer can be skipped. Without this the guard reads null every time.
+        expect(body('handleHoverResult')).toContain('this._hoverDrawn = message');
+        expect(body('handleHoverResult')).toContain('sameHighlight');
     });
 });

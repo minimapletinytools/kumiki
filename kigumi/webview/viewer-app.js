@@ -3275,8 +3275,7 @@ class KigumiViewerApp extends LitElement {
             // Either nothing under the pointer, or a click here would take the
             // whole timber rather than anything inside it.
             this._hover.clear();
-            this.clearHoverOutline();
-            this._updateMeasurePreview(null);
+            this._forgetHover();
             return;
         }
 
@@ -4181,14 +4180,32 @@ class KigumiViewerApp extends LitElement {
         this._hoverHighlightEdge = line;
     }
 
+    /**
+     * Take down the outline. NOTHING ELSE.
+     *
+     * drawHoverHighlight calls this as its first line, to remove the outline it
+     * is about to replace -- so anything forgotten here is forgotten in the
+     * middle of drawing, which is not a moment when the hover has gone away.
+     * That is what erased the measurement preview a statement after it was
+     * drawn, and what left `_hoverDrawn` null after every draw, so the record
+     * of what was on screen said "nothing" while something was.
+     */
     clearHoverOutline() {
-        this._hoverDrawn = null;
-        // NOT the measurement preview. drawHoverHighlight calls this first, to
-        // take down the outline it is about to replace -- so clearing the
-        // preview here erased it a moment after it was drawn, which looked
-        // exactly like a preview that never appeared.
         this._disposeHighlightMesh('_hoverHighlightMesh');
         this._disposeHighlightMesh('_hoverHighlightEdge');
+    }
+
+    /**
+     * The pointer is over nothing worth drawing: forget what was.
+     *
+     * The outline, the measurement preview, and the record of what is drawn --
+     * one thing between them, so they go together. Called where the hover has
+     * actually gone away, never from the teardown inside a redraw.
+     */
+    _forgetHover() {
+        this.clearHoverOutline();
+        this._hoverDrawn = null;
+        this._updateMeasurePreview(null);
     }
 
     /** Leaving the canvas, or changing mode: nothing should stay lit. */
@@ -4197,10 +4214,7 @@ class KigumiViewerApp extends LitElement {
             this._hover.clear();
         }
         this._hoverClient = null;
-        this.clearHoverOutline();
-        // Here, where the pointer has actually gone: nothing is being offered
-        // any more, so nothing should still be drawn as though it were.
-        this._updateMeasurePreview(null);
+        this._forgetHover();
     }
 
     handleCanvasClick(event) {
