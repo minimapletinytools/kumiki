@@ -1874,3 +1874,57 @@ class TestTheBroadphase:
 
         assert with_filter[0] == without[0]
         assert with_filter[2] == without[2]
+
+
+class TestAFeatureOnALabelledRoot:
+    """Pickable, and then never found again.
+
+    Navigation records a label only when it steps ONTO a child, so a feature
+    declared on a labelled ROOT comes back with an empty path. Refusing an empty
+    path on a labelled node made every such feature selectable and then
+    unresolvable -- a reference to it broke the moment anything looked it up.
+    Rafters and other timbers whose root carries a label are the case.
+    """
+
+    def _labelled_root(self, frame):
+        """A cut timber whose root carries a label AND declares features."""
+        for cut_timber in frame.cut_timbers:
+            roots, _ = runner._roots_for_path(cut_timber, ())
+            for root in roots:
+                if runner._label_name(root) is not None and root.get_declared_features():
+                    return cut_timber, root
+        return None, None
+
+    @pytest.fixture
+    def rooted(self):
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        return load_module(
+            "labelled_root_fixture",
+            root / "kigumi" / "test-fixtures" / "measured_frame.py",
+        ).build_frame()
+
+    def test_the_fixture_has_one_to_check(self, rooted):
+        # Without this, every test below would pass by being about nothing.
+        _, root = self._labelled_root(rooted)
+
+        assert root is not None
+        assert runner._label_name(root) is not None
+
+    def test_an_empty_path_means_the_node_you_are_on(self, rooted):
+        _, root = self._labelled_root(rooted)
+
+        assert runner._find_csg_by_labels(root, ()) is root
+
+    def test_so_a_feature_it_declares_can_be_found_again(self, rooted):
+        cut_timber, root = self._labelled_root(rooted)
+        name = root.get_declared_features()[0].name
+
+        found = runner._find_declared_feature(
+            cut_timber,
+            runner.deserialize_feature_path(
+                {"timber": cut_timber.name, "csgPath": [], "feature": name}).ref)
+
+        assert found is not None
+        assert found[0].name == name

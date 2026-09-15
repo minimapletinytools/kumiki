@@ -2280,7 +2280,14 @@ def _find_csg_by_labels(csg: Any, labels: Tuple[str, ...]) -> Optional[Any]:
     remaining = labels
     if label is not None:
         if not remaining:
-            return None
+            # No steps left, and this node is where we already are. A labelled
+            # ROOT is the case: navigation only records a label when it steps
+            # ONTO a child, so a feature declared on a labelled root comes back
+            # with an empty path -- and refusing that made every feature on such
+            # a timber pickable but unresolvable afterwards. There is no branch
+            # to choose here, so answering with the node we are on cannot pick
+            # the wrong one.
+            return csg
         wanted = ResolvedJointPath.parse(remaining[0])
         if label != wanted.path:
             # A labelled node that is not the one wanted: the wrong branch, and
