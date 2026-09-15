@@ -19,7 +19,7 @@ point it cannot hit exactly. See FeatureTestTolerances.
 """
 
 import re
-from typing import Callable, Dict, Iterator, List, Optional, Tuple, Union, cast
+from typing import Callable, Dict, Iterator, List, Optional, Sequence, Tuple, Union, cast
 from dataclasses import dataclass, field, replace
 from abc import ABC, abstractmethod
 from enum import Enum, Flag
@@ -516,6 +516,32 @@ def _drop_real_hits_off_boundary(
     return [hit for hit in hits if not hit.feature.real]
 
 
+def _corner_span_on_line(hit: 'OwnedFeatureHit', line: Line) -> Optional[Tuple[float, float]]:
+    """How far a face reaches along a line, as stations from the line's point.
+
+    None when the face cannot say where its corners are -- one that runs to
+    infinity, or a shape that does not work them out yet.
+    """
+    corners = getattr(hit.feature, "corners", None)
+    if corners is None:
+        return None
+    found = corners(hit.owner)
+    if not found:
+        return None
+    reach = [float(((corner - line.point).T * line.direction)[0, 0])
+             for corner in found]
+    return (min(reach), max(reach))
+
+
+def _box_around(points: Sequence[V3]) -> 'BoundingBox':
+    """The smallest axis-aligned box holding these points."""
+    reach = [[float(point[axis, 0]) for point in points] for axis in range(3)]
+    return BoundingBox(
+        min_x=scalar(repr(min(reach[0]))), min_y=scalar(repr(min(reach[1]))),
+        min_z=scalar(repr(min(reach[2]))), max_x=scalar(repr(max(reach[0]))),
+        max_y=scalar(repr(max(reach[1]))), max_z=scalar(repr(max(reach[2]))))
+
+
 def _finite_midpoint(start: Optional[Numeric], end: Optional[Numeric]) -> Numeric:
     """Midpoint of a possibly-infinite extent along an axis.
 
@@ -765,24 +791,43 @@ class DerivedEdgeFeature(CSGFeature):
         return intersect_planes(_as_plane(self.a.locate()), _as_plane(self.b.locate()))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Where this edge sits -- only approximately, and deliberately so.
+        """Where this edge sits, and where it ends when its parents can say.
 
-        `ends` is None and `anchor` is the point on the INFINITE line closest to
-        the origin, which need not be anywhere near the stretch of edge that
-        actually exists. Harmless for picking, which only calls
-        test_point_unbounded, and
-        not good enough to hang a dimension line off.
+        A derived edge is the line two faces meet in, so it reaches only as far
+        as BOTH of them do. Each parent that knows its own corners gives an
+        interval along that line, and the edge is where those overlap.
 
-        Measurement does the cropping instead, a level up where the enclosing
-        timber is known -- this feature cannot see it, since its owner is
-        whichever node derived it. See cropcsg.segment_on_line, called
-        from the runner's _feature_anchor.
+        Asked of the parents rather than found by clipping the line to a solid,
+        because the line lies exactly ON both of their surfaces -- the one place
+        an inside test cannot be trusted, and where clipping answered "nowhere"
+        and lost the feature entirely.
+
+        Exact when the line runs along one of a face's own directions, which is
+        every arris of a box. For an oblique line across a rectangle it is the
+        bounding interval rather than the true crossing: an over-estimate, never
+        an under-estimate, so an edge is never reported shorter than it is.
+
+        `ends` stays None when neither parent can bound it, and `anchor` is then
+        the point on the INFINITE line closest to the origin, which need not be
+        anywhere near the stretch that exists. Harmless for picking, which only
+        calls test_point_unbounded.
         """
         if self.a is None or self.b is None:
             return None
         line = self.locate(owner)
         if not isinstance(line, Line):
             return None
+        bounds = [span for span in
+                  (_corner_span_on_line(hit, line) for hit in (self.a, self.b))
+                  if span is not None]
+        if bounds:
+            low = max(span[0] for span in bounds)
+            high = min(span[1] for span in bounds)
+            if low < high:
+                def at(station):
+                    return line.point + line.direction * scalar(repr(station))
+                return CSGFeatureExtent(
+                    anchor=at((low + high) / 2), ends=(at(low), at(high)))
         return CSGFeatureExtent(anchor=line.point)
 
     @staticmethod
@@ -922,6 +967,51 @@ class SimpleRectangularPrismFeature(CSGFeature):
         normal, centre = frame
         return Plane(normal=normal, point=centre)
 
+    def _face_axes(
+        self, owner: 'RectangularPrism',
+    ) -> Optional[Tuple[Tuple[Direction3D, Numeric], Tuple[Direction3D, Numeric]]]:
+        """The face's two in-plane directions and half-sizes, or None if unbounded.
+
+        A prism fully determines its own faces: two of the three local axes span
+        each one, and how far it reaches along them is the size and the length.
+        None when the end it would reach to runs to infinity, which is an honest
+        answer rather than a guess -- an unbounded face has no corners.
+        """
+        width_dir, height_dir, length_dir = owner._local_axes()
+        half_width = owner.size[0] / 2
+        half_height = owner.size[1] / 2
+        if self.face in (PrismFace.TOP, PrismFace.BOTTOM):
+            return ((width_dir, half_width), (height_dir, half_height))
+        if owner.start_distance is None or owner.end_distance is None:
+            return None
+        half_length = (owner.end_distance - owner.start_distance) / 2
+        if self.face in (PrismFace.RIGHT, PrismFace.LEFT):
+            return ((height_dir, half_height), (length_dir, half_length))
+        if self.face in (PrismFace.FRONT, PrismFace.BACK):
+            return ((width_dir, half_width), (length_dir, half_length))
+        return None
+
+    def corners(self, owner: 'CutCSG') -> Optional[Tuple[V3, V3, V3, V3]]:
+        """The face's four corners, exactly, or None when it is unbounded.
+
+        Exact because the prism knows them: this is arithmetic on its size,
+        its length and its transform, not a clipping of one solid by another.
+        Everything measurement wants to know about where a face reaches comes
+        from here.
+        """
+        if not isinstance(owner, RectangularPrism):
+            return None
+        frame = self._face_frame(owner)
+        axes = self._face_axes(owner)
+        if frame is None or axes is None:
+            return None
+        _, centre = frame
+        (first, first_half), (second, second_half) = axes
+        return tuple(
+            centre + first * (first_half * scalar(a)) + second * (second_half * scalar(b))
+            for a, b in ((1, 1), (1, -1), (-1, -1), (-1, 1))
+        )
+
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
         if not isinstance(owner, RectangularPrism):
             return None
@@ -929,7 +1019,18 @@ class SimpleRectangularPrismFeature(CSGFeature):
         if frame is None:
             return None
         _, centre = frame
-        return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
+        corners = self.corners(owner)
+        # TODO: carry the corners themselves, not a box. An aabb is axis-aligned
+        # in WORLD space, so a face of a rotated prism gets a box substantially
+        # larger than the face and never smaller -- which is fine for hinting
+        # where to put an annotation and not good enough to measure against. An
+        # edge carries its `ends` for exactly this reason; a face wants the same.
+        # See docs/measurement-spec.md.
+        if corners is None:
+            # Unbounded in one direction, so the prism's own box is the most
+            # that can be said.
+            return CSGFeatureExtent(anchor=centre, aabb=owner.get_aabb())
+        return CSGFeatureExtent(anchor=centre, aabb=_box_around(corners))
 
     def test_point_unbounded(self, owner: 'CutCSG', point: V3, test_tolerance: Optional[Numeric] = None) -> bool:
         if not isinstance(owner, RectangularPrism):
@@ -1016,15 +1117,30 @@ class SimpleRectangularPrismEdgeFeature(CSGFeature):
         return intersect_planes(_as_plane(first.locate(owner)), _as_plane(second.locate(owner)))
 
     def get_extent(self, owner: 'CutCSG') -> Optional[CSGFeatureExtent]:
-        """Where the arris sits -- only approximately, as for a derived edge.
+        """Where the arris sits, and where it ends.
 
-        `ends` is None and `anchor` is the point on the INFINITE line closest to
-        the origin. Cropping it to the timber is measurement's job, a level up
-        where the enclosing solid is known; see cropcsg.segment_on_line.
+        Its two ends are the two corners of one face that also lie on the other:
+        an arris IS that pair of corners, so asking the faces for them is exact
+        and needs no clipping. A face that runs to infinity has no corners, and
+        then there is nothing to say but where the line is.
+
+        `ends` is what measurement wants. Without it the extent had to be found
+        by clipping the arris's infinite line to some enclosing solid, and an
+        arris lies exactly ON the surface of what declared it -- the one place
+        an inside test cannot be trusted.
         """
         line = self.locate(owner)
         if not isinstance(line, Line):
             return None
+        first, second = self._sides()
+        corners = first.corners(owner)
+        if corners is not None:
+            shared = [corner for corner in corners
+                      if second.test_point_unbounded(owner, corner)]
+            if len(shared) == 2:
+                return CSGFeatureExtent(
+                    anchor=(shared[0] + shared[1]) / scalar(2),
+                    ends=(shared[0], shared[1]))
         return CSGFeatureExtent(anchor=line.point)
 
 
