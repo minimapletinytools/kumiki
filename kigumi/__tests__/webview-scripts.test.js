@@ -11,6 +11,46 @@ const path = require('path');
 // That has happened. These guard it.
 
 const webviewDir = path.join(__dirname, '..', 'webview');
+/**
+ * The body of a method of viewer-app.js, by brace matching.
+ *
+ * The opening brace is found after the PARAMETER LIST closes, not at the first
+ * brace after the name: `_memberAppearance(key, bundle, { a, b, c })` puts one
+ * in its own parameters, and taking that one reads the destructuring pattern as
+ * though it were the method -- which quietly reported six of its twelve reads.
+ */
+function methodBody(source, name) {
+    const at = source.search(new RegExp(`\\n    ${name}\\(`));
+    if (at === -1) {
+        throw new Error(`${name} is not a method of viewer-app.js`);
+    }
+    const params = source.indexOf('(', at);
+    let depth = 0;
+    let open = -1;
+    for (let i = params; i < source.length; i += 1) {
+        if (source[i] === '(') depth += 1;
+        if (source[i] === ')') {
+            depth -= 1;
+            if (depth === 0) {
+                open = source.indexOf('{', i);
+                break;
+            }
+        }
+    }
+    if (open === -1) {
+        throw new Error(`${name} has no body`);
+    }
+    depth = 0;
+    for (let end = open; end < source.length; end += 1) {
+        if (source[end] === '{') depth += 1;
+        if (source[end] === '}') {
+            depth -= 1;
+            if (depth === 0) return source.slice(open, end + 1);
+        }
+    }
+    throw new Error(`${name} is never closed`);
+}
+
 const html = fs.readFileSync(path.join(webviewDir, 'viewer.html'), 'utf8');
 const viewerJs = fs.readFileSync(path.join(__dirname, '..', 'viewer.js'), 'utf8');
 
@@ -208,23 +248,6 @@ describe('the hover is asked again whenever the held end changes', () => {
     // one from before, however right the comparison that draws it.
     const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
 
-    /** The body of a method, by brace matching, whatever it takes. */
-    function body(name) {
-        const at = app.search(new RegExp(`\\n    ${name}\\([^)]*\\) \\{`));
-        if (at === -1) {
-            throw new Error(`${name} is not a method of viewer-app.js`);
-        }
-        const open = app.indexOf('{', at + name.length + 5);
-        let depth = 0;
-        for (let end = open; end < app.length; end += 1) {
-            if (app[end] === '{') depth += 1;
-            if (app[end] === '}') {
-                depth -= 1;
-                if (depth === 0) return app.slice(open, end + 1);
-            }
-        }
-        throw new Error(`${name} is never closed`);
-    }
 
     test.each([
         'startMeasurementFromFocus',
@@ -232,7 +255,7 @@ describe('the hover is asked again whenever the held end changes', () => {
         '_writeMeasurement',
         'clearMeasureDraft',
     ])('%s asks the hover again', (method) => {
-        expect(body(method)).toContain('_reaskHover');
+        expect(methodBody(app, method)).toContain('_reaskHover');
     });
 });
 
@@ -252,53 +275,37 @@ describe('what a redraw tears down, and what only a real clear does', () => {
     // take no feature.
     const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
 
-    function body(name) {
-        const at = app.search(new RegExp(`\\n    ${name}\\([^)]*\\) \\{`));
-        if (at === -1) {
-            throw new Error(`${name} is not a method of viewer-app.js`);
-        }
-        const open = app.indexOf('{', at + name.length + 5);
-        let depth = 0;
-        for (let end = open; end < app.length; end += 1) {
-            if (app[end] === '{') depth += 1;
-            if (app[end] === '}') {
-                depth -= 1;
-                if (depth === 0) return app.slice(open, end + 1);
-            }
-        }
-        throw new Error(`${name} is never closed`);
-    }
 
     test('drawHoverHighlight still tears the outline down first', () => {
         // If it stops doing this, every test below is about nothing.
-        expect(body('drawHoverHighlight')).toContain('clearHoverOutline');
+        expect(methodBody(app, 'drawHoverHighlight')).toContain('clearHoverOutline');
     });
 
     test.each(['_updateMeasurePreview', '_hoverDrawn'])(
         'the teardown does not touch %s', (forgotten) => {
-            expect(body('clearHoverOutline')).not.toContain(forgotten);
+            expect(methodBody(app, 'clearHoverOutline')).not.toContain(forgotten);
         },
     );
 
     test('the teardown disposes the outline, which is its whole job', () => {
-        expect(body('clearHoverOutline')).toContain('_disposeHighlightMesh');
+        expect(methodBody(app, 'clearHoverOutline')).toContain('_disposeHighlightMesh');
     });
 
     test.each(['_updateMeasurePreview(null)', '_hoverDrawn = null'])(
         'forgetting the hover does %s', (forgotten) => {
-            expect(body('_forgetHover')).toContain(forgotten);
+            expect(methodBody(app, '_forgetHover')).toContain(forgotten);
         },
     );
 
     test('and leaving the canvas forgets the hover', () => {
-        expect(body('clearHover')).toContain('_forgetHover');
+        expect(methodBody(app, 'clearHover')).toContain('_forgetHover');
     });
 
     test('the redraw guard has something to compare against', () => {
         // _hoverDrawn is set to the answer just drawn, so the next identical
         // answer can be skipped. Without this the guard reads null every time.
-        expect(body('handleHoverResult')).toContain('this._hoverDrawn = message');
-        expect(body('handleHoverResult')).toContain('sameHighlight');
+        expect(methodBody(app, 'handleHoverResult')).toContain('this._hoverDrawn = message');
+        expect(methodBody(app, 'handleHoverResult')).toContain('sameHighlight');
     });
 });
 
@@ -334,5 +341,77 @@ describe('the kind dropdown compares names, not the object a kind arrives as', (
         // it is is worth saying even when it cannot be changed.
         expect(body).toContain('ip-detail-value');
         expect(body).toContain('viewer.measure.kind.');
+    });
+});
+
+describe('everything the frame is drawn from is in the signature it is drawn for', () => {
+    // What a member looks like is PULLED: the frame loop folds the state into a
+    // signature and redraws when it differs, so nothing has to remember to
+    // announce a change. That removes the "eleven callers can forget" problem
+    // and leaves exactly one way to get it wrong -- reading an input in
+    // _memberAppearance that visualSignature does not fold, which would let the
+    // frame stop following the state with nothing to say so.
+    //
+    // This is that check. It is the reason the pulled design is safe to rely
+    // on, so it is not decoration.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+
+    /**
+     * Reads that are not state of their own, with why each is safe.
+     *
+     * Every entry here is a claim. If one stops being true, what is drawn can
+     * drift and this test will not say so.
+     */
+    const NOT_STATE = {
+        // The members being walked. The signature walks the same list, so a
+        // member appearing or leaving changes it by construction.
+        sceneManager: true,
+        // Folded as the selected keys and the focus.
+        selectionManager: true,
+        // Reads RENDER_PROFILES, which is frozen at module load. The per-member
+        // half is bundle.profileId, which the signature does fold.
+        resolveRenderProfile: true,
+        // The function whose reads are being collected here.
+        _memberAppearance: true,
+        // Reads the selected timbers and the focus. Both folded.
+        _getSelectionVisualContext: true,
+        // Pure, from a state and a base opacity: the state comes from the
+        // context above and the opacity from a slider the signature folds.
+        _getSelectionVisualPolicy: true,
+    };
+
+    const signature = methodBody(app, 'visualSignature');
+    const reads = new Set();
+    for (const method of ['_memberAppearance', 'applySelectionOpacity']) {
+        for (const match of methodBody(app, method).matchAll(/this\.([A-Za-z_][A-Za-z0-9_]*)/g)) {
+            reads.add(match[1]);
+        }
+    }
+
+    test('there is something to check', () => {
+        // If the shape changes so nothing is found, everything below passes by
+        // being about nothing.
+        expect(reads.size).toBeGreaterThan(4);
+        expect(reads.has('edgeMode')).toBe(true);
+        expect(signature.length).toBeGreaterThan(200);
+    });
+
+    test.each([...reads].filter((name) => !NOT_STATE[name]))(
+        'the signature folds %s', (name) => {
+            expect(signature).toContain(name);
+        },
+    );
+
+    test('the frame loop asks for it, rather than waiting to be told', () => {
+        expect(methodBody(app, 'setupThreeScene')).toContain('applyDerivedVisuals');
+    });
+
+    test('and the pass only redraws when the answer differs', () => {
+        const pass = methodBody(app, 'applyDerivedVisuals');
+
+        expect(pass).toContain('this.visualSignature()');
+        expect(pass).toContain('this._visualSignature');
+        expect(pass).toContain('applySelectionOpacity');
     });
 });

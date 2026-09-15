@@ -88,6 +88,41 @@ Not a defect on its own, and not worth splitting for its own sake. It is
 *why* the above is hard to see: the eleven callers, the five drags and the two
 halves of the hover machine are all in one file, none of them named as a thing.
 
+## The rule: pull, don't push
+
+> **Anything derived is pulled. Only effects are pushed.**
+>
+> The test: *if I recomputed this from scratch right now, would I get the same
+> answer?* Yes — pull it, and never maintain it incrementally. No, because it
+> involves history or the outside world (send a message, push an undo entry,
+> write the file) — that is an effect, and effects are the only thing worth an
+> event.
+
+The first draft of this plan said to bump a version counter in each place that
+mutates an input. That is push wearing a pull costume: it moves "remember to
+call `applySelectionOpacity`" to "remember to bump the counter", in the same
+eleven places, somewhere less visible. The counters are gone.
+
+Instead the frame loop **asks**: `visualSignature()` folds every input into one
+value, and the pass redraws when it differs. Nothing announces anything, so
+nothing can forget to.
+
+**Cost.** About a hundred and fifty values for a frame of twenty-five timbers.
+In that same frame `renderMeasurements` throws away the SVG overlay and builds
+DOM nodes for every dimension — and that is the one visual here that has never
+drifted. The fold is noise beside what we already pay, happily, for the thing
+that works.
+
+**The one way left to get it wrong** is reading an input in `_memberAppearance`
+that the signature does not fold. That is checkable, and checked: a test reads
+both and asserts every `this.x` in the appearance path appears in the signature,
+with an explicit list of the reads that are not state and why each is safe. A
+counter-based design could never be checked that way, because there is no
+single place to compare against.
+
+Expensive derivations do not break the rule — they memoise on a pulled
+signature. The signature is a **cache key**, never a notification.
+
 ## What to do, in order
 
 **0. Tests for what is already pure.** `computeSelectionVisualContext` has five
@@ -95,17 +130,17 @@ states and a fallback, was split out with a comment saying it is "independently
 testable", and has no tests. `layer-state-store` has none either. Free, and it
 makes the next step safe.
 
-**1. One derive pass.** A single `applyDerivedVisuals()` — member appearance and
-the overlays together — reached from the frame loop beside `renderMeasurements`,
-and the eleven manual calls deleted.
+**1. One derive pass.** *Done, in part.* `visualSignature()` folds the inputs and
+`applyDerivedVisuals()` runs from the frame loop, redrawing when the answer
+differs. The eleven callers are **still there on purpose**: if the signature is
+complete they are redundant, and if it has a gap they still cover it. Removing
+them is the next step, and wants a session of watching the viewer first — the
+two rounds of drawing it every frame cost nothing, and the belt is worth keeping
+until the braces are proven.
 
-Per-frame recomputation over every member is more than the SVG rebuild costs, so
-gate it on a **signature**: a cheap value over the inputs that decide appearance
-(selection, focus, layers, scene, the sliders). Compare it each frame and
-re-derive when it differs. That keeps "cannot drift" without paying for a walk
-over every member sixty times a second — and, unlike the eleven callers, adding
-a new input means adding it to the signature, in one place, where forgetting is
-visible rather than silent.
+*Still to do here:* delete the eleven, and with them the `layerStatesByKey`
+mirror — under pull the app asks the panel's store, and a mirror synced by
+CustomEvents exists only to serve push.
 
 **2. `highlightsFor(state)`.** What this review was for. Once step 1 exists, the
 overlays become a list the pass reconciles rather than seven lifetimes, and a

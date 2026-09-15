@@ -1364,6 +1364,8 @@ class KigumiViewerApp extends LitElement {
         this._csgParentHighlightMesh = null;
         this.memberMetadataByKey = new Map(); // member key -> { name, type }
         this.layerStatesByKey = new Map(); // member key -> { locked, hidden, fixed }
+        /** The last state the frame was drawn for. See visualSignature. */
+        this._visualSignature = null;
         this.renderProfiles = RENDER_PROFILES;
         this.memberRenderProfileByType = {
             timber: 'timber-default',
@@ -1884,6 +1886,10 @@ class KigumiViewerApp extends LitElement {
                     this.emitViewerLog('hover-error', { message: String(error && error.message || error) });
                 }
             }
+            // Pulled, not pushed: what is drawn follows the state because the
+            // state is asked, every frame, rather than because something
+            // remembered to say it had changed.
+            this.applyDerivedVisuals();
             this.renderViewports();
         };
         animate();
@@ -4481,6 +4487,74 @@ class KigumiViewerApp extends LitElement {
 
     _getSelectionVisualPolicy(state, baseUnselectedOpacity) {
         return selectionVisualPolicy(state, baseUnselectedOpacity);
+    }
+
+    /**
+     * Everything the look of the frame depends on, folded into one value.
+     *
+     * READ off the state, never announced by it. Nothing has to remember to say
+     * that something changed -- which is the point. The eleven places that call
+     * applySelectionOpacity are eleven places that can forget, and a counter
+     * bumped by each of them would only move the forgetting somewhere less
+     * visible. Asking costs nothing to get wrong.
+     *
+     * Cheap enough to take every frame: about a hundred and fifty values for a
+     * frame of twenty-five timbers. In that same frame renderMeasurements
+     * throws the whole SVG overlay away and builds DOM nodes for every
+     * dimension -- and that is the one visual here that has never drifted.
+     *
+     * EVERY INPUT `_memberAppearance` READS HAS TO BE IN HERE, or what is drawn
+     * can stop following the state. A test reads both and checks, because that
+     * is the one way left to get this wrong.
+     */
+    visualSignature() {
+        if (!this.sceneManager || !this.selectionManager) {
+            return '';
+        }
+        const focus = this.selectionManager.csgFocus;
+        const drawn = this.activeSceneMembers;
+        const parts = [
+            this.unselectedTransparencyPercent,
+            this.selectedTransparencyPercent,
+            this.edgeLineVisibilityPercent,
+            this.edgeMode,
+            this.showDrawingGhosts ? 1 : 0,
+            // Which timbers are selected, and what is picked inside one. Joined
+            // rather than compared: a different ORDER only costs one extra pass,
+            // and missing a change costs a frame that lies about the state.
+            (this.selectionManager.getSelectedTimbers() || []).join(','),
+            focus ? (focus.timberKey || '') : '',
+            focus && Array.isArray(focus.path) ? focus.path.join('/') : '',
+            focus ? (focus.featureLabel || '') : '',
+        ];
+        for (const [key, bundle] of this.sceneManager.entries()) {
+            parts.push(
+                // The member set itself: a rebuild that adds or drops timbers
+                // changes this without anyone having to say so.
+                key,
+                bundle.profileId || '',
+                this.isMemberHidden(key) ? 1 : 0,
+                drawn && !drawn.has(key) ? 1 : 0,
+            );
+        }
+        return parts.join('|');
+    }
+
+    /**
+     * Bring what is drawn back in line with the state, if the state has moved.
+     *
+     * Called from the frame loop. The eleven callers of applySelectionOpacity
+     * are still there and still right; this is here so that FORGETTING one
+     * stops being possible, and it is what will be doing the work once they go.
+     */
+    applyDerivedVisuals() {
+        const signature = this.visualSignature();
+        if (signature === this._visualSignature) {
+            return false;
+        }
+        this._visualSignature = signature;
+        this.applySelectionOpacity();
+        return true;
     }
 
     applySelectionOpacity() {
