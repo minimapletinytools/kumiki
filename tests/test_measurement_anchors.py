@@ -710,3 +710,141 @@ class TestAPlacedAnchorStaysPlaced:
             seen.append(out.get("unresolved") or tuple(out["a"]["at"]))
 
         assert len(set(map(str, seen))) > 1
+
+
+class TestDroppingAPerpendicularOntoAFace:
+    """In the solid a face is a PLANE, and a distance to one is square to it.
+
+    On a sheet a face is only measurable seen edge-on, where it draws as a line,
+    so the anchor rules had two shapes and both ends of any pair were lines. In
+    the 3D view nothing is projected away: a face has two directions to be
+    square to rather than one, and putting it through the two-lines rule --
+    which shares a station along a single direction -- left the dimension
+    between an edge and the face it runs parallel to leaning by however far the
+    two were offset in the other direction.
+    """
+
+    SOLID = None  # built in setup_method, to keep the import local
+
+    def setup_method(self):
+        from kumiki.drawing import (MeasurementKind, MeasurementOperation,
+                                    MeasurementSpace)
+
+        self.SOLID = MeasurementKind(
+            MeasurementOperation.DISTANCE, MeasurementSpace.THREE_D)
+
+    def _anchors(self, first, second):
+        from kumiki.drawing import distance_anchors
+
+        return distance_anchors(first, second, self.SOLID)
+
+    def _along(self, a, b):
+        return tuple(round(b[i] - a[i], 9) for i in range(3))
+
+    def test_an_edge_parallel_to_a_face_measures_square_to_it(self):
+        from kumiki.drawing import MeasureSpan
+
+        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
+        # Offset in x and in y, and the y offset is the one the two-lines rule
+        # could not remove: it shares a station along x only.
+        edge = MeasureSpan(at=(500, 300, 100), direction=(1, 0, 0), interval=(0.0, 200.0))
+
+        at_face, at_edge = self._anchors(face, edge)
+
+        assert self._along(at_face, at_edge) == (0.0, 0.0, 100.0)
+
+    def test_and_the_same_the_other_way_round(self):
+        from kumiki.drawing import MeasureSpan
+
+        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
+        edge = MeasureSpan(at=(500, 300, 100), direction=(1, 0, 0), interval=(0.0, 200.0))
+
+        at_edge, at_face = self._anchors(edge, face)
+
+        assert self._along(at_face, at_edge) == (0.0, 0.0, 100.0)
+
+    def test_the_edge_anchor_is_on_the_edge(self):
+        from kumiki.drawing import MeasureSpan
+
+        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
+        edge = MeasureSpan(at=(500, 300, 100), direction=(1, 0, 0), interval=(0.0, 200.0))
+
+        _, at_edge = self._anchors(face, edge)
+
+        # The middle of what survives of it, which is where a reader points.
+        assert at_edge == (600.0, 300.0, 100.0)
+
+    def test_a_point_and_a_face(self):
+        from kumiki.drawing import MeasureSpan
+
+        face = MeasureSpan(at=(0, 0, 0), normal=(0, 0, 1))
+        point = MeasureSpan(at=(120, -45, 70))
+
+        at_point, at_face = self._anchors(point, face)
+
+        assert at_point == (120, -45, 70)
+        assert self._along(at_face, at_point) == (0.0, 0.0, 70.0)
+
+    def test_two_parallel_faces(self):
+        from kumiki.drawing import MeasureSpan
+
+        near = MeasureSpan(at=(10, 20, 0), normal=(0, 0, 1))
+        far = MeasureSpan(at=(900, -400, 63.5), normal=(0, 0, 1))
+
+        at_near, at_far = self._anchors(near, far)
+
+        assert self._along(at_near, at_far) == (0.0, 0.0, 63.5)
+
+    def test_two_edges_still_share_a_station(self):
+        # The rule that was already right is left alone: neither end is a plane,
+        # so nothing above applies.
+        from kumiki.drawing import MeasureSpan
+
+        one = MeasureSpan(at=(0, 0, 0), direction=(1, 0, 0), interval=(0.0, 100.0))
+        other = MeasureSpan(at=(0, 50, 0), direction=(1, 0, 0), interval=(0.0, 100.0))
+
+        at_one, at_other = self._anchors(one, other)
+
+        assert self._along(at_one, at_other) == (0.0, 50.0, 0.0)
+
+
+class TestAFaceIsOnlyAPlaneInTheSolid:
+    """On a sheet it stays the line it draws as.
+
+    `_measure_span` takes the space as an argument, and the name it first took
+    was already the name of the timber's own CSG a few lines below -- so the
+    check was always true, and every face came back a plane in drawings too.
+    """
+
+    def _span(self, solid_space):
+        import importlib.util
+        import sys
+        from pathlib import Path
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_space", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_space"] = runner
+        spec.loader.exec_module(runner)
+        frame = load_module(
+            "space_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
+        ).build_frame()
+
+        measures = [measure
+                    for drawing in runner.collect_drawings(frame, None, [])
+                    for viewport in (drawing.get("viewports") or [])
+                    for measure in (viewport.get("measurements") or [])
+                    if not measure.get("unresolved")]
+        assert measures, "the fixture has no measurements to take a span from"
+        placed = runner._resolve_anchor_placed(
+            frame, measures[0].get("a"), [0, 1, 0], solid_space)
+        assert placed is not None
+        return placed[1]
+
+    def test_on_a_sheet_a_face_is_not_a_plane(self):
+        assert self._span(False).is_plane is False
+
+    def test_in_the_solid_it_is(self):
+        assert self._span(True).is_plane is True

@@ -112,6 +112,12 @@ the second was wrong.
 - **A written measurement carries its own plane**, fixed at creation. In the 3D
   view that plane comes partly from where the camera was; the value must not
   drift when the reader orbits afterwards.
+- **A distance to a face is square to the face.** In the solid a face is a
+  plane, not the line a face draws as when seen edge-on from a sheet, so the
+  anchor is chosen on whichever end has less freedom — a point has none, a line
+  one direction, a plane two — and dropped onto the other perpendicular to it.
+  Treating a face as a line there shared a station along one direction only, and
+  left a dimension to a parallel edge leaning by the offset in the other.
 
 ## What the panel says
 

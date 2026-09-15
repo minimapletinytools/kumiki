@@ -294,30 +294,51 @@ def _cross(a: Sequence[float], b: Sequence[float]) -> Tuple[float, float, float]
 
 @dataclass(frozen=True)
 class MeasureSpan:
-    """What a feature is, once projected into the plane a measurement is taken on.
+    """What a feature is, where a measurement is being taken.
 
-    Two shapes, not three. A point is a point; an edge is a line with an extent;
-    and a FACE seen edge-on is also a line with an extent, while a face seen at
-    any other angle covers the view and admits no measurement at all. So there
-    is nothing else for a measurable feature to be, and the anchor rules below
-    have two cases rather than six.
+    Three shapes, and which ones can occur depends on the space:
+
+    ON A SHEET, two. A point is a point; an edge is a line with an extent; and a
+    FACE seen edge-on is also a line with an extent, while a face seen at any
+    other angle covers the view and admits no measurement at all.
+
+    IN THE SOLID, three. Nothing is projected away, so a face is a PLANE -- it
+    is measurable from anywhere, not only edge-on, and it is not a line. Leaving
+    it as a line there is what leaned a dimension between an edge and the face
+    it runs parallel to: the anchors were placed by the two-lines rule, which
+    shares a station along one direction, and a face has two directions to be
+    square to rather than one.
 
     `interval` is how far it reaches along `direction`, as stations from `at`,
-    taken from what the feature occupies once cropped to the timber. Both are
-    None for a point.
+    taken from what the feature occupies once cropped to the timber. `normal` is
+    set instead, for a plane. All three are None for a point.
     """
 
     at: Tuple[float, float, float]
     direction: Optional[Tuple[float, float, float]] = None
     interval: Optional[Tuple[float, float]] = None
+    normal: Optional[Tuple[float, float, float]] = None
 
     @property
     def is_point(self) -> bool:
-        return self.direction is None
+        return self.direction is None and self.normal is None
+
+    @property
+    def is_plane(self) -> bool:
+        return self.normal is not None
+
+    @property
+    def is_line(self) -> bool:
+        return self.direction is not None
 
     def ends(self) -> Tuple[Tuple[float, float, float], ...]:
-        """The two extremities, or the point itself."""
-        if self.is_point:
+        """The two extremities, or the point itself.
+
+        A plane has no extremities along any one direction, so it answers with
+        the one point it is placed at; the rules that ask this are the ones for
+        lines.
+        """
+        if self.is_point or self.is_plane:
             return (self.at,)
         unit = _unit(self.direction)
         return tuple(
@@ -360,6 +381,34 @@ def _foot_on(span: MeasureSpan, point: Sequence[float]):
     return tuple(span.at[i] + unit[i] * station for i in range(3))
 
 
+def _representative_point(span: MeasureSpan) -> Tuple[float, float, float]:
+    """The one point that stands for a span when something must be dropped onto it.
+
+    A point is itself. A line offers the middle of its surviving extent, which is
+    where a reader would put a finger on it.
+    """
+    if not span.is_line:
+        return tuple(span.at)
+    low, high = span.interval or (0.0, 0.0)
+    unit = _unit(span.direction)
+    middle = (low + high) / 2
+    return tuple(span.at[i] + unit[i] * middle for i in range(3))
+
+
+def _foot_on_plane(span: MeasureSpan, point: Sequence[float]):
+    """Where a perpendicular from `point` meets a plane.
+
+    NOT clamped to the face, unlike the foot on a line: a span carries a plane's
+    normal and a point on it, not its outline, so there is nothing here to clamp
+    against. For a pair that admits a distance the two features face each other,
+    which is when the foot lands on the face anyway. Clamping properly wants the
+    face's corners -- see the note in cutcsg about extents being an AABB.
+    """
+    unit = _unit(span.normal)
+    gap = _dot([point[i] - span.at[i] for i in range(3)], unit)
+    return tuple(point[i] - unit[i] * gap for i in range(3))
+
+
 def distance_anchors(
     first: MeasureSpan,
     second: MeasureSpan,
@@ -384,6 +433,12 @@ def distance_anchors(
     whole of what is being measured from -- and the other end is the foot of the
     perpendicular dropped onto the line.
 
+    PERPENDICULAR, anything and a PLANE: the same rule one step further. The
+    anchor is chosen on whichever feature has less freedom -- a point has none,
+    a line one direction, a plane two -- and dropped onto the other square to
+    it. A face only IS a plane in the solid; on a sheet it is a line seen
+    edge-on and takes the rules above.
+
     PERPENDICULAR, two points: themselves. With no line to be square to, the
     distance between them is the distance.
 
@@ -400,6 +455,26 @@ def distance_anchors(
             "right" if named.endswith("horizontal_distance") else "up") or (1, 0, 0))
         offset = _dot([second.at[i] - first.at[i] for i in range(3)], axis)
         return (first.at, tuple(first.at[i] + axis[i] * offset for i in range(3)))
+
+    # A PLANE is measured to by dropping a perpendicular onto it. The anchor is
+    # chosen on whichever feature has less freedom -- a point has none, a line
+    # one direction, a plane two -- and carried to the other square to it. That
+    # is what makes the dimension perpendicular to the face rather than merely
+    # touching it: an edge and the face it runs parallel to were both treated as
+    # lines and put through the shared-station rule, which shares ONE direction,
+    # and the dimension leaned by however far the two were offset in the other.
+    #
+    # Only in the solid: on a sheet a face is a line and never gets here.
+    if first.is_plane or second.is_plane:
+        if first.is_plane and second.is_plane:
+            # Parallel faces. Either centroid will do, and the first is the one
+            # the reader chose first.
+            return (first.at, _foot_on_plane(second, first.at))
+        if first.is_plane:
+            from_second = _representative_point(second)
+            return (_foot_on_plane(first, from_second), from_second)
+        from_first = _representative_point(first)
+        return (from_first, _foot_on_plane(second, from_first))
 
     if first.is_point and second.is_point:
         return (first.at, second.at)

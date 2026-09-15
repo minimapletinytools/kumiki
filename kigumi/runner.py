@@ -2072,16 +2072,19 @@ def _anchors_for_pick(
     if frame is None:
         return None
 
+    from kumiki.drawing import MeasurementSpace
+
+    solid = _pick_space(payload) is MeasurementSpace.THREE_D
     plane = _plane_for_pick(located_pick, timber, payload)
     normal = (plane or {}).get("normal") or look
-    placed = _resolve_anchor_placed(frame, held, normal)
+    placed = _resolve_anchor_placed(frame, held, normal, solid)
     if placed is None or placed[1] is None:
         return None
     held_span = placed[1]
 
     picked_span = _measure_span(
         located_pick[0], located_pick[1], timber, located_pick[2],
-        _root_csg_of(ss, payload.get("memberKey")), normal)
+        _root_csg_of(ss, payload.get("memberKey")), normal, solid)
     if picked_span is None:
         return None
 
@@ -2673,19 +2676,25 @@ def _projects_to_a_point(direction: Sequence[float], plane_normal: Sequence[floa
 def _measure_span(
     feature: Any, node: Any, timber: Any, located: Any, root_csg: Any,
     plane_normal: Optional[Sequence[float]],
+    # NOT `solid`: that name is taken below, by the timber's own CSG. Shadowing
+    # it made this always true, and every face came back a plane on sheets too.
+    solid_space: bool = False,
 ) -> Optional[Any]:
-    """What a feature is, once projected into the plane a measurement is on.
+    """What a feature is, where the measurement is being taken.
 
-    A point, or a line with an extent -- see MeasureSpan. The extent comes from
-    what the feature occupies once cropped to the timber, not from what declared
-    it: a cutter extended past the timber puts its declared extent out there
-    with it.
+    See MeasureSpan. The extent comes from what the feature occupies once
+    cropped to the timber, not from what declared it: a cutter extended past the
+    timber puts its declared extent out there with it.
 
-    A FACE becomes a line, because a face is only measurable when it is seen
-    edge-on and a face seen edge-on draws as a line along itself. Which line
-    depends on the plane, which is why this needs it. Without a plane, or for a
-    face that is not edge-on, it falls back to the point it used to be: enough
-    to attach a dimension to, and no worse than before.
+    ON A SHEET a FACE becomes a line, because a face is only measurable when it
+    is seen edge-on and a face seen edge-on draws as a line along itself. Which
+    line depends on the plane, which is why this needs it. Without a plane, or
+    for a face that is not edge-on, it falls back to the point it used to be.
+
+    IN THE SOLID nothing is projected away: a face is a PLANE, and an edge
+    pointing at the reader is still an edge. Both collapses below are the
+    sheet's, and applying them there put an edge and the face it runs parallel
+    to through the two-lines rule, which leaned the dimension.
     """
     from kumiki.geometry import Line, Plane, Point
     from kumiki.cropcsg import (
@@ -2725,7 +2734,8 @@ def _measure_span(
             start = to_world(located.point + located.direction * scalar_of(low))
             end = to_world(located.point + located.direction * scalar_of(high))
             direction = _normalize([end[i] - start[i] for i in range(3)])
-            if plane_normal is not None and _projects_to_a_point(direction, plane_normal):
+            if (not solid_space and plane_normal is not None
+                    and _projects_to_a_point(direction, plane_normal)):
                 # Seen end-on it IS a point, and a point is what the rules have
                 # to be given: a line whose length is all depth has no direction
                 # on the sheet to be square to, and treating it as one put a
@@ -2743,11 +2753,16 @@ def _measure_span(
         if middle is None:
             return None
         at = to_world(middle)
+        normal = _normalize(_located_geometry_payload(located, timber)["normal"])
+        if solid_space:
+            # A plane, not a line: measurable from anywhere rather than only
+            # edge-on, and square to its normal in two directions rather than
+            # one.
+            return MeasureSpan(at=at, normal=tuple(normal))
         if plane_normal is None:
             return MeasureSpan(at=at)
         # Edge-on, so it draws as a line running along the face, square to its
         # own normal and to the way we are looking.
-        normal = _normalize(_located_geometry_payload(located, timber)["normal"])
         along = _cross(normal, _normalize(list(plane_normal)))
         if not any(abs(part) > 1e-9 for part in along):
             # Facing the reader rather than edge-on: it covers the view and
@@ -2799,8 +2814,15 @@ def _resolve_measurement(
         # orthographic viewport's measurements are entitled to rely on.
         plane = axes.get("look")
 
+    # Which space this is taken in, needed before the ends are resolved: a face
+    # is a PLANE in the solid and a line on a sheet, and that is what each end's
+    # span comes back as. A 3D measurement says so in its own kind; one still
+    # being inferred is projected, since that is what a sheet has.
+    declared = MeasurementKind.from_wire(measure.get("kind"))
+    solid = declared is not None and declared.space is MeasurementSpace.THREE_D
+
     for key in ("a", "b"):
-        placed = _resolve_anchor_placed(frame, measure.get(key), plane)
+        placed = _resolve_anchor_placed(frame, measure.get(key), plane, solid)
         if placed is None:
             broken.append(key)
             continue
@@ -2821,12 +2843,9 @@ def _resolve_measurement(
         # instead put two crossing faces -- which admit an ANGLE and nothing
         # else -- through the parallel-line rule, and came out square to one of
         # them and not the other.
-        # Judged in the space the measurement is taken in. A 3D measurement
-        # says so in its own kind; one still being inferred is projected,
-        # since that is what a sheet has. Projecting a solid measurement here
+        # Judged in the same space, so what the pair admits and what its ends
+        # came back as cannot disagree. Projecting a solid measurement here
         # called its faces AREAs and left it with no kind at all.
-        declared = MeasurementKind.from_wire(measure.get("kind"))
-        solid = declared is not None and declared.space is MeasurementSpace.THREE_D
         admitted = (
             solid_kinds(resolved["a"].get("geometry"), resolved["b"].get("geometry"))
             if solid else projected_kinds(
@@ -3250,6 +3269,7 @@ def resolve_anchor(frame: Any, anchor: Dict[str, Any]) -> Optional[Dict[str, Any
 
 def _resolve_anchor_placed(
     frame: Any, anchor: Dict[str, Any], plane: Optional[Sequence[float]],
+    solid_space: bool = False,
 ):
     """Where the feature an anchor names actually is, in world space.
 
@@ -3304,17 +3324,17 @@ def _resolve_anchor_placed(
         return None
     feature, node = found
     located = feature.locate(node)
-    return _anchor_payload(feature, node, timber, located, root_csg, plane)
+    return _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space)
 
 
-def _anchor_payload(feature, node, timber, located, root_csg, plane):
+def _anchor_payload(feature, node, timber, located, root_csg, plane, solid_space=False):
     """What one end of a measurement is: where it is, what it lies on, its extent.
 
     The span is what the pairwise rules need and the anchor is what they fall
     back to. Both come from one lookup so they cannot end up describing
     different features.
     """
-    span = _measure_span(feature, node, timber, located, root_csg, plane)
+    span = _measure_span(feature, node, timber, located, root_csg, plane, solid_space)
     return ({
         "at": _feature_anchor(feature, node, timber, located, root_csg),
         "geometry": _located_geometry_payload(located, timber),
