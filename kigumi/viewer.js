@@ -144,6 +144,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
     const i18nJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'i18n.js'))).toString();
     const selectionStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-store.js'))).toString();
     const selectionVisualsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'selection-visuals.js'))).toString();
+    const highlightsJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'highlights.js'))).toString();
     const layerStateStoreJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layer-state-store.js'))).toString();
     const layersPanelJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'layers-panel.js'))).toString();
     const assemblyTimelineJsUri = webview.asWebviewUri(vscode.Uri.file(path.join(webviewDir, 'assembly-timeline.js'))).toString();
@@ -205,6 +206,7 @@ function getWebviewContent(webview, frameData, geometryData, profiling, uiState 
         .replace('__I18N_JS_URI__', i18nJsUri)
         .replace('__SELECTION_STORE_JS_URI__', selectionStoreJsUri)
         .replace('__SELECTION_VISUALS_JS_URI__', selectionVisualsJsUri)
+        .replace('__HIGHLIGHTS_JS_URI__', highlightsJsUri)
         .replace('__LAYER_STATE_STORE_JS_URI__', layerStateStoreJsUri)
         .replace('__LAYERS_PANEL_JS_URI__', layersPanelJsUri)
         .replace('__ASSEMBLY_TIMELINE_JS_URI__', assemblyTimelineJsUri)

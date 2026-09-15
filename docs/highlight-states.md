@@ -1,5 +1,10 @@
 # What is lit, and why: timber and feature rendering
 
+**Status: §6 is built.** Overlays are a list now — `highlights.js` says what
+should be lit and a reconciler makes the scene match, called from the frame
+loop's derive pass. Sections 1–4 below describe what it was and why, because the
+reasoning is what stops it growing back; §5 is still the open question.
+
 Companion to `measuring-states.md`. That says what the viewer is *doing*; this
 says what it *looks like* while doing it, and where the two can disagree.
 
@@ -152,6 +157,18 @@ the reconciler can tell "the same highlight, still wanted" from "a new one".
 Measurements already have `measurementKey` for exactly this reason, and the CSG
 overlays can key on member plus path plus feature.
 
-**Do `computeSelectionVisualContext`'s tests first, whatever else happens.** It
-is pure, it was written to be tested, it has five states and a fallback, and
-nothing checks any of it. It is the cheapest guard on this page.
+**Done.** `computeSelectionVisualContext` was moved out of `viewer-app.js` — it
+could not be tested there, since that file wants a browser — and has tests, as
+does `layer-state-store`. `highlightsFor` is pure and tested, the reconciler
+owns every overlay's lifetime, and three things fell out of the shape rather
+than being fixed:
+
+- **A resize now reaches every overlay.** Only the selection's line had its
+  resolution refreshed; the hover and held lines had fields of their own and
+  were missed, so they went thin until something rebuilt them.
+- **Held and hover no longer share a render order.** They sat at 1101 together,
+  which left which one won undefined, and they are the two most likely to
+  overlap.
+- **A highlight's opacity follows the selection.** It was frozen at the moment
+  the message arrived, so deepening a selection faded the timber and left the
+  highlight where it was.

@@ -259,6 +259,29 @@ const CSG_HIGHLIGHT_EDGE_WIDTH_PX = 5;
 // Metric stays the default, which is what the viewer always displayed.
 const { DEFAULT_UNIT_SYSTEM } = window.KigumiUnits;
 
+/**
+ * What a CSG selection is ABOUT, as one comparable value.
+ *
+ * The selection highlight is kept from the message that brought it and offered
+ * only while the focus still names this. A message from before the focus moved
+ * describes a selection nobody has, and lighting from it is how a stale
+ * highlight outlives what it was about.
+ */
+function csgFocusKey(focus) {
+    if (!focus) {
+        return null;
+    }
+    return `${focus.timberKey || ''}|${(focus.path || []).join('/')}|${focus.featureLabel || ''}`;
+}
+
+/** The held end, as one comparable value: which feature is being measured from. */
+function heldHighlightKey(reference) {
+    if (!reference) {
+        return null;
+    }
+    return JSON.stringify(window.KigumiMeasureDraft.referenceKey(reference));
+}
+
 // Which state a selection is in, and what that does to every timber's opacity.
 // Lives in selection-visuals.js so it can be loaded and tested without lit.
 const {
@@ -1308,7 +1331,6 @@ class KigumiViewerApp extends LitElement {
         this.measureDraft = new window.KigumiMeasureDraft.MeasureDraft();
         this.undoStacks = new window.KigumiUndoStacks.UndoStacks();
         /** Lines drawn for the feature a measurement is being taken from. */
-        this._heldFeatureLines = [];
         // The eyeball on the 3D measurements node. About looking rather than
         // about the drawing, so deliberately not on the undo stack.
         this.measurementsHidden = false;
@@ -1360,11 +1382,22 @@ class KigumiViewerApp extends LitElement {
         this.orbitCenterGizmo = null;
 
         this.selectionManager = new SelectionStore();
-        this._csgHighlightMesh = null;
-        this._csgParentHighlightMesh = null;
         this.memberMetadataByKey = new Map(); // member key -> { name, type }
         /** The last state the frame was drawn for. See visualSignature. */
         this._visualSignature = null;
+        /**
+         * What is lit, by id. See highlights.js: the pass asks what SHOULD be
+         * lit and reconciles this against it, so no overlay outlives the state
+         * that wanted it and none has a lifetime of its own.
+         */
+        this._highlightObjects = new Map();
+        /**
+         * The geometry the runner sent for the current selection, kept so the
+         * overlay can be re-derived rather than built once on arrival. Only
+         * used while the focus still names the same thing -- a message from
+         * before the focus moved lights nothing.
+         */
+        this._csgHighlightSource = null;
         this.renderProfiles = RENDER_PROFILES;
         this.memberRenderProfileByType = {
             timber: 'timber-default',
@@ -1538,7 +1571,7 @@ class KigumiViewerApp extends LitElement {
             // types as well only ever missed a cleanup -- selecting a joint,
             // or clearing the focus outright, left a stale mesh behind.
             if (!this.selectionManager.csgFocus) {
-                this.removeCSGHighlight();
+                this._csgHighlightSource = null;
             }
             this.selectionPanel.updateInfo(this.currentFrameData);
         });
@@ -3026,8 +3059,13 @@ class KigumiViewerApp extends LitElement {
                 bundle.edges.material.resolution = resolution;
             }
         }
-        if (this._csgHighlightEdgeLine && this._csgHighlightEdgeLine.material) {
-            this._csgHighlightEdgeLine.material.resolution = resolution;
+        // Every overlay, not only the selection's: the hover and held lines
+        // had their own fields and were missed here, so they went thin on a
+        // resize until something happened to rebuild them.
+        for (const object of this._highlightObjects.values()) {
+            if (object.material && object.material.resolution) {
+                object.material.resolution = resolution;
+            }
         }
     }
 
@@ -3114,7 +3152,7 @@ class KigumiViewerApp extends LitElement {
     _dropCsgFocus() {
         this.selectionManager.clearCsgFocus();
         this.lastPickDetail = null;
-        this.removeCSGHighlight();
+        this._csgHighlightSource = null;
     }
 
     // -------------------------------------------------------------------------
@@ -3225,15 +3263,9 @@ class KigumiViewerApp extends LitElement {
         this._hoverDrawn = message;
         // What the pointer is offering, drawn as the measurement it would make.
         this._updateMeasurePreview(message);
-        // `kinds` is null when nothing is held -- an ordinary hover -- empty
-        // when this pair cannot be measured from here, and a list when it can.
-        // The runner answers it, so what is drawn red is what the click
-        // refuses; two judgements would eventually disagree.
-        if (window.KigumiHover.HoverState.isRefused(message)) {
-            this.drawHoverHighlight(message, HOVER_REFUSED_COLOR);
-            return;
-        }
-        this.drawHoverHighlight(message);
+        // Nothing is drawn here. What the pointer is over is part of the state,
+        // and the frame loop lights it -- including in the refused colour, from
+        // the same verdict the click reads, so the two cannot disagree.
     }
 
     // -------------------------------------------------------------------------
@@ -3269,7 +3301,6 @@ class KigumiViewerApp extends LitElement {
         // Nothing half-made is on the stack to undo, so undo would reach past
         // it to something you are no longer looking at.
         this.undoStacks.suspend(true);
-        this.drawHeldFeature(this._lastPickAnchor.highlight);
         this.emitViewerLog('measure-hold', {
             feature: this._lastPickAnchor.reference.feature || null,
         });
@@ -3341,7 +3372,6 @@ class KigumiViewerApp extends LitElement {
         const kind = KigumiMeasurements.kindWire(
             (kinds && kinds[0]) || null, this.measurementSpace);
         this.undoStacks.suspend(false);
-        this.clearHeldFeature();
         this._measurePreview = null;
         // The feature selection has served its purpose; the measurement it made
         // takes its place, so the kind can be changed in the moment you want to
@@ -3407,8 +3437,7 @@ class KigumiViewerApp extends LitElement {
             return false;
         }
         if (released.action === 'left') {
-            this.clearHeldFeature();
-            this.undoStacks.suspend(false);
+                this.undoStacks.suspend(false);
         }
         this._measurePreview = null;
         this.renderMeasurements();
@@ -3423,7 +3452,6 @@ class KigumiViewerApp extends LitElement {
         this.measureDraft.leave();
         this._measurePreview = null;
         this.undoStacks.suspend(false);
-        this.clearHeldFeature();
         this._reaskHover();
     }
 
@@ -3944,64 +3972,8 @@ class KigumiViewerApp extends LitElement {
         }
     }
 
-    /**
-     * Show the feature a measurement is being taken from.
-     *
-     * The mesh, and its edges as well. A face seen exactly edge-on -- the usual
-     * case in an elevation, and the case where measuring to it makes most sense
-     * -- projects to a line with no area, so the mesh alone renders as nothing.
-     */
-    drawHeldFeature(highlight) {
-        this.clearHeldFeature();
-        const mesh = highlight && highlight.highlightMesh;
-        const positions = edgeSegmentPositions(highlight && highlight.highlightEdgeSegments);
 
-        if (positions.length > 0) {
-            this._addHeldLine(positions);
-        }
-        if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
-            this._buildHighlightMesh(
-                mesh.vertices, mesh.indices, HELD_COLOR, HELD_OPACITY, '_heldFeatureMesh',
-            );
-            if (this._heldFeatureMesh) {
-                this._heldFeatureMesh.renderOrder = HELD_RENDER_ORDER;
-            }
-            // No outline from the mesh itself. Its triangles are a
-            // tessellation, not a boundary, so drawing their edges wrote the
-            // triangulation across the middle of the face. The boundary is
-            // what highlightEdgeSegments carries, drawn above -- which is
-            // exactly what the selection highlight does with the same answer.
-        }
-    }
 
-    _addHeldLine(positions) {
-        const geometry = new THREE.LineSegmentsGeometry();
-        geometry.setPositions(positions);
-        const material = new THREE.LineMaterial({
-            color: HELD_COLOR,
-            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
-            resolution: this._getRendererResolution(),
-            depthTest: false,
-            transparent: true,
-        });
-        const line = new THREE.LineSegments2(geometry, material);
-        line.computeLineDistances();
-        line.renderOrder = HELD_RENDER_ORDER + 1;
-        this.scene.add(line);
-        // A list: an edge pick draws its segments and a face pick draws its
-        // outline, and holding only the last would leak the ones before it.
-        this._heldFeatureLines.push(line);
-    }
-
-    clearHeldFeature() {
-        this._disposeHighlightMesh('_heldFeatureMesh');
-        for (const line of this._heldFeatureLines) {
-            this.scene.remove(line);
-            line.geometry.dispose();
-            line.material.dispose();
-        }
-        this._heldFeatureLines = [];
-    }
 
     /** What the hover has to say about the measurement in hand, if any. */
     _heldForRequest() {
@@ -4036,73 +4008,8 @@ class KigumiViewerApp extends LitElement {
         };
     }
 
-    /**
-     * Draw what a click would have highlighted, in the hover colour.
-     *
-     * The same mesh and the same line the selection uses, from the same runner
-     * answer -- only the colour and the render order differ. Drawing it any
-     * other way is how hover ends up showing something a click would not do:
-     * an outline taken from the CSG was convex, so a timber face with mortises
-     * through it lit as a whole rectangle over the openings.
-     */
-    drawHoverHighlight(message, color) {
-        this.clearHoverOutline();
-        const mesh = message.highlightMesh;
-        const positions = edgeSegmentPositions(message.highlightEdgeSegments);
-        const shade = color === undefined ? HOVER_COLOR : color;
 
-        if (positions.length > 0) {
-            this._buildHoverEdgeLine(positions, shade);
-        }
-        if (mesh && Array.isArray(mesh.vertices) && mesh.vertices.length > 0) {
-            this._buildHighlightMesh(
-                mesh.vertices, mesh.indices, shade, HOVER_OPACITY, '_hoverHighlightMesh',
-            );
-            // OVER the selection's own highlight, which sits at 999. It used
-            // to go under, on the grounds that what is selected outranks what
-            // is merely under the pointer -- but hovering over something
-            // already selected then blended orange under blue into a muddy
-            // colour that read as neither, which is the one moment the hover
-            // has a job to do. What is selected does not stop being selected
-            // for the moment the pointer is on it.
-            if (this._hoverHighlightMesh) {
-                this._hoverHighlightMesh.renderOrder = 1100;
-            }
-        }
-    }
 
-    _buildHoverEdgeLine(positions, color) {
-        const geometry = new THREE.LineSegmentsGeometry();
-        geometry.setPositions(positions);
-        const material = new THREE.LineMaterial({
-            color: color === undefined ? HOVER_COLOR : color,
-            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
-            resolution: this._getRendererResolution(),
-            depthTest: false,
-            transparent: true,
-            opacity: HOVER_OPACITY,
-        });
-        const line = new THREE.LineSegments2(geometry, material);
-        line.computeLineDistances();
-        line.renderOrder = 1101;   // over the selection, see drawHoverHighlight
-        this.scene.add(line);
-        this._hoverHighlightEdge = line;
-    }
-
-    /**
-     * Take down the outline. NOTHING ELSE.
-     *
-     * drawHoverHighlight calls this as its first line, to remove the outline it
-     * is about to replace -- so anything forgotten here is forgotten in the
-     * middle of drawing, which is not a moment when the hover has gone away.
-     * That is what erased the measurement preview a statement after it was
-     * drawn, and what left `_hoverDrawn` null after every draw, so the record
-     * of what was on screen said "nothing" while something was.
-     */
-    clearHoverOutline() {
-        this._disposeHighlightMesh('_hoverHighlightMesh');
-        this._disposeHighlightMesh('_hoverHighlightEdge');
-    }
 
     /**
      * The pointer is over nothing worth drawing: forget what was.
@@ -4112,7 +4019,6 @@ class KigumiViewerApp extends LitElement {
      * actually gone away, never from the teardown inside a redraw.
      */
     _forgetHover() {
-        this.clearHoverOutline();
         this._hoverDrawn = null;
         this._updateMeasurePreview(null);
     }
@@ -4340,42 +4246,16 @@ class KigumiViewerApp extends LitElement {
         const visualContext = this._getSelectionVisualContext();
         const policy = this._getSelectionVisualPolicy(visualContext.state, baseUnselectedOpacity);
 
-        // Build highlight geometry
-        this.removeCSGHighlight();
-        const edgePositions = edgeSegmentPositions(message.highlightEdgeSegments);
-        if (edgePositions.length > 0) {
-            // An edge is a line: shading the triangles beside it lit a stray
-            // wedge that read as geometry rather than as a selection.
-            this._buildHighlightEdgeLine(edgePositions, CSG_HIGHLIGHT_COLORS.feature);
-        }
-        if (featureLabel && parentHlMesh && Array.isArray(parentHlMesh.vertices) && parentHlMesh.vertices.length > 0) {
-            // Feature selected: parent CSG gets dim highlight, feature face gets bright highlight
-            this._buildHighlightMesh(
-                parentHlMesh.vertices,
-                parentHlMesh.indices,
-                CSG_HIGHLIGHT_COLORS.tagged,
-                policy.parentHighlightOpacity,
-                '_csgParentHighlightMesh',
-            );
-            if (hlMesh && Array.isArray(hlMesh.vertices) && hlMesh.vertices.length > 0) {
-                this._buildHighlightMesh(
-                    hlMesh.vertices,
-                    hlMesh.indices,
-                    CSG_HIGHLIGHT_COLORS.feature,
-                    policy.featureHighlightOpacity,
-                    '_csgHighlightMesh',
-                );
-            }
-        } else if (hlMesh && Array.isArray(hlMesh.vertices) && hlMesh.vertices.length > 0 && Array.isArray(hlMesh.indices)) {
-            // Tagged CSG selected (no feature): standard highlight
-            this._buildHighlightMesh(
-                hlMesh.vertices,
-                hlMesh.indices,
-                CSG_HIGHLIGHT_COLORS.tagged,
-                policy.csgHighlightOpacity,
-                '_csgHighlightMesh',
-            );
-        }
+        // Kept, not drawn. What is lit is worked out from the state every
+        // frame -- see _highlightState -- so this is the geometry that answer
+        // will need, and it stops being used the moment the focus moves off it.
+        this._csgHighlightSource = {
+            key: csgFocusKey({ timberKey, path, featureLabel }),
+            mesh: hlMesh,
+            parentMesh: parentHlMesh,
+            edgePositions: edgeSegmentPositions(message.highlightEdgeSegments),
+            featureLabel,
+        };
 
         if (stats) {
             this.emitViewerLog('csg-selection', {
@@ -4396,73 +4276,9 @@ class KigumiViewerApp extends LitElement {
         return div.innerHTML;
     }
 
-    _buildHighlightMesh(vertices, indices, color, opacity, storeKey) {
-        const geometry = new THREE.BufferGeometry();
-        const posArray = new Float32Array(vertices);
-        geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-        geometry.setIndex(indices);
-        geometry.computeVertexNormals();
 
-        const material = new THREE.MeshBasicMaterial({
-            color,
-            transparent: true,
-            opacity,
-            depthTest: false,
-            depthWrite: false,
-            side: THREE.DoubleSide,
-        });
 
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.renderOrder = 999;
-        mesh.castShadow = false;
-        mesh.receiveShadow = false;
-        this.scene.add(mesh);
-        this[storeKey] = mesh;
-    }
 
-    /** The fat line over a selected edge. */
-    _buildHighlightEdgeLine(positions, color) {
-        const geometry = new THREE.LineSegmentsGeometry();
-        geometry.setPositions(positions);
-
-        const material = new THREE.LineMaterial({
-            color,
-            linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
-            // Pixel thickness is computed against this, so it tracks the canvas
-            // the same way the timbers' own edges do (see onWindowResize).
-            resolution: this._getRendererResolution(),
-            depthTest: false,
-            transparent: true,
-        });
-
-        const line = new THREE.LineSegments2(geometry, material);
-        line.computeLineDistances();
-        // Above the highlight meshes, which are already above the timbers: the
-        // point of selecting an edge is to see exactly which line it is.
-        line.renderOrder = 1000;
-        this.scene.add(line);
-        this._csgHighlightEdgeLine = line;
-    }
-
-    removeCSGHighlight() {
-        this._disposeHighlightMesh('_csgHighlightMesh');
-        this._disposeHighlightMesh('_csgParentHighlightMesh');
-        this._disposeHighlightMesh('_csgHighlightEdgeLine');
-    }
-
-    _disposeHighlightMesh(storeKey) {
-        const mesh = this[storeKey];
-        if (mesh) {
-            this.scene.remove(mesh);
-            if (mesh.geometry) {
-                mesh.geometry.dispose();
-            }
-            if (mesh.material) {
-                mesh.material.dispose();
-            }
-            this[storeKey] = null;
-        }
-    }
 
     _getSelectionVisualContext() {
         return computeSelectionVisualContext(
@@ -4493,10 +4309,14 @@ class KigumiViewerApp extends LitElement {
      * can stop following the state. A test reads both and checks, because that
      * is the one way left to get this wrong.
      */
-    visualSignature() {
+    visualSignature(state) {
         if (!this.sceneManager || !this.selectionManager) {
             return '';
         }
+        // Worked out once a frame and handed in: building it twice would mean
+        // asking the same question twice and allocating the edge positions
+        // twice with it.
+        const lit = state || this._highlightState();
         const focus = this.selectionManager.csgFocus;
         const drawn = this.activeSceneMembers;
         const parts = [
@@ -4513,6 +4333,15 @@ class KigumiViewerApp extends LitElement {
             focus && Array.isArray(focus.path) ? focus.path.join('/') : '',
             focus ? (focus.featureLabel || '') : '',
         ];
+        // What is LIT, as well as what everything looks like: the overlays are
+        // derived in the same pass, so the state they are derived from has to
+        // be in the same answer. Identity only -- their colours follow the
+        // policy, which is folded above.
+        parts.push(
+            lit.csg ? lit.csg.key : '',
+            lit.hover ? `${lit.hover.key}:${lit.hover.refused ? 'no' : 'ok'}` : '',
+            lit.held ? lit.held.key : '',
+        );
         for (const [key, bundle] of this.sceneManager.entries()) {
             parts.push(
                 // The member set itself: a rebuild that adds or drops timbers
@@ -4535,13 +4364,125 @@ class KigumiViewerApp extends LitElement {
      * frame later, which is the same frame it would have been drawn in anyway.
      */
     applyDerivedVisuals() {
-        const signature = this.visualSignature();
+        const lit = this._highlightState();
+        const signature = this.visualSignature(lit);
         if (signature === this._visualSignature) {
             return false;
         }
         this._visualSignature = signature;
         this.applySelectionOpacity();
+        this._reconcileHighlights(window.KigumiHighlights.highlightsFor(lit));
         return true;
+    }
+
+    /**
+     * What should be lit, as a list. See highlights.js.
+     *
+     * Every source is kept rather than drawn on arrival, and offered here only
+     * while the state it belongs to is still the state: a selection highlight
+     * from before the focus moved describes a selection nobody has.
+     */
+    _highlightState() {
+        const focus = this.selectionManager && this.selectionManager.csgFocus;
+        const source = this._csgHighlightSource;
+        const held = this.measureDraft && this.measureDraft.heldEnd;
+        const hover = this._hoverDrawn;
+        return {
+            csg: (source && focus && source.key === csgFocusKey(focus)) ? source : null,
+            hover: hover ? {
+                key: `${hover.memberKey}|${(hover.path || []).join('/')}|${hover.featureLabel || ''}`,
+                mesh: hover.highlightMesh,
+                edgePositions: edgeSegmentPositions(hover.highlightEdgeSegments),
+                refused: window.KigumiHover.HoverState.isRefused(hover),
+            } : null,
+            held: (held && held.highlight) ? {
+                key: heldHighlightKey(held.reference),
+                mesh: held.highlight.highlightMesh,
+                edgePositions: edgeSegmentPositions(held.highlight.highlightEdgeSegments),
+            } : null,
+            policy: this._getSelectionVisualPolicy(
+                this._getSelectionVisualContext().state,
+                1 - (this.unselectedTransparencyPercent / 100)),
+        };
+    }
+
+    /**
+     * Make what is lit match what should be.
+     *
+     * Adds what is missing, drops what is no longer wanted, and leaves the rest
+     * alone -- so an overlay that is still wanted keeps its geometry and only
+     * its colour and opacity follow the state. Nothing here decides WHETHER
+     * something should be lit; that is highlightsFor's job, and it is pure.
+     */
+    _reconcileHighlights(wanted) {
+        const seen = new Set();
+        for (const descriptor of wanted) {
+            seen.add(descriptor.id);
+            let object = this._highlightObjects.get(descriptor.id);
+            if (!object) {
+                object = this._buildHighlightObject(descriptor);
+                if (!object) {
+                    continue;
+                }
+                this.scene.add(object);
+                this._highlightObjects.set(descriptor.id, object);
+            }
+            // Appearance every pass, geometry only once: the opacity follows
+            // the selection, which the old code froze at the moment the
+            // message arrived.
+            object.material.color.setHex(descriptor.color);
+            object.material.opacity = descriptor.opacity;
+            object.renderOrder = descriptor.renderOrder;
+        }
+        for (const [id, object] of Array.from(this._highlightObjects.entries())) {
+            if (seen.has(id)) {
+                continue;
+            }
+            this.scene.remove(object);
+            object.geometry.dispose();
+            object.material.dispose();
+            this._highlightObjects.delete(id);
+        }
+    }
+
+    /** One overlay, of either shape. */
+    _buildHighlightObject(descriptor) {
+        if (descriptor.shape === 'edges') {
+            const geometry = new THREE.LineSegmentsGeometry();
+            geometry.setPositions(descriptor.positions);
+            const material = new THREE.LineMaterial({
+                color: descriptor.color,
+                linewidth: CSG_HIGHLIGHT_EDGE_WIDTH_PX,
+                // Pixel thickness is computed against this, so it tracks the
+                // canvas the way the timbers' own edges do. Kept in step on
+                // resize for EVERY overlay now -- only the selection's line
+                // used to be, so the hover and the held one went thin.
+                resolution: this._getRendererResolution(),
+                depthTest: false,
+                transparent: true,
+                opacity: descriptor.opacity,
+            });
+            const line = new THREE.LineSegments2(geometry, material);
+            line.computeLineDistances();
+            return line;
+        }
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute(
+            'position', new THREE.BufferAttribute(new Float32Array(descriptor.mesh.vertices), 3));
+        geometry.setIndex(descriptor.mesh.indices);
+        geometry.computeVertexNormals();
+        const material = new THREE.MeshBasicMaterial({
+            color: descriptor.color,
+            transparent: true,
+            opacity: descriptor.opacity,
+            depthTest: false,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.castShadow = false;
+        mesh.receiveShadow = false;
+        return mesh;
     }
 
     applySelectionOpacity() {

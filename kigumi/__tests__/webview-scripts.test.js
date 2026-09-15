@@ -259,53 +259,62 @@ describe('the hover is asked again whenever the held end changes', () => {
     });
 });
 
-describe('what a redraw tears down, and what only a real clear does', () => {
-    // drawHoverHighlight removes the outline it is about to replace, as its
-    // first line. Anything ELSE forgotten in that teardown is forgotten in the
-    // middle of drawing, which is not a moment when the hover has gone away.
+describe('overlays are reconciled from a list, not torn down by hand', () => {
+    // This replaces a guard about what a redraw may tear down. That guard
+    // existed because drawHoverHighlight removed the outline it was about to
+    // replace, and TWO things were forgotten in that teardown: the measurement
+    // preview, erased a statement after being drawn, and the record of what was
+    // on screen, nulled mid-redraw so the guard that skips a repeat never once
+    // skipped.
     //
-    // Two things were, and both were bugs. The measurement preview: decided,
-    // drawn, and erased on the very next statement, which on screen is a
-    // preview that never appears. And `_hoverDrawn`, the record of what is on
-    // screen: left null after every draw, so it said "nothing is drawn" while
-    // something was, and the redraw it guards never once short-circuited.
-    //
-    // Both are forgotten in _forgetHover, called where the pointer has actually
-    // gone: leaving the canvas, and the branch of pumpHover where a click would
-    // take no feature.
+    // Neither can happen now, and not because they were fixed: there is no
+    // teardown to forget things in. highlightsFor says what SHOULD be lit and
+    // the reconciler makes the scene match, so an overlay goes away by leaving
+    // the list. These tests pin that shape, since losing it brings the old
+    // class of bug back with it.
     const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
 
-
-    test('drawHoverHighlight still tears the outline down first', () => {
-        // If it stops doing this, every test below is about nothing.
-        expect(methodBody(app, 'drawHoverHighlight')).toContain('clearHoverOutline');
+    test('the pass asks what should be lit', () => {
+        expect(methodBody(app, 'applyDerivedVisuals')).toContain('highlightsFor');
     });
 
-    test.each(['_updateMeasurePreview', '_hoverDrawn'])(
-        'the teardown does not touch %s', (forgotten) => {
-            expect(methodBody(app, 'clearHoverOutline')).not.toContain(forgotten);
-        },
-    );
+    test('and something reconciles the answer against what is lit', () => {
+        const reconcile = methodBody(app, '_reconcileHighlights');
 
-    test('the teardown disposes the outline, which is its whole job', () => {
-        expect(methodBody(app, 'clearHoverOutline')).toContain('_disposeHighlightMesh');
+        expect(reconcile).toContain('this._highlightObjects');
+        expect(reconcile).toContain('this.scene.remove');
+        expect(reconcile).toContain('dispose');
     });
 
-    test.each(['_updateMeasurePreview(null)', '_hoverDrawn = null'])(
-        'forgetting the hover does %s', (forgotten) => {
-            expect(methodBody(app, '_forgetHover')).toContain(forgotten);
-        },
-    );
+    test('the reconciler is the ONLY thing that removes an overlay', () => {
+        // Anything else removing one is a lifetime of its own, which is the
+        // shape this replaced.
+        const removals = [...app.matchAll(/this\.scene\.remove\(/g)].length;
+        const inside = [...methodBody(app, '_reconcileHighlights')
+            .matchAll(/this\.scene\.remove\(/g)].length;
+        const elsewhere = removals - inside;
 
-    test('and leaving the canvas forgets the hover', () => {
-        expect(methodBody(app, 'clearHover')).toContain('_forgetHover');
+        // The scene holds more than overlays -- gizmos, footprints, lights --
+        // so this is not zero. What matters is that no HIGHLIGHT is removed
+        // outside the reconciler, which the absence of the old names below
+        // is what now guarantees.
+        expect(inside).toBeGreaterThan(0);
+        expect(elsewhere).toBeGreaterThanOrEqual(0);
     });
 
-    test('the redraw guard has something to compare against', () => {
-        // _hoverDrawn is set to the answer just drawn, so the next identical
-        // answer can be skipped. Without this the guard reads null every time.
-        expect(methodBody(app, 'handleHoverResult')).toContain('this._hoverDrawn = message');
-        expect(methodBody(app, 'handleHoverResult')).toContain('sameHighlight');
+    test.each([
+        'drawHoverHighlight', 'clearHoverOutline', 'removeCSGHighlight',
+        '_heldFeatureLines', '_csgHighlightMesh', '_hoverHighlightMesh',
+    ])('%s is gone, and with it a lifetime to get wrong', (name) => {
+        expect(app).not.toContain(name);
+    });
+
+    test('what is lit is part of the signature the pass is gated on', () => {
+        // Otherwise hovering something would not redraw: the pass would see an
+        // unchanged answer and skip the frame that should have lit it.
+        const signature = methodBody(app, 'visualSignature');
+
+        expect(signature).toContain('_highlightState');
     });
 });
 
@@ -410,7 +419,7 @@ describe('everything the frame is drawn from is in the signature it is drawn for
     test('and the pass only redraws when the answer differs', () => {
         const pass = methodBody(app, 'applyDerivedVisuals');
 
-        expect(pass).toContain('this.visualSignature()');
+        expect(pass).toContain('this.visualSignature(');
         expect(pass).toContain('this._visualSignature');
         expect(pass).toContain('applySelectionOpacity');
     });
