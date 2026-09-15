@@ -130,17 +130,18 @@ states and a fallback, was split out with a comment saying it is "independently
 testable", and has no tests. `layer-state-store` has none either. Free, and it
 makes the next step safe.
 
-**1. One derive pass.** *Done, in part.* `visualSignature()` folds the inputs and
-`applyDerivedVisuals()` runs from the frame loop, redrawing when the answer
-differs. The eleven callers are **still there on purpose**: if the signature is
-complete they are redundant, and if it has a gap they still cover it. Removing
-them is the next step, and wants a session of watching the viewer first — the
-two rounds of drawing it every frame cost nothing, and the belt is worth keeping
-until the braces are proven.
+**1. One derive pass.** *Done.* `visualSignature()` folds the inputs,
+`applyDerivedVisuals()` runs from the frame loop, and the eleven scattered
+callers are gone — a change is seen at most one frame later, which is the frame
+it would have been drawn in anyway.
 
-*Still to do here:* delete the eleven, and with them the `layerStatesByKey`
-mirror — under pull the app asks the panel's store, and a mirror synced by
-CustomEvents exists only to serve push.
+The `layerStatesByKey` mirror went with them. It was a Map on the app kept in
+step with the panel's store by CustomEvents: two copies of one fact, the second
+stale exactly when an event is missed, and the frame drawn from the stale one.
+The app asks the store now, through an accessor rather than a private field.
+What survived of those handlers is the one EFFECT — locking a member takes it
+out of the selection — which changes state rather than describing it, and so
+cannot be derived.
 
 **2. `highlightsFor(state)`.** What this review was for. Once step 1 exists, the
 overlays become a list the pass reconciles rather than seven lifetimes, and a

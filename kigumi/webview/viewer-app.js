@@ -1363,7 +1363,6 @@ class KigumiViewerApp extends LitElement {
         this._csgHighlightMesh = null;
         this._csgParentHighlightMesh = null;
         this.memberMetadataByKey = new Map(); // member key -> { name, type }
-        this.layerStatesByKey = new Map(); // member key -> { locked, hidden, fixed }
         /** The last state the frame was drawn for. See visualSignature. */
         this._visualSignature = null;
         this.renderProfiles = RENDER_PROFILES;
@@ -1417,7 +1416,6 @@ class KigumiViewerApp extends LitElement {
         this.onLightDialPointerUp = this.onLightDialPointerUp.bind(this);
         this.onWindowKeyDown = this.onWindowKeyDown.bind(this);
         this.onLayerStateChanged = this.onLayerStateChanged.bind(this);
-        this.onLayerStateSync = this.onLayerStateSync.bind(this);
         this.onMemberContextMenuRequest = this.onMemberContextMenuRequest.bind(this);
         this.onCsgTreeRequested = this.onCsgTreeRequested.bind(this);
         this.onCsgByPathRequested = this.onCsgByPathRequested.bind(this);
@@ -1542,7 +1540,6 @@ class KigumiViewerApp extends LitElement {
             if (!this.selectionManager.csgFocus) {
                 this.removeCSGHighlight();
             }
-            this.applySelectionOpacity();
             this.selectionPanel.updateInfo(this.currentFrameData);
         });
 
@@ -1554,7 +1551,6 @@ class KigumiViewerApp extends LitElement {
         this._layersView = layersView;
         if (this._layersView) {
             this._layersView.addEventListener('layer-state-changed', this.onLayerStateChanged);
-            this._layersView.addEventListener('layer-state-sync', this.onLayerStateSync);
             this._layersView.addEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
             this._layersView.addEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
             this._layersView.addEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
@@ -1605,7 +1601,6 @@ class KigumiViewerApp extends LitElement {
         }
         if (this._layersView) {
             this._layersView.removeEventListener('layer-state-changed', this.onLayerStateChanged);
-            this._layersView.removeEventListener('layer-state-sync', this.onLayerStateSync);
             this._layersView.removeEventListener('kigumi-member-contextmenu', this.onMemberContextMenuRequest);
             this._layersView.removeEventListener('kigumi-request-csg-tree', this.onCsgTreeRequested);
             this._layersView.removeEventListener('kigumi-request-csg-by-path', this.onCsgByPathRequested);
@@ -1638,39 +1633,33 @@ class KigumiViewerApp extends LitElement {
         if (typeof key !== 'string' || key.length === 0) {
             return;
         }
-        const state = detail.state && typeof detail.state === 'object' ? detail.state : null;
-        if (state) {
-            this.layerStatesByKey.set(key, state);
+        // The only thing left here, and it is an EFFECT: it changes the state
+        // rather than describing it, so it cannot be derived and has to happen
+        // when it happens. What a locked member LOOKS like is derived, and the
+        // frame loop works that out by asking.
+        if (detail.prop === 'locked' && detail.value === true
+                && this.selectionManager.isTimberSelected(key)) {
+            this._dropCsgFocus();
+            this.selectionManager.deselectTimber(key);
         }
-        if (detail.prop === 'locked' && detail.value === true) {
-            if (this.selectionManager.isTimberSelected(key)) {
-                this._dropCsgFocus();
-                this.selectionManager.deselectTimber(key);
-            }
-        }
-        this.applySelectionOpacity();
     }
 
-    onLayerStateSync(event) {
-        const detail = event && event.detail ? event.detail : {};
-        const states = detail.states && typeof detail.states === 'object' ? detail.states : {};
-        this.layerStatesByKey.clear();
-        for (const [key, state] of Object.entries(states)) {
-            if (typeof key === 'string' && key.length > 0 && state && typeof state === 'object') {
-                this.layerStatesByKey.set(key, state);
-            }
-        }
-        this.applySelectionOpacity();
-    }
 
+    /**
+     * Whether a member is hidden or locked, ASKED of the one copy.
+     *
+     * There used to be a mirror here -- a Map on the app, kept in step with the
+     * panel's store by events. Two copies of one fact, the second stale exactly
+     * when an event goes missing, and the frame drawn from the stale one.
+     */
     isMemberHidden(memberKey) {
-        const state = this.layerStatesByKey.get(memberKey);
-        return Boolean(state && state.hidden);
+        const layers = this._layersView && this._layersView.layerState;
+        return Boolean(layers && layers.isHidden(memberKey));
     }
 
     isMemberLocked(memberKey) {
-        const state = this.layerStatesByKey.get(memberKey);
-        return Boolean(state && state.locked);
+        const layers = this._layersView && this._layersView.layerState;
+        return Boolean(layers && layers.isLocked(memberKey));
     }
 
     setupUiEvents() {
@@ -2259,7 +2248,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this.requestUpdate();
-        this.applySelectionOpacity();
     }
 
     setSelectedTransparencyPercent(nextPercent) {
@@ -2267,7 +2255,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this.requestUpdate();
-        this.applySelectionOpacity();
     }
 
     setEdgeLineVisibilityPercent(nextPercent) {
@@ -2275,7 +2262,6 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         this.requestUpdate();
-        this.applySelectionOpacity();
     }
 
     // Set a boolean export-related flag, re-rendering only when it changes.
@@ -4493,10 +4479,10 @@ class KigumiViewerApp extends LitElement {
      * Everything the look of the frame depends on, folded into one value.
      *
      * READ off the state, never announced by it. Nothing has to remember to say
-     * that something changed -- which is the point. The eleven places that call
-     * applySelectionOpacity are eleven places that can forget, and a counter
-     * bumped by each of them would only move the forgetting somewhere less
-     * visible. Asking costs nothing to get wrong.
+     * that something changed -- which is the point. Eleven places used to call
+     * applySelectionOpacity, which is eleven places that could forget, and a
+     * counter bumped by each would only have moved the forgetting somewhere
+     * less visible. Asking costs nothing to get wrong.
      *
      * Cheap enough to take every frame: about a hundred and fifty values for a
      * frame of twenty-five timbers. In that same frame renderMeasurements
@@ -4543,9 +4529,10 @@ class KigumiViewerApp extends LitElement {
     /**
      * Bring what is drawn back in line with the state, if the state has moved.
      *
-     * Called from the frame loop. The eleven callers of applySelectionOpacity
-     * are still there and still right; this is here so that FORGETTING one
-     * stops being possible, and it is what will be doing the work once they go.
+     * Called from the frame loop, and the only thing that calls
+     * applySelectionOpacity now: the eleven scattered callers are gone, and
+     * with them the possibility of forgetting one. A change is seen at most a
+     * frame later, which is the same frame it would have been drawn in anyway.
      */
     applyDerivedVisuals() {
         const signature = this.visualSignature();
@@ -5404,7 +5391,6 @@ class KigumiViewerApp extends LitElement {
             }
         }
         this.requestUpdate();
-        this.applySelectionOpacity();
     }
 
     setEdgeLineThicknessPx(nextThickness) {
@@ -5678,7 +5664,6 @@ class KigumiViewerApp extends LitElement {
             const profileId = this.resolveRenderProfileIdForMemberType(metadata.type);
             this.applyRenderProfileToBundle(bundle, profileId);
         }
-        this.applySelectionOpacity();
     }
 
     /** How much room a face has for text, inside its frame. */
@@ -6306,7 +6291,6 @@ class KigumiViewerApp extends LitElement {
         this.rebuildFootprints(geometryData && geometryData.footprints);
         this.memberListPanel.rebuild(meshes);
         this.updateReflectionTransforms();
-        this.applySelectionOpacity();
         // Rebuilt meshes come in at the origin; re-seat them at the current
         // scrub position so the assembly preview survives geometry refreshes.
         this.applyAssemblyOffsets();
@@ -7145,7 +7129,6 @@ class KigumiViewerApp extends LitElement {
         this._syncDrawingPanel();
         // What is ghosted follows the scene: a drawing dims everything it is
         // not about, and leaving one puts the frame back.
-        this.applySelectionOpacity();
         this.updateCamera();
         this.requestUpdate();
     }
@@ -7177,7 +7160,6 @@ class KigumiViewerApp extends LitElement {
         if (!this.displayOptions.set('showDrawingGhosts', Boolean(enabled))) {
             return;
         }
-        this.applySelectionOpacity();
         this.requestUpdate();
     }
 

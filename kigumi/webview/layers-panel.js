@@ -1012,6 +1012,18 @@
             this._disposePanel();
         }
 
+        /**
+         * Which members are hidden, locked or fixed.
+         *
+         * Exposed so anything that needs to KNOW can ask, rather than being
+         * told and keeping a copy. The viewer used to mirror this into a Map of
+         * its own, synced by events -- two copies of one fact, the second of
+         * which is stale exactly when an event is missed.
+         */
+        get layerState() {
+            return this._layerStateStore || null;
+        }
+
         attach(selectionManager, _vscode) {
             this._selectionManager = selectionManager;
             this._ensureMounted();
