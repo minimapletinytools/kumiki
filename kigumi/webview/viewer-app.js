@@ -3825,18 +3825,6 @@ class KigumiViewerApp extends LitElement {
         const offered = Boolean(
             held && verdict && verdict.kinds && verdict.kinds.length > 0
             && anchor && this.measureDraft.canTake(anchor).ok);
-        // Temporary, for chasing a preview that does not appear. Says which of
-        // the conditions failed, rather than leaving all of them suspects.
-        if (held) {
-            this.emitViewerLog('preview-decide', {
-                offered,
-                verdict: verdict ? 'present' : 'absent',
-                kinds: verdict && verdict.kinds ? verdict.kinds.length : null,
-                anchors: Boolean(verdict && verdict.anchors),
-                canTake: anchor ? this.measureDraft.canTake(anchor).reason || 'ok' : 'no-anchor',
-                feature: message && message.featureLabel,
-            });
-        }
         const was = this._measurePreview;
         this._measurePreview = offered ? {
             held,
@@ -4195,7 +4183,10 @@ class KigumiViewerApp extends LitElement {
 
     clearHoverOutline() {
         this._hoverDrawn = null;
-        this._updateMeasurePreview(null);
+        // NOT the measurement preview. drawHoverHighlight calls this first, to
+        // take down the outline it is about to replace -- so clearing the
+        // preview here erased it a moment after it was drawn, which looked
+        // exactly like a preview that never appeared.
         this._disposeHighlightMesh('_hoverHighlightMesh');
         this._disposeHighlightMesh('_hoverHighlightEdge');
     }
@@ -4207,6 +4198,9 @@ class KigumiViewerApp extends LitElement {
         }
         this._hoverClient = null;
         this.clearHoverOutline();
+        // Here, where the pointer has actually gone: nothing is being offered
+        // any more, so nothing should still be drawn as though it were.
+        this._updateMeasurePreview(null);
     }
 
     handleCanvasClick(event) {
@@ -6805,14 +6799,6 @@ class KigumiViewerApp extends LitElement {
         // a row that says why can never disagree.
         const status = KigumiMeasurements.measurementStatus(
             measure, axes, this.viewportProjection(viewport));
-        if (options.pending) {
-            // Temporary: whether the preview, once decided on, actually draws.
-            this.emitViewerLog('preview-draw', {
-                drawable: status.drawable, reason: status.reason,
-                kind: status.kind, available: status.available,
-                viewport: viewport && viewport.id,
-            });
-        }
         if (!status.drawable) {
             return;
         }

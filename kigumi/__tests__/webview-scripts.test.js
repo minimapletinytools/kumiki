@@ -235,3 +235,45 @@ describe('the hover is asked again whenever the held end changes', () => {
         expect(body(method)).toContain('_reaskHover');
     });
 });
+
+describe('the preview is not torn down by the highlight it belongs with', () => {
+    // drawHoverHighlight clears the outline it is about to replace, as its
+    // first line. Clearing the measurement preview in that same teardown erased
+    // the preview a moment after it was drawn -- the logs showed it decided,
+    // drawn, and cleared on every single hover, which looked exactly like a
+    // preview that never appeared.
+    //
+    // The preview is cleared where the pointer has actually gone: clearHover,
+    // and the branch of pumpHover where a click would take no feature.
+    const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+
+    function body(name) {
+        const at = app.search(new RegExp(`\\n    ${name}\\([^)]*\\) \\{`));
+        if (at === -1) {
+            throw new Error(`${name} is not a method of viewer-app.js`);
+        }
+        const open = app.indexOf('{', at + name.length + 5);
+        let depth = 0;
+        for (let end = open; end < app.length; end += 1) {
+            if (app[end] === '{') depth += 1;
+            if (app[end] === '}') {
+                depth -= 1;
+                if (depth === 0) return app.slice(open, end + 1);
+            }
+        }
+        throw new Error(`${name} is never closed`);
+    }
+
+    test('drawHoverHighlight still tears the outline down first', () => {
+        // If it stops doing this the test below stops meaning anything.
+        expect(body('drawHoverHighlight')).toContain('clearHoverOutline');
+    });
+
+    test('taking down the outline does not take down the preview', () => {
+        expect(body('clearHoverOutline')).not.toContain('_updateMeasurePreview');
+    });
+
+    test('but leaving the canvas does', () => {
+        expect(body('clearHover')).toContain('_updateMeasurePreview(null)');
+    });
+});
