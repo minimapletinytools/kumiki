@@ -3825,6 +3825,18 @@ class KigumiViewerApp extends LitElement {
         const offered = Boolean(
             held && verdict && verdict.kinds && verdict.kinds.length > 0
             && anchor && this.measureDraft.canTake(anchor).ok);
+        // Temporary, for chasing a preview that does not appear. Says which of
+        // the conditions failed, rather than leaving all of them suspects.
+        if (held) {
+            this.emitViewerLog('preview-decide', {
+                offered,
+                verdict: verdict ? 'present' : 'absent',
+                kinds: verdict && verdict.kinds ? verdict.kinds.length : null,
+                anchors: Boolean(verdict && verdict.anchors),
+                canTake: anchor ? this.measureDraft.canTake(anchor).reason || 'ok' : 'no-anchor',
+                feature: message && message.featureLabel,
+            });
+        }
         const was = this._measurePreview;
         this._measurePreview = offered ? {
             held,
@@ -6793,6 +6805,14 @@ class KigumiViewerApp extends LitElement {
         // a row that says why can never disagree.
         const status = KigumiMeasurements.measurementStatus(
             measure, axes, this.viewportProjection(viewport));
+        if (options.pending) {
+            // Temporary: whether the preview, once decided on, actually draws.
+            this.emitViewerLog('preview-draw', {
+                drawable: status.drawable, reason: status.reason,
+                kind: status.kind, available: status.available,
+                viewport: viewport && viewport.id,
+            });
+        }
         if (!status.drawable) {
             return;
         }
