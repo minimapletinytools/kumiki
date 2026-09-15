@@ -9,8 +9,10 @@ not wrong rules — every rule read correctly on its own — but two places
 answering the same question differently, or one place answering it with an input
 the other did not have. A state nobody wrote down is a state nobody checks.
 
-Sections 1–6 are **what the code does today**. Section 7 is the design being
-moved to, and section 8 is how.
+**Status: done.** Phases 1–3 of §8 are implemented; `measuring-states.md` is
+the target they were built to and is now the description of the code. Sections
+1–6 below are kept as the investigation — what the code did, and why it kept
+going wrong — because the reasoning is the part worth not losing.
 
 ## 1. The state is four things, not one
 
@@ -216,10 +218,11 @@ writes, clears the selection, resumes undo and pushes one entry. The selection
 panel keeps "Measure from" and loses "Confirm".
 *The behaviour change, once the two things it relies on are in.*
 
-**Phase 4 — settle up.** Rewrite the Escape and pending paragraphs in
-`measurement-spec.md`. Retest the angle/distance kind stickiness — Phase 1
-should remove its cause. Then the deferred items: angle placement, and faces
-carrying corners rather than an AABB.
+**Phase 4 — settle up.** *Done:* the Escape, pending and mode-table paragraphs
+in `measurement-spec.md` are rewritten. *Outstanding:* retest the
+angle/distance kind stickiness — Phase 1 removed its cause, and it needs
+confirming in the viewer rather than asserting. Then the deferred items: angle
+placement, and faces carrying corners rather than an AABB.
 
 Phases 1 and 2 are independent of each other and both independent of 3, so they
 can land in either order; 3 wants both.

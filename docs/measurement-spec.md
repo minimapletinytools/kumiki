@@ -15,8 +15,10 @@ measurement", and there is a plain selection in a drawing again.
   to an edge derived from two faces.
 - **Plane** — the flat surface a measurement is taken and drawn on. A point and
   a normal. It is the measurement's own property, not the viewport's.
-- **Pending measurement** — one that has both anchors but has not been
-  confirmed. It lives in the viewer only.
+- **Preview** — the measurement the pointer is currently offering, drawn while
+  an end is held. It lives in the viewer only and is never written until the
+  click. There is no pending measurement and no confirm step; see
+  `measuring-states.md`.
 - **3D drawing** — the one reserved drawing that holds the 3D view's
   measurements.
 
@@ -159,7 +161,7 @@ timber is selected.
 selectedTimbers : Set          multi-select. 3D view only.
 focus           : one of       { kind: 'csg' } | { kind: 'measurement' } | null
 held            : anchor|null  the first end of a measurement being made
-pending         : measure|null both ends, unconfirmed, viewer-only
+preview         : measure|null what the pointer offers, drawn, never written
 markedMeasures  : Set          measurements marked for deletion
 ```
 
@@ -177,11 +179,9 @@ the info panel — reads `focus` and acts on exactly one.
 | mode | timbers | features | measurements |
 |---|---|---|---|
 | 3D, idle | yes, multi | yes, after selecting a timber | yes, click or tree |
-| 3D, holding | unchanged | yes, this is the second pick | no |
-| 3D, pending | frozen | re-pick replaces the second end | no |
+| 3D, holding | unchanged | yes, **on any timber**, selected or not | no |
 | Drawing, idle | **no** | yes, as if every member were selected | yes, click or panel |
 | Drawing, holding | no | yes | no |
-| Drawing, pending | no | re-pick replaces the second end | no |
 
 Rules that fall out of it:
 
@@ -200,9 +200,13 @@ Rules that fall out of it:
 - **Measurements are clickable when the pointer is over one and no pick is in
   flight.** Not keyed to whether something is selected — in a drawing there is
   no timber selection to key off.
-- **Escape** releases the second end, then the held end, then leaves drawing
-  mode in the 3D view. In the drawing view there is no mode to leave, so a third
-  press does nothing.
+- **Escape** releases the held end, then leaves drawing mode in the 3D view. In
+  the drawing view there is no mode to leave, so a second press does nothing.
+  One level, there being one end to release.
+- **While an end is held, a click reaches the feature directly in both views.**
+  The 3D view's usual two clicks would leave a feature on any unselected timber
+  unhoverable, so the preview could never appear for the ordinary case of
+  measuring between two timbers.
 - **Delete and Backspace** delete the focused measurement, or every marked one —
   when it is one the file owns. See below.
 
@@ -239,17 +243,18 @@ The same flow in both views, from one module. Where they differ is named.
 3. **Hover** shows what a click would take, coloured by whether it could finish
    the measurement from here. One verdict answers both the colour and the
    refusal, so what is drawn red is what the click refuses.
-4. **The second pick** goes through ordinary feature selection — select the
-   timber, then the feature on it — which unselects the first. That is fine; it
-   is held, not selected.
-5. **Pending.** Both ends are known. The measurement is drawn but exists only in
-   the viewer. Re-picking replaces the second end. Escape releases it.
-6. **Confirm** writes it, selects it, and pushes one entry onto the undo stack.
+4. **The preview.** Whatever the pointer is over that the verdict allows is
+   drawn as the measurement it would make — on the plane and at the anchors it
+   will be written with. The focus moves to it; the first end is held, not
+   selected, and stays drawn.
+5. **The click writes it**, selects it, and pushes one entry onto the undo
+   stack. There is no confirm step: the preview under the pointer is already
+   what the click takes, so clicking it IS the confirmation.
 
-The pending measurement is **not** written to the design before confirmation.
-Holding it in the viewer costs a little state and removes a class of problems:
-a reload, an external edit to the drawings file, or a change of scene in the
-middle of making one. Nothing outside the viewer needs to see a half-made
+Nothing is written to the design until that click. The preview costs no stored
+state at all — it is derived from the hover's verdict — so a reload, an external
+edit to the drawings file, or a change of scene in the middle of making one has
+nothing to tidy up. Nothing outside the viewer ever sees a half-made
 measurement.
 
 ### Hover picks the best matching feature
@@ -282,9 +287,9 @@ own.
 - **Survives** saving. Saving is not an edit.
 - **Purged** on reload, and on switching frames. Both are cheap to purge and
   expensive to keep honest.
-- **Disabled while a measurement is pending.** There is no half-made measurement
-  on the stack to undo, and allowing it would mean deciding what undo means
-  mid-gesture. Confirm or cancel first.
+- **Disabled while an end is held.** There is no half-made measurement on the
+  stack to undo, and allowing it would mean reaching past the thing being looked
+  at. Click a second feature, or press Escape, first.
 - **No interaction with VS Code's undo.** The drawings file is data, not a
   document being edited.
 
