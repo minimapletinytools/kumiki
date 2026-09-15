@@ -6997,6 +6997,14 @@ class KigumiViewerApp extends LitElement {
             const size = Math.hypot(run.x, run.y);
             return size > 0 ? { x: run.x / size, y: run.y / size } : null;
         };
+        // Only for forms that RUN somewhere. A solid plane has a normal and no
+        // direction, and this arc is built from the way each feature runs as
+        // drawn -- feeding it a normal is what drew the arc out of two normals
+        // in the first place, and reading a direction that is not there threw
+        // on every frame, which took the whole render down with it.
+        if (!formA.direction || !formB.direction) {
+            return null;
+        }
         const fromDirection = screenDirection(from, formA.direction);
         const toDirection = screenDirection(to, formB.direction);
         if (!fromDirection || !toDirection) {

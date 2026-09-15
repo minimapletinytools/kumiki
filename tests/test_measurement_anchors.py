@@ -1013,3 +1013,81 @@ class TestWhereAnAngleSits:
         rays = self._rays(crossing, other)
 
         assert [round(v, 6) for v in rays["from"]] == [1.0, 0.0, 0.0]
+
+
+class TestAFeatureOnALabelledRoot:
+    """Pickable and then unresolvable, which showed as a measurement in red.
+
+    Navigation records a label only when it steps ONTO a child, so a feature
+    declared on a labelled ROOT comes back with an empty path. The resolver
+    refused an empty path on a labelled node, so that feature could be picked,
+    measured from, and then never found again -- the measurement was written and
+    immediately broke. Every rafter in a frame has a labelled root.
+    """
+
+    def _runner_and_frame(self):
+        import importlib.util
+        import sys
+        from pathlib import Path
+        from tests.testing_shavings import load_module
+
+        root = Path(__file__).resolve().parent.parent
+        spec = importlib.util.spec_from_file_location(
+            "kigumi_runner_rooted", root / "kigumi" / "runner.py")
+        runner = importlib.util.module_from_spec(spec)
+        sys.modules["kigumi_runner_rooted"] = runner
+        spec.loader.exec_module(runner)
+        frame = load_module(
+            "rooted_fixture", root / "kigumi" / "test-fixtures" / "measured_frame.py"
+        ).build_frame()
+        return runner, frame
+
+    def _labelled_root(self, runner, frame):
+        """A cut timber whose root carries a label AND declares features."""
+        for cut_timber in frame.cut_timbers:
+            roots, _ = runner._roots_for_path(cut_timber, ())
+            for root in roots:
+                if runner._label_name(root) is not None and root.get_declared_features():
+                    return cut_timber, root
+        return None, None
+
+    def test_the_fixture_has_one_to_check(self):
+        # Without this the tests below would pass by being about nothing.
+        runner, frame = self._runner_and_frame()
+
+        cut_timber, root = self._labelled_root(runner, frame)
+
+        assert root is not None
+        assert runner._label_name(root) is not None
+
+    def test_an_empty_path_means_the_node_you_are_on(self):
+        runner, frame = self._runner_and_frame()
+        _, root = self._labelled_root(runner, frame)
+
+        assert runner._find_csg_by_labels(root, ()) is root
+
+    def test_so_a_feature_it_declares_can_be_found(self):
+        runner, frame = self._runner_and_frame()
+        cut_timber, root = self._labelled_root(runner, frame)
+        name = root.get_declared_features()[0].name
+
+        found = runner._find_declared_feature(
+            cut_timber, runner.deserialize_feature_path(
+                {"timber": cut_timber.name, "csgPath": [], "feature": name}).ref)
+
+        assert found is not None
+        assert found[0].name == name
+
+    def test_and_a_measurement_to_it_resolves(self):
+        # The whole point: picked, written, and still findable afterwards.
+        runner, frame = self._runner_and_frame()
+        cut_timber, root = self._labelled_root(runner, frame)
+        name = root.get_declared_features()[0].name
+        entries, _ = runner._assign_member_keys(frame)
+        member = next(e["memberKey"] for e in entries
+                      if e["cutTimber"] is cut_timber)
+
+        placed = runner._resolve_anchor_placed(
+            frame, {"timber": member, "csgPath": [], "feature": name}, [0, 0, 1])
+
+        assert placed is not None
