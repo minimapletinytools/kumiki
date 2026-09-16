@@ -320,3 +320,155 @@ describe('whether redrawing the hover would change anything', () => {
         expect(HoverState.sameHighlight(null, null)).toBe(true);
     });
 });
+
+describe('which feature under the pointer is meant', () => {
+    // Tab steps through them and the right-click menu names one outright. This
+    // lived on the app, beside the call into here, and the two thresholds that
+    // govern it sat on either side of that call.
+
+    test('nobody has said, to begin with', () => {
+        const hover = new HoverState();
+
+        expect(hover.candidate).toBeUndefined();
+        expect(hover.asking).toBeNull();
+    });
+
+    test('asking is null rather than undefined, because ZERO IS A CHOICE', () => {
+        // Stepping round to the first feature is somebody choosing it, and the
+        // runner has to tell that from "choose for me".
+        const hover = new HoverState();
+        hover.choose(0);
+
+        expect(hover.asking).toBe(0);
+    });
+
+    test('Tab steps through them and wraps', () => {
+        const hover = new HoverState();
+
+        expect(hover.cycle(3)).toBe(0);
+        expect(hover.cycle(3)).toBe(1);
+        expect(hover.cycle(3)).toBe(2);
+        expect(hover.cycle(3)).toBe(0);
+    });
+
+    test('and a count of nothing still steps somewhere', () => {
+        expect(new HoverState().cycle(0)).toBe(0);
+    });
+
+    test('the menu names one', () => {
+        const hover = new HoverState();
+
+        expect(hover.choose('2')).toBe(2);
+        expect(hover.asking).toBe(2);
+    });
+});
+
+describe('the two thresholds a moving pointer meets', () => {
+    // Different on purpose, and they used to sit on either side of the call
+    // into this module.
+
+    test('any movement at all forgets which feature was chosen', () => {
+        // Cycling is about ONE place. Somewhere else is a different question.
+        const hover = new HoverState({ slop: 20 });
+        hover.pointerAt(100, 100);
+        hover.choose(2);
+
+        hover.pointerAt(101, 100);
+
+        expect(hover.candidate).toBeUndefined();
+    });
+
+    test('but a pointer that has not moved keeps it', () => {
+        const hover = new HoverState({ slop: 20 });
+        hover.pointerAt(100, 100);
+        hover.choose(2);
+
+        hover.pointerAt(100, 100);
+
+        expect(hover.candidate).toBe(2);
+    });
+
+    test('while asking again waits for the slop', () => {
+        // Measured from the last point that COUNTED, so a slow drag adds up
+        // rather than being refused one small move at a time.
+        const hover = new HoverState({ slop: 20 });
+        hover.pointerAt(100, 100);
+        // Answered, because one question is outstanding at a time and an
+        // unanswered one refuses the next whatever the pointer does.
+        hover.answered(hover.due().request, { featureLabel: 'front' });
+
+        hover.pointerAt(105, 100);
+        expect(hover.due()).toBeNull();
+
+        hover.pointerAt(130, 100);
+        expect(hover.due()).not.toBeNull();
+    });
+
+    test('the question carries the point, so nobody keeps a copy', () => {
+        const hover = new HoverState();
+        hover.pointerAt(42, 77);
+
+        expect(hover.due()).toMatchObject({ x: 42, y: 77 });
+    });
+});
+
+describe('what is on screen', () => {
+    const answer = (label, kinds) => ({
+        memberKey: 'post#0', path: ['cut'], featureLabel: label,
+        verdict: kinds === undefined ? null : { kinds },
+    });
+
+    test('nothing, to begin with', () => {
+        expect(new HoverState().drawn).toBeNull();
+    });
+
+    test('the first answer is worth drawing', () => {
+        expect(new HoverState().wouldRedraw(answer('front'))).toBe(true);
+    });
+
+    test('the same answer again is not', () => {
+        const hover = new HoverState();
+        hover.markDrawn(answer('front'));
+
+        expect(hover.wouldRedraw(answer('front'))).toBe(false);
+    });
+
+    test('a different feature is', () => {
+        const hover = new HoverState();
+        hover.markDrawn(answer('front'));
+
+        expect(hover.wouldRedraw(answer('back'))).toBe(true);
+    });
+
+    test('and so is the SAME feature whose verdict changed', () => {
+        // The colour says whether the click will be taken, and that turns on
+        // what is held -- which changes while the pointer rests still.
+        const hover = new HoverState();
+        hover.markDrawn(answer('front'));
+
+        expect(hover.wouldRedraw(answer('front', []))).toBe(true);
+    });
+
+    test('forgetting it means the next answer is drawn again', () => {
+        const hover = new HoverState();
+        hover.markDrawn(answer('front'));
+
+        hover.markDrawn(null);
+
+        expect(hover.wouldRedraw(answer('front'))).toBe(true);
+    });
+
+    test('clearing the hover forgets it too', () => {
+        // Leaving the canvas: nothing should stay lit, and nothing should think
+        // it still is.
+        const hover = new HoverState();
+        hover.pointerAt(10, 10);
+        hover.markDrawn(answer('front'));
+        hover.choose(1);
+
+        hover.clear();
+
+        expect(hover.drawn).toBeNull();
+        expect(hover.candidate).toBeUndefined();
+    });
+});

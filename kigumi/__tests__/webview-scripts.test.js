@@ -218,25 +218,47 @@ describe('the app asks the draft what is held, rather than deciding again', () =
     });
 });
 
-describe('the hover redraws when the verdict changes, not just the feature', () => {
-    // handleHoverResult skips redrawing an answer about the same feature. The
-    // colour it draws says whether the click will be taken, and that turns on
-    // what is held -- so the skip has to account for it. Comparing features
-    // alone left the highlight green over a pair that could not be measured.
+describe('the hover machine has one home', () => {
+    // It used to have two. hover-state.js owned the timing -- when to ask,
+    // which answer is still wanted -- while the app owned what was drawn, which
+    // feature under the pointer was meant, and where the pointer was. Both
+    // hover bugs grew on that seam: a stale verdict left green because the
+    // comparison lived on one side, and the record of what was drawn nulled by
+    // a teardown on the other.
     const app = fs.readFileSync(path.join(webviewDir, 'viewer-app.js'), 'utf8');
+    const machine = fs.readFileSync(path.join(webviewDir, 'hover-state.js'), 'utf8');
 
-    test('it compares whole highlights', () => {
-        expect(app).toContain('HoverState.sameHighlight');
+    test.each(['_hoverDrawn', '_candidateIndex', '_hoverClient'])(
+        'the app no longer keeps %s of its own', (field) => {
+            expect(app).not.toContain(field);
+        },
+    );
+
+    test('it asks the machine whether a redraw would change anything', () => {
+        expect(app).toContain('wouldRedraw');
     });
 
-    test('and never the feature alone, which is the weaker question', () => {
+    test('and the machine is what compares whole highlights', () => {
+        // The feature AND the verdict. Comparing features alone left a
+        // highlight green over a pair that could not be measured.
+        expect(machine).toContain('sameHighlight(this.drawn, answer)');
+    });
+
+    test('the app does not reach past it to the weaker question', () => {
         expect(app).not.toContain('HoverState.sameFeature');
     });
 
-    test('with one place judging what counts as refused', () => {
+    test('one place judges what counts as refused', () => {
         // The hover colour and the click refusal must agree, so both ask the
         // same function rather than each testing kinds.length.
         expect(app).not.toContain('kinds.length === 0');
+    });
+
+    test('and one place knows which feature is being asked for', () => {
+        // Null, never undefined: zero is a choice, and the runner has to tell
+        // it from "choose for me".
+        expect(machine).toContain('get asking()');
+        expect(app).toContain('this._hover.asking');
     });
 });
 

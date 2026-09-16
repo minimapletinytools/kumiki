@@ -65,6 +65,18 @@
             /** What is under the pointer, as the runner answered. */
             this.feature = null;
             this.at = null;
+            /**
+             * The answer currently ON SCREEN, which is not the same as the last
+             * one received: a redraw is skipped when it would change nothing.
+             */
+            this.drawn = null;
+            /**
+             * Which of the features under the pointer is meant, once somebody
+             * has said -- by Tab, or from the right-click menu. Undefined means
+             * "choose for me", and ZERO IS A CHOICE, so the two cannot be the
+             * same value.
+             */
+            this.candidate = undefined;
             this._pending = null;
             this._asked = 0;
             this._outstanding = false;
@@ -97,6 +109,67 @@
             this._pending = { x, y };
             this._stillFrames = 0;
             return { ask: false, reason: 'pending' };
+        }
+
+        /**
+         * The pointer is at a point. Answers whether it is worth asking about.
+         *
+         * TWO thresholds, deliberately different:
+         *
+         *  - the CANDIDATE is forgotten on any movement at all, because cycling
+         *    is about one place and somewhere else is a different question;
+         *  - the QUESTION is only asked once the pointer has travelled past the
+         *    slop, measured from the last point that counted.
+         *
+         * Both used to live on the app, on either side of the call into here,
+         * which is the seam both hover bugs grew on.
+         */
+        pointerAt(x, y) {
+            if (this.at === null || x !== this.at.x || y !== this.at.y) {
+                this.candidate = undefined;
+            }
+            return this.moved(x, y);
+        }
+
+        /** Step to the next of `count` features under the pointer. */
+        cycle(count) {
+            const many = Math.max(1, count || 1);
+            this.candidate = ((this.candidate === undefined ? -1 : this.candidate) + 1) % many;
+            return this.candidate;
+        }
+
+        /** Name one outright, as the right-click menu does. */
+        choose(index) {
+            this.candidate = Number(index);
+            return this.candidate;
+        }
+
+        /**
+         * Which feature to ask for, as the runner wants it.
+         *
+         * Null, never undefined: zero is a choice -- stepping round to the first
+         * feature, or picking the first row of the menu -- and the runner has to
+         * tell that from "choose for me".
+         */
+        get asking() {
+            return this.candidate === undefined ? null : this.candidate;
+        }
+
+        /**
+         * Whether drawing this answer would put something different on screen.
+         *
+         * The feature AND the verdict: what is drawn is geometry plus a colour,
+         * and the colour turns on what is held, which changes without the
+         * pointer moving.
+         */
+        wouldRedraw(answer) {
+            return !HoverState.sameHighlight(this.drawn, answer);
+        }
+
+        /** Remember what is now on screen. */
+        markDrawn(answer) {
+            this.drawn = answer || null;
+            return this.drawn;
         }
 
         /**

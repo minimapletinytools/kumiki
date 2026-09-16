@@ -2960,10 +2960,9 @@ class KigumiViewerApp extends LitElement {
             // the face you most often want to measure to.
             event.preventDefault();
             const count = Math.max(1, this._hover.feature.candidateCount || 1);
-            this._candidateIndex = ((this._candidateIndex === undefined
-                ? -1 : this._candidateIndex) + 1) % count;
+            const index = this._hover.cycle(count);
             this.emitViewerLog('measure-cycle', {
-                index: this._candidateIndex, of: count,
+                index, of: count,
                 from: this._hover.feature.featureLabel,
             });
             // The place did not change, the question did: ask the same point
@@ -3164,20 +3163,13 @@ class KigumiViewerApp extends LitElement {
         if (!this._hover) {
             this._hover = new window.KigumiHover.HoverState();
         }
-        this._hoverClient = { x: event.clientX, y: event.clientY };
-        if (this._hover.at === null
-            || Math.abs(event.clientX - this._hover.at.x)
-               + Math.abs(event.clientY - this._hover.at.y) > 0) {
-            // Cycling is about one place. Move somewhere else and the runner
-            // chooses again -- undefined rather than zero, which would pin it
-            // to the first feature there.
-            this._candidateIndex = undefined;
-        }
         // Which viewport a pick lands in is decided from here, since the answer
         // arrives long after the click that asked.
         this._lastClientX = event.clientX;
         this._lastClientY = event.clientY;
-        this._hover.moved(event.clientX, event.clientY);
+        // Both thresholds at once: forget a cycled choice on any movement, ask
+        // again only once past the slop. See HoverState.pointerAt.
+        this._hover.pointerAt(event.clientX, event.clientY);
     }
 
     /**
@@ -3192,7 +3184,7 @@ class KigumiViewerApp extends LitElement {
             return;
         }
         const due = this._hover.due();
-        if (!due || !this._hoverClient) {
+        if (!due) {
             return;
         }
         // The same decision a click makes, so hover shows what a click would do
@@ -3202,7 +3194,7 @@ class KigumiViewerApp extends LitElement {
         //
         // The decision also says WHICH member, which is not the nearest one: a
         // click drills into the selected timber wherever it sits along the ray.
-        const along = this._findMembersAlongRay(this._hoverClient.x, this._hoverClient.y);
+        const along = this._findMembersAlongRay(due.x, due.y);
         const decision = choosePickAction({
             hits: along.hits,
             selectedTimbers: this.selectionManager.selectedTimbers,
@@ -3231,8 +3223,7 @@ class KigumiViewerApp extends LitElement {
             request: due.request,
             // Null, not zero: zero means "the first one", and the runner needs
             // to tell that from "choose for me".
-            candidateIndex: this._candidateIndex === undefined
-                ? null : this._candidateIndex,
+            candidateIndex: this._hover.asking,
             // The same tolerances a click would use, or hover lights something
             // a click then refuses to select -- and through the camera the ray
             // actually went through, which on a sheet need not be the active
@@ -3257,10 +3248,10 @@ class KigumiViewerApp extends LitElement {
         // The verdict counts as part of what is drawn, not just the feature:
         // taking a first end is a button press, so the colour can change while
         // the pointer rests exactly where it was.
-        if (window.KigumiHover.HoverState.sameHighlight(this._hoverDrawn, message)) {
+        if (!this._hover.wouldRedraw(message)) {
             return;
         }
-        this._hoverDrawn = message;
+        this._hover.markDrawn(message);
         // What the pointer is offering, drawn as the measurement it would make.
         this._updateMeasurePreview(message);
         // Nothing is drawn here. What the pointer is over is part of the state,
@@ -4019,7 +4010,7 @@ class KigumiViewerApp extends LitElement {
      * actually gone away, never from the teardown inside a redraw.
      */
     _forgetHover() {
-        this._hoverDrawn = null;
+        this._hover.markDrawn(null);
         this._updateMeasurePreview(null);
     }
 
@@ -4028,7 +4019,6 @@ class KigumiViewerApp extends LitElement {
         if (this._hover) {
             this._hover.clear();
         }
-        this._hoverClient = null;
         this._forgetHover();
     }
 
@@ -4078,8 +4068,7 @@ class KigumiViewerApp extends LitElement {
                     ctrlClick: !!event.ctrlKey || !!event.metaKey,
                     tolerances: this._pickTolerances(point, pickCamera),
                     // Whatever the hover is showing is what the click takes.
-                    candidateIndex: this._candidateIndex === undefined
-                        ? null : this._candidateIndex,
+                    candidateIndex: this._hover ? this._hover.asking : null,
                     // The same question the hover asked, so the click resolves
                     // to the feature the hover lit rather than to a different
                     // one -- and so the pick comes back with the plane.
@@ -4141,7 +4130,7 @@ class KigumiViewerApp extends LitElement {
             // One feature under the pointer is not a choice.
             return false;
         }
-        const current = (this._candidateIndex || 0) % candidates.length;
+        const current = (this._hover.candidate || 0) % candidates.length;
         return this.contextMenu.open({
             x: clientX,
             y: clientY,
@@ -4153,10 +4142,10 @@ class KigumiViewerApp extends LitElement {
                 checked: index === current,
             })),
             onChoose: (id) => {
-                this._candidateIndex = Number(id);
+                const chosen = this._hover.choose(id);
                 this._hover.askAgain();
                 this.emitViewerLog('measure-cycle', {
-                    index: this._candidateIndex, of: candidates.length, from: 'menu',
+                    index: chosen, of: candidates.length, from: 'menu',
                 });
             },
         }) && (this.requestUpdate(), true);
@@ -4386,7 +4375,7 @@ class KigumiViewerApp extends LitElement {
         const focus = this.selectionManager && this.selectionManager.csgFocus;
         const source = this._csgHighlightSource;
         const held = this.measureDraft && this.measureDraft.heldEnd;
-        const hover = this._hoverDrawn;
+        const hover = this._hover && this._hover.drawn;
         return {
             csg: window.KigumiHighlights.sourceForFocus(source, csgFocusKey(focus)),
             hover: hover ? {

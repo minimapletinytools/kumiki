@@ -147,9 +147,12 @@ cannot be derived.
 overlays become a list the pass reconciles rather than seven lifetimes, and a
 measurement lighting its features is an entry in that list.
 
-**3. Give the hover machine one home.** Move `_hoverDrawn`, `_candidateIndex`
-and `_hoverClient` into `hover-state.js`. The seam goes, and with it the class
-of bug that has twice grown on it.
+**3. Give the hover machine one home.** *Done.* `drawn`, `candidate` and the
+pointer live in `hover-state.js` now, and the app keeps none of them. The two
+thresholds that governed a moving pointer used to sit on either side of the call
+into the module -- a cycled choice forgotten on any movement at all, a question
+re-asked only past the slop -- and are one method. Twenty-two tests came with
+them, for state that could not be tested while it sat on the app.
 
 **4. One drag concept.** Fold the four ad-hoc drags into `PointerDrag`'s shape,
 with the listener lifetime owned by the module rather than by four pairs of
